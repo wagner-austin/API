@@ -235,7 +235,13 @@ def _dispatch_protocol_tank(subtype: int, inner: bytes) -> BinaryMessage | None:
 
     if subtype == 0x21 and len(inner) >= 10:
         return decode_tank_info(inner)
-    if subtype == 0x28 and len(inner) >= 10:
+    if subtype == 0x28 and len(inner) >= 9:
+        # JS Uf.h reads a[0..8] = 9 bytes. Lowering the threshold from
+        # 10 to 9 matches the decoder's require_min_length(9) and the
+        # JS source; without it the lone 10-byte 0x2E body with
+        # subtype 0x28 in 150 production captures fell through to the
+        # length-based "TankUpdateCompact" path. See
+        # analysis_scripts/crack_tank_update.py.
         return decode_tank_entry(inner)
     if subtype == 0x2E and len(inner) >= 8:
         return decode_tank_status_sync(inner)
@@ -284,7 +290,6 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         decode_deactivation,
         decode_shoot_event,
     )
-    from tankpit_bot.protocol.decoders.misc import decode_action_done
     from tankpit_bot.protocol.decoders.radar import (
         decode_radar_result,
         decode_radar_scan_result,
@@ -307,10 +312,32 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         return decode_radar_scan_result(inner)
     if subtype == 0x53 and len(inner) >= 10:
         return decode_shoot_event(inner)
-    if subtype == 0x54 and len(inner) >= 1:
-        return decode_action_done(inner)
     if subtype == 0x5A and len(inner) >= 2:
         return decode_viewport_update(inner)
+    return None
+
+
+def _dispatch_protocol_misc(subtype: int, inner: bytes) -> BinaryMessage | None:
+    """Subtypes that tunnel a protocol misc message.
+
+    Covers ActionDone (0x54), BuildPickup (0x42), and Statistics
+    (0x56). All three were ground-truthed against production captures
+    (analysis_scripts/crack_tank_update.py): 0x56 fires on 239/239
+    samples in the corpus, 0x42 on 2/2 own-tank build/pickup events,
+    and 0x54 is the ~1-byte ActionDone heartbeat.
+    """
+    from tankpit_bot.protocol.decoders.misc import (
+        decode_action_done,
+        decode_build_pickup,
+        decode_statistics,
+    )
+
+    if subtype == 0x42 and len(inner) >= 9:
+        return decode_build_pickup(inner)
+    if subtype == 0x54 and len(inner) >= 1:
+        return decode_action_done(inner)
+    if subtype == 0x56 and len(inner) >= 12:
+        return decode_statistics(inner)
     return None
 
 
@@ -345,6 +372,9 @@ def decode_0x2e_message(data: bytes) -> BinaryMessage:
     if result is not None:
         return result
     result = _dispatch_protocol_world(subtype, inner)
+    if result is not None:
+        return result
+    result = _dispatch_protocol_misc(subtype, inner)
     if result is not None:
         return result
     return decode_container_message(data)

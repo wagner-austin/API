@@ -32,7 +32,6 @@ from tests.container.test_data import (
     TANK_STATUS_SYNC_2,
     TANK_STATUS_SYNC_3,
     TANK_UPDATE_COMPACT_10,
-    TANK_UPDATE_EXTENDED_14,
     TANK_UPDATE_FULL_15,
     TELEPORT_LANDED_1,
     TIP_NOTIFICATION_29,
@@ -94,11 +93,6 @@ class TestIdentifyContainerType:
         """Correctly identifies tank update compact structure (10 bytes)."""
         result = identify_container_type(TANK_UPDATE_COMPACT_10)
         assert result == ContainerMessageType.TANK_UPDATE_COMPACT
-
-    def test_identifies_tank_update_extended(self) -> None:
-        """Correctly identifies tank update extended structure (14 bytes)."""
-        result = identify_container_type(TANK_UPDATE_EXTENDED_14)
-        assert result == ContainerMessageType.TANK_UPDATE_EXTENDED
 
     def test_identifies_tank_update_full(self) -> None:
         """Correctly identifies tank update full structure (15 bytes)."""
@@ -233,11 +227,6 @@ class TestDecodeContainerMessage:
         """Dispatches to tank update compact decoder (10 bytes)."""
         result = decode_container_message(TANK_UPDATE_COMPACT_10)
         assert result["msg_type"] == "tank_update_compact"
-
-    def test_dispatches_tank_update_extended(self) -> None:
-        """Dispatches to tank update extended decoder (14 bytes)."""
-        result = decode_container_message(TANK_UPDATE_EXTENDED_14)
-        assert result["msg_type"] == "tank_update_extended"
 
     def test_dispatches_tank_update_full(self) -> None:
         """Dispatches to tank update full decoder (15 bytes)."""

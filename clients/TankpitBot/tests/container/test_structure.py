@@ -16,7 +16,6 @@ from tankpit_bot.container import (
     is_tank_registry_structure,
     is_tank_status_short_structure,
     is_tank_update_compact_structure,
-    is_tank_update_extended_structure,
     is_tank_update_full_structure,
     is_teleport_landed_structure,
     is_tip_notification_structure,
@@ -42,7 +41,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_20,
     TANK_STATUS_SHORT_9,
     TANK_UPDATE_COMPACT_10,
-    TANK_UPDATE_EXTENDED_14,
     TANK_UPDATE_FULL_15,
     TELEPORT_LANDED_1,
     TIP_NOTIFICATION_29,
@@ -175,19 +173,6 @@ class TestIsTankUpdateCompactStructure:
         """Rejects messages with wrong length."""
         assert is_tank_update_compact_structure(bytes([0x01] * 9)) is False
         assert is_tank_update_compact_structure(bytes([0x01] * 11)) is False
-
-
-class TestIsTankUpdateExtendedStructure:
-    """Tests for tank update extended structure detection."""
-
-    def test_matches_14_bytes(self) -> None:
-        """Matches exactly 14-byte message."""
-        assert is_tank_update_extended_structure(TANK_UPDATE_EXTENDED_14) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_tank_update_extended_structure(bytes([0x01] * 13)) is False
-        assert is_tank_update_extended_structure(bytes([0x01] * 15)) is False
 
 
 class TestIsTankUpdateFullStructure:

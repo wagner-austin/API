@@ -277,7 +277,7 @@ class TestDecodeMessage:
         result = decode_message(MSG_BUILD_PICKUP, build_data)
         assert result["msg_type"] == 0x42
         assert result["tank_id"] == 0x0010
-        assert result["is_bridge"] is True
+        assert result["obstacle_type"] == 1
 
     def test_raises_on_unknown_type(self) -> None:
         """Raises DecodeError on unknown message type."""

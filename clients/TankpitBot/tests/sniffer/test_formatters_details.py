@@ -489,7 +489,7 @@ class TestFormatFunctions:
         assert "tanks=1" in result
 
     def test_format_tank_details_build_pickup_bridge(self) -> None:
-        """Test format_tank_details for BuildPickup (0x42) bridge variant."""
+        """obstacle_type == 1 renders as the bridge variant."""
         from tankpit_bot.protocol import BuildPickupDict
         from tankpit_bot.sniffer.formatters import format_tank_details
 
@@ -501,7 +501,7 @@ class TestFormatFunctions:
             drop_x=11,
             drop_y=20,
             direction=4,
-            is_bridge=True,
+            obstacle_type=1,
             flag=0,
         )
         result = format_tank_details(msg)
@@ -511,7 +511,7 @@ class TestFormatFunctions:
         assert "(11,20)" in result
 
     def test_format_tank_details_build_pickup_obstacle(self) -> None:
-        """Test format_tank_details for BuildPickup (0x42) obstacle variant."""
+        """Any non-1 obstacle_type renders as a generic obstacle drop/pickup."""
         from tankpit_bot.protocol import BuildPickupDict
         from tankpit_bot.sniffer.formatters import format_tank_details
 
@@ -523,7 +523,7 @@ class TestFormatFunctions:
             drop_x=11,
             drop_y=20,
             direction=4,
-            is_bridge=False,
+            obstacle_type=2,
             flag=1,
         )
         result = format_tank_details(msg)
@@ -641,21 +641,6 @@ class TestFormatFunctions:
         assert "tank=75" in result
         assert "flags=0x05" in result
         assert "data=aabbccddeeff" in result
-
-    def test_format_container_details_tank_update_extended(self) -> None:
-        """Test format_container_details for tank update extended."""
-        from tankpit_bot.container import TankUpdateExtendedDict
-
-        msg = TankUpdateExtendedDict(
-            msg_type="tank_update_extended",
-            flags=0x07,
-            tank_id=80,
-            status_data=b"\x11\x22\x33\x44\x55\x66\x77\x88\x99\xaa",
-        )
-        result = format_container_details(msg)
-        assert "tank=80" in result
-        assert "flags=0x07" in result
-        assert "data=112233445566778899aa" in result
 
     def test_format_container_details_tank_update_full(self) -> None:
         """Test format_container_details for tank update full."""

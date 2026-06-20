@@ -254,20 +254,8 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
 # =============================================================================
 
 
-def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
-    """Dispatch tank join / info / status / damage / removal / announcement.
-
-    Handled here: 0x28 TankEntry, 0x21 TankInfo, 0x3E TankStatusFull,
-    0x2E TankStatusSync (damage), 0x58 TankRemove, 0x29 TankExit
-    announcement, 0x2B Promotion. None of these resolve combat geometry.
-
-    Args:
-        ws: World service instance.
-        decoded: Decoded binary protocol message.
-
-    Returns:
-        True if the message was handled, False otherwise.
-    """
+def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch tank join / info / status / damage / removal."""
     match decoded:
         case {
             "msg_type": 0x28,
@@ -297,6 +285,19 @@ def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) 
         case {"msg_type": 0x58, "tank_id": int(tid)}:
             update_world_state_from_tank_remove(ws, tid)
             return True
+    return False
+
+
+def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch announcement-style messages with no positional effect.
+
+    Covers 0x29 TankExit, 0x2B Promotion, 0x4E Decoration, 0x56
+    Statistics. The 0x42 BuildPickup is handled here too because it
+    behaves like an event observation -- it does mutate the actor's
+    position via :func:`_update_tank_position` but contributes no
+    structural world-state change beyond that.
+    """
+    match decoded:
         case {
             "msg_type": 0x29,
             "team": int(team),
@@ -339,7 +340,7 @@ def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) 
             "source_y": int(sy),
             "drop_x": int(dx),
             "drop_y": int(dy),
-            "is_bridge": bool(is_bridge),
+            "obstacle_type": int(obstacle_type),
         }:
             _update_tank_position(ws, tid, sx, sy)
             emit_diagnostic(
@@ -349,10 +350,52 @@ def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) 
                 source_y=sy,
                 drop_x=dx,
                 drop_y=dy,
-                is_bridge=is_bridge,
+                obstacle_type=obstacle_type,
+            )
+            return True
+        case {
+            "msg_type": 0x56,
+            "playtime_hours": int(hours),
+            "playtime_minutes": int(minutes),
+            "playtime_seconds": int(seconds),
+            "destroyed": int(destroyed),
+            "deactivated": int(deactivated),
+            "score": int(score),
+        }:
+            emit_diagnostic(
+                diagnostic_kind="self_statistics",
+                playtime_hours=hours,
+                playtime_minutes=minutes,
+                playtime_seconds=seconds,
+                destroyed=destroyed,
+                deactivated=deactivated,
+                score=score,
             )
             return True
     return False
+
+
+def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch every tank lifecycle / announcement / stats message.
+
+    Handled here: 0x28 TankEntry, 0x21 TankInfo, 0x3E TankStatusFull,
+    0x2E TankStatusSync (damage), 0x58 TankRemove, 0x29 TankExit
+    announcement, 0x2B Promotion, 0x4E Decoration, 0x42 BuildPickup,
+    0x56 Statistics. None of these resolve combat geometry; the actual
+    state-bearing ones (TankEntry/Info/Status/Damage/Remove) are
+    factored into :func:`_dispatch_tank_state` and the rest into
+    :func:`_dispatch_tank_announcements`.
+
+    Args:
+        ws: World service instance.
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True if the message was handled, False otherwise.
+    """
+    if _dispatch_tank_state(ws, decoded):
+        return True
+    return _dispatch_tank_announcements(ws, decoded)
 
 
 def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
@@ -424,7 +467,7 @@ def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> b
     """
     match decoded:
         case {
-            "msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full",
+            "msg_type": "tank_update_compact" | "tank_update_full",
             "flags": int(flags),
             "tank_id": int(tid),
             "status_data": bytes(sd),

@@ -57,13 +57,11 @@ from tankpit_bot.container.decoders.tank import (
     decode_tank_registry,
     decode_tank_status_short,
     decode_tank_update_compact,
-    decode_tank_update_extended,
     decode_tank_update_full,
     is_tank_leave_structure,
     is_tank_registry_structure,
     is_tank_status_short_structure,
     is_tank_update_compact_structure,
-    is_tank_update_extended_structure,
     is_tank_update_full_structure,
 )
 from tankpit_bot.container.identification import identify_container_type
@@ -102,8 +100,6 @@ def _dispatch_length_tank(data: bytes) -> ContainerMessage | None:
         return decode_tank_update_compact(data)
     if is_tank_registry_structure(data):
         return decode_tank_registry(data)
-    if is_tank_update_extended_structure(data):
-        return decode_tank_update_extended(data)
     if is_tank_update_full_structure(data):
         return decode_tank_update_full(data)
     return None
@@ -176,7 +172,6 @@ __all__ = [
     "decode_tank_registry",
     "decode_tank_status_short",
     "decode_tank_update_compact",
-    "decode_tank_update_extended",
     "decode_tank_update_full",
     "decode_teleport_landed",
     "decode_tip_notification",
@@ -195,7 +190,6 @@ __all__ = [
     "is_tank_registry_structure",
     "is_tank_status_short_structure",
     "is_tank_update_compact_structure",
-    "is_tank_update_extended_structure",
     "is_tank_update_full_structure",
     "is_teleport_landed_structure",
     "is_tip_notification_structure",

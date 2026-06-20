@@ -246,11 +246,13 @@ class TestDecodeBuildPickup:
 
     0x42 'B' Jg decoder: ``Jg(X(a[0],a[1]), a[2], a[3], a[4], a[5],
     a[6], a[7], a[8])`` -- tank_id, source x/y, drop x/y, direction,
-    is_bridge, flag.
+    obstacle_type, flag. JS ``Jg.prototype.h`` stamps the drop tile's
+    ``j`` field with ``a[7]`` and only treats ``a[7] === 1`` as a
+    bridge module; other non-zero values are obstacle subtypes.
     """
 
     def test_decodes_bridge_build(self) -> None:
-        """Decodes a bridge module build event (is_bridge == 1)."""
+        """obstacle_type=1 is the bridge variant."""
         data = bytes([0x10, 0x00, 5, 6, 7, 8, 12, 1, 0])
         result = decode_build_pickup(data)
         assert result["msg_type"] == 0x42
@@ -260,15 +262,32 @@ class TestDecodeBuildPickup:
         assert result["drop_x"] == 7
         assert result["drop_y"] == 8
         assert result["direction"] == 12
-        assert result["is_bridge"] is True
+        assert result["obstacle_type"] == 1
         assert result["flag"] == 0
 
     def test_decodes_obstacle_pickup(self) -> None:
-        """Decodes an obstacle pickup / drop event (is_bridge == 0)."""
+        """Cleared obstacle (obstacle_type=0) with a non-zero flag."""
         data = bytes([0x05, 0x00, 1, 1, 2, 2, 4, 0, 3])
         result = decode_build_pickup(data)
-        assert result["is_bridge"] is False
+        assert result["obstacle_type"] == 0
         assert result["flag"] == 3
+
+    def test_decodes_real_obstacle_type_2(self) -> None:
+        """Production captures (2026-06-19) show obstacle_type=2 for a
+        regular obstacle drop -- byte 7 must be carried through as a
+        plain int, not coerced to bool."""
+        # Real capture: 2 of 2 production 0x42 samples have a[7]=0x02.
+        # Sample sourced from runs/bot/*.capture_session.json via
+        # analysis_scripts/crack_tank_update.py
+        # inner_hex=1505c776c676770200 (tid=1301 src=(199,118)).
+        data = bytes.fromhex("1505c776c676770200")
+        result = decode_build_pickup(data)
+        assert result["tank_id"] == 1301
+        assert result["source_x"] == 199
+        assert result["source_y"] == 118
+        assert result["drop_x"] == 198
+        assert result["drop_y"] == 118
+        assert result["obstacle_type"] == 2
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data (require 9 bytes)."""
@@ -462,3 +481,46 @@ class TestDecode0x2eMessage:
 
         with pytest.raises(ContainerDecodeError):
             decode_0x2e_message(b"")
+
+    def test_tunneled_statistics_routes_through_misc(self) -> None:
+        """Tunneled 0x56 inside 0x2E decodes as a Statistics body.
+
+        Verified against 239 production samples
+        (analysis_scripts/crack_tank_update.py): every 15-byte 0x2E
+        body with subtype 0x56 in 150 capture sessions decodes to a
+        sane Statistics record (minutes/seconds within bounds,
+        monotonic playtime/destroyed/score).
+        """
+        # First production sample, exactly as captured:
+        # 56 28 00 12 1f 00 00 00 1e 00 00 00 00 da 7b
+        # -> hours=40 minutes=18 seconds=31 destroyed=30
+        #    deactivated=0 score=55931
+        data = bytes.fromhex("562800121f0000001e00000000da7b")
+        result = decode_0x2e_message(data)
+        assert result["msg_type"] == 0x56
+        assert result["playtime_hours"] == 40
+        assert result["playtime_minutes"] == 18
+        assert result["playtime_seconds"] == 31
+        assert result["destroyed"] == 30
+        assert result["deactivated"] == 0
+        assert result["score"] == 55931
+
+    def test_tunneled_build_pickup_routes_through_misc(self) -> None:
+        """Tunneled 0x42 inside 0x2E decodes as a BuildPickup body.
+
+        Verified against 2 production samples (own-tank obstacle drop
+        events). The actor is tank 1301 dropping an obstacle on the
+        adjacent tile west of the source.
+        """
+        # Production sample with subtype 0x42 prepended:
+        # 42 15 05 c7 76 c6 76 77 02 00
+        # -> tid=1301 src=(199,118) drop=(198,118) obstacle_type=2
+        data = bytes.fromhex("421505c776c676770200")
+        result = decode_0x2e_message(data)
+        assert result["msg_type"] == 0x42
+        assert result["tank_id"] == 1301
+        assert result["source_x"] == 199
+        assert result["source_y"] == 118
+        assert result["drop_x"] == 198
+        assert result["drop_y"] == 118
+        assert result["obstacle_type"] == 2

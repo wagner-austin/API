@@ -97,11 +97,6 @@ TANK_STATUS_SYNC_3 = bytes.fromhex("030102")
 # Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]
 TANK_UPDATE_COMPACT_10 = bytes.fromhex("3644df501d1a2b9bf78b")
 
-# Tank update extended: 14 bytes
-# From session capture "3f447950521a001b11879a3c2479"
-# Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]
-TANK_UPDATE_EXTENDED_14 = bytes.fromhex("3f447950521a001b11879a3c2479")
-
 # Tank update full: 15 bytes
 # From session capture "3f46c750541a001b11871c59642525"
 # Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]

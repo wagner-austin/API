@@ -201,23 +201,6 @@ class TestDispatchTankMessages:
         assert state["tanks"]["200"]["x"] == 82
         assert state["tanks"]["200"]["y"] == 26
 
-    def test_dispatch_tank_update_extended_sets_position(self) -> None:
-        """Test dispatch handles tank_update_extended and extracts x,y from status_data."""
-        from tankpit_bot.container import TankUpdateExtendedDict
-
-        msg = TankUpdateExtendedDict(
-            msg_type="tank_update_extended",
-            flags=0x44,
-            tank_id=201,
-            status_data=bytes([110, 55, 0, 0x1B, 0x11, 0x87, 0x9A, 0x3C, 0x24, 0x79]),
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "201" in state["tanks"]
-        assert state["tanks"]["201"]["x"] == 110
-        assert state["tanks"]["201"]["y"] == 55
-
     def test_dispatch_tank_update_full_sets_position(self) -> None:
         """Test dispatch handles tank_update_full and extracts x,y from status_data."""
         from tankpit_bot.container import TankUpdateFullDict
@@ -647,7 +630,7 @@ class TestDispatchBuildPickup:
             drop_x=21,
             drop_y=30,
             direction=8,
-            is_bridge=False,
+            obstacle_type=2,
             flag=0,
         )
         dispatch_world_state_update(ws, msg)
@@ -684,6 +667,48 @@ class TestDispatchDecoration:
 
         after = ws.world_state["tanks"]["44"]
         assert after == before
+
+
+class TestDispatchStatistics:
+    """Tests for dispatch_world_state_update with 0x56 Statistics (Wg)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_statistics_is_observation_only_no_state_mutation(self) -> None:
+        """0x56 Wg emits a self_statistics diagnostic; world state untouched.
+
+        Sourced from production capture (2026-06-19) via
+        analysis_scripts/crack_tank_update.py: 239/239 corpus samples
+        decode to sane minutes/seconds and monotonic playtime/score
+        series, so the field semantics are pinned. The dispatcher
+        simply forwards them as a diagnostic since they describe the
+        own-tank session, not any world geometry.
+        """
+        from tankpit_bot.protocol import StatisticsDict
+
+        ws = get_world_service()
+        before = ws.world_state
+
+        # First production sample from the crack run:
+        # hrs=40 min=18 sec=31 destroyed=30 deactivated=0 score=55931
+        msg = StatisticsDict(
+            msg_type=0x56,
+            playtime_hours=40,
+            playtime_minutes=18,
+            playtime_seconds=31,
+            destroyed=30,
+            deactivated=0,
+            score=55931,
+        )
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.world_state is before
 
 
 class TestDispatchPromotion:

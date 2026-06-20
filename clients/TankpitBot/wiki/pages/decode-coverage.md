@@ -76,7 +76,6 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 | (any) | 6 | TankLeave | FULL | — |
 | (any) | 9 | TankStatusShort | PARTIAL | byte 8 is rank_points, labeled "extra"[^9] |
 | (any) | 10 | TankUpdateCompact | PARTIAL | bytes 0-1 (x,y) used; bytes 2-5 dropped[^10] |
-| (any) | 14 | TankUpdateExtended | PARTIAL | bytes 0-1 (x,y) used; bytes 2-9 dropped |
 | (any) | 15 | TankUpdateFull | PARTIAL | bytes 0-1 (x,y) used; bytes 2-10 dropped |
 | (any) | 16-20 | TankRegistry | FULL | rejects subtype 0x47 (which is tunneled Movement) |
 | (any) | 29-79 | TipNotification | IDENTIFIED | — |
@@ -85,9 +84,38 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 
 ## Critical Gaps (ordered by impact)
 
-### 1. TankUpdate compact/extended/full — 2-10 bytes of damage/direction/rank dropped per message
+(none open at end of 2026-06-19 -- see ``analysis_scripts/crack_tank_update.py`` for the audit
+that closed the last "TankUpdate*" gap by tracing the misclassified bodies back to tunneled
+0x56 Statistics, 0x42 BuildPickup, and 0x47 Movement handlers.)
 
-These three subtypes carry post-position state for tanks but we only read bytes 0-1 (x,y). The remaining bytes likely contain damage, direction, and rank — currently unstructured.[^10]
+## Tunneling cross-check (2026-06-19 corpus, 150 sessions)
+
+The length-based container fallback that used to label bodies as
+``tank_update_compact/extended/full`` is mostly residual: when the
+subtype-first dispatch is run on the same 150 capture sessions, the
+populations classified as "TankUpdate*" collapse from 597 to 1.
+
+- **0x56 / Wg Statistics**: 239/239 ex-``TankUpdateFull`` samples now
+  route via tunneled Statistics. All 239 decode to sane minutes/seconds
+  bounds and the playtime/destroyed/score series is monotonic across
+  the session -- ground-truth via
+  ``analysis_scripts/crack_tank_update.py``.
+- **0x47 / Lg Movement**: every 14-byte 0x2E body in the corpus is a
+  tunneled Movement carrying 1-2 waypoint chars. Long obstacle-rich
+  paths can stretch this much further; ``inner >= 12`` is the only
+  guard, so the tunneled path fires for every 0x47-prefixed length.
+  ``TankUpdateExtendedDict`` was deleted as proven dead.
+- **0x42 / Jg BuildPickup**: 2/2 ex-``TankUpdateCompact`` samples decode
+  cleanly as own-tank obstacle drops (src/drop adjacent, byte 7 =
+  ``obstacle_type``, never matched as 0/1 -- shipped W6 was treating
+  it as ``is_bridge: bool``; that field has been corrected to
+  ``obstacle_type: int``).
+- **0x28 / Uf TankEntry**: 1 remaining 10-byte ``TankUpdateCompact``
+  candidate routed by lowering the tunneled dispatch threshold from
+  ``inner >= 10`` to ``inner >= 9`` -- matches JS Uf.h (which reads
+  ``a[0..8]``) and our existing ``decode_tank_entry`` minimum. After
+  the change, 0 length-10 bodies remain in the corpus's length-based
+  fallback.
 
 ## Proven Field Mappings
 

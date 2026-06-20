@@ -408,15 +408,18 @@ class BuildPickupDict(TypedDict):
       a[4]          = drop_x    -- target tile receiving the obstacle / bridge
       a[5]          = drop_y
       a[6]          = direction -- new facing for the acting tank (passed to We())
-      a[7]          = is_bridge -- 1 = bridge module, else obstacle marker
+      a[7]          = obstacle_type -- assigned to tile.j; ``1`` means bridge
+                       module, other non-zero values are obstacle subtypes.
+                       Production captures (2026-06-19) show ``2`` for a
+                       regular obstacle drop; ``0`` is the cleared state.
       a[8]          = flag      -- influences pickup-visibility branch (this.s in JS)
 
     JS Jg.prototype.h:
       * Updates the tank's facing at (source_x, source_y).
-      * Stamps ``drop_x, drop_y`` tile's ``j`` field with ``is_bridge``.
-      * For the player's own tank, prints "Bridge module built",
-        "Obstacle dropped", or "Obstacle picked up" depending on
-        ``a.la`` (carry state) and ``is_bridge``.
+      * Stamps ``drop_x, drop_y`` tile's ``j`` field with ``obstacle_type``.
+      * For the player's own tank, prints "Bridge module built"
+        (when ``obstacle_type == 1``), "Obstacle dropped", or
+        "Obstacle picked up" depending on ``a.la`` (carry state).
     """
 
     msg_type: Literal[0x42]
@@ -426,7 +429,7 @@ class BuildPickupDict(TypedDict):
     drop_x: int
     drop_y: int
     direction: int
-    is_bridge: bool
+    obstacle_type: int
     flag: int
 
 

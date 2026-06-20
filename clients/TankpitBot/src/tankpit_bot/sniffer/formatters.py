@@ -144,7 +144,7 @@ def _format_tank_motion(d: protocol.BinaryMessage) -> str:
         rank = rank_name(d["rank"])
         return f"tank={d['tank_id']} at ({d['x']},{d['y']}) {rank}"
     if d["msg_type"] == 0x42:
-        action = "bridge built" if d["is_bridge"] else "obstacle drop/pickup"
+        action = "bridge built" if d["obstacle_type"] == 1 else "obstacle drop/pickup"
         src = f"({d['source_x']},{d['source_y']})"
         drop = f"({d['drop_x']},{d['drop_y']})"
         return f"tank={d['tank_id']} {action} from {src} at {drop}"
@@ -438,7 +438,7 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
         }:
             return format_tank_status_short(tid, dmg, rank, lb)
         case {
-            "msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full",
+            "msg_type": "tank_update_compact" | "tank_update_full",
             "tank_id": int(tid),
             "flags": int(f),
             "status_data": bytes(sd),

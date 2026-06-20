@@ -23,7 +23,6 @@ class ContainerMessageType(IntEnum):
     POSITION_UPDATE = auto()
     TANK_STATUS_SHORT = auto()
     TANK_UPDATE_COMPACT = auto()
-    TANK_UPDATE_EXTENDED = auto()
     TANK_UPDATE_FULL = auto()
     TANK_LEAVE = auto()
     PLAYER_LIST_SHORT = auto()
@@ -70,7 +69,6 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
     ContainerMessageType.TANK_STATUS_SHORT: DecodeLevel.FULL,
     ContainerMessageType.TANK_UPDATE_COMPACT: DecodeLevel.FULL,
-    ContainerMessageType.TANK_UPDATE_EXTENDED: DecodeLevel.FULL,
     ContainerMessageType.TANK_UPDATE_FULL: DecodeLevel.FULL,
     ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
@@ -238,19 +236,11 @@ class TankUpdateCompactDict(TypedDict):
     status_data: bytes
 
 
-class TankUpdateExtendedDict(TypedDict):
-    """Extended tank update from 0x2E container (14 bytes).
-
-    Structure (verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:10]
-
-    Extended status update with additional tank information.
-    """
-
-    msg_type: Literal["tank_update_extended"]
-    flags: int
-    tank_id: int
-    status_data: bytes
+# TankUpdateExtendedDict deleted 2026-06-19: the 14-byte length
+# heuristic never matched a real wire body across 150 production
+# capture sessions -- every 14-byte 0x2E body in the corpus is a
+# tunneled 0x47 Movement (Lg.h), dispatched before length-based
+# container fallback runs. See analysis_scripts/crack_tank_update.py.
 
 
 class TankUpdateFullDict(TypedDict):
@@ -484,7 +474,6 @@ ContainerMessage = (
     | PositionUpdateDict
     | TankStatusShortDict
     | TankUpdateCompactDict
-    | TankUpdateExtendedDict
     | TankUpdateFullDict
     | TankLeaveDict
     | PlayerListShortDict
@@ -516,7 +505,6 @@ __all__ = [
     "TankRegistryDict",
     "TankStatusShortDict",
     "TankUpdateCompactDict",
-    "TankUpdateExtendedDict",
     "TankUpdateFullDict",
     "TeleportLandedDict",
     "TipNotificationDict",

@@ -15,13 +15,11 @@ from tankpit_bot.container import (
     TankRegistryDict,
     TankStatusShortDict,
     TankUpdateCompactDict,
-    TankUpdateExtendedDict,
     TankUpdateFullDict,
     decode_tank_leave,
     decode_tank_registry,
     decode_tank_status_short,
     decode_tank_update_compact,
-    decode_tank_update_extended,
     decode_tank_update_full,
 )
 from tankpit_bot.container.decoders.combat import decode_mine_detonation, decode_mine_placement
@@ -39,7 +37,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_CONTAINER_WASD,
     TANK_STATUS_SHORT_9,
     TANK_UPDATE_COMPACT_10,
-    TANK_UPDATE_EXTENDED_14,
     TANK_UPDATE_FULL_15,
 )
 
@@ -280,33 +277,6 @@ class TestDecodeTankUpdateCompact:
         assert result["flags"] == 0x44
         assert result["tank_id"] == 0x50DF
         assert len(result["status_data"]) == 6
-
-
-class TestDecodeTankUpdateExtended:
-    """Tests for tank update extended decoding (14 bytes)."""
-
-    def test_decodes_14_byte_update(self) -> None:
-        """Decodes 14-byte tank update extended correctly."""
-        result = decode_tank_update_extended(TANK_UPDATE_EXTENDED_14)
-        assert result["msg_type"] == "tank_update_extended"
-        assert result["flags"] == 0x44  # byte[1]
-        assert result["tank_id"] == 0x5079  # 79 50 little-endian at bytes[2-3]
-        assert len(result["status_data"]) == 10  # bytes 4-13
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises on invalid length."""
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_extended(bytes([0x01] * 13))
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_extended(bytes([0x01] * 15))
-
-    def test_tank_update_extended_dict_keys(self) -> None:
-        """TankUpdateExtendedDict has expected keys."""
-        result: TankUpdateExtendedDict = decode_tank_update_extended(TANK_UPDATE_EXTENDED_14)
-        assert result["msg_type"] == "tank_update_extended"
-        assert result["flags"] == 0x44
-        assert result["tank_id"] == 0x5079
-        assert len(result["status_data"]) == 10
 
 
 class TestDecodeTankUpdateFull:

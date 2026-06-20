@@ -15,7 +15,6 @@ from tankpit_bot.container.types import (
     TankRegistryDict,
     TankStatusShortDict,
     TankUpdateCompactDict,
-    TankUpdateExtendedDict,
     TankUpdateFullDict,
 )
 from tankpit_bot.protocol.constants import TEAM_NAMES
@@ -274,48 +273,15 @@ def decode_tank_update_compact(data: bytes) -> TankUpdateCompactDict:
     )
 
 
-def is_tank_update_extended_structure(data: bytes) -> bool:
-    """Check if data matches tank update extended structure.
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if length is exactly 14 bytes.
-    """
-    return len(data) == 14
-
-
-def decode_tank_update_extended(data: bytes) -> TankUpdateExtendedDict:
-    """Decode tank update extended message from container body.
-
-    Structure (14 bytes):
-      [0]    subtype (ignored, XOR encoded)
-      [1]    flags
-      [2-3]  tank_id (LE)
-      [4-13] status_data
-
-    Args:
-        data: Decoded container body bytes (must be 14 bytes).
-
-    Returns:
-        Decoded tank update extended data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 14, "TankUpdateExtended")
-
-    flags = data[1]
-    tank_id = extract_uint16_le(data, 2, "TankUpdateExtended.tank_id")
-    status_data = bytes(data[4:])
-
-    return TankUpdateExtendedDict(
-        msg_type="tank_update_extended",
-        flags=flags,
-        tank_id=tank_id,
-        status_data=status_data,
-    )
+# 14-byte container TankUpdateExtended was deleted 2026-06-19. The
+# "Extended" type-id was a length heuristic that never matched a real
+# wire body in 150 production sessions: every 14-byte 0x2E body in the
+# corpus is a tunneled 0x47 Movement (Lg.h) carrying 1 waypoint char
+# in its blob tail. Movement bodies can be much longer when paths are
+# obstacle-rich -- ``inner >= 12`` is the only constraint -- so the
+# tunneled subtype check fires for every 0x47-prefixed length before
+# the length-based fallback runs. See
+# analysis_scripts/crack_tank_update.py.
 
 
 def is_tank_update_full_structure(data: bytes) -> bool:
@@ -426,12 +392,10 @@ __all__ = [
     "decode_tank_registry",
     "decode_tank_status_short",
     "decode_tank_update_compact",
-    "decode_tank_update_extended",
     "decode_tank_update_full",
     "is_tank_leave_structure",
     "is_tank_registry_structure",
     "is_tank_status_short_structure",
     "is_tank_update_compact_structure",
-    "is_tank_update_extended_structure",
     "is_tank_update_full_structure",
 ]

@@ -132,7 +132,8 @@ def decode_build_pickup(data: bytes) -> BuildPickupDict:
       a[2:4]        = source_x, source_y
       a[4:6]        = drop_x, drop_y
       a[6]          = direction
-      a[7]          = is_bridge (1 = bridge module)
+      a[7]          = obstacle_type (1 = bridge module; other non-zero
+                                     values = obstacle subtypes; 0 = cleared)
       a[8]          = flag (pickup-visibility branch in JS)
 
     Args:
@@ -153,7 +154,7 @@ def decode_build_pickup(data: bytes) -> BuildPickupDict:
         drop_x=data[4],
         drop_y=data[5],
         direction=data[6],
-        is_bridge=data[7] == 1,
+        obstacle_type=data[7],
         flag=data[8],
     )
 

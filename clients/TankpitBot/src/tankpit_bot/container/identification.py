@@ -27,7 +27,6 @@ from tankpit_bot.container.decoders.tank import (
     is_tank_registry_structure,
     is_tank_status_short_structure,
     is_tank_update_compact_structure,
-    is_tank_update_extended_structure,
     is_tank_update_full_structure,
 )
 from tankpit_bot.container.types import ContainerMessageType
@@ -45,9 +44,6 @@ def _identify_tank_update_type(data: bytes) -> ContainerMessageType:
     # Tank update compact: exactly 10 bytes
     if is_tank_update_compact_structure(data):
         return ContainerMessageType.TANK_UPDATE_COMPACT
-    # Tank update extended: exactly 14 bytes
-    if is_tank_update_extended_structure(data):
-        return ContainerMessageType.TANK_UPDATE_EXTENDED
     # Tunneled mine placement: exactly 15 bytes with subtype 0x4B
     if is_mine_placement_structure(data):
         return ContainerMessageType.MINE_PLACEMENT
