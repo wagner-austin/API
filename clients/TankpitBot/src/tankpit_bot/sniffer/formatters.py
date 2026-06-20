@@ -253,6 +253,9 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
         return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}"
     if d["msg_type"] == 0x4C:
         return f"fuel_dots={len(d['fuel_dots'])} tanks={len(d['tanks'])}"
+    if d["msg_type"] == 0x3C:
+        preview = d["message"].replace("\n", " ")[:60]
+        return f"message={preview!r}"
     return ""
 
 
@@ -296,20 +299,6 @@ def format_tank_registry_details(
     bot_str = " [BOT]" if is_bot else ""
     badge_str = f" badges={badges}" if badges > 0 else ""
     return f'tank={tid} "{name}" {team} {rank_str}{badge_str}{bot_str}'
-
-
-def format_tank_update_details(tid: int, flags: int, status_data: bytes) -> str:
-    """Format tank_update_* message details.
-
-    Args:
-        tid: Tank ID.
-        flags: Message flags.
-        status_data: Status data bytes.
-
-    Returns:
-        Formatted details string.
-    """
-    return f"tank={tid} flags=0x{flags:02X} data={status_data.hex()}"
 
 
 def format_radar_response(containers: list[RadarContainerDict], mines: list[RadarMineDict]) -> str:
@@ -437,13 +426,6 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
             "leaderboard_position": int(lb),
         }:
             return format_tank_status_short(tid, dmg, rank, lb)
-        case {
-            "msg_type": "tank_update_compact" | "tank_update_full",
-            "tank_id": int(tid),
-            "flags": int(f),
-            "status_data": bytes(sd),
-        }:
-            return format_tank_update_details(tid, f, sd)
         case {"msg_type": "unknown_container", "length": int(length), "data": bytes(data)}:
             return f"len={length} data={data.hex()[:40]}"
         case {
@@ -561,7 +543,6 @@ __all__ = [
     "format_tank_details",
     "format_tank_registry_details",
     "format_tank_status_short",
-    "format_tank_update_details",
     "handle_tank_registry",
     "rank_name",
     "team_name",

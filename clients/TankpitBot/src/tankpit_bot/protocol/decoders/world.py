@@ -16,6 +16,7 @@ from tankpit_bot.protocol.types import (
     CombinedTileUpdateDict,
     OverlayUpdateDict,
     SupervisorDict,
+    SupervisorTextDict,
     SyncDict,
     TerrainUpdateDict,
     ViewportEntityDict,
@@ -264,6 +265,28 @@ def decode_viewport_update(data: bytes) -> ViewportUpdateDict:
     )
 
 
+def decode_supervisor_text(data: bytes) -> SupervisorTextDict:
+    """Decode the 0x3C '<' SupervisorText (free-form server message).
+
+    Trace-verified from tpclient.js wg.h (V['<']):
+      ``wg.h(a) = new wg(p(a))`` -- ``p()`` is ``String.fromCharCode``
+      over every byte of the XOR-decoded body. The renderer prints
+      "Message from the Supervisor:\\n<message>".
+
+    The body is decoded as Latin-1 / char-code per the JS p() helper.
+
+    Args:
+        data: XOR-decoded message body (without the 0x3C prefix).
+
+    Returns:
+        Decoded SupervisorText message.
+    """
+    return SupervisorTextDict(
+        msg_type=0x3C,
+        message=data.decode("latin-1"),
+    )
+
+
 def decode_supervisor(data: bytes) -> SupervisorDict:
     """Decode supervisor message from XOR-decoded data.
 
@@ -330,6 +353,7 @@ __all__ = [
     "decode_combined_tile_update",
     "decode_overlay_update",
     "decode_supervisor",
+    "decode_supervisor_text",
     "decode_sync",
     "decode_terrain_update",
     "decode_viewport_update",

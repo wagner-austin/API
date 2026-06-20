@@ -475,6 +475,16 @@ class TestFormatFunctions:
         assert "slot=2" in result
         assert "level=3" in result
 
+    def test_format_misc_details_supervisor_text(self) -> None:
+        """Test format_misc_details for SupervisorText (0x3C)."""
+        from tankpit_bot.protocol import SupervisorTextDict
+
+        msg = SupervisorTextDict(msg_type=0x3C, message="Server down\nin 5 mins")
+        result = format_misc_details(msg)
+        assert "Server down" in result
+        # newlines are flattened in the preview
+        assert "\\n" not in result
+
     def test_format_misc_details_map_data(self) -> None:
         """Test format_misc_details for MapData (0x4C)."""
         from tankpit_bot.protocol import MapDataDict, MapTankEntry
@@ -626,36 +636,6 @@ class TestFormatFunctions:
         assert "lieutenant" in result  # rank 4
         assert "hp=medium" in result  # damage_state 2
         assert "lb=25" in result
-
-    def test_format_container_details_tank_update_compact(self) -> None:
-        """Test format_container_details for tank update compact."""
-        from tankpit_bot.container import TankUpdateCompactDict
-
-        msg = TankUpdateCompactDict(
-            msg_type="tank_update_compact",
-            flags=0x05,
-            tank_id=75,
-            status_data=b"\xaa\xbb\xcc\xdd\xee\xff",
-        )
-        result = format_container_details(msg)
-        assert "tank=75" in result
-        assert "flags=0x05" in result
-        assert "data=aabbccddeeff" in result
-
-    def test_format_container_details_tank_update_full(self) -> None:
-        """Test format_container_details for tank update full."""
-        from tankpit_bot.container import TankUpdateFullDict
-
-        msg = TankUpdateFullDict(
-            msg_type="tank_update_full",
-            flags=0x0F,
-            tank_id=90,
-            status_data=b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b",
-        )
-        result = format_container_details(msg)
-        assert "tank=90" in result
-        assert "flags=0x0F" in result
-        assert "data=0102030405060708090a0b" in result
 
     def test_format_container_details_unknown_container(self) -> None:
         """Test format_container_details for unknown container."""

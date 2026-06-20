@@ -184,71 +184,6 @@ class TestDispatchTankMessages:
         state = get_world_service().world_state
         assert "8" not in state["tanks"]
 
-    def test_dispatch_tank_update_compact_sets_position(self) -> None:
-        """Test dispatch handles tank_update_compact and extracts x,y from status_data."""
-        from tankpit_bot.container import TankUpdateCompactDict
-
-        msg = TankUpdateCompactDict(
-            msg_type="tank_update_compact",
-            flags=0x44,
-            tank_id=200,
-            status_data=bytes([82, 26, 0x2B, 0x9B, 0xF7, 0x8B]),
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "200" in state["tanks"]
-        assert state["tanks"]["200"]["x"] == 82
-        assert state["tanks"]["200"]["y"] == 26
-
-    def test_dispatch_tank_update_full_sets_position(self) -> None:
-        """Test dispatch handles tank_update_full and extracts x,y from status_data."""
-        from tankpit_bot.container import TankUpdateFullDict
-
-        msg = TankUpdateFullDict(
-            msg_type="tank_update_full",
-            flags=0x46,
-            tank_id=202,
-            status_data=bytes([84, 26, 0, 0x1B, 0x11, 0x87, 0x1C, 0x59, 0x64, 0x25, 0x25]),
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "202" in state["tanks"]
-        assert state["tanks"]["202"]["x"] == 84
-        assert state["tanks"]["202"]["y"] == 26
-
-    def test_dispatch_tank_update_compact_short_status_data(self) -> None:
-        """Test dispatch handles tank_update_compact with too-short status_data (< 2 bytes)."""
-        from tankpit_bot.container import TankUpdateCompactDict
-
-        msg = TankUpdateCompactDict(
-            msg_type="tank_update_compact",
-            flags=0x44,
-            tank_id=203,
-            status_data=bytes([0x01]),
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Tank should NOT be created since status_data too short for position
-        state = get_world_service().world_state
-        assert "203" not in state["tanks"]
-
-    def test_dispatch_tank_update_compact_flag_cd_does_not_set_tank_position(self) -> None:
-        """Test obstacle-correlated 0xCD compact updates do not create tank positions."""
-        from tankpit_bot.container import TankUpdateCompactDict
-
-        msg = TankUpdateCompactDict(
-            msg_type="tank_update_compact",
-            flags=0xCD,
-            tank_id=2308,
-            status_data=bytes.fromhex("a50aa5000200"),
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "2308" not in state["tanks"]
-
     def test_dispatch_tunneled_terrain_update_sets_terrain_tile(self) -> None:
         """Test 0x4A terrain updates modify world terrain state."""
         from tankpit_bot.protocol import TerrainUpdateDict
@@ -667,6 +602,34 @@ class TestDispatchDecoration:
 
         after = ws.world_state["tanks"]["44"]
         assert after == before
+
+
+class TestDispatchSupervisorText:
+    """Tests for dispatch_world_state_update with 0x3C SupervisorText (wg)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_supervisor_text_is_observation_only_no_state_mutation(self) -> None:
+        """0x3C wg emits a supervisor_text diagnostic; world state untouched.
+
+        Wire format is Latin-1 over the XOR-decoded body per JS p().
+        The bot never observed a SupervisorText body in the 150-session
+        production corpus (the practice room doesn't get them), so this
+        test exercises the dispatch path against a JS-spec'd payload.
+        """
+        from tankpit_bot.protocol import SupervisorTextDict
+
+        ws = get_world_service()
+        before = ws.world_state
+        msg = SupervisorTextDict(msg_type=0x3C, message="Test")
+        dispatch_world_state_update(ws, msg)
+        assert ws.world_state is before
 
 
 class TestDispatchStatistics:

@@ -257,6 +257,11 @@ class TestDecodeMessage:
         result = decode_message(MSG_ACTION_DONE, action_data)
         assert result["msg_type"] == 0x54
 
+        # SupervisorText (0x3C 'wg', free-form server message)
+        result = decode_message(0x3C, b"Hello!")
+        assert result["msg_type"] == 0x3C
+        assert result["message"] == "Hello!"
+
         # Promotion (binary Rf form, disambiguated by routing)
         promo_data = bytes([3, 1])
         result = decode_message(MSG_PROMOTION, promo_data)

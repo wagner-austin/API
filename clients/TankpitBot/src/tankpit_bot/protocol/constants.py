@@ -127,6 +127,7 @@ MSG_TERRAIN_UPDATE = ord("J")
 MSG_PING = ord("`")
 MSG_DISCONNECT = ord("~")
 MSG_SUPERVISOR = ord("R")
+MSG_SUPERVISOR_TEXT = ord("<")
 MSG_TANK_STATUS_FULL = ord(">")
 MSG_VIEWPORT = ord("Z")
 MSG_SYNC = ord("?")
@@ -207,6 +208,7 @@ __all__ = [
     "MSG_SHOOT",
     "MSG_STATISTICS",
     "MSG_SUPERVISOR",
+    "MSG_SUPERVISOR_TEXT",
     "MSG_SYNC",
     "MSG_TANK_ENTRY",
     "MSG_TANK_EXIT",

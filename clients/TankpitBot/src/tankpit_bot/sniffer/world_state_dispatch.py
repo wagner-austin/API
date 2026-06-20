@@ -372,6 +372,11 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
                 score=score,
             )
             return True
+        case {"msg_type": 0x3C, "message": str(message)}:
+            # ``message`` is reserved by the runtime logger as the
+            # human-readable channel line; use ``text`` for the payload.
+            emit_diagnostic(diagnostic_kind="supervisor_text", text=message)
+            return True
     return False
 
 
@@ -466,17 +471,6 @@ def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> b
         True if the message was handled, False otherwise.
     """
     match decoded:
-        case {
-            "msg_type": "tank_update_compact" | "tank_update_full",
-            "flags": int(flags),
-            "tank_id": int(tid),
-            "status_data": bytes(sd),
-        }:
-            if flags == 0xCD:
-                return True
-            if len(sd) >= 2:
-                _update_tank_position(ws, tid, sd[0], sd[1])
-            return True
         case {
             "msg_type": "tank_status_short",
             "tank_id": int(tid),

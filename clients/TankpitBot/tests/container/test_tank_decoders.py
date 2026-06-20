@@ -14,13 +14,9 @@ from tankpit_bot.container import (
     TankLeaveDict,
     TankRegistryDict,
     TankStatusShortDict,
-    TankUpdateCompactDict,
-    TankUpdateFullDict,
     decode_tank_leave,
     decode_tank_registry,
     decode_tank_status_short,
-    decode_tank_update_compact,
-    decode_tank_update_full,
 )
 from tankpit_bot.container.decoders.combat import decode_mine_detonation, decode_mine_placement
 from tankpit_bot.container.decoders.tank import _parse_tank_name
@@ -36,8 +32,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_CONTAINER_GARBAGE,
     TANK_REGISTRY_CONTAINER_WASD,
     TANK_STATUS_SHORT_9,
-    TANK_UPDATE_COMPACT_10,
-    TANK_UPDATE_FULL_15,
 )
 
 
@@ -250,60 +244,6 @@ class TestDecodeTankStatusShort:
 # Container TankStatusSync decoder was deleted 2026-06-19 (length-only
 # catch-all). Real 0x2E TankStatusSync (8+ bytes per JS Og.h) is tested
 # in tests/protocol/test_tank.py::TestDecodeTankStatusSync.
-
-
-class TestDecodeTankUpdateCompact:
-    """Tests for tank update compact decoding (10 bytes)."""
-
-    def test_decodes_10_byte_update(self) -> None:
-        """Decodes 10-byte tank update compact correctly."""
-        result = decode_tank_update_compact(TANK_UPDATE_COMPACT_10)
-        assert result["msg_type"] == "tank_update_compact"
-        assert result["flags"] == 0x44  # byte[1]
-        assert result["tank_id"] == 0x50DF  # df 50 little-endian at bytes[2-3]
-        assert len(result["status_data"]) == 6  # bytes 4-9
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises on invalid length."""
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_compact(bytes([0x01] * 9))
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_compact(bytes([0x01] * 11))
-
-    def test_tank_update_compact_dict_keys(self) -> None:
-        """TankUpdateCompactDict has expected keys."""
-        result: TankUpdateCompactDict = decode_tank_update_compact(TANK_UPDATE_COMPACT_10)
-        assert result["msg_type"] == "tank_update_compact"
-        assert result["flags"] == 0x44
-        assert result["tank_id"] == 0x50DF
-        assert len(result["status_data"]) == 6
-
-
-class TestDecodeTankUpdateFull:
-    """Tests for tank update full decoding (15 bytes)."""
-
-    def test_decodes_15_byte_update(self) -> None:
-        """Decodes 15-byte tank update full correctly."""
-        result = decode_tank_update_full(TANK_UPDATE_FULL_15)
-        assert result["msg_type"] == "tank_update_full"
-        assert result["flags"] == 0x46  # byte[1]
-        assert result["tank_id"] == 0x50C7  # c7 50 little-endian at bytes[2-3]
-        assert len(result["status_data"]) == 11  # bytes 4-14
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises on invalid length."""
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_full(bytes([0x01] * 14))
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_update_full(bytes([0x01] * 16))
-
-    def test_tank_update_full_dict_keys(self) -> None:
-        """TankUpdateFullDict has expected keys."""
-        result: TankUpdateFullDict = decode_tank_update_full(TANK_UPDATE_FULL_15)
-        assert result["msg_type"] == "tank_update_full"
-        assert result["flags"] == 0x46
-        assert result["tank_id"] == 0x50C7
-        assert len(result["status_data"]) == 11
 
 
 class TestDecodeTankLeave:

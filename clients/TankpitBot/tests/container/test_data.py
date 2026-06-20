@@ -88,19 +88,11 @@ TANK_STATUS_SYNC_2 = bytes.fromhex("0100")
 # Tank status sync: 3 bytes
 TANK_STATUS_SYNC_3 = bytes.fromhex("030102")
 
-# =============================================================================
-# Tank Update Test Data
-# =============================================================================
-
-# Tank update compact: 10 bytes
-# From session capture "3644df501d1a2b9bf78b"
-# Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]
-TANK_UPDATE_COMPACT_10 = bytes.fromhex("3644df501d1a2b9bf78b")
-
-# Tank update full: 15 bytes
-# From session capture "3f46c750541a001b11871c59642525"
-# Structure: [subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]
-TANK_UPDATE_FULL_15 = bytes.fromhex("3f46c750541a001b11871c59642525")
+# Tank update compact / full / extended fixtures deleted 2026-06-19.
+# After the tunneled-subtype dispatch fix (analysis_scripts/
+# crack_tank_update.py), zero production bodies fell through to the
+# length-based "tank_update_*" container fallback across 150 sessions,
+# so the types, decoders, and these fixtures were removed together.
 
 # Tunneled mine placement: 15 bytes
 # From capture after mine command by Artax at (131,126)

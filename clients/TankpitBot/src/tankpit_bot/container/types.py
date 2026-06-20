@@ -22,8 +22,6 @@ class ContainerMessageType(IntEnum):
     TANK_REGISTRY = auto()
     POSITION_UPDATE = auto()
     TANK_STATUS_SHORT = auto()
-    TANK_UPDATE_COMPACT = auto()
-    TANK_UPDATE_FULL = auto()
     TANK_LEAVE = auto()
     PLAYER_LIST_SHORT = auto()
     PLAYER_LIST_EXTENDED = auto()
@@ -68,8 +66,6 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
     ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
     ContainerMessageType.TANK_STATUS_SHORT: DecodeLevel.FULL,
-    ContainerMessageType.TANK_UPDATE_COMPACT: DecodeLevel.FULL,
-    ContainerMessageType.TANK_UPDATE_FULL: DecodeLevel.FULL,
     ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_EXTENDED: DecodeLevel.FULL,
@@ -221,41 +217,12 @@ class TankStatusShortDict(TypedDict):
     leaderboard_position: int
 
 
-class TankUpdateCompactDict(TypedDict):
-    """Compact tank update from 0x2E container (10 bytes).
-
-    Structure (verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:6]
-
-    Compact status update for tanks, possibly viewport entry notification.
-    """
-
-    msg_type: Literal["tank_update_compact"]
-    flags: int
-    tank_id: int
-    status_data: bytes
-
-
-# TankUpdateExtendedDict deleted 2026-06-19: the 14-byte length
-# heuristic never matched a real wire body across 150 production
-# capture sessions -- every 14-byte 0x2E body in the corpus is a
-# tunneled 0x47 Movement (Lg.h), dispatched before length-based
-# container fallback runs. See analysis_scripts/crack_tank_update.py.
-
-
-class TankUpdateFullDict(TypedDict):
-    """Full tank update from 0x2E container (15 bytes).
-
-    Structure (verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [status_data:11]
-
-    Full status update with complete tank information.
-    """
-
-    msg_type: Literal["tank_update_full"]
-    flags: int
-    tank_id: int
-    status_data: bytes
+# Container TankUpdateCompactDict, TankUpdateExtendedDict, and
+# TankUpdateFullDict were deleted 2026-06-19. The full audit
+# (analysis_scripts/crack_tank_update.py) showed 0 production bodies
+# ever reached the length-based fallback for any of the three lengths
+# (10/14/15) once the tunneled dispatchers route 0x28 TankEntry,
+# 0x42 BuildPickup, 0x47 Movement, and 0x56 Statistics first.
 
 
 # Container TankStatusSync deleted 2026-06-19 (length-only catch-all
@@ -473,8 +440,6 @@ ContainerMessage = (
     | TankRegistryDict
     | PositionUpdateDict
     | TankStatusShortDict
-    | TankUpdateCompactDict
-    | TankUpdateFullDict
     | TankLeaveDict
     | PlayerListShortDict
     | PlayerListExtendedDict
@@ -504,8 +469,6 @@ __all__ = [
     "TankLeaveDict",
     "TankRegistryDict",
     "TankStatusShortDict",
-    "TankUpdateCompactDict",
-    "TankUpdateFullDict",
     "TeleportLandedDict",
     "TipNotificationDict",
     "UnknownContainerDict",

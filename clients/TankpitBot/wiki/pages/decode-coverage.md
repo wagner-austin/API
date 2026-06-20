@@ -30,7 +30,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x2E | `.` | Og | TankStatusSync: team, id, rank, damage, lb_score, promo_state, fuel | FULL | — |
 | 0x2F | `/` | Yg | ActivePlayers: id+rank list | FULL | — |
 | 0x31 | `1` | Zg | Top10 leaderboard | FULL | — |
-| 0x3C | `<` | wg | SupervisorText: free text from server | NONE | Not decoded[^3] |
+| 0x3C | `<` | wg | SupervisorText: free text from server | FULL | 0 production samples (practice room) -- decoded per JS spec |
 | 0x3D | `=` | Mg | MovementResponse: team, id, pos, direction, damage, rank, lb_score, carrying | FULL | — |
 | 0x3E | `>` | Qf | TankStatusFull: team, rank, decorations, lb_score, name | FULL | — |
 | 0x3F | `?` | vg | Sync/heartbeat | FULL | — |
@@ -75,8 +75,6 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 | (any) | 1 | TeleportLanded | FULL | Always 0x54 subtype in production captures[^8] |
 | (any) | 6 | TankLeave | FULL | — |
 | (any) | 9 | TankStatusShort | PARTIAL | byte 8 is rank_points, labeled "extra"[^9] |
-| (any) | 10 | TankUpdateCompact | PARTIAL | bytes 0-1 (x,y) used; bytes 2-5 dropped[^10] |
-| (any) | 15 | TankUpdateFull | PARTIAL | bytes 0-1 (x,y) used; bytes 2-10 dropped |
 | (any) | 16-20 | TankRegistry | FULL | rejects subtype 0x47 (which is tunneled Movement) |
 | (any) | 29-79 | TipNotification | IDENTIFIED | — |
 | (any) | 80-130 | ChunkData | IDENTIFIED | — |
@@ -203,9 +201,7 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
      128+ = custom text (remaining bytes)
 ```
 
-[^3]: JS `wg` renders supervisor text messages; separate from command errors (V.R)
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^9]: TSS byte 8 is lb_score low byte (rank_points), proven by 13/13 exact timestamp match with 0x3D byte 11
-[^10]: Only bytes 0-1 (position) extracted; remaining bytes likely contain damage, direction, rank
 [^11]: 42 corpse messages (direction>=32) found across 18 tanks in all captures; JS `Pg.prototype.h` sets `d.direction = (d.direction & 240) !== 0 ? 33 : 32` on deactivation
 [^12]: fuel = byte[10] + byte[11]*256 (inner offsets, after subtype byte stripped); 98/152 exact match with FuelGain at same ms; mismatches from pre/post-update timing within same tick; 8/15 sessions start at 1100 (Private fuel)

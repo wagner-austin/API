@@ -24,6 +24,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x29: "TankExit",
     0x2B: "Promotion",
     0x2E: "TankStatus",
+    0x3C: "SupervisorText",
     0x3D: "MoveResponse",
     0x3E: "TankStatus",
     0x41: "Deactivation",
@@ -60,7 +61,7 @@ TANK_MSG_TYPES: frozenset[int] = frozenset(
 RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
-MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 0x4E, 0x4C})
+MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 0x4E, 0x4C, 0x3C})
 
 # Text message type bytes (ASCII chars that indicate text, not binary)
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
@@ -99,6 +100,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("V"): 16,  # Statistics
     ord("*"): 4,  # ActiveForces
     ord("R"): 3,  # Supervisor
+    ord("<"): 0,  # SupervisorText (wg: free-form message, any length)
     ord("T"): 0,  # ActionDone (no minimum)
 }
 
@@ -126,6 +128,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x31: ("top10_list", "IDENTIFIED"),  # '1' MSG_TOP10
     0x32: ("top10_extended", "IDENTIFIED"),  # '2' similar to top10
     0x33: ("score_update", "IDENTIFIED"),  # '3'
+    0x3C: ("supervisor_text", "FULL"),
     0x3D: ("movement", "FULL"),
     0x3E: ("tank_status", "PARTIAL"),
     0x3F: ("position", "FULL"),

@@ -588,6 +588,23 @@ class TerrainUpdateDict(TypedDict):
     updates: list[tuple[int, int, int]]
 
 
+class SupervisorTextDict(TypedDict):
+    """Free-form server text channel (0x3C '<' message).
+
+    Trace-verified from tpclient.js wg.h (V['<']):
+      ``wg.h(a) = new wg(p(a))`` -- a is the entire XOR-decoded body
+      and ``p()`` is just byte-to-string conversion
+      (``String.fromCharCode(a[i] & 255)``). The renderer prints:
+      "Message from the Supervisor:\\n<message>\\n".
+
+    Distinct from 0x52 CommandResult (V.R / xg) which carries a 3-byte
+    error code; this is the server's freeform announcement channel.
+    """
+
+    msg_type: Literal[0x3C]
+    message: str
+
+
 class SupervisorDict(TypedDict):
     """Command failure response (0x52 'R' message).
 
@@ -674,6 +691,7 @@ __all__ = [
     "ShootEventDict",
     "StatisticsDict",
     "SupervisorDict",
+    "SupervisorTextDict",
     "SyncDict",
     "TankEntryDict",
     "TankExitDict",
@@ -727,6 +745,7 @@ BinaryMessage = (
     | TankStatusSyncDict
     | TankStatusDict
     | SupervisorDict
+    | SupervisorTextDict
     | TerrainUpdateDict
     | ViewportUpdateDict
     | ContainerMessage

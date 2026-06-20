@@ -15,8 +15,6 @@ from tankpit_bot.container import (
     is_tank_leave_structure,
     is_tank_registry_structure,
     is_tank_status_short_structure,
-    is_tank_update_compact_structure,
-    is_tank_update_full_structure,
     is_teleport_landed_structure,
     is_tip_notification_structure,
     is_world_state_structure,
@@ -40,8 +38,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_16,
     TANK_REGISTRY_20,
     TANK_STATUS_SHORT_9,
-    TANK_UPDATE_COMPACT_10,
-    TANK_UPDATE_FULL_15,
     TELEPORT_LANDED_1,
     TIP_NOTIFICATION_29,
     TIP_NOTIFICATION_55,
@@ -160,32 +156,6 @@ class TestIsTankStatusShortStructure:
 # Container TankStatusSync structure check was a 2-3 byte length-only
 # catch-all -- deleted 2026-06-19. Real 0x2E TankStatusSync (8+ bytes
 # per JS Og.h) is tested at the protocol layer.
-
-
-class TestIsTankUpdateCompactStructure:
-    """Tests for tank update compact structure detection."""
-
-    def test_matches_10_bytes(self) -> None:
-        """Matches exactly 10-byte message."""
-        assert is_tank_update_compact_structure(TANK_UPDATE_COMPACT_10) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_tank_update_compact_structure(bytes([0x01] * 9)) is False
-        assert is_tank_update_compact_structure(bytes([0x01] * 11)) is False
-
-
-class TestIsTankUpdateFullStructure:
-    """Tests for tank update full structure detection."""
-
-    def test_matches_15_bytes(self) -> None:
-        """Matches exactly 15-byte message."""
-        assert is_tank_update_full_structure(TANK_UPDATE_FULL_15) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_tank_update_full_structure(bytes([0x01] * 14)) is False
-        assert is_tank_update_full_structure(bytes([0x01] * 16)) is False
 
 
 class TestIsTankLeaveStructure:

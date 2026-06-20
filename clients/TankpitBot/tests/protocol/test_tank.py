@@ -221,6 +221,40 @@ class TestDecodeSupervisor:
             decode_supervisor(bytes([1, 2]))
 
 
+class TestDecodeSupervisorText:
+    """Tests for decode_supervisor_text function.
+
+    JS wg.h (V['<']): ``new wg(p(a))`` where ``p()`` is
+    ``String.fromCharCode(a[i] & 255)`` over the entire XOR-decoded
+    body. So the body is just a Latin-1 byte stream representing the
+    message text. 0 production samples across the 150-session corpus
+    (the practice room the bot plays never gets these), so the
+    contract is JS-spec only: every byte maps 1:1 to a char.
+    """
+
+    def test_decodes_ascii_message(self) -> None:
+        """ASCII bytes round-trip through the decoder unchanged."""
+        from tankpit_bot.protocol import decode_supervisor_text
+
+        result = decode_supervisor_text(b"Server going down in 5 minutes.")
+        assert result["msg_type"] == 0x3C
+        assert result["message"] == "Server going down in 5 minutes."
+
+    def test_decodes_latin1_high_byte(self) -> None:
+        """High bytes are preserved per JS String.fromCharCode(a & 255)."""
+        from tankpit_bot.protocol import decode_supervisor_text
+
+        result = decode_supervisor_text(b"\xa9 2026")
+        assert result["message"] == "© 2026"
+
+    def test_decodes_empty_body(self) -> None:
+        """Empty body yields empty message (JS wg has no min length)."""
+        from tankpit_bot.protocol import decode_supervisor_text
+
+        result = decode_supervisor_text(b"")
+        assert result["message"] == ""
+
+
 class TestSupervisorHelpers:
     """Tests for supervisor error code helpers."""
 

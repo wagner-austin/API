@@ -14,8 +14,6 @@ from tankpit_bot.container.types import (
     TankLeaveDict,
     TankRegistryDict,
     TankStatusShortDict,
-    TankUpdateCompactDict,
-    TankUpdateFullDict,
 )
 from tankpit_bot.protocol.constants import TEAM_NAMES
 
@@ -229,103 +227,21 @@ def decode_tank_status_short(data: bytes) -> TankStatusShortDict:
     )
 
 
-def is_tank_update_compact_structure(data: bytes) -> bool:
-    """Check if data matches tank update compact structure.
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if length is exactly 10 bytes.
-    """
-    return len(data) == 10
-
-
-def decode_tank_update_compact(data: bytes) -> TankUpdateCompactDict:
-    """Decode tank update compact message from container body.
-
-    Structure (10 bytes):
-      [0]    subtype (ignored, XOR encoded)
-      [1]    flags
-      [2-3]  tank_id (LE)
-      [4-9]  status_data
-
-    Args:
-        data: Decoded container body bytes (must be 10 bytes).
-
-    Returns:
-        Decoded tank update compact data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 10, "TankUpdateCompact")
-
-    flags = data[1]
-    tank_id = extract_uint16_le(data, 2, "TankUpdateCompact.tank_id")
-    status_data = bytes(data[4:])
-
-    return TankUpdateCompactDict(
-        msg_type="tank_update_compact",
-        flags=flags,
-        tank_id=tank_id,
-        status_data=status_data,
-    )
-
-
-# 14-byte container TankUpdateExtended was deleted 2026-06-19. The
-# "Extended" type-id was a length heuristic that never matched a real
-# wire body in 150 production sessions: every 14-byte 0x2E body in the
-# corpus is a tunneled 0x47 Movement (Lg.h) carrying 1 waypoint char
-# in its blob tail. Movement bodies can be much longer when paths are
-# obstacle-rich -- ``inner >= 12`` is the only constraint -- so the
-# tunneled subtype check fires for every 0x47-prefixed length before
-# the length-based fallback runs. See
-# analysis_scripts/crack_tank_update.py.
-
-
-def is_tank_update_full_structure(data: bytes) -> bool:
-    """Check if data matches tank update full structure.
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if length is exactly 15 bytes.
-    """
-    return len(data) == 15
-
-
-def decode_tank_update_full(data: bytes) -> TankUpdateFullDict:
-    """Decode tank update full message from container body.
-
-    Structure (15 bytes):
-      [0]    subtype (ignored, XOR encoded)
-      [1]    flags
-      [2-3]  tank_id (LE)
-      [4-14] status_data
-
-    Args:
-        data: Decoded container body bytes (must be 15 bytes).
-
-    Returns:
-        Decoded tank update full data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 15, "TankUpdateFull")
-
-    flags = data[1]
-    tank_id = extract_uint16_le(data, 2, "TankUpdateFull.tank_id")
-    status_data = bytes(data[4:])
-
-    return TankUpdateFullDict(
-        msg_type="tank_update_full",
-        flags=flags,
-        tank_id=tank_id,
-        status_data=status_data,
-    )
+# Container TankUpdateCompact (10b), Extended (14b), and Full (15b)
+# were deleted 2026-06-19 after analysis_scripts/crack_tank_update.py
+# proved them dead. The full audit:
+#   * length=14 (Extended): 0 production bodies. Every 14-byte 0x2E
+#     body is a tunneled 0x47 Movement (Lg.h) routed before the
+#     length-based fallback.
+#   * length=15 (Full): 239/239 production bodies are tunneled 0x56
+#     Statistics (Wg.h). Tunneled at inner >= 12.
+#   * length=10 (Compact): 3 production bodies -- 2 tunneled 0x42
+#     BuildPickup (Jg.h, inner >= 9), 1 tunneled 0x28 TankEntry
+#     (Uf.h, inner >= 9). All now routed before the length-based
+#     fallback runs.
+# After the tunneling fix, 0/150 sessions produce any length-based
+# TankUpdate* dispatch hit. The types, decoders, structure checks,
+# fixtures, and tests are all removed.
 
 
 # Container TankStatusSync (2-3 byte catch-all) was deleted 2026-06-19:
@@ -391,11 +307,7 @@ __all__ = [
     "decode_tank_leave",
     "decode_tank_registry",
     "decode_tank_status_short",
-    "decode_tank_update_compact",
-    "decode_tank_update_full",
     "is_tank_leave_structure",
     "is_tank_registry_structure",
     "is_tank_status_short_structure",
-    "is_tank_update_compact_structure",
-    "is_tank_update_full_structure",
 ]

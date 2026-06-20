@@ -26,6 +26,7 @@ from tankpit_bot.protocol.constants import (
     MSG_SHOOT,
     MSG_STATISTICS,
     MSG_SUPERVISOR,
+    MSG_SUPERVISOR_TEXT,
     MSG_SYNC,
     MSG_TANK_ENTRY,
     MSG_TANK_EXIT,
@@ -78,6 +79,7 @@ from tankpit_bot.protocol.decoders.world import (
     decode_combined_tile_update,
     decode_overlay_update,
     decode_supervisor,
+    decode_supervisor_text,
     decode_sync,
     decode_terrain_update,
     decode_viewport_update,
@@ -175,6 +177,8 @@ def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_active_forces(data)
     if msg_type == MSG_SUPERVISOR:
         return decode_supervisor(data)
+    if msg_type == MSG_SUPERVISOR_TEXT:
+        return decode_supervisor_text(data)
     if msg_type == MSG_ACTION_DONE:
         return decode_action_done(data)
     if msg_type == MSG_PROMOTION:
