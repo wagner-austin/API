@@ -74,7 +74,6 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 | 0x79 | 7 | PlayerListExtended | FULL | — |
 | (any) | 1 | TeleportLanded | FULL | Always 0x54 subtype in production captures[^8] |
 | (any) | 6 | TankLeave | FULL | — |
-| (any) | 9 | TankStatusShort | PARTIAL | byte 8 is rank_points, labeled "extra"[^9] |
 | (any) | 16-20 | TankRegistry | FULL | rejects subtype 0x47 (which is tunneled Movement) |
 | (any) | 29-79 | TipNotification | IDENTIFIED | — |
 | (any) | 80-130 | ChunkData | IDENTIFIED | — |
@@ -114,6 +113,13 @@ populations classified as "TankUpdate*" collapse from 597 to 1.
   ``a[0..8]``) and our existing ``decode_tank_entry`` minimum. After
   the change, 0 length-10 bodies remain in the corpus's length-based
   fallback.
+- **0x2E / Og TankStatusSync (short form)**: 74/74 ex-``TankStatusShort``
+  samples now route via ``decode_tank_status_sync`` -- a hard fix:
+  the container ``TankStatusShort`` layout was wrong on every byte
+  position (74/74 produced rank > 8). The previous dispatch was
+  silently feeding ``damage_state`` (and probably wiping it) from
+  the wrong byte for every enemy tank update of this length. See
+  ``analysis_scripts/crack_tank_status_short.py``.
 
 ## Proven Field Mappings
 
@@ -202,6 +208,5 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
 ```
 
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
-[^9]: TSS byte 8 is lb_score low byte (rank_points), proven by 13/13 exact timestamp match with 0x3D byte 11
 [^11]: 42 corpse messages (direction>=32) found across 18 tanks in all captures; JS `Pg.prototype.h` sets `d.direction = (d.direction & 240) !== 0 ? 33 : 32` on deactivation
 [^12]: fuel = byte[10] + byte[11]*256 (inner offsets, after subtype byte stripped); 98/152 exact match with FuelGain at same ms; mismatches from pre/post-update timing within same tick; 8/15 sessions start at 1100 (Private fuel)

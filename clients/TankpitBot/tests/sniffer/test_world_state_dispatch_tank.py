@@ -341,24 +341,30 @@ class TestDispatchTankMessages:
         assert "39,53" not in state["mines"]
         assert "38,54" not in state["mines"]
 
-    def test_dispatch_tank_status_short_updates_damage(self) -> None:
-        """Test dispatch handles tank_status_short by updating damage."""
-        from tankpit_bot.container import TankStatusShortDict
-        from tankpit_bot.protocol import TankEntryDict
+    def test_dispatch_9byte_2e_routes_through_og_and_updates_damage(self) -> None:
+        """0x2E body of length 9 routes to Og.h TankStatusSync.
 
-        # First create a tank
+        Prior to 2026-06-19 these bodies fell to the broken container
+        TankStatusShort layout (rank > 8 in 74/74 corpus samples).
+        After the fix they decode as Og.h short-form -- and we test
+        that the damage byte (Og.h ``a[3]``) flows correctly into
+        world state.
+        """
+        from tankpit_bot.protocol import TankEntryDict, TankStatusSyncDict
+
         entry = TankEntryDict(
             msg_type=0x28, team=0, tank_id=300, rank=0, damage_state=0, score=0, x=50, y=60
         )
         dispatch_world_state_update(get_world_service(), entry)
 
-        msg = TankStatusShortDict(
-            msg_type="tank_status_short",
-            flags=0x82,
+        msg = TankStatusSyncDict(
+            msg_type=0x2E,
+            subtype=0x40,  # team byte with flag bit 6 set (matches corpus)
             tank_id=300,
             damage_state=3,
             rank=4,
-            leaderboard_position=21,
+            lb_score=1234,
+            fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -375,9 +381,8 @@ class TestDispatchTankMessages:
         """
         from pathlib import Path
 
-        from tankpit_bot.container import TankStatusShortDict
         from tankpit_bot.diagnostics.event_stream import load_event_records
-        from tankpit_bot.protocol import TankEntryDict
+        from tankpit_bot.protocol import TankEntryDict, TankStatusSyncDict
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
         artifacts = configure_bot_runtime_logging("20260610-230000")
@@ -387,13 +392,14 @@ class TestDispatchTankMessages:
         dispatch_world_state_update(get_world_service(), entry)
 
         for repeated_damage_state in (2, 2):
-            msg = TankStatusShortDict(
-                msg_type="tank_status_short",
-                flags=0x82,
+            msg = TankStatusSyncDict(
+                msg_type=0x2E,
+                subtype=0x40,
                 tank_id=300,
                 damage_state=repeated_damage_state,
                 rank=4,
-                leaderboard_position=21,
+                lb_score=1234,
+                fuel=None,
             )
             dispatch_world_state_update(get_world_service(), msg)
 
@@ -415,18 +421,19 @@ class TestDispatchTankMessages:
         """A tier sync for an untracked tank has no transition to report."""
         from pathlib import Path
 
-        from tankpit_bot.container import TankStatusShortDict
         from tankpit_bot.diagnostics.event_stream import load_event_records
+        from tankpit_bot.protocol import TankStatusSyncDict
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
         artifacts = configure_bot_runtime_logging("20260610-230000")
-        msg = TankStatusShortDict(
-            msg_type="tank_status_short",
-            flags=0x82,
+        msg = TankStatusSyncDict(
+            msg_type=0x2E,
+            subtype=0x40,
             tank_id=999,
             damage_state=3,
             rank=4,
-            leaderboard_position=21,
+            lb_score=1234,
+            fuel=None,
         )
         dispatch_world_state_update(get_world_service(), msg)
 

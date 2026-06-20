@@ -471,13 +471,6 @@ def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> b
         True if the message was handled, False otherwise.
     """
     match decoded:
-        case {
-            "msg_type": "tank_status_short",
-            "tank_id": int(tid),
-            "damage_state": int(dmg),
-        }:
-            update_world_state_from_tank_damage(ws, tid, dmg)
-            return True
         case {"msg_type": "tank_leave", "tank_id": int(tid)}:
             update_world_state_from_tank_remove(ws, tid)
             return True

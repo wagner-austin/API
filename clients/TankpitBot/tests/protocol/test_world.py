@@ -505,6 +505,29 @@ class TestDecode0x2eMessage:
         assert result["deactivated"] == 0
         assert result["score"] == 55931
 
+    def test_9byte_body_routes_to_tank_status_sync(self) -> None:
+        """9-byte 0x2E bodies are Og.h short-form per JS V['.'] = Og.
+
+        Crack: analysis_scripts/crack_tank_status_short.py paired 74
+        production samples against both candidate schemas. 74/74 sane
+        under Og.h (dmg<=3 AND rank<=8 AND promo<=11). 0/74 sane under
+        the prior container TankStatusShort layout (rank > 8 always).
+
+        Fixture below is the first production sample, byte-for-byte:
+        ``43 c6 af 00 00 c7 b0 25 00``
+          team=3, tid=44998, dmg=0, rank=0, lb_score=13086757, promo=0
+        """
+        body = bytes.fromhex("43c6af0000c7b02500")
+        result = decode_0x2e_message(body)
+        assert result["msg_type"] == 0x2E
+        assert result["subtype"] == 0x43
+        assert result["tank_id"] == 44998
+        assert result["damage_state"] == 0
+        assert result["rank"] == 0
+        assert result["lb_score"] == 13086757
+        # Short form: no fuel field
+        assert result["fuel"] is None
+
     def test_tunneled_build_pickup_routes_through_misc(self) -> None:
         """Tunneled 0x42 inside 0x2E decodes as a BuildPickup body.
 

@@ -80,7 +80,10 @@ POSITION_UPDATE_13 = bytes.fromhex("2453cd0715121d67b315515506")
 # Tank status short: 9 bytes (enemy status with rank/damage)
 # Structure: [subtype:1] [tank_id:2 LE] [damage:1] [rank:1] [flag:1] [lb_pos:2 LE] [extra:1]
 # Example: tank_id=0x5782, damage=2 (medium), rank=4 (lieutenant), flag=0, lb_pos=0x0015, extra=0
-TANK_STATUS_SHORT_9 = bytes.fromhex("018257020400150000")
+# TANK_STATUS_SHORT_9 deleted 2026-06-19: the container "tank_status_short"
+# was wrong on every byte position (crack confirmed 0/74 corpus samples
+# produced a valid container rank). 9-byte 0x2E bodies now route to
+# Og.h TankStatusSync. See analysis_scripts/crack_tank_status_short.py.
 
 # Tank status sync: 2 bytes
 TANK_STATUS_SYNC_2 = bytes.fromhex("0100")

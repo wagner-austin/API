@@ -357,23 +357,6 @@ def format_position_update(tid: int, x: int, y: int, f: int, ed: bytes) -> str:
     return f"tank={tid} pos=({x},{y}) flags=0x{f:02X} data={ed.hex()}"
 
 
-def format_tank_status_short(tid: int, dmg: int, rank: int, lb: int) -> str:
-    """Format tank status short details.
-
-    Args:
-        tid: Tank ID.
-        dmg: Damage state.
-        rank: Rank number.
-        lb: Leaderboard position.
-
-    Returns:
-        Formatted tank status string.
-    """
-    rank_str = rank_name(rank)
-    dmg_str = damage_name(dmg)
-    return f"tank={tid} {rank_str} hp={dmg_str} lb={lb}"
-
-
 def handle_tank_registry(
     tid: int,
     name: str,
@@ -418,14 +401,6 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
         Formatted string, or None if not handled.
     """
     match d:
-        case {
-            "msg_type": "tank_status_short",
-            "tank_id": int(tid),
-            "damage_state": int(dmg),
-            "rank": int(rank),
-            "leaderboard_position": int(lb),
-        }:
-            return format_tank_status_short(tid, dmg, rank, lb)
         case {"msg_type": "unknown_container", "length": int(length), "data": bytes(data)}:
             return f"len={length} data={data.hex()[:40]}"
         case {
@@ -542,7 +517,6 @@ __all__ = [
     "format_resource_details",
     "format_tank_details",
     "format_tank_registry_details",
-    "format_tank_status_short",
     "handle_tank_registry",
     "rank_name",
     "team_name",

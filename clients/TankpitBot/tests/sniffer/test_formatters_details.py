@@ -619,24 +619,6 @@ class TestFormatFunctions:
         assert "tank=200" in result
         assert "flags=0xAB" in result or "x=" in result
 
-    def test_format_container_details_tank_status_short(self) -> None:
-        """Test format_container_details for tank status short."""
-        from tankpit_bot.container import TankStatusShortDict
-
-        msg = TankStatusShortDict(
-            msg_type="tank_status_short",
-            flags=0,
-            tank_id=150,
-            damage_state=2,
-            rank=4,
-            leaderboard_position=25,
-        )
-        result = format_container_details(msg)
-        assert "tank=150" in result
-        assert "lieutenant" in result  # rank 4
-        assert "hp=medium" in result  # damage_state 2
-        assert "lb=25" in result
-
     def test_format_container_details_unknown_container(self) -> None:
         """Test format_container_details for unknown container."""
         from tankpit_bot.container import UnknownContainerDict

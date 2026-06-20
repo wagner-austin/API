@@ -377,6 +377,15 @@ def decode_0x2e_message(data: bytes) -> BinaryMessage:
     result = _dispatch_protocol_misc(subtype, inner)
     if result is not None:
         return result
+    # 9-byte 0x2E bodies are Og.h TankStatusSync (short form, no fuel)
+    # per JS V['.'] = Og. Corpus crack
+    # (analysis_scripts/crack_tank_status_short.py) verified 74/74
+    # production "TankStatusShort" container fallbacks are Og.h-shaped
+    # (0/74 produce a valid container rank). The container fallback
+    # was silently writing the wrong byte to ``damage_state`` for
+    # every enemy tank in those messages -- fixed here.
+    if len(data) == 9:
+        return decode_tank_status_sync(data)
     return decode_container_message(data)
 
 

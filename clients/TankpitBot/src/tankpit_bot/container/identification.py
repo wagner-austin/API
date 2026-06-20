@@ -25,7 +25,6 @@ from tankpit_bot.container.decoders.position import is_position_update_structure
 from tankpit_bot.container.decoders.tank import (
     is_tank_leave_structure,
     is_tank_registry_structure,
-    is_tank_status_short_structure,
 )
 from tankpit_bot.container.types import ContainerMessageType
 
@@ -99,9 +98,9 @@ def _identify_single_length_type(data: bytes) -> ContainerMessageType:
     # Tank leave: 6 bytes
     if is_tank_leave_structure(data):
         return ContainerMessageType.TANK_LEAVE
-    # Tank status short: exactly 9 bytes
-    if is_tank_status_short_structure(data):
-        return ContainerMessageType.TANK_STATUS_SHORT
+    # 9-byte 0x2E bodies are routed to Og.h TankStatusSync directly in
+    # decode_0x2e_message; the broken container TankStatusShort layout
+    # was deleted 2026-06-19. See analysis_scripts/crack_tank_status_short.py.
     # 13-byte position update: subtype 0x24. The 13-byte 0x2E nested
     # self-status form moved to the protocol path 2026-06-19 (handled
     # as TankStatusSync with fuel in decode_tank_status_sync).

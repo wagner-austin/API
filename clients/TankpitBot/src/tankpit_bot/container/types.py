@@ -21,7 +21,6 @@ class ContainerMessageType(IntEnum):
     MINE_PLACEMENT = auto()
     TANK_REGISTRY = auto()
     POSITION_UPDATE = auto()
-    TANK_STATUS_SHORT = auto()
     TANK_LEAVE = auto()
     PLAYER_LIST_SHORT = auto()
     PLAYER_LIST_EXTENDED = auto()
@@ -65,7 +64,6 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     ContainerMessageType.MINE_PLACEMENT: DecodeLevel.FULL,
     ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
     ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
-    ContainerMessageType.TANK_STATUS_SHORT: DecodeLevel.FULL,
     ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
     ContainerMessageType.PLAYER_LIST_EXTENDED: DecodeLevel.FULL,
@@ -199,22 +197,14 @@ class TankRegistryDict(TypedDict):
     tank_viewport_x: int | None  # Tank viewport-relative X (from info_bytes[6])
 
 
-class TankStatusShortDict(TypedDict):
-    """Enemy tank status with HP and rank from 0x2E container.
-
-    Structure (9 bytes, verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [damage_state:1] [rank:1] [lb_pos:2 LE] [extra:1]
-
-    The damage_state controls how dark the enemy tank name appears (0=full to 3=critical).
-    The rank is 0-7 (recruit to general).
-    """
-
-    msg_type: Literal["tank_status_short"]
-    flags: int
-    tank_id: int
-    damage_state: int
-    rank: int
-    leaderboard_position: int
+# TankStatusShortDict deleted 2026-06-19. Wire-layout was wrong on
+# every byte:
+# analysis_scripts/crack_tank_status_short.py paired all 74 production
+# 9-byte 0x2E bodies against the JS Og.h schema and got 74/74 sane
+# (dmg<=3 AND rank<=8 AND promo_state<=11) vs 0/74 sane on the
+# container layout (rank > 8 every time). 9-byte 0x2E bodies are now
+# dispatched to ``decode_tank_status_sync`` (Og.h short form) from
+# ``decode_0x2e_message``.
 
 
 # Container TankUpdateCompactDict, TankUpdateExtendedDict, and
@@ -439,7 +429,6 @@ ContainerMessage = (
     | MinePlacementDict
     | TankRegistryDict
     | PositionUpdateDict
-    | TankStatusShortDict
     | TankLeaveDict
     | PlayerListShortDict
     | PlayerListExtendedDict
@@ -468,7 +457,6 @@ __all__ = [
     "PositionUpdateDict",
     "TankLeaveDict",
     "TankRegistryDict",
-    "TankStatusShortDict",
     "TeleportLandedDict",
     "TipNotificationDict",
     "UnknownContainerDict",

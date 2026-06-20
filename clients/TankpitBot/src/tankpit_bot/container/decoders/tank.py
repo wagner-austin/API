@@ -13,7 +13,6 @@ from tankpit_bot.container.helpers import (
 from tankpit_bot.container.types import (
     TankLeaveDict,
     TankRegistryDict,
-    TankStatusShortDict,
 )
 from tankpit_bot.protocol.constants import TEAM_NAMES
 
@@ -176,55 +175,15 @@ def decode_tank_registry(data: bytes) -> TankRegistryDict:
     )
 
 
-def is_tank_status_short_structure(data: bytes) -> bool:
-    """Check if data matches tank status short message structure.
-
-    Args:
-        data: Decoded container body bytes.
-
-    Returns:
-        True if length is exactly 9 bytes.
-    """
-    return len(data) == 9
-
-
-def decode_tank_status_short(data: bytes) -> TankStatusShortDict:
-    """Decode tank status short message from container body.
-
-    Structure (9 bytes):
-      [0]    subtype (ignored, XOR encoded)
-      [1]    flags
-      [2-3]  tank_id (LE)
-      [4]    damage_state (0-3)
-      [5]    rank (0-7: recruit to general)
-      [6-7]  leaderboard_position (LE)
-      [8]    extra byte (ignored)
-
-    Args:
-        data: Decoded container body bytes (must be 9 bytes).
-
-    Returns:
-        Decoded tank status short data.
-
-    Raises:
-        ContainerDecodeError: If structure validation fails.
-    """
-    require_exact_length(data, 9, "TankStatusShort")
-
-    flags = data[1]
-    tank_id = extract_uint16_le(data, 2, "TankStatusShort.tank_id")
-    damage_state = data[4]
-    rank = data[5]
-    lb_pos = extract_uint16_le(data, 6, "TankStatusShort.leaderboard_position")
-
-    return TankStatusShortDict(
-        msg_type="tank_status_short",
-        flags=flags,
-        tank_id=tank_id,
-        damage_state=damage_state,
-        rank=rank,
-        leaderboard_position=lb_pos,
-    )
+# Container TankStatusShortDict was deleted 2026-06-19. The 9-byte
+# length heuristic was wrong on every byte position:
+# analysis_scripts/crack_tank_status_short.py proved 74/74 production
+# bodies are Og.h TankStatusSync short-form (V['.'] = Og); the
+# container layout had tank_id off by one (bytes 2:3 instead of 1:3),
+# damage_state at byte 4 (Og.h's rank), rank at byte 5 (Og.h's
+# lb_score middle byte), and dropped byte 8 (Og.h's promo_state).
+# 9-byte 0x2E bodies now route through ``decode_tank_status_sync``
+# from ``decode_0x2e_message``.
 
 
 # Container TankUpdateCompact (10b), Extended (14b), and Full (15b)
@@ -306,8 +265,6 @@ __all__ = [
     "SUBTYPE_TANK_REGISTRY",
     "decode_tank_leave",
     "decode_tank_registry",
-    "decode_tank_status_short",
     "is_tank_leave_structure",
     "is_tank_registry_structure",
-    "is_tank_status_short_structure",
 ]

@@ -14,7 +14,6 @@ from tankpit_bot.container import (
     is_position_update_structure,
     is_tank_leave_structure,
     is_tank_registry_structure,
-    is_tank_status_short_structure,
     is_teleport_landed_structure,
     is_tip_notification_structure,
     is_world_state_structure,
@@ -37,7 +36,6 @@ from tests.container.test_data import (
     TANK_LEAVE_LARGE_ID,
     TANK_REGISTRY_16,
     TANK_REGISTRY_20,
-    TANK_STATUS_SHORT_9,
     TELEPORT_LANDED_1,
     TIP_NOTIFICATION_29,
     TIP_NOTIFICATION_55,
@@ -140,22 +138,12 @@ class TestIsPositionUpdateStructure:
         assert is_position_update_structure(data) is False
 
 
-class TestIsTankStatusShortStructure:
-    """Tests for tank status short structure detection."""
-
-    def test_matches_9_bytes(self) -> None:
-        """Matches exactly 9-byte message."""
-        assert is_tank_status_short_structure(TANK_STATUS_SHORT_9) is True
-
-    def test_rejects_wrong_length(self) -> None:
-        """Rejects messages with wrong length."""
-        assert is_tank_status_short_structure(bytes([0x01] * 8)) is False
-        assert is_tank_status_short_structure(bytes([0x01] * 10)) is False
-
-
 # Container TankStatusSync structure check was a 2-3 byte length-only
 # catch-all -- deleted 2026-06-19. Real 0x2E TankStatusSync (8+ bytes
-# per JS Og.h) is tested at the protocol layer.
+# per JS Og.h) is tested at the protocol layer. The 9-byte
+# "TankStatusShort" length check was deleted in the same 2026-06-19
+# sweep after analysis_scripts/crack_tank_status_short.py showed every
+# corpus body was Og.h-shaped.
 
 
 class TestIsTankLeaveStructure:

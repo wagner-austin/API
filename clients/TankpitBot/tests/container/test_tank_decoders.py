@@ -13,10 +13,8 @@ from tankpit_bot.container import (
     MinePlacementDict,
     TankLeaveDict,
     TankRegistryDict,
-    TankStatusShortDict,
     decode_tank_leave,
     decode_tank_registry,
-    decode_tank_status_short,
 )
 from tankpit_bot.container.decoders.combat import decode_mine_detonation, decode_mine_placement
 from tankpit_bot.container.decoders.tank import _parse_tank_name
@@ -31,7 +29,6 @@ from tests.container.test_data import (
     TANK_REGISTRY_BOT,
     TANK_REGISTRY_CONTAINER_GARBAGE,
     TANK_REGISTRY_CONTAINER_WASD,
-    TANK_STATUS_SHORT_9,
 )
 
 
@@ -208,42 +205,11 @@ class TestDecodeMineDetonation:
         assert result["is_container"] is False
 
 
-class TestDecodeTankStatusShort:
-    """Tests for tank status short decoding (9 bytes with rank/damage)."""
-
-    def test_decodes_9_byte_status(self) -> None:
-        """Decodes 9-byte tank status short correctly."""
-        # Data: 01 82 57 02 04 00 15 00 00
-        # [0]=subtype [1]=flags [2-3]=tank_id [4]=dmg [5]=rank [6-7]=lb_pos [8]=extra
-        result = decode_tank_status_short(TANK_STATUS_SHORT_9)
-        assert result["msg_type"] == "tank_status_short"
-        assert result["flags"] == 0x82
-        assert result["tank_id"] == 0x0257  # 57 02 little-endian = 599
-        assert result["damage_state"] == 4
-        assert result["rank"] == 0  # recruit
-        assert result["leaderboard_position"] == 0x0015  # 15 00 little-endian
-
-    def test_raises_on_wrong_length(self) -> None:
-        """Raises on invalid length."""
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_status_short(bytes([0x01] * 8))
-        with pytest.raises(ContainerDecodeError):
-            decode_tank_status_short(bytes([0x01] * 10))
-
-    def test_tank_status_short_dict_keys(self) -> None:
-        """TankStatusShortDict has expected keys."""
-        result: TankStatusShortDict = decode_tank_status_short(TANK_STATUS_SHORT_9)
-        assert result["msg_type"] == "tank_status_short"
-        assert result["flags"] == 0x82
-        assert result["tank_id"] == 0x0257
-        assert result["damage_state"] == 4
-        assert result["rank"] == 0
-        assert result["leaderboard_position"] == 0x0015
-
-
-# Container TankStatusSync decoder was deleted 2026-06-19 (length-only
-# catch-all). Real 0x2E TankStatusSync (8+ bytes per JS Og.h) is tested
-# in tests/protocol/test_tank.py::TestDecodeTankStatusSync.
+# Container TankStatusShort decoder was deleted 2026-06-19. Crack
+# confirmed 0/74 production samples produced a valid container rank;
+# all 74 are Og.h-shaped (decode_tank_status_sync). Real 0x2E
+# TankStatusSync is tested in
+# tests/protocol/test_tank.py::TestDecodeTankStatusSync.
 
 
 class TestDecodeTankLeave:

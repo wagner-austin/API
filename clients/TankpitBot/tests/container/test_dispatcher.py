@@ -28,7 +28,6 @@ from tests.container.test_data import (
     TANK_LEAVE_6,
     TANK_REGISTRY_16,
     TANK_REGISTRY_20,
-    TANK_STATUS_SHORT_9,
     TANK_STATUS_SYNC_2,
     TANK_STATUS_SYNC_3,
     TELEPORT_LANDED_1,
@@ -71,11 +70,6 @@ class TestIdentifyContainerType:
         """Does not classify an unrelated packet as a known container subtype."""
         data = bytes.fromhex("46938292839182938191839181")
         assert identify_container_type(data) == ContainerMessageType.UNKNOWN
-
-    def test_identifies_tank_status_short(self) -> None:
-        """Correctly identifies tank status short structure (9 bytes)."""
-        result = identify_container_type(TANK_STATUS_SHORT_9)
-        assert result == ContainerMessageType.TANK_STATUS_SHORT
 
     def test_short_bodies_are_unknown(self) -> None:
         """2-3 byte container bodies resolve to UNKNOWN_CONTAINER.
@@ -200,11 +194,6 @@ class TestDecodeContainerMessage:
 
         with pytest.raises(ContainerDecodeError, match="expected subtype 0x24"):
             decode_position_update(bytes([0x99] + [0x00] * 12))
-
-    def test_dispatches_tank_status_short(self) -> None:
-        """Dispatches to tank status short decoder (9 bytes)."""
-        result = decode_container_message(TANK_STATUS_SHORT_9)
-        assert result["msg_type"] == "tank_status_short"
 
     def test_dispatches_short_body_as_unknown(self) -> None:
         """Short bodies (2-3 bytes) dispatch as unknown_container."""
