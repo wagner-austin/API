@@ -348,6 +348,24 @@ class TankRemoveDict(TypedDict):
     tank_id: int
 
 
+class PromotionDict(TypedDict):
+    """Binary promotion notification (0x2B '+' message, gameplay).
+
+    Trace-verified from tpclient.js Rf.h (V["+"]):
+      a[0] = new_rank (target rank, indexes into rank-name table)
+      a[1] = was_promoted (1 = "You have been promoted!" banner;
+                           0 = silent rank set, e.g. on join)
+
+    Distinct from the text-format ``WorldInfoDict`` (also 0x2B) emitted
+    by the server at lobby/ROOM_LIST time. The two are disambiguated by
+    wire body length: Rf carries exactly 2 XOR-decoded payload bytes.
+    """
+
+    msg_type: Literal[0x2B]
+    new_rank: int
+    was_promoted: bool
+
+
 class TankExitDict(TypedDict):
     """Tank exit/elimination announcement (0x29 ')' message).
 
@@ -539,6 +557,7 @@ __all__ = [
     "MovementDict",
     "MovementResponseDict",
     "OverlayUpdateDict",
+    "PromotionDict",
     "RadarContainerDict",
     "RadarMineDict",
     "RadarResultDict",
@@ -588,6 +607,7 @@ BinaryMessage = (
     | TankEntryDict
     | TankExitDict
     | TankRemoveDict
+    | PromotionDict
     | ActionDoneDict
     | ChatMessageDict
     | StatisticsDict

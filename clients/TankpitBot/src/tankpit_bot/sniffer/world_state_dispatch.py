@@ -48,7 +48,7 @@ from tankpit_bot.sniffer.world_state_tanks import (
 from tankpit_bot.sniffer.world_state_tiles import (
     render_ascii_if_available,
 )
-from tankpit_bot.state import add_mine, remove_mine
+from tankpit_bot.state import add_mine, remove_mine, set_self_rank
 
 log = get_logger(__name__)
 
@@ -137,6 +137,27 @@ def _dispatch_shoot_event(
         _update_tank_position(ws, shooter_id, sx, sy)
 
 
+def _dispatch_self_promotion(ws: WorldService, new_rank: int, was_promoted: bool) -> None:
+    """Apply a 0x2B Promotion (Rf) to self_state and emit a diagnostic.
+
+    JS Rf.prototype.h: ``a.i.l = this.j`` -- the server-authoritative
+    rank assignment to the player's own tank. ``was_promoted`` is the
+    UI banner flag; ``new_rank`` is the absolute new rank index.
+
+    Args:
+        ws: World service instance.
+        new_rank: New rank index (0-8).
+        was_promoted: True when the server intends a "promoted" banner;
+            False on silent rank resets (e.g. join-time initialization).
+    """
+    ws.world_state = set_self_rank(ws.world_state, new_rank, browser.get_current_time_ms())
+    emit_diagnostic(
+        diagnostic_kind="self_promotion",
+        new_rank=new_rank,
+        was_promoted=was_promoted,
+    )
+
+
 def _find_tank_at_tile(ws: WorldService, x: int, y: int, exclude_id: int) -> int:
     """Return the tank id occupying (x, y), or -1 if the tile is empty.
 
@@ -205,8 +226,12 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
 # =============================================================================
 
 
-def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
-    """Dispatch tank-related messages to update world state.
+def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch tank join / info / status / damage / removal / announcement.
+
+    Handled here: 0x28 TankEntry, 0x21 TankInfo, 0x3E TankStatusFull,
+    0x2E TankStatusSync (damage), 0x58 TankRemove, 0x29 TankExit
+    announcement, 0x2B Promotion. None of these resolve combat geometry.
 
     Args:
         ws: World service instance.
@@ -259,6 +284,29 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
                 was_eliminated=was_eliminated,
             )
             return True
+        case {
+            "msg_type": 0x2B,
+            "new_rank": int(new_rank),
+            "was_promoted": bool(was_promoted),
+        }:
+            _dispatch_self_promotion(ws, new_rank, was_promoted)
+            return True
+    return False
+
+
+def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch tank-related messages to update world state.
+
+    Args:
+        ws: World service instance.
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True if the message was handled, False otherwise.
+    """
+    if _dispatch_tank_lifecycle(ws, decoded):
+        return True
+    match decoded:
         case {
             "msg_type": 0x53,
             "shooter_id": int(shooter_id),

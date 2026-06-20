@@ -26,7 +26,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x28 | `(` | Uf | TankEntry: team, rank, position, score | FULL | — |
 | 0x29 | `)` | Vf | TankExit: team, id, was_silent, was_eliminated | FULL | — |
 | 0x2A | `*` | Xg | ActiveForces: team counts | FULL | — |
-| 0x2B | `+` | Rf | **Promotion: new_rank, was_promoted** | NONE | Decoder exists in `decode_text.py`; not wired to world state[^2] |
+| 0x2B | `+` | Rf | Promotion: new_rank, was_promoted | FULL | Disambiguated from text WorldInfo by 3-byte body length |
 | 0x2E | `.` | Og | TankStatusSync: team, id, rank, damage, lb_score, promo_state, fuel | FULL | — |
 | 0x2F | `/` | Yg | ActivePlayers: id+rank list | FULL | — |
 | 0x31 | `1` | Zg | Top10 leaderboard | FULL | — |
@@ -85,11 +85,7 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 
 ## Critical Gaps (ordered by impact)
 
-### 1. Promotion (0x2B) not dispatched — rank-up events lost
-
-The game sends `V["+"]` with `new_rank` and `was_promoted` flag on promotion. Decoder in `decode_text.py` exists; dispatch in `world_state_dispatch.py` doesn't wire it.[^2]
-
-### 2. TankUpdate compact/extended/full — 2-10 bytes of damage/direction/rank dropped per message
+### 1. TankUpdate compact/extended/full — 2-10 bytes of damage/direction/rank dropped per message
 
 These three subtypes carry post-position state for tanks but we only read bytes 0-1 (x,y). The remaining bytes likely contain damage, direction, and rank — currently unstructured.[^10]
 
@@ -179,7 +175,6 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
      128+ = custom text (remaining bytes)
 ```
 
-[^2]: Decoder in `decode_text.py` exists but dispatch in `world_state_dispatch.py` doesn't handle it
 [^3]: JS `wg` renders supervisor text messages; separate from command errors (V.R)
 [^4]: JS `Jg` handles obstacle build/pickup responses; not relevant for practice map combat
 [^5]: JS `Ig` fully parses the 0x4C map blob into tank positions and fuel dot coordinates

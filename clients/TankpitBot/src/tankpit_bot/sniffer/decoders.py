@@ -14,7 +14,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.parser import is_room_info_text
-from tankpit_bot.protocol.constants import RANK_NAMES
+from tankpit_bot.protocol.constants import MSG_PROMOTION, RANK_NAMES
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_state import (
@@ -26,6 +26,34 @@ from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tankpit_bot.sniffer.xor import xor_decode
 
 log = get_logger(__name__)
+
+# Binary Promotion (Rf) carries exactly 2 XOR-decoded payload bytes
+# (new_rank, was_promoted) -> body length 3. Text WorldInfo/ROOM_LIST
+# (also 0x2B '+') is far longer (pipe-delimited fields). This is the
+# only place in the wire grammar where a single byte type covers both
+# a text and a binary path; we disambiguate by length.
+_BINARY_PROMOTION_BODY_LEN = 3
+
+
+def _is_text_route(msg_type: int, body: bytes) -> bool:
+    """Decide whether a body should take the text-log path.
+
+    The 0x2B '+' byte is dual-use: text WorldInfo / ROOM_LIST at lobby
+    vs. binary Promotion (Rf) during gameplay. Wire length is the only
+    field that uniquely separates them (3 bytes for Rf, far more for
+    text). Every other entry in ``TEXT_MESSAGE_TYPES`` is text-only.
+
+    Args:
+        msg_type: First byte of the message body.
+        body: Full body bytes including ``msg_type``.
+
+    Returns:
+        True if the body should be formatted/logged as text.
+    """
+    if msg_type not in TEXT_MESSAGE_TYPES:
+        return False
+    return not (msg_type == MSG_PROMOTION and len(body) == _BINARY_PROMOTION_BODY_LEN)
+
 
 _PROTOCOL_FRAME_LOGGING_ENABLED = True
 
@@ -115,7 +143,7 @@ def try_decode_received(payload: str) -> str | None:
     msg_type = body[0]
 
     # Text messages (not XOR encoded)
-    if msg_type in TEXT_MESSAGE_TYPES:
+    if _is_text_route(msg_type, body):
         text = body.decode("utf-8", errors="replace")
         return decode_text_message(text, len(body), "RECEIVED", body)
 
@@ -163,8 +191,8 @@ def _process_single_message(body: bytes) -> None:
     """
     msg_type = body[0]
 
-    # Text messages — log only
-    if msg_type in TEXT_MESSAGE_TYPES:
+    # Text messages — log only.
+    if _is_text_route(msg_type, body):
         text = body.decode("utf-8", errors="replace")
         result = decode_text_message(text, len(body), "RECEIVED", body)
         _log_protocol_line(result)

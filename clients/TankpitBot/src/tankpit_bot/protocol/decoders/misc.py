@@ -11,6 +11,7 @@ from tankpit_bot.protocol.types import (
     ActionDoneDict,
     ActiveForcesDict,
     ChatMessageDict,
+    PromotionDict,
     StatisticsDict,
 )
 
@@ -97,6 +98,30 @@ def decode_statistics(data: bytes) -> StatisticsDict:
     )
 
 
+def decode_promotion(data: bytes) -> PromotionDict:
+    """Decode the binary 0x2B '+' Promotion message.
+
+    Trace-verified from tpclient.js Rf.h (V["+"]):
+      a[0] = new_rank
+      a[1] = was_promoted (1 = banner shown; 0 = silent rank set)
+
+    Args:
+        data: XOR-decoded message body (without the 0x2B prefix).
+
+    Returns:
+        Decoded promotion event.
+
+    Raises:
+        DecodeError: If decoding fails.
+    """
+    require_min_length(data, 2, "Promotion")
+    return PromotionDict(
+        msg_type=0x2B,
+        new_rank=data[0],
+        was_promoted=data[1] == 1,
+    )
+
+
 def decode_active_forces(data: bytes) -> ActiveForcesDict:
     """Decode active forces from XOR-decoded data.
 
@@ -117,5 +142,6 @@ __all__ = [
     "decode_action_done",
     "decode_active_forces",
     "decode_chat_message",
+    "decode_promotion",
     "decode_statistics",
 ]

@@ -17,6 +17,7 @@ from tankpit_bot.state import (
     remove_mine,
     remove_tank,
     set_self_fuel,
+    set_self_rank,
     update_container_from_radar,
     update_self_from_movement_response,
     update_terrain_from_viewport,
@@ -503,6 +504,45 @@ class TestSetSelfFuel:
 
         result = set_self_fuel(state, -10, 1000)
         assert get_self_state(result)["fuel"] == 0
+
+
+class TestSetSelfRank:
+    """Tests for set_self_rank mutation (driven by 0x2B Rf Promotion)."""
+
+    def test_returns_unchanged_when_no_self_state(self) -> None:
+        """No-op until self has joined: rank can't precede a self_state."""
+        state = make_empty_world_state()
+        result = set_self_rank(state, 5, 1000)
+        assert result["self_state"] is None
+        assert result is state
+
+    def test_sets_absolute_rank_and_preserves_other_fields(self) -> None:
+        """Promotion lifts rank only; team/position/fuel/lb stay intact."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=42, x=10, y=20, team=1, rank=2, leaderboard_position=7, timestamp_ms=500
+        )
+        state = set_self_fuel(state, 175, 600)
+
+        result = set_self_rank(state, 5, 1000)
+
+        promoted = get_self_state(result)
+        assert promoted["rank"] == 5
+        assert promoted["tank_id"] == 42
+        assert promoted["x"] == 10
+        assert promoted["y"] == 20
+        assert promoted["team"] == 1
+        assert promoted["fuel"] == 175
+        assert promoted["leaderboard_position"] == 7
+
+    def test_timestamp_advances(self) -> None:
+        """Mutation stamps the new world-state timestamp."""
+        state = make_empty_world_state()
+        state = update_self_from_movement_response(
+            state, tank_id=1, x=0, y=0, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
+        )
+        result = set_self_rank(state, 3, 1234)
+        assert result["timestamp_ms"] == 1234
 
 
 class TestPickupContainer:

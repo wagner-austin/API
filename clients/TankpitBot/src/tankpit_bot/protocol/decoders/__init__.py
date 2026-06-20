@@ -14,6 +14,7 @@ from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
     decode_chat_message,
+    decode_promotion,
     decode_statistics,
 )
 from tankpit_bot.protocol.decoders.movement import (
@@ -211,6 +212,7 @@ __all__ = [
     "decode_movement",
     "decode_movement_response",
     "decode_overlay_update",
+    "decode_promotion",
     "decode_radar_container",
     "decode_radar_mine",
     "decode_radar_result",

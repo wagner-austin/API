@@ -16,6 +16,7 @@ from tankpit_bot.protocol import (
     decode_chat_message,
     decode_combined_tile_update,
     decode_overlay_update,
+    decode_promotion,
     decode_statistics,
     decode_sync,
     decode_terrain_update,
@@ -179,6 +180,40 @@ class TestDecodeActiveForces:
         """Raises DecodeError on insufficient data."""
         with pytest.raises(DecodeError):
             decode_active_forces(bytes([1, 2]))
+
+
+class TestDecodePromotion:
+    """Tests for decode_promotion function.
+
+    0x2B '+' Rf binary form: ``Rf(a[0], 1===a[1])``. a[0] is the new
+    rank index; a[1]==1 sets the "You have been promoted!" banner.
+    """
+
+    def test_decodes_promotion_with_banner(self) -> None:
+        """Banner-on promotion: rank=4, was_promoted=True."""
+        data = bytes([4, 1])
+        result = decode_promotion(data)
+        assert result["msg_type"] == 0x2B
+        assert result["new_rank"] == 4
+        assert result["was_promoted"] is True
+
+    def test_decodes_silent_rank_set(self) -> None:
+        """Silent rank set (e.g. join-time): a[1]=0 -> was_promoted=False."""
+        data = bytes([2, 0])
+        result = decode_promotion(data)
+        assert result["new_rank"] == 2
+        assert result["was_promoted"] is False
+
+    def test_banner_flag_only_true_on_exact_one(self) -> None:
+        """JS uses ``1===a[1]``: byte 2 is False (not truthy)."""
+        data = bytes([1, 2])
+        result = decode_promotion(data)
+        assert result["was_promoted"] is False
+
+    def test_raises_on_short_data(self) -> None:
+        """Raises DecodeError on insufficient data (require 2 bytes)."""
+        with pytest.raises(DecodeError):
+            decode_promotion(bytes([1]))
 
 
 class TestDecodeTerrainUpdate:

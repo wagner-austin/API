@@ -565,6 +565,55 @@ class TestDispatchTankMessages:
     # 0x47 Movement carries tank_id directly per JS Lg.h.
 
 
+class TestDispatchPromotion:
+    """Tests for dispatch_world_state_update with 0x2B Promotion (Rf) messages."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_promotion_updates_self_rank(self) -> None:
+        """0x2B Rf sets self_state.rank to ``new_rank`` when self is joined."""
+        from tankpit_bot.protocol import PromotionDict
+        from tankpit_bot.state import update_self_from_movement_response
+
+        ws = get_world_service()
+        ws.world_state = update_self_from_movement_response(
+            ws.world_state,
+            tank_id=99,
+            x=10,
+            y=20,
+            team=1,
+            rank=1,
+            leaderboard_position=5,
+            timestamp_ms=500,
+        )
+
+        msg = PromotionDict(msg_type=0x2B, new_rank=4, was_promoted=True)
+        dispatch_world_state_update(ws, msg)
+
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state must exist after a self-join + Promotion")
+        assert self_state["rank"] == 4
+
+    def test_promotion_noop_when_no_self_state(self) -> None:
+        """0x2B before self has joined leaves world state unchanged."""
+        from tankpit_bot.protocol import PromotionDict
+
+        ws = get_world_service()
+        before = ws.world_state
+        msg = PromotionDict(msg_type=0x2B, new_rank=3, was_promoted=False)
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.world_state["self_state"] is None
+        assert ws.world_state is before
+
+
 class TestDispatchEnemyDetection:
     """Tests for dispatch_world_state_update with EnemyDetection (0x48) messages."""
 

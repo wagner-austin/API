@@ -697,3 +697,56 @@ class TestProcessReceivedMessage:
         frame = len(body).to_bytes(2, "little") + body
         payload = base64.b64encode(frame).decode()
         process_received_message(payload)  # should decode, log, and dispatch
+
+    def test_binary_promotion_takes_binary_route(self) -> None:
+        """0x2B with 3-byte body disambiguates to binary Rf, not text WorldInfo.
+
+        Binary Rf is the only message in the wire grammar that shares a
+        type byte with a text format. Length is the disambiguator
+        (3 bytes for Rf, far more for WorldInfo / ROOM_LIST).
+        """
+        from tankpit_bot.sniffer.decoders import process_received_message
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+        from tankpit_bot.state import update_self_from_movement_response
+
+        reset_world_state()
+        ws = get_world_service()
+        ws.world_state = update_self_from_movement_response(
+            ws.world_state,
+            tank_id=1,
+            x=10,
+            y=20,
+            team=0,
+            rank=1,
+            leaderboard_position=3,
+            timestamp_ms=500,
+        )
+
+        # Binary Rf body: 0x2B + 2 XOR-decoded bytes (new_rank=5, banner=1).
+        # XOR table is None in tests so body[1:] passes through verbatim.
+        body = bytes([0x2B, 5, 1])
+        frame = len(body).to_bytes(2, "little") + body
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)
+
+        self_state = get_world_service().world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should be present after dispatch")
+        assert self_state["rank"] == 5
+        reset_world_state()
+
+    def test_text_world_info_still_takes_text_route(self) -> None:
+        """0x2B with a long pipe-delimited body stays on the text-log path."""
+        from tankpit_bot.sniffer.decoders import process_received_message
+        from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+
+        reset_world_state()
+        # Long ROOM_LIST / WorldInfo body; well above the 3-byte Rf threshold.
+        body = b"+1|RoomName|24|1,1,1|0|n|field24.gif|2026"
+        frame = len(body).to_bytes(2, "little") + body
+        payload = base64.b64encode(frame).decode()
+        process_received_message(payload)
+
+        # No self_state should have been created since this is not binary Rf.
+        assert get_world_service().world_state["self_state"] is None
+        reset_world_state()

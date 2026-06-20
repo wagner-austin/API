@@ -345,6 +345,48 @@ def set_self_fuel(
     )
 
 
+def set_self_rank(
+    state: WorldStateDict,
+    rank: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Set self rank to absolute value from a Promotion message (0x2B Rf).
+
+    Args:
+        state: Current world state.
+        rank: New rank index (0-8 per the JS rank table).
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New WorldStateDict with updated self rank, or unchanged if no
+        self_state has been established yet (rank can't precede join).
+    """
+    if state["self_state"] is None:
+        return state
+
+    new_self = SelfStateDict(
+        tank_id=state["self_state"]["tank_id"],
+        x=state["self_state"]["x"],
+        y=state["self_state"]["y"],
+        team=state["self_state"]["team"],
+        rank=rank,
+        fuel=state["self_state"]["fuel"],
+        leaderboard_position=state["self_state"]["leaderboard_position"],
+    )
+
+    return WorldStateDict(
+        self_state=new_self,
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
 def remove_tank(
     state: WorldStateDict,
     tank_id: int,

@@ -158,7 +158,9 @@ def _make_unknown_payload(xor_table: bytes) -> str:
     Returns:
         Base64-encoded received frame payload.
     """
-    return _encode_received_frame(0x2B, b"\x00\x01\x02", xor_table)
+    # 0xAB is reserved / not assigned in the V table. Previous fixture
+    # used 0x2B '+' but that is now binary Promotion (Rf) and decodes.
+    return _encode_received_frame(0xAB, b"\x00\x01\x02", xor_table)
 
 
 def _make_session(messages: list[CapturedMessage], magic: str) -> CaptureSession:

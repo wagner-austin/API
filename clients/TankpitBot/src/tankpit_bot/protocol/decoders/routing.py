@@ -18,6 +18,7 @@ from tankpit_bot.protocol.constants import (
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
     MSG_OVERLAY_UPDATE,
+    MSG_PROMOTION,
     MSG_RADAR_RESULT,
     MSG_SHOOT,
     MSG_STATISTICS,
@@ -40,6 +41,7 @@ from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
     decode_chat_message,
+    decode_promotion,
     decode_statistics,
 )
 from tankpit_bot.protocol.decoders.movement import (
@@ -167,4 +169,6 @@ def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_supervisor(data)
     if msg_type == MSG_ACTION_DONE:
         return decode_action_done(data)
+    if msg_type == MSG_PROMOTION:
+        return decode_promotion(data)
     return None

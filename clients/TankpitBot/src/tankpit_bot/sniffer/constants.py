@@ -22,6 +22,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x21: "TankInfo",
     0x28: "TankJoin",
     0x29: "TankExit",
+    0x2B: "Promotion",
     0x2E: "TankStatus",
     0x3D: "MoveResponse",
     0x3E: "TankStatus",
@@ -55,7 +56,7 @@ TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x29, 0x58, 0x2E, 0x3E, 0x21, 
 RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
-MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D})
+MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B})
 
 # Text message type bytes (ASCII chars that indicate text, not binary)
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
@@ -76,6 +77,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("O"): 2,  # CombinedTileUpdate
     ord("("): 10,  # TankEntry
     ord(")"): 5,  # TankExit (Vf: team, tank_id, was_silent, was_eliminated)
+    ord("+"): 2,  # Promotion (Rf binary form: new_rank, was_promoted)
     ord("X"): 2,  # TankRemove
     ord("."): 1,  # 0x2E container (TankStatusSync or tunneled message)
     ord(">"): 13,  # TankStatus
