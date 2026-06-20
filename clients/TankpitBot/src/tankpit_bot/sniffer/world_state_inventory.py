@@ -55,6 +55,28 @@ def get_inventory_state(ws: WorldService) -> InventoryState:
     return ws.inventory_state
 
 
+def _apply_inventory_state(ws: WorldService, new_state: InventoryState) -> list[InventoryChange]:
+    """Replace the inventory state, log + emit changes, and return the diff.
+
+    Centralizes the diff / log / inventory-sample-emit cycle shared by
+    every inventory mutator below so each caller can focus on its own
+    transform.
+
+    Args:
+        ws: World service instance.
+        new_state: Fresh inventory state to install on ``ws``.
+
+    Returns:
+        List of detected changes vs the previous state.
+    """
+    old = ws.inventory_state
+    ws.inventory_state = new_state
+    changes = diff_inventory(old, ws.inventory_state)
+    _log_inventory_changes(changes)
+    _emit_inventory_sample(ws, changes)
+    return changes
+
+
 def update_inventory_from_protocol(
     ws: WorldService,
     counts: list[int],
@@ -70,18 +92,16 @@ def update_inventory_from_protocol(
     Returns:
         List of inventory changes detected.
     """
-    old = ws.inventory_state
-    ws.inventory_state = InventoryState(
-        armor_shields=InventoryItem(count=counts[0], enabled=enabled[0]),
-        dual_shots=InventoryItem(count=counts[1], enabled=enabled[1]),
-        missile_shots=InventoryItem(count=counts[2], enabled=enabled[2]),
-        homing_shots=InventoryItem(count=counts[3], enabled=enabled[3]),
-        extra_radars=InventoryItem(count=counts[4], enabled=enabled[4]),
+    return _apply_inventory_state(
+        ws,
+        InventoryState(
+            armor_shields=InventoryItem(count=counts[0], enabled=enabled[0]),
+            dual_shots=InventoryItem(count=counts[1], enabled=enabled[1]),
+            missile_shots=InventoryItem(count=counts[2], enabled=enabled[2]),
+            homing_shots=InventoryItem(count=counts[3], enabled=enabled[3]),
+            extra_radars=InventoryItem(count=counts[4], enabled=enabled[4]),
+        ),
     )
-    changes = diff_inventory(old, ws.inventory_state)
-    _log_inventory_changes(changes)
-    _emit_inventory_sample(ws, changes)
-    return changes
 
 
 def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[InventoryChange]:
@@ -95,30 +115,31 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
         List of inventory changes detected.
     """
     old = ws.inventory_state
-    ws.inventory_state = InventoryState(
-        armor_shields=InventoryItem(
-            count=old["armor_shields"]["count"] + gained[0],
-            enabled=old["armor_shields"]["enabled"],
-        ),
-        dual_shots=InventoryItem(
-            count=old["dual_shots"]["count"] + gained[1],
-            enabled=old["dual_shots"]["enabled"],
-        ),
-        missile_shots=InventoryItem(
-            count=old["missile_shots"]["count"] + gained[2],
-            enabled=old["missile_shots"]["enabled"],
-        ),
-        homing_shots=InventoryItem(
-            count=old["homing_shots"]["count"] + gained[3],
-            enabled=old["homing_shots"]["enabled"],
-        ),
-        extra_radars=InventoryItem(
-            count=old["extra_radars"]["count"] + gained[4],
-            enabled=old["extra_radars"]["enabled"],
+    changes = _apply_inventory_state(
+        ws,
+        InventoryState(
+            armor_shields=InventoryItem(
+                count=old["armor_shields"]["count"] + gained[0],
+                enabled=old["armor_shields"]["enabled"],
+            ),
+            dual_shots=InventoryItem(
+                count=old["dual_shots"]["count"] + gained[1],
+                enabled=old["dual_shots"]["enabled"],
+            ),
+            missile_shots=InventoryItem(
+                count=old["missile_shots"]["count"] + gained[2],
+                enabled=old["missile_shots"]["enabled"],
+            ),
+            homing_shots=InventoryItem(
+                count=old["homing_shots"]["count"] + gained[3],
+                enabled=old["homing_shots"]["enabled"],
+            ),
+            extra_radars=InventoryItem(
+                count=old["extra_radars"]["count"] + gained[4],
+                enabled=old["extra_radars"]["enabled"],
+            ),
         ),
     )
-    changes = diff_inventory(old, ws.inventory_state)
-    _log_inventory_changes(changes)
     emit_diagnostic(
         diagnostic_kind="equipment_gain",
         armor=gained[0],
@@ -127,7 +148,6 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
         homing=gained[3],
         radar=gained[4],
     )
-    _emit_inventory_sample(ws, changes)
     return changes
 
 
@@ -145,17 +165,16 @@ def update_inventory_from_toggle(
         List of inventory changes detected.
     """
     old = ws.inventory_state
-    ws.inventory_state = InventoryState(
-        armor_shields=InventoryItem(count=old["armor_shields"]["count"], enabled=enabled[0]),
-        dual_shots=InventoryItem(count=old["dual_shots"]["count"], enabled=enabled[1]),
-        missile_shots=InventoryItem(count=old["missile_shots"]["count"], enabled=enabled[2]),
-        homing_shots=InventoryItem(count=old["homing_shots"]["count"], enabled=enabled[3]),
-        extra_radars=InventoryItem(count=old["extra_radars"]["count"], enabled=enabled[4]),
+    return _apply_inventory_state(
+        ws,
+        InventoryState(
+            armor_shields=InventoryItem(count=old["armor_shields"]["count"], enabled=enabled[0]),
+            dual_shots=InventoryItem(count=old["dual_shots"]["count"], enabled=enabled[1]),
+            missile_shots=InventoryItem(count=old["missile_shots"]["count"], enabled=enabled[2]),
+            homing_shots=InventoryItem(count=old["homing_shots"]["count"], enabled=enabled[3]),
+            extra_radars=InventoryItem(count=old["extra_radars"]["count"], enabled=enabled[4]),
+        ),
     )
-    changes = diff_inventory(old, ws.inventory_state)
-    _log_inventory_changes(changes)
-    _emit_inventory_sample(ws, changes)
-    return changes
 
 
 def _log_inventory_changes(changes: list[InventoryChange]) -> None:

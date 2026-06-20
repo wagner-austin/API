@@ -6,6 +6,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.state.types import (
     ContainerRefreshKind,
+    EntitySource,
     SelfStateDict,
     WorldStateDict,
     coord_key,
@@ -186,7 +187,30 @@ def add_mine_from_radar(
     team: int,
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Add mine discovered via radar scan.
+    """Add or refresh a mine discovered via radar scan (0x4F-tunneled).
+
+    Radar mine entries are 3 bytes wide -- ``x, y, team`` -- and carry
+    NEITHER ``mine_type`` NOR the placer's ``tank_id``. Those fields are
+    only knowable via wire MinePlacement (V.K / 0x4B, per tpclient.js
+    handler ``Dg.h``). When radar refreshes a tile where a wire-placed
+    mine already lives, this mutator must preserve the wire-known
+    ``mine_type`` and ``tank_id`` -- they came from a richer source and
+    radar cannot reproduce them.
+
+    Merge rules:
+      * New tile (no existing mine): seed with ``mine_type=0``,
+        ``tank_id=-1``, ``source="radar"``.
+      * Existing wire-sourced mine: preserve ``mine_type`` and
+        ``tank_id``, keep ``source="viewport"`` (still wire-richer),
+        advance ``timestamp_ms``, update ``team`` to the radar value
+        (the wire team is authoritative on placement and the radar
+        team is authoritative on refresh -- a placement followed by a
+        radar sighting at the same tile is the same mine, and team
+        cannot legally change for an undetonated mine, so this
+        difference indicates the wire team field went stale and should
+        be re-synced).
+      * Existing radar-sourced mine: refresh as before with
+        ``source="radar"``.
 
     Args:
         state: Current world state.
@@ -196,19 +220,33 @@ def add_mine_from_radar(
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with mine added.
+        New ``WorldStateDict`` with the mine added or refreshed.
     """
+    key = coord_key(x, y)
+    existing = state["mines"].get(key)
+    if existing is None:
+        merged_mine_type = 0
+        merged_tank_id = -1
+        merged_source: EntitySource = "radar"
+    elif existing["source"] == "viewport":
+        merged_mine_type = existing["mine_type"]
+        merged_tank_id = existing["tank_id"]
+        merged_source = "viewport"
+    else:
+        merged_mine_type = existing["mine_type"]
+        merged_tank_id = existing["tank_id"]
+        merged_source = "radar"
+
     new_mine = make_mine_state(
         x=x,
         y=y,
-        mine_type=0,
-        tank_id=-1,
+        mine_type=merged_mine_type,
+        tank_id=merged_tank_id,
         team=team,
-        source="radar",
+        source=merged_source,
         timestamp_ms=timestamp_ms,
     )
 
-    key = coord_key(x, y)
     new_mines = dict(state["mines"])
     new_mines[key] = new_mine
 
@@ -315,9 +353,61 @@ def pickup_container(
     )
 
 
+def increment_container_failed_pickups(
+    state: WorldStateDict,
+    x: int,
+    y: int,
+) -> WorldStateDict:
+    """Increment the ``failed_pickups`` counter for a container.
+
+    Used by the planner to deprioritize containers whose pickups stall.
+    The container's ``timestamp_ms`` is preserved so this is not a
+    freshness update; only the diagnostic counter advances. Returns
+    ``state`` unchanged if no container exists at ``(x, y)``.
+
+    Args:
+        state: Current world state.
+        x: Container X coordinate.
+        y: Container Y coordinate.
+
+    Returns:
+        New ``WorldStateDict`` with the container's
+        ``failed_pickups`` advanced by one, or the original state if
+        no container is at ``(x, y)``.
+    """
+    key = coord_key(x, y)
+    container = state["containers"].get(key)
+    if container is None:
+        return state
+    new_container = make_container_state(
+        x=container["x"],
+        y=container["y"],
+        is_fuel=container["is_fuel"],
+        volume=container["volume"],
+        source=container["source"],
+        refresh_kind=container["refresh_kind"],
+        timestamp_ms=container["timestamp_ms"],
+        failed_pickups=container["failed_pickups"] + 1,
+    )
+    new_containers = dict(state["containers"])
+    new_containers[key] = new_container
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=new_containers,
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
+        timestamp_ms=state["timestamp_ms"],
+    )
+
+
 __all__ = [
     "add_mine",
     "add_mine_from_radar",
+    "increment_container_failed_pickups",
     "pickup_container",
     "remove_container",
     "remove_mine",

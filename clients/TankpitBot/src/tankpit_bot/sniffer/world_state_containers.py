@@ -13,8 +13,6 @@ from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
-    WorldStateDict,
-    make_container_state,
     pickup_container,
     replace_map_fuel_dots,
     set_self_fuel,
@@ -103,6 +101,9 @@ def remove_container_at(ws: WorldService, x: int, y: int) -> None:
     """Remove a container from world state at the given position.
 
     Used when the bot detects a container is unreachable (stuck timeout).
+    Delegates the world-state edit to the central
+    :func:`state.remove_container` mutator, then clears the radar tile
+    cache so the planner cannot re-acquire the same tile.
 
     Args:
         ws: World service instance.
@@ -110,70 +111,45 @@ def remove_container_at(ws: WorldService, x: int, y: int) -> None:
         y: Container Y coordinate.
     """
     from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
+    from tankpit_bot.state import remove_container
 
     key = f"{x},{y}"
-    if key in ws.world_state["containers"]:
-        new_containers = dict(ws.world_state["containers"])
-        del new_containers[key]
-        ws.world_state = WorldStateDict(
-            self_state=ws.world_state["self_state"],
-            tanks=ws.world_state["tanks"],
-            containers=new_containers,
-            mines=ws.world_state["mines"],
-            terrain=ws.world_state["terrain"],
-            viewport=ws.world_state["viewport"],
-            scanned_viewports=ws.world_state["scanned_viewports"],
-            map_fuel_dots=ws.world_state["map_fuel_dots"],
-            timestamp_ms=ws.world_state["timestamp_ms"],
-        )
-        clear_container_tile_cache(ws, x, y)
-        log.info("Removed unreachable container at (%d, %d)", x, y)
+    if key not in ws.world_state["containers"]:
+        return
+    ws.world_state = remove_container(ws.world_state, x, y, ws.world_state["timestamp_ms"])
+    clear_container_tile_cache(ws, x, y)
+    log.info("Removed unreachable container at (%d, %d)", x, y)
 
 
 def increment_container_failed_pickups(ws: WorldService, x: int, y: int) -> None:
     """Increment the failed_pickups counter on a container.
 
     Called when a pickup attempt stalls. The container stays in world
-    state but is deprioritized by the planner.
+    state but is deprioritized by the planner. Delegates the world-state
+    edit to the central
+    :func:`state.container_mutations.increment_container_failed_pickups`
+    mutator.
 
     Args:
         ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
     """
-    key = f"{x},{y}"
-    container = ws.world_state["containers"].get(key)
+    from tankpit_bot.state.container_mutations import (
+        increment_container_failed_pickups as _bump_failed_pickups,
+    )
+
+    container = ws.world_state["containers"].get(f"{x},{y}")
     if container is None:
         return
-    new_container = make_container_state(
-        x=container["x"],
-        y=container["y"],
-        is_fuel=container["is_fuel"],
-        volume=container["volume"],
-        source=container["source"],
-        refresh_kind=container["refresh_kind"],
-        timestamp_ms=container["timestamp_ms"],
-        failed_pickups=container["failed_pickups"] + 1,
-    )
-    new_containers = dict(ws.world_state["containers"])
-    new_containers[key] = new_container
-    ws.world_state = WorldStateDict(
-        self_state=ws.world_state["self_state"],
-        tanks=ws.world_state["tanks"],
-        containers=new_containers,
-        mines=ws.world_state["mines"],
-        terrain=ws.world_state["terrain"],
-        viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
-        map_fuel_dots=ws.world_state["map_fuel_dots"],
-        timestamp_ms=ws.world_state["timestamp_ms"],
-    )
+    previous_failed_pickups = container["failed_pickups"]
+    ws.world_state = _bump_failed_pickups(ws.world_state, x, y)
     log.info(
         "Container (%d,%d) failed_pickups: %d -> %d",
         x,
         y,
-        container["failed_pickups"],
-        new_container["failed_pickups"],
+        previous_failed_pickups,
+        previous_failed_pickups + 1,
     )
 
 

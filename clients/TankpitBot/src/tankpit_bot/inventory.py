@@ -1,8 +1,10 @@
-"""Inventory tracking for Tankpit game.
+"""Inventory TypedDicts, diffing, and codecs.
 
-Provides utilities to parse and track inventory items from the game DOM.
-Detects changes in item counts and enabled states for correlation with
-WebSocket messages.
+The DOM-scraping path (``InventoryScraper``, ``parse_inventory``,
+``scrape_inventory_text``, ``SCRAPE_INVENTORY_JS``, ``ITEM_NAME_MAP``)
+was deleted 2026-06-19. Wire-decoded 0x49 / 0x67 / 0x74 messages are the
+authoritative inventory source; DOM scraping reads stale UI and was
+never wired into the production tick loop.
 """
 
 from __future__ import annotations
@@ -17,8 +19,6 @@ from platform_core.json_utils import (
 )
 from platform_core.logging import get_logger
 
-from tankpit_bot._test_hooks import CDPSessionProtocol
-
 log = get_logger(__name__)
 
 
@@ -29,15 +29,6 @@ log = get_logger(__name__)
 
 # Known inventory item types
 ItemType = Literal["armor_shields", "dual_shots", "missile_shots", "homing_shots", "extra_radars"]
-
-# Mapping from display names to item types
-ITEM_NAME_MAP: dict[str, ItemType] = {
-    "armor shields": "armor_shields",
-    "dual shots": "dual_shots",
-    "missile shots": "missile_shots",
-    "homing shots": "homing_shots",
-    "extra radars": "extra_radars",
-}
 
 
 class InventoryItem(TypedDict):
@@ -90,144 +81,32 @@ class InventoryChange(TypedDict):
     now_enabled: bool
 
 
-# =============================================================================
-# JavaScript for DOM scraping
-# =============================================================================
+def replace_inventory_slot(
+    state: InventoryState,
+    slot: ItemType,
+    item: InventoryItem,
+) -> InventoryState:
+    """Return a new ``InventoryState`` with one slot replaced.
 
-
-SCRAPE_INVENTORY_JS = """
-(() => {
-    const body = document.body;
-    if (!body) return '';
-
-    const text = body.innerText || '';
-
-    // Find "Inventory:" header
-    const invStart = text.indexOf('Inventory:');
-    if (invStart < 0) return '';
-
-    // Find the dashed line after Inventory:
-    const dashStart = text.indexOf('----', invStart);
-    if (dashStart < 0) return '';
-
-    // Find newline after dashes to get item list start
-    let itemStart = text.indexOf('\\n', dashStart);
-    if (itemStart < 0) return '';
-
-    // Find closing stars (end of inventory section)
-    const endStars = text.indexOf('****', itemStart);
-    if (endStars < 0) return '';
-
-    return text.substring(itemStart, endStars).trim();
-})()
-"""
-
-
-# =============================================================================
-# Scraping Functions
-# =============================================================================
-
-
-def scrape_inventory_text(cdp: CDPSessionProtocol) -> str:
-    """Scrape the raw inventory text from the DOM.
-
-    Uses CDP Runtime.evaluate to execute JavaScript that extracts
-    the inventory section from the page body.
+    Used when only one item changed (e.g. ammo consumed by a hit). The
+    other four slots are preserved by reference.
 
     Args:
-        cdp: CDP session for executing JavaScript.
+        state: Current inventory state.
+        slot: Which slot to replace.
+        item: New value for that slot.
 
     Returns:
-        Raw inventory text, or empty string if not found.
-    """
-    result: JSONObject = cdp.send(
-        "Runtime.evaluate",
-        {"expression": SCRAPE_INVENTORY_JS, "returnByValue": True},
-    )
-    result_obj = result.get("result")
-    if isinstance(result_obj, dict):
-        value = result_obj.get("value")
-        if isinstance(value, str):
-            return value
-    return ""
-
-
-def _make_empty_inventory() -> InventoryState:
-    """Create an empty inventory state with all items at zero.
-
-    Returns:
-        InventoryState with all counts at 0 and enabled True.
+        Fresh ``InventoryState`` with ``slot`` set to ``item`` and
+        every other slot preserved from ``state``.
     """
     return InventoryState(
-        armor_shields=InventoryItem(count=0, enabled=True),
-        dual_shots=InventoryItem(count=0, enabled=True),
-        missile_shots=InventoryItem(count=0, enabled=True),
-        homing_shots=InventoryItem(count=0, enabled=True),
-        extra_radars=InventoryItem(count=0, enabled=True),
+        armor_shields=item if slot == "armor_shields" else state["armor_shields"],
+        dual_shots=item if slot == "dual_shots" else state["dual_shots"],
+        missile_shots=item if slot == "missile_shots" else state["missile_shots"],
+        homing_shots=item if slot == "homing_shots" else state["homing_shots"],
+        extra_radars=item if slot == "extra_radars" else state["extra_radars"],
     )
-
-
-def _parse_inventory_line(line: str) -> tuple[ItemType, InventoryItem] | None:
-    """Parse a single inventory line into item type and state.
-
-    Expected format: "30 armor shields (disabled)" or "30 dual shots"
-
-    Args:
-        line: A single line from the inventory section.
-
-    Returns:
-        Tuple of (item_type, InventoryItem) if parsed successfully, None otherwise.
-    """
-    stripped = line.strip()
-    if not stripped:
-        return None
-
-    # Check for (disabled) suffix
-    enabled = True
-    if stripped.endswith("(disabled)"):
-        enabled = False
-        stripped = stripped.replace("(disabled)", "").strip()
-
-    # Split into count and item name
-    parts = stripped.split(None, 1)
-    if len(parts) != 2:
-        return None
-
-    count_str, item_name = parts
-
-    # Parse count
-    if not count_str.isdigit():
-        return None
-    count = int(count_str)
-
-    # Look up item type
-    item_name_lower = item_name.lower()
-    item_type = ITEM_NAME_MAP.get(item_name_lower)
-    if item_type is None:
-        return None
-
-    return (item_type, InventoryItem(count=count, enabled=enabled))
-
-
-def parse_inventory(raw_text: str) -> InventoryState:
-    """Parse raw inventory text into structured state.
-
-    Args:
-        raw_text: Raw text scraped from the inventory section.
-
-    Returns:
-        Parsed InventoryState with all item counts and enabled states.
-    """
-    state = _make_empty_inventory()
-
-    for line in raw_text.split("\n"):
-        parsed = _parse_inventory_line(line)
-        if parsed is not None:
-            item_type, item = parsed
-            # Use explicit assignment for type safety (Literal narrowing)
-            state[item_type] = item
-
-    return state
 
 
 def diff_inventory(old: InventoryState, new: InventoryState) -> list[InventoryChange]:
@@ -269,90 +148,6 @@ def diff_inventory(old: InventoryState, new: InventoryState) -> list[InventoryCh
             )
 
     return changes
-
-
-# =============================================================================
-# InventoryScraper Class
-# =============================================================================
-
-
-class InventoryScraper:
-    """Tracks inventory changes over time.
-
-    Maintains previous inventory state to detect changes when scraping
-    the DOM repeatedly. Reports changes with deltas for correlation
-    with WebSocket messages.
-    """
-
-    def __init__(self, cdp: CDPSessionProtocol) -> None:
-        """Initialize the scraper.
-
-        Args:
-            cdp: CDP session for DOM access.
-        """
-        self._cdp = cdp
-        self._previous_state: InventoryState | None = None
-
-    def scrape(self) -> InventoryState:
-        """Scrape current inventory state.
-
-        Returns:
-            Current inventory state.
-        """
-        raw_text = scrape_inventory_text(self._cdp)
-        return parse_inventory(raw_text)
-
-    def get_changes(self) -> list[InventoryChange]:
-        """Get inventory changes since last call.
-
-        Compares current inventory with previous state and returns
-        list of changes. On first call, returns empty list.
-
-        Returns:
-            List of inventory changes.
-        """
-        current = self.scrape()
-
-        if self._previous_state is None:
-            self._previous_state = current
-            return []
-
-        changes = diff_inventory(self._previous_state, current)
-        self._previous_state = current
-        return changes
-
-    def log_changes(self) -> list[InventoryChange]:
-        """Log any inventory changes to the logger.
-
-        Checks for changes and logs them with appropriate messages.
-
-        Returns:
-            List of inventory changes that were logged.
-        """
-        changes = self.get_changes()
-        for change in changes:
-            item_display = change["item"].replace("_", " ")
-            if change["delta"] != 0:
-                if change["delta"] > 0:
-                    log.info(
-                        "[INV:GAINED] %s: +%d (%d->%d)",
-                        item_display,
-                        change["delta"],
-                        change["old_count"],
-                        change["new_count"],
-                    )
-                else:
-                    log.info(
-                        "[INV:USED] %s: %d (%d->%d)",
-                        item_display,
-                        change["delta"],
-                        change["old_count"],
-                        change["new_count"],
-                    )
-            if change["enabled_changed"]:
-                state_str = "enabled" if change["now_enabled"] else "disabled"
-                log.info("[INV:TOGGLE] %s: %s", item_display, state_str)
-        return changes
 
 
 # =============================================================================
@@ -528,11 +323,9 @@ def decode_inventory_change(obj: JSONObject) -> InventoryChange:
 
 
 __all__ = [
-    "ITEM_NAME_MAP",
     "VALID_ITEM_TYPES",
     "InventoryChange",
     "InventoryItem",
-    "InventoryScraper",
     "InventoryState",
     "ItemType",
     "decode_inventory_change",
@@ -542,7 +335,6 @@ __all__ = [
     "encode_inventory_change",
     "encode_inventory_item",
     "encode_inventory_state",
-    "parse_inventory",
-    "scrape_inventory_text",
+    "replace_inventory_slot",
     "validate_item_type",
 ]

@@ -20,10 +20,6 @@ from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.bot.states import (
     make_initial_state_data,
 )
-from tankpit_bot.bot.vision import (
-    VisionStateDict,
-    make_empty_vision_state,
-)
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.dom_scraper import (
@@ -118,7 +114,6 @@ class Bot(DispatchMixin):
         self._game_log_scraper: GameLogScraper | None = None
         self._shot_screenshot_seq: int = 0
         self._ai_state: AIStateDict = make_initial_ai_state()
-        self._vision_state: VisionStateDict = make_empty_vision_state()
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x
@@ -230,6 +225,15 @@ class Bot(DispatchMixin):
     # =========================================================================
     # Game Log
     # =========================================================================
+    #
+    # The bot inherits ``SessionBase`` -- a parallel hierarchy from the
+    # ``BrowserSession`` used by the standalone sniffer -- so it owns
+    # its own game-log scraper hooks. The tick loop calls
+    # ``self._poll_game_log()`` each tick and feeds the entries to
+    # ``register_kills_from_game_log`` (own-kill detection, since wire
+    # 0x41 never fires for own kills) and
+    # ``register_world_feedback_from_game_log`` (failed pickups, full
+    # tank, rejected moves -- the only signal for those).
 
     def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
         """Create the game log scraper for server feedback visibility.
@@ -340,7 +344,6 @@ class Bot(DispatchMixin):
         self._magic = None
         self._state_data = make_initial_state_data()
         self._ai_state = make_initial_ai_state()
-        self._vision_state = make_empty_vision_state()
         self._cdp_message_buffer = []
 
         with _test_hooks.sync_playwright() as playwright:

@@ -1,8 +1,14 @@
-"""Tests for tankpit_bot.inventory module."""
+"""Tests for tankpit_bot.inventory module.
+
+The DOM-scraping path (``InventoryScraper``, ``parse_inventory``,
+``scrape_inventory_text``, ``SCRAPE_INVENTORY_JS``, ``ITEM_NAME_MAP``)
+was deleted 2026-06-19 along with its ~250-line test suite; wire-decoded
+0x49 / 0x67 / 0x74 messages are now the authoritative inventory source.
+Remaining coverage in this file exercises ``diff_inventory`` and the
+inventory TypedDict codecs.
+"""
 
 from __future__ import annotations
-
-from collections.abc import Callable
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError
@@ -10,7 +16,6 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 from tankpit_bot.inventory import (
     InventoryChange,
     InventoryItem,
-    InventoryScraper,
     InventoryState,
     decode_inventory_change,
     decode_inventory_item,
@@ -19,233 +24,16 @@ from tankpit_bot.inventory import (
     encode_inventory_change,
     encode_inventory_item,
     encode_inventory_state,
-    parse_inventory,
-    scrape_inventory_text,
     validate_item_type,
 )
 
-
-class FakeCDPForScraper:
-    """Fake CDP session for scraper tests.
-
-    Configurable to return different values for Runtime.evaluate.
-    """
-
-    def __init__(self, return_value: str = "") -> None:
-        """Initialize fake with return value.
-
-        Args:
-            return_value: Value to return from Runtime.evaluate.
-        """
-        self._return_value = return_value
-        self.calls: list[tuple[str, JSONObject | None]] = []
-        self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Send CDP command.
-
-        Args:
-            method: CDP method name.
-            params: Optional parameters.
-
-        Returns:
-            Fake result with configured value.
-        """
-        self.calls.append((method, params))
-        return {"result": {"value": self._return_value}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """Register event handler.
-
-        Args:
-            event: Event name.
-            handler: Event handler function.
-        """
-        if event not in self._handlers:
-            self._handlers[event] = []
-        self._handlers[event].append(handler)
-
-    def detach(self) -> None:
-        """Detach CDP session."""
-
-
-class FakeCDPEmptyResult:
-    """Fake CDP session that returns empty result (no 'result' key)."""
-
-    def __init__(self) -> None:
-        """Initialize fake."""
-        self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return empty dict (missing 'result' key)."""
-        _ = method
-        _ = params
-        return {}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """Register event handler."""
-        if event not in self._handlers:
-            self._handlers[event] = []
-        self._handlers[event].append(handler)
-
-    def detach(self) -> None:
-        """Detach CDP session."""
-
-
-class FakeCDPNonDictResult:
-    """Fake CDP session that returns non-dict result."""
-
-    def __init__(self) -> None:
-        """Initialize fake."""
-        self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return result that is not a dict."""
-        _ = method
-        _ = params
-        return {"result": "not a dict"}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """Register event handler."""
-        if event not in self._handlers:
-            self._handlers[event] = []
-        self._handlers[event].append(handler)
-
-    def detach(self) -> None:
-        """Detach CDP session."""
-
-
-class FakeCDPNumericValue:
-    """Fake CDP session that returns numeric value instead of string."""
-
-    def __init__(self) -> None:
-        """Initialize fake."""
-        self._handlers: dict[str, list[Callable[[JSONObject], None]]] = {}
-
-    def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
-        """Return result with numeric value."""
-        _ = method
-        _ = params
-        return {"result": {"value": 12345}}
-
-    def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
-        """Register event handler."""
-        if event not in self._handlers:
-            self._handlers[event] = []
-        self._handlers[event].append(handler)
-
-    def detach(self) -> None:
-        """Detach CDP session."""
-
-
 # =============================================================================
-# Inventory Scraping Tests
+# diff_inventory tests
 # =============================================================================
-
-
-def test_scrape_inventory_text_returns_value() -> None:
-    """Test scrape_inventory_text extracts value from CDP result."""
-    cdp = FakeCDPForScraper("30 armor shields (disabled)\n30 dual shots")
-    result = scrape_inventory_text(cdp)
-    assert result == "30 armor shields (disabled)\n30 dual shots"
-
-
-def test_scrape_inventory_text_handles_empty() -> None:
-    """Test scrape_inventory_text returns empty string when no value."""
-    cdp = FakeCDPForScraper("")
-    result = scrape_inventory_text(cdp)
-    assert result == ""
-
-
-def test_scrape_inventory_text_handles_missing_result() -> None:
-    """Test scrape_inventory_text handles missing result object."""
-    cdp = FakeCDPEmptyResult()
-    result = scrape_inventory_text(cdp)
-    assert result == ""
-
-
-def test_scrape_inventory_text_handles_non_dict_result() -> None:
-    """Test scrape_inventory_text handles non-dict result."""
-    cdp = FakeCDPNonDictResult()
-    result = scrape_inventory_text(cdp)
-    assert result == ""
-
-
-def test_scrape_inventory_text_handles_non_string_value() -> None:
-    """Test scrape_inventory_text handles non-string value."""
-    cdp = FakeCDPNumericValue()
-    result = scrape_inventory_text(cdp)
-    assert result == ""
-
-
-def test_parse_inventory_empty() -> None:
-    """Test parse_inventory handles empty input."""
-    state = parse_inventory("")
-    assert state["armor_shields"]["count"] == 0
-    assert state["dual_shots"]["count"] == 0
-    assert state["missile_shots"]["count"] == 0
-    assert state["homing_shots"]["count"] == 0
-    assert state["extra_radars"]["count"] == 0
-
-
-def test_parse_inventory_all_items() -> None:
-    """Test parse_inventory parses all inventory items."""
-    raw = """30 armor shields (disabled)
-25 dual shots
-20 missile shots (disabled)
-15 homing shots
-10 extra radars"""
-    state = parse_inventory(raw)
-    assert state["armor_shields"]["count"] == 30
-    assert state["armor_shields"]["enabled"] is False
-    assert state["dual_shots"]["count"] == 25
-    assert state["dual_shots"]["enabled"] is True
-    assert state["missile_shots"]["count"] == 20
-    assert state["missile_shots"]["enabled"] is False
-    assert state["homing_shots"]["count"] == 15
-    assert state["homing_shots"]["enabled"] is True
-    assert state["extra_radars"]["count"] == 10
-    assert state["extra_radars"]["enabled"] is True
-
-
-def test_parse_inventory_skips_unknown_items() -> None:
-    """Test parse_inventory skips unknown item names."""
-    raw = "30 dual shots\n99 unknown items\n10 extra radars"
-    state = parse_inventory(raw)
-    assert state["dual_shots"]["count"] == 30
-    assert state["extra_radars"]["count"] == 10
-    # Unknown items are ignored, armor_shields stays at default
-    assert state["armor_shields"]["count"] == 0
-
-
-def test_parse_inventory_skips_invalid_count() -> None:
-    """Test parse_inventory skips lines with non-numeric count."""
-    raw = "XX dual shots\n10 extra radars"
-    state = parse_inventory(raw)
-    assert state["dual_shots"]["count"] == 0  # Stays at default
-    assert state["extra_radars"]["count"] == 10
-
-
-def test_parse_inventory_skips_single_word_lines() -> None:
-    """Test parse_inventory skips lines without item name."""
-    raw = "30\n10 extra radars"
-    state = parse_inventory(raw)
-    assert state["extra_radars"]["count"] == 10
-
-
-def test_parse_inventory_extra_radars_not_last() -> None:
-    """Test parse_inventory handles extra_radars when not last item."""
-    # extra_radars before homing_shots (covers branch 313->300)
-    # After processing extra_radars, loop continues to process homing_shots
-    raw = "10 extra radars\n15 homing shots\n30 armor shields"
-    state = parse_inventory(raw)
-    assert state["extra_radars"]["count"] == 10
-    assert state["homing_shots"]["count"] == 15
-    assert state["armor_shields"]["count"] == 30
 
 
 def test_diff_inventory_no_changes() -> None:
-    """Test diff_inventory returns empty list when no changes."""
+    """``diff_inventory`` returns an empty list when no fields changed."""
     old: InventoryState = {
         "armor_shields": InventoryItem(count=30, enabled=True),
         "dual_shots": InventoryItem(count=25, enabled=True),
@@ -265,7 +53,7 @@ def test_diff_inventory_no_changes() -> None:
 
 
 def test_diff_inventory_count_change() -> None:
-    """Test diff_inventory detects count changes."""
+    """``diff_inventory`` detects per-item count changes with signed deltas."""
     old: InventoryState = {
         "armor_shields": InventoryItem(count=30, enabled=True),
         "dual_shots": InventoryItem(count=25, enabled=True),
@@ -294,7 +82,7 @@ def test_diff_inventory_count_change() -> None:
 
 
 def test_diff_inventory_enabled_change() -> None:
-    """Test diff_inventory detects enabled state changes."""
+    """``diff_inventory`` detects enabled-flag changes with zero delta."""
     old: InventoryState = {
         "armor_shields": InventoryItem(count=30, enabled=True),
         "dual_shots": InventoryItem(count=25, enabled=True),
@@ -318,100 +106,12 @@ def test_diff_inventory_enabled_change() -> None:
 
 
 # =============================================================================
-# InventoryScraper Tests
-# =============================================================================
-
-
-def test_inventory_scraper_scrape() -> None:
-    """Test InventoryScraper.scrape returns current state."""
-    cdp = FakeCDPForScraper("30 dual shots\n10 extra radars")
-    scraper = InventoryScraper(cdp)
-    state = scraper.scrape()
-    assert state["dual_shots"]["count"] == 30
-    assert state["extra_radars"]["count"] == 10
-
-
-def test_inventory_scraper_get_changes_first_call() -> None:
-    """Test InventoryScraper.get_changes returns empty on first call."""
-    cdp = FakeCDPForScraper("30 dual shots")
-    scraper = InventoryScraper(cdp)
-    changes = scraper.get_changes()
-    assert len(changes) == 0  # First call initializes state
-
-
-def test_inventory_scraper_get_changes_detects_change() -> None:
-    """Test InventoryScraper.get_changes detects changes."""
-    cdp = FakeCDPForScraper("30 dual shots\n10 extra radars")
-    scraper = InventoryScraper(cdp)
-
-    # First call initializes
-    scraper.get_changes()
-
-    # Update fake with changed inventory
-    cdp._return_value = "37 dual shots\n10 extra radars"
-    changes = scraper.get_changes()
-    assert len(changes) == 1
-    assert changes[0]["item"] == "dual_shots"
-    assert changes[0]["delta"] == 7
-
-
-def test_inventory_scraper_log_changes_gained() -> None:
-    """Test InventoryScraper.log_changes logs gained items."""
-    cdp = FakeCDPForScraper("30 dual shots")
-    scraper = InventoryScraper(cdp)
-    scraper.get_changes()  # Initialize
-
-    cdp._return_value = "35 dual shots"
-    changes = scraper.log_changes()
-    assert len(changes) == 1
-    assert changes[0]["delta"] == 5
-
-
-def test_inventory_scraper_log_changes_used() -> None:
-    """Test InventoryScraper.log_changes logs used items."""
-    cdp = FakeCDPForScraper("30 dual shots")
-    scraper = InventoryScraper(cdp)
-    scraper.get_changes()  # Initialize
-
-    cdp._return_value = "28 dual shots"
-    changes = scraper.log_changes()
-    assert len(changes) == 1
-    assert changes[0]["delta"] == -2
-
-
-def test_inventory_scraper_log_changes_toggle() -> None:
-    """Test InventoryScraper.log_changes logs toggle changes."""
-    cdp = FakeCDPForScraper("30 armor shields")
-    scraper = InventoryScraper(cdp)
-    scraper.get_changes()  # Initialize
-
-    cdp._return_value = "30 armor shields (disabled)"
-    changes = scraper.log_changes()
-    assert len(changes) == 1
-    assert changes[0]["enabled_changed"] is True
-    assert changes[0]["now_enabled"] is False
-
-
-def test_inventory_scraper_log_changes_toggle_enabled() -> None:
-    """Test InventoryScraper.log_changes logs re-enable changes."""
-    cdp = FakeCDPForScraper("30 armor shields (disabled)")
-    scraper = InventoryScraper(cdp)
-    scraper.get_changes()  # Initialize
-
-    cdp._return_value = "30 armor shields"
-    changes = scraper.log_changes()
-    assert len(changes) == 1
-    assert changes[0]["enabled_changed"] is True
-    assert changes[0]["now_enabled"] is True
-
-
-# =============================================================================
-# Inventory Encode/Decode Tests
+# validate_item_type tests
 # =============================================================================
 
 
 def test_validate_item_type_all_values() -> None:
-    """Test validate_item_type handles all item types."""
+    """``validate_item_type`` accepts every wire-known item label."""
     assert validate_item_type("armor_shields") == "armor_shields"
     assert validate_item_type("dual_shots") == "dual_shots"
     assert validate_item_type("missile_shots") == "missile_shots"
@@ -420,13 +120,18 @@ def test_validate_item_type_all_values() -> None:
 
 
 def test_validate_item_type_invalid() -> None:
-    """Test validate_item_type raises on invalid type."""
+    """``validate_item_type`` raises ``ValueError`` on unknown labels."""
     with pytest.raises(ValueError, match="Invalid item type"):
         validate_item_type("invalid_item")
 
 
+# =============================================================================
+# Codec tests
+# =============================================================================
+
+
 def test_encode_inventory_item() -> None:
-    """Test encode_inventory_item creates correct dict."""
+    """``encode_inventory_item`` produces a JSON-serializable dict."""
     item: InventoryItem = {"count": 30, "enabled": True}
     encoded = encode_inventory_item(item)
     assert encoded["count"] == 30
@@ -434,7 +139,7 @@ def test_encode_inventory_item() -> None:
 
 
 def test_decode_inventory_item() -> None:
-    """Test decode_inventory_item decodes valid item."""
+    """``decode_inventory_item`` returns a validated ``InventoryItem``."""
     obj: JSONObject = {"count": 25, "enabled": False}
     item = decode_inventory_item(obj)
     assert item["count"] == 25
@@ -442,21 +147,21 @@ def test_decode_inventory_item() -> None:
 
 
 def test_decode_inventory_item_missing_count() -> None:
-    """Test decode_inventory_item raises on missing count."""
+    """``decode_inventory_item`` raises ``JSONTypeError`` on missing count."""
     obj: JSONObject = {"enabled": True}
     with pytest.raises(JSONTypeError, match="Missing required field 'count'"):
         decode_inventory_item(obj)
 
 
 def test_decode_inventory_item_missing_enabled() -> None:
-    """Test decode_inventory_item raises on missing enabled."""
+    """``decode_inventory_item`` raises ``JSONTypeError`` on missing enabled."""
     obj: JSONObject = {"count": 10}
     with pytest.raises(JSONTypeError, match="Missing required field 'enabled'"):
         decode_inventory_item(obj)
 
 
 def test_encode_inventory_state() -> None:
-    """Test encode_inventory_state creates correct dict."""
+    """``encode_inventory_state`` round-trips through ``decode_inventory_state``."""
     state: InventoryState = {
         "armor_shields": InventoryItem(count=30, enabled=False),
         "dual_shots": InventoryItem(count=25, enabled=True),
@@ -465,14 +170,13 @@ def test_encode_inventory_state() -> None:
         "extra_radars": InventoryItem(count=10, enabled=True),
     }
     encoded = encode_inventory_state(state)
-    # Verify by decoding back and checking values
     decoded = decode_inventory_state(encoded)
     assert decoded["armor_shields"]["count"] == 30
     assert decoded["dual_shots"]["enabled"] is True
 
 
 def test_decode_inventory_state() -> None:
-    """Test decode_inventory_state decodes valid state."""
+    """``decode_inventory_state`` validates and decodes a complete state."""
     obj: JSONObject = {
         "armor_shields": {"count": 30, "enabled": False},
         "dual_shots": {"count": 25, "enabled": True},
@@ -487,7 +191,7 @@ def test_decode_inventory_state() -> None:
 
 
 def test_decode_inventory_state_missing_item() -> None:
-    """Test decode_inventory_state raises on missing item."""
+    """A missing item in the state JSON raises ``ValueError``."""
     obj: JSONObject = {
         "armor_shields": {"count": 30, "enabled": False},
         "dual_shots": {"count": 25, "enabled": True},
@@ -498,7 +202,7 @@ def test_decode_inventory_state_missing_item() -> None:
 
 
 def test_decode_inventory_state_non_dict_armor() -> None:
-    """Test decode_inventory_state raises on non-dict armor_shields."""
+    """A non-dict ``armor_shields`` field raises ``ValueError``."""
     obj: JSONObject = {
         "armor_shields": "not a dict",
         "dual_shots": {"count": 25, "enabled": True},
@@ -511,7 +215,7 @@ def test_decode_inventory_state_non_dict_armor() -> None:
 
 
 def test_decode_inventory_state_non_dict_dual() -> None:
-    """Test decode_inventory_state raises on non-dict dual_shots."""
+    """A non-dict ``dual_shots`` field raises ``ValueError``."""
     obj: JSONObject = {
         "armor_shields": {"count": 30, "enabled": False},
         "dual_shots": "not a dict",
@@ -524,7 +228,7 @@ def test_decode_inventory_state_non_dict_dual() -> None:
 
 
 def test_decode_inventory_state_non_dict_homing() -> None:
-    """Test decode_inventory_state raises on non-dict homing_shots."""
+    """A non-dict ``homing_shots`` field raises ``ValueError``."""
     obj: JSONObject = {
         "armor_shields": {"count": 30, "enabled": False},
         "dual_shots": {"count": 25, "enabled": True},
@@ -537,7 +241,7 @@ def test_decode_inventory_state_non_dict_homing() -> None:
 
 
 def test_decode_inventory_state_non_dict_radar() -> None:
-    """Test decode_inventory_state raises on non-dict extra_radars."""
+    """A non-dict ``extra_radars`` field raises ``ValueError``."""
     obj: JSONObject = {
         "armor_shields": {"count": 30, "enabled": False},
         "dual_shots": {"count": 25, "enabled": True},
@@ -550,7 +254,7 @@ def test_decode_inventory_state_non_dict_radar() -> None:
 
 
 def test_encode_inventory_change() -> None:
-    """Test encode_inventory_change creates correct dict."""
+    """``encode_inventory_change`` produces a JSON-serializable dict."""
     change: InventoryChange = {
         "item": "dual_shots",
         "old_count": 25,
@@ -565,7 +269,7 @@ def test_encode_inventory_change() -> None:
 
 
 def test_decode_inventory_change() -> None:
-    """Test decode_inventory_change decodes valid change."""
+    """``decode_inventory_change`` returns a validated ``InventoryChange``."""
     obj: JSONObject = {
         "item": "extra_radars",
         "old_count": 10,
@@ -580,7 +284,7 @@ def test_decode_inventory_change() -> None:
 
 
 def test_decode_inventory_change_invalid_item() -> None:
-    """Test decode_inventory_change raises on invalid item type."""
+    """``decode_inventory_change`` rejects an unknown item label."""
     obj: JSONObject = {
         "item": "invalid_item",
         "old_count": 10,
@@ -594,7 +298,7 @@ def test_decode_inventory_change_invalid_item() -> None:
 
 
 def test_inventory_state_encode_decode_roundtrip() -> None:
-    """Test encode/decode roundtrip preserves InventoryState."""
+    """``encode_inventory_state`` -> ``decode_inventory_state`` is identity."""
     original: InventoryState = {
         "armor_shields": InventoryItem(count=30, enabled=False),
         "dual_shots": InventoryItem(count=25, enabled=True),
@@ -608,7 +312,7 @@ def test_inventory_state_encode_decode_roundtrip() -> None:
 
 
 def test_inventory_change_encode_decode_roundtrip() -> None:
-    """Test encode/decode roundtrip preserves InventoryChange."""
+    """``encode_inventory_change`` -> ``decode_inventory_change`` is identity."""
     original: InventoryChange = {
         "item": "homing_shots",
         "old_count": 15,
