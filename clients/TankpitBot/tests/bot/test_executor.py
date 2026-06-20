@@ -220,9 +220,9 @@ class TestApplyEquipment:
         # Disable slot 2 via toggle so enable triggers a toggle command
         update_inventory_from_toggle(get_world_service(), [True, False, True, True, True])
         apply_equipment(bot, [2, 5])
-        # slot 1: not desired, enabled → disable → toggle (1 CDP)
-        # slot 2: desired, disabled, has stock → enable → toggle (1 CDP)
-        # slot 4: not desired, enabled → disable → toggle (1 CDP)
+        # slot 1: not desired, enabled -> disable -> toggle (1 CDP)
+        # slot 2: desired, disabled, has stock -> enable -> toggle (1 CDP)
+        # slot 4: not desired, enabled -> disable -> toggle (1 CDP)
         assert fake_cdp._sent_methods.count("Runtime.evaluate") == 3
 
     def test_disables_undesired_slots(self, fake_env: FakeEnv) -> None:
@@ -240,9 +240,9 @@ class TestApplyEquipment:
         # Set inventory to match: 1=off, 2=on, 4=off, 5=on
         update_inventory_from_toggle(get_world_service(), [False, True, True, False, True])
         apply_equipment(bot, [2, 5])
-        # slot 1: not in desired, already disabled → no toggle
-        # slot 2: in desired, already enabled → no toggle
-        # slot 4: not in desired, already disabled → no toggle
+        # slot 1: not in desired, already disabled -> no toggle
+        # slot 2: in desired, already enabled -> no toggle
+        # slot 4: not in desired, already disabled -> no toggle
         assert len(fake_cdp._sent_methods) == 0
 
 
@@ -1016,6 +1016,7 @@ class TestSecondaryCommandDispatch:
                     source="viewport",
                     timestamp_ms=1000,
                     last_wire_seen_ms=1000,
+                    last_position_update_ms=1000,
                 ),
             },
             containers={

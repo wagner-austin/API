@@ -16,6 +16,34 @@ from tankpit_bot.state.types.constants import EntitySource, require_entity_sourc
 class TankStateDict(TypedDict):
     """State of a single tank in the game world.
 
+    Three independent freshness timestamps lock the freshness model:
+
+    * ``timestamp_ms`` advances on ANY observation source (wire OR map).
+      Used to keep a tank in the registry as a HUNT acquisition
+      candidate even when only the map snapshot has confirmed it.
+
+    * ``last_wire_seen_ms`` advances only on WIRE-SOURCED observations
+      (viewport, radar, movement response, enemy detection,
+      TankStatusSync). Map snapshot updates deliberately do NOT advance
+      it — a tank truly present talks on the wire; a departed
+      afterimage goes silent on the wire while the map keeps re-listing
+      it.
+
+    * ``last_position_update_ms`` advances ONLY when an observation
+      carries a fresh ``(x, y)`` value. Damage-only wire messages
+      (TankStatusSync, TankStatusShort) refresh ``last_wire_seen_ms``
+      but NOT this field. This is the kill-shot gate — only fire at a
+      tank whose position is structurally proven recent, never at a
+      stale registry entry being kept alive by status-only broadcasts.
+
+    The three-timestamp model exists because the broadcast cadences
+    differ by message kind. 0x2E TankStatusSync broadcasts globally
+    every ~2 s for every active tank regardless of viewport, so a
+    single "any wire activity" timestamp would never expire and the
+    bot would keep firing at stale registry positions. Position-bearing
+    messages (0x3D MovementResponse, 0x47 Movement, 0x28 TankEntry,
+    container TankUpdate*) refresh on a slower viewport-bound cadence.
+
     Attributes:
         tank_id: Unique identifier for this tank.
         x: X coordinate (0-255).
@@ -25,7 +53,7 @@ class TankStateDict(TypedDict):
         damage_state: Health state (0=full, 1=light, 2=medium, 3=critical).
         direction: Sprite direction byte. Low nibble (0-15) = facing
             heading, high nibble carries state flags. Bit 5 (value 32)
-            is the DEAD flag — the game client sets direction to 32 or
+            is the DEAD flag -- the game client sets direction to 32 or
             33 on deactivation (tpclient.js ``Pg.prototype.h``). Check
             ``direction >= 32`` to detect dead/corpse tanks. Verified
             across 42 corpse transitions in capture data (2026-06-18).
@@ -33,21 +61,13 @@ class TankStateDict(TypedDict):
         is_bot: Whether this is a bot player.
         is_self: Whether this is the player's own tank.
         source: Which observed source most recently confirmed this tank.
-        timestamp_ms: When this tank was last confirmed by ANY source
-            (map blob, movement response, viewport, or radar). Used for
-            acquisition freshness — finding enemies to teleport toward.
-            Advanced by map updates, so a departed tank the map still
-            lists stays "fresh" here; that is intentional for
-            navigation and is why it must NOT gate the kill shot.
-        last_wire_seen_ms: When a WIRE-PRESENCE source last vouched for
-            this tank actually being present (viewport, radar, movement
-            response, enemy detection). Map blob updates deliberately do
-            NOT advance it: a tank truly present talks on the wire
-            (raw-capture 2026-06-13: a live tank emits a wire message
-            every few seconds; a departed afterimage goes silent for
-            minutes while the map keeps re-listing it). This is the
-            kill-shot gate — only fire at a tank with recent wire
-            presence, never at a map-only afterimage.
+        timestamp_ms: Wall-clock ms of the most recent observation by
+            ANY source (wire OR map). Acquisition gate.
+        last_wire_seen_ms: Wall-clock ms of the most recent
+            wire-sourced observation. Wire-presence gate.
+        last_position_update_ms: Wall-clock ms of the most recent
+            wire-sourced observation that carried a fresh ``(x, y)``.
+            Kill-shot gate.
     """
 
     tank_id: int
@@ -63,6 +83,7 @@ class TankStateDict(TypedDict):
     source: EntitySource
     timestamp_ms: int
     last_wire_seen_ms: int
+    last_position_update_ms: int
 
 
 def make_tank_state(
@@ -78,6 +99,7 @@ def make_tank_state(
     source: EntitySource = "viewport",
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
+    last_position_update_ms: int = 0,
     direction: int = 0,
 ) -> TankStateDict:
     """Create a tank state.
@@ -93,9 +115,13 @@ def make_tank_state(
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
         source: Which observed source confirmed this tank.
-        timestamp_ms: When this tank was last confirmed by any source.
-        last_wire_seen_ms: When a wire-presence source last vouched for
-            this tank's presence. Zero means never wire-confirmed.
+        timestamp_ms: Wall-clock ms of the most recent observation by
+            ANY source. Zero means never observed.
+        last_wire_seen_ms: Wall-clock ms of the most recent
+            wire-sourced observation. Zero means never wire-confirmed.
+        last_position_update_ms: Wall-clock ms of the most recent
+            wire-sourced observation that carried fresh ``(x, y)``.
+            Zero means the position has never been wire-confirmed.
         direction: Sprite direction byte. 0-31 = alive facing,
             32-33 = dead corpse.
 
@@ -116,6 +142,7 @@ def make_tank_state(
         source=source,
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
+        last_position_update_ms=last_position_update_ms,
     )
 
 
@@ -142,6 +169,7 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "source": state["source"],
         "timestamp_ms": state["timestamp_ms"],
         "last_wire_seen_ms": state["last_wire_seen_ms"],
+        "last_position_update_ms": state["last_position_update_ms"],
     }
 
 
@@ -171,6 +199,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         source=require_entity_source(data, "source"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
+        last_position_update_ms=require_int(data, "last_position_update_ms"),
     )
 
 

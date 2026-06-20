@@ -80,6 +80,12 @@ from tankpit_bot.state.types.tank import (
     encode_tank_state,
     make_tank_state,
 )
+from tankpit_bot.state.types.tank_observation import (
+    TankObservation,
+    decode_tank_observation,
+    encode_tank_observation,
+    make_tank_observation,
+)
 from tankpit_bot.state.types.terrain import (
     TerrainTileDict,
     decode_terrain_tile,
@@ -131,6 +137,7 @@ __all__ = [
     "EntitySource",
     "MineStateDict",
     "SelfStateDict",
+    "TankObservation",
     "TankStateDict",
     "TerrainTileDict",
     "ViewportStateDict",
@@ -140,6 +147,7 @@ __all__ = [
     "decode_container_state",
     "decode_mine_state",
     "decode_self_state",
+    "decode_tank_observation",
     "decode_tank_state",
     "decode_terrain_tile",
     "decode_viewport_state",
@@ -148,6 +156,7 @@ __all__ = [
     "encode_container_state",
     "encode_mine_state",
     "encode_self_state",
+    "encode_tank_observation",
     "encode_tank_state",
     "encode_terrain_tile",
     "encode_viewport_state",
@@ -156,6 +165,7 @@ __all__ = [
     "make_empty_world_state",
     "make_mine_state",
     "make_self_state",
+    "make_tank_observation",
     "make_tank_state",
     "make_terrain_tile",
     "parse_coord_key",

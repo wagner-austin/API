@@ -107,6 +107,7 @@ class TestEnemyThreat:
             is_bot=True,
             timestamp_ms=8000,
             last_wire_seen_ms=4200,
+            last_position_update_ms=4200,
         )
         assert threat["tank_id"] == 536
         assert threat["x"] == 100
@@ -147,6 +148,7 @@ class TestEnemyThreat:
             is_bot=False,
             timestamp_ms=7000,
             last_wire_seen_ms=6500,
+            last_position_update_ms=6500,
         )
         encoded = encode_enemy_threat(original)
         assert encoded["last_wire_seen_ms"] == 6500

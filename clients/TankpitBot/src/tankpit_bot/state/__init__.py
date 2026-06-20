@@ -13,21 +13,20 @@ Submodules:
 from tankpit_bot.state.container_mutations import (
     add_mine,
     add_mine_from_radar,
+    increment_container_failed_pickups,
     pickup_container,
     remove_container,
     remove_mine,
     update_container_from_radar,
 )
 from tankpit_bot.state.mutations import (
+    apply_tank_observation,
     mark_viewport_scanned,
     remove_tank,
     replace_map_fuel_dots,
     set_self_fuel,
     update_self_from_movement_response,
-    update_self_fuel,
     update_self_position,
-    update_tank_damage,
-    update_tank_from_registry,
     update_terrain_from_viewport,
 )
 from tankpit_bot.state.renderer import (
@@ -133,6 +132,7 @@ __all__ = [
     "WorldStateDict",
     "add_mine",
     "add_mine_from_radar",
+    "apply_tank_observation",
     "coord_key",
     "decode_container_refresh_kind",
     "decode_container_state",
@@ -150,6 +150,7 @@ __all__ = [
     "encode_terrain_tile",
     "encode_viewport_state",
     "encode_world_state",
+    "increment_container_failed_pickups",
     "make_container_state",
     "make_empty_world_state",
     "make_mine_state",
@@ -168,10 +169,7 @@ __all__ = [
     "terrain_to_ascii",
     "update_container_from_radar",
     "update_self_from_movement_response",
-    "update_self_fuel",
     "update_self_position",
-    "update_tank_damage",
-    "update_tank_from_registry",
     "update_terrain_from_viewport",
     "viewport_scan_key",
 ]

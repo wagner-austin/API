@@ -541,8 +541,8 @@ class TestBotAIIntegration:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tankpit_bot.state.mutations import update_tank_from_registry
-        from tankpit_bot.state.types import make_tank_state
+        from tankpit_bot.state.mutations import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation, make_tank_state
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
@@ -552,18 +552,19 @@ class TestBotAIIntegration:
 
         # Add a close, damaged enemy to trigger HUNT mode
 
-        get_world_service().world_state = update_tank_from_registry(
+        get_world_service().world_state = apply_tank_observation(
             get_world_service().world_state,
-            tank_id=10,
-            team=1,
-            name="enemy",
-            rank=0,
-            is_bot=True,
-            x=110,
-            y=100,
-            source="viewport",
-            timestamp_ms=get_current_time_ms(),
-            wire_present=True,
+            make_tank_observation(
+                tank_id=10,
+                timestamp_ms=get_current_time_ms(),
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(110, 100),
+                team=1,
+                rank=0,
+                name="enemy",
+                is_bot=True,
+            ),
         )
         # Set damage to critical so homing gets enabled
         tank = make_tank_state(
@@ -1149,8 +1150,12 @@ class TestBotEquipmentManagement:
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
-        from tankpit_bot.state import update_tank_from_registry
-        from tankpit_bot.state.types import SelfStateDict, WorldStateDict
+        from tankpit_bot.state import apply_tank_observation
+        from tankpit_bot.state.types import (
+            SelfStateDict,
+            WorldStateDict,
+            make_tank_observation,
+        )
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
@@ -1162,18 +1167,19 @@ class TestBotEquipmentManagement:
         # The tracked tank sits at a different tile than the shoot command
         # targets, so the executor's structural re-check rejects the shoot
         # (the target drifted between decision and dispatch).
-        get_world_service().world_state = update_tank_from_registry(
+        get_world_service().world_state = apply_tank_observation(
             get_world_service().world_state,
-            tank_id=10,
-            team=2,
-            name="enemy",
-            rank=1,
-            is_bot=False,
-            x=105,
-            y=100,
-            source="viewport",
-            timestamp_ms=1000,
-            wire_present=True,
+            make_tank_observation(
+                tank_id=10,
+                timestamp_ms=1000,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(105, 100),
+                team=2,
+                rank=1,
+                name="enemy",
+                is_bot=False,
+            ),
         )
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1267,8 +1273,8 @@ class TestBotEquipmentManagement:
             reset_world_state,
             update_world_state_from_position,
         )
-        from tankpit_bot.state.mutations import update_tank_from_registry
-        from tankpit_bot.state.types import make_tank_state
+        from tankpit_bot.state.mutations import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation, make_tank_state
         from tests.fakes import FakeCDPSession
 
         reset_world_state()
@@ -1278,18 +1284,19 @@ class TestBotEquipmentManagement:
             get_world_service(), [0, 3, 0, 10, 10], [False, True, False, True, True]
         )
 
-        get_world_service().world_state = update_tank_from_registry(
+        get_world_service().world_state = apply_tank_observation(
             get_world_service().world_state,
-            tank_id=10,
-            team=1,
-            name="enemy",
-            rank=0,
-            is_bot=True,
-            x=106,
-            y=100,
-            source="viewport",
-            timestamp_ms=get_current_time_ms(),
-            wire_present=True,
+            make_tank_observation(
+                tank_id=10,
+                timestamp_ms=get_current_time_ms(),
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(106, 100),
+                team=1,
+                rank=0,
+                name="enemy",
+                is_bot=True,
+            ),
         )
         enemy = make_tank_state(
             tank_id=10,
@@ -1953,7 +1960,7 @@ class TestBotEquipmentManagement:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_get_combat_feedback returns '' until a wire CombatHit arrives.
+        """_get_combat_feedback returns '' until a wire ShootEvent arrives.
 
         Old heuristic guessed 'miss' just because dual was available. The
         tile-occupancy signal requires an actual wire response -- absent
@@ -1995,7 +2002,7 @@ class TestBotEquipmentManagement:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_get_combat_feedback returns 'hit' when CombatHit was received."""
+        """_get_combat_feedback returns 'hit' when a 0x53 ShootEvent was received."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state

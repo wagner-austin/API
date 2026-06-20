@@ -25,6 +25,7 @@ def _enemy_threat(
     y: int = 100,
     name: str = "Enemy",
     last_wire_seen_ms: int = 100000,
+    last_position_update_ms: int = 100000,
 ) -> EnemyThreatDict:
     """Create a typed enemy threat for combat helper tests.
 
@@ -36,6 +37,10 @@ def _enemy_threat(
         last_wire_seen_ms: Last wire-presence confirmation (defaults to
             the helper's ``timestamp_ms`` so the threat is wire-present at
             the tests' 100000 clock unless overridden to model a ghost).
+        last_position_update_ms: Last wire-sourced position confirmation
+            (defaults to the helper's clock so the threat passes the
+            kill-shot gate unless overridden to model a stale-position
+            target).
 
     Returns:
         Enemy threat payload.
@@ -52,6 +57,7 @@ def _enemy_threat(
         is_bot=False,
         timestamp_ms=100000,
         last_wire_seen_ms=last_wire_seen_ms,
+        last_position_update_ms=last_position_update_ms,
     )
 
 
@@ -292,6 +298,7 @@ class TestGetLockedTargetWorldStateFallback:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -471,16 +478,28 @@ class TestKillShotWireGate:
         """Reset shared world-state globals after each test."""
         reset_world_state()
 
-    def _adjacent_world_and_ctx(self, last_wire_seen_ms: int) -> tuple[DecideCtx, EnemyThreatDict]:
-        """Build a ctx with one adjacent enemy at the given wire stamp.
+    def _adjacent_world_and_ctx(
+        self,
+        last_wire_seen_ms: int,
+        *,
+        last_position_update_ms: int | None = None,
+    ) -> tuple[DecideCtx, EnemyThreatDict]:
+        """Build a ctx with one adjacent enemy at the given freshness stamps.
 
         Args:
             last_wire_seen_ms: The enemy's last wire-presence confirmation.
+            last_position_update_ms: The enemy's last wire-sourced
+                position confirmation. Defaults to ``last_wire_seen_ms``
+                so the enemy is both wire- and position-fresh; pass an
+                older value to model the stale-position case.
 
         Returns:
             A decision context (tick clock 100000) and the matching
             adjacent enemy threat.
         """
+        position_stamp = (
+            last_position_update_ms if last_position_update_ms is not None else last_wire_seen_ms
+        )
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -494,6 +513,7 @@ class TestKillShotWireGate:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=last_wire_seen_ms,
+                last_position_update_ms=position_stamp,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
@@ -506,7 +526,13 @@ class TestKillShotWireGate:
             None,
             "",
         )
-        target = _enemy_threat(x=101, y=100, name="Adjacent", last_wire_seen_ms=last_wire_seen_ms)
+        target = _enemy_threat(
+            x=101,
+            y=100,
+            name="Adjacent",
+            last_wire_seen_ms=last_wire_seen_ms,
+            last_position_update_ms=position_stamp,
+        )
         return ctx, target
 
     def test_wire_fresh_adjacent_target_is_shot(self) -> None:
@@ -527,6 +553,27 @@ class TestKillShotWireGate:
         replan instead of wasting a round on an afterimage.
         """
         ctx, target = self._adjacent_world_and_ctx(last_wire_seen_ms=100000 - 60000)
+
+        decision = engage_target(ctx, target)
+
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["updated_ai_state"]["combat_target_id"] != 50
+
+    def test_position_stale_adjacent_target_is_blocked_not_shot(self) -> None:
+        """A wire-present but position-stale target is blocked, not shot.
+
+        TankStatusSync broadcasts every 2 s globally and refresh
+        ``last_wire_seen_ms`` even for off-screen tanks. If the only
+        wire activity is status-only, the kill-shot gate must refuse to
+        fire at the stale registry position. This is the precise
+        invariant whose violation caused the 22-miss feedback loop in
+        run bot-20260619-050303.
+        """
+        ctx, target = self._adjacent_world_and_ctx(
+            last_wire_seen_ms=100000,
+            last_position_update_ms=100000 - 5000,
+        )
 
         decision = engage_target(ctx, target)
 
@@ -569,6 +616,7 @@ class TestMissOnMovedTarget:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
@@ -750,6 +798,7 @@ class TestFindCombatPickup:
                     source="viewport",
                     timestamp_ms=100000,
                     last_wire_seen_ms=100000,
+                    last_position_update_ms=100000,
                 ),
             },
             containers={

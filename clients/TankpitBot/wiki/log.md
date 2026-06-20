@@ -196,3 +196,42 @@ Collapsed the protocol vs. container dual-path 0x2E decoder into a single subtyp
 **Pages updated (4):** [[decode-coverage]], [[combat-hit-format]] → [[shoot-event-format]] (renamed + rescoped), [[deactivation-format]], hub link sweep across [[shot-range]] / [[tank-registry]] / [[weapon-log-markers]] / [[weapon-selection]].
 
 **Running total: 47 pages across 6 hubs.**
+
+---
+
+## [2026-06-19] refactor | Three-timestamp tank-freshness model + observation-based mutator
+
+Replaced the conflated single "wire-seen" freshness with three independent timestamps (`timestamp_ms`, `last_wire_seen_ms`, `last_position_update_ms`) and routed every tank-state mutation through a single observation-based mutator (`apply_tank_observation`). The bug class this prevents: damage-only wire broadcasts (0x2E TankStatusSync, every ~2 s globally) used to refresh the wire-seen stamp for tanks that had teleported out of viewport, fooling the kill-shot gate into firing at stale registry positions.
+
+Production evidence: `runs/bot/bot-20260619-050303` recorded 25 `combat_miss` events on the same target (orange-8 at 155,155) over ~100 s, all `target_moved=false`. The unified decoders (committed earlier today) made the bug visible; this refactor closes it structurally.
+
+**Type additions:**
+- `last_position_update_ms` added to `TankStateDict` (and re-exposed on `EnemyThreatDict`).
+- New `TankObservation` TypedDict in `tankpit_bot.state.types.tank_observation` with full encode/decode + `require_*` validation. Required + None-bearing optional aspects (no `NotRequired`).
+
+**Single mutator (single source of truth):**
+- `apply_tank_observation(state, obs)` in `tankpit_bot.state.mutations`.
+- Invariants enforced in code, pinned by tests in `tests/world_state/test_tank_observation.py`:
+  1. `timestamp_ms` advances on every observation.
+  2. `last_wire_seen_ms` advances iff `is_wire_sourced`.
+  3. `last_position_update_ms` advances iff `is_wire_sourced AND position is not None`.
+
+**Deleted (every legacy mutator):**
+- `update_tank_from_registry`, `update_tank_damage` -- the divergent low-level mutators that silently conflated freshness concepts.
+- Their public re-exports from `state/__init__.py` and `state/mutations.py`.
+- The obsolete test classes `TestUpdateTankFromRegistry`, `TestWirePresenceFunnel`, `TestUpdateTankDamage` in `tests/world_state/test_mutations.py`.
+
+**Dispatch sites converted (every wire-to-tank-state path):** the helpers in `sniffer/world_state_tanks.py` (TankEntry, TankInfo, TankStatus, container TankRegistry, MoveResponseFull, client-registry refinement, TankStatusSync damage, position update, radar enemy detect) plus the direct dispatch builders in `sniffer/world_state_dispatch.py` (0x3D position+status) and `sniffer/world_state_dispatch_position.py` (map-snapshot per-tank). Every one of these now builds a `TankObservation` and calls `apply_tank_observation`.
+
+**Kill-shot gate:**
+- `POSITION_FRESHNESS_TTL_MS = 3000` added in `bot/ai/threats.py`.
+- `is_position_fresh(last_position_update_ms, now_ms)` exposed alongside the existing `is_wire_present`.
+- `bot/ai/combat_strategy.py::engage_target` checks position freshness AFTER the wire-presence gate; a wire-present but position-stale target is blocked and replanned with a `combat_stale_position` diagnostic.
+
+**Tests:** 3991 pass at 100% statement + branch coverage.
+
+**Pages written (1):** [[tank-freshness-model]] -- the contract page documenting the three timestamps, the single mutator, the per-message advancement table, and the locked invariant tests.
+
+**Pages updated (3):** [[decode-coverage]] (added `related` link), [[combat-chase-bug]] (added `related` link), [[hubs/architecture]] (added the new page).
+
+**Running total: 48 pages across 6 hubs.**

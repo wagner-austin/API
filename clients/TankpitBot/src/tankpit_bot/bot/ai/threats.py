@@ -51,14 +51,28 @@ _WIRE_PRESENCE_TTL_MS = 7000
 #: Public alias for cross-module consumers (combat_strategy, recover_fuel_mode).
 WIRE_PRESENCE_TTL_MS = _WIRE_PRESENCE_TTL_MS
 
+# Position-bearing messages (0x3D MovementResponse, 0x47 Movement, 0x28
+# TankEntry, container TankUpdate*) arrive every ~2 s for tanks in view.
+# Three TTL periods (~1.5 cycles + jitter) keeps the kill gate strict
+# enough to filter out tanks whose position has gone stale -- e.g. a
+# teleport whose new (x, y) has not yet hit the wire -- without
+# rejecting position-bearing messages that slipped a tick.
+_POSITION_FRESHNESS_TTL_MS = 3000
+
+#: Public alias for cross-module consumers (combat_strategy).
+POSITION_FRESHNESS_TTL_MS = _POSITION_FRESHNESS_TTL_MS
+
 
 def is_wire_present(last_wire_seen_ms: int, now_ms: int) -> bool:
     """Return True when a tank's last wire timestamp is fresh.
 
-    A tank actually in the viewport talks on the wire constantly; a stale
-    registry afterimage is silent.  Two fight-cadence periods of silence
-    means the tank is no longer here, so a ``last_wire_seen_ms`` older
-    than :data:`_WIRE_PRESENCE_TTL_MS` is treated as absent.
+    A tank actually in the viewport talks on the wire constantly; a
+    stale registry afterimage is silent.  Two fight-cadence periods of
+    silence means the tank is no longer here, so a
+    ``last_wire_seen_ms`` older than :data:`_WIRE_PRESENCE_TTL_MS` is
+    treated as absent. This gate guards ACQUISITION (HUNT candidate
+    selection); the tighter :func:`is_position_fresh` gate guards the
+    KILL SHOT.
 
     Args:
         last_wire_seen_ms: Timestamp of the tank's most recent wire message.
@@ -68,6 +82,28 @@ def is_wire_present(last_wire_seen_ms: int, now_ms: int) -> bool:
         True if the wire timestamp is within the presence TTL.
     """
     return now_ms - last_wire_seen_ms <= _WIRE_PRESENCE_TTL_MS
+
+
+def is_position_fresh(last_position_update_ms: int, now_ms: int) -> bool:
+    """Return True when a tank's position was wire-confirmed recently.
+
+    Position-bearing wire messages (0x3D MovementResponse, 0x47
+    Movement, 0x28 TankEntry, container TankUpdate*) refresh
+    ``last_position_update_ms``; damage-only wire messages (0x2E
+    TankStatusSync, container TankStatusShort) do NOT. This gate is
+    the kill-shot guard: a tank whose presence is fresh but whose
+    position has gone stale (the historical stale-registry combat
+    bug) must NOT be fired at.
+
+    Args:
+        last_position_update_ms: Timestamp of the tank's most recent
+            wire-sourced position-bearing message.
+        now_ms: Current tick timestamp.
+
+    Returns:
+        True if the position timestamp is within the freshness TTL.
+    """
+    return now_ms - last_position_update_ms <= _POSITION_FRESHNESS_TTL_MS
 
 
 def analyze_threats(
@@ -123,6 +159,7 @@ def analyze_threats(
                 is_bot=tank["is_bot"],
                 timestamp_ms=tank["timestamp_ms"],
                 last_wire_seen_ms=tank["last_wire_seen_ms"],
+                last_position_update_ms=tank["last_position_update_ms"],
             )
         )
 
@@ -209,9 +246,11 @@ def threats_in_range(
 
 
 __all__ = [
+    "POSITION_FRESHNESS_TTL_MS",
     "WIRE_PRESENCE_TTL_MS",
     "analyze_threats",
     "find_closest_threat",
+    "is_position_fresh",
     "is_wire_present",
     "manhattan_distance",
     "threats_in_range",

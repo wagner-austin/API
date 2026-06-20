@@ -40,6 +40,7 @@ class TestDecideTeleportToFarTarget:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -188,6 +189,7 @@ class TestDecideTeleportToFarTarget:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -314,6 +316,7 @@ class TestDecideTeleportToFarTarget:
             is_bot=False,
             timestamp_ms=0,
             last_wire_seen_ms=0,
+            last_position_update_ms=0,
         )
 
         landing_x, landing_y = _combat_landing_tile(ctx, target)

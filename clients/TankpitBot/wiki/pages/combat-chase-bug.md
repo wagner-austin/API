@@ -1,7 +1,7 @@
 ---
 title: "Combat Chase Loop Bug (Diagnosed 2026-06-16)"
 tags: [combat, bug, teleport]
-related: [[shot-range]], [[enemy-bot-behavior]], [[teleport-mechanics]]
+related: [[shot-range]], [[enemy-bot-behavior]], [[teleport-mechanics]], [[tank-freshness-model]]
 sources: [see footnotes]
 fact_checked: 2026-06-16
 confidence: high

@@ -25,7 +25,7 @@ class TestDecodeTankState:
     """Tests for decode_tank_state."""
 
     def test_decodes_valid_data(self) -> None:
-        """Decodes valid tank state data."""
+        """Decodes valid tank state data with all three freshness timestamps."""
         data: JSONObject = {
             "tank_id": 42,
             "x": 100,
@@ -40,6 +40,7 @@ class TestDecodeTankState:
             "source": "viewport",
             "timestamp_ms": 5000,
             "last_wire_seen_ms": 4200,
+            "last_position_update_ms": 4100,
         }
         tank = decode_tank_state(data)
 
@@ -52,6 +53,7 @@ class TestDecodeTankState:
         assert tank["direction"] == 8
         assert tank["timestamp_ms"] == 5000
         assert tank["last_wire_seen_ms"] == 4200
+        assert tank["last_position_update_ms"] == 4100
         assert tank["source"] == "viewport"
         assert tank["name"] == "Test"
         assert tank["is_bot"] is True
@@ -79,6 +81,7 @@ class TestDecodeTankState:
             "source": "invalid",
             "timestamp_ms": 5000,
             "last_wire_seen_ms": 0,
+            "last_position_update_ms": 0,
         }
         with pytest.raises(JSONTypeError, match="source must be one of"):
             decode_tank_state(data)
@@ -403,6 +406,7 @@ class TestDecodeWorldState:
                     "source": "viewport",
                     "timestamp_ms": 500,
                     "last_wire_seen_ms": 500,
+                    "last_position_update_ms": 500,
                 },
             },
             "containers": {},

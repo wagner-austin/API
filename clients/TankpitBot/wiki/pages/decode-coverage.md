@@ -1,7 +1,7 @@
 ---
 title: Wire Decode Coverage Map
 tags: [protocol, decode, coverage]
-related: [[shoot-event-format]], [[tank-registry]], [[deactivation-format]], [[v-table-complete]], [[js-source-map]]
+related: [[shoot-event-format]], [[tank-registry]], [[deactivation-format]], [[v-table-complete]], [[js-source-map]], [[tank-freshness-model]]
 sources: [tpclient.js V table, runs/bot/bot-20260619-053210 capture, 2026-06-19 unification audit]
 fact_checked: 2026-06-19
 confidence: high

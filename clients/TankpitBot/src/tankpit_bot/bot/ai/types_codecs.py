@@ -124,6 +124,7 @@ def encode_enemy_threat(threat: EnemyThreatDict) -> JSONObject:
         "is_bot": threat["is_bot"],
         "timestamp_ms": threat["timestamp_ms"],
         "last_wire_seen_ms": threat["last_wire_seen_ms"],
+        "last_position_update_ms": threat["last_position_update_ms"],
     }
 
 
@@ -151,6 +152,7 @@ def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
         is_bot=require_bool(data, "is_bot"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
+        last_position_update_ms=require_int(data, "last_position_update_ms"),
     )
 
 

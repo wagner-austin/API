@@ -374,7 +374,8 @@ def _update_map_tank(
         team: Team number.
         rank: Military rank.
     """
-    from tankpit_bot.state import update_tank_from_registry
+    from tankpit_bot.state.mutations import apply_tank_observation
+    from tankpit_bot.state.types import make_tank_observation
 
     ts = browser.get_current_time_ms()
     key = str(tank_id)
@@ -391,19 +392,19 @@ def _update_map_tank(
             delta_x=x - existing["x"],
             delta_y=y - existing["y"],
         )
-    ws.world_state = update_tank_from_registry(
-        ws.world_state,
-        tank_id,
-        team,
-        existing["name"] if existing else "",
-        rank,
-        existing["is_bot"] if existing else False,
-        x,
-        y,
-        "world_state",
-        ts,
-        wire_present=False,
+    # Map snapshot updates carry position but are not wire-sourced;
+    # apply_tank_observation enforces that neither last_wire_seen_ms
+    # nor last_position_update_ms advance from this observation.
+    obs = make_tank_observation(
+        tank_id=tank_id,
+        timestamp_ms=ts,
+        is_wire_sourced=False,
+        storage_source="world_state",
+        position=(x, y),
+        team=team,
+        rank=rank,
     )
+    ws.world_state = apply_tank_observation(ws.world_state, obs)
 
 
 # =============================================================================

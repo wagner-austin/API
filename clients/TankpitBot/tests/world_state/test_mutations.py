@@ -1,11 +1,7 @@
 """Tests for state mutation functions."""
 
 from tankpit_bot.state import (
-    DAMAGE_CRITICAL,
-    DAMAGE_LIGHT,
-    DAMAGE_MEDIUM,
     TEAM_BLUE,
-    TEAM_RED,
     TERRAIN_FERRY,
     TERRAIN_GROUND,
     TERRAIN_ROCK_A,
@@ -23,9 +19,6 @@ from tankpit_bot.state import (
     set_self_fuel,
     update_container_from_radar,
     update_self_from_movement_response,
-    update_self_fuel,
-    update_tank_damage,
-    update_tank_from_registry,
     update_terrain_from_viewport,
 )
 from tests.world_state.helpers import get_self_state
@@ -110,289 +103,11 @@ class TestUpdateSelfFromMovementResponse:
         assert self_state["fuel"] == 0
 
 
-class TestUpdateTankFromRegistry:
-    """Tests for update_tank_from_registry."""
-
-    def test_adds_new_tank(self) -> None:
-        """Adds new tank to state."""
-        state = make_empty_world_state()
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=TEAM_RED,
-            name="Enemy",
-            rank=2,
-            is_bot=False,
-            x=50,
-            y=75,
-            source="viewport",
-            timestamp_ms=1000,
-        )
-
-        assert "42" in updated["tanks"]
-        tank = updated["tanks"]["42"]
-        assert tank["tank_id"] == 42
-        assert tank["team"] == TEAM_RED
-        assert tank["name"] == "Enemy"
-        assert tank["rank"] == 2
-        assert tank["is_bot"] is False
-        assert tank["x"] == 50
-        assert tank["y"] == 75
-
-    def test_updates_existing_tank(self) -> None:
-        """Updates existing tank position."""
-        state = make_empty_world_state()
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=500,
-        )
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=2,
-            is_bot=False,
-            x=60,
-            y=70,
-            source="viewport",
-            timestamp_ms=1000,
-        )
-
-        tank = updated["tanks"]["42"]
-        assert tank["x"] == 60
-        assert tank["y"] == 70
-        assert tank["rank"] == 2
-
-    def test_preserves_damage_state(self) -> None:
-        """Preserves existing damage state when updating."""
-        state = make_empty_world_state()
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=500,
-        )
-        state = update_tank_damage(state, tank_id=42, damage_state=DAMAGE_MEDIUM, timestamp_ms=750)
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=2,
-            is_bot=False,
-            x=60,
-            y=70,
-            source="viewport",
-            timestamp_ms=1000,
-        )
-
-        assert updated["tanks"]["42"]["damage_state"] == DAMAGE_MEDIUM
-
-    def test_marks_self_tank(self) -> None:
-        """Marks tank as is_self when matching self_state tank_id."""
-        state = make_empty_world_state()
-        state = update_self_from_movement_response(
-            state,
-            tank_id=42,
-            x=100,
-            y=100,
-            team=0,
-            rank=0,
-            leaderboard_position=1,
-            timestamp_ms=500,
-        )
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Self",
-            rank=1,
-            is_bot=False,
-            x=100,
-            y=100,
-            source="viewport",
-            timestamp_ms=1000,
-        )
-
-        assert updated["tanks"]["42"]["is_self"] is True
-
-
-class TestWirePresenceFunnel:
-    """Tests for the ``wire_present`` rule in update_tank_from_registry."""
-
-    def test_wire_present_advances_last_wire_seen_ms(self) -> None:
-        """A wire-present update stamps last_wire_seen_ms to the timestamp."""
-        state = make_empty_world_state()
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=1000,
-            wire_present=True,
-        )
-
-        assert updated["tanks"]["42"]["last_wire_seen_ms"] == 1000
-
-    def test_new_non_wire_tank_has_zero_last_wire_seen_ms(self) -> None:
-        """A first sighting from a non-wire source never vouches presence."""
-        state = make_empty_world_state()
-        updated = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Ghost",
-            rank=1,
-            is_bot=False,
-            x=34,
-            y=96,
-            source="world_state",
-            timestamp_ms=1000,
-            wire_present=False,
-        )
-
-        assert updated["tanks"]["42"]["last_wire_seen_ms"] == 0
-        assert updated["tanks"]["42"]["timestamp_ms"] == 1000
-
-    def test_map_refresh_preserves_wire_stamp_while_advancing_timestamp(self) -> None:
-        """A map (non-wire) refresh advances timestamp but freezes the wire stamp.
-
-        This is the exact ghost mechanism: a tank confirmed on the wire
-        leaves, the map keeps re-listing it, and only ``timestamp_ms``
-        advances. ``last_wire_seen_ms`` must stay frozen at the last real
-        sighting so the kill gate can tell the afterimage apart.
-        """
-        state = make_empty_world_state()
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=1000,
-            wire_present=True,
-        )
-
-        refreshed = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="world_state",
-            timestamp_ms=9000,
-            wire_present=False,
-        )
-
-        assert refreshed["tanks"]["42"]["timestamp_ms"] == 9000
-        assert refreshed["tanks"]["42"]["last_wire_seen_ms"] == 1000
-
-    def test_returning_wire_update_readvances_wire_stamp(self) -> None:
-        """A fresh wire sighting after a map-only gap re-stamps presence."""
-        state = make_empty_world_state()
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=1000,
-            wire_present=True,
-        )
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="world_state",
-            timestamp_ms=9000,
-            wire_present=False,
-        )
-
-        returned = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=1,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=51,
-            y=50,
-            source="viewport",
-            timestamp_ms=12000,
-            wire_present=True,
-        )
-
-        assert returned["tanks"]["42"]["last_wire_seen_ms"] == 12000
-
-
-class TestUpdateTankDamage:
-    """Tests for update_tank_damage."""
-
-    def test_updates_damage_state(self) -> None:
-        """Updates tank damage state."""
-        state = make_empty_world_state()
-        state = update_tank_from_registry(
-            state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=500,
-        )
-        updated = update_tank_damage(
-            state, tank_id=42, damage_state=DAMAGE_CRITICAL, timestamp_ms=1000
-        )
-
-        assert updated["tanks"]["42"]["damage_state"] == DAMAGE_CRITICAL
-
-    def test_returns_unchanged_for_unknown_tank(self) -> None:
-        """Returns unchanged state for unknown tank ID."""
-        state = make_empty_world_state()
-        updated = update_tank_damage(
-            state, tank_id=999, damage_state=DAMAGE_LIGHT, timestamp_ms=1000
-        )
-
-        assert updated is state  # Same reference
+# TestUpdateTankFromRegistry, TestWirePresenceFunnel, and
+# TestUpdateTankDamage were deleted 2026-06-19 with the freshness-model
+# refactor. The deleted mutators are replaced by apply_tank_observation;
+# its contract -- including the freshness-funnel rules these classes
+# pinned -- lives in tests/world_state/test_tank_observation.py.
 
 
 class TestUpdateContainerFromRadar:
@@ -475,6 +190,48 @@ class TestRemoveContainer:
         assert updated is state  # Same reference
 
 
+class TestIncrementContainerFailedPickups:
+    """Tests for increment_container_failed_pickups (central state-layer mutator)."""
+
+    def test_advances_failed_pickups_by_one(self) -> None:
+        """An existing container's failed_pickups counter advances by 1."""
+        from tankpit_bot.state import increment_container_failed_pickups
+
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=100, y=100, volume=500, timestamp_ms=500)
+        before = state["containers"]["100,100"]["failed_pickups"]
+
+        updated = increment_container_failed_pickups(state, x=100, y=100)
+
+        assert updated["containers"]["100,100"]["failed_pickups"] == before + 1
+
+    def test_preserves_container_timestamp(self) -> None:
+        """The bump must NOT advance the container's freshness timestamp.
+
+        ``failed_pickups`` is a planner-deprioritization counter, not a
+        freshness signal. If this test ever flips, planning logic that
+        relies on container freshness will silently regress.
+        """
+        from tankpit_bot.state import increment_container_failed_pickups
+
+        state = make_empty_world_state()
+        state = update_container_from_radar(state, x=100, y=100, volume=500, timestamp_ms=500)
+        container_ts_before = state["containers"]["100,100"]["timestamp_ms"]
+
+        updated = increment_container_failed_pickups(state, x=100, y=100)
+
+        assert updated["containers"]["100,100"]["timestamp_ms"] == container_ts_before
+
+    def test_returns_unchanged_for_missing_container(self) -> None:
+        """No container at ``(x, y)`` -> returned state IS the input state."""
+        from tankpit_bot.state import increment_container_failed_pickups
+
+        state = make_empty_world_state()
+        updated = increment_container_failed_pickups(state, x=200, y=300)
+
+        assert updated is state
+
+
 class TestAddMine:
     """Tests for add_mine."""
 
@@ -534,6 +291,81 @@ class TestAddMineFromRadar:
         assert state["mines"]["20,20"]["team"] == 1
         assert state["mines"]["30,30"]["team"] == 2
         assert state["mines"]["40,40"]["team"] == 3
+
+
+class TestAddMineFromRadarPreservesWireFields:
+    """Radar refresh must NOT clobber wire-known mine_type / tank_id.
+
+    Radar 3-byte mine entries (per V.O / 0x4F tunneled, see
+    wiki/pages/v-table-complete.md) carry only x, y, team. Wire
+    MinePlacement (V.K / 0x4B per Dg.h) carries mine_type and tank_id.
+    A radar refresh of a wire-placed mine MUST preserve the
+    wire-richer fields. Locked here as a contract.
+    """
+
+    def test_radar_refresh_preserves_wire_mine_type(self) -> None:
+        """A radar refresh keeps the wire-placed mine_type intact."""
+        state = make_empty_world_state()
+        state = add_mine(state, x=50, y=50, mine_type=2, tank_id=42, team=1, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["mine_type"] == 2
+
+    def test_radar_refresh_preserves_wire_tank_id(self) -> None:
+        """A radar refresh keeps the wire-placed placer tank_id intact."""
+        state = make_empty_world_state()
+        state = add_mine(state, x=50, y=50, mine_type=2, tank_id=42, team=1, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["tank_id"] == 42
+
+    def test_radar_refresh_preserves_wire_source_label(self) -> None:
+        """A wire-known mine refreshed by radar stays marked as viewport-sourced.
+
+        The mine_type and tank_id remain wire-richer values, so the
+        source label that flags them as wire-richer must stick.
+        """
+        state = make_empty_world_state()
+        state = add_mine(state, x=50, y=50, mine_type=2, tank_id=42, team=1, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["source"] == "viewport"
+
+    def test_radar_refresh_advances_timestamp(self) -> None:
+        """A radar refresh still advances the mine's timestamp."""
+        state = make_empty_world_state()
+        state = add_mine(state, x=50, y=50, mine_type=2, tank_id=42, team=1, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["timestamp_ms"] == 1500
+
+    def test_radar_refresh_updates_team_when_radar_disagrees(self) -> None:
+        """When radar reports a different team for an existing mine,
+        the radar value wins. Team cannot legally change for an
+        undetonated mine, so a discrepancy indicates the wire team
+        field went stale and is re-synced from radar.
+        """
+        state = make_empty_world_state()
+        state = add_mine(state, x=50, y=50, mine_type=2, tank_id=42, team=0, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=3, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["team"] == 3
+
+    def test_radar_refresh_of_radar_mine_preserves_radar_source(self) -> None:
+        """Radar-then-radar refresh keeps source='radar' (no wire history)."""
+        state = make_empty_world_state()
+        state = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=500)
+
+        refreshed = add_mine_from_radar(state, x=50, y=50, team=1, timestamp_ms=1500)
+
+        assert refreshed["mines"]["50,50"]["source"] == "radar"
+        assert refreshed["mines"]["50,50"]["mine_type"] == 0
+        assert refreshed["mines"]["50,50"]["tank_id"] == -1
 
 
 class TestRemoveMine:
@@ -606,18 +438,23 @@ class TestRemoveTank:
 
     def test_removes_existing_tank(self) -> None:
         """Removes tank from state."""
+        from tankpit_bot.state import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation
+
         state = make_empty_world_state()
-        state = update_tank_from_registry(
+        state = apply_tank_observation(
             state,
-            tank_id=42,
-            team=0,
-            name="Test",
-            rank=1,
-            is_bot=False,
-            x=50,
-            y=50,
-            source="viewport",
-            timestamp_ms=500,
+            make_tank_observation(
+                tank_id=42,
+                timestamp_ms=500,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(50, 50),
+                team=0,
+                rank=1,
+                name="Test",
+                is_bot=False,
+            ),
         )
         updated = remove_tank(state, tank_id=42, timestamp_ms=1000)
 
@@ -631,38 +468,10 @@ class TestRemoveTank:
         assert updated is state  # Same reference
 
 
-class TestUpdateSelfFuel:
-    """Tests for update_self_fuel mutation."""
-
-    def test_update_self_fuel_no_self_state(self) -> None:
-        """Returns unchanged state when self_state is None."""
-        state = make_empty_world_state()
-        result = update_self_fuel(state, 50, 1000)
-        assert result["self_state"] is None
-        assert result is state
-
-    def test_update_self_fuel_adds_fuel(self) -> None:
-        """Adds fuel to existing self_state."""
-        state = make_empty_world_state()
-        state = update_self_from_movement_response(
-            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
-        )
-        initial_fuel = get_self_state(state)["fuel"]
-
-        result = update_self_fuel(state, 50, 1000)
-        assert get_self_state(result)["fuel"] == initial_fuel + 50
-
-    def test_update_self_fuel_subtracts_fuel(self) -> None:
-        """Subtracts fuel (damage) from self_state, clamped to zero."""
-        state = make_empty_world_state()
-        state = update_self_from_movement_response(
-            state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
-        )
-        current_fuel = get_self_state(state)["fuel"]
-
-        # Subtract more than available - should clamp to 0
-        result = update_self_fuel(state, -(current_fuel + 200), 700)
-        assert get_self_state(result)["fuel"] == 0
+# TestUpdateSelfFuel was deleted 2026-06-19 with the additive-delta
+# update_self_fuel mutator. Production wire fuel messages all funnel
+# through set_self_fuel (absolute value); the delta variant had no
+# callers in src/.
 
 
 class TestSetSelfFuel:

@@ -31,6 +31,7 @@ class TestDecideCombatFeedback:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -83,6 +84,7 @@ class TestDecideCombatFeedback:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -137,6 +139,7 @@ class TestDecideShotTracking:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -180,6 +183,7 @@ class TestDecideKillCooldown:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -214,6 +218,7 @@ class TestDecideKillCooldown:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -250,6 +255,7 @@ class TestDecideKillCooldown:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -289,6 +295,7 @@ class TestDecideKillCooldown:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)
@@ -328,6 +335,7 @@ class TestDecideKillCooldown:
                 damage_state=0,
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)

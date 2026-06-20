@@ -62,6 +62,7 @@ def _enemy(*, x: int, y: int, timestamp_ms: int = 100000) -> TankStateDict:
         damage_state=0,
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=timestamp_ms,
+        last_position_update_ms=timestamp_ms,
     )
 
 

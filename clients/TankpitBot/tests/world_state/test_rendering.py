@@ -25,13 +25,14 @@ from tankpit_bot.state import (
     TERRAIN_ROCK_AB,
     TERRAIN_ROCK_B,
     add_mine,
+    apply_tank_observation,
     make_empty_world_state,
     render_world_ascii,
     terrain_to_ascii,
     update_container_from_radar,
     update_self_from_movement_response,
-    update_tank_from_registry,
 )
+from tankpit_bot.state.types import make_tank_observation
 from tankpit_bot.terrain import TerrainMap
 
 _IMAGE = load_pillow_image_module()
@@ -132,17 +133,19 @@ class TestRenderWorldAscii:
             leaderboard_position=1,
             timestamp_ms=500,
         )
-        state = update_tank_from_registry(
+        state = apply_tank_observation(
             state,
-            tank_id=42,
-            team=TEAM_RED,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=5,
-            y=5,
-            source="viewport",
-            timestamp_ms=1000,
+            make_tank_observation(
+                tank_id=42,
+                timestamp_ms=1000,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(5, 5),
+                team=TEAM_RED,
+                rank=1,
+                name="Enemy",
+                is_bot=False,
+            ),
         )
         output = render_world_ascii(state, terrain_map)
 
@@ -161,17 +164,19 @@ class TestRenderWorldAscii:
             leaderboard_position=1,
             timestamp_ms=500,
         )
-        state = update_tank_from_registry(
+        state = apply_tank_observation(
             state,
-            tank_id=42,
-            team=TEAM_BLUE,
-            name="Ally",
-            rank=1,
-            is_bot=False,
-            x=5,
-            y=5,
-            source="viewport",
-            timestamp_ms=1000,
+            make_tank_observation(
+                tank_id=42,
+                timestamp_ms=1000,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(5, 5),
+                team=TEAM_BLUE,
+                rank=1,
+                name="Ally",
+                is_bot=False,
+            ),
         )
         output = render_world_ascii(state, terrain_map)
 
@@ -217,29 +222,33 @@ class TestRenderWorldAscii:
             leaderboard_position=1,
             timestamp_ms=500,
         )
-        state = update_tank_from_registry(
+        state = apply_tank_observation(
             state,
-            tank_id=10,
-            team=TEAM_BLUE,
-            name="Ally",
-            rank=1,
-            is_bot=False,
-            x=5,
-            y=5,
-            source="viewport",
-            timestamp_ms=600,
+            make_tank_observation(
+                tank_id=10,
+                timestamp_ms=600,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(5, 5),
+                team=TEAM_BLUE,
+                rank=1,
+                name="Ally",
+                is_bot=False,
+            ),
         )
-        state = update_tank_from_registry(
+        state = apply_tank_observation(
             state,
-            tank_id=20,
-            team=TEAM_RED,
-            name="Enemy",
-            rank=1,
-            is_bot=False,
-            x=6,
-            y=6,
-            source="viewport",
-            timestamp_ms=700,
+            make_tank_observation(
+                tank_id=20,
+                timestamp_ms=700,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(6, 6),
+                team=TEAM_RED,
+                rank=1,
+                name="Enemy",
+                is_bot=False,
+            ),
         )
         output = render_world_ascii(state, terrain_map)
 

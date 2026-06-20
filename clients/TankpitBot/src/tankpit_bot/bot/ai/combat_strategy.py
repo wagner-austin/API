@@ -22,6 +22,7 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
+    is_position_fresh,
     is_wire_present,
 )
 from tankpit_bot.bot.ai.types import (
@@ -508,6 +509,30 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             self_x=ctx.self_state["x"],
             self_y=ctx.self_state["y"],
             wire_age_ms=ctx.timestamp_ms - target["last_wire_seen_ms"],
+        )
+        return block_combat_target_and_replan(ctx, target)
+
+    if not is_position_fresh(target["last_position_update_ms"], ctx.timestamp_ms):
+        # Wire-present but position-stale: status-only broadcasts kept
+        # the wire-presence stamp fresh while no position-bearing
+        # message has arrived recently (the historical 2026-06-19
+        # stale-registry combat-miss loop). Block and replan -- do NOT
+        # fire at a position the wire has not structurally proven.
+        position_age_ms = ctx.timestamp_ms - target["last_position_update_ms"]
+        emit_ai(
+            "stale-position %s pos %dms old - blocking without firing",
+            target["name"],
+            position_age_ms,
+        )
+        emit_diagnostic(
+            diagnostic_kind="combat_stale_position",
+            target_name=target["name"],
+            target_id=target["tank_id"],
+            target_x=target["x"],
+            target_y=target["y"],
+            self_x=ctx.self_state["x"],
+            self_y=ctx.self_state["y"],
+            position_age_ms=position_age_ms,
         )
         return block_combat_target_and_replan(ctx, target)
 

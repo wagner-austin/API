@@ -97,22 +97,27 @@ def make_behavior_score(
 class EnemyThreatDict(TypedDict):
     """An analyzed enemy tank with computed distance.
 
+    Carries the three freshness timestamps from
+    :class:`tankpit_bot.state.types.tank.TankStateDict` so the
+    combat-strategy layer can read them without re-querying the
+    registry.
+
     Attributes:
-        tank_id: Enemy tank ID.
+        tank_id: Enemy tank id.
         x: Enemy X coordinate.
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
         damage_state: Health state (0=full, 1=light, 2=medium, 3=critical).
         rank: Military rank (0-7). Lower rank = weaker.
-        team: Enemy team ID (0-3).
+        team: Enemy team id (0-3).
         name: Enemy player name.
         is_bot: Whether this enemy is a bot.
-        timestamp_ms: When this tank was last confirmed by the server.
-            Used for freshness-based target selection.
-        last_wire_seen_ms: When a wire-presence source last vouched this
-            tank is actually in view (zero means never). Read by the
-            kill-shot gate: a target the map keeps re-listing but that no
-            wire source confirms is a ghost and must not be fired at.
+        timestamp_ms: When this tank was last confirmed by ANY source.
+            Drives acquisition freshness.
+        last_wire_seen_ms: When a wire-presence source last vouched the
+            tank is in view. Drives the ghost gate.
+        last_position_update_ms: When a wire-sourced observation last
+            carried fresh ``(x, y)``. Drives the kill-shot gate.
     """
 
     tank_id: int
@@ -126,6 +131,7 @@ class EnemyThreatDict(TypedDict):
     is_bot: bool
     timestamp_ms: int
     last_wire_seen_ms: int
+    last_position_update_ms: int
 
 
 def make_enemy_threat(
@@ -140,22 +146,26 @@ def make_enemy_threat(
     is_bot: bool,
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
+    last_position_update_ms: int = 0,
 ) -> EnemyThreatDict:
     """Create an EnemyThreatDict.
 
     Args:
-        tank_id: Enemy tank ID.
+        tank_id: Enemy tank id.
         x: Enemy X coordinate.
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
         damage_state: Health state (0-3).
         rank: Military rank (0-7).
-        team: Team ID (0-3).
+        team: Team id (0-3).
         name: Player name.
         is_bot: Whether this is a bot.
         timestamp_ms: When this tank was last confirmed by any source.
-        last_wire_seen_ms: When a wire-presence source last vouched this
+        last_wire_seen_ms: When a wire-presence source last vouched the
             tank is in view. Zero means never wire-confirmed.
+        last_position_update_ms: When a wire-sourced observation last
+            carried fresh ``(x, y)``. Zero means position has never
+            been wire-confirmed.
 
     Returns:
         EnemyThreatDict with the provided values.
@@ -172,6 +182,7 @@ def make_enemy_threat(
         is_bot=is_bot,
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
+        last_position_update_ms=last_position_update_ms,
     )
 
 

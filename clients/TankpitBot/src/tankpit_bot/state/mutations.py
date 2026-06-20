@@ -6,12 +6,10 @@ new state objects (immutable update pattern).
 
 from __future__ import annotations
 
-from typing import Literal
-
 from tankpit_bot.state.types import (
     DAMAGE_FULL,
     SelfStateDict,
-    TankStateDict,
+    TankObservation,
     WorldStateDict,
     coord_key,
     make_self_state,
@@ -132,122 +130,104 @@ def update_self_position(
     )
 
 
-def update_tank_from_registry(
-    state: WorldStateDict,
-    tank_id: int,
-    team: int,
-    name: str,
-    rank: int,
-    is_bot: bool,
-    x: int,
-    y: int,
-    source: Literal["viewport", "radar", "world_state"],
-    timestamp_ms: int,
-    *,
-    wire_present: bool = True,
-    direction: int = -1,
-) -> WorldStateDict:
-    """Update tank state from TankRegistry message.
+# update_tank_from_registry and update_tank_damage were deleted
+# 2026-06-19 with the freshness-model refactor. Every tank-state
+# mutation now flows through apply_tank_observation, which enforces the
+# three-timestamp freshness invariants. Callers build TankObservation
+# values at the dispatch boundary; see
+# tankpit_bot.sniffer.world_state_tanks for the wire-message-to-
+# observation translators.
+
+
+def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> WorldStateDict:
+    """Apply a single tank observation, advancing exactly the right freshness.
+
+    Single source of truth for tank-state mutations from wire and map
+    observations. Freshness invariants -- LOCKED by tests in
+    ``tests/state/test_tank_observation.py``:
+
+    1. ``timestamp_ms`` advances to ``obs["timestamp_ms"]`` on every
+       call (every observation is an observation).
+    2. ``last_wire_seen_ms`` advances iff ``obs["is_wire_sourced"]`` is
+       True. Map-snapshot observations leave it untouched, so a
+       departed tank that the map still lists cannot masquerade as
+       wire-present.
+    3. ``last_position_update_ms`` advances iff BOTH
+       ``obs["is_wire_sourced"]`` is True AND ``obs["position"]`` is
+       not None. Damage-only wire messages (TankStatusSync) leave it
+       untouched, so the position-freshness gate cannot be lied to by
+       a status-only broadcast.
+
+    Field values: each present ``obs`` field overwrites the existing
+    tank's corresponding value; each ``None`` field preserves the
+    existing value. A non-existent tank is created with default values
+    for fields the observation does not provide.
 
     Args:
         state: Current world state.
-        tank_id: Tank ID.
-        team: Team ID.
-        name: Player name.
-        rank: Military rank.
-        is_bot: Whether this is a bot.
-        x: X coordinate.
-        y: Y coordinate.
-        source: Source that confirmed this tank.
-        timestamp_ms: Message timestamp.
-        wire_present: Whether this update came from a live wire message.
-            When True the tank's ``last_wire_seen_ms`` is stamped to
-            *timestamp_ms*; when False the existing value is preserved
-            (or 0 for a first-seen tank).
-        direction: Sprite direction byte. 0-31 = alive facing,
-            32-33 = dead corpse. -1 preserves the existing value.
+        obs: Observation event for one tank.
 
     Returns:
-        New WorldStateDict with updated tank.
+        New ``WorldStateDict`` with the tank updated or created. The
+        outer ``state["timestamp_ms"]`` also advances to
+        ``obs["timestamp_ms"]``.
     """
-    is_self = state["self_state"] is not None and state["self_state"]["tank_id"] == tank_id
-    key = str(tank_id)
+    key = str(obs["tank_id"])
     existing = state["tanks"].get(key)
-    damage_state = existing["damage_state"] if existing else DAMAGE_FULL
-    if wire_present:
-        last_wire_seen_ms = timestamp_ms
+    self_state = state["self_state"]
+    is_self = self_state is not None and self_state["tank_id"] == obs["tank_id"]
+
+    obs_position = obs["position"]
+    if obs_position is not None:
+        new_x, new_y = obs_position
+    elif existing is not None:
+        new_x, new_y = existing["x"], existing["y"]
     else:
-        last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
-    resolved_direction = direction if direction >= 0 else (existing["direction"] if existing else 0)
+        new_x, new_y = 0, 0
+
+    new_team = obs["team"] if obs["team"] is not None else (existing["team"] if existing else 0)
+    new_rank = obs["rank"] if obs["rank"] is not None else (existing["rank"] if existing else 0)
+    new_damage = (
+        obs["damage_state"]
+        if obs["damage_state"] is not None
+        else (existing["damage_state"] if existing else DAMAGE_FULL)
+    )
+    new_direction = (
+        obs["direction"]
+        if obs["direction"] is not None
+        else (existing["direction"] if existing else 0)
+    )
+    new_name = obs["name"] if obs["name"] is not None else (existing["name"] if existing else "")
+    new_is_bot = (
+        obs["is_bot"] if obs["is_bot"] is not None else (existing["is_bot"] if existing else False)
+    )
+
+    timestamp_ms = obs["timestamp_ms"]
+    if obs["is_wire_sourced"]:
+        new_last_wire_seen_ms = timestamp_ms
+        if obs_position is not None:
+            new_last_position_update_ms = timestamp_ms
+        else:
+            new_last_position_update_ms = existing["last_position_update_ms"] if existing else 0
+    else:
+        new_last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
+        new_last_position_update_ms = existing["last_position_update_ms"] if existing else 0
 
     new_tank = make_tank_state(
-        tank_id=tank_id,
-        x=x,
-        y=y,
-        team=team,
-        rank=rank,
-        damage_state=damage_state,
-        direction=resolved_direction,
-        name=name,
-        is_bot=is_bot,
+        tank_id=obs["tank_id"],
+        x=new_x,
+        y=new_y,
+        team=new_team,
+        rank=new_rank,
+        damage_state=new_damage,
+        direction=new_direction,
+        name=new_name,
+        is_bot=new_is_bot,
         is_self=is_self,
-        source=source,
+        source=obs["storage_source"],
         timestamp_ms=timestamp_ms,
-        last_wire_seen_ms=last_wire_seen_ms,
-    )
-
-    new_tanks = dict(state["tanks"])
-    new_tanks[key] = new_tank
-
-    return WorldStateDict(
-        self_state=state["self_state"],
-        tanks=new_tanks,
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
-        timestamp_ms=timestamp_ms,
-    )
-
-
-def update_tank_damage(
-    state: WorldStateDict,
-    tank_id: int,
-    damage_state: int,
-    timestamp_ms: int,
-) -> WorldStateDict:
-    """Update tank damage state from TankStatusShort message.
-
-    Args:
-        state: Current world state.
-        tank_id: Tank ID.
-        damage_state: New damage state (0-3).
-        timestamp_ms: Message timestamp.
-
-    Returns:
-        New WorldStateDict with updated tank damage.
-    """
-    key = str(tank_id)
-    existing = state["tanks"].get(key)
-    if existing is None:
-        return state
-
-    new_tank = TankStateDict(
-        tank_id=existing["tank_id"],
-        x=existing["x"],
-        y=existing["y"],
-        team=existing["team"],
-        rank=existing["rank"],
-        damage_state=damage_state,
-        direction=existing["direction"],
-        name=existing["name"],
-        is_bot=existing["is_bot"],
-        is_self=existing["is_self"],
-        source=existing["source"],
-        timestamp_ms=timestamp_ms,
-        last_wire_seen_ms=timestamp_ms,
+        last_wire_seen_ms=new_last_wire_seen_ms,
+        last_position_update_ms=new_last_position_update_ms,
     )
 
     new_tanks = dict(state["tanks"])
@@ -317,46 +297,11 @@ def update_terrain_from_viewport(
     )
 
 
-def update_self_fuel(
-    state: WorldStateDict,
-    fuel_delta: int,
-    timestamp_ms: int,
-) -> WorldStateDict:
-    """Update self fuel by adding a delta.
-
-    Args:
-        state: Current world state.
-        fuel_delta: Fuel amount to add (can be negative for damage).
-        timestamp_ms: Message timestamp.
-
-    Returns:
-        New WorldStateDict with updated fuel, or unchanged if no self_state.
-    """
-    if state["self_state"] is None:
-        return state
-
-    new_fuel = max(0, state["self_state"]["fuel"] + fuel_delta)
-    new_self = SelfStateDict(
-        tank_id=state["self_state"]["tank_id"],
-        x=state["self_state"]["x"],
-        y=state["self_state"]["y"],
-        team=state["self_state"]["team"],
-        rank=state["self_state"]["rank"],
-        fuel=new_fuel,
-        leaderboard_position=state["self_state"]["leaderboard_position"],
-    )
-
-    return WorldStateDict(
-        self_state=new_self,
-        tanks=state["tanks"],
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
-        timestamp_ms=timestamp_ms,
-    )
+# update_self_fuel (delta variant) was deleted 2026-06-19: production
+# wire fuel messages (0x2E TankStatusSync, 0x44 FuelGain, 0x64
+# FuelDeposit) all carry the absolute fuel value and funnel through
+# set_self_fuel; the additive-delta variant was dead in src/ and only
+# alive in tests.
 
 
 def set_self_fuel(
@@ -506,14 +451,12 @@ def replace_map_fuel_dots(
 # =============================================================================
 
 __all__ = [
+    "apply_tank_observation",
     "mark_viewport_scanned",
     "remove_tank",
     "replace_map_fuel_dots",
     "set_self_fuel",
     "update_self_from_movement_response",
-    "update_self_fuel",
     "update_self_position",
-    "update_tank_damage",
-    "update_tank_from_registry",
     "update_terrain_from_viewport",
 ]

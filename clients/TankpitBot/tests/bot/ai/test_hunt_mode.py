@@ -44,6 +44,7 @@ def _enemy_tank(
         damage_state=0,
         timestamp_ms=100000,
         last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
     )
 
 
