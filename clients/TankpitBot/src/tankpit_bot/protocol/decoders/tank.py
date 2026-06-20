@@ -263,6 +263,11 @@ def _dispatch_protocol_tank(subtype: int, inner: bytes) -> BinaryMessage | None:
         return decode_tank_status(inner)
     if subtype == 0x47 and len(inner) >= 12:
         return decode_movement(inner)
+    if subtype == 0x58 and len(inner) >= 2:
+        # 231 corpus samples (analysis_scripts audit). Tunneled
+        # TankRemove (Ug.h) inside 0x2E -- previously fell through to
+        # UNKNOWN_CONTAINER.
+        return decode_tank_remove(inner)
     return None
 
 
@@ -307,6 +312,7 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         decode_radar_scan_result,
     )
     from tankpit_bot.protocol.decoders.world import (
+        decode_supervisor,
         decode_sync,
         decode_terrain_update,
         decode_viewport_update,
@@ -322,6 +328,11 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
         return decode_terrain_update(inner)
     if subtype == 0x4F and _is_radar_scan_structure(inner):
         return decode_radar_scan_result(inner)
+    if subtype == 0x52 and len(inner) >= 3:
+        # 705 corpus samples (analysis_scripts audit). Tunneled
+        # CommandResult inside 0x2E -- previously fell through to
+        # UNKNOWN_CONTAINER.
+        return decode_supervisor(inner)
     if subtype == 0x53 and len(inner) >= 10:
         return decode_shoot_event(inner)
     if subtype == 0x5A and len(inner) >= 2:

@@ -200,10 +200,17 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     assert result["session_id"] == "43c10dc5-a93b-4d0d-b702-12f0a718cae1"
     assert result["total_ticks"] == 19
     assert result["total_messages"] == 145
-    assert behavior_counts["HUNT"] == 18
-    assert behavior_counts["COLLECT_FUEL"] == 1
-    assert command_counts["shoot"] == 10
+    # 2026-06-19 retune: 705 ex-UNKNOWN_CONTAINER 0x52 CommandResults
+    # were misrouted; tunneled-dispatch fix landed them as real
+    # ``last_command_error`` transitions. The bot now correctly
+    # recognises "Insufficient fuel" / "Empty container" earlier and
+    # spends 2 extra ticks in COLLECT_FUEL, takes 3 fewer shots, and
+    # opens the map 5 times for recovery decisions.
+    assert behavior_counts["HUNT"] == 16
+    assert behavior_counts["COLLECT_FUEL"] == 3
+    assert command_counts["shoot"] == 7
     assert command_counts.get("radar", 0) == 1
+    assert command_counts.get("map_open", 0) == 5
     assert traces[15]["ai_mode"] == "RECOVER_FUEL"
 
     _reset_replay_globals()
