@@ -5,10 +5,12 @@ from __future__ import annotations
 from tankpit_bot.protocol.constants import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
+    MSG_BUILD_PICKUP,
     MSG_CACHE_OVERLAY_UPDATE,
     MSG_CACHE_UPDATE,
     MSG_CHAT,
     MSG_DEACTIVATE,
+    MSG_DECORATION,
     MSG_ENEMY_DETECT,
     MSG_EQUIP_GAIN,
     MSG_EQUIP_TOGGLE,
@@ -40,7 +42,9 @@ from tankpit_bot.protocol.decoders.combat import (
 from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
+    decode_build_pickup,
     decode_chat_message,
+    decode_decoration,
     decode_promotion,
     decode_statistics,
 )
@@ -171,4 +175,8 @@ def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_action_done(data)
     if msg_type == MSG_PROMOTION:
         return decode_promotion(data)
+    if msg_type == MSG_DECORATION:
+        return decode_decoration(data)
+    if msg_type == MSG_BUILD_PICKUP:
+        return decode_build_pickup(data)
     return None

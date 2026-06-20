@@ -291,6 +291,39 @@ def _dispatch_tank_lifecycle(ws: WorldService, decoded: protocol.BinaryMessage) 
         }:
             _dispatch_self_promotion(ws, new_rank, was_promoted)
             return True
+        case {
+            "msg_type": 0x4E,
+            "tank_id": int(tid),
+            "slot": int(slot),
+            "level": int(level),
+        }:
+            emit_diagnostic(
+                diagnostic_kind="tank_decoration",
+                tank_id=tid,
+                slot=slot,
+                level=level,
+            )
+            return True
+        case {
+            "msg_type": 0x42,
+            "tank_id": int(tid),
+            "source_x": int(sx),
+            "source_y": int(sy),
+            "drop_x": int(dx),
+            "drop_y": int(dy),
+            "is_bridge": bool(is_bridge),
+        }:
+            _update_tank_position(ws, tid, sx, sy)
+            emit_diagnostic(
+                diagnostic_kind="build_pickup",
+                tank_id=tid,
+                source_x=sx,
+                source_y=sy,
+                drop_x=dx,
+                drop_y=dy,
+                is_bridge=is_bridge,
+            )
+            return True
     return False
 
 

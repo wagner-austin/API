@@ -565,6 +565,74 @@ class TestDispatchTankMessages:
     # 0x47 Movement carries tank_id directly per JS Lg.h.
 
 
+class TestDispatchBuildPickup:
+    """Tests for dispatch_world_state_update with 0x42 BuildPickup (Jg)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_build_pickup_updates_actor_position(self) -> None:
+        """0x42 advances the acting tank's position to its source x/y."""
+        from tankpit_bot.protocol import BuildPickupDict, TankEntryDict
+
+        ws = get_world_service()
+        entry = TankEntryDict(
+            msg_type=0x28, team=2, tank_id=12, rank=0, damage_state=0, score=0, x=0, y=0
+        )
+        dispatch_world_state_update(ws, entry)
+
+        msg = BuildPickupDict(
+            msg_type=0x42,
+            tank_id=12,
+            source_x=20,
+            source_y=30,
+            drop_x=21,
+            drop_y=30,
+            direction=8,
+            is_bridge=False,
+            flag=0,
+        )
+        dispatch_world_state_update(ws, msg)
+
+        tank = ws.world_state["tanks"]["12"]
+        assert tank["x"] == 20
+        assert tank["y"] == 30
+
+
+class TestDispatchDecoration:
+    """Tests for dispatch_world_state_update with 0x4E Decoration (Sf) messages."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_decoration_is_observation_only_no_state_mutation(self) -> None:
+        """0x4E Sf is an announcement: emits a diagnostic, does not mutate tanks."""
+        from tankpit_bot.protocol import DecorationDict, TankEntryDict
+
+        ws = get_world_service()
+        entry = TankEntryDict(
+            msg_type=0x28, team=2, tank_id=44, rank=0, damage_state=0, score=0, x=1, y=2
+        )
+        dispatch_world_state_update(ws, entry)
+        before = ws.world_state["tanks"]["44"]
+
+        msg = DecorationDict(msg_type=0x4E, tank_id=44, slot=1, level=2)
+        dispatch_world_state_update(ws, msg)
+
+        after = ws.world_state["tanks"]["44"]
+        assert after == before
+
+
 class TestDispatchPromotion:
     """Tests for dispatch_world_state_update with 0x2B Promotion (Rf) messages."""
 

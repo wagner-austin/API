@@ -12,9 +12,11 @@ from tankpit_bot.protocol import (
     ViewportEntityDict,
     decode_0x2e_message,
     decode_active_forces,
+    decode_build_pickup,
     decode_cache_update,
     decode_chat_message,
     decode_combined_tile_update,
+    decode_decoration,
     decode_overlay_update,
     decode_promotion,
     decode_statistics,
@@ -214,6 +216,64 @@ class TestDecodePromotion:
         """Raises DecodeError on insufficient data (require 2 bytes)."""
         with pytest.raises(DecodeError):
             decode_promotion(bytes([1]))
+
+
+class TestDecodeDecoration:
+    """Tests for decode_decoration function.
+
+    0x4E 'N' Sf decoder: ``Sf(X(a[0],a[1]), a[2], a[3])`` -- tank_id,
+    decoration slot, level. The renderer prints a banner only when
+    ``level`` exceeds the tank's current level in that slot.
+    """
+
+    def test_decodes_decoration(self) -> None:
+        """Decodes tank_id (LE), slot, level per JS Sf.h."""
+        data = bytes([0x05, 0x01, 2, 3])
+        result = decode_decoration(data)
+        assert result["msg_type"] == 0x4E
+        assert result["tank_id"] == 0x0105
+        assert result["slot"] == 2
+        assert result["level"] == 3
+
+    def test_raises_on_short_data(self) -> None:
+        """Raises DecodeError on insufficient data (require 4 bytes)."""
+        with pytest.raises(DecodeError):
+            decode_decoration(bytes([1, 2, 3]))
+
+
+class TestDecodeBuildPickup:
+    """Tests for decode_build_pickup function.
+
+    0x42 'B' Jg decoder: ``Jg(X(a[0],a[1]), a[2], a[3], a[4], a[5],
+    a[6], a[7], a[8])`` -- tank_id, source x/y, drop x/y, direction,
+    is_bridge, flag.
+    """
+
+    def test_decodes_bridge_build(self) -> None:
+        """Decodes a bridge module build event (is_bridge == 1)."""
+        data = bytes([0x10, 0x00, 5, 6, 7, 8, 12, 1, 0])
+        result = decode_build_pickup(data)
+        assert result["msg_type"] == 0x42
+        assert result["tank_id"] == 0x0010
+        assert result["source_x"] == 5
+        assert result["source_y"] == 6
+        assert result["drop_x"] == 7
+        assert result["drop_y"] == 8
+        assert result["direction"] == 12
+        assert result["is_bridge"] is True
+        assert result["flag"] == 0
+
+    def test_decodes_obstacle_pickup(self) -> None:
+        """Decodes an obstacle pickup / drop event (is_bridge == 0)."""
+        data = bytes([0x05, 0x00, 1, 1, 2, 2, 4, 0, 3])
+        result = decode_build_pickup(data)
+        assert result["is_bridge"] is False
+        assert result["flag"] == 3
+
+    def test_raises_on_short_data(self) -> None:
+        """Raises DecodeError on insufficient data (require 9 bytes)."""
+        with pytest.raises(DecodeError):
+            decode_build_pickup(bytes([1, 2, 3, 4, 5, 6, 7, 8]))
 
 
 class TestDecodeTerrainUpdate:

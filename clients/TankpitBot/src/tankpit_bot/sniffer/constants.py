@@ -27,6 +27,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x3D: "MoveResponse",
     0x3E: "TankStatus",
     0x41: "Deactivation",
+    0x42: "BuildPickup",
     0x43: "CacheUpdate",
     0x44: "FuelDeposit",
     0x45: "MineDetonate",
@@ -38,6 +39,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x4B: "MinePlace",
     0x4C: "WorldEntry",
     0x4D: "PlayerList",
+    0x4E: "Decoration",
     0x4F: "CombinedTileUpdate",
     0x52: "Supervisor",
     0x53: "Shooting",
@@ -52,11 +54,13 @@ MSG_TYPE_NAMES: dict[int, str] = {
 
 # Message type categories for formatting dispatch
 COMBAT_MSG_TYPES: frozenset[int] = frozenset({0x53, 0x41})
-TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x29, 0x58, 0x2E, 0x3E, 0x21, 0x47, 0x3D, 0x48})
+TANK_MSG_TYPES: frozenset[int] = frozenset(
+    {0x21, 0x28, 0x29, 0x2E, 0x3D, 0x3E, 0x42, 0x47, 0x48, 0x58}
+)
 RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
-MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B})
+MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 0x4E})
 
 # Text message type bytes (ASCII chars that indicate text, not binary)
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
@@ -65,6 +69,7 @@ TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x
 MSG_MIN_LENGTHS: dict[int, int] = {
     ord("S"): 12,  # ShootEvent
     ord("A"): 5,  # Deactivation
+    ord("B"): 9,  # BuildPickup (Jg: tank_id, src x/y, drop x/y, direction, is_bridge, flag)
     ord("K"): 4,  # MinePlacement
     ord("E"): 0,  # MineDetonation (no minimum)
     ord("D"): 3,  # FuelGain
@@ -78,6 +83,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("("): 10,  # TankEntry
     ord(")"): 5,  # TankExit (Vf: team, tank_id, was_silent, was_eliminated)
     ord("+"): 2,  # Promotion (Rf binary form: new_rank, was_promoted)
+    ord("N"): 4,  # Decoration (Sf: tank_id, slot, level)
     ord("X"): 2,  # TankRemove
     ord("."): 1,  # 0x2E container (TankStatusSync or tunneled message)
     ord(">"): 13,  # TankStatus
@@ -124,6 +130,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x3F: ("position", "FULL"),
     0x40: ("overlay_update", "IDENTIFIED"),
     0x41: ("kill", "FULL"),
+    0x42: ("build_pickup", "FULL"),
     0x43: ("cache_update", "FULL"),
     0x45: ("mine_detonate", "FULL"),
     0x46: ("radar_ack", "FULL"),
@@ -133,6 +140,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x4B: ("mine_place", "FULL"),
     0x4C: ("tank_entry", "PARTIAL"),
     0x4D: ("player_list", "IDENTIFIED"),
+    0x4E: ("decoration", "FULL"),
     0x4F: ("combined_tile_update", "FULL"),
     0x52: ("supervisor", "PARTIAL"),
     0x53: ("tank_move", "FULL"),

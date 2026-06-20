@@ -465,6 +465,57 @@ class TestFormatFunctions:
         result = format_misc_details(msg)
         assert result == ""
 
+    def test_format_misc_details_decoration(self) -> None:
+        """Test format_misc_details for decoration (0x4E)."""
+        from tankpit_bot.protocol import DecorationDict
+
+        msg = DecorationDict(msg_type=0x4E, tank_id=99, slot=2, level=3)
+        result = format_misc_details(msg)
+        assert "tank=99" in result
+        assert "slot=2" in result
+        assert "level=3" in result
+
+    def test_format_tank_details_build_pickup_bridge(self) -> None:
+        """Test format_tank_details for BuildPickup (0x42) bridge variant."""
+        from tankpit_bot.protocol import BuildPickupDict
+        from tankpit_bot.sniffer.formatters import format_tank_details
+
+        msg = BuildPickupDict(
+            msg_type=0x42,
+            tank_id=44,
+            source_x=10,
+            source_y=20,
+            drop_x=11,
+            drop_y=20,
+            direction=4,
+            is_bridge=True,
+            flag=0,
+        )
+        result = format_tank_details(msg)
+        assert "tank=44" in result
+        assert "bridge" in result
+        assert "(10,20)" in result
+        assert "(11,20)" in result
+
+    def test_format_tank_details_build_pickup_obstacle(self) -> None:
+        """Test format_tank_details for BuildPickup (0x42) obstacle variant."""
+        from tankpit_bot.protocol import BuildPickupDict
+        from tankpit_bot.sniffer.formatters import format_tank_details
+
+        msg = BuildPickupDict(
+            msg_type=0x42,
+            tank_id=44,
+            source_x=10,
+            source_y=20,
+            drop_x=11,
+            drop_y=20,
+            direction=4,
+            is_bridge=False,
+            flag=1,
+        )
+        result = format_tank_details(msg)
+        assert "obstacle" in result
+
     def test_format_decoded_message_container(self) -> None:
         """Format a container TankLeave message."""
         from tankpit_bot.container import TankLeaveDict

@@ -36,7 +36,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x3F | `?` | vg | Sync/heartbeat | FULL | — |
 | 0x40 | `@` | ah | OverlayUpdate: mine tile patches | FULL | — |
 | 0x41 | `A` | Pg | Deactivation: status, victim, promo_eligible, killer, is_mine_kill | FULL | — |
-| 0x42 | `B` | Jg | BuildPickup: obstacle build/pickup result | NONE | Not decoded[^4] |
+| 0x42 | `B` | Jg | BuildPickup: tank_id, src x/y, drop x/y, direction, is_bridge, flag | FULL | — |
 | 0x44 | `D` | Rg | FuelGain: absolute fuel total | FULL | — |
 | 0x45 | `E` | dh | MineDetonate: positions | FULL | — |
 | 0x46 | `F` | Fg | RadarAck: found flag | FULL | — |
@@ -47,7 +47,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x4B | `K` | Dg | MinePlacement: type, tank, positions | FULL | — |
 | 0x4C | `L` | Ig | **MapData: all tank positions + fuel dots** | IDENTIFIED | Blob structure not decoded[^5] |
 | 0x4D | `M` | Qg | Chat: sender, type, position | FULL | — |
-| 0x4E | `N` | Sf | **Decoration: tank_id, type, level** | NONE | Not decoded[^6] |
+| 0x4E | `N` | Sf | Decoration: tank_id, slot, level | FULL | — |
 | 0x4F | `O` | ch | CombinedTileUpdate / RadarScanResult (structural disambiguation) | FULL | — |
 | 0x52 | `R` | xg | CommandResult: reset_action, close_map, error_code | FULL | — |
 | 0x53 | `S` | Gg | ShootEvent: team, shooter, source pos, target pos, weapon | FULL | — |
@@ -176,9 +176,7 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
 ```
 
 [^3]: JS `wg` renders supervisor text messages; separate from command errors (V.R)
-[^4]: JS `Jg` handles obstacle build/pickup responses; not relevant for practice map combat
 [^5]: JS `Ig` fully parses the 0x4C map blob into tank positions and fuel dot coordinates
-[^6]: JS `Sf` handles decoration/award events; not critical for combat
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^9]: TSS byte 8 is lb_score low byte (rank_points), proven by 13/13 exact timestamp match with 0x3D byte 11
 [^10]: Only bytes 0-1 (position) extracted; remaining bytes likely contain damage, direction, rank

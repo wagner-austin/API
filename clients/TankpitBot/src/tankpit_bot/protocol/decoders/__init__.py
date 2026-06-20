@@ -13,7 +13,9 @@ from tankpit_bot.protocol.decoders.combat import (
 from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
+    decode_build_pickup,
     decode_chat_message,
+    decode_decoration,
     decode_promotion,
     decode_statistics,
 )
@@ -197,10 +199,12 @@ __all__ = [
     "decode_0x2e_message",
     "decode_action_done",
     "decode_active_forces",
+    "decode_build_pickup",
     "decode_cache_update",
     "decode_chat_message",
     "decode_combined_tile_update",
     "decode_deactivation",
+    "decode_decoration",
     "decode_enemy_detection",
     "decode_equipment_gain",
     "decode_equipment_toggle",

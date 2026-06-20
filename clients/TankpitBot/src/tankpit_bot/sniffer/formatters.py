@@ -107,6 +107,50 @@ def format_combat_details(d: protocol.BinaryMessage) -> str:
     return ""
 
 
+def _format_tank_lifecycle(d: protocol.BinaryMessage) -> str:
+    """Format tank join / info / status / exit / removal lines."""
+    if d["msg_type"] == 0x28:
+        return f"tank={d['tank_id']} team={d['team']} rank={d['rank']} at ({d['x']},{d['y']})"
+    if d["msg_type"] == 0x58:
+        return f"tank={d['tank_id']} removed"
+    if d["msg_type"] == 0x29:
+        outcome = "eliminated" if d["was_eliminated"] else "left"
+        silent = " silent" if d["was_silent"] else ""
+        return f"tank={d['tank_id']} team={d['team']} {outcome}{silent}"
+    if d["msg_type"] == 0x21:
+        team = team_name(d["team"])
+        return f"tank={d['tank_id']} {team} name={d['name']}"
+    if d["msg_type"] == 0x3E:
+        rank = rank_name(d["rank"])
+        team = team_name(d["team"])
+        return f"tank={d['tank_id']} {team} {rank} lb={d['leaderboard_score']}"
+    if d["msg_type"] == 0x2E:
+        rank = rank_name(d["rank"])
+        dmg = damage_name(d["damage_state"])
+        return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['lb_score']}"
+    return ""
+
+
+def _format_tank_motion(d: protocol.BinaryMessage) -> str:
+    """Format movement / detection / build-pickup lines."""
+    if d["msg_type"] == 0x47:
+        x, y, dr = d["start_x"], d["start_y"], d["direction"]
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} rank={d['rank']} lb={d['lb_score']}"
+    if d["msg_type"] == 0x3D:
+        rank = rank_name(d["rank"])
+        x, y, dr = d["x"], d["y"], d["direction"]
+        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} {rank} lb={d['lb_score']}"
+    if d["msg_type"] == 0x48:
+        rank = rank_name(d["rank"])
+        return f"tank={d['tank_id']} at ({d['x']},{d['y']}) {rank}"
+    if d["msg_type"] == 0x42:
+        action = "bridge built" if d["is_bridge"] else "obstacle drop/pickup"
+        src = f"({d['source_x']},{d['source_y']})"
+        drop = f"({d['drop_x']},{d['drop_y']})"
+        return f"tank={d['tank_id']} {action} from {src} at {drop}"
+    return ""
+
+
 def format_tank_details(d: protocol.BinaryMessage) -> str:
     """Format tank status message details.
 
@@ -116,42 +160,10 @@ def format_tank_details(d: protocol.BinaryMessage) -> str:
     Returns:
         Formatted tank details string.
     """
-    if d["msg_type"] == 0x28:
-        # TankEntryDict: team, tank_id, rank, x, y (name from TankInfo)
-        return f"tank={d['tank_id']} team={d['team']} rank={d['rank']} at ({d['x']},{d['y']})"
-    if d["msg_type"] == 0x58:
-        return f"tank={d['tank_id']} removed"
-    if d["msg_type"] == 0x29:
-        outcome = "eliminated" if d["was_eliminated"] else "left"
-        silent = " silent" if d["was_silent"] else ""
-        return f"tank={d['tank_id']} team={d['team']} {outcome}{silent}"
-    if d["msg_type"] == 0x2E:
-        # TankStatusSyncDict: damage_state (dual-purpose b.u field)
-        rank = rank_name(d["rank"])
-        dmg = damage_name(d["damage_state"])
-        return f"tank={d['tank_id']} {rank} hp={dmg} lb={d['lb_score']}"
-    if d["msg_type"] == 0x3E:
-        # TankStatusDict: has leaderboard_score (position ranking)
-        rank = rank_name(d["rank"])
-        team = team_name(d["team"])
-        return f"tank={d['tank_id']} {team} {rank} lb={d['leaderboard_score']}"
-    if d["msg_type"] == 0x21:
-        # TankInfoDict: has team
-        team = team_name(d["team"])
-        return f"tank={d['tank_id']} {team} name={d['name']}"
-    if d["msg_type"] == 0x47:
-        # MovementDict: has rank, damage_state, lb_score
-        x, y, dr = d["start_x"], d["start_y"], d["direction"]
-        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} rank={d['rank']} lb={d['lb_score']}"
-    if d["msg_type"] == 0x3D:
-        # MovementResponseDict: has rank, damage_state, lb_score
-        rank = rank_name(d["rank"])
-        x, y, dr = d["x"], d["y"], d["direction"]
-        return f"tank={d['tank_id']} at ({x},{y}) dir={dr} {rank} lb={d['lb_score']}"
-    if d["msg_type"] == 0x48:
-        rank = rank_name(d["rank"])
-        return f"tank={d['tank_id']} at ({d['x']},{d['y']}) {rank}"
-    return ""
+    lifecycle = _format_tank_lifecycle(d)
+    if lifecycle:
+        return lifecycle
+    return _format_tank_motion(d)
 
 
 def format_resource_details(d: protocol.BinaryMessage) -> str:
@@ -237,6 +249,8 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x2B:
         banner = " (banner)" if d["was_promoted"] else ""
         return f"new_rank={rank_name(d['new_rank'])}{banner}"
+    if d["msg_type"] == 0x4E:
+        return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}"
     return ""
 
 

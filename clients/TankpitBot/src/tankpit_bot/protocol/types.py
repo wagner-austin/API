@@ -348,6 +348,58 @@ class TankRemoveDict(TypedDict):
     tank_id: int
 
 
+class BuildPickupDict(TypedDict):
+    """Obstacle / bridge build / pickup event (0x42 'B' message).
+
+    Trace-verified from tpclient.js Jg.h (V.B):
+      X(a[0], a[1]) = tank_id (LE u16)
+      a[2]          = source_x  -- where the tank was when the action fired
+      a[3]          = source_y
+      a[4]          = drop_x    -- target tile receiving the obstacle / bridge
+      a[5]          = drop_y
+      a[6]          = direction -- new facing for the acting tank (passed to We())
+      a[7]          = is_bridge -- 1 = bridge module, else obstacle marker
+      a[8]          = flag      -- influences pickup-visibility branch (this.s in JS)
+
+    JS Jg.prototype.h:
+      * Updates the tank's facing at (source_x, source_y).
+      * Stamps ``drop_x, drop_y`` tile's ``j`` field with ``is_bridge``.
+      * For the player's own tank, prints "Bridge module built",
+        "Obstacle dropped", or "Obstacle picked up" depending on
+        ``a.la`` (carry state) and ``is_bridge``.
+    """
+
+    msg_type: Literal[0x42]
+    tank_id: int
+    source_x: int
+    source_y: int
+    drop_x: int
+    drop_y: int
+    direction: int
+    is_bridge: bool
+    flag: int
+
+
+class DecorationDict(TypedDict):
+    """Decoration / award notification (0x4E 'N' message).
+
+    Trace-verified from tpclient.js Sf.h (V.N):
+      X(a[0], a[1]) = tank_id (LE u16)
+      a[2]          = slot (decoration slot index into the tank's ``v[]`` table)
+      a[3]          = level (new decoration level for that slot)
+
+    JS Sf.prototype.h prints a banner only when the new ``level`` raises
+    the tank's current ``v[slot]`` -- the new value is assigned
+    unconditionally. The decoration label is
+    ``nb[3 * slot + level - 1]`` (3 medals per slot).
+    """
+
+    msg_type: Literal[0x4E]
+    tank_id: int
+    slot: int
+    level: int
+
+
 class PromotionDict(TypedDict):
     """Binary promotion notification (0x2B '+' message, gameplay).
 
@@ -542,11 +594,13 @@ __all__ = [
     "ActionDoneDict",
     "ActiveForcesDict",
     "BinaryMessage",
+    "BuildPickupDict",
     "CacheUpdateDict",
     "ChatMessageDict",
     "CombinedTileUpdateDict",
     "DeactivationDict",
     "DecodedMessage",
+    "DecorationDict",
     "EnemyDetectionDict",
     "EquipmentGainDict",
     "EquipmentToggleDict",
@@ -608,6 +662,8 @@ BinaryMessage = (
     | TankExitDict
     | TankRemoveDict
     | PromotionDict
+    | DecorationDict
+    | BuildPickupDict
     | ActionDoneDict
     | ChatMessageDict
     | StatisticsDict

@@ -10,7 +10,9 @@ from tankpit_bot.protocol.helpers import require_min_length, x16
 from tankpit_bot.protocol.types import (
     ActionDoneDict,
     ActiveForcesDict,
+    BuildPickupDict,
     ChatMessageDict,
+    DecorationDict,
     PromotionDict,
     StatisticsDict,
 )
@@ -122,6 +124,66 @@ def decode_promotion(data: bytes) -> PromotionDict:
     )
 
 
+def decode_build_pickup(data: bytes) -> BuildPickupDict:
+    """Decode the 0x42 'B' BuildPickup message.
+
+    Trace-verified from tpclient.js Jg.h (V.B):
+      X(a[0], a[1]) = tank_id
+      a[2:4]        = source_x, source_y
+      a[4:6]        = drop_x, drop_y
+      a[6]          = direction
+      a[7]          = is_bridge (1 = bridge module)
+      a[8]          = flag (pickup-visibility branch in JS)
+
+    Args:
+        data: XOR-decoded message body (without the 0x42 prefix).
+
+    Returns:
+        Decoded build / pickup event.
+
+    Raises:
+        DecodeError: If decoding fails.
+    """
+    require_min_length(data, 9, "BuildPickup")
+    return BuildPickupDict(
+        msg_type=0x42,
+        tank_id=x16(data[0], data[1]),
+        source_x=data[2],
+        source_y=data[3],
+        drop_x=data[4],
+        drop_y=data[5],
+        direction=data[6],
+        is_bridge=data[7] == 1,
+        flag=data[8],
+    )
+
+
+def decode_decoration(data: bytes) -> DecorationDict:
+    """Decode the 0x4E 'N' Decoration / award message.
+
+    Trace-verified from tpclient.js Sf.h (V.N):
+      X(a[0], a[1]) = tank_id (LE u16)
+      a[2]          = slot
+      a[3]          = level
+
+    Args:
+        data: XOR-decoded message body (without the 0x4E prefix).
+
+    Returns:
+        Decoded decoration event.
+
+    Raises:
+        DecodeError: If decoding fails.
+    """
+    require_min_length(data, 4, "Decoration")
+    return DecorationDict(
+        msg_type=0x4E,
+        tank_id=x16(data[0], data[1]),
+        slot=data[2],
+        level=data[3],
+    )
+
+
 def decode_active_forces(data: bytes) -> ActiveForcesDict:
     """Decode active forces from XOR-decoded data.
 
@@ -141,7 +203,9 @@ def decode_active_forces(data: bytes) -> ActiveForcesDict:
 __all__ = [
     "decode_action_done",
     "decode_active_forces",
+    "decode_build_pickup",
     "decode_chat_message",
+    "decode_decoration",
     "decode_promotion",
     "decode_statistics",
 ]

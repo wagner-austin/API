@@ -11,10 +11,12 @@ import pytest
 from tankpit_bot.protocol import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
+    MSG_BUILD_PICKUP,
     MSG_CACHE_OVERLAY_UPDATE,
     MSG_CACHE_UPDATE,
     MSG_CHAT,
     MSG_DEACTIVATE,
+    MSG_DECORATION,
     MSG_ENEMY_DETECT,
     MSG_EQUIP_GAIN,
     MSG_EQUIP_TOGGLE,
@@ -247,6 +249,28 @@ class TestDecodeMessage:
         action_data = b""
         result = decode_message(MSG_ACTION_DONE, action_data)
         assert result["msg_type"] == 0x54
+
+        # Promotion (binary Rf form, disambiguated by routing)
+        promo_data = bytes([3, 1])
+        result = decode_message(MSG_PROMOTION, promo_data)
+        assert result["msg_type"] == 0x2B
+        assert result["new_rank"] == 3
+        assert result["was_promoted"] is True
+
+        # Decoration (Sf)
+        deco_data = bytes([0x05, 0x00, 1, 2])
+        result = decode_message(MSG_DECORATION, deco_data)
+        assert result["msg_type"] == 0x4E
+        assert result["tank_id"] == 5
+        assert result["slot"] == 1
+        assert result["level"] == 2
+
+        # BuildPickup (Jg)
+        build_data = bytes([0x10, 0x00, 1, 2, 3, 4, 7, 1, 0])
+        result = decode_message(MSG_BUILD_PICKUP, build_data)
+        assert result["msg_type"] == 0x42
+        assert result["tank_id"] == 0x0010
+        assert result["is_bridge"] is True
 
     def test_raises_on_unknown_type(self) -> None:
         """Raises DecodeError on unknown message type."""
