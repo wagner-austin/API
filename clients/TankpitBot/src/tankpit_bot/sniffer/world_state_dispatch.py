@@ -48,7 +48,7 @@ from tankpit_bot.sniffer.world_state_tanks import (
 from tankpit_bot.sniffer.world_state_tiles import (
     render_ascii_if_available,
 )
-from tankpit_bot.state import add_mine, remove_mine, set_self_rank
+from tankpit_bot.state import add_mine, remove_mine, replace_map_fuel_dots, set_self_rank
 
 log = get_logger(__name__)
 
@@ -135,6 +135,34 @@ def _dispatch_shoot_event(
         mark_combat_hit(ws, weapon, victim_id)
     elif shooter_id > 0:
         _update_tank_position(ws, shooter_id, sx, sy)
+
+
+def _dispatch_map_data(
+    ws: WorldService, fuel_dots: list[tuple[int, int]], tanks: list[protocol.MapTankEntry]
+) -> None:
+    """Apply a 0x4C MapData snapshot to world state.
+
+    Two effects, both wholesale: the fuel-dot atlas is replaced and
+    every tank slot is lifted into world state via the observation
+    pipeline so the freshness model sees one wire-sourced position
+    update per tank.
+
+    Args:
+        ws: World service instance.
+        fuel_dots: Decoded ``(x, y)`` fuel dot positions.
+        tanks: Decoded :class:`protocol.MapTankEntry` slots, one per
+            tank visible on the map.
+    """
+    ts = browser.get_current_time_ms()
+    ws.world_state = replace_map_fuel_dots(ws.world_state, fuel_dots, ts)
+    for entry in tanks:
+        _update_tank_position(ws, entry["tank_id"], entry["x"], entry["y"])
+        update_world_state_from_tank_damage(ws, entry["tank_id"], entry["damage"])
+    emit_diagnostic(
+        diagnostic_kind="map_data_snapshot",
+        fuel_dot_count=len(fuel_dots),
+        tank_count=len(tanks),
+    )
 
 
 def _dispatch_self_promotion(ws: WorldService, new_rank: int, was_promoted: bool) -> None:
@@ -586,6 +614,9 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
             else:
                 update_world_state_from_radar(ws, containers, mines)
                 render_ascii_if_available(ws, "Radar")
+            return
+        case {"msg_type": 0x4C, "fuel_dots": list(fuel_dots), "tanks": list(map_tanks)}:
+            _dispatch_map_data(ws, fuel_dots, map_tanks)
             return
 
 

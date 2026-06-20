@@ -23,6 +23,7 @@ from tankpit_bot.protocol import (
     MSG_FUEL_DEPOSIT,
     MSG_FUEL_GAIN,
     MSG_INVENTORY,
+    MSG_MAP_DATA,
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
     MSG_OVERLAY_UPDATE,
@@ -222,6 +223,12 @@ class TestDecodeMessage:
         result = decode_message(MSG_OVERLAY_UPDATE, overlay_data)
         assert result["msg_type"] == 0x40
         assert result["updates"] == [(11, 21, 7), (12, 22, 255)]
+
+        # MapData (0x4C) -- empty body (just the u16 RLE header)
+        result = decode_message(MSG_MAP_DATA, bytes([0, 0]))
+        assert result["msg_type"] == 0x4C
+        assert result["fuel_dots"] == []
+        assert result["tanks"] == []
 
     def test_dispatches_misc_messages(self) -> None:
         """Dispatches to misc message decoders."""

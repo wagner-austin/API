@@ -108,6 +108,7 @@ MSG_MINE_PLACE = ord("K")
 MSG_MINE_DETONATE = ord("E")
 MSG_CHAT = ord("M")
 MSG_TANK_REMOVE = ord("X")
+MSG_MAP_DATA = ord("L")
 MSG_MAP_UPDATE = ord("Z")
 MSG_TANK_ENTRY = ord("(")
 MSG_TANK_EXIT = ord(")")
@@ -193,6 +194,7 @@ __all__ = [
     "MSG_FUEL_DEPOSIT",
     "MSG_FUEL_GAIN",
     "MSG_INVENTORY",
+    "MSG_MAP_DATA",
     "MSG_MAP_UPDATE",
     "MSG_MINE_DETONATE",
     "MSG_MINE_PLACE",

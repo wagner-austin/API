@@ -45,7 +45,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x49 | `I` | Xf | Inventory: counts + enabled flags | FULL | — |
 | 0x4A | `J` | bh | TerrainUpdate: terrain tile patches | FULL | — |
 | 0x4B | `K` | Dg | MinePlacement: type, tank, positions | FULL | — |
-| 0x4C | `L` | Ig | **MapData: all tank positions + fuel dots** | IDENTIFIED | Blob structure not decoded[^5] |
+| 0x4C | `L` | Ig | MapData: all tank positions + fuel dots | FULL | — |
 | 0x4D | `M` | Qg | Chat: sender, type, position | FULL | — |
 | 0x4E | `N` | Sf | Decoration: tank_id, slot, level | FULL | — |
 | 0x4F | `O` | ch | CombinedTileUpdate / RadarScanResult (structural disambiguation) | FULL | — |
@@ -176,7 +176,6 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
 ```
 
 [^3]: JS `wg` renders supervisor text messages; separate from command errors (V.R)
-[^5]: JS `Ig` fully parses the 0x4C map blob into tank positions and fuel dot coordinates
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^9]: TSS byte 8 is lb_score low byte (rank_points), proven by 13/13 exact timestamp match with 0x3D byte 11
 [^10]: Only bytes 0-1 (position) extracted; remaining bytes likely contain damage, direction, rank

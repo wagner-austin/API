@@ -10,6 +10,7 @@ from tankpit_bot.protocol.decoders.combat import (
     decode_deactivation,
     decode_shoot_event,
 )
+from tankpit_bot.protocol.decoders.map_data import decode_map_data
 from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
@@ -212,6 +213,7 @@ __all__ = [
     "decode_fuel_gain",
     "decode_inventory",
     "decode_join_confirm",
+    "decode_map_data",
     "decode_message",
     "decode_movement",
     "decode_movement_response",

@@ -565,6 +565,59 @@ class TestDispatchTankMessages:
     # 0x47 Movement carries tank_id directly per JS Lg.h.
 
 
+class TestDispatchMapData:
+    """Tests for dispatch_world_state_update with 0x4C MapData (Ig)."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_map_data_replaces_fuel_dots_and_lifts_tank_positions(self) -> None:
+        """0x4C replaces fuel-dot atlas and advances every tank's wire position."""
+        from tankpit_bot.protocol import MapDataDict, MapTankEntry, TankEntryDict
+
+        ws = get_world_service()
+        entry = TankEntryDict(
+            msg_type=0x28, team=0, tank_id=7, rank=0, damage_state=0, score=0, x=0, y=0
+        )
+        dispatch_world_state_update(ws, entry)
+
+        snapshot = MapDataDict(
+            msg_type=0x4C,
+            fuel_dots=[(5, 6), (7, 8)],
+            tanks=[
+                MapTankEntry(x=100, y=120, tank_id=7, rank=2, damage=1, team=0),
+            ],
+        )
+        dispatch_world_state_update(ws, snapshot)
+
+        tank = ws.world_state["tanks"]["7"]
+        assert tank["x"] == 100
+        assert tank["y"] == 120
+        assert tank["damage_state"] == 1
+
+        # Atlas replaced wholesale.
+        dots = ws.world_state["map_fuel_dots"]
+        assert len(dots) == 2
+
+    def test_empty_snapshot_clears_fuel_dots(self) -> None:
+        """An empty MapData clears the atlas (replace, not merge)."""
+        from tankpit_bot.protocol import MapDataDict
+        from tankpit_bot.state import replace_map_fuel_dots
+
+        ws = get_world_service()
+        ws.world_state = replace_map_fuel_dots(ws.world_state, [(1, 2), (3, 4)], 100)
+        assert len(ws.world_state["map_fuel_dots"]) == 2
+
+        snapshot = MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[])
+        dispatch_world_state_update(ws, snapshot)
+        assert ws.world_state["map_fuel_dots"] == {}
+
+
 class TestDispatchBuildPickup:
     """Tests for dispatch_world_state_update with 0x42 BuildPickup (Jg)."""
 

@@ -251,6 +251,8 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
         return f"new_rank={rank_name(d['new_rank'])}{banner}"
     if d["msg_type"] == 0x4E:
         return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}"
+    if d["msg_type"] == 0x4C:
+        return f"fuel_dots={len(d['fuel_dots'])} tanks={len(d['tanks'])}"
     return ""
 
 

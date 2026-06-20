@@ -475,6 +475,19 @@ class TestFormatFunctions:
         assert "slot=2" in result
         assert "level=3" in result
 
+    def test_format_misc_details_map_data(self) -> None:
+        """Test format_misc_details for MapData (0x4C)."""
+        from tankpit_bot.protocol import MapDataDict, MapTankEntry
+
+        msg = MapDataDict(
+            msg_type=0x4C,
+            fuel_dots=[(1, 2), (3, 4)],
+            tanks=[MapTankEntry(x=1, y=2, tank_id=5, rank=0, damage=0, team=0)],
+        )
+        result = format_misc_details(msg)
+        assert "fuel_dots=2" in result
+        assert "tanks=1" in result
+
     def test_format_tank_details_build_pickup_bridge(self) -> None:
         """Test format_tank_details for BuildPickup (0x42) bridge variant."""
         from tankpit_bot.protocol import BuildPickupDict

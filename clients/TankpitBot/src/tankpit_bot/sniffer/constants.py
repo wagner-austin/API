@@ -37,7 +37,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x49: "ItemPickup",
     0x4A: "TerrainUpdate",
     0x4B: "MinePlace",
-    0x4C: "WorldEntry",
+    0x4C: "MapData",
     0x4D: "PlayerList",
     0x4E: "Decoration",
     0x4F: "CombinedTileUpdate",
@@ -60,7 +60,7 @@ TANK_MSG_TYPES: frozenset[int] = frozenset(
 RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
-MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 0x4E})
+MISC_MSG_TYPES: frozenset[int] = frozenset({0x67, 0x74, 0x56, 0x52, 0x4D, 0x2B, 0x4E, 0x4C})
 
 # Text message type bytes (ASCII chars that indicate text, not binary)
 TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x2D})
@@ -71,6 +71,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("A"): 5,  # Deactivation
     ord("B"): 9,  # BuildPickup (Jg: tank_id, src x/y, drop x/y, direction, is_bridge, flag)
     ord("K"): 4,  # MinePlacement
+    ord("L"): 2,  # MapData (Ig: u16 RLE count + RLE bytes + 5-byte tank entries)
     ord("E"): 0,  # MineDetonation (no minimum)
     ord("D"): 3,  # FuelGain
     ord("d"): 2,  # FuelDeposit
@@ -138,7 +139,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x49: ("item_pickup", "FULL"),
     0x4A: ("terrain_update", "IDENTIFIED"),  # 'J' MSG_TERRAIN_UPDATE
     0x4B: ("mine_place", "FULL"),
-    0x4C: ("tank_entry", "PARTIAL"),
+    0x4C: ("map_data", "FULL"),
     0x4D: ("player_list", "IDENTIFIED"),
     0x4E: ("decoration", "FULL"),
     0x4F: ("combined_tile_update", "FULL"),

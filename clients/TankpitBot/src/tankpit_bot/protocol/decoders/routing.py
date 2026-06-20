@@ -17,6 +17,7 @@ from tankpit_bot.protocol.constants import (
     MSG_FUEL_DEPOSIT,
     MSG_FUEL_GAIN,
     MSG_INVENTORY,
+    MSG_MAP_DATA,
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
     MSG_OVERLAY_UPDATE,
@@ -39,6 +40,7 @@ from tankpit_bot.protocol.decoders.combat import (
     decode_deactivation,
     decode_shoot_event,
 )
+from tankpit_bot.protocol.decoders.map_data import decode_map_data
 from tankpit_bot.protocol.decoders.misc import (
     decode_action_done,
     decode_active_forces,
@@ -158,6 +160,8 @@ def _decode_world_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_combined_tile_update(data)
     if msg_type == MSG_SYNC:
         return decode_sync(data)
+    if msg_type == MSG_MAP_DATA:
+        return decode_map_data(data)
     return None
 
 
