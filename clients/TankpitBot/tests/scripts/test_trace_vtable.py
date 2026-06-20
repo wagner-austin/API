@@ -445,7 +445,13 @@ class TestTraceVtable:
             _sys.stdout = old_stdout
 
     def test_runpy_main_guard(self) -> None:
-        """Covers if __name__ == '__main__' via runpy."""
+        """Covers if __name__ == '__main__' via runpy.
+
+        ``scripts.trace_vtable`` is already imported at module top, so
+        ``run_module`` would emit a RuntimeWarning about re-executing
+        an imported module. Drop it from ``sys.modules`` first so
+        runpy executes a clean module under ``__main__``.
+        """
         import runpy
         import sys as _sys
 
@@ -465,8 +471,11 @@ class TestTraceVtable:
         _test_hooks.setup_rich_logging = fake_logging
 
         old_argv = _sys.argv
+        saved = _sys.modules.pop("scripts.trace_vtable", None)
         try:
             _sys.argv = ["trace_vtable"]
             runpy.run_module("scripts.trace_vtable", run_name="__main__")
         finally:
             _sys.argv = old_argv
+            if saved is not None:
+                _sys.modules["scripts.trace_vtable"] = saved
