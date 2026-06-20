@@ -325,10 +325,15 @@ def update_world_state_from_tank_damage(
         )
 
 
-def update_world_state_from_tank_exit(ws: WorldService, tank_id: int) -> None:
-    """Remove tank from world state on TankExit (0x58).
+def update_world_state_from_tank_remove(ws: WorldService, tank_id: int) -> None:
+    """Remove tank from world state on TankRemove (0x58) or container TankLeave.
 
-    TankExit is a deletion, not an observation, so it does not flow
+    Server-driven removal — clears the tile entry and drops the rendered
+    tank. Distinct from 0x29 TankExit, which is an announcement-only
+    message (the player-visible "left the game" / "eliminated" log line)
+    and does not mutate world state.
+
+    Removal is a deletion, not an observation, so it does not flow
     through the observation pipeline; it goes straight to
     :func:`remove_tank`.
 

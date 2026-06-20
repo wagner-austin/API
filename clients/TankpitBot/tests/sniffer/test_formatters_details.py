@@ -83,13 +83,46 @@ class TestFormatFunctions:
         assert "(50,60)" in result
         assert "team=0" in result
 
-    def test_format_tank_details_exit(self) -> None:
-        """Test format_tank_details for tank exit (0x58)."""
+    def test_format_tank_details_remove(self) -> None:
+        """Test format_tank_details for tank remove (0x58)."""
+        from tankpit_bot.protocol import TankRemoveDict
+
+        msg = TankRemoveDict(msg_type=0x58, tank_id=100)
+        result = format_tank_details(msg)
+        assert "tank=100 removed" in result
+
+    def test_format_tank_details_exit_eliminated(self) -> None:
+        """Test format_tank_details for 0x29 TankExit (eliminated, non-silent)."""
         from tankpit_bot.protocol import TankExitDict
 
-        msg = TankExitDict(msg_type=0x58, tank_id=100)
+        msg = TankExitDict(
+            msg_type=0x29,
+            team=2,
+            tank_id=100,
+            was_silent=False,
+            was_eliminated=True,
+        )
         result = format_tank_details(msg)
-        assert "tank=100 left" in result
+        assert "tank=100" in result
+        assert "team=2" in result
+        assert "eliminated" in result
+        assert "silent" not in result
+
+    def test_format_tank_details_exit_left_silent(self) -> None:
+        """Test format_tank_details for 0x29 TankExit (left, silent)."""
+        from tankpit_bot.protocol import TankExitDict
+
+        msg = TankExitDict(
+            msg_type=0x29,
+            team=1,
+            tank_id=200,
+            was_silent=True,
+            was_eliminated=False,
+        )
+        result = format_tank_details(msg)
+        assert "tank=200" in result
+        assert "left" in result
+        assert "silent" in result
 
     def test_format_tank_details_status_sync(self) -> None:
         """Test format_tank_details for tank status sync (0x2E)."""

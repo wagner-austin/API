@@ -21,7 +21,7 @@ DEFAULT_CAPTURE_DURATION_MS = 0  # 0 = indefinite (wait until browser closed)
 MSG_TYPE_NAMES: dict[int, str] = {
     0x21: "TankInfo",
     0x28: "TankJoin",
-    0x29: "TankLeave",
+    0x29: "TankExit",
     0x2E: "TankStatus",
     0x3D: "MoveResponse",
     0x3E: "TankStatus",
@@ -42,7 +42,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x53: "Shooting",
     0x54: "ActionDone",
     0x56: "Statistics",
-    0x58: "TankExit",
+    0x58: "TankRemove",
     0x5A: "ViewportUpdate",
     0x64: "FuelDeposit",
     0x67: "EquipGain",
@@ -51,7 +51,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
 
 # Message type categories for formatting dispatch
 COMBAT_MSG_TYPES: frozenset[int] = frozenset({0x53, 0x41})
-TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x58, 0x2E, 0x3E, 0x21, 0x47, 0x3D, 0x48})
+TANK_MSG_TYPES: frozenset[int] = frozenset({0x28, 0x29, 0x58, 0x2E, 0x3E, 0x21, 0x47, 0x3D, 0x48})
 RESOURCE_MSG_TYPES: frozenset[int] = frozenset({0x44, 0x64, 0x49})
 POSITION_MSG_TYPES: frozenset[int] = frozenset({0x4B, 0x45})
 RADAR_MSG_TYPES: frozenset[int] = frozenset({0x46, 0x4F, 0x5A})
@@ -75,7 +75,8 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("H"): 6,  # EnemyDetection
     ord("O"): 2,  # CombinedTileUpdate
     ord("("): 10,  # TankEntry
-    ord("X"): 2,  # TankExit
+    ord(")"): 5,  # TankExit (Vf: team, tank_id, was_silent, was_eliminated)
+    ord("X"): 2,  # TankRemove
     ord("."): 1,  # 0x2E container (TankStatusSync or tunneled message)
     ord(">"): 13,  # TankStatus
     ord("!"): 10,  # TankInfo
@@ -108,7 +109,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x21: ("tank_info", "FULL"),
     0x22: ("entity_position", "IDENTIFIED"),  # '"' 13-byte position update
     0x28: ("tank_join", "IDENTIFIED"),
-    0x29: ("tank_leave", "IDENTIFIED"),
+    0x29: ("tank_exit", "FULL"),
     0x2B: ("promotion", "FULL"),
     0x2D: ("world_entity", "IDENTIFIED"),  # '-' 16-byte entity state
     0x2E: ("tank_status_sync", "PARTIAL"),
@@ -135,7 +136,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x53: ("tank_move", "FULL"),
     0x54: ("tank_shoot", "FULL"),
     0x56: ("statistics", "FULL"),
-    0x58: ("tank_exit", "FULL"),
+    0x58: ("tank_remove", "FULL"),
     0x5A: ("viewport_update", "PARTIAL"),
     0x5F: ("action_event", "IDENTIFIED"),  # '_' 11-byte action/event
     0x64: ("fuel_deposit", "FULL"),

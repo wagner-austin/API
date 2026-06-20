@@ -40,9 +40,9 @@ from tankpit_bot.sniffer.world_state_tanks import (
     _update_tank_position,
     update_world_state_from_tank_damage,
     update_world_state_from_tank_entry,
-    update_world_state_from_tank_exit,
     update_world_state_from_tank_info,
     update_world_state_from_tank_registry,
+    update_world_state_from_tank_remove,
     update_world_state_from_tank_status,
 )
 from tankpit_bot.sniffer.world_state_tiles import (
@@ -242,7 +242,22 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             update_world_state_from_tank_damage(ws, tid, dmg)
             return True
         case {"msg_type": 0x58, "tank_id": int(tid)}:
-            update_world_state_from_tank_exit(ws, tid)
+            update_world_state_from_tank_remove(ws, tid)
+            return True
+        case {
+            "msg_type": 0x29,
+            "team": int(team),
+            "tank_id": int(tid),
+            "was_silent": bool(was_silent),
+            "was_eliminated": bool(was_eliminated),
+        }:
+            emit_diagnostic(
+                diagnostic_kind="tank_exit_announcement",
+                team=team,
+                tank_id=tid,
+                was_silent=was_silent,
+                was_eliminated=was_eliminated,
+            )
             return True
         case {
             "msg_type": 0x53,
@@ -318,7 +333,7 @@ def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             update_world_state_from_tank_damage(ws, tid, dmg)
             return True
         case {"msg_type": "tank_leave", "tank_id": int(tid)}:
-            update_world_state_from_tank_exit(ws, tid)
+            update_world_state_from_tank_remove(ws, tid)
             return True
         case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
             emit_diagnostic(

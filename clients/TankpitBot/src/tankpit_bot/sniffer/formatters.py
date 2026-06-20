@@ -120,7 +120,11 @@ def format_tank_details(d: protocol.BinaryMessage) -> str:
         # TankEntryDict: team, tank_id, rank, x, y (name from TankInfo)
         return f"tank={d['tank_id']} team={d['team']} rank={d['rank']} at ({d['x']},{d['y']})"
     if d["msg_type"] == 0x58:
-        return f"tank={d['tank_id']} left"
+        return f"tank={d['tank_id']} removed"
+    if d["msg_type"] == 0x29:
+        outcome = "eliminated" if d["was_eliminated"] else "left"
+        silent = " silent" if d["was_silent"] else ""
+        return f"tank={d['tank_id']} team={d['team']} {outcome}{silent}"
     if d["msg_type"] == 0x2E:
         # TankStatusSyncDict: damage_state (dual-purpose b.u field)
         rank = rank_name(d["rank"])

@@ -334,11 +334,40 @@ class TankEntryDict(TypedDict):
     y: int
 
 
-class TankExitDict(TypedDict):
-    """Tank exit (0x58 'X' message)."""
+class TankRemoveDict(TypedDict):
+    """Tank removal from world (0x58 'X' message).
+
+    Trace-verified from tpclient.js Ug.h (V.X):
+      a[0:2] = tank_id (LE u16)
+
+    Server-driven removal — clears the tile entry, releases the tank slot,
+    and drops the rendered tank. No accompanying display text.
+    """
 
     msg_type: Literal[0x58]
     tank_id: int
+
+
+class TankExitDict(TypedDict):
+    """Tank exit/elimination announcement (0x29 ')' message).
+
+    Trace-verified from tpclient.js Vf.h (V[")"]):
+      a[0]   = team
+      a[1:3] = tank_id (LE u16)
+      a[3]   = was_silent (1 = no display text emitted)
+      a[4]   = was_eliminated (1 = "eliminated from the game",
+                               0 = "left the game")
+
+    Pure announcement — the renderer prints a log line unless
+    ``was_silent``. Separate from 0x58 TankRemove, which physically
+    removes the tank from the world.
+    """
+
+    msg_type: Literal[0x29]
+    team: int
+    tank_id: int
+    was_silent: bool
+    was_eliminated: bool
 
 
 class TankStatusSyncDict(TypedDict):
@@ -521,6 +550,7 @@ __all__ = [
     "TankEntryDict",
     "TankExitDict",
     "TankInfoDict",
+    "TankRemoveDict",
     "TankStatusDict",
     "TankStatusSyncDict",
     "TerrainUpdateDict",
@@ -557,6 +587,7 @@ BinaryMessage = (
     | CombinedTileUpdateDict
     | TankEntryDict
     | TankExitDict
+    | TankRemoveDict
     | ActionDoneDict
     | ChatMessageDict
     | StatisticsDict

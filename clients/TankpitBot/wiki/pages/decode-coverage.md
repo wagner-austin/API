@@ -24,7 +24,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 |-----|------|-----------|-------------|-----------|-----|
 | 0x21 | `!` | Tf | TankInfo: name, team, decorations, score | FULL | — |
 | 0x28 | `(` | Uf | TankEntry: team, rank, position, score | FULL | — |
-| 0x29 | `)` | Vf | TankExit: team, id, was_silent, was_eliminated | PARTIAL | Missing was_silent / was_eliminated flags[^1] |
+| 0x29 | `)` | Vf | TankExit: team, id, was_silent, was_eliminated | FULL | — |
 | 0x2A | `*` | Xg | ActiveForces: team counts | FULL | — |
 | 0x2B | `+` | Rf | **Promotion: new_rank, was_promoted** | NONE | Decoder exists in `decode_text.py`; not wired to world state[^2] |
 | 0x2E | `.` | Og | TankStatusSync: team, id, rank, damage, lb_score, promo_state, fuel | FULL | — |
@@ -49,7 +49,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x4D | `M` | Qg | Chat: sender, type, position | FULL | — |
 | 0x4E | `N` | Sf | **Decoration: tank_id, type, level** | NONE | Not decoded[^6] |
 | 0x4F | `O` | ch | CombinedTileUpdate / RadarScanResult (structural disambiguation) | FULL | — |
-| 0x52 | `R` | xg | **CommandResult: error_code, close_map, reset_action** | WRONG | Constants misnamed as PROMO_KILL/PROMO_ELIGIBLE[^7] |
+| 0x52 | `R` | xg | CommandResult: reset_action, close_map, error_code | FULL | — |
 | 0x53 | `S` | Gg | ShootEvent: team, shooter, source pos, target pos, weapon | FULL | — |
 | 0x54 | `T` | Kg | ActionDone: bare completion ping | FULL | — |
 | 0x56 | `V` | Wg | Statistics: playtime, destroyed, deactivated, score | FULL | — |
@@ -85,19 +85,11 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 
 ## Critical Gaps (ordered by impact)
 
-### 1. Supervisor (0x52) misnamed — 705+ command failure signals ignored
-
-The `SUPERVISOR_STATUS_PROMO_KILL` and `SUPERVISOR_STATUS_PROMO_ELIGIBLE` constants are wrong. The message is the server's **command failure response**. The `data` field is an error code index: 0="You can't do this", 1="You can't go there!", 4="Empty container", 5="Tank full", 8="Insufficient fuel". 37 "Insufficient fuel" errors were ignored.[^7]
-
-### 2. Promotion (0x2B) not dispatched — rank-up events lost
+### 1. Promotion (0x2B) not dispatched — rank-up events lost
 
 The game sends `V["+"]` with `new_rank` and `was_promoted` flag on promotion. Decoder in `decode_text.py` exists; dispatch in `world_state_dispatch.py` doesn't wire it.[^2]
 
-### 3. TankExit (0x29) — was_silent / was_eliminated dropped
-
-JS `Vf` parses `a[3]=was_silent, a[4]=was_eliminated`. Our decoder only extracts `tank_id`.[^1]
-
-### 4. TankUpdate compact/extended/full — 2-10 bytes of damage/direction/rank dropped per message
+### 2. TankUpdate compact/extended/full — 2-10 bytes of damage/direction/rank dropped per message
 
 These three subtypes carry post-position state for tanks but we only read bytes 0-1 (x,y). The remaining bytes likely contain damage, direction, and rank — currently unstructured.[^10]
 
@@ -187,13 +179,11 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
      128+ = custom text (remaining bytes)
 ```
 
-[^1]: JS `Vf` parses `a[3]=was_silent, a[4]=was_eliminated`; our decoder only gets `tank_id`
 [^2]: Decoder in `decode_text.py` exists but dispatch in `world_state_dispatch.py` doesn't handle it
 [^3]: JS `wg` renders supervisor text messages; separate from command errors (V.R)
 [^4]: JS `Jg` handles obstacle build/pickup responses; not relevant for practice map combat
 [^5]: JS `Ig` fully parses the 0x4C map blob into tank positions and fuel dot coordinates
 [^6]: JS `Sf` handles decoration/award events; not critical for combat
-[^7]: `SUPERVISOR_STATUS_PROMO_KILL=8` is actually error code 8="Insufficient fuel"; `SUPERVISOR_STATUS_PROMO_ELIGIBLE=1` is error code 1="You can't go there!"
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^9]: TSS byte 8 is lb_score low byte (rank_points), proven by 13/13 exact timestamp match with 0x3D byte 11
 [^10]: Only bytes 0-1 (position) extracted; remaining bytes likely contain damage, direction, rank

@@ -34,6 +34,7 @@ from tankpit_bot.protocol import (
     MSG_TANK_EXIT,
     MSG_TANK_INFO,
     MSG_TANK_POS,
+    MSG_TANK_REMOVE,
     MSG_TANK_STATS,
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
@@ -143,10 +144,18 @@ class TestDecodeMessage:
         result = decode_message(MSG_TANK_ENTRY, entry_data)
         assert result["msg_type"] == 0x28
 
-        # Tank exit
-        exit_data = bytes([0x02, 0x01])
+        # Tank exit (0x29 ')' - announcement, 5 bytes per JS Vf)
+        exit_data = bytes([1, 0x02, 0x01, 0, 1])
         result = decode_message(MSG_TANK_EXIT, exit_data)
+        assert result["msg_type"] == 0x29
+        assert result["tank_id"] == 0x0102
+        assert result["was_eliminated"] is True
+
+        # Tank remove (0x58 'X' - server-driven physical removal, 2 bytes)
+        remove_data = bytes([0x02, 0x01])
+        result = decode_message(MSG_TANK_REMOVE, remove_data)
         assert result["msg_type"] == 0x58
+        assert result["tank_id"] == 0x0102
 
         # Tank stats (0x2E) - uses container decoder. 0x53 ShootEvent
         # routes via the protocol tunnel path now; use teleport_landed

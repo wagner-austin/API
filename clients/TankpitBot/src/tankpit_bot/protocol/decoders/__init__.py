@@ -54,6 +54,7 @@ from tankpit_bot.protocol.decoders.tank import (
     decode_tank_entry,
     decode_tank_exit,
     decode_tank_info,
+    decode_tank_remove,
     decode_tank_status,
     decode_tank_status_sync,
 )
@@ -221,6 +222,7 @@ __all__ = [
     "decode_tank_entry",
     "decode_tank_exit",
     "decode_tank_info",
+    "decode_tank_remove",
     "decode_tank_status",
     "decode_tank_status_sync",
     "decode_terrain_update",

@@ -55,21 +55,43 @@ class TestDispatchTankMessages:
         assert state["tanks"]["99"]["team"] == 2
         assert state["tanks"]["99"]["rank"] == 5
 
-    def test_dispatch_tank_exit(self) -> None:
-        """Test dispatch handles TankExit (0x58) message."""
-        from tankpit_bot.protocol import TankEntryDict, TankExitDict
+    def test_dispatch_tank_remove(self) -> None:
+        """Test dispatch handles TankRemove (0x58) message: tank deleted."""
+        from tankpit_bot.protocol import TankEntryDict, TankRemoveDict
 
-        # First add a tank
         entry_msg = TankEntryDict(
             msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
         )
         dispatch_world_state_update(get_world_service(), entry_msg)
         assert "42" in get_world_service().world_state["tanks"]
 
-        # Then remove it
-        exit_msg = TankExitDict(msg_type=0x58, tank_id=42)
-        dispatch_world_state_update(get_world_service(), exit_msg)
+        remove_msg = TankRemoveDict(msg_type=0x58, tank_id=42)
+        dispatch_world_state_update(get_world_service(), remove_msg)
         assert "42" not in get_world_service().world_state["tanks"]
+
+    def test_dispatch_tank_exit_does_not_remove_tank(self) -> None:
+        """0x29 TankExit is announcement-only; tank stays in world state.
+
+        The actual removal arrives separately via 0x58 TankRemove or
+        container tank_leave. JS Vf only prints a log line.
+        """
+        from tankpit_bot.protocol import TankEntryDict, TankExitDict
+
+        entry_msg = TankEntryDict(
+            msg_type=0x28, team=1, tank_id=77, rank=0, damage_state=0, score=0, x=10, y=20
+        )
+        dispatch_world_state_update(get_world_service(), entry_msg)
+        assert "77" in get_world_service().world_state["tanks"]
+
+        exit_msg = TankExitDict(
+            msg_type=0x29,
+            team=1,
+            tank_id=77,
+            was_silent=False,
+            was_eliminated=True,
+        )
+        dispatch_world_state_update(get_world_service(), exit_msg)
+        assert "77" in get_world_service().world_state["tanks"]
 
     def test_dispatch_tank_registry_non_container(self) -> None:
         """Test dispatch handles tank_registry for actual tanks (not containers)."""

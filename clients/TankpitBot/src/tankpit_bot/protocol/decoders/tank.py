@@ -12,6 +12,7 @@ from tankpit_bot.protocol.types import (
     TankEntryDict,
     TankExitDict,
     TankInfoDict,
+    TankRemoveDict,
     TankStatusDict,
     TankStatusSyncDict,
 )
@@ -82,10 +83,17 @@ def decode_tank_entry(data: bytes) -> TankEntryDict:
 
 
 def decode_tank_exit(data: bytes) -> TankExitDict:
-    """Decode tank exit from XOR-decoded data.
+    """Decode tank exit/elimination announcement from XOR-decoded data.
+
+    Trace-verified from tpclient.js Vf.h (V[")"]):
+      a[0]   = team
+      a[1:3] = tank_id (LE u16)
+      a[3]   = was_silent (1 = no display text emitted)
+      a[4]   = was_eliminated (1 = "eliminated from the game",
+                               0 = "left the game")
 
     Args:
-        data: XOR-decoded message body (without 0x58 prefix).
+        data: XOR-decoded message body (without 0x29 prefix).
 
     Returns:
         Decoded tank exit.
@@ -93,8 +101,33 @@ def decode_tank_exit(data: bytes) -> TankExitDict:
     Raises:
         DecodeError: If decoding fails.
     """
-    require_min_length(data, 2, "TankExit")
-    return TankExitDict(msg_type=0x58, tank_id=x16(data[0], data[1]))
+    require_min_length(data, 5, "TankExit")
+    return TankExitDict(
+        msg_type=0x29,
+        team=data[0],
+        tank_id=x16(data[1], data[2]),
+        was_silent=data[3] == 1,
+        was_eliminated=data[4] == 1,
+    )
+
+
+def decode_tank_remove(data: bytes) -> TankRemoveDict:
+    """Decode tank removal from world from XOR-decoded data.
+
+    Trace-verified from tpclient.js Ug.h (V.X):
+      a[0:2] = tank_id (LE u16)
+
+    Args:
+        data: XOR-decoded message body (without 0x58 prefix).
+
+    Returns:
+        Decoded tank remove.
+
+    Raises:
+        DecodeError: If decoding fails.
+    """
+    require_min_length(data, 2, "TankRemove")
+    return TankRemoveDict(msg_type=0x58, tank_id=x16(data[0], data[1]))
 
 
 def decode_tank_status_sync(data: bytes) -> TankStatusSyncDict:
@@ -322,6 +355,7 @@ __all__ = [
     "decode_tank_entry",
     "decode_tank_exit",
     "decode_tank_info",
+    "decode_tank_remove",
     "decode_tank_status",
     "decode_tank_status_sync",
 ]

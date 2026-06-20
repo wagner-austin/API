@@ -26,6 +26,7 @@ from tankpit_bot.protocol.constants import (
     MSG_TANK_ENTRY,
     MSG_TANK_EXIT,
     MSG_TANK_INFO,
+    MSG_TANK_REMOVE,
     MSG_TANK_STATS,
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
@@ -61,6 +62,7 @@ from tankpit_bot.protocol.decoders.tank import (
     decode_tank_entry,
     decode_tank_exit,
     decode_tank_info,
+    decode_tank_remove,
     decode_tank_status,
 )
 from tankpit_bot.protocol.decoders.world import (
@@ -114,6 +116,8 @@ def _decode_tank_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_tank_entry(data)
     if msg_type == MSG_TANK_EXIT:
         return decode_tank_exit(data)
+    if msg_type == MSG_TANK_REMOVE:
+        return decode_tank_remove(data)
     if msg_type == MSG_TANK_STATS:
         # 0x2E container envelope. `decode_0x2e_message` is the single
         # entrypoint for body decoding (subtype-first + length fallback).

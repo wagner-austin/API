@@ -15,6 +15,7 @@ from tankpit_bot.protocol import (
     decode_tank_entry,
     decode_tank_exit,
     decode_tank_info,
+    decode_tank_remove,
     decode_tank_status,
     decode_tank_status_sync,
     supervisor_error_code,
@@ -79,19 +80,70 @@ class TestDecodeTankEntry:
 
 
 class TestDecodeTankExit:
-    """Tests for decode_tank_exit function."""
+    """Tests for decode_tank_exit function.
 
-    def test_decodes_tank_exit(self) -> None:
-        """Decodes tank exit message."""
-        data = bytes([0x02, 0x01])  # tank_id=0x0102
+    0x29 ')' TankExit (JS Vf): team / tank_id / was_silent / was_eliminated.
+    Pure announcement; the renderer prints a log line unless was_silent.
+    """
+
+    def test_decodes_left_announcement(self) -> None:
+        """Decodes a non-silent 'left the game' announcement.
+
+        Wire: [team, tid_lo, tid_hi, was_silent=0, was_eliminated=0]
+        """
+        data = bytes([1, 0x02, 0x01, 0, 0])
         result = decode_tank_exit(data)
+        assert result["msg_type"] == 0x29
+        assert result["team"] == 1
+        assert result["tank_id"] == 0x0102
+        assert result["was_silent"] is False
+        assert result["was_eliminated"] is False
+
+    def test_decodes_eliminated_announcement(self) -> None:
+        """Decodes 'eliminated from the game' (was_eliminated=1)."""
+        data = bytes([2, 0x05, 0x00, 0, 1])
+        result = decode_tank_exit(data)
+        assert result["team"] == 2
+        assert result["tank_id"] == 5
+        assert result["was_eliminated"] is True
+        assert result["was_silent"] is False
+
+    def test_decodes_silent_eliminated(self) -> None:
+        """Silent + eliminated combination (no log line; still a kill)."""
+        data = bytes([3, 0xFF, 0x00, 1, 1])
+        result = decode_tank_exit(data)
+        assert result["was_silent"] is True
+        assert result["was_eliminated"] is True
+
+    def test_silent_flag_only_true_on_one(self) -> None:
+        """JS uses ``1===a[3]``: any byte other than 1 is False."""
+        data = bytes([0, 0x01, 0x00, 2, 0])
+        result = decode_tank_exit(data)
+        assert result["was_silent"] is False
+
+    def test_raises_on_short_data(self) -> None:
+        """Raises DecodeError on insufficient data (require 5 bytes)."""
+        with pytest.raises(DecodeError):
+            decode_tank_exit(bytes([1, 2, 3, 4]))
+
+
+class TestDecodeTankRemove:
+    """Tests for decode_tank_remove function.
+
+    0x58 'X' TankRemove (JS Ug): server-driven removal carrying tank_id only.
+    """
+
+    def test_decodes_tank_remove(self) -> None:
+        """Decodes tank remove message."""
+        data = bytes([0x02, 0x01])
+        result = decode_tank_remove(data)
         assert result["msg_type"] == 0x58
         assert result["tank_id"] == 0x0102
 
     def test_raises_on_short_data(self) -> None:
         """Raises DecodeError on insufficient data."""
         with pytest.raises(DecodeError):
-            decode_tank_exit(bytes([1]))
+            decode_tank_remove(bytes([1]))
 
 
 class TestDecodeTankStatusSync:
