@@ -17,6 +17,7 @@ from tankpit_bot.state.types import (
     make_terrain_tile,
     viewport_scan_key,
 )
+from tankpit_bot.state.types.constants import DIRECTION_DEAD_THRESHOLD, TankLiveness
 from tankpit_bot.state.viewport_geometry import (
     make_visible_viewport_state,
     viewport_patch_world_coords,
@@ -213,6 +214,32 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         new_last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
         new_last_position_update_ms = existing["last_position_update_ms"] if existing else 0
 
+    # Liveness transition. Three rules, evaluated in order:
+    #   1. New tank or wire-sourced position update with alive sprite
+    #      direction (< 32) -- ``alive``. This covers fresh joins,
+    #      MovementResponse arrivals, and the respawn flow (a previously
+    #      deactivated tank that moved and emitted a non-corpse 0x3D).
+    #   2. Any observation with a corpse direction (>= 32) -- mark
+    #      ``deactivated``. tpclient.js Pg.prototype.h sets direction
+    #      to 32/33 on deactivation; this rule catches both the kill
+    #      we made (0x41 firing first, then 0x3D with dir=32) and the
+    #      kill we observed someone else make (no 0x41 victim_id match
+    #      but the 0x3D arrives).
+    #   3. Otherwise preserve existing liveness. MapData entries
+    #      (is_wire_sourced=False) don't change liveness; they're
+    #      authoritative for position only.
+    new_liveness: TankLiveness
+    if existing is None or (
+        obs["is_wire_sourced"]
+        and obs_position is not None
+        and (obs["direction"] is None or obs["direction"] < DIRECTION_DEAD_THRESHOLD)
+    ):
+        new_liveness = "alive"
+    elif obs["direction"] is not None and obs["direction"] >= DIRECTION_DEAD_THRESHOLD:
+        new_liveness = "deactivated"
+    else:
+        new_liveness = existing["liveness"]
+
     new_tank = make_tank_state(
         tank_id=obs["tank_id"],
         x=new_x,
@@ -228,6 +255,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=new_last_wire_seen_ms,
         last_position_update_ms=new_last_position_update_ms,
+        liveness=new_liveness,
     )
 
     new_tanks = dict(state["tanks"])
@@ -387,28 +415,116 @@ def set_self_rank(
     )
 
 
+def _set_tank_liveness(
+    state: WorldStateDict,
+    tank_id: int,
+    liveness: TankLiveness,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Set a tank's liveness state. No-op when the tank is unknown.
+
+    Args:
+        state: Current world state.
+        tank_id: Tank id to transition.
+        liveness: Target liveness literal.
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New ``WorldStateDict`` with the tank's liveness updated (and the
+        outer ``timestamp_ms`` advanced).
+    """
+    key = str(tank_id)
+    existing = state["tanks"].get(key)
+    if existing is None:
+        return state
+
+    new_tank = make_tank_state(
+        tank_id=existing["tank_id"],
+        x=existing["x"],
+        y=existing["y"],
+        team=existing["team"],
+        rank=existing["rank"],
+        damage_state=existing["damage_state"],
+        direction=existing["direction"],
+        name=existing["name"],
+        is_bot=existing["is_bot"],
+        is_self=existing["is_self"],
+        source=existing["source"],
+        timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=existing["last_wire_seen_ms"],
+        last_position_update_ms=existing["last_position_update_ms"],
+        liveness=liveness,
+    )
+
+    new_tanks = dict(state["tanks"])
+    new_tanks[key] = new_tank
+
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=new_tanks,
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
+        map_fuel_dots=state["map_fuel_dots"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def deactivate_tank(
+    state: WorldStateDict,
+    tank_id: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Mark a tank as a corpse on 0x41 Deactivation.
+
+    Args:
+        state: Current world state.
+        tank_id: Victim tank id.
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New ``WorldStateDict`` with the tank's liveness set to
+        ``"deactivated"``. No-op when the tank is not in state.
+    """
+    return _set_tank_liveness(state, tank_id, "deactivated", timestamp_ms)
+
+
 def remove_tank(
     state: WorldStateDict,
     tank_id: int,
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Remove tank when it exits.
+    """Delete a tank from the registry on 0x58 TankRemove.
+
+    0x58 TankRemove fires whenever the server stops broadcasting
+    per-tank updates for a tank to this client -- this happens on
+    actual deaths but also when a tank simply leaves the client's
+    awareness radius. Empirical verification 2026-06-20: orange-5 got
+    five TankRemove events across two actual kills; the other three
+    were tracking churn, not deaths. Treating every 0x58 as a death
+    would corrupt the world model.
+
+    The simpler correct behaviour is to drop the tank from the
+    registry. If it was a death, that's correct. If it was tracking
+    churn, the next MapData entry or per-tank wire re-adds the tank
+    at its current position with ``liveness="alive"``.
 
     Args:
         state: Current world state.
-        tank_id: Tank ID to remove.
+        tank_id: Tank ID to delete.
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with tank removed.
+        New WorldStateDict with the tank deleted. No-op when the tank
+        is not in state.
     """
     key = str(tank_id)
     if key not in state["tanks"]:
         return state
-
     new_tanks = dict(state["tanks"])
     del new_tanks[key]
-
     return WorldStateDict(
         self_state=state["self_state"],
         tanks=new_tanks,

@@ -2,73 +2,19 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sniffer import viewport
+from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.sniffer.formatters import (
     format_container_pickup,
     format_radar_response,
-    format_tank_registry_details,
 )
 
 
 class TestFormatFunctionsEdgeCases:
     """Tests for format function edge cases."""
 
-    def test_format_tank_registry_details_container_with_viewport(self) -> None:
-        """Test format_tank_registry_details for container with viewport position."""
-        viewport.reset_viewport_tracking()
-        viewport.update_viewport_origin(100, 200)
-        try:
-            result = format_tank_registry_details(
-                tid=42,
-                name="",
-                team="",
-                rank=0,
-                badges=0,
-                is_bot=False,
-                is_container=True,
-                container_y=50,
-                container_viewport_x=10,
-            )
-            assert "container id=42" in result
-            assert "pos=(110,50)" in result  # 100 + 10 = 110
-        finally:
-            viewport.reset_viewport_tracking()
-
-    def test_format_tank_registry_details_container_no_viewport(self) -> None:
-        """Test format_tank_registry_details for container without viewport left."""
-        viewport.reset_viewport_tracking()
-        try:
-            result = format_tank_registry_details(
-                tid=42,
-                name="",
-                team="",
-                rank=0,
-                badges=0,
-                is_bot=False,
-                is_container=True,
-                container_y=50,
-                container_viewport_x=10,
-            )
-            assert "container id=42" in result
-            assert "y=50" in result
-            assert "vx=10" in result
-        finally:
-            viewport.reset_viewport_tracking()
-
-    def test_format_tank_registry_details_container_no_position(self) -> None:
-        """Test format_tank_registry_details for container without position data."""
-        result = format_tank_registry_details(
-            tid=42,
-            name="",
-            team="",
-            rank=0,
-            badges=0,
-            is_bot=False,
-            is_container=True,
-            container_y=None,
-            container_viewport_x=None,
-        )
-        assert result == "container id=42"
+    # format_tank_registry_details tests deleted 2026-06-20: the
+    # underlying TankRegistryDict + formatter were removed after corpus
+    # sweep proved zero production fires for the container path.
 
     # format_movement was deleted 2026-06-19 along with the container
     # MovementDict / PlayerIdMapper. Protocol 0x47 Movement is formatted
@@ -121,14 +67,36 @@ class TestFormatFunctionsEdgeCases:
         assert "mine[blue]" in result
         assert "mine[orange]" in result
 
-    def test_format_container_pickup_fuel(self) -> None:
-        """Test format_container_pickup for fuel container."""
-        result = format_container_pickup(x=10, y=20, vol=100, is_fuel=True)
+    def test_format_container_pickup_partial_remaining(self) -> None:
+        """Partial fuel pickup leaves volume in the container; format flags it."""
+        result = format_container_pickup(
+            (ContainerPickupRecordDict(x=10, y=20, remaining_volume=283),),
+        )
         assert "pos=(10,20)" in result
-        assert "FUEL vol=100" in result
+        assert "FUEL partial remaining=283" in result
 
-    def test_format_container_pickup_equipment(self) -> None:
-        """Test format_container_pickup for equipment container."""
-        result = format_container_pickup(x=30, y=40, vol=-1, is_fuel=False)
+    def test_format_container_pickup_empty(self) -> None:
+        """An emptied container (vol=0) is either equipment or a fully consumed
+        fuel container; the formatter is agnostic and shows ``container emptied``.
+        """
+        result = format_container_pickup(
+            (ContainerPickupRecordDict(x=30, y=40, remaining_volume=0),),
+        )
         assert "pos=(30,40)" in result
-        assert "EQUIPMENT" in result
+        assert "container emptied" in result
+
+    def test_format_container_pickup_multi_record(self) -> None:
+        """Multi-record bodies render a comma-joined summary with a count.
+
+        A 3-record pickup (the empirical 13-byte 0x43 corpus case) prints
+        ``pickups=N: <record1>, <record2>, <record3>``.
+        """
+        pickups = (
+            ContainerPickupRecordDict(x=240, y=150, remaining_volume=0),
+            ContainerPickupRecordDict(x=239, y=149, remaining_volume=0),
+            ContainerPickupRecordDict(x=240, y=149, remaining_volume=846),
+        )
+        result = format_container_pickup(pickups)
+        assert "pickups=3" in result
+        assert "pos=(240,150) container emptied" in result
+        assert "pos=(240,149) FUEL partial remaining=846" in result

@@ -94,15 +94,8 @@ class TestGetDecodeLevel:
     # RADAR_RESPONSE enum entry deleted 2026-06-19 with the rest of the
     # container radar chain.
 
-    def test_identified_level_for_tip_notification(self) -> None:
-        """Tip notification has IDENTIFIED decode level."""
-        level = get_decode_level(ContainerMessageType.TIP_NOTIFICATION)
-        assert level == DecodeLevel.IDENTIFIED
-
-    def test_identified_level_for_world_state(self) -> None:
-        """World state has IDENTIFIED decode level."""
-        level = get_decode_level(ContainerMessageType.WORLD_STATE)
-        assert level == DecodeLevel.IDENTIFIED
+    # TIP_NOTIFICATION / CHUNK_DATA / WORLD_STATE enum entries deleted
+    # 2026-06-19 with the rest of the dead container blob chain.
 
     def test_unknown_for_unknown_type(self) -> None:
         """UNKNOWN type has UNKNOWN decode level."""

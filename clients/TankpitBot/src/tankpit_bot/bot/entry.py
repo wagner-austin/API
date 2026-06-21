@@ -49,6 +49,7 @@ def main() -> None:
     from dotenv import load_dotenv
 
     from tankpit_bot.bot.base import Bot
+    from tankpit_bot.bot.tick_loop import request_interrupt, reset_interrupt_flag
     from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
     load_dotenv()
@@ -68,6 +69,16 @@ def main() -> None:
         f"{session_seconds}s" if session_seconds > 0 else "until stopped",
         stop_file_path,
     )
+
+    # Reset the interrupt flag so a re-run within the same process
+    # (rare; test/probe paths) starts clean, then install SIGINT/SIGTERM
+    # handlers. Ctrl+C and ``kill PID`` now request a graceful exit at
+    # the next tick boundary, writing the scorecard + index row before
+    # process exit. Without this, an interrupted run leaves
+    # ``runs/bot/_index.tsv`` silent on that session, which made
+    # "find runs that were Ctrl+C'd" impossible.
+    reset_interrupt_flag()
+    _test_hooks.install_signal_handlers(request_interrupt)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()

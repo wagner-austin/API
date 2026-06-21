@@ -9,3 +9,5 @@ Fighting strategy, weapon behavior, enemy AI patterns, and diagnosed combat bugs
 [Combat Chase Bug](../pages/combat-chase-bug.md) -- teleport-chase loop diagnosed and fixed: teleport directly to target
 [Gameplay Loop](../pages/gameplay-loop.md) -- the full combat→refill→radar conservation cycle as played by a human
 [Equipment Refill Strategy](../pages/equipment-refill-strategy.md) -- low-radar grid walk, extra radar conservation, container randomness
+[Mine Mechanics](../pages/mine-mechanics.md) -- 3x3 placement filter, mine-on-mine destruction, cascade chain detonation, real-combat wire evidence 2026-06-20
+[Game Economy](../pages/game-economy.md) -- empirical fuel costs (walk 1/tile, single shot 6, radar 10), damage taken (single 45, dual 90, mine 45), max fuel cap 1100, container_pickup remaining_volume semantic (2026-06-20)

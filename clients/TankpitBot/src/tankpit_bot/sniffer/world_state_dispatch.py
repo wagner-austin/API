@@ -10,6 +10,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
+from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
@@ -20,11 +21,9 @@ from tankpit_bot.sniffer.world_state_combat import (
 from tankpit_bot.sniffer.world_state_containers import (
     update_world_state_from_container_pickup,
     update_world_state_from_fuel_total,
-    update_world_state_from_tank_registry_container,
 )
 from tankpit_bot.sniffer.world_state_dispatch_position import (
     _dispatch_position_update,
-    _parse_world_state_blob,
 )
 from tankpit_bot.sniffer.world_state_inventory import (
     update_inventory_from_gain,
@@ -41,14 +40,19 @@ from tankpit_bot.sniffer.world_state_tanks import (
     update_world_state_from_tank_damage,
     update_world_state_from_tank_entry,
     update_world_state_from_tank_info,
-    update_world_state_from_tank_registry,
     update_world_state_from_tank_remove,
     update_world_state_from_tank_status,
 )
 from tankpit_bot.sniffer.world_state_tiles import (
     render_ascii_if_available,
 )
-from tankpit_bot.state import add_mine, remove_mine, replace_map_fuel_dots, set_self_rank
+from tankpit_bot.state import (
+    add_mine,
+    deactivate_tank,
+    remove_mine,
+    replace_map_fuel_dots,
+    set_self_rank,
+)
 
 log = get_logger(__name__)
 
@@ -144,8 +148,15 @@ def _dispatch_map_data(
 
     Two effects, both wholesale: the fuel-dot atlas is replaced and
     every tank slot is lifted into world state via the observation
-    pipeline so the freshness model sees one wire-sourced position
-    update per tank.
+    pipeline. **Map snapshots are not wire-sourced** -- they're cached
+    server state that can keep re-listing a tank at a stale position
+    after the tank has actually left. The observations therefore
+    declare ``is_wire_sourced=False`` so the wire-presence freshness
+    counter (``last_wire_seen_ms``) does not advance, even as
+    ``timestamp_ms`` does. The ghost-wire-presence regression in
+    ``tests/replay/test_ghost_wire_presence_regression.py`` proves
+    why: a tank that's wire-silent but map-fresh must still be
+    acquisition-fresh, while the kill gate must reject it.
 
     Args:
         ws: World service instance.
@@ -153,11 +164,25 @@ def _dispatch_map_data(
         tanks: Decoded :class:`protocol.MapTankEntry` slots, one per
             tank visible on the map.
     """
+    from tankpit_bot.state.types import make_tank_observation
+
     ts = browser.get_current_time_ms()
     ws.world_state = replace_map_fuel_dots(ws.world_state, fuel_dots, ts)
     for entry in tanks:
-        _update_tank_position(ws, entry["tank_id"], entry["x"], entry["y"])
-        update_world_state_from_tank_damage(ws, entry["tank_id"], entry["damage"])
+        obs = make_tank_observation(
+            tank_id=entry["tank_id"],
+            timestamp_ms=ts,
+            is_wire_sourced=False,
+            storage_source="world_state",
+            position=(entry["x"], entry["y"]),
+            team=entry["team"],
+            rank=entry["rank"],
+            damage_state=entry["damage"],
+        )
+        from tankpit_bot.state.mutations import apply_tank_observation
+
+        ws.world_state = apply_tank_observation(ws.world_state, obs)
+    ws.mark_map_data_processed()
     emit_diagnostic(
         diagnostic_kind="map_data_snapshot",
         fuel_dot_count=len(fuel_dots),
@@ -442,52 +467,28 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             "victim_id": int(vid),
             "killer_id": int(kid),
         }:
+            # 0x41 starts the corpse window. Empirical capture
+            # 2026-06-20: 0x58 TankRemove arrives ~22 s later; in
+            # between, the tile renders a corpse but the bot must not
+            # re-target it. The liveness="deactivated" gate filters the
+            # tank from analyze_threats; the position is preserved as
+            # the death tile so the bot can still reason about the
+            # geometry (mine-on-corpse, fuel-deposit-on-corpse, etc.).
             mark_tank_killed(ws, vid)
-            _update_tank_position(ws, vid, 0, 0)
+            ws.world_state = deactivate_tank(ws.world_state, vid, browser.get_current_time_ms())
             emit_diagnostic(
                 diagnostic_kind="tank_deactivated",
                 origin="protocol_0x41",
                 victim_id=vid,
                 killer_id=kid,
             )
-            log.info("DEACTIVATED: tank=%d killed, position invalidated", vid)
+            log.info("DEACTIVATED: tank=%d killed by %d", vid, kid)
             return True
     return False
 
 
 # =============================================================================
-# Dispatch — tank events (container-decoded)
-# =============================================================================
-
-
-def _dispatch_tank_event(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
-    """Dispatch tank lifecycle events (leave, deactivation, damage, update).
-
-    Args:
-        ws: World service instance.
-        decoded: Decoded binary protocol message.
-
-    Returns:
-        True if the message was handled, False otherwise.
-    """
-    match decoded:
-        case {"msg_type": "tank_leave", "tank_id": int(tid)}:
-            update_world_state_from_tank_remove(ws, tid)
-            return True
-        case {"msg_type": "deactivation_death", "killer_id": int(kid)}:
-            emit_diagnostic(
-                diagnostic_kind="tank_deactivated",
-                origin="container_death",
-                victim_id=-1,
-                killer_id=kid,
-            )
-            log.info("DEACTIVATION_DEATH: killed by tank=%d", kid)
-            return True
-    return False
-
-
-# =============================================================================
-# Dispatch — container messages (mines, registry, combat, pickup)
+# Dispatch — container messages (mines, combat, pickup)
 # =============================================================================
 
 
@@ -551,8 +552,70 @@ def _dispatch_mine_detonation(
     return True
 
 
+#: Window during which a repeated ContainerPickup with identical pickup
+#: signature is treated as the server's duplicate broadcast (one to the
+#: picker, one to the world view). Empirically the two broadcasts arrive
+#: within ~1-200 ms; 500 ms is the comfortable upper bound.
+PICKUP_DEDUP_WINDOW_MS: int = 500
+
+
+def _is_duplicate_pickup_broadcast(
+    ws: WorldService,
+    pickups: tuple[ContainerPickupRecordDict, ...],
+) -> bool:
+    """Suppress the second copy of a server-broadcast ContainerPickup.
+
+    Builds a signature from the pickup records (x, y, remaining_volume
+    tuples) and checks the per-session recent-pickup ledger. If the same
+    signature was already seen within :data:`PICKUP_DEDUP_WINDOW_MS`,
+    this is the world-view broadcast that pairs with the picker
+    broadcast; return True and the caller skips the world-state update.
+
+    Args:
+        ws: World service instance carrying the dedup ledger.
+        pickups: Pickup records from the decoded message.
+
+    Returns:
+        True when this is a duplicate of a recent broadcast (caller
+        should skip), False on the first sighting (caller should apply).
+    """
+    signature = tuple((record["x"], record["y"], record["remaining_volume"]) for record in pickups)
+    now_ms = browser.get_current_time_ms()
+    last_seen = ws.recent_pickup_signatures.get(signature)
+    if last_seen is not None and now_ms - last_seen <= PICKUP_DEDUP_WINDOW_MS:
+        ws.recent_pickup_signatures[signature] = now_ms
+        return True
+    ws.recent_pickup_signatures[signature] = now_ms
+    # Bound the ledger so it doesn't grow without limit during long
+    # sessions. Drop entries older than 2 windows.
+    cutoff = now_ms - 2 * PICKUP_DEDUP_WINDOW_MS
+    ws.recent_pickup_signatures = {
+        sig: ts for sig, ts in ws.recent_pickup_signatures.items() if ts >= cutoff
+    }
+    return False
+
+
+def _apply_container_pickups(
+    ws: WorldService,
+    pickups: tuple[ContainerPickupRecordDict, ...],
+) -> None:
+    """Apply one decoded ContainerPickup body (single- or multi-record).
+
+    Drops duplicate server broadcasts via :func:`_is_duplicate_pickup_broadcast`
+    and forwards each unique record to the world-state mutator.
+
+    Args:
+        ws: World service instance.
+        pickups: Tuple of pickup records from one wire message.
+    """
+    if _is_duplicate_pickup_broadcast(ws, pickups):
+        return
+    for record in pickups:
+        update_world_state_from_container_pickup(ws, record["x"], record["y"])
+
+
 def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
-    """Dispatch container-level messages (tank_registry, tank_update, etc.).
+    """Dispatch container-level messages (mines, pickup, teleport landed).
 
     Args:
         ws: World service instance.
@@ -571,36 +634,14 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
             return _dispatch_mine_placement(ws, mine_type, tank_id, positions)
         case {"msg_type": 0x45, "positions": list(positions)}:
             return _dispatch_mine_detonation(ws, positions)
-        case {
-            "msg_type": "tank_registry",
-            "is_container": True,
-            "container_y": int(cy),
-            "container_viewport_x": int(cvx),
-        }:
-            update_world_state_from_tank_registry_container(cy, cvx)
-            log.info("Container from tank_registry: y=%d vx=%d", cy, cvx)
-            return True
-        case {"msg_type": "container_pickup", "x": int(x), "y": int(y)}:
-            update_world_state_from_container_pickup(ws, x, y)
+        case {"msg_type": "container_pickup", "pickups": tuple(pickups)}:
+            _apply_container_pickups(ws, pickups)
             return True
         case {"msg_type": "teleport_landed"}:
             emit_world("TELEPORT_LANDED: server confirmed teleport")
             mark_teleport_landed(ws)
             return True
-        case {
-            "msg_type": "tank_registry",
-            "is_container": False,
-            "tank_id": int(tid),
-            "tank_name": str(name),
-            "team": str(team_str),
-            "military_rank": int(rank),
-            "is_bot": bool(is_bot),
-            "tank_y": int(ty),
-            "tank_viewport_x": int(tvx),
-        }:
-            update_world_state_from_tank_registry(ws, tid, name, team_str, rank, is_bot, ty, tvx)
-            return True
-    return _dispatch_tank_event(ws, decoded)
+    return False
 
 
 # =============================================================================
@@ -634,9 +675,6 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
                 diagnostic_kind="command_error",
                 error_code=error_code,
             )
-            return
-        case {"msg_type": "world_state", "world_data": bytes(wd)}:
-            _parse_world_state_blob(ws, wd)
             return
         case {"msg_type": 0x4F, "containers": list(containers), "mines": list(mines)}:
             if not containers and not mines:

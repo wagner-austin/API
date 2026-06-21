@@ -21,6 +21,7 @@ from tankpit_bot.state.container_mutations import (
 )
 from tankpit_bot.state.mutations import (
     apply_tank_observation,
+    deactivate_tank,
     mark_viewport_scanned,
     remove_tank,
     replace_map_fuel_dots,
@@ -135,6 +136,7 @@ __all__ = [
     "add_mine_from_radar",
     "apply_tank_observation",
     "coord_key",
+    "deactivate_tank",
     "decode_container_refresh_kind",
     "decode_container_state",
     "decode_mine_state",

@@ -505,29 +505,33 @@ class TestDecode0x2eMessage:
         assert result["deactivated"] == 0
         assert result["score"] == 55931
 
-    def test_9byte_body_routes_to_tank_status_sync(self) -> None:
-        """9-byte 0x2E bodies are Og.h short-form per JS V['.'] = Og.
+    def test_9byte_0x43_body_routes_to_multi_record_container_pickup(self) -> None:
+        """9-byte 0x43 0x2E bodies are 2-record ContainerPickup, not Og.h.
 
-        Crack: analysis_scripts/crack_tank_status_short.py paired 74
-        production samples against both candidate schemas. 74/74 sane
-        under Og.h (dmg<=3 AND rank<=8 AND promo<=11). 0/74 sane under
-        the prior container TankStatusShort layout (rank > 8 always).
+        Corpus correction 2026-06-20: the prior version of this test
+        claimed 9-byte bodies routed to TankStatusSync short form,
+        based on a corpus sweep that read each body as Og.h and noted
+        the resulting (damage, rank, lb_score, promo) fell inside sane
+        bounds. The interpretation was wrong: every one of those 80
+        samples has byte 0 = 0x43, and the JS Mf dispatcher
+        (tpclient.pretty.js:4837) re-dispatches on byte 0 -- so a body
+        starting with 0x43 goes to V.C = $g (CacheUpdate), reading
+        repeating 4-byte ``[x, y, cache_lo, cache_hi]`` records. Each
+        record is a container pickup notification. The Og.h reading
+        produced in-range numbers by coincidence; team=67 (from
+        byte 0 = 0x43) was the giveaway that something was off.
 
         Fixture below is the first production sample, byte-for-byte:
         ``43 c6 af 00 00 c7 b0 25 00``
-          team=3, tid=44998, dmg=0, rank=0, lb_score=13086757, promo=0
+          pickup 1: x=198, y=175, remaining=0     (container emptied)
+          pickup 2: x=199, y=176, remaining=37    (partial)
         """
         body = bytes.fromhex("43c6af0000c7b02500")
         result = decode_0x2e_message(body)
-        assert result["msg_type"] == 0x2E
-        assert result["subtype"] == 0x43
-        assert result["tank_id"] == 44998
-        assert result["damage_state"] == 0
-        assert result["rank"] == 0
-        assert result["lb_score"] == 13086757
-        assert result["promo_state"] == 0
-        # Short form: no fuel field
-        assert result["fuel"] is None
+        assert result["msg_type"] == "container_pickup"
+        assert len(result["pickups"]) == 2
+        assert result["pickups"][0] == {"x": 198, "y": 175, "remaining_volume": 0}
+        assert result["pickups"][1] == {"x": 199, "y": 176, "remaining_volume": 37}
 
     def test_tunneled_map_data_routes_through_world(self) -> None:
         """Tunneled 0x4C inside 0x2E decodes as MapData.

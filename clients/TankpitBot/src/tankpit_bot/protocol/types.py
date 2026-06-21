@@ -63,14 +63,24 @@ class ShootEventDict(TypedDict):
       a[4]    = source_y  -- shooter's tile Y
       a[5]    = target_x  -- shot's landing tile X (homing's final tile)
       a[6]    = target_y  -- shot's landing tile Y
-      a[7]    = unk1 (often duplicates target tile -- semantics TBD)
-      a[8]    = unk2
+      a[7]    = aim_x     -- aim tile X (the tile the gun is pointed at)
+      a[8]    = aim_y     -- aim tile Y
       a[9]    = weapon (0=single, 1=dual, 2=missile, 3=homing)
 
     Prior decoder named a[3,4] as target and a[5,6] as projectile_start
     -- reversed. Prior names for a[7..9] as fuel/weapon/ammo were also
     wrong. Three-way validation (enemy src tracking, homing tgt tile,
     wire damage events) confirmed the corrected layout.
+
+    a[7]/a[8] semantics promoted from ``unk1``/``unk2`` to
+    ``aim_x``/``aim_y`` 2026-06-20. JS evidence: ``Gg.h`` passes them to
+    the projectile-animation constructor ``yf`` as ``z`` and ``O``;
+    inside ``yf``, ``this.qa = 24 * z + 12`` and ``this.ta = 16 * O + 8``
+    are PIXEL CENTRES of the tile the tank's gun is aimed at, and
+    ``yf.start()`` uses ``atan2(this.h - this.qa, this.ta - this.i)`` to
+    set the tank's facing direction. For straight shots aim == target;
+    for guided weapons (missile/homing) aim is the initial barrel
+    direction and target is the homing impact tile.
 
     Hit detection per JS Gg.prototype.h case 18: shot landed on a named
     tank tile -> hit. That tile lookup uses (target_x, target_y).
@@ -83,8 +93,8 @@ class ShootEventDict(TypedDict):
     source_y: int
     target_x: int
     target_y: int
-    unk1: int
-    unk2: int
+    aim_x: int
+    aim_y: int
     weapon: int
 
 

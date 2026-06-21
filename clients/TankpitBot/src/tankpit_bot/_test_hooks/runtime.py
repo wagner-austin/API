@@ -111,6 +111,52 @@ def _real_start_watchdog(seconds: float, on_fire: Callable[[], None]) -> None:
 start_watchdog: StartWatchdogProtocol = _real_start_watchdog
 
 
+class InstallSignalHandlersProtocol(Protocol):
+    """Protocol for registering SIGINT / SIGTERM handlers on the bot CLI.
+
+    Production binds ``signal.signal`` for both signals; tests inject
+    a fake that records the registered callback and exercise it
+    synchronously without touching process-wide signal state.
+    """
+
+    def __call__(self, on_interrupt: Callable[[], None]) -> None:
+        """Register ``on_interrupt`` for SIGINT and SIGTERM.
+
+        Args:
+            on_interrupt: Zero-argument callback invoked when either
+                signal fires.
+        """
+        ...
+
+
+def _real_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
+    """Real implementation -- bind SIGINT and SIGTERM to ``on_interrupt``.
+
+    The signal-handler signature ``(signum, frame)`` is adapted to the
+    zero-argument ``on_interrupt`` callback by ignoring both arguments.
+    SIGINT is what Ctrl+C raises on every platform; SIGTERM is what
+    process supervisors (systemd, Docker, ``kill PID``) send for a
+    graceful shutdown request. Both go through the same handler so
+    callers do not have to discriminate.
+
+    Args:
+        on_interrupt: Zero-argument callback to invoke when either
+            signal fires.
+    """
+    import signal as _signal
+    from types import FrameType
+
+    def _handle(signum: int, frame: FrameType | None) -> None:
+        _ = (signum, frame)
+        on_interrupt()
+
+    _signal.signal(_signal.SIGINT, _handle)
+    _signal.signal(_signal.SIGTERM, _handle)
+
+
+install_signal_handlers: InstallSignalHandlersProtocol = _real_install_signal_handlers
+
+
 # The real implementation IS os._exit -- bound directly, no wrapper.
 # It must bypass interpreter teardown: the watchdog fires precisely
 # because normal teardown is hung.
@@ -119,11 +165,13 @@ force_exit: Callable[[int], None] = os._exit
 
 __all__ = [
     "FindBestStaticByteProtocol",
+    "InstallSignalHandlersProtocol",
     "ProcessReceivedMessageProtocol",
     "StartWatchdogProtocol",
     "find_best_static_byte",
     "force_exit",
     "get_argv",
+    "install_signal_handlers",
     "process_received_message_hook",
     "start_watchdog",
 ]

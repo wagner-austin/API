@@ -32,13 +32,16 @@ def decode_shoot_event(data: bytes) -> ShootEventDict:
       [4]    source_y
       [5]    target_x  (shot's landing tile X)
       [6]    target_y
-      [7]    unk1 (often duplicates target -- semantics TBD)
-      [8]    unk2
+      [7]    aim_x     (aim tile X -- where the gun is pointed)
+      [8]    aim_y     (aim tile Y)
       [9]    weapon (0=single, 1=dual, 2=missile, 3=homing)
 
-    Prior decoder swapped target/source meanings and misnamed bytes 7-9.
-    Three-way validated against enemy position tracking, homing target
-    tile, and wire damage transitions.
+    Bytes 7-8 promoted from ``unk1``/``unk2`` to ``aim_x``/``aim_y``
+    2026-06-20 after JS source confirmed they are the projectile
+    animation's PIXEL CENTRE source (``24*z+12, 16*O+8`` in ``yf``).
+    Real-combat corpus (practice-vs-real-20260620-150138) shows
+    aim==target on every observed straight shot (single/dual);
+    homing/missile weapons may diverge.
 
     Args:
         data: XOR-decoded message body (without 0x53 prefix).
@@ -58,8 +61,8 @@ def decode_shoot_event(data: bytes) -> ShootEventDict:
         source_y=data[4],
         target_x=data[5],
         target_y=data[6],
-        unk1=data[7],
-        unk2=data[8],
+        aim_x=data[7],
+        aim_y=data[8],
         weapon=data[9],
     )
 

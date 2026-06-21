@@ -89,7 +89,7 @@ class TestAnalyzeProtocolCensus:
                 direction="received",
                 payload=_encode_received_frame(
                     0x2E,
-                    bytes([0x24, 0x02, 0x7D, 0x04, 140, 137, 8, 3, 0, 0, 0, 0, 0]),
+                    bytes([0x0C]),  # 1-byte teleport_landed
                     xor_table,
                 ),
                 ws_url="wss://test/ws",
@@ -123,7 +123,7 @@ class TestAnalyzeProtocolCensus:
         assert result["short_or_invalid_frame_count"] == 1
         assert result["unsupported_frame_count"] == 1
         assert result["framing_error_count"] == 0
-        assert result["decoded"] == [{"label": "position_update", "count": 1}]
+        assert result["decoded"] == [{"label": "teleport_landed", "count": 1}]
 
     def test_preserves_short_sample_hex(self, _fake_fs: FakeFileSystem) -> None:
         """Stores raw and decoded hex for short packets."""
@@ -389,7 +389,7 @@ def test_record_protocol_sample_preserves_first_sample_only() -> None:
 
 def test_message_label_covers_string_int_and_unknown() -> None:
     """Formats message labels for string, int, and unknown values."""
-    assert pc._message_label("position_update") == "position_update"
+    assert pc._message_label("teleport_landed") == "teleport_landed"
     assert pc._message_label(0x3D) == "0x3D"
     assert pc._message_label(None) == "unknown"
 

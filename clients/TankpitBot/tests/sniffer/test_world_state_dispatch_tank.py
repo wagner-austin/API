@@ -56,18 +56,31 @@ class TestDispatchTankMessages:
         assert state["tanks"]["99"]["rank"] == 5
 
     def test_dispatch_tank_remove(self) -> None:
-        """Test dispatch handles TankRemove (0x58) message: tank deleted."""
+        """Test dispatch handles TankRemove (0x58): tank is deleted from registry.
+
+        Empirical verification 2026-06-20 (ghost_observe capture):
+        0x58 TankRemove does NOT mean "tank died" -- it fires when the
+        server stops broadcasting per-tank updates to this client,
+        which happens on actual deaths but also when a tank simply
+        leaves the client's awareness radius (orange-5 got 5 0x58
+        events across 2 actual kills). The simpler correct behaviour
+        is to drop the tank; the next MapData / per-tank wire will
+        re-add it at its current position.
+        """
         from tankpit_bot.protocol import TankEntryDict, TankRemoveDict
 
         entry_msg = TankEntryDict(
             msg_type=0x28, team=0, tank_id=42, rank=0, damage_state=0, score=0, x=100, y=150
         )
         dispatch_world_state_update(get_world_service(), entry_msg)
-        assert "42" in get_world_service().world_state["tanks"]
+        tanks = get_world_service().world_state["tanks"]
+        assert "42" in tanks
+        assert tanks["42"]["liveness"] == "alive"
 
         remove_msg = TankRemoveDict(msg_type=0x58, tank_id=42)
         dispatch_world_state_update(get_world_service(), remove_msg)
-        assert "42" not in get_world_service().world_state["tanks"]
+        tanks = get_world_service().world_state["tanks"]
+        assert "42" not in tanks
 
     def test_dispatch_tank_exit_does_not_remove_tank(self) -> None:
         """0x29 TankExit is announcement-only; tank stays in world state.
@@ -93,96 +106,10 @@ class TestDispatchTankMessages:
         dispatch_world_state_update(get_world_service(), exit_msg)
         assert "77" in get_world_service().world_state["tanks"]
 
-    def test_dispatch_tank_registry_non_container(self) -> None:
-        """Test dispatch handles tank_registry for actual tanks (not containers)."""
-        from tankpit_bot.container import TankRegistryDict
-        from tankpit_bot.sniffer import viewport
-
-        viewport.update_viewport_origin(50, 0)
-
-        msg = TankRegistryDict(
-            msg_type="tank_registry",
-            flags=0x01,
-            tank_id=7,
-            info_bytes=b"\x00\x00\x00\x00",
-            team="blue",
-            tank_name="ScoutBot",
-            military_rank=3,
-            badge_count=1,
-            is_bot=True,
-            is_container=False,
-            container_x=None,
-            container_y=None,
-            container_viewport_x=None,
-            tank_y=120,
-            tank_viewport_x=5,
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "7" in state["tanks"]
-        assert state["tanks"]["7"]["name"] == "ScoutBot"
-        # x = viewport_left(50) + tank_viewport_x(5) = 55
-        assert state["tanks"]["7"]["x"] == 55
-        assert state["tanks"]["7"]["y"] == 120
-
-        viewport.reset_viewport_tracking()
-
-    def test_dispatch_tank_registry_non_container_without_viewport_origin(self) -> None:
-        """Test tank_registry tank is ignored until viewport origin is known."""
-        from tankpit_bot.container import TankRegistryDict
-        from tankpit_bot.sniffer import viewport
-
-        viewport.reset_viewport_tracking()
-
-        msg = TankRegistryDict(
-            msg_type="tank_registry",
-            flags=0x01,
-            tank_id=9,
-            info_bytes=b"\x00\x00\x00\x00",
-            team="blue",
-            tank_name="NoViewportBot",
-            military_rank=1,
-            badge_count=0,
-            is_bot=False,
-            is_container=False,
-            container_x=None,
-            container_y=None,
-            container_viewport_x=None,
-            tank_y=130,
-            tank_viewport_x=6,
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "9" not in state["tanks"]
-
-    def test_dispatch_tank_registry_non_container_no_position(self) -> None:
-        """Test dispatch handles tank_registry with None position (short info_bytes)."""
-        from tankpit_bot.container import TankRegistryDict
-
-        msg = TankRegistryDict(
-            msg_type="tank_registry",
-            flags=0x01,
-            tank_id=8,
-            info_bytes=b"\x00\x00\x00\x00",
-            team="red",
-            tank_name="ShortBot",
-            military_rank=2,
-            badge_count=0,
-            is_bot=False,
-            is_container=False,
-            container_x=None,
-            container_y=None,
-            container_viewport_x=None,
-            tank_y=None,
-            tank_viewport_x=None,
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Tank should NOT be added since position is None (match falls through)
-        state = get_world_service().world_state
-        assert "8" not in state["tanks"]
+    # Container tank_registry dispatch tests deleted 2026-06-20: container
+    # TankRegistry decoder removed after corpus sweep proved zero
+    # production fires. Tank join now flows through 0x21 TankInfo /
+    # 0x28 TankEntry from the protocol path.
 
     def test_dispatch_tunneled_terrain_update_sets_terrain_tile(self) -> None:
         """Test 0x4A terrain updates modify world terrain state."""
@@ -301,6 +228,151 @@ class TestDispatchTankMessages:
 
         state = get_world_service().world_state
         assert state["mines"] == {}
+
+    def test_mine_on_mine_destruction_real_capture(self) -> None:
+        """Regression for the 3x3 placement that destroys adjacent enemy mines.
+
+        Captured 2026-06-20 (practice-vs-real-20260620-150138, t+56.15s):
+        Artax (team 2, blue) on the tile center placed 7 blue mines and
+        the server simultaneously fired a 0x45 MineDetonation listing 2
+        adjacent enemy mines (purple) destroyed by the same placement.
+        Total = 9 = full 3x3 attempted around the placer per the game
+        mechanic (server filters water / terrain / tanks / enemy mines;
+        clear tiles get the mine, enemy-mine tiles get the detonation,
+        impossible tiles get nothing).
+
+        Post-state: 7 of 9 tiles have our blue mines; 2 tiles are empty
+        (the detonated enemy mines did not become our mines -- per
+        user, those gaps require re-placement to fill).
+        """
+        from tankpit_bot.protocol import MovementResponseDict
+        from tankpit_bot.state import add_mine
+
+        ws = get_world_service()
+        # Establish self at the placement center.
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=133,
+                y=124,
+                direction=8,
+                damage_state=0,
+                rank=1,
+                lb_score=1313,
+                carrying=0,
+            ),
+        )
+        # Seed the two enemy (purple, team=1) mines that the placement
+        # is about to detonate.
+        ws.world_state = add_mine(ws.world_state, 132, 123, 2, 1229, 1, 1)
+        ws.world_state = add_mine(ws.world_state, 134, 125, 2, 1229, 1, 1)
+        assert ws.world_state["mines"]["132,123"]["team"] == 1
+        assert ws.world_state["mines"]["134,125"]["team"] == 1
+
+        # Wire packet 1: 7 blue mines placed at the 7 clear tiles in the 3x3.
+        dispatch_world_state_update(
+            ws,
+            {
+                "msg_type": 0x4B,
+                "mine_type": 2,
+                "tank_id": 1301,
+                "positions": [
+                    (133, 124),
+                    (132, 124),
+                    (133, 123),
+                    (134, 123),
+                    (134, 124),
+                    (133, 125),
+                    (132, 125),
+                ],
+            },
+        )
+        # Wire packet 2 (same wire tick): the 2 enemy-mine tiles get
+        # 0x45 MineDetonation -- enemy mines destroyed.
+        dispatch_world_state_update(
+            ws,
+            {"msg_type": 0x45, "positions": [(132, 123), (134, 125)]},
+        )
+
+        mines = ws.world_state["mines"]
+        # 7 own mines placed.
+        own_mine_positions = [
+            (133, 124),
+            (132, 124),
+            (133, 123),
+            (134, 123),
+            (134, 124),
+            (133, 125),
+            (132, 125),
+        ]
+        for x, y in own_mine_positions:
+            assert mines[f"{x},{y}"]["team"] == 2
+            assert mines[f"{x},{y}"]["tank_id"] == 1301
+        # 2 detonated tiles are empty -- no own mine, no enemy mine.
+        assert "132,123" not in mines
+        assert "134,125" not in mines
+
+    def test_mine_cascade_two_packet_chain_real_capture(self) -> None:
+        """Regression for one shot detonating a mine + chain detonation.
+
+        Captured 2026-06-20 (practice-vs-real-20260620-150138, t+62.15s):
+        Artax shot tile (134, 126) -- the server emitted two 0x45
+        MineDetonate packets in the same wire tick. First packet listed
+        the directly hit mine [(134, 126)]; second packet listed the
+        6 adjacent chain mines destroyed in the cascade
+        [(135, 126), (134, 127), (133, 126), (135, 127), (135, 125),
+        (133, 127)]. Total 7 tiles cleared.
+
+        World-state must apply both packets atomically (each removes its
+        listed positions) and end with all 7 tiles empty regardless of
+        the mines' original team.
+        """
+        from tankpit_bot.state import add_mine
+
+        ws = get_world_service()
+        # Seed the 7 mines that the cascade is about to destroy --
+        # mix of own (blue, team=2) and enemy (purple, team=1).
+        seed = [
+            (134, 126, 2, 1301),  # own, the directly-hit one
+            (135, 126, 1, 1229),  # enemy
+            (134, 127, 2, 1301),  # own
+            (133, 126, 1, 1229),  # enemy
+            (135, 127, 1, 1229),  # enemy
+            (135, 125, 2, 1301),  # own
+            (133, 127, 1, 1229),  # enemy
+        ]
+        for x, y, team, tid in seed:
+            ws.world_state = add_mine(ws.world_state, x, y, 2, tid, team, 1)
+        assert len(ws.world_state["mines"]) == 7
+
+        # Wire packet 1: directly hit mine.
+        dispatch_world_state_update(
+            ws,
+            {"msg_type": 0x45, "positions": [(134, 126)]},
+        )
+        # Wire packet 2 (same wire tick): chain detonation cascade.
+        dispatch_world_state_update(
+            ws,
+            {
+                "msg_type": 0x45,
+                "positions": [
+                    (135, 126),
+                    (134, 127),
+                    (133, 126),
+                    (135, 127),
+                    (135, 125),
+                    (133, 127),
+                ],
+            },
+        )
+
+        # All 7 tiles empty after the cascade -- own and enemy alike.
+        mines = ws.world_state["mines"]
+        for x, y, _team, _tid in seed:
+            assert f"{x},{y}" not in mines
 
     def test_dispatch_tunneled_mine_detonation_removes_mines(self) -> None:
         """Test tunneled 0x45 removes mines at decoded coordinates."""
@@ -447,46 +519,11 @@ class TestDispatchTankMessages:
         ]
         assert records == []
 
-    def test_dispatch_tank_leave_removes_tank(self) -> None:
-        """Test dispatch handles tank_leave by removing the tank."""
-        from tankpit_bot.container import TankLeaveDict
-        from tankpit_bot.protocol import TankEntryDict
-
-        # First create a tank
-        entry = TankEntryDict(
-            msg_type=0x28, team=0, tank_id=400, rank=0, damage_state=0, score=0, x=50, y=60
-        )
-        dispatch_world_state_update(get_world_service(), entry)
-        assert "400" in get_world_service().world_state["tanks"]
-
-        msg = TankLeaveDict(
-            msg_type="tank_leave",
-            tank_id=400,
-            flags=0x13,
-            extra_data=b"\x42\x13",
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        assert "400" not in get_world_service().world_state["tanks"]
-
-    def test_dispatch_position_update_other_tank_updates_position(self) -> None:
-        """Test dispatch updates enemy tank position from non-self position_update."""
-        from tankpit_bot.container import PositionUpdateDict
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0x00,  # Other tank flag
-            tank_id=539,
-            x=193,
-            y=150,
-            extra_data=b"\x08\x03\x01\x00\x48\xe2\x00",
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "539" in state["tanks"]
-        assert state["tanks"]["539"]["x"] == 193
-        assert state["tanks"]["539"]["y"] == 150
+    # Container tank_leave / position_update dispatch tests deleted
+    # 2026-06-20: container TankLeave and PositionUpdate decoders removed
+    # after corpus sweep proved zero production fires. Tank removal flows
+    # through 0x58 TankRemove and position updates through 0x3D
+    # MovementResponse on the protocol path.
 
     # test_dispatch_enemy_movement_with_resolved_player_id deleted
     # 2026-06-19: container Movement / PlayerIdMapper removed. Protocol
@@ -544,6 +581,34 @@ class TestDispatchMapData:
         snapshot = MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[])
         dispatch_world_state_update(ws, snapshot)
         assert ws.world_state["map_fuel_dots"] == {}
+
+    def test_map_data_marks_action_complete(self) -> None:
+        """0x4C dispatch must flag map_data_processed so the bot's
+        in-flight map_open action clears via the authoritative server signal
+        instead of stalling for action_stall_timeout_ms (10 s) and replanning.
+
+        Regression: the dispatcher was decoding MapData and emitting the
+        ``map_data_snapshot`` diagnostic but forgetting to call
+        ``ws.mark_map_data_processed()``, so ``_clear_completed_map_open``
+        (which polls ``check_and_clear_map_data_processed``) always
+        returned False. The bot looped open-close-map every 10 seconds
+        (live run 2026-06-20: 30 cycles in a 5-min session with zero
+        forward progress).
+        """
+        from tankpit_bot.protocol import MapDataDict
+
+        ws = get_world_service()
+        # Pre-condition: flag is initially unset.
+        assert ws.check_and_clear_map_data_processed() is False
+
+        dispatch_world_state_update(
+            ws,
+            MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[]),
+        )
+
+        assert ws.check_and_clear_map_data_processed() is True
+        # check_and_clear is one-shot -- a second read must return False.
+        assert ws.check_and_clear_map_data_processed() is False
 
 
 class TestDispatchBuildPickup:

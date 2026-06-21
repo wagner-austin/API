@@ -100,130 +100,10 @@ class TestDispatchMovement:
     # Movement is covered by TestDispatchProtocolMovement below.
 
 
-class TestDispatchPositionUpdate:
-    """Tests for dispatch_world_state_update with position update messages."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state and hooks after each test."""
-        reset_world_state()
-        _test_hooks.path_exists = _test_hooks._real_path_exists
-        _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
-
-    def test_dispatch_position_update_absolute_coords_self(self) -> None:
-        """Test dispatch handles position_update with absolute coords for self.
-
-        When x or y >= 18 and flags indicate self (0x02 bit set),
-        should update the self position.
-        """
-        from tankpit_bot.container import PositionUpdateDict
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0x02,  # Self flag
-            tank_id=638,
-            x=202,
-            y=149,
-            extra_data=b"\x08\x03\x03\x00\x2e\x84\x00",
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None after dispatch")
-        assert self_state["x"] == 202
-        assert self_state["y"] == 149
-
-    def test_dispatch_position_update_other_tank_ignored(self) -> None:
-        """Test dispatch ignores position_update for other tanks.
-
-        Position updates with flags=0x00 are for other tanks (bots, enemies)
-        and should NOT update self position.
-        """
-        from tankpit_bot.container import PositionUpdateDict
-
-        # First set a known position
-        update_world_state_from_position(100, 100)
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0x00,  # Other tank flag
-            tank_id=539,
-            x=193,
-            y=150,
-            extra_data=b"\x08\x03\x01\x00\x48\xe2\x00",
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Position should remain unchanged
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None")
-        assert self_state["x"] == 100
-        assert self_state["y"] == 100
-
-    def test_dispatch_position_update_viewport_relative_ignored(self) -> None:
-        """Test dispatch ignores position_update with viewport-relative coords.
-
-        When both x < 18 and y < 18, they are viewport-relative coordinates
-        and should NOT update the self position even with self flag.
-        """
-        from tankpit_bot.container import PositionUpdateDict
-
-        # First set a known position
-        update_world_state_from_position(100, 100)
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0x02,  # Self flag
-            tank_id=638,
-            x=3,
-            y=3,
-            extra_data=b"\x00\x2e\x85\x0a\x00\x0c\x05",
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Position should remain unchanged
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None")
-        assert self_state["x"] == 100
-        assert self_state["y"] == 100
-
-    def test_dispatch_position_update_viewport_relative_other_coords_ignored(self) -> None:
-        """Test dispatch ignores position_update with any small viewport coords.
-
-        Any coords where both x < 18 and y < 18 are viewport-relative,
-        not just (3,3). For example, (2,3) at the left edge of viewport.
-        """
-        from tankpit_bot.container import PositionUpdateDict
-
-        # First set a known position
-        update_world_state_from_position(100, 100)
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0x02,  # Self flag
-            tank_id=638,
-            x=2,
-            y=3,
-            extra_data=b"\x00" * 7,
-        )
-
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Position should remain unchanged
-        self_state = get_world_service().world_state["self_state"]
-        if self_state is None:
-            raise AssertionError("self_state should not be None")
-        assert self_state["x"] == 100
-        assert self_state["y"] == 100
+# Container position_update dispatch tests deleted 2026-06-20 after the
+# container PositionUpdate decoder was removed. 13-byte 0x2E bodies now
+# all decode to 0x3D MovementResponse via the protocol tunnel, and self
+# position updates flow through the MovementResponse dispatch path.
 
 
 class TestDispatchProtocolMovement:
@@ -407,8 +287,17 @@ class TestDispatchProtocolMovement:
         assert get_world_service().world_state["tanks"]["610"]["x"] == 50
         assert get_world_service().world_state["tanks"]["610"]["y"] == 60
 
-    def test_dispatch_deactivate_invalidates_position(self) -> None:
-        """Dispatch 0x41 invalidates position and records the kill."""
+    def test_dispatch_deactivate_marks_liveness_and_keeps_position(self) -> None:
+        """Dispatch 0x41 transitions the victim to ``deactivated`` and
+        preserves the death tile.
+
+        Pre-2026-06-20 the handler invalidated position to (0, 0) as a
+        sentinel. That hack is replaced by an explicit
+        ``liveness == "deactivated"`` filter in ``analyze_threats``;
+        the death tile is preserved so the bot can still reason about
+        it (e.g. depositing fuel or planting mines on the corpse tile,
+        as seen in 2026-06-20 ghost_visual capture).
+        """
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
 
         entry = TankEntryDict(
@@ -416,6 +305,7 @@ class TestDispatchProtocolMovement:
         )
         dispatch_world_state_update(get_world_service(), entry)
         assert get_world_service().world_state["tanks"]["700"]["x"] == 100
+        assert get_world_service().world_state["tanks"]["700"]["liveness"] == "alive"
 
         msg = DeactivationDict(
             msg_type=0x41,
@@ -427,9 +317,11 @@ class TestDispatchProtocolMovement:
         )
         dispatch_world_state_update(get_world_service(), msg)
 
-        # Position invalidated to (0, 0)
-        assert get_world_service().world_state["tanks"]["700"]["x"] == 0
-        assert get_world_service().world_state["tanks"]["700"]["y"] == 0
+        tank = get_world_service().world_state["tanks"]["700"]
+        assert tank["liveness"] == "deactivated"
+        # Death tile preserved on the tank state.
+        assert tank["x"] == 100
+        assert tank["y"] == 100
         assert drain_killed_tank_ids(get_world_service()) == {700}
 
 

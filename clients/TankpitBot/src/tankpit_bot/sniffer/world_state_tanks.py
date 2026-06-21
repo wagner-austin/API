@@ -14,7 +14,6 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser
 from tankpit_bot.runtime_logging import emit_diagnostic
-from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import remove_tank
 from tankpit_bot.state.mutations import apply_tank_observation
@@ -114,63 +113,6 @@ def update_world_state_from_tank_status(
         team=team,
         rank=rank,
         name=name,
-    )
-    ws.world_state = apply_tank_observation(ws.world_state, obs)
-
-
-def update_world_state_from_tank_registry(
-    ws: WorldService,
-    tank_id: int,
-    name: str,
-    team_str: str,
-    rank: int,
-    is_bot: bool,
-    tank_y: int,
-    tank_viewport_x: int,
-) -> None:
-    """Store tank with position from a container ``tank_registry`` message.
-
-    Computes the absolute X coordinate from
-    ``viewport_left + viewport_x``. If the viewport origin is not yet
-    known the call is a no-op (the registry entry will be re-emitted on
-    the next viewport).
-
-    Args:
-        ws: World service instance.
-        tank_id: Tank id.
-        name: Tank name.
-        team_str: Team name string ("red", "purple", "blue", "orange").
-        rank: Military rank (0-7).
-        is_bot: Whether the tank is a bot.
-        tank_y: Absolute Y coordinate.
-        tank_viewport_x: Viewport-relative X coordinate.
-    """
-    from tankpit_bot.protocol.constants import TEAM_NAMES
-
-    team = TEAM_NAMES.index(team_str) if team_str in TEAM_NAMES else 0
-
-    viewport_left = get_viewport_left()
-    if viewport_left is None:
-        log.info(
-            "Cannot add tank_registry tank: viewport_left not yet known (tank=%d, y=%d, vx=%d)",
-            tank_id,
-            tank_y,
-            tank_viewport_x,
-        )
-        return
-    tank_x = viewport_left + tank_viewport_x
-
-    ts = browser.get_current_time_ms()
-    obs = make_tank_observation(
-        tank_id=tank_id,
-        timestamp_ms=ts,
-        is_wire_sourced=True,
-        storage_source="viewport",
-        position=(tank_x, tank_y),
-        team=team,
-        rank=rank,
-        name=name,
-        is_bot=is_bot,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
 

@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
-from scripts import _test_hooks
 from scripts.analyze_session_timing import analyze_timing, render_timing_report
 
+from scripts import _test_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.types import encode_captured_message
 

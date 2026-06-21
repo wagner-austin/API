@@ -10,59 +10,13 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.runtime_logging import emit_world
-from tankpit_bot.sniffer.viewport import get_viewport_left
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     pickup_container,
-    replace_map_fuel_dots,
     set_self_fuel,
 )
 
 log = get_logger(__name__)
-
-
-def update_world_state_from_fuel_dots(ws: WorldService, dots: list[tuple[int, int]]) -> None:
-    """Replace the map-wide fuel-dot atlas from a parsed MAP_DATA dot layer.
-
-    Args:
-        ws: World service instance.
-        dots: Decoded ``(x, y)`` world coordinates of every fuel dot.
-    """
-    ws.world_state = replace_map_fuel_dots(
-        ws.world_state,
-        dots,
-        get_current_time_ms(),
-    )
-
-
-def update_world_state_from_tank_registry_container(
-    container_y: int,
-    container_viewport_x: int,
-) -> None:
-    """Ignore non-radar container registry hints for planning state.
-
-    Tank registry container entries expose coarse location hints but do not
-    provide trustworthy resource truth. Container planning is radar-driven, so
-    these messages must not populate ``world["containers"]``.
-
-    Args:
-        container_y: Absolute Y coordinate.
-        container_viewport_x: Viewport-relative X coordinate.
-    """
-    viewport_left = get_viewport_left()
-    if viewport_left is None:
-        log.info(
-            "Ignoring tank_registry container: viewport_left not yet known (y=%d, vx=%d)",
-            container_y,
-            container_viewport_x,
-        )
-        return
-    container_x = viewport_left + container_viewport_x
-    log.debug(
-        "Ignoring tank_registry container hint at (%d, %d); radar is authoritative",
-        container_x,
-        container_y,
-    )
 
 
 def update_world_state_from_fuel_total(ws: WorldService, fuel_total: int) -> None:
@@ -157,7 +111,5 @@ __all__ = [
     "increment_container_failed_pickups",
     "remove_container_at",
     "update_world_state_from_container_pickup",
-    "update_world_state_from_fuel_dots",
     "update_world_state_from_fuel_total",
-    "update_world_state_from_tank_registry_container",
 ]

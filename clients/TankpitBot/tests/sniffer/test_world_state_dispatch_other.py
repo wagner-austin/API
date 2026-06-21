@@ -38,36 +38,10 @@ class TestDispatchOther:
 
         assert get_world_service().world_state["self_state"] == initial_self
 
-    def test_dispatch_tank_registry_container(self) -> None:
-        """Tank-registry container messages do not populate resource truth."""
-        from tankpit_bot.container import TankRegistryDict
-        from tankpit_bot.sniffer import viewport
-
-        viewport.update_viewport_origin(200, 0)
-
-        msg = TankRegistryDict(
-            msg_type="tank_registry",
-            flags=0,
-            tank_id=1000,
-            info_bytes=b"",
-            team="red",
-            tank_name="",
-            military_rank=0,
-            badge_count=0,
-            is_bot=False,
-            is_container=True,
-            container_x=None,
-            container_y=75,
-            container_viewport_x=3,
-            tank_y=None,
-            tank_viewport_x=None,
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        state = get_world_service().world_state
-        assert "203,75" not in state["containers"]
-
-        viewport.reset_viewport_tracking()
+    # Container tank_registry dispatch test deleted 2026-06-20 after the
+    # container TankRegistry decoder was removed. Container resource
+    # truth is now sourced exclusively from 0x4F RadarResponse on the
+    # protocol path.
 
     def test_dispatch_fuel_gain_message(self) -> None:
         """Test dispatch handles FuelGain (0x44) message."""
@@ -153,7 +127,7 @@ class TestDispatchOther:
 
     def test_dispatch_container_pickup_message(self) -> None:
         """Test dispatch handles container_pickup message."""
-        from tankpit_bot.container import ContainerPickupDict
+        from tankpit_bot.container import ContainerPickupDict, ContainerPickupRecordDict
         from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 
         # First set up a position to create self_state
@@ -167,8 +141,15 @@ class TestDispatchOther:
         state = get_world_service().world_state
         assert "80,90" in state["containers"]
 
-        # Dispatch container pickup
-        msg = ContainerPickupDict(msg_type="container_pickup", x=80, y=90, volume=50, is_fuel=True)
+        # Dispatch container pickup. ``remaining_volume`` is the
+        # fuel left in the container after pickup (50 here -- the
+        # picker took only a partial top-up because their tank was
+        # nearly full); the dispatch path uses only (x, y) to clear
+        # the container from world state.
+        msg = ContainerPickupDict(
+            msg_type="container_pickup",
+            pickups=(ContainerPickupRecordDict(x=80, y=90, remaining_volume=50),),
+        )
         dispatch_world_state_update(get_world_service(), msg)
 
         state = get_world_service().world_state

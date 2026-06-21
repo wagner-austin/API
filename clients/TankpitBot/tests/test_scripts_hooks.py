@@ -6,8 +6,8 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from scripts import _test_hooks
 
+from scripts import _test_hooks
 from tankpit_bot import _test_hooks as core_hooks
 
 

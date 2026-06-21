@@ -6,9 +6,9 @@ import types
 from collections.abc import Generator
 
 import pytest
+
 from scripts import _test_hooks
 from scripts import queue_probe as queue_probe_script
-
 from tankpit_bot import _test_hooks as bot_hooks
 from tankpit_bot._test_hooks.browser import (
     BrowserProtocol,

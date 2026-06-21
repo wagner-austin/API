@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_state import (
     get_world_service,
     reset_world_state,
@@ -186,48 +185,10 @@ class TestWorldStateGetter:
         assert state["self_state"]["y"] == 60
 
 
-class TestContainerUpdate:
-    """Tests for container update functions."""
-
-    def setup_method(self) -> None:
-        """Reset world state before each test."""
-        reset_world_state()
-
-    def teardown_method(self) -> None:
-        """Reset world state and hooks after each test."""
-        reset_world_state()
-        _test_hooks.path_exists = _test_hooks._real_path_exists
-        _test_hooks.load_terrain_map = _test_hooks._real_load_terrain_map
-
-    def test_update_world_state_from_tank_registry_container_no_viewport(self) -> None:
-        """Tank-registry container hints are ignored when viewport is unknown."""
-        from tankpit_bot.sniffer import viewport
-        from tankpit_bot.sniffer.world_state_containers import (
-            update_world_state_from_tank_registry_container,
-        )
-
-        viewport.reset_viewport_tracking()
-
-        update_world_state_from_tank_registry_container(100, 5)
-
-        state = get_world_service().world_state
-        assert state["containers"] == {}
-
-    def test_update_world_state_from_tank_registry_container_with_viewport(self) -> None:
-        """Tank-registry container hints are ignored even when viewport is known."""
-        from tankpit_bot.sniffer import viewport
-        from tankpit_bot.sniffer.world_state_containers import (
-            update_world_state_from_tank_registry_container,
-        )
-
-        viewport.update_viewport_origin(100, 0)
-
-        update_world_state_from_tank_registry_container(50, 5)
-
-        state = get_world_service().world_state
-        assert "105,50" not in state["containers"]
-
-        viewport.reset_viewport_tracking()
+# TestContainerUpdate class deleted 2026-06-20 with its sole tests
+# (update_world_state_from_tank_registry_container); container
+# TankRegistry was removed after corpus sweep proved zero production
+# fires.
 
 
 class TestFuelUpdate:

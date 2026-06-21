@@ -1,4 +1,9 @@
-"""Tests for scripts.analyze_viewport."""
+"""Tests for scripts.analyze_viewport.
+
+The position_update analysis path was deleted 2026-06-20 along with
+the container PositionUpdate decoder. The script now reports only
+MovementResponse + ViewportUpdate + 13-byte shape census.
+"""
 
 from __future__ import annotations
 
@@ -56,35 +61,6 @@ def _make_viewport_update_payload(
     return _encode_received_frame(0x5A, decoded_data, xor_table)
 
 
-def _make_position_update_payload(
-    tank_id: int,
-    x: int,
-    y: int,
-    extra_x: int,
-    extra_y: int,
-    xor_table: bytes,
-) -> str:
-    """Create an absolute self position_update payload."""
-    decoded_data = bytes(
-        [
-            0x24,
-            0x02,
-            tank_id & 0xFF,
-            tank_id >> 8,
-            x,
-            y,
-            extra_x,
-            extra_y,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ]
-    )
-    return _encode_received_frame(0x2E, decoded_data, xor_table)
-
-
 @pytest.fixture()
 def _fake_fs() -> Generator[FakeFileSystem, None, None]:
     """Patch both script and core file hooks with a fake filesystem."""
@@ -118,7 +94,7 @@ class TestAnalyzeViewportScript:
         _fake_fs: FakeFileSystem,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """Prints viewport inference and position evidence from a capture session."""
+        """Prints viewport inference summary from a capture session."""
         magic = "script-magic"
         static_key = "K" * 64
         xor_table = build_xor_table(static_key, magic)
@@ -141,12 +117,6 @@ class TestAnalyzeViewportScript:
                     "payload": _make_viewport_update_payload(136, 134, xor_table),
                     "ws_url": "wss://test/ws",
                 },
-                {
-                    "timestamp_ms": 1200,
-                    "direction": "received",
-                    "payload": _make_position_update_payload(638, 144, 137, 8, 3, xor_table),
-                    "ws_url": "wss://test/ws",
-                },
             ],
             "magic": magic,
             "game_log": [],
@@ -166,8 +136,7 @@ class TestAnalyzeViewportScript:
 
         output = capsys.readouterr().out
         assert "self_tank_id=638" in output
-        assert "position_extra_x_matches=1/1" in output
-        assert "position_extra_y_matches=1/1" in output
+        assert "capture_status=viewport_inferred" in output
         assert "viewport=(136,134)" in output
 
     def test_exits_when_file_missing(self, _fake_fs: FakeFileSystem) -> None:
@@ -253,12 +222,6 @@ class TestAnalyzeViewportScript:
                     "timestamp_ms": 1100,
                     "direction": "received",
                     "payload": _make_viewport_update_payload(136, 134, xor_table),
-                    "ws_url": "wss://test/ws",
-                },
-                {
-                    "timestamp_ms": 1200,
-                    "direction": "received",
-                    "payload": _make_position_update_payload(638, 144, 137, 8, 3, xor_table),
                     "ws_url": "wss://test/ws",
                 },
             ],

@@ -29,8 +29,8 @@ class TestFormatFunctions:
             source_y=154,
             target_x=155,
             target_y=155,
-            unk1=155,
-            unk2=155,
+            aim_x=155,
+            aim_y=155,
             weapon=1,
         )
         result = format_combat_details(msg)
@@ -540,13 +540,8 @@ class TestFormatFunctions:
         result = format_tank_details(msg)
         assert "obstacle" in result
 
-    def test_format_decoded_message_container(self) -> None:
-        """Format a container TankLeave message."""
-        from tankpit_bot.container import TankLeaveDict
-
-        msg = TankLeaveDict(msg_type="tank_leave", tank_id=42, flags=0, extra_data=b"\x00" * 3)
-        result = format_decoded_message(0x2E, msg)
-        assert "TankLeave" in result
+    # Container TankLeave format_decoded_message test deleted 2026-06-20
+    # after the container TankLeaveDict was removed.
 
     def test_format_decoded_message_protocol(self) -> None:
         """Format decoded ShootEvent (0x53) message."""
@@ -560,8 +555,8 @@ class TestFormatFunctions:
             source_y=154,
             target_x=155,
             target_y=155,
-            unk1=155,
-            unk2=155,
+            aim_x=155,
+            aim_y=155,
             weapon=1,
         )
         result = format_decoded_message(0x53, msg)
@@ -576,49 +571,9 @@ class TestFormatFunctions:
         result = format_decoded_message(0x3F, msg)
         assert "[" in result  # Just has type name in brackets
 
-    def test_format_container_details_tank_registry(self) -> None:
-        """Test format_container_details for tank registry."""
-        from tankpit_bot.container import TankRegistryDict
-
-        msg = TankRegistryDict(
-            msg_type="tank_registry",
-            flags=0x12,
-            tank_id=100,
-            info_bytes=b"\x01\x02\x03\x04",
-            team="blue",
-            tank_name="TestTank",
-            military_rank=2,
-            badge_count=3,
-            is_bot=False,
-            is_container=False,
-            container_x=None,
-            container_y=None,
-            container_viewport_x=None,
-            tank_y=None,
-            tank_viewport_x=None,
-        )
-        result = format_container_details(msg)
-        assert "tank=100" in result
-        assert '"TestTank"' in result
-        assert "blue" in result
-        assert "corporal" in result
-        assert "badges=3" in result
-
-    def test_format_container_details_position_update(self) -> None:
-        """Test format_container_details for position update."""
-        from tankpit_bot.container import PositionUpdateDict
-
-        msg = PositionUpdateDict(
-            msg_type="position_update",
-            flags=0xAB,
-            tank_id=200,
-            x=50,
-            y=75,
-            extra_data=b"\x01\x02\x03\x04\x05\x06\x07",
-        )
-        result = format_container_details(msg)
-        assert "tank=200" in result
-        assert "flags=0xAB" in result or "x=" in result
+    # Container tank_registry / position_update format tests deleted
+    # 2026-06-20: the underlying TypedDicts and formatters were removed
+    # after corpus sweep proved zero production fires.
 
     def test_format_container_details_unknown_container(self) -> None:
         """Test format_container_details for unknown container."""
@@ -635,15 +590,13 @@ class TestFormatFunctions:
         assert "data=" in result
 
     def test_format_container_details_unmatched_returns_empty(self) -> None:
-        """Test format_container_details returns empty for unmatched pattern."""
-        from tankpit_bot.container import TankLeaveDict
+        """Test format_container_details returns empty for unmatched pattern.
 
-        # TankLeaveDict is not handled by format_container_details
-        msg = TankLeaveDict(
-            msg_type="tank_leave",
-            tank_id=100,
-            flags=0,
-            extra_data=b"\x00\x00",
-        )
+        TeleportLandedDict (string msg_type, not handled by
+        format_container_simple) routes through the empty fallback.
+        """
+        from tankpit_bot.container import TeleportLandedDict
+
+        msg = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
         result = format_container_details(msg)
         assert result == ""

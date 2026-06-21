@@ -119,9 +119,10 @@ class TestBuildMessageStats:
     def test_tracks_decoded_known_structure(self, fake_fs: FakeFileSystem) -> None:
         """Known container structures land in the decoded counter.
 
-        Use a 4-byte player_list_short body (subtype 0x79) -- the
-        identifier returns its name + level, exercising the decoded
-        branch in build_message_stats.
+        Use a 1-byte teleport_landed body -- the identifier returns its
+        name + level, exercising the decoded branch in build_message_stats.
+        Container PlayerListShort was removed 2026-06-20 after corpus
+        proof of zero production fires.
         """
         from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
 
@@ -134,8 +135,8 @@ class TestBuildMessageStats:
             ord(static_key[i]) ^ magic_bytes[i % len(magic_bytes)] for i in range(len(static_key))
         )
 
-        # 4-byte body starting with 0x79 -> player_list_short
-        decoded_data = bytes([0x79, 0x99, 0x05, 0x07])
+        # 1-byte body 0x0C -> teleport_landed
+        decoded_data = bytes([0x0C])
         encoded = bytes(decoded_data[i] ^ xor_table[i] for i in range(len(decoded_data)))
         body = bytes([0x2E]) + encoded
         header = len(body).to_bytes(2, "little")
@@ -158,7 +159,7 @@ class TestBuildMessageStats:
 
         result = build_message_stats(session)
         assert result["total_received"] == 1
-        assert "len=04 player_list_short" in result["decoded"]
+        assert "len=01 teleport_landed" in result["decoded"]
 
     def test_unknown_samples_limited_to_3(self, fake_fs: FakeFileSystem) -> None:
         """Test unknown samples are limited to 3 per length key."""

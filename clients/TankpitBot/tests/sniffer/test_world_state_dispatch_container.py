@@ -164,8 +164,8 @@ class TestDispatchShootEvent:
             source_y=154,
             target_x=155,
             target_y=155,
-            unk1=155,
-            unk2=155,
+            aim_x=155,
+            aim_y=155,
             weapon=1,
         )
         dispatch_world_state_update(ws, msg)
@@ -205,8 +205,8 @@ class TestDispatchShootEvent:
             source_y=154,
             target_x=170,
             target_y=174,
-            unk1=170,
-            unk2=174,
+            aim_x=170,
+            aim_y=174,
             weapon=3,
         )
         dispatch_world_state_update(ws, msg)
@@ -246,8 +246,8 @@ class TestDispatchShootEvent:
             source_y=10,
             target_x=10,
             target_y=10,
-            unk1=10,
-            unk2=10,
+            aim_x=10,
+            aim_y=10,
             weapon=0,
         )
         dispatch_world_state_update(ws, msg)
@@ -297,8 +297,8 @@ class TestDispatchShootEvent:
             source_y=155,
             target_x=155,
             target_y=154,
-            unk1=155,
-            unk2=154,
+            aim_x=155,
+            aim_y=154,
             weapon=0,
         )
         dispatch_world_state_update(ws, msg)
@@ -322,8 +322,13 @@ class TestDispatchProtocolDeactivation:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_dispatch_deactivation_invalidates_victim(self) -> None:
-        """Dispatch 0x41 deactivation invalidates victim tank position."""
+    def test_dispatch_deactivation_marks_liveness_deactivated(self) -> None:
+        """Dispatch 0x41 marks the victim ``liveness="deactivated"`` and
+        preserves the death tile.
+
+        Replaces the prior ``position-set-to-(0,0)`` sentinel with the
+        explicit liveness state machine introduced 2026-06-20.
+        """
         from tankpit_bot.protocol import DeactivationDict, TankEntryDict
 
         ws = get_world_service()
@@ -342,21 +347,14 @@ class TestDispatchProtocolDeactivation:
         )
         dispatch_world_state_update(ws, msg)
 
-        assert ws.world_state["tanks"]["900"]["x"] == 0
-        assert ws.world_state["tanks"]["900"]["y"] == 0
+        tank = ws.world_state["tanks"]["900"]
+        assert tank["liveness"] == "deactivated"
+        assert tank["x"] == 100
+        assert tank["y"] == 100
 
-    def test_dispatch_deactivation_death_is_handled(self) -> None:
-        """Dispatch deactivation_death is handled without error."""
-        from tankpit_bot.container import DeactivationDeathDict
-
-        ws = get_world_service()
-        msg = DeactivationDeathDict(
-            msg_type="deactivation_death",
-            flags=0,
-            killer_id=42,
-            extra_data=b"\x00\x01\x02",
-        )
-        dispatch_world_state_update(ws, msg)  # should not raise
+    # Container deactivation_death dispatch test deleted 2026-06-20 after
+    # the container DeactivationDeath decoder was removed. Tank
+    # deactivation flows through 0x41 Deactivation on the protocol path.
 
 
 class TestIncrementContainerFailedPickups:

@@ -5,10 +5,10 @@
 ## Hubs
 
 [Game Mechanics](hubs/game-mechanics.md) -- how the game works: viewport, teleport, radar, fuel, ferries, map, equipment, official rules (8 pages)
-[Protocol](hubs/protocol.md) -- wire format: combat hits, deactivation, MAP_DATA, viewport entities, tank registry, weapon selection, decode coverage (6 pages)
-[Combat](hubs/combat.md) -- fighting strategy: shot range, enemy behavior, weapon selection, gameplay loop, equipment refill (7 pages)
+[Protocol](hubs/protocol.md) -- wire format: combat hits, deactivation, MAP_DATA, viewport entities, tank registry, weapon selection, decode coverage (7 pages)
+[Combat](hubs/combat.md) -- fighting strategy: shot range, enemy behavior, weapon selection, gameplay loop, equipment refill, mine mechanics, game economy (9 pages)
 [JS Client](hubs/js-client.md) -- reverse-engineered tpclient.js: source map, commands, V table, constants, state machine, XOR, terrain, chat, connection, more (20 pages)
-[Architecture](hubs/architecture.md) -- codebase decisions: inheritance chain, DI, test hooks, coding standards, tank freshness model (3 pages)
+[Architecture](hubs/architecture.md) -- codebase decisions: inheritance chain, DI, test hooks, coding standards, tank freshness model, bot behavior contract (4 pages)
 [Codebase](hubs/codebase.md) -- module map, services, testing patterns, make targets, how to add a probe (5 pages)
 
 ## How this works

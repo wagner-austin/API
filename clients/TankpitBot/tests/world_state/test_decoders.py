@@ -41,6 +41,7 @@ class TestDecodeTankState:
             "timestamp_ms": 5000,
             "last_wire_seen_ms": 4200,
             "last_position_update_ms": 4100,
+            "liveness": "alive",
         }
         tank = decode_tank_state(data)
 
@@ -58,6 +59,7 @@ class TestDecodeTankState:
         assert tank["name"] == "Test"
         assert tank["is_bot"] is True
         assert tank["is_self"] is False
+        assert tank["liveness"] == "alive"
 
     def test_missing_field_raises(self) -> None:
         """Raises JSONTypeError for missing field."""
@@ -82,9 +84,59 @@ class TestDecodeTankState:
             "timestamp_ms": 5000,
             "last_wire_seen_ms": 0,
             "last_position_update_ms": 0,
+            "liveness": "alive",
         }
         with pytest.raises(JSONTypeError, match="source must be one of"):
             decode_tank_state(data)
+
+    def test_invalid_liveness_raises(self) -> None:
+        """Raises JSONTypeError for an unsupported tank liveness value.
+
+        Locks in ``require_tank_liveness`` rejects anything outside
+        the three documented states.
+        """
+        data: JSONObject = {
+            "tank_id": 42,
+            "x": 100,
+            "y": 150,
+            "team": 2,
+            "rank": 3,
+            "damage_state": 1,
+            "direction": 0,
+            "name": "Test",
+            "is_bot": True,
+            "is_self": False,
+            "source": "viewport",
+            "timestamp_ms": 5000,
+            "last_wire_seen_ms": 0,
+            "last_position_update_ms": 0,
+            "liveness": "zombified",
+        }
+        with pytest.raises(JSONTypeError, match="liveness must be one of"):
+            decode_tank_state(data)
+
+    def test_all_liveness_states_decode(self) -> None:
+        """Each of ``alive`` / ``deactivated`` decodes."""
+        for state in ("alive", "deactivated"):
+            data: JSONObject = {
+                "tank_id": 42,
+                "x": 100,
+                "y": 150,
+                "team": 2,
+                "rank": 3,
+                "damage_state": 1,
+                "direction": 0,
+                "name": "Test",
+                "is_bot": True,
+                "is_self": False,
+                "source": "viewport",
+                "timestamp_ms": 5000,
+                "last_wire_seen_ms": 0,
+                "last_position_update_ms": 0,
+                "liveness": state,
+            }
+            tank = decode_tank_state(data)
+            assert tank["liveness"] == state
 
 
 class TestDecodeContainerState:
@@ -407,6 +459,7 @@ class TestDecodeWorldState:
                     "timestamp_ms": 500,
                     "last_wire_seen_ms": 500,
                     "last_position_update_ms": 500,
+                    "liveness": "alive",
                 },
             },
             "containers": {},
@@ -425,6 +478,7 @@ class TestDecodeWorldState:
         assert tank["name"] == "TestTank"
         assert tank["source"] == "viewport"
         assert tank["timestamp_ms"] == 500
+        assert tank["liveness"] == "alive"
 
     def test_decodes_with_terrain(self) -> None:
         """Decodes world state with terrain tiles."""

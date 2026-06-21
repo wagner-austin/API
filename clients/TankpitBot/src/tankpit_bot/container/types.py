@@ -19,17 +19,8 @@ class ContainerMessageType(IntEnum):
     UNKNOWN = 0
     MINE_DETONATION = auto()
     MINE_PLACEMENT = auto()
-    TANK_REGISTRY = auto()
-    POSITION_UPDATE = auto()
-    TANK_LEAVE = auto()
-    PLAYER_LIST_SHORT = auto()
-    PLAYER_LIST_EXTENDED = auto()
-    DEACTIVATION_DEATH = auto()
     TELEPORT_LANDED = auto()
     CONTAINER_PICKUP = auto()
-    TIP_NOTIFICATION = auto()
-    CHUNK_DATA = auto()
-    WORLD_STATE = auto()
 
 
 class DecodeLevel(IntEnum):
@@ -62,18 +53,8 @@ MESSAGE_TYPE_LEVELS: dict[ContainerMessageType, DecodeLevel] = {
     # Fully decoded message types (all fields understood)
     ContainerMessageType.MINE_DETONATION: DecodeLevel.FULL,
     ContainerMessageType.MINE_PLACEMENT: DecodeLevel.FULL,
-    ContainerMessageType.TANK_REGISTRY: DecodeLevel.FULL,
-    ContainerMessageType.POSITION_UPDATE: DecodeLevel.FULL,
-    ContainerMessageType.TANK_LEAVE: DecodeLevel.FULL,
-    ContainerMessageType.PLAYER_LIST_SHORT: DecodeLevel.FULL,
-    ContainerMessageType.PLAYER_LIST_EXTENDED: DecodeLevel.FULL,
-    ContainerMessageType.DEACTIVATION_DEATH: DecodeLevel.FULL,
     ContainerMessageType.TELEPORT_LANDED: DecodeLevel.FULL,
     ContainerMessageType.CONTAINER_PICKUP: DecodeLevel.FULL,
-    # Identified but not fully decoded (type known, structure partial)
-    ContainerMessageType.TIP_NOTIFICATION: DecodeLevel.IDENTIFIED,
-    ContainerMessageType.CHUNK_DATA: DecodeLevel.IDENTIFIED,
-    ContainerMessageType.WORLD_STATE: DecodeLevel.IDENTIFIED,
 }
 
 
@@ -118,21 +99,10 @@ class MineDetonationDict(TypedDict):
 # protocol/decoders/routing.py (7 -> 6) ensures the protocol path now
 # fires for the wire 6-byte body.
 
-
-class DeactivationDeathDict(TypedDict):
-    """Deactivation event when you were killed by another tank.
-
-    Structure (7 bytes, verified from captures):
-      [subtype:1] [flags:1] [killer_id:2 LE] [extra:3]
-
-    Subtype is 0x43 ('C') after XOR decode.
-    Sent when you are deactivated by another tank.
-    """
-
-    msg_type: Literal["deactivation_death"]
-    flags: int
-    killer_id: int
-    extra_data: bytes
+# Container DeactivationDeath (7-byte 0x43) was deleted 2026-06-20 after
+# empirical proof of zero production fires: 7-byte 0x2E bodies all route
+# to 0x49 Inventory / 0x67 EquipmentGain / 0x4A TerrainUpdate / 0x4F
+# CombinedTileUpdate via the tunneled protocol dispatch.
 
 
 class MinePlacementDict(TypedDict):
@@ -153,111 +123,27 @@ class MinePlacementDict(TypedDict):
 # =============================================================================
 # Tank Messages
 # =============================================================================
-
-
-class TankRegistryDict(TypedDict):
-    """Tank registry entry decoded from 0x2E container.
-
-    Structure (16-20 bytes, verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [info_bytes:12-16]
-
-    For tanks (tank_id < 1000):
-      info_bytes structure:
-        Standard (flags & 0x2C == 0): [rank_badges:1][zeros:4][unk:2][name]
-        Extended (flags & 0x2C != 0): [rank_badges:1][zeros:4][pos:2][unk:3][name]
-
-      rank_badges byte encoding:
-        bits 0-2: military rank (0=recruit...7=colonel, overflow for general)
-        bits 3-7: badge/award count
-
-    For containers (tank_id >= 1000):
-      Equipment/fuel containers on the map are encoded as "tanks".
-      info_bytes structure: [y:1][viewport_x:1][type_data:10-14]
-      - y is absolute map coordinate
-      - viewport_x is relative to player position (player at center ~3)
-      - To get absolute x: map_x = player_x + (viewport_x - 3)
-
-    Team encoded in flags lower 2 bits: 0=red, 1=purple, 2=blue, 3=orange.
-    """
-
-    msg_type: Literal["tank_registry"]
-    flags: int
-    tank_id: int
-    info_bytes: bytes
-    team: str
-    tank_name: str
-    military_rank: int
-    badge_count: int
-    is_bot: bool
-    is_container: bool
-    container_x: int | None  # Absolute x - requires player position to calculate
-    container_y: int | None  # Absolute y coordinate
-    container_viewport_x: int | None  # Viewport-relative x (player at center ~3)
-    tank_y: int | None  # Tank absolute Y coordinate (from info_bytes[5])
-    tank_viewport_x: int | None  # Tank viewport-relative X (from info_bytes[6])
-
-
-# TankStatusShortDict deleted 2026-06-19. Wire-layout was wrong on
-# every byte:
-# analysis_scripts/crack_tank_status_short.py paired all 74 production
-# 9-byte 0x2E bodies against the JS Og.h schema and got 74/74 sane
-# (dmg<=3 AND rank<=8 AND promo_state<=11) vs 0/74 sane on the
-# container layout (rank > 8 every time). 9-byte 0x2E bodies are now
-# dispatched to ``decode_tank_status_sync`` (Og.h short form) from
-# ``decode_0x2e_message``.
-
-
-# Container TankUpdateCompactDict, TankUpdateExtendedDict, and
-# TankUpdateFullDict were deleted 2026-06-19. The full audit
-# (analysis_scripts/crack_tank_update.py) showed 0 production bodies
-# ever reached the length-based fallback for any of the three lengths
-# (10/14/15) once the tunneled dispatchers route 0x28 TankEntry,
-# 0x42 BuildPickup, 0x47 Movement, and 0x56 Statistics first.
-
-
-# Container TankStatusSync deleted 2026-06-19 (length-only catch-all
-# misidentifying short subtypes). Real 0x2E TankStatusSync lives in
-# tankpit_bot.protocol (TankStatusSyncDict, 8+ bytes per JS Og.h).
-
-
-class TankLeaveDict(TypedDict):
-    """Tank leave event decoded from 0x2E container.
-
-    Structure (6 bytes, verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [extra:2]
-
-    Sent when a player leaves/disconnects from the game.
-    Tank ID at bytes[2:4] as little-endian u16.
-    """
-
-    msg_type: Literal["tank_leave"]
-    tank_id: int
-    flags: int
-    extra_data: bytes
+# Container TankRegistry / TankLeave / TankStatusShort / TankUpdateCompact
+# / TankUpdateExtended / TankUpdateFull / TankStatusSync all deleted.
+# Single source of truth lives in tankpit_bot.protocol:
+#
+# * 0x21 TankInfo replaces TankRegistry (5143 corpus samples cover the
+#   16/17/19-byte 0x2E body slots that TankRegistry previously ate).
+# * 0x47 Movement (Lg.h) replaces TankUpdate / TankLeave.
+# * 0x3D MovementResponse (Lg.h) replaces 13-byte TankStatusSync / the
+#   long-form TankStatusFull.
+# * Og.h TankStatusSync (short/full) handles 9-byte and 13-byte self
+#   status with fuel.
+#
+# Empirical proof: corpus sweep of 150 sessions / 48,304 0x2E bodies,
+# 0 production fires for any of the deleted types (2026-06-20).
 
 
 # =============================================================================
 # Position/Movement Messages
 # =============================================================================
-
-
-class PositionUpdateDict(TypedDict):
-    """Position/status update decoded from 0x2E container.
-
-    Structure (verified from captures):
-      [subtype:1] [flags:1] [tank_id:2 LE] [x:1] [y:1] [extra:7]
-
-    Periodic position and status updates for tanks.
-    x,y are map grid coordinates (0-127 range).
-    """
-
-    msg_type: Literal["position_update"]
-    flags: int
-    tank_id: int
-    x: int
-    y: int
-    extra_data: bytes
-
+# Container PositionUpdate (13-byte 0x24) deleted 2026-06-20. 13-byte
+# 0x2E slots are all 0x3D MovementResponse (4197 corpus samples).
 
 # 0x47 Movement lives in tankpit_bot.protocol (MovementDict). The
 # container path was deleted 2026-06-19: it had misinterpreted bytes
@@ -279,35 +165,10 @@ class PositionUpdateDict(TypedDict):
 # =============================================================================
 # Player List Messages
 # =============================================================================
-
-
-class PlayerListShortDict(TypedDict):
-    """Short player list response decoded from 0x2E container.
-
-    Structure (4 bytes, verified from captures):
-      [subtype:1] [data:3]
-
-    Sent in response to pressing '/' key (active players query).
-    Contains count or summary of active players.
-    """
-
-    msg_type: Literal["player_list_short"]
-    response_data: bytes
-
-
-class PlayerListExtendedDict(TypedDict):
-    """Extended player list response decoded from 0x2E container.
-
-    Structure (7 bytes, verified from captures):
-      [subtype:1] [base_data:3] [extended_data:3]
-
-    Sent when multiple players are active.
-    First 4 bytes match short format, with 3 additional bytes.
-    """
-
-    msg_type: Literal["player_list_extended"]
-    response_data: bytes
-    extended_data: bytes
+# Container PlayerListShort (4-byte 0x79) and PlayerListExtended
+# (7-byte 0x79) deleted 2026-06-20. The bot never sends the '/' query
+# and 4/7-byte 0x2E bodies route to 0x44 FuelGain / 0x52 SupervisorText
+# / other tunneled subtypes via the protocol path.
 
 
 # =============================================================================
@@ -329,67 +190,73 @@ class TeleportLandedDict(TypedDict):
     subtype: int
 
 
+class ContainerPickupRecordDict(TypedDict):
+    """One pickup record inside a 0x43 ContainerPickup body.
+
+    Each record is 4 wire bytes: ``[x:1] [y:1] [remaining_volume:2 LE]``.
+    """
+
+    x: int
+    y: int
+    remaining_volume: int
+
+
 class ContainerPickupDict(TypedDict):
-    """Container pickup event.
+    """Container pickup event (one OR more pickups in one wire message).
 
-    Structure (5 bytes):
-      [subtype:1] [x:1] [y:1] [volume:2 LE]
+    Wire format (per JS V.C = $g handler, tpclient.pretty.js:4743):
+      [subtype:1=0x43] [record_1: 4 bytes] [record_2: 4 bytes] ...
+      Each record = ``[x:1] [y:1] [remaining_volume:2 LE]``.
 
-    Sent when a container is picked up.
-    - volume = 0: Equipment container
-    - volume > 0: Fuel container (volume = fuel received)
+    Corpus distribution (156 sessions, 2026-06-20 sweep):
+      1 record (5-byte body):  2653 samples (regular single pickup)
+      2 records (9-byte body):   80 samples (two pickups same tick)
+      3 records (13-byte body):   2 samples (three pickups same tick)
+
+    Multi-record bodies fire when a tank's movement causes multiple
+    container tiles to update in one server tick -- for example a
+    tank walking from one container tile into another, or a deposit
+    happening simultaneously with a pickup on an adjacent tile.
+
+    ``remaining_volume`` is the fuel that remains in the container
+    **after** this pickup -- it is NOT the fuel transferred to the
+    picker. Empirically verified 2026-06-20 against an annotated
+    multi-pickup capture (runs/sniff/sniff-20260620-155103) where the
+    user walked over fuel containers of known volume (300, 400, 100)
+    and reported the server's remaining-vol read-out after each
+    pickup; the wire ``remaining_volume`` matched exactly
+    (283, 397, 96).
+
+    Discriminator:
+    - ``remaining_volume == 0`` -- container is empty after pickup.
+      This covers both equipment containers (no fuel attribute) AND
+      fuel containers fully consumed by the pickup.
+    - ``remaining_volume > 0`` -- the picker took only part of a fuel
+      container (typically because their tank is near the 1100 cap).
+
+    Equipment pickups also fire a separate ``0x67 EquipmentGain``
+    wire message in the same tick that carries the actual items
+    received -- consumers that need to distinguish equipment vs fuel
+    pickups should check for the paired ``0x67``. The fuel transferred
+    on a fuel pickup is observable from the ``0x2E TankStatusSync``
+    fuel-delta in the same tick.
+
+    Server broadcasts this event TWICE per real pickup (one to the
+    picker, one to the world view). Both arrive within ~200 ms as
+    separate WS frames -- measured 43.9% duplicate rate across 13
+    sniff sessions, 2026-06-20. The dispatcher de-duplicates by
+    (subtype, body-bytes) within ``WIRE_DUP_WINDOW_MS``; downstream
+    handlers can assume each pickup fires exactly once.
     """
 
     msg_type: Literal["container_pickup"]
-    x: int
-    y: int
-    volume: int
-    is_fuel: bool
+    pickups: tuple[ContainerPickupRecordDict, ...]
 
 
-class TipNotificationDict(TypedDict):
-    """Tip/notification container message.
-
-    Structure (29-79 bytes):
-      [subtype:1] [notification_data:28-78]
-
-    Contains UI tips and game notifications.
-    """
-
-    msg_type: Literal["tip_notification"]
-    subtype: int
-    length: int
-    notification_data: bytes
-
-
-class ChunkDataDict(TypedDict):
-    """Chunk data container message.
-
-    Structure (80-130 bytes):
-      [subtype:1] [chunk_data:79-129]
-
-    Contains map/terrain chunk data.
-    """
-
-    msg_type: Literal["chunk_data"]
-    subtype: int
-    length: int
-    chunk_data: bytes
-
-
-class WorldStateDict(TypedDict):
-    """World state container message.
-
-    Structure (500+ bytes):
-      [subtype:1] [world_data:499+]
-
-    Contains full world/map state data.
-    """
-
-    msg_type: Literal["world_state"]
-    subtype: int
-    length: int
-    world_data: bytes
+# TipNotificationDict / ChunkDataDict / WorldStateDict all deleted
+# 2026-06-19 -- 0 corpus samples landed on any of them after 0x4C
+# MapData was tunneled inside 0x2E (2933 samples) and the regression
+# fixture was regenerated under its run's real magic.
 
 
 class UnknownContainerDict(TypedDict):
@@ -427,39 +294,22 @@ class UnknownContainerDict(TypedDict):
 ContainerMessage = (
     MineDetonationDict
     | MinePlacementDict
-    | TankRegistryDict
-    | PositionUpdateDict
-    | TankLeaveDict
-    | PlayerListShortDict
-    | PlayerListExtendedDict
-    | DeactivationDeathDict
     | TeleportLandedDict
     | ContainerPickupDict
-    | TipNotificationDict
-    | ChunkDataDict
-    | WorldStateDict
     | UnknownContainerDict
 )
 
 
 __all__ = [
     "MESSAGE_TYPE_LEVELS",
-    "ChunkDataDict",
     "ContainerMessage",
     "ContainerMessageType",
     "ContainerPickupDict",
-    "DeactivationDeathDict",
+    "ContainerPickupRecordDict",
     "DecodeLevel",
     "MineDetonationDict",
     "MinePlacementDict",
-    "PlayerListExtendedDict",
-    "PlayerListShortDict",
-    "PositionUpdateDict",
-    "TankLeaveDict",
-    "TankRegistryDict",
     "TeleportLandedDict",
-    "TipNotificationDict",
     "UnknownContainerDict",
-    "WorldStateDict",
     "get_decode_level",
 ]

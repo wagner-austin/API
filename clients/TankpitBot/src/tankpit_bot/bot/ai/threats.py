@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
-from tankpit_bot.state.types.constants import DIRECTION_DEAD_THRESHOLD
 
 
 def manhattan_distance(x1: int, y1: int, x2: int, y2: int) -> int:
@@ -134,14 +133,27 @@ def analyze_threats(
     for tank in world["tanks"].values():
         if not _is_enemy(tank, self_team):
             continue
-        # Skip dead tanks — deactivation sets position to (0, 0)
-        if tank["x"] == 0 and tank["y"] == 0:
+        # Liveness gate. ``deactivated`` is the corpse window after a
+        # kill (empirical ~22 s, 2026-06-20 capture). 0x58 TankRemove
+        # is NOT a death signal -- it's tracking removal -- so there
+        # is no separate ``removed`` state; removed tanks are simply
+        # deleted from the registry and re-added by the next MapData
+        # or per-tank wire. The previous explicit ``direction >= 32``
+        # corpse-sprite check was replaced by this single liveness
+        # filter -- ``apply_tank_observation`` now routes both
+        # corpse-direction wire arrivals and 0x41 Deactivation to
+        # ``liveness == "deactivated"``.
+        if tank["liveness"] != "alive":
             continue
-        # Skip corpses — direction >= 32 is the dead/corpse sprite
-        # (tpclient.js Pg.prototype.h sets direction to 32 or 33 on
-        # deactivation; verified across 42 corpse transitions in
-        # capture data 2026-06-18).
-        if tank["direction"] >= DIRECTION_DEAD_THRESHOLD:
+        # Position-confirmation sentinel. A tank we only know via
+        # 0x21 TankInfo carries name and team but no position; it sits
+        # at default (0, 0). Acquiring it would fire at tile (0, 0).
+        # Wait for a position-bearing wire (0x3D MovementResponse,
+        # 0x28 TankEntry, 0x47 Movement, etc.) before treating it as
+        # a threat. The same gate filtered deactivation sentinels
+        # before the liveness machine landed; now the liveness gate
+        # owns deactivation and this one owns the unsynced case.
+        if tank["x"] == 0 and tank["y"] == 0:
             continue
         if now_ms - tank["timestamp_ms"] > WIRE_PRESENCE_TTL_MS:
             continue

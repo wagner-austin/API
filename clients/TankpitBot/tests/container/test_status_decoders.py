@@ -9,6 +9,10 @@ tests/protocol/test_tank.py.
 The 0x3D TankPositionStatus moved to the protocol layer as
 MovementResponseDict (with the carrying byte restored). Tests for
 that path live in tests/protocol/test_movement.py.
+
+Container PositionUpdate (0x24 13-byte) was deleted 2026-06-20 after
+empirical proof of zero production fires; 13-byte 0x2E bodies are now
+all 0x3D MovementResponse via the protocol tunnel.
 """
 
 from __future__ import annotations
@@ -20,10 +24,10 @@ from tankpit_bot.container.types import ContainerMessageType
 class TestIdentification:
     """Tests for the slimmed-down container identification."""
 
-    def test_identifies_position_update_0x24(self) -> None:
-        """0x24 13-byte is still identified as POSITION_UPDATE."""
+    def test_zero_24_no_longer_identified_as_position_update(self) -> None:
+        """0x24 13-byte was POSITION_UPDATE; now falls through (decoder deleted)."""
         data = bytes([0x24, 0x02, 0x15, 0x05, 0xA5, 0x4A, 0x08, 0x01, 0x01, 0x00, 0x00, 0x97, 0x00])
-        assert identify_container_type(data) == ContainerMessageType.POSITION_UPDATE
+        assert identify_container_type(data) == ContainerMessageType.UNKNOWN
 
     def test_zero_2e_no_longer_identified_as_self_status(self) -> None:
         """0x2E 13-byte was SELF_STATUS in the container path; now falls through.

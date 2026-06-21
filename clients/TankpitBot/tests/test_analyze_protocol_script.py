@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str
-from scripts import _test_hooks as script_hooks
 from scripts.analyze_protocol import main
 
+from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
 from tests.conftest import FakeFileSystem
@@ -84,7 +84,7 @@ class TestAnalyzeProtocolScript:
                     "direction": "received",
                     "payload": _encode_received_frame(
                         0x2E,
-                        bytes([0x24, 0x02, 0x7D, 0x04, 140, 137, 8, 3, 0, 0, 0, 0, 0]),
+                        bytes([0x0C]),  # 1-byte teleport_landed
                         xor_table,
                     ),
                     "ws_url": "wss://test/ws",
@@ -122,7 +122,7 @@ class TestAnalyzeProtocolScript:
         assert "decoded_binary_frames=1" in output
         assert "short_or_invalid_frames=1" in output
         assert "unsupported_frames=1" in output
-        assert "position_update x1" in output
+        assert "teleport_landed x1" in output
         assert "0x21 len=3" in output
         assert "0x7B len=4" in output
 

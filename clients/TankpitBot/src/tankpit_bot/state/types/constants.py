@@ -49,6 +49,11 @@ ENTITY_SOURCES: tuple[str, ...] = (
     "world_state",
 )
 
+TANK_LIVENESS_STATES: tuple[str, ...] = (
+    "alive",
+    "deactivated",
+)
+
 CONTAINER_REFRESH_KINDS: tuple[str, ...] = (
     "radar_response",
     "radar_cache_refresh",
@@ -58,6 +63,31 @@ CONTAINER_REFRESH_KINDS: tuple[str, ...] = (
 
 EntitySource = Literal["viewport", "radar", "world_state"]
 """Coarse observed-source label attached to every entity TypedDict."""
+
+TankLiveness = Literal["alive", "deactivated"]
+"""Per-tank liveness state.
+
+Two states, wire-driven:
+
+* ``alive`` is the default. Any wire-sourced observation with a
+  non-corpse direction flips a ``deactivated`` tank back to ``alive``
+  (the respawn-then-move flow). MapData is always applied as a
+  position update regardless of liveness.
+* ``deactivated`` is the corpse window between 0x41 Deactivation and
+  the tank being fully cleaned up. The bot must NOT acquire
+  deactivated tanks; the tile renders a corpse for ~22 s
+  (empirical, 2026-06-20). The wire path also flips a tank into
+  ``deactivated`` when a 0x3D MovementResponse arrives with the
+  corpse-direction sprite (direction >= 32, per JS Pg.prototype.h).
+
+Note: 0x58 TankRemove does NOT set liveness="deactivated". 0x58 means
+"server stopped broadcasting per-tank updates to this client" -- it
+fires for actual deaths, but also when a tank simply leaves the
+client's awareness radius (verified 2026-06-20: orange-5 got 5
+TankRemove events across 2 actual kills, the other 3 were tracking
+churn). The handler instead deletes the tank from the registry; the
+next MapData / per-tank wire re-adds it at its current position.
+"""
 
 ContainerRefreshKind = Literal[
     "radar_response",
@@ -89,6 +119,27 @@ def require_entity_source(data: JSONObject, key: str) -> EntitySource:
     if raw == "world_state":
         return "world_state"
     raise JSONTypeError(f"{key} must be one of {ENTITY_SOURCES}, got {raw!r}")
+
+
+def require_tank_liveness(data: JSONObject, key: str) -> TankLiveness:
+    """Validate and extract a tank liveness value from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated tank liveness value.
+
+    Raises:
+        JSONTypeError: If the value is not a supported liveness state.
+    """
+    raw = require_str(data, key)
+    if raw == "alive":
+        return "alive"
+    if raw == "deactivated":
+        return "deactivated"
+    raise JSONTypeError(f"{key} must be one of {TANK_LIVENESS_STATES}, got {raw!r}")
 
 
 def decode_container_refresh_kind(data: JSONObject, key: str) -> ContainerRefreshKind:
@@ -147,6 +198,7 @@ __all__ = [
     "DAMAGE_MEDIUM",
     "DIRECTION_DEAD_THRESHOLD",
     "ENTITY_SOURCES",
+    "TANK_LIVENESS_STATES",
     "TEAM_BLUE",
     "TEAM_ORANGE",
     "TEAM_PURPLE",
@@ -159,7 +211,9 @@ __all__ = [
     "TERRAIN_ROCK_B",
     "ContainerRefreshKind",
     "EntitySource",
+    "TankLiveness",
     "decode_container_refresh_kind",
     "encode_container_refresh_kind",
     "require_entity_source",
+    "require_tank_liveness",
 ]

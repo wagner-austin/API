@@ -391,7 +391,11 @@ def decode_0x2e_message(data: bytes) -> BinaryMessage:
         Decoded `BinaryMessage`. `BinaryMessage` includes `ContainerMessage`
         so callers see one unified union.
     """
-    from tankpit_bot.container.decoders import decode_container_message
+    from tankpit_bot.container.decoders import (
+        decode_container_message,
+        is_container_pickup_structure,
+    )
+    from tankpit_bot.container.decoders.events import decode_container_pickup
 
     if len(data) < 1:
         return decode_container_message(data)
@@ -409,15 +413,18 @@ def decode_0x2e_message(data: bytes) -> BinaryMessage:
     result = _dispatch_protocol_misc(subtype, inner)
     if result is not None:
         return result
-    # 9-byte 0x2E bodies are Og.h TankStatusSync (short form, no fuel)
-    # per JS V['.'] = Og. Corpus crack
-    # (analysis_scripts/crack_tank_status_short.py) verified 74/74
-    # production "TankStatusShort" container fallbacks are Og.h-shaped
-    # (0/74 produce a valid container rank). The container fallback
-    # was silently writing the wrong byte to ``damage_state`` for
-    # every enemy tank in those messages -- fixed here.
-    if len(data) == 9:
-        return decode_tank_status_sync(data)
+    # Multi-record ContainerPickup (subtype 0x43 + N*4 bytes of records,
+    # N >= 1). The JS V.C = $g handler reads repeating 4-byte
+    # ``[x, y, cache_lo, cache_hi]`` records; in the 0x2E envelope each
+    # record is a container pickup notification. Corpus 2026-06-20:
+    # 2653 single-record, 80 two-record, 2 three-record samples.
+    # Replaces the previous ``if len(data) == 9: return
+    # decode_tank_status_sync(data)`` shortcut, whose "74 sane samples"
+    # were all 0x43-prefixed -- they were 2-record CacheUpdates being
+    # misread as Og.h short-form bodies (where subtype=0x43 silently
+    # became team=67, an invalid team byte).
+    if subtype == 0x43 and is_container_pickup_structure(data):
+        return decode_container_pickup(data)
     return decode_container_message(data)
 
 

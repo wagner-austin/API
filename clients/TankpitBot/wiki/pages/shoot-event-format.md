@@ -22,14 +22,16 @@ JS handler `Gg.h` (V.S), verified against three independent witnesses on 2026-06
 [4]    source_y
 [5]    target_x — impact tile (where the projectile resolves)
 [6]    target_y
-[7]    unk1
-[8]    unk2
+[7]    aim_x — aim tile (where the gun is pointed, == target for straight shots)
+[8]    aim_y
 [9]    weapon (0=single, 1=dual, 2=missile, 3=homing)
 ```
 
 Top-level 0x53 message: body is 10 bytes (above) after the message-type byte. Tunneled inside 0x2E: outer subtype is `0x53`, inner is 10 bytes — same layout.
 
 **History:** before 2026-06-19, the decoder had wrong field names — it reported `source_x` as `target_x` and treated `target_x` as `projectile_x`. The byte offsets were correct; the semantic labels were swapped. Three independent verifications (own-tank firing position, homing-shot impact tile, enemy damage-state transitions on target tiles) forced the rename.
+
+**2026-06-20:** `a[7]`/`a[8]` promoted from `unk1`/`unk2` to `aim_x`/`aim_y` after JS proof: `Gg.h` passes them to the projectile-animation constructor `yf` as `z` and `O`; inside `yf`, `this.qa = 24 * z + 12` and `this.ta = 16 * O + 8` compute the PIXEL CENTRE of the aim tile, and `yf.start()` uses `atan2(this.h - this.qa, this.ta - this.i)` to set the tank's facing direction. For straight shots aim == target; for missile/homing weapons the aim is the initial barrel direction and the target is the impact tile.
 
 ## Hit vs miss
 

@@ -39,6 +39,107 @@ _RESERVED_EVENT_KEYS: frozenset[str] = frozenset(
     {"timestamp", "level", "logger", "mode", "channel", "message"}
 )
 
+#: Context-field key names auto-attached to every emit_* event when
+#: present in ``_RUNTIME_CONTEXT``. Documented separately so consumers
+#: can introspect what to expect from JSONL queries.
+RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})
+
+
+class RuntimeContextDict(TypedDict, total=False):
+    """Per-tick context auto-attached to every emit_* event.
+
+    Each field is optional; absent fields are omitted from the JSONL
+    record. The tick loop sets these once per tick so every event
+    emitted that tick carries the same context. Explicit fields passed
+    to an emit_* call override the context (last-write-wins).
+
+    Attributes:
+        tick_n: 1-based index of the currently-executing tick. Use 0
+            when no tick is active (boot, login, shutdown). Always
+            attached when set, even if the value is 0.
+        bot_state: ``"<mode>/<mode_state>"`` snapshot of the durable
+            AI mode and its inner state. Empty string when none.
+        in_flight_action_kind: ``ActionKind`` literal of the bot's
+            current in-flight action, or ``"none"`` when idle.
+    """
+
+    tick_n: int
+    bot_state: str
+    in_flight_action_kind: str
+
+
+# Internal storage for the active context, split into one typed slot per
+# field so each value is mypy-narrowed at its source. The public
+# :class:`RuntimeContextDict` view is assembled by :func:`get_runtime_context`.
+_RUNTIME_CONTEXT_TICK_N: int | None = None
+_RUNTIME_CONTEXT_BOT_STATE: str | None = None
+_RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND: str | None = None
+
+
+def set_runtime_context(
+    *,
+    tick_n: int | None = None,
+    bot_state: str | None = None,
+    in_flight_action_kind: str | None = None,
+) -> None:
+    """Set or update the active per-tick runtime context.
+
+    Each subsequent ``emit_*`` call attaches the present context fields
+    to its structured payload (under the field names ``tick_n``,
+    ``bot_state``, ``in_flight_action_kind``). Pass ``None`` to leave a
+    previous value unchanged; use :func:`clear_runtime_context` to
+    remove every value.
+
+    Args:
+        tick_n: 1-based current tick index, or ``None`` to keep the
+            previous value.
+        bot_state: ``"<mode>/<mode_state>"`` snapshot, or ``None`` to
+            keep the previous value.
+        in_flight_action_kind: ``ActionKind`` string, or ``None`` to
+            keep the previous value.
+    """
+    global _RUNTIME_CONTEXT_TICK_N
+    global _RUNTIME_CONTEXT_BOT_STATE
+    global _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
+    if tick_n is not None:
+        _RUNTIME_CONTEXT_TICK_N = tick_n
+    if bot_state is not None:
+        _RUNTIME_CONTEXT_BOT_STATE = bot_state
+    if in_flight_action_kind is not None:
+        _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND = in_flight_action_kind
+
+
+def clear_runtime_context() -> None:
+    """Remove every field from the active runtime context.
+
+    Subsequent ``emit_*`` calls emit without context until
+    :func:`set_runtime_context` is called again. The tick loop's
+    teardown path calls this so test/probe sessions start clean.
+    """
+    global _RUNTIME_CONTEXT_TICK_N
+    global _RUNTIME_CONTEXT_BOT_STATE
+    global _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
+    _RUNTIME_CONTEXT_TICK_N = None
+    _RUNTIME_CONTEXT_BOT_STATE = None
+    _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND = None
+
+
+def get_runtime_context() -> RuntimeContextDict:
+    """Return a typed defensive copy of the current runtime context.
+
+    Returns:
+        A typed snapshot of the active context. Callers may mutate the
+        returned dict without affecting the module-level state.
+    """
+    snapshot: RuntimeContextDict = {}
+    if _RUNTIME_CONTEXT_TICK_N is not None:
+        snapshot["tick_n"] = _RUNTIME_CONTEXT_TICK_N
+    if _RUNTIME_CONTEXT_BOT_STATE is not None:
+        snapshot["bot_state"] = _RUNTIME_CONTEXT_BOT_STATE
+    if _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND is not None:
+        snapshot["in_flight_action_kind"] = _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
+    return snapshot
+
 
 class RuntimeEventRecordDict(TypedDict):
     """Structured runtime event record.
@@ -606,6 +707,32 @@ def _remove_artifact_handlers(root: stdlib_logging.Logger) -> None:
     root.handlers = handlers_to_keep
 
 
+def _merge_context_into_fields(
+    fields: dict[str, str | int | float | bool],
+) -> dict[str, str | int | float | bool]:
+    """Return a new field dict with the active runtime context attached.
+
+    Context fields are written first; explicit ``fields`` win on
+    collision so call-site arguments override the per-tick context.
+
+    Args:
+        fields: Explicit fields passed to the emit_* call.
+
+    Returns:
+        New dict containing the context fields (when set) plus the
+        original ``fields`` overrides.
+    """
+    merged: dict[str, str | int | float | bool] = {}
+    if _RUNTIME_CONTEXT_TICK_N is not None:
+        merged["tick_n"] = _RUNTIME_CONTEXT_TICK_N
+    if _RUNTIME_CONTEXT_BOT_STATE is not None:
+        merged["bot_state"] = _RUNTIME_CONTEXT_BOT_STATE
+    if _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND is not None:
+        merged["in_flight_action_kind"] = _RUNTIME_CONTEXT_IN_FLIGHT_ACTION_KIND
+    merged.update(fields)
+    return merged
+
+
 def _emit_runtime_event(
     channel: str,
     message: str,
@@ -613,6 +740,11 @@ def _emit_runtime_event(
     **fields: str | int | float | bool,
 ) -> None:
     """Emit a runtime event to both console logs and JSONL artifacts.
+
+    The active runtime context (``tick_n`` / ``bot_state`` /
+    ``in_flight_action_kind`` set via :func:`set_runtime_context`) is
+    merged into the structured payload before write. Explicit
+    ``fields`` override the context fields on collision.
 
     Args:
         channel: Event channel such as ``AI`` or ``WORLD``.
@@ -627,7 +759,7 @@ def _emit_runtime_event(
         runtime_channel=channel,
         runtime_message=formatted,
         runtime_mode=_runtime_mode_name(),
-        runtime_fields=dict(fields),
+        runtime_fields=_merge_context_into_fields(dict(fields)),
     )
     _EMITTER_LOGGER.info("%s: %s", channel, formatted, extra=extra)
 
@@ -649,7 +781,10 @@ def _runtime_mode_name() -> str:
 
 
 __all__ = [
+    "RUNTIME_CONTEXT_KEYS",
+    "RuntimeContextDict",
     "RuntimeEventRecordDict",
+    "clear_runtime_context",
     "configure_bot_runtime_logging",
     "configure_probe_runtime_logging",
     "configure_sniff_runtime_logging",
@@ -664,8 +799,10 @@ __all__ = [
     "encode_runtime_event_record",
     "get_bot_runtime_artifacts",
     "get_probe_runtime_artifacts",
+    "get_runtime_context",
     "get_sniff_runtime_artifacts",
     "require_bool_field",
     "require_int_field",
     "require_str_field",
+    "set_runtime_context",
 ]

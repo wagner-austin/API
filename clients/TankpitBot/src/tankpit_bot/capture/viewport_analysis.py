@@ -3,6 +3,12 @@
 Derives viewport origin evidence from captured protocol traffic so
 viewport semantics can be verified from real packets rather than inferred
 from client behavior.
+
+The PositionUpdate (13-byte 0x24) container path was deleted 2026-06-20
+after a corpus sweep proved zero production fires (13-byte 0x2E bodies
+are now all 0x3D MovementResponse via the protocol tunnel). The viewport
+inference here therefore relies solely on 0x5A ViewportUpdate frames
+and the raw 13-byte 0x2E body shape census.
 """
 
 from __future__ import annotations
@@ -11,18 +17,15 @@ from collections import Counter
 
 from tankpit_bot.capture.viewport_analysis_types import (
     DecodedBinaryRecordDict,
-    PositionViewportEvidenceDict,
     ThirteenByteShapeDict,
     ViewportAnalysisDict,
     ViewportAnalysisStateDict,
     ViewportInferenceDict,
     ViewportShiftDict,
-    decode_position_viewport_evidence,
     decode_thirteen_byte_shape,
     decode_viewport_analysis,
     decode_viewport_inference,
     decode_viewport_shift,
-    encode_position_viewport_evidence,
     encode_thirteen_byte_shape,
     encode_viewport_analysis,
     encode_viewport_inference,
@@ -30,7 +33,6 @@ from tankpit_bot.capture.viewport_analysis_types import (
 )
 from tankpit_bot.capture.xor import decode_base64_safe, xor_decode_body
 from tankpit_bot.protocol import try_decode_binary_message
-from tankpit_bot.state.viewport_geometry import VIEWPORT_PATCH_WIDTH
 from tankpit_bot.types.session import CaptureSession
 
 
@@ -53,20 +55,6 @@ def _split_frame_messages(frame: bytes) -> list[bytes]:
         bodies.append(frame[offset : offset + msg_len])
         offset += msg_len
     return bodies
-
-
-def _is_absolute_position(x: int, y: int) -> bool:
-    """Return whether a position_update uses absolute coordinates.
-
-    Args:
-        x: Position update x coordinate.
-        y: Position update y coordinate.
-
-    Returns:
-        True when either coordinate lies outside the 18x18 viewport-relative
-        patch grid.
-    """
-    return x >= VIEWPORT_PATCH_WIDTH or y >= VIEWPORT_PATCH_WIDTH
 
 
 def _decode_received_binary_records(
@@ -216,86 +204,6 @@ def _handle_viewport_update(
     )
 
 
-def _handle_position_update(
-    state: ViewportAnalysisStateDict,
-    message_index: int,
-    timestamp_ms: int,
-    flags: int,
-    tank_id: int,
-    x: int,
-    y: int,
-    extra_data: bytes,
-    position_evidence: list[PositionViewportEvidenceDict],
-) -> ViewportAnalysisStateDict:
-    """Update analysis state from a self absolute position_update."""
-    if (flags & 0x02) == 0:
-        return state
-
-    self_tank_id = state["self_tank_id"]
-    if self_tank_id is None:
-        self_tank_id = tank_id
-    if tank_id != self_tank_id:
-        return state
-    if not _is_absolute_position(x, y):
-        return ViewportAnalysisStateDict(
-            self_tank_id=self_tank_id,
-            current_viewport_left=state["current_viewport_left"],
-            current_viewport_top=state["current_viewport_top"],
-        )
-    if len(extra_data) < 2:
-        return ViewportAnalysisStateDict(
-            self_tank_id=self_tank_id,
-            current_viewport_left=state["current_viewport_left"],
-            current_viewport_top=state["current_viewport_top"],
-        )
-
-    current_viewport_left = state["current_viewport_left"]
-    current_viewport_top = state["current_viewport_top"]
-    if current_viewport_left is None or current_viewport_top is None:
-        return ViewportAnalysisStateDict(
-            self_tank_id=self_tank_id,
-            current_viewport_left=current_viewport_left,
-            current_viewport_top=current_viewport_top,
-        )
-
-    expected_viewport_x = x - current_viewport_left
-    expected_viewport_y = y - current_viewport_top
-    position_evidence.append(
-        PositionViewportEvidenceDict(
-            message_index=message_index,
-            timestamp_ms=timestamp_ms,
-            tank_id=tank_id,
-            x=x,
-            y=y,
-            extra_x=extra_data[0],
-            extra_y=extra_data[1],
-            viewport_left=current_viewport_left,
-            viewport_top=current_viewport_top,
-            expected_viewport_x=expected_viewport_x,
-            expected_viewport_y=expected_viewport_y,
-            matches_x=extra_data[0] == expected_viewport_x,
-            matches_y=extra_data[1] == expected_viewport_y,
-        )
-    )
-    return ViewportAnalysisStateDict(
-        self_tank_id=self_tank_id,
-        current_viewport_left=current_viewport_left,
-        current_viewport_top=current_viewport_top,
-    )
-
-
-def _count_matches(position_evidence: list[PositionViewportEvidenceDict]) -> tuple[int, int]:
-    """Count x and y matches in comparable position evidence."""
-    extra_x_match_count = 0
-    extra_y_match_count = 0
-    for evidence in position_evidence:
-        if evidence["matches_x"]:
-            extra_x_match_count += 1
-        if evidence["matches_y"]:
-            extra_y_match_count += 1
-    return extra_x_match_count, extra_y_match_count
-
-
 def analyze_capture_session(
     session: CaptureSession,
     xor_table: bytes,
@@ -315,11 +223,9 @@ def analyze_capture_session(
         current_viewport_top=None,
     )
     viewport_inferences: list[ViewportInferenceDict] = []
-    position_evidence: list[PositionViewportEvidenceDict] = []
     viewport_shifts: list[ViewportShiftDict] = []
     movement_response_count = 0
     viewport_update_count = 0
-    position_update_count = 0
 
     for record in _decode_received_binary_records(session, xor_table):
         match record["decoded"]:
@@ -344,30 +250,9 @@ def analyze_capture_session(
                     viewport_inferences,
                     viewport_shifts,
                 )
-            case {
-                "msg_type": "position_update",
-                "flags": int(flags),
-                "tank_id": int(tank_id),
-                "x": int(x),
-                "y": int(y),
-                "extra_data": bytes(extra_data),
-            }:
-                position_update_count += 1
-                state = _handle_position_update(
-                    state,
-                    record["message_index"],
-                    record["timestamp_ms"],
-                    flags,
-                    tank_id,
-                    x,
-                    y,
-                    extra_data,
-                    position_evidence,
-                )
             case _:
                 continue
 
-    extra_x_match_count, extra_y_match_count = _count_matches(position_evidence)
     thirteen_byte_0x2e_count, thirteen_byte_shapes = _collect_thirteen_byte_shapes(
         session,
         xor_table,
@@ -376,30 +261,21 @@ def analyze_capture_session(
     return ViewportAnalysisDict(
         self_tank_id=state["self_tank_id"],
         viewport_inferences=viewport_inferences,
-        position_evidence=position_evidence,
         viewport_shifts=viewport_shifts,
         movement_response_count=movement_response_count,
         viewport_update_count=viewport_update_count,
-        position_update_count=position_update_count,
         thirteen_byte_0x2e_count=thirteen_byte_0x2e_count,
         thirteen_byte_shapes=thirteen_byte_shapes,
-        comparable_position_count=len(position_evidence),
-        extra_x_match_count=extra_x_match_count,
-        extra_y_match_count=extra_y_match_count,
     )
 
 
 def _format_capture_status(result: ViewportAnalysisDict) -> str:
     """Return a bounded status line for the capture evidence quality."""
-    if result["comparable_position_count"] > 0:
-        return "capture_status=position_update_comparable"
     if result["movement_response_count"] == 0:
         return "capture_status=missing_movement_response"
     if result["viewport_update_count"] == 0:
         return "capture_status=missing_viewport_update"
-    if result["position_update_count"] == 0:
-        return "capture_status=missing_proven_position_update"
-    return "capture_status=position_update_not_comparable_yet"
+    return "capture_status=viewport_inferred"
 
 
 def format_viewport_analysis(result: ViewportAnalysisDict) -> str:
@@ -416,18 +292,9 @@ def format_viewport_analysis(result: ViewportAnalysisDict) -> str:
     lines.append(_format_capture_status(result))
     lines.append(f"movement_responses={result['movement_response_count']}")
     lines.append(f"viewport_updates={result['viewport_update_count']}")
-    lines.append(f"position_updates={result['position_update_count']}")
     lines.append(f"raw_thirteen_byte_0x2e={result['thirteen_byte_0x2e_count']}")
     lines.append(f"viewport_inferences={len(result['viewport_inferences'])}")
     lines.append(f"viewport_shifts={len(result['viewport_shifts'])}")
-    lines.append(
-        "position_extra_x_matches="
-        f"{result['extra_x_match_count']}/{result['comparable_position_count']}"
-    )
-    lines.append(
-        "position_extra_y_matches="
-        f"{result['extra_y_match_count']}/{result['comparable_position_count']}"
-    )
 
     if len(result["thirteen_byte_shapes"]) > 0:
         lines.append("")
@@ -455,37 +322,19 @@ def format_viewport_analysis(result: ViewportAnalysisDict) -> str:
                 "({old_left},{old_top}) -> ({new_left},{new_top})".format(**shift)
             )
 
-    if len(result["position_evidence"]) > 0:
-        lines.append("")
-        lines.append("Comparable position updates:")
-        for pe in result["position_evidence"]:
-            lines.append(
-                "[idx={message_index} ts={timestamp_ms}] "
-                "pos=({x},{y}) extra=({extra_x},{extra_y}) "
-                "expected=({expected_viewport_x},{expected_viewport_y}) "
-                "match_x={matches_x} match_y={matches_y}".format(**pe)
-            )
-
-    if len(result["position_evidence"]) == 0:
-        lines.append("")
-        lines.append("No comparable absolute self position_update samples were found.")
-
     return "\n".join(lines)
 
 
 __all__ = [
-    "PositionViewportEvidenceDict",
     "ThirteenByteShapeDict",
     "ViewportAnalysisDict",
     "ViewportInferenceDict",
     "ViewportShiftDict",
     "analyze_capture_session",
-    "decode_position_viewport_evidence",
     "decode_thirteen_byte_shape",
     "decode_viewport_analysis",
     "decode_viewport_inference",
     "decode_viewport_shift",
-    "encode_position_viewport_evidence",
     "encode_thirteen_byte_shape",
     "encode_viewport_analysis",
     "encode_viewport_inference",

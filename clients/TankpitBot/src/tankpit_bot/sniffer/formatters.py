@@ -7,6 +7,7 @@ into human-readable strings for logging and display.
 from __future__ import annotations
 
 from tankpit_bot import protocol
+from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
 from tankpit_bot.sniffer.constants import (
     COMBAT_MSG_TYPES,
@@ -20,10 +21,6 @@ from tankpit_bot.sniffer.constants import (
     TANK_MSG_TYPES,
     TEAM_NAMES,
 )
-from tankpit_bot.sniffer.player_tracking import (
-    register_tank_name,
-)
-from tankpit_bot.sniffer.viewport import get_viewport_left
 
 
 def rank_name(rank: int) -> str:
@@ -259,48 +256,6 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
     return ""
 
 
-def format_tank_registry_details(
-    tid: int,
-    name: str,
-    team: str,
-    rank: int,
-    badges: int,
-    is_bot: bool,
-    is_container: bool,
-    container_y: int | None,
-    container_viewport_x: int | None,
-) -> str:
-    """Format tank_registry message details.
-
-    Args:
-        tid: Tank ID.
-        name: Tank name.
-        team: Team name.
-        rank: Military rank.
-        badges: Badge count.
-        is_bot: Whether tank is a bot.
-        is_container: Whether entry is a container.
-        container_y: Container Y coordinate (absolute).
-        container_viewport_x: Container X relative to viewport left edge.
-
-    Returns:
-        Formatted details string.
-    """
-    if is_container:
-        # Calculate absolute x if viewport_left is known
-        viewport_left = get_viewport_left()
-        if container_y is not None and container_viewport_x is not None:
-            if viewport_left is not None:
-                container_x = viewport_left + container_viewport_x
-                return f"container id={tid} pos=({container_x},{container_y})"
-            return f"container id={tid} y={container_y} vx={container_viewport_x}"
-        return f"container id={tid}"
-    rank_str = rank_name(rank)
-    bot_str = " [BOT]" if is_bot else ""
-    badge_str = f" badges={badges}" if badges > 0 else ""
-    return f'tank={tid} "{name}" {team} {rank_str}{badge_str}{bot_str}'
-
-
 def format_radar_response(containers: list[RadarContainerDict], mines: list[RadarMineDict]) -> str:
     """Format radar response container and mine list.
 
@@ -325,70 +280,38 @@ def format_radar_response(containers: list[RadarContainerDict], mines: list[Rada
     return " ".join(parts)
 
 
-def format_container_pickup(x: int, y: int, vol: int, is_fuel: bool) -> str:
-    """Format container pickup details.
-
-    Args:
-        x: X coordinate.
-        y: Y coordinate.
-        vol: Volume.
-        is_fuel: Whether it's a fuel container.
-
-    Returns:
-        Formatted pickup string.
-    """
-    ctype = f"FUEL vol={vol}" if is_fuel else "EQUIPMENT"
-    return f"pos=({x},{y}) {ctype}"
-
-
-def format_position_update(tid: int, x: int, y: int, f: int, ed: bytes) -> str:
-    """Format position update details.
-
-    Args:
-        tid: Tank ID.
-        x: X coordinate.
-        y: Y coordinate.
-        f: Flags.
-        ed: Extra data bytes.
-
-    Returns:
-        Formatted position update string.
-    """
-    return f"tank={tid} pos=({x},{y}) flags=0x{f:02X} data={ed.hex()}"
-
-
-def handle_tank_registry(
-    tid: int,
-    name: str,
-    team: str,
-    rank: int,
-    badges: int,
-    is_bot: bool,
-    is_container: bool,
-    container_y: int | None,
-    container_viewport_x: int | None,
+def format_container_pickup(
+    pickups: tuple[ContainerPickupRecordDict, ...] | list[ContainerPickupRecordDict],
 ) -> str:
-    """Handle tank registry: store name and format details.
+    """Format container pickup details (one or more records).
+
+    Each record's ``remaining_volume`` is the container's leftover fuel
+    AFTER pickup, not the fuel transferred. ``remaining_volume == 0``
+    means either an equipment container or a fuel container fully
+    consumed by this pickup; the discriminator is the paired
+    ``0x67 EquipmentGain`` (fired in the same tick for equipment) or
+    the ``0x2E TankStatusSync`` fuel delta (positive for fuel).
 
     Args:
-        tid: Tank ID.
-        name: Tank name.
-        team: Team name.
-        rank: Military rank.
-        badges: Badge count.
-        is_bot: Whether tank is a bot.
-        is_container: Whether entry is a container.
-        container_y: Container Y coordinate.
-        container_viewport_x: Container viewport X.
+        pickups: Tuple/list of pickup records, each carrying x, y, and
+            remaining_volume.
 
     Returns:
-        Formatted details string.
+        Formatted pickup string -- single ``pos=(x,y) ...`` line for the
+        common single-record case, comma-joined for multi-record bodies.
     """
-    if name and not is_container:
-        register_tank_name(tid, name)
-    return format_tank_registry_details(
-        tid, name, team, rank, badges, is_bot, is_container, container_y, container_viewport_x
-    )
+
+    def _one(record: ContainerPickupRecordDict) -> str:
+        x = record["x"]
+        y = record["y"]
+        remaining = record["remaining_volume"]
+        if remaining > 0:
+            return f"pos=({x},{y}) FUEL partial remaining={remaining}"
+        return f"pos=({x},{y}) container emptied"
+
+    if len(pickups) == 1:
+        return _one(pickups[0])
+    return f"pickups={len(pickups)}: " + ", ".join(_one(record) for record in pickups)
 
 
 def format_container_simple(d: protocol.BinaryMessage) -> str | None:
@@ -403,14 +326,8 @@ def format_container_simple(d: protocol.BinaryMessage) -> str | None:
     match d:
         case {"msg_type": "unknown_container", "length": int(length), "data": bytes(data)}:
             return f"len={length} data={data.hex()[:40]}"
-        case {
-            "msg_type": "container_pickup",
-            "x": int(x),
-            "y": int(y),
-            "volume": int(vol),
-            "is_fuel": bool(is_fuel),
-        }:
-            return format_container_pickup(x, y, vol, is_fuel)
+        case {"msg_type": "container_pickup", "pickups": tuple(pickups)}:
+            return format_container_pickup(pickups)
         case {
             "msg_type": 0x4F,
             "containers": list(containers),
@@ -430,46 +347,10 @@ def format_container_details(d: protocol.BinaryMessage) -> str:
     Returns:
         Formatted container details string.
     """
-    # Try simple message types first
     simple = format_container_simple(d)
     if simple is not None:
         return simple
-
-    match d:
-        case {
-            "msg_type": "tank_registry",
-            "tank_id": int(tid),
-            "tank_name": str(name),
-            "team": str(team),
-            "military_rank": int(rank),
-            "badge_count": int(badges),
-            "is_bot": bool(is_bot),
-            "is_container": bool(is_container),
-            "container_y": int() | None as container_y,
-            "container_viewport_x": int() | None as container_viewport_x,
-        }:
-            return handle_tank_registry(
-                tid,
-                name,
-                team,
-                rank,
-                badges,
-                is_bot,
-                is_container,
-                container_y,
-                container_viewport_x,
-            )
-        case {
-            "msg_type": "position_update",
-            "tank_id": int(tid),
-            "flags": int(f),
-            "x": int(x),
-            "y": int(y),
-            "extra_data": bytes(ed),
-        }:
-            return format_position_update(tid, x, y, f, ed)
-        case _:
-            return ""
+    return ""
 
 
 def format_message_details(d: protocol.BinaryMessage) -> str:
@@ -511,13 +392,10 @@ __all__ = [
     "format_message_details",
     "format_misc_details",
     "format_position_details",
-    "format_position_update",
     "format_radar_details",
     "format_radar_response",
     "format_resource_details",
     "format_tank_details",
-    "format_tank_registry_details",
-    "handle_tank_registry",
     "rank_name",
     "team_name",
 ]

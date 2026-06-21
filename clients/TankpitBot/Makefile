@@ -2,7 +2,7 @@ SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
 OUTPUT ?= capture_session.json
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe combat-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe combat-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport smoke debug-run
 
 help:
 	@Write-Host ""
@@ -56,6 +56,9 @@ lint:
 	@Write-Host "  -> guard" -ForegroundColor DarkCyan
 	if ((Test-Path ".\\scripts\\guard.py") -or (Test-Path ".\\scripts\\guard\\__main__.py")) { poetry run python -m scripts.guard; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] guard failed" -ForegroundColor Red; exit $$LASTEXITCODE } }
 	@Write-Host ""
+	@Write-Host "  -> undecoded-field check" -ForegroundColor DarkCyan
+	poetry run tankpit-check-undecoded-fields; if ($$LASTEXITCODE -ne 0) { Write-Host "[lint] undecoded-field check failed" -ForegroundColor Red; exit $$LASTEXITCODE }
+	@Write-Host ""
 	@Write-Host "  -> ruff check + format" -ForegroundColor DarkCyan
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -83,6 +86,29 @@ sniff: install
 	@Write-Host ""
 	@Write-Host "==> sniff (output: $(OUTPUT))" -ForegroundColor Cyan
 	$$env:TANKPIT_OUTPUT = '$(OUTPUT)'; poetry run tankpit-sniff
+
+# Live health gate. Run a $(SMOKE_DURATION)-second bot session, then
+# assert 5 concrete signals on runs/bot/latest.events.jsonl. Override
+# the duration with `make smoke SMOKE_DURATION=60`.
+SMOKE_DURATION ?= 30
+smoke: install
+	@Write-Host ""
+	@Write-Host "==> smoke (duration: $(SMOKE_DURATION)s)" -ForegroundColor Cyan
+	$$env:TANKPIT_BOT_SESSION_SECONDS = '$(SMOKE_DURATION)'; poetry run tankpit-bot
+	@Write-Host ""
+	@Write-Host "==> smoke assertions" -ForegroundColor Cyan
+	poetry run tankpit-smoke
+
+# Live debug session. Same as `make smoke` but skips the assertions
+# and chains into `make analyze` so you can read the issue report.
+DEBUG_DURATION ?= 30
+debug-run: install
+	@Write-Host ""
+	@Write-Host "==> debug-run (duration: $(DEBUG_DURATION)s)" -ForegroundColor Cyan
+	$$env:TANKPIT_BOT_SESSION_SECONDS = '$(DEBUG_DURATION)'; poetry run tankpit-bot
+	@Write-Host ""
+	@Write-Host "==> debug-run analyze" -ForegroundColor Cyan
+	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
 
 teleport-probe: teleport-probe-safe teleport-probe-aggressive
 	@Write-Host ""

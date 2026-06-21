@@ -8,9 +8,9 @@ import types
 from collections.abc import Generator
 
 import pytest
+
 from scripts import _test_hooks as script_hooks
 from scripts import fuel_probe
-
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
     BrowserProtocol,

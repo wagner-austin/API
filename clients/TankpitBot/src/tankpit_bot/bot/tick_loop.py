@@ -30,9 +30,20 @@ from tankpit_bot.browser.overlay import OverlayStateDict, update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.game_log_feedback import register_world_feedback_from_game_log
 from tankpit_bot.diagnostics.game_log_kills import register_kills_from_game_log
+from tankpit_bot.diagnostics.runs_index import (
+    append_index_row,
+    count_stall_timeouts,
+    make_index_row,
+)
 from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
 from tankpit_bot.protocol.commands import TICK_RATE_MS
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic, emit_sync
+from tankpit_bot.runtime_logging import (
+    emit_ai,
+    emit_diagnostic,
+    emit_sync,
+    get_bot_runtime_artifacts,
+    set_runtime_context,
+)
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -83,6 +94,7 @@ def run_tick_loop(
     max_ticks = session_seconds * 1000 // TICK_RATE_MS if session_seconds > 0 else 0
     ticks_done = 0
     while True:
+        _publish_tick_context(bot, ticks_done + 1)
         _tick_once(bot)
         ticks_done += 1
         if max_ticks > 0 and ticks_done >= max_ticks:
@@ -91,18 +103,31 @@ def run_tick_loop(
                 max_ticks,
                 session_seconds,
             )
-            _emit_session_scorecard(bot, ticks_done)
+            _emit_session_scorecard(bot, ticks_done, exit_reason="completed")
+            return
+        if _INTERRUPT_REQUESTED:
+            log.info("Interrupt signal received, ending run gracefully")
+            _emit_session_scorecard(bot, ticks_done, exit_reason="interrupted")
             return
         if _test_hooks.path_exists(stop_file_path):
             _test_hooks.remove_file(stop_file_path)
             log.info("Stop file %s detected, ending run", stop_file_path)
-            _emit_session_scorecard(bot, ticks_done)
+            _emit_session_scorecard(bot, ticks_done, exit_reason="stop_file")
             return
         page.wait_for_timeout(TICK_RATE_MS)
 
 
-def _emit_session_scorecard(bot: Bot, ticks: int) -> None:
-    """Emit a structured session summary at run end."""
+def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
+    """Emit a structured session summary at run end and append to the index.
+
+    Args:
+        bot: Bot instance carrying the AI scorecard.
+        ticks: Total ticks executed before exit.
+        exit_reason: How the session ended -- ``"completed"`` (tick
+            budget exhausted), ``"stop_file"`` (graceful shutdown via
+            the sentinel file), or ``"interrupted"`` (SIGINT/SIGTERM
+            handler, registered by the CLI entry point).
+    """
     ai = bot._ai_state
     ws = get_world_service()
     inv = get_inventory_state(ws)
@@ -130,6 +155,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int) -> None:
         targets_blocked=blocked,
         ai_mode=mode,
         ai_mode_state=mode_state,
+        exit_reason=exit_reason,
     )
     shots = hits + misses
     hit_rate = f"{hits * 100 // shots}%" if shots > 0 else "n/a"
@@ -137,6 +163,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int) -> None:
         f"TANKPIT SESSION SUMMARY\n"
         f"{'=' * 40}\n"
         f"Ticks:    {ticks}\n"
+        f"Exit:     {exit_reason}\n"
         f"Kills:    {kills}\n"
         f"Shots:    {shots} ({hits} hits, {misses} misses)\n"
         f"Hit rate: {hit_rate}\n"
@@ -151,9 +178,125 @@ def _emit_session_scorecard(bot: Bot, ticks: int) -> None:
     )
     log.info("\n%s", summary)
     _test_hooks.write_text(Path("runs/bot/latest.summary.txt"), summary)
+    _append_index_row(ticks, shots, kills, exit_reason)
+
+
+def _append_index_row(ticks: int, shots: int, kills: int, exit_reason: str) -> None:
+    """Append one row to ``runs/bot/_index.tsv`` summarising this run.
+
+    The stamp is extracted from the active bot runtime artifacts. When
+    the bot was never configured (test/probe path), the index append
+    is skipped.
+
+    Args:
+        ticks: Total ticks executed.
+        shots: ``hits + misses`` from the AI scorecard.
+        kills: ``session_kill_count`` from the AI scorecard.
+        exit_reason: Lifecycle outcome string.
+    """
+    artifacts = get_bot_runtime_artifacts()
+    if artifacts is None:
+        return
+    stamp = _extract_stamp_from_archive_path(artifacts["archive_events_path"])
+    duration_s = ticks * TICK_RATE_MS // 1000
+    stalls = count_stall_timeouts(Path(artifacts["latest_events_path"]))
+    row = make_index_row(
+        stamp=stamp,
+        duration_s=duration_s,
+        exit_reason=exit_reason,
+        ticks=ticks,
+        stalls=stalls,
+        shots_fired=shots,
+        kills=kills,
+    )
+    append_index_row(row)
+
+
+def _extract_stamp_from_archive_path(archive_events_path: str) -> str:
+    """Pull the ``YYYYMMDD-HHMMSS`` stamp from an archive events path.
+
+    The runtime artifacts builder writes archives at
+    ``runs/bot/bot-<stamp>.events.jsonl``. This helper extracts the
+    ``<stamp>`` segment so the index row matches the archive filenames.
+
+    Args:
+        archive_events_path: Archive path string from
+            :class:`BotRunArtifactsDict`.
+
+    Returns:
+        The embedded run stamp.
+
+    Raises:
+        ValueError: If the archive path does not follow the
+            ``bot-<stamp>.events.jsonl`` convention.
+    """
+    name = Path(archive_events_path).name
+    if not name.startswith("bot-") or not name.endswith(".events.jsonl"):
+        raise ValueError(f"archive events path does not match bot-<stamp>: {name}")
+    return name[len("bot-") : -len(".events.jsonl")]
 
 
 _WS_READY_STATE_OPEN = 1
+
+#: True when an OS signal (SIGINT / SIGTERM) has requested a graceful
+#: shutdown. The tick loop checks this once per iteration so the bot
+#: exits at a clean tick boundary, writing the session scorecard +
+#: index row before the process dies. Reset to ``False`` by
+#: :func:`reset_interrupt_flag` so consecutive sessions start clean.
+_INTERRUPT_REQUESTED: bool = False
+
+
+def request_interrupt() -> None:
+    """Signal the tick loop to exit at the next tick boundary.
+
+    Idempotent: calling more than once between resets has no extra
+    effect. Used as the SIGINT/SIGTERM handler installed by
+    :func:`tankpit_bot.bot.entry.main`.
+    """
+    global _INTERRUPT_REQUESTED
+    _INTERRUPT_REQUESTED = True
+
+
+def reset_interrupt_flag() -> None:
+    """Clear the interrupt flag so a new run starts unblocked.
+
+    Tests rely on this to keep state from one session out of the next.
+    Production code does NOT need to call it -- a fresh process
+    starts with the flag already ``False``.
+    """
+    global _INTERRUPT_REQUESTED
+    _INTERRUPT_REQUESTED = False
+
+
+def is_interrupt_requested() -> bool:
+    """Return True when an interrupt has been requested.
+
+    Returns:
+        Current value of the module-level flag.
+    """
+    return _INTERRUPT_REQUESTED
+
+
+def _publish_tick_context(bot: Bot, tick_n: int) -> None:
+    """Update the runtime logger's context for the upcoming tick.
+
+    The context is auto-attached to every ``emit_*`` event the bot
+    produces during the tick, so a single JSONL line is enough to
+    reconstruct what mode the bot was in and which action it was
+    waiting on. Called once per tick from :func:`run_tick_loop`
+    immediately before :func:`_tick_once`.
+
+    Args:
+        bot: Bot instance.
+        tick_n: 1-based index of the tick about to execute.
+    """
+    ai = bot._ai_state
+    action = bot._state_data["in_flight_action"]
+    set_runtime_context(
+        tick_n=tick_n,
+        bot_state=f"{ai['mode']}/{ai['mode_state']}",
+        in_flight_action_kind=action["kind"],
+    )
 
 
 def _tick_once(bot: Bot) -> None:

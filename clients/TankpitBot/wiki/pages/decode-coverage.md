@@ -14,7 +14,7 @@ Complete mapping of every message type in the game client (`tpclient.js` V table
 
 ## Architecture (post-2026-06-19)
 
-Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`. The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x42, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4F, 0x53, 0x54, 0x56, 0x5A, 0x64, 0x67, 0x74). A length=9 shortcut routes any other 9-byte 0x2E body to Og.h short form. The remainder falls through to `container.decoders.decode_container_message` for container-only subtypes (0x24, 0x43, 0x45, 0x4B, 0x79) and length-based types (TipNotification, TeleportLanded, TankRegistry, TankLeave, ChunkData, WorldState). No more dual paths.
+Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`. The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x42, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4C, 0x4F, 0x52, 0x53, 0x54, 0x56, 0x58, 0x5A, 0x64, 0x67, 0x74). A length=9 shortcut routes any other 9-byte 0x2E body to Og.h short form. The remainder falls through to `container.decoders.decode_container_message` for the four container-only subtypes (0x43 ContainerPickup, 0x45 MineDetonation, 0x4B MinePlacement) plus 1-byte TeleportLanded. No more dual paths, no length-based "blob" fallbacks.
 
 ## Coverage Table
 
@@ -53,7 +53,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x53 | `S` | Gg | ShootEvent: team, shooter, source pos, target pos, weapon | FULL | — |
 | 0x54 | `T` | Kg | ActionDone: bare completion ping | FULL | — |
 | 0x56 | `V` | Wg | Statistics: playtime, destroyed, deactivated, score | FULL | — |
-| 0x58 | `X` | Ug | TankRemove | FULL | — |
+| 0x58 | `X` | Ug | TankRemove: server stopped per-tank updates (NOT a death — use 0x41) | FULL | Semantics clarified 2026-06-20 -- see [[game-economy]] and [[bot-behavior-contract]] |
 | 0x5A | `Z` | Vg | ViewportUpdate: position + entity tiles | FULL | — |
 | 0x64 | `d` | Sg | FuelDeposit: absolute fuel total | FULL | — |
 | 0x67 | `g` | Wf | EquipmentGain: counts per slot | FULL | — |
@@ -65,19 +65,31 @@ After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`
 
 | Subtype | Bytes | Type | Status | Notes |
 |---------|-------|------|--------|-------|
-| 0x24 | 13 | PositionUpdate | FULL | — |
-| 0x43 | 5 | ContainerPickup | FULL | — |
-| 0x43 | 7 | DeactivationDeath | FULL | — |
+| 0x43 | 5, 9, 13, ... (1 + 4N) | ContainerPickup (multi-record) | FULL | Each body carries N pickup records, each ``[x, y, remaining_lo, remaining_hi]``. Corpus 2026-06-20: 2653/80/2 samples at N=1/2/3. JS V.C = $g handler at ``tpclient.pretty.js:4743``. |
 | 0x45 | 3+ | MineDetonation | FULL | — |
 | 0x4B | 15 | MinePlacement | FULL | — |
-| 0x79 | 4 | PlayerListShort | FULL | — |
-| 0x79 | 7 | PlayerListExtended | FULL | — |
 | (any) | 1 | TeleportLanded | FULL | Always 0x54 subtype in production captures[^8] |
-| (any) | 6 | TankLeave | FULL | — |
-| (any) | 16-20 | TankRegistry | FULL | rejects subtype 0x47 (which is tunneled Movement) |
-| (any) | 29-79 | TipNotification | IDENTIFIED | — |
-| (any) | 80-130 | ChunkData | IDENTIFIED | — |
-| (any) | 500+ | WorldState | IDENTIFIED | — |
+
+PositionUpdate (0x24 13-byte), DeactivationDeath (0x43 7-byte),
+PlayerListShort (0x79 4-byte), PlayerListExtended (0x79 7-byte),
+TankLeave (6-byte length-based) and TankRegistry (16-20 byte
+length-based) were deleted 2026-06-20 after a corpus sweep of 150
+sessions / 48,304 0x2E bodies proved zero production fires. The
+corresponding protocol subtypes (0x3D MovementResponse, 0x41
+Deactivation, 0x21 TankInfo, 0x58 TankRemove, 0x44 FuelGain, 0x47
+Movement) cover every body that used to flow into those length-based
+container fallbacks.
+
+The 3-byte 0x24 (tasks #88, "room-join confirmation?") and 1-byte 0x41
+(task #89, "action ack?") candidates were also closed 2026-06-20: 0
+corpus samples for either across the same 156-session sweep. Both were
+speculative -- the wire paths don't exist in production.
+
+The 9-byte "TankStatusShort -> Og.h" shortcut (the prior fallback that
+routed any 9-byte 0x2E body to ``decode_tank_status_sync``) was
+removed 2026-06-20. The "74/74 sane samples" it was built for were
+all 0x43-prefixed two-record ContainerPickups; the subtype-first
+multi-record dispatch above now claims them at their real semantics.
 
 ## Critical Gaps (ordered by impact)
 
@@ -167,8 +179,8 @@ Verified against production capture `runs/bot/bot-20260619-050303` msg t+25.47s 
 [4]    source_y
 [5]    target_x (impact tile)
 [6]    target_y
-[7]    unk1
-[8]    unk2
+[7]    aim_x (aim tile -- where the gun is pointed)
+[8]    aim_y
 [9]    weapon (0=single, 1=dual, 2=missile, 3=homing)
 ```
 

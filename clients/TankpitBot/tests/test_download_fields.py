@@ -6,9 +6,10 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from scripts import _test_hooks
 from scripts._test_hooks import HttpGetResponseProtocol
 from scripts.download_fields import download_field_gifs, main
+
+from scripts import _test_hooks
 
 
 class _FakeResponse:

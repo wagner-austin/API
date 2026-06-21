@@ -20,11 +20,14 @@ class TestDecodeShootEvent:
     Real wire bytes from runs/bot/bot-20260619-050303 capture, validated
     three ways: enemy src tracking, homing target tile, wire damage
     transitions. Field layout per tpclient.js Gg.h (V.S):
-      [team][shooter_id:2 LE][src_x][src_y][tgt_x][tgt_y][unk1][unk2][weapon]
+      [team][shooter_id:2 LE][src_x][src_y][tgt_x][tgt_y][aim_x][aim_y][weapon]
     """
 
     def test_decodes_own_dual_shot(self) -> None:
-        """Own dual shot at orange-8 -- real bytes from t+35.48s."""
+        """Own dual shot at orange-8 -- real bytes from t+35.48s.
+
+        Straight shot: aim == target (both at (155,155)).
+        """
         # Body after 0x53 opcode stripped:
         # 02 15 05 9b 9a 9b 9b 9b 9b 01
         data = bytes.fromhex("0215059b9a9b9b9b9b01")
@@ -36,10 +39,15 @@ class TestDecodeShootEvent:
         assert result["source_y"] == 154
         assert result["target_x"] == 155
         assert result["target_y"] == 155
+        assert result["aim_x"] == 155
+        assert result["aim_y"] == 155
         assert result["weapon"] == 1  # dual
 
     def test_decodes_enemy_single_shot(self) -> None:
-        """Enemy single shot at us -- orange-8 firing back from (155,155)."""
+        """Enemy single shot at us -- orange-8 firing back from (155,155).
+
+        Straight shot: aim == target (both at (155,154)).
+        """
         data = bytes.fromhex("0316029b9b9b9a9b9a00")
         result = decode_shoot_event(data)
         assert result["msg_type"] == 0x53
@@ -49,16 +57,24 @@ class TestDecodeShootEvent:
         assert result["source_y"] == 155
         assert result["target_x"] == 155  # our tile
         assert result["target_y"] == 154
+        assert result["aim_x"] == 155
+        assert result["aim_y"] == 154
         assert result["weapon"] == 0  # single
 
     def test_decodes_homing_shot_landing_off_command(self) -> None:
-        """Homing seeker landed at (170,174) when bot fired toward (155,155)."""
+        """Homing seeker landed at (170,174) when bot fired toward (155,155).
+
+        Homing weapon: aim is the initial barrel direction (where the
+        bot pointed when firing); target is the homing impact tile.
+        """
         data = bytes.fromhex("0215059b9aaaaeaaae03")
         result = decode_shoot_event(data)
         assert result["source_x"] == 155
         assert result["source_y"] == 154
         assert result["target_x"] == 170  # homing seeker's actual impact
         assert result["target_y"] == 174
+        assert result["aim_x"] == 170  # initial barrel aim (same here)
+        assert result["aim_y"] == 174
         assert result["weapon"] == 3  # homing
 
     def test_raises_on_short_data(self) -> None:

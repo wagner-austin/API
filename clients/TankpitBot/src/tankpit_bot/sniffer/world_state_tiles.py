@@ -17,7 +17,6 @@ from tankpit_bot.state import (
     render_world_ascii,
 )
 from tankpit_bot.state.viewport_geometry import (
-    VIEWPORT_PATCH_WIDTH,
     make_visible_viewport_state,
     viewport_patch_world_coords,
 )
@@ -234,19 +233,6 @@ def apply_waypoints(start_x: int, start_y: int, waypoints: str) -> tuple[int, in
     return x, y
 
 
-def is_absolute_position(x: int, y: int) -> bool:
-    """Check if position_update coordinates are absolute world coordinates.
-
-    Args:
-        x: X coordinate from position_update.
-        y: Y coordinate from position_update.
-
-    Returns:
-        True if coordinates are absolute world coordinates.
-    """
-    return x >= VIEWPORT_PATCH_WIDTH or y >= VIEWPORT_PATCH_WIDTH
-
-
 def render_ascii_if_available(ws: WorldService, event: str) -> None:
     """Render ASCII viewport if terrain map is available.
 
@@ -276,7 +262,6 @@ def render_world_state_ascii(ws: WorldService) -> str | None:
 
 __all__ = [
     "apply_waypoints",
-    "is_absolute_position",
     "render_ascii_if_available",
     "render_world_state_ascii",
     "update_cache_tiles",

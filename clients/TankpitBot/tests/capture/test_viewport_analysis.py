@@ -1,4 +1,10 @@
-"""Tests for capture viewport analysis."""
+"""Tests for capture viewport analysis.
+
+The PositionUpdate (13-byte 0x24) container path was deleted 2026-06-20
+after corpus proof of zero production fires. The position_evidence path
+of the analyzer is gone; only the MovementResponse + ViewportUpdate +
+13-byte shape census remain.
+"""
 
 from __future__ import annotations
 
@@ -96,47 +102,6 @@ def _make_viewport_update_payload(
     return _encode_received_frame(0x5A, decoded_data, xor_table)
 
 
-def _make_position_update_payload(
-    tank_id: int,
-    x: int,
-    y: int,
-    extra_x: int,
-    extra_y: int,
-    xor_table: bytes,
-) -> str:
-    """Create an absolute self position_update payload.
-
-    Args:
-        tank_id: Tank identifier.
-        x: Absolute x position.
-        y: Absolute y position.
-        extra_x: First extra_data byte.
-        extra_y: Second extra_data byte.
-        xor_table: Session XOR table.
-
-    Returns:
-        Base64-encoded received frame payload.
-    """
-    decoded_data = bytes(
-        [
-            0x24,
-            0x02,
-            tank_id & 0xFF,
-            tank_id >> 8,
-            x,
-            y,
-            extra_x,
-            extra_y,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ]
-    )
-    return _encode_received_frame(0x2E, decoded_data, xor_table)
-
-
 def _make_sync_payload(xor_table: bytes) -> str:
     """Create a Sync payload.
 
@@ -158,8 +123,6 @@ def _make_unknown_payload(xor_table: bytes) -> str:
     Returns:
         Base64-encoded received frame payload.
     """
-    # 0xAB is reserved / not assigned in the V table. Previous fixture
-    # used 0x2B '+' but that is now binary Promotion (Rf) and decodes.
     return _encode_received_frame(0xAB, b"\x00\x01\x02", xor_table)
 
 
@@ -188,8 +151,8 @@ def _make_session(messages: list[CapturedMessage], magic: str) -> CaptureSession
 class TestAnalyzeCaptureSession:
     """Tests for analyze_capture_session."""
 
-    def test_matches_position_update_extra_bytes_against_inferred_viewport(self) -> None:
-        """Confirms 0x5A viewport origin makes position_update bytes comparable."""
+    def test_records_viewport_inference_and_movement_response(self) -> None:
+        """Records a viewport inference from 0x5A and learns self tank id from 0x3D."""
         magic = "analysis-magic"
         static_key = "A" * 64
         xor_table = build_xor_table(static_key, magic)
@@ -207,12 +170,6 @@ class TestAnalyzeCaptureSession:
                 payload=_make_viewport_update_payload(136, 134, xor_table),
                 ws_url="wss://test/ws",
             ),
-            CapturedMessage(
-                timestamp_ms=1200,
-                direction="received",
-                payload=_make_position_update_payload(638, 144, 137, 8, 3, xor_table),
-                ws_url="wss://test/ws",
-            ),
         ]
 
         result = analyze_capture_session(_make_session(messages, magic), xor_table)
@@ -220,19 +177,11 @@ class TestAnalyzeCaptureSession:
         assert result["self_tank_id"] == 638
         assert result["movement_response_count"] == 1
         assert result["viewport_update_count"] == 1
-        assert result["position_update_count"] == 1
-        assert result["thirteen_byte_0x2e_count"] == 1
-        assert result["thirteen_byte_shapes"] == [
-            {"first_byte": 0x24, "second_byte": 0x02, "count": 1}
-        ]
+        assert result["thirteen_byte_0x2e_count"] == 0
+        assert result["thirteen_byte_shapes"] == []
         assert len(result["viewport_inferences"]) == 1
         assert result["viewport_inferences"][0]["viewport_left"] == 136
         assert result["viewport_inferences"][0]["viewport_top"] == 134
-        assert result["comparable_position_count"] == 1
-        assert result["extra_x_match_count"] == 1
-        assert result["extra_y_match_count"] == 1
-        assert result["position_evidence"][0]["expected_viewport_x"] == 8
-        assert result["position_evidence"][0]["expected_viewport_y"] == 3
 
     def test_records_viewport_shift_when_inferred_origin_changes(self) -> None:
         """Records a viewport shift when later 0x5A origin changes."""
@@ -271,7 +220,6 @@ class TestAnalyzeCaptureSession:
 
         assert result["movement_response_count"] == 2
         assert result["viewport_update_count"] == 2
-        assert result["position_update_count"] == 0
         assert result["thirteen_byte_0x2e_count"] == 0
         assert result["thirteen_byte_shapes"] == []
         assert len(result["viewport_inferences"]) == 2
@@ -297,23 +245,6 @@ class TestViewportAnalysisEncoding:
                     "viewport_top": 134,
                 }
             ],
-            "position_evidence": [
-                {
-                    "message_index": 3,
-                    "timestamp_ms": 1300,
-                    "tank_id": 638,
-                    "x": 144,
-                    "y": 137,
-                    "extra_x": 8,
-                    "extra_y": 3,
-                    "viewport_left": 136,
-                    "viewport_top": 134,
-                    "expected_viewport_x": 8,
-                    "expected_viewport_y": 3,
-                    "matches_x": True,
-                    "matches_y": True,
-                }
-            ],
             "viewport_shifts": [
                 {
                     "message_index": 2,
@@ -326,7 +257,6 @@ class TestViewportAnalysisEncoding:
             ],
             "movement_response_count": 2,
             "viewport_update_count": 1,
-            "position_update_count": 1,
             "thirteen_byte_0x2e_count": 1,
             "thirteen_byte_shapes": [
                 {
@@ -335,9 +265,6 @@ class TestViewportAnalysisEncoding:
                     "count": 1,
                 }
             ],
-            "comparable_position_count": 1,
-            "extra_x_match_count": 1,
-            "extra_y_match_count": 1,
         }
 
         encoded = encode_viewport_analysis(result)
@@ -370,23 +297,6 @@ class TestViewportAnalysisEncoding:
                     "viewport_top": 134,
                 }
             ],
-            "position_evidence": [
-                {
-                    "message_index": 3,
-                    "timestamp_ms": 1300,
-                    "tank_id": 638,
-                    "x": 144,
-                    "y": 137,
-                    "extra_x": 8,
-                    "extra_y": 3,
-                    "viewport_left": 136,
-                    "viewport_top": 134,
-                    "expected_viewport_x": 8,
-                    "expected_viewport_y": 3,
-                    "matches_x": True,
-                    "matches_y": True,
-                }
-            ],
             "viewport_shifts": [
                 {
                     "message_index": 2,
@@ -399,7 +309,6 @@ class TestViewportAnalysisEncoding:
             ],
             "movement_response_count": 2,
             "viewport_update_count": 1,
-            "position_update_count": 1,
             "thirteen_byte_0x2e_count": 1,
             "thirteen_byte_shapes": [
                 {
@@ -408,48 +317,35 @@ class TestViewportAnalysisEncoding:
                     "count": 1,
                 }
             ],
-            "comparable_position_count": 1,
-            "extra_x_match_count": 1,
-            "extra_y_match_count": 1,
         }
 
         formatted = format_viewport_analysis(result)
 
         assert "self_tank_id=638" in formatted
-        assert "capture_status=position_update_comparable" in formatted
+        assert "capture_status=viewport_inferred" in formatted
         assert "movement_responses=2" in formatted
         assert "viewport_updates=1" in formatted
-        assert "position_updates=1" in formatted
         assert "raw_thirteen_byte_0x2e=1" in formatted
         assert "first=0x24 second=0x02 count=1" in formatted
-        assert "position_extra_x_matches=1/1" in formatted
-        assert "position_extra_y_matches=1/1" in formatted
         assert "viewport=(136,134)" in formatted
-        assert "expected=(8,3)" in formatted
         assert "(136,134) -> (137,134)" in formatted
 
     def test_formats_empty_analysis_report(self) -> None:
-        """Formats the empty-evidence message when nothing is comparable."""
+        """Formats the missing-evidence status when nothing is observed."""
         result: ViewportAnalysisDict = {
             "self_tank_id": None,
             "viewport_inferences": [],
-            "position_evidence": [],
             "viewport_shifts": [],
             "movement_response_count": 0,
             "viewport_update_count": 0,
-            "position_update_count": 0,
             "thirteen_byte_0x2e_count": 0,
             "thirteen_byte_shapes": [],
-            "comparable_position_count": 0,
-            "extra_x_match_count": 0,
-            "extra_y_match_count": 0,
         }
 
         formatted = format_viewport_analysis(result)
 
         assert "self_tank_id=None" in formatted
         assert "capture_status=missing_movement_response" in formatted
-        assert "No comparable absolute self position_update samples were found." in formatted
 
     def test_rejects_non_object_nested_entries(self) -> None:
         """Rejects invalid nested analysis entries with precise errors."""
@@ -458,34 +354,11 @@ class TestViewportAnalysisEncoding:
                 {
                     "self_tank_id": None,
                     "viewport_inferences": [1],
-                    "position_evidence": [],
                     "viewport_shifts": [],
                     "movement_response_count": 0,
                     "viewport_update_count": 0,
-                    "position_update_count": 0,
                     "thirteen_byte_0x2e_count": 0,
                     "thirteen_byte_shapes": [],
-                    "comparable_position_count": 0,
-                    "extra_x_match_count": 0,
-                    "extra_y_match_count": 0,
-                }
-            )
-
-        with pytest.raises(JSONTypeError, match="position_evidence\\[0\\]"):
-            decode_viewport_analysis(
-                {
-                    "self_tank_id": None,
-                    "viewport_inferences": [],
-                    "position_evidence": [1],
-                    "viewport_shifts": [],
-                    "movement_response_count": 0,
-                    "viewport_update_count": 0,
-                    "position_update_count": 0,
-                    "thirteen_byte_0x2e_count": 0,
-                    "thirteen_byte_shapes": [],
-                    "comparable_position_count": 0,
-                    "extra_x_match_count": 0,
-                    "extra_y_match_count": 0,
                 }
             )
 
@@ -494,16 +367,11 @@ class TestViewportAnalysisEncoding:
                 {
                     "self_tank_id": None,
                     "viewport_inferences": [],
-                    "position_evidence": [],
                     "viewport_shifts": [1],
                     "movement_response_count": 0,
                     "viewport_update_count": 0,
-                    "position_update_count": 0,
                     "thirteen_byte_0x2e_count": 0,
                     "thirteen_byte_shapes": [],
-                    "comparable_position_count": 0,
-                    "extra_x_match_count": 0,
-                    "extra_y_match_count": 0,
                 }
             )
 
@@ -512,16 +380,11 @@ class TestViewportAnalysisEncoding:
                 {
                     "self_tank_id": None,
                     "viewport_inferences": [],
-                    "position_evidence": [],
                     "viewport_shifts": [],
                     "movement_response_count": 0,
                     "viewport_update_count": 0,
-                    "position_update_count": 0,
                     "thirteen_byte_0x2e_count": 0,
                     "thirteen_byte_shapes": [1],
-                    "comparable_position_count": 0,
-                    "extra_x_match_count": 0,
-                    "extra_y_match_count": 0,
                 }
             )
 
@@ -646,63 +509,39 @@ class TestViewportAnalysisHelpers:
 
     def test_format_capture_status_covers_remaining_outcomes(self) -> None:
         """Reports the exact missing evidence stage for each outcome."""
-        missing_position: ViewportAnalysisDict = {
-            "self_tank_id": 638,
-            "viewport_inferences": [],
-            "position_evidence": [],
-            "viewport_shifts": [],
-            "movement_response_count": 1,
-            "viewport_update_count": 1,
-            "position_update_count": 0,
-            "thirteen_byte_0x2e_count": 0,
-            "thirteen_byte_shapes": [],
-            "comparable_position_count": 0,
-            "extra_x_match_count": 0,
-            "extra_y_match_count": 0,
-        }
         missing_viewport: ViewportAnalysisDict = {
             "self_tank_id": 638,
             "viewport_inferences": [],
-            "position_evidence": [],
             "viewport_shifts": [],
             "movement_response_count": 1,
             "viewport_update_count": 0,
-            "position_update_count": 0,
             "thirteen_byte_0x2e_count": 0,
             "thirteen_byte_shapes": [],
-            "comparable_position_count": 0,
-            "extra_x_match_count": 0,
-            "extra_y_match_count": 0,
         }
-        missing_comparable: ViewportAnalysisDict = {
+        inferred: ViewportAnalysisDict = {
             "self_tank_id": 638,
-            "viewport_inferences": [],
-            "position_evidence": [],
+            "viewport_inferences": [
+                {
+                    "message_index": 1,
+                    "timestamp_ms": 1100,
+                    "viewport_left": 136,
+                    "viewport_top": 134,
+                }
+            ],
             "viewport_shifts": [],
             "movement_response_count": 1,
             "viewport_update_count": 1,
-            "position_update_count": 1,
-            "thirteen_byte_0x2e_count": 1,
-            "thirteen_byte_shapes": [{"first_byte": 0x24, "second_byte": 0x02, "count": 1}],
-            "comparable_position_count": 0,
-            "extra_x_match_count": 0,
-            "extra_y_match_count": 0,
+            "thirteen_byte_0x2e_count": 0,
+            "thirteen_byte_shapes": [],
         }
 
         assert (
-            va._format_capture_status(missing_position)
-            == "capture_status=missing_proven_position_update"
-        )
-        assert (
             va._format_capture_status(missing_viewport) == "capture_status=missing_viewport_update"
         )
-        assert (
-            va._format_capture_status(missing_comparable)
-            == "capture_status=position_update_not_comparable_yet"
-        )
+        assert va._format_capture_status(inferred) == "capture_status=viewport_inferred"
 
     def test_handle_movement_response_ignores_other_tanks(self) -> None:
-        """Leaves viewport state unchanged when movement belongs to another tank."""
+        """Leaves viewport state unchanged when self id is already learned."""
         state = ViewportAnalysisStateDict(
             self_tank_id=638,
             current_viewport_left=136,
@@ -725,7 +564,7 @@ class TestViewportAnalysisHelpers:
         assert updated["current_viewport_top"] == 134
         assert updated["self_tank_id"] == 638
 
-    def test_handle_viewport_update_requires_known_self_and_entity(self) -> None:
+    def test_handle_viewport_update_records_inference_and_shift(self) -> None:
         """Records direct viewport origins and shift transitions."""
         state = ViewportAnalysisStateDict(
             self_tank_id=638,
@@ -758,123 +597,6 @@ class TestViewportAnalysisHelpers:
             }
         ]
 
-    def test_handle_position_update_early_returns_and_mismatch_counts(self) -> None:
-        """Handles all early-return conditions and mixed x/y match counting."""
-        evidence: list[va.PositionViewportEvidenceDict] = []
-        empty_state = ViewportAnalysisStateDict(
-            self_tank_id=None,
-            current_viewport_left=None,
-            current_viewport_top=None,
-        )
-
-        no_flag = va._handle_position_update(
-            empty_state,
-            1,
-            1000,
-            0x00,
-            638,
-            144,
-            137,
-            b"\x08\x03",
-            evidence,
-        )
-        assert no_flag == empty_state
-
-        relative_update = va._handle_position_update(
-            empty_state,
-            2,
-            1100,
-            0x02,
-            638,
-            8,
-            3,
-            b"\x08\x03",
-            evidence,
-        )
-        assert relative_update["self_tank_id"] == 638
-        assert evidence == []
-
-        short_extra = va._handle_position_update(
-            relative_update,
-            3,
-            1200,
-            0x02,
-            638,
-            144,
-            137,
-            b"\x08",
-            evidence,
-        )
-        assert short_extra["self_tank_id"] == 638
-        assert evidence == []
-
-        wrong_tank = va._handle_position_update(
-            ViewportAnalysisStateDict(
-                self_tank_id=638,
-                current_viewport_left=136,
-                current_viewport_top=134,
-            ),
-            4,
-            1300,
-            0x02,
-            999,
-            144,
-            137,
-            b"\x08\x03",
-            evidence,
-        )
-        assert wrong_tank["self_tank_id"] == 638
-        assert evidence == []
-
-        no_viewport = va._handle_position_update(
-            ViewportAnalysisStateDict(
-                self_tank_id=638,
-                current_viewport_left=None,
-                current_viewport_top=None,
-            ),
-            5,
-            1400,
-            0x02,
-            638,
-            144,
-            137,
-            b"\x08\x03",
-            evidence,
-        )
-        assert no_viewport["self_tank_id"] == 638
-        assert evidence == []
-
-        matched = va._handle_position_update(
-            ViewportAnalysisStateDict(
-                self_tank_id=638,
-                current_viewport_left=136,
-                current_viewport_top=134,
-            ),
-            6,
-            1500,
-            0x02,
-            638,
-            144,
-            137,
-            b"\x08\x03",
-            evidence,
-        )
-        assert matched["current_viewport_left"] == 136
-        assert len(evidence) == 1
-
-        va._handle_position_update(
-            matched,
-            7,
-            1600,
-            0x02,
-            638,
-            145,
-            137,
-            b"\x08\x02",
-            evidence,
-        )
-        assert va._count_matches(evidence) == (1, 1)
-
     def test_analyze_capture_session_ignores_unmatched_sync_messages(self) -> None:
         """Ignores decoded messages that are outside the viewport-analysis cases."""
         magic = "analyze-other"
@@ -894,8 +616,5 @@ class TestViewportAnalysisHelpers:
         assert result["self_tank_id"] is None
         assert result["movement_response_count"] == 0
         assert result["viewport_update_count"] == 0
-        assert result["position_update_count"] == 0
         assert result["thirteen_byte_0x2e_count"] == 0
         assert result["thirteen_byte_shapes"] == []
-        assert result["viewport_inferences"] == []
-        assert result["position_evidence"] == []

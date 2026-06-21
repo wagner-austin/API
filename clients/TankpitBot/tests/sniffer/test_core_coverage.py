@@ -95,20 +95,24 @@ class TestSnifferCoverageBranches:
         assert viewport.get_viewport_top() is None
 
     def test_format_container_simple_container_pickup(self) -> None:
-        """Test format_container_simple for container_pickup message."""
-        from tankpit_bot.container.types import ContainerPickupDict
+        """Test format_container_simple for container_pickup message.
+
+        ``remaining_volume>0`` means the picker took a partial top-up
+        and left fuel behind in the container (typical when the picker
+        was already near the 1100-fuel cap).
+        """
+        from tankpit_bot.container.types import (
+            ContainerPickupDict,
+            ContainerPickupRecordDict,
+        )
         from tankpit_bot.sniffer.formatters import format_container_simple
 
         msg = ContainerPickupDict(
             msg_type="container_pickup",
-            x=10,
-            y=20,
-            volume=500,
-            is_fuel=True,
+            pickups=(ContainerPickupRecordDict(x=10, y=20, remaining_volume=500),),
         )
         result = format_container_simple(msg)
-        # container_pickup returns "pos=(x,y) FUEL vol=N" format
-        assert result == "pos=(10,20) FUEL vol=500"
+        assert result == "pos=(10,20) FUEL partial remaining=500"
 
     def test_format_container_simple_radar_response(self) -> None:
         """Format the protocol-layer RadarScanResult (0x4F)."""
@@ -235,51 +239,9 @@ class TestSnifferCoverageBranches:
         result = decode_state_message(body, "TEST")
         assert "[TEST]" in result
 
-    def test_handle_tank_registry_with_name_not_container(self) -> None:
-        """Test handle_tank_registry stores name for non-container tanks."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.formatters import handle_tank_registry
-
-        # Reset tank names
-        player_tracking._tank_names.clear()
-
-        result = handle_tank_registry(
-            tid=100,
-            name="TestPlayer",
-            team="red",
-            rank=3,
-            badges=0,
-            is_bot=False,
-            is_container=False,
-            container_y=None,
-            container_viewport_x=None,
-        )
-        assert "TestPlayer" in result
-        assert player_tracking._tank_names.get(100) == "TestPlayer"
-
-    def test_handle_tank_registry_container_skips_name_storage(self) -> None:
-        """Test handle_tank_registry does not store name for containers."""
-        from tankpit_bot.sniffer import player_tracking
-        from tankpit_bot.sniffer.formatters import handle_tank_registry
-
-        # Reset tank names
-        player_tracking._tank_names.clear()
-
-        result = handle_tank_registry(
-            tid=200,
-            name="ContainerName",
-            team="red",
-            rank=0,
-            badges=0,
-            is_bot=False,
-            is_container=True,  # Container - should skip name storage
-            container_y=50,
-            container_viewport_x=10,
-        )
-        # Result should still format the details
-        assert "200" in result
-        # But name should NOT be stored in _tank_names
-        assert player_tracking._tank_names.get(200) is None
+    # handle_tank_registry tests deleted 2026-06-20: the helper and the
+    # underlying TankRegistryDict were removed after corpus sweep proved
+    # zero production fires for the container path.
 
     def test_init_trackers_skips_already_initialized(self, fake_fs: FakeFileSystem) -> None:
         """Test init_trackers_with_magic skips trackers with xor_table set."""

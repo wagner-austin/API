@@ -103,6 +103,19 @@ def _unexpected_force_exit(exit_code: int) -> None:
     raise AssertionError(f"force_exit({exit_code}) called without a test-installed fake")
 
 
+def _noop_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
+    """Inert signal-handler installer for tests.
+
+    The real implementation binds SIGINT/SIGTERM via ``signal.signal``;
+    tests must not mutate process-wide signal state. Tests that
+    exercise the handler install their own recording fake.
+
+    Args:
+        on_interrupt: Ignored callback that production would register.
+    """
+    del on_interrupt
+
+
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
     """Reset all shared test hooks to canonical defaults for each test."""
@@ -123,11 +136,13 @@ def _restore_hooks() -> Generator[None, None, None]:
     # behavior install recording fakes explicitly.
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
+    _test_hooks.install_signal_handlers = _noop_install_signal_handlers
 
     yield
 
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
+    _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     _test_hooks.get_env = _test_hooks._default_get_env
     _test_hooks.write_text = _test_hooks._real_write_text
     _test_hooks.read_text = _test_hooks._real_read_text
@@ -158,12 +173,14 @@ def _restore_runtime_logging_state() -> Generator[None, None, None]:
 
     runtime_logging._BOT_ARTIFACTS = None
     runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging.clear_runtime_context()
     runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
     yield
 
     runtime_logging._BOT_ARTIFACTS = None
     runtime_logging._SNIFF_ARTIFACTS = None
+    runtime_logging.clear_runtime_context()
     runtime_logging._remove_artifact_handlers(stdlib_logging.getLogger())
 
 

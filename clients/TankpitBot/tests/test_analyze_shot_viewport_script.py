@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str
-from scripts import _test_hooks as script_hooks
 from scripts.analyze_shot_viewport import main
 
+from scripts import _test_hooks as script_hooks
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot.capture.xor import build_xor_table, xor_decode_body
 from tankpit_bot.protocol.commands import CMD_SHOOT, TYPE_COMBAT

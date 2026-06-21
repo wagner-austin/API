@@ -10,7 +10,12 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.state.types.constants import EntitySource, require_entity_source
+from tankpit_bot.state.types.constants import (
+    EntitySource,
+    TankLiveness,
+    require_entity_source,
+    require_tank_liveness,
+)
 
 
 class TankStateDict(TypedDict):
@@ -68,6 +73,19 @@ class TankStateDict(TypedDict):
         last_position_update_ms: Wall-clock ms of the most recent
             wire-sourced observation that carried a fresh ``(x, y)``.
             Kill-shot gate.
+        liveness: Three-state lifecycle gate. ``alive`` is the default.
+            ``deactivated`` is set on 0x41 Deactivation -- the tank is a
+            corpse on the tile for ~22 s until the server cleans it up
+            with 0x58 TankRemove. ``removed`` is set on 0x58 -- the
+            tile is empty and MapData entries for this id must be
+            skipped (tombstone). Any per-tank wire (TankInfo,
+            TankEntry, MovementResponse, TankStatusSync, Movement) flips
+            a non-alive tank back to ``alive`` -- the respawn flow.
+            ``analyze_threats`` filters to ``liveness == "alive"``;
+            ``_combat_shoot`` thus cannot fire at a corpse or empty
+            tile. Empirical capture 2026-06-20: bot used to shoot the
+            corpse 3 times during the 22 s window because no 0x41
+            handler updated the tank state.
     """
 
     tank_id: int
@@ -84,6 +102,7 @@ class TankStateDict(TypedDict):
     timestamp_ms: int
     last_wire_seen_ms: int
     last_position_update_ms: int
+    liveness: TankLiveness
 
 
 def make_tank_state(
@@ -101,6 +120,7 @@ def make_tank_state(
     last_wire_seen_ms: int = 0,
     last_position_update_ms: int = 0,
     direction: int = 0,
+    liveness: TankLiveness = "alive",
 ) -> TankStateDict:
     """Create a tank state.
 
@@ -124,6 +144,8 @@ def make_tank_state(
             Zero means the position has never been wire-confirmed.
         direction: Sprite direction byte. 0-31 = alive facing,
             32-33 = dead corpse.
+        liveness: Three-state lifecycle gate. Defaults to ``alive``.
+            See :class:`TankStateDict` for the full semantics.
 
     Returns:
         TankStateDict with the provided values.
@@ -143,6 +165,7 @@ def make_tank_state(
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
         last_position_update_ms=last_position_update_ms,
+        liveness=liveness,
     )
 
 
@@ -170,6 +193,7 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "timestamp_ms": state["timestamp_ms"],
         "last_wire_seen_ms": state["last_wire_seen_ms"],
         "last_position_update_ms": state["last_position_update_ms"],
+        "liveness": state["liveness"],
     }
 
 
@@ -200,6 +224,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
+        liveness=require_tank_liveness(data, "liveness"),
     )
 
 

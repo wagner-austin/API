@@ -307,6 +307,67 @@ def test_decode_runtime_event_record_handles_record_with_no_extra_fields() -> No
     assert decoded["fields"] == {}
 
 
+def test_event_handler_skips_record_without_runtime_channel_or_message(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """A record carrying neither runtime_channel nor runtime_message is dropped.
+
+    Covers the earliest guard in ``_HookEventArtifactHandler.emit``: when
+    a stdlib LogRecord arrives without any runtime metadata at all, the
+    JSONL handler must silently skip it -- writing to the events file
+    would corrupt the JSONL with mode-less rows.
+    """
+    artifacts = configure_bot_runtime_logging("20260331-230405")
+
+    from platform_core.logging import stdlib_logging
+
+    logger = stdlib_logging.getLogger("tankpit_bot.runtime.no_runtime_extras")
+    logger.info("plain log line with no runtime extras")
+
+    files = fake_fs.get_written_files()
+    assert files[artifacts["latest_events_path"]] == ""
+
+
+def test_emit_without_runtime_configured_uses_unconfigured_mode(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """``_runtime_mode_name`` returns ``"unconfigured"`` when no mode is set.
+
+    The autouse runtime-logging-state fixture resets every artifact
+    holder to ``None`` at test start, so an emit_* before any
+    ``configure_*_runtime_logging`` call exercises the unconfigured
+    fallback. We assert against the LogRecord extra rather than the
+    artifact file because no handler is attached yet.
+    """
+    from platform_core.logging import stdlib_logging
+
+    records: list[stdlib_logging.LogRecord] = []
+
+    class _RecordCapture(stdlib_logging.Handler):
+        def emit(self, record: stdlib_logging.LogRecord) -> None:
+            records.append(record)
+
+    capture = _RecordCapture()
+    capture.setLevel(stdlib_logging.INFO)
+    root = stdlib_logging.getLogger()
+    root.addHandler(capture)
+    try:
+        emit_ai("emitted before configure_bot_runtime_logging")
+    finally:
+        root.removeHandler(capture)
+
+    from tankpit_bot.runtime_logging import _RuntimeRecordMapping
+
+    matching: list[_RuntimeRecordMapping] = []
+    for record in records:
+        rec_dict: _RuntimeRecordMapping = record.__dict__
+        if "runtime_mode" in rec_dict:
+            matching.append(rec_dict)
+    if not matching:
+        raise AssertionError("expected at least one record with runtime_mode extra")
+    assert matching[0]["runtime_mode"] == "unconfigured"
+
+
 def test_event_handler_skips_record_with_missing_runtime_fields_extra(
     fake_fs: FakeFileSystem,
 ) -> None:
@@ -472,6 +533,153 @@ class TestRequireFieldAccessors:
         fields: dict[str, str | int | float | bool] = {"uses_extra": 1}
         with pytest.raises(TypeError, match="must be bool"):
             require_bool_field(fields, "uses_extra")
+
+
+class TestRuntimeContext:
+    """Tests for the per-tick context auto-attached to emit_* events."""
+
+    def test_set_and_get_context_round_trips(self) -> None:
+        """``set_runtime_context`` stores; ``get_runtime_context`` returns a copy."""
+        from tankpit_bot.runtime_logging import (
+            get_runtime_context,
+            set_runtime_context,
+        )
+
+        set_runtime_context(tick_n=42, bot_state="HUNT/engaging", in_flight_action_kind="shoot")
+        ctx = get_runtime_context()
+        assert ctx == {
+            "tick_n": 42,
+            "bot_state": "HUNT/engaging",
+            "in_flight_action_kind": "shoot",
+        }
+
+    def test_get_returns_independent_copy(self) -> None:
+        """Mutating the returned dict must not affect the module cache."""
+        from tankpit_bot.runtime_logging import (
+            get_runtime_context,
+            set_runtime_context,
+        )
+
+        set_runtime_context(tick_n=1, bot_state="IDLE/", in_flight_action_kind="none")
+        snapshot = get_runtime_context()
+        snapshot["tick_n"] = 99
+        assert get_runtime_context()["tick_n"] == 1
+
+    def test_set_with_none_leaves_previous_value_intact(self) -> None:
+        """Passing ``None`` for a field preserves the prior value."""
+        from tankpit_bot.runtime_logging import (
+            get_runtime_context,
+            set_runtime_context,
+        )
+
+        set_runtime_context(tick_n=5, bot_state="HUNT/searching", in_flight_action_kind="scan")
+        set_runtime_context(tick_n=6)  # only update tick_n
+        ctx = get_runtime_context()
+        assert ctx["tick_n"] == 6
+        assert ctx["bot_state"] == "HUNT/searching"
+        assert ctx["in_flight_action_kind"] == "scan"
+
+    def test_clear_removes_every_field(self) -> None:
+        """``clear_runtime_context`` empties the cache."""
+        from tankpit_bot.runtime_logging import (
+            clear_runtime_context,
+            get_runtime_context,
+            set_runtime_context,
+        )
+
+        set_runtime_context(tick_n=10, bot_state="IDLE/", in_flight_action_kind="none")
+        clear_runtime_context()
+        assert get_runtime_context() == {}
+
+    def test_set_with_all_nones_is_a_noop(self) -> None:
+        """``set_runtime_context()`` with every arg ``None`` changes nothing."""
+        from tankpit_bot.runtime_logging import get_runtime_context, set_runtime_context
+
+        set_runtime_context(tick_n=7)
+        set_runtime_context()
+        assert get_runtime_context() == {"tick_n": 7}
+
+    def test_context_keys_constant_matches_typeddict(self) -> None:
+        """``RUNTIME_CONTEXT_KEYS`` lists exactly the context field names."""
+        from tankpit_bot.runtime_logging import RUNTIME_CONTEXT_KEYS
+
+        assert frozenset({"tick_n", "bot_state", "in_flight_action_kind"}) == RUNTIME_CONTEXT_KEYS
+
+    def test_context_fields_attached_to_emit_ai(self, fake_fs: FakeFileSystem) -> None:
+        """``emit_ai`` events carry the active context fields."""
+        from tankpit_bot.runtime_logging import set_runtime_context
+
+        artifacts = configure_bot_runtime_logging("20260620-150138")
+        set_runtime_context(
+            tick_n=12,
+            bot_state="HUNT/engaging",
+            in_flight_action_kind="shoot",
+        )
+        emit_ai("HUNT score=0.5")
+
+        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        decoded = narrow_json_to_dict(load_json_str(event_line))
+        assert decoded["channel"] == "AI"
+        assert decoded["message"] == "HUNT score=0.5"
+        assert decoded["tick_n"] == 12
+        assert decoded["bot_state"] == "HUNT/engaging"
+        assert decoded["in_flight_action_kind"] == "shoot"
+
+    def test_explicit_fields_override_context_fields_on_collision(
+        self, fake_fs: FakeFileSystem
+    ) -> None:
+        """An explicit ``tick_n=`` arg wins over the context's ``tick_n``."""
+        from tankpit_bot.runtime_logging import set_runtime_context
+
+        artifacts = configure_bot_runtime_logging("20260620-150138")
+        set_runtime_context(tick_n=12)
+        emit_diagnostic(diagnostic_kind="explicit_override", tick_n=999)
+
+        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        decoded = narrow_json_to_dict(load_json_str(event_line))
+        assert decoded["tick_n"] == 999
+
+    def test_unset_context_fields_do_not_appear(self, fake_fs: FakeFileSystem) -> None:
+        """Fields never set in the context are absent from emitted events."""
+        from tankpit_bot.runtime_logging import set_runtime_context
+
+        artifacts = configure_bot_runtime_logging("20260620-150138")
+        set_runtime_context(tick_n=3)  # bot_state / in_flight_action_kind not set
+        emit_state("IDLE")
+
+        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        decoded = narrow_json_to_dict(load_json_str(event_line))
+        assert decoded["tick_n"] == 3
+        assert "bot_state" not in decoded
+        assert "in_flight_action_kind" not in decoded
+
+    def test_context_is_attached_to_wire_complete_events(self, fake_fs: FakeFileSystem) -> None:
+        """``emit_wire_complete`` also picks up the context.
+
+        This is the highest-value attachment: the post-mortem JSONL
+        query "which tick fired the stall_timeout?" works because every
+        WIRE_COMPLETE event carries ``tick_n``.
+        """
+        from tankpit_bot.runtime_logging import set_runtime_context
+
+        artifacts = configure_bot_runtime_logging("20260620-150138")
+        set_runtime_context(
+            tick_n=42,
+            bot_state="HUNT/engaging",
+            in_flight_action_kind="shoot",
+        )
+        emit_wire_complete(
+            action_kind="shoot",
+            duration_ms=80,
+            signal="our_shot_response",
+        )
+
+        event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
+        decoded = narrow_json_to_dict(load_json_str(event_line))
+        assert decoded["channel"] == "WIRE_COMPLETE"
+        assert decoded["tick_n"] == 42
+        assert decoded["bot_state"] == "HUNT/engaging"
+        assert decoded["in_flight_action_kind"] == "shoot"
 
 
 def test_remove_artifact_handlers_keeps_non_artifact_handlers() -> None:

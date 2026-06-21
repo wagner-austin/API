@@ -107,6 +107,14 @@ class WorldService:
         self.failed_move_targets: dict[str, int] = {}
         self.failed_scan_viewports: dict[str, int] = {}
         self.last_command_error: int = -1
+        # ContainerPickup de-duplication. The server broadcasts each
+        # 0x43 pickup TWICE within ~200 ms (one to the picker, one to
+        # the world view) -- empirical 43.9% duplicate rate across 13
+        # sniff sessions (2026-06-20). The dispatcher records each
+        # pickup signature here with its receipt timestamp; the next
+        # arrival of the same signature within
+        # ``PICKUP_DEDUP_WINDOW_MS`` is suppressed.
+        self.recent_pickup_signatures: dict[tuple[tuple[int, int, int], ...], int] = {}
 
     # -----------------------------------------------------------------
     # World state accessors

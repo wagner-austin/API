@@ -17,6 +17,7 @@ from tankpit_bot.state.types import (
     make_tank_state,
     viewport_scan_key,
 )
+from tankpit_bot.state.types.constants import TankLiveness
 
 
 def _tank(
@@ -29,6 +30,7 @@ def _tank(
     name: str = "",
     is_bot: bool = True,
     is_self: bool = False,
+    liveness: TankLiveness = "alive",
 ) -> TankStateDict:
     """Create a TankStateDict with defaults for testing.
 
@@ -42,6 +44,7 @@ def _tank(
         name: Player name (defaults to "tank-{key}").
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.
+        liveness: Lifecycle state. Defaults to ``"alive"``.
 
     Returns:
         TankStateDict with the provided values.
@@ -57,6 +60,7 @@ def _tank(
         name=name or f"tank-{key}",
         is_bot=is_bot,
         is_self=is_self,
+        liveness=liveness,
     )
 
 
@@ -224,12 +228,12 @@ class TestAnalyzeThreats:
         assert t["name"] == "enemy-42"
         assert t["is_bot"] is False
 
-    def test_filters_dead_tanks_at_origin(self) -> None:
-        """Dead tanks at (0,0) are excluded from threat analysis."""
+    def test_filters_deactivated_tanks(self) -> None:
+        """Tanks in the ``deactivated`` corpse window are excluded."""
         world = _world(
             {
-                "10": _tank("10", x=0, y=0, team=1),  # dead tank (corpse at origin)
-                "20": _tank("20", x=110, y=100, team=2),  # alive enemy
+                "10": _tank("10", x=110, y=100, team=1, liveness="deactivated"),
+                "20": _tank("20", x=120, y=100, team=2),  # alive enemy
             }
         )
         threats = analyze_threats(world, _self_at(), now_ms=0)
@@ -251,21 +255,39 @@ class TestAnalyzeThreats:
         ids = {t["tank_id"] for t in threats}
         assert ids == {20, 40}
 
-    def test_filters_corpse_direction_32(self) -> None:
-        """Tanks with direction=32 (corpse sprite) are excluded."""
-        world = _world(
-            {
-                "10": _tank("10", x=110, y=100, team=1, direction=32),
-                "20": _tank("20", x=120, y=100, team=2, direction=4),
-            }
-        )
-        threats = analyze_threats(world, _self_at(), now_ms=0)
-        assert len(threats) == 1
-        assert threats[0]["tank_id"] == 20
+    def test_filters_corpse_via_liveness_when_apply_observation_sets_it(self) -> None:
+        """Corpse-direction wire observations transition liveness to
+        ``deactivated`` via ``apply_tank_observation``; ``analyze_threats``
+        then filters on liveness, not direction.
 
-    def test_filters_corpse_direction_33(self) -> None:
-        """Tanks with direction=33 (alt corpse sprite) are excluded."""
-        world = _world({"10": _tank("10", x=110, y=100, team=1, direction=33)})
+        The previous behaviour ran a direct ``direction >= 32`` check
+        inside ``analyze_threats`` itself. That filter was removed once
+        ``apply_tank_observation`` started routing corpse wire arrivals
+        to ``liveness == "deactivated"`` (and the 0x41 Deactivation
+        dispatcher fires the same transition). The world-state layer
+        owns the corpse classification; the threat selector is a single
+        liveness check.
+        """
+        from tankpit_bot.state.mutations import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation
+
+        world = _world({"10": _tank("10", x=110, y=100, team=1)})
+        # An incoming 0x3D with the corpse-direction sprite flips
+        # liveness to deactivated. After apply, the tank should be
+        # filtered.
+        world = apply_tank_observation(
+            world,
+            make_tank_observation(
+                tank_id=10,
+                timestamp_ms=0,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(110, 100),
+                team=1,
+                direction=32,
+            ),
+        )
+        assert world["tanks"]["10"]["liveness"] == "deactivated"
         threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 0
 

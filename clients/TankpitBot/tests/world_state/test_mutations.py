@@ -10,6 +10,7 @@ from tankpit_bot.state import (
     add_mine,
     add_mine_from_radar,
     coord_key,
+    deactivate_tank,
     make_container_state,
     make_empty_world_state,
     pickup_container,
@@ -438,7 +439,16 @@ class TestRemoveTank:
     """Tests for remove_tank."""
 
     def test_removes_existing_tank(self) -> None:
-        """Removes tank from state."""
+        """Deletes the tank from the registry.
+
+        ``remove_tank`` is the 0x58 TankRemove handler. 0x58 doesn't
+        mean "tank died" -- it means the server stopped broadcasting
+        per-tank updates to this client (verified 2026-06-20
+        ghost_observe capture: orange-5 got 5 TankRemove events across
+        2 actual kills). Simpler correct behaviour: drop the tank from
+        the registry. The next MapData or per-tank wire re-adds it at
+        its current position with ``liveness="alive"``.
+        """
         from tankpit_bot.state import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation
 
@@ -457,9 +467,12 @@ class TestRemoveTank:
                 is_bot=False,
             ),
         )
+        assert state["tanks"]["42"]["liveness"] == "alive"
+
         updated = remove_tank(state, tank_id=42, timestamp_ms=1000)
 
         assert "42" not in updated["tanks"]
+        assert updated["timestamp_ms"] == 1000
 
     def test_returns_unchanged_for_nonexistent(self) -> None:
         """Returns unchanged state if tank doesn't exist."""
@@ -467,6 +480,53 @@ class TestRemoveTank:
         updated = remove_tank(state, tank_id=999, timestamp_ms=1000)
 
         assert updated is state  # Same reference
+
+
+class TestDeactivateTank:
+    """Tests for deactivate_tank (0x41 corpse-window handler)."""
+
+    def test_marks_tank_deactivated(self) -> None:
+        """Existing tank flips to ``liveness="deactivated"`` and keeps tile.
+
+        Replays the 2026-06-20 ghost_visual kill cycle at the
+        world-state layer: TankEntry establishes orange-8 at
+        (170, 174); Deactivation marks it ``deactivated`` while
+        preserving the death tile (the bot still reasons about that
+        tile for mines, fuel deposits, etc.).
+        """
+        from tankpit_bot.state import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation
+
+        state = make_empty_world_state()
+        state = apply_tank_observation(
+            state,
+            make_tank_observation(
+                tank_id=534,
+                timestamp_ms=500,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(170, 174),
+                team=3,
+                rank=2,
+                name="orange-8",
+                is_bot=True,
+            ),
+        )
+        assert state["tanks"]["534"]["liveness"] == "alive"
+
+        updated = deactivate_tank(state, tank_id=534, timestamp_ms=1000)
+
+        tank = updated["tanks"]["534"]
+        assert tank["liveness"] == "deactivated"
+        assert tank["x"] == 170
+        assert tank["y"] == 174
+        assert tank["timestamp_ms"] == 1000
+
+    def test_returns_unchanged_for_nonexistent(self) -> None:
+        """Deactivating an unknown tank id is a no-op."""
+        state = make_empty_world_state()
+        updated = deactivate_tank(state, tank_id=999, timestamp_ms=1000)
+        assert updated is state
 
 
 # TestUpdateSelfFuel was deleted 2026-06-19 with the additive-delta

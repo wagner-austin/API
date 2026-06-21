@@ -17,12 +17,19 @@ class TestDecideCombatFeedback:
         reset_world_state()
 
     def test_hit_feedback_after_kill_sees_no_enemy(self) -> None:
-        """After a kill, deactivated enemies no longer participate in threat selection."""
+        """After a kill, deactivated enemies no longer participate in threat selection.
+
+        The death tile is preserved on the tank state -- it's the
+        ``liveness="deactivated"`` filter in ``analyze_threats`` that
+        keeps the corpse from re-acquiring as a target. Pre-2026-06-20
+        this test used ``x=0, y=0`` as the dead-sentinel; that hack is
+        replaced by the explicit liveness state machine.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
-                x=0,
-                y=0,
+                x=110,
+                y=110,
                 team=2,
                 rank=1,
                 name="Enemy",
@@ -32,6 +39,7 @@ class TestDecideCombatFeedback:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                liveness="deactivated",
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
