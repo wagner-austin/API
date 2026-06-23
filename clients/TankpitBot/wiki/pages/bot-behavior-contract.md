@@ -85,7 +85,7 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 | Aspect | Contract |
 |---|---|
 | MUST | Mode selection is deterministic given (world_state, self_state, config). No randomness. |
-| MUST | RECOVER_FUEL takes precedence over HUNT when `fuel < fuel_low_threshold`. |
+| MUST | RECOVER_FUEL entry uses `should_enter_recover_fuel`, which today is the single-threshold check `fuel <= fuel_low_threshold` (`fuel_critical_threshold` was collapsed into `fuel_low_threshold` 2026-06-22). RECOVER_FUEL takes precedence over HUNT when that gate fires. Note: the current gate does NOT check `combat_target_id`, so it can interrupt an in-flight engagement; symmetric "finish the kill first" tier is planned but not yet shipped (cf. equipment-mode tier in section 3.4). |
 | MUST | HUNT is the default mode when no other mode triggers. |
 | MUST NOT | Enter HUNT while `self_state` is None (lifecycle 1.1). |
 | Verified by | `tests/bot/ai/test_mode_controller.py` (existing). |
@@ -121,11 +121,12 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 |---|---|
 | MUST | RECOVER_FUEL runs the Strict -> Sense -> Hop cascade when `fuel < fuel_low_threshold`: pick up reachable visible fuel; if none, radar the current viewport; if the viewport is already scanned, teleport to a fresh one. |
 | MUST | Collect adjacent containers opportunistically when path passes them. |
-| MUST | Refill equipment to `dual_resume_threshold` before resuming combat after a `dual_break_threshold` event. |
+| MUST | RECOVER_EQUIPMENT entry has two tiers (`should_enter_recover_equipment`, 2026-06-23): (1) **Emergency** -- any reserve below its *break* threshold (4 / 4 / 5) fires even with an active combat target; (2) **Between kills** -- any reserve below its *resume* threshold (25 / 25 / 20) AND `combat_target_id == -1` (no active lock). The lock gate enforces "restock, fight, restock" -- the bot finishes the in-flight kill before flipping to restock for the next hunt. Exit (`should_exit_recover_equipment`) is symmetric: releases only when dual ≥ 25 AND homing ≥ 25 AND radar ≥ 20. |
+| MUST | `self_state["fuel"]` is updated **only** from the wire's absolute-fuel messages (0x44 FuelGain, 0x2E TankStatusSync, 0x64 FuelDeposit). `pickup_container` is registry-only -- it does NOT add `transferred = prior_volume - remaining_volume` locally. The local-delta branch was a double-count on top of the wire's already-correct absolute fuel; removed 2026-06-23 after live observation of a 438-volume container producing a +438 ghost. See [[fuel-system#fuel-data-flow-single-source-of-truth]]. |
 | MUST | A pickup is NEVER pre-filtered as wasted -- the server picks the slot you're most behind on at pickup time (see [[equipment-system]]). The bot dispatches `pickup_equipment` whenever any equipment container is in range; only the all-25 case fails with code 7. |
 | MUST | Recognise server 0x52 `SUPERVISOR_ERROR_INVENTORY_FULL` (code 7) as an action-blocking error in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`). The in-flight pickup clears immediately on the wire signal instead of stalling the full 10 s timeout, and the container's `failed_pickups` counter is bumped so the blacklist takes over. Closed 2026-06-21 with the empirical guard `tests/bot/test_tick_loop_coverage.py::test_command_error_clears_collect_on_inventory_full`. |
 | MUST | After firing a radar, mark exactly the tiles the radar revealed in `AIStateDict.local_scan_tiles`. Free radar = intersection of `(tank ± 2)` with viewport bounds; extra radar = every tile in the viewport. The bot picks its next forage action from this map (see `bot/ai/scan_coverage.py`, refactor 2026-06-21). |
-| Verified by | `tests/integration/test_refuel_triggers_below_threshold.py` (Tier 1, handed off). |
+| Verified by | `tests/bot/ai/test_mode_controller.py`, `tests/bot/ai/test_recover_fuel_mode.py`, `tests/world_state/test_mutations.py::TestPickupContainer`. |
 
 ## 4. Action execution
 

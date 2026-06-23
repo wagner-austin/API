@@ -5,4 +5,7 @@ accounts.json
 wire_byte_analysis.json
 combat_probe.json
 combat_probe.capture_session.json
+enemy_tracking_probe.json
+enemy_tracking_probe.capture_session.json
+_sniff_*.out
 tpclient.pretty.js

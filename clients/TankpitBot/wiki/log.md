@@ -425,3 +425,80 @@ No source-code changes -- this is pure documentation correcting the wiki against
 - Replay test `fuel_radar_loop` relaxed to expect `ValueError`: the more aggressive walks burn fuel faster than the recorded policy, the bot lands marooned at fuel=0 by tick ~34, and the new RECOVER_FUEL owner raises rather than idle silently (consistent with the 2026-06-22 marooning contract).
 
 **Net:** the bot now uses its free-radar fuel budget productively. When extras = 0, each ~5-tile walk + ~10-fuel radar cycle reveals ~25 fresh tiles instead of mostly overlapping the previous scan.
+
+---
+
+## [2026-06-22] refactor | Collapse fuel_critical_threshold into fuel_low_threshold
+
+The two-tier "polite low vs. emergency critical" fuel threshold was dead in this codebase: both `fuel_critical_threshold` and `fuel_low_threshold` had drifted to 300. The user chose to collapse them rather than reintroduce a gap.
+
+**Cuts:**
+
+- `AIConfigDict` (`bot/ai/types.py`) -- removed `fuel_critical_threshold` field. Default factory + encode/decode (`bot/ai/types_codecs.py`) updated.
+- `recover_fuel_mode.py`: `minimum_recovery_fuel_volume` and the opportunistic-equipment gate in `_plan_fuel_recovery` switched to `fuel_low_threshold`. Deleted `try_collect_critical_fuel` and `try_collect_fuel` (both exported but never called from production). The `_plan_fuel_recovery` wrapper was inlined into `decide_recover_fuel_mode` -- the `owner_required` parameter was always True from the single production caller.
+- `mode_controller.should_enter_recover_fuel`: simplified from a priority-swap rule (no-extras + above-critical -> defer to equipment mode) to a flat `ctx.fuel <= ctx.config["fuel_low_threshold"]`. The priority swap was dependent on the critical/low gap which no longer exists.
+- Deleted `tests/integration/test_refuel_triggers_below_threshold.py` (tested the deleted helpers). Deleted `test_decide_recover_fuel_mode_raises_when_plan_returns_none` (used module-level monkey-patching of the now-deleted internal helper and was guard-banned anyway). Trimmed `fuel_critical_threshold` references from `test_types.py` fixtures and `test_recover_fuel_mode.py` helpers.
+
+**Result:** one fuel threshold for everything (entry, combat reserve, opportunistic-fuel gate). 4030 tests pass.
+
+---
+
+## [2026-06-23] fix | pickup_container fuel double-count
+
+`state/container_mutations.pickup_container` was adding `transferred = prior_volume - remaining_volume` to `self_state["fuel"]` on every fuel-container pickup. The wire ALSO emits an absolute-fuel message (0x44 FuelGain) for the same pickup, which calls `set_self_fuel(fuel_total)` through `world_state_containers.update_world_state_from_fuel_total`. Both updates fired for every pickup -> double-count.
+
+**Live evidence** (`runs/bot/latest.log` 2026-06-23 00:35:57):
+
+```
+25:57  WORLD: Fuel: 195 -> 633 (+438)   <- 0x44 FuelGain set absolute fuel = 633
+25:57  WORLD: Picked up container at (152, 204)
+       <- pickup_container also ran: fuel = 633 + 438 = 1071 (NOT logged)
+25:57  AI:    collect fuel at (147,212) vol=323 (fuel=1071)
+25:57+ WIRE teleport cost: Fuel: 1071 -> 622  <- wire-side fuel was also 1071
+```
+
+The 438 ghost matched the container volume exactly. Both the bot AND the wire-stamped subsequent cost log show fuel = 1071, so the double-count was real, not a display glitch.
+
+**Fix:** removed the fuel-update branch from `pickup_container` (the `if container["is_fuel"] and container["volume"] > remaining_volume: new_self = SelfStateDict(..., fuel=new_self["fuel"] + transferred, ...)` block). The function now mutates only the container registry. Wire absolute-fuel messages (0x44 FuelGain, 0x2E TankStatusSync, 0x64 FuelDeposit) are the single source of truth for `self_state["fuel"]`.
+
+**Same single-source-of-truth pattern** as the 2026-06-22 0x58 TankRemove no-op: the wire authoritative messages own state changes; secondary handlers don't duplicate them.
+
+Tests updated:
+
+- `tests/world_state/test_mutations.py::TestPickupContainer::test_pickup_fuel_container_adds_fuel` renamed to `test_pickup_container_does_not_modify_self_fuel`, assertion flipped.
+- `tests/sniffer/test_world_state_dispatch_other.py::test_dispatch_container_pickup_partial_updates_volume` -- no longer asserts `self_state["fuel"] == 200`; instead asserts fuel unchanged (wire path is what would update it in production).
+
+1302 affected tests still pass. mypy clean.
+
+---
+
+## [2026-06-23] fix | RECOVER_EQUIPMENT no longer interrupts active combat
+
+`should_enter_recover_equipment` was firing on every ammo decrement during combat -- after the first shot of a 25-dual engagement, dual dropped to 24, the gate said "below resume (25)", and the mode controller flipped HUNT -> RECOVER_EQUIPMENT mid-fight. Live observation 60s run 2026-06-23: bot fired ONE shot at purple-8, immediately bailed for a pickup, second pickup got `INVENTORY_FULL` (slot just topped up), then re-acquired and fired one MORE shot, bailed again. Pattern was "restock, shoot once, restock" -- not the "restock, fight, restock" the user asked for.
+
+**Fix:** added a two-tier gate to `should_enter_recover_equipment`:
+
+1. **Emergency** -- any reserve below its *break* threshold (4 / 4 / 5) fires unconditionally. The bot can't fight without ammo; restock interrupts even an active combat target.
+2. **Between kills** -- any reserve below its *resume* threshold (25 / 25 / 20) AND `combat_target_id == -1` (no lock). The bot finishes the in-flight kill before flipping to restock for the next hunt.
+
+```python
+def should_enter_recover_equipment(ctx):
+    if any reserve < break threshold:
+        return True  # emergency, interrupt anything
+    if combat_target_id != -1:
+        return False  # mid-fight, finish the kill
+    return any reserve < resume threshold  # between kills, restock
+```
+
+**Verification** (60s run 2026-06-23 00:35:53-55):
+
+```
+25:51  HUNT/ENGAGE: shoot(145,210,id=516)  ->  hit, dual 25->24
+25:53  HUNT/ENGAGE: shoot(145,210,id=516)  ->  hit, dual 24->23
+```
+
+Two consecutive shots at the SAME target without a mode flip. Pre-fix the bot would have bailed after the first 25->24 transition.
+
+No source code change to `should_exit_recover_equipment` -- the exit gate still releases only when all three reserves are at or above resume.
+
+**Symmetric fuel-mode fix is planned, not yet shipped.** `should_enter_recover_fuel` still uses the single-threshold check `fuel <= fuel_low_threshold` (300) with no combat-lock gate. Same 60s run showed the bot bailing from purple-8 at fuel=251 to refuel -- combat is near-free, 251 was plenty to finish the kill. Apply the same two-tier pattern (emergency at `hunt_min_fuel = 100`, between-kills above) when the next session opens.
