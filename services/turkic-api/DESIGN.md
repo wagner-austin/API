@@ -56,7 +56,7 @@ branch = true        # 100% branch coverage required
 - **Package Manager**: Poetry 1.8+
 - **Type Checker**: mypy 1.13+ (strict mode)
 - **Linter**: Ruff 0.14+
-- **Formatter**: Ruff + Black 25.11+
+- **Formatter**: Ruff (format)
 - **Testing**: pytest 9.0+ with coverage, asyncio, xdist, timeout
 
 ### Deployment

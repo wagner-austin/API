@@ -140,7 +140,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 - ✅ Guard scripts enforce patterns
 - ✅ No `TYPE_CHECKING` blocks
 - ✅ No try/except blocks (explicit error handling)
-- ✅ Ruff + Black formatting
+- ✅ Ruff formatting + linting
 
 ## Environment Variables
 
