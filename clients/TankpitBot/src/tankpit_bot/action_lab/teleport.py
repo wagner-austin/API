@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Protocol
 
 from platform_core.logging import get_logger
 
@@ -247,6 +247,29 @@ class TeleportProbe(ProbeBase):
         )
 
 
+class BuildTeleportProbeProtocol(Protocol):
+    """Factory contract for instantiating a live ``TeleportProbe``."""
+
+    def __call__(
+        self,
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+    ) -> TeleportProbe:
+        """Build one TeleportProbe instance.
+
+        Args:
+            target_url: URL to navigate the browser to.
+            headless: Whether to run headlessly.
+            prefer_account: Whether to use account login instead of guest.
+
+        Returns:
+            New TeleportProbe instance ready for live execution.
+        """
+        ...
+
+
 def _create_teleport_probe(
     target_url: str,
     *,
@@ -264,6 +287,9 @@ def _create_teleport_probe(
     )
     assert isinstance(probe, TeleportProbe)
     return probe
+
+
+build_teleport_probe: BuildTeleportProbeProtocol = _create_teleport_probe
 
 
 def run_teleport_probe(
@@ -319,7 +345,7 @@ def run_teleport_probe(
         )
 
     return run_and_save_standard_probe_session(
-        probe_factory=_create_teleport_probe,
+        probe_factory=build_teleport_probe,
         run_session=_run_session,
         encoder=encode_teleport_probe_session,
         summary_formatter=format_teleport_probe_summary,
@@ -332,11 +358,13 @@ def run_teleport_probe(
 
 __all__ = [
     "DEFAULT_TELEPORT_STRATEGY",
+    "BuildTeleportProbeProtocol",
     "TeleportProbe",
     "TeleportProbeError",
     "_teleport_strategy_requires_map_sync",
     "_wait_for_teleport_outcome",
     "build_box_targets",
+    "build_teleport_probe",
     "format_teleport_probe_summary",
     "parse_targets_arg",
     "run_teleport_probe",

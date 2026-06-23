@@ -56,7 +56,10 @@ from tankpit_bot.action_lab.pickup_phase import (
     PickupTimeoutSizerProtocol,
 )
 from tankpit_bot.action_lab.teleport import TeleportProbeError
-from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
+from tankpit_bot.action_lab.teleport_attempt import (
+    TeleportAttemptProbeProtocol,
+    TrackedTeleportAttempt,
+)
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterKwargs,
     TeleportOutcomeWaiterProtocol,
@@ -230,7 +233,6 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=x - 8, top=y - 8, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 
@@ -1445,9 +1447,9 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
         )
 
     def _run_attempt(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: FuelProbe,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportAttemptProbeProtocol,
+        target: TeleportTargetDict,
         *,
         cdp: CDPSessionProtocol | None,
         attempt_label: str,
@@ -1459,7 +1461,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
         wait_for_acquisition_sync: bool,
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
-        wait_for_outcome: _WaitForTeleportOutcomeProtocol,
+        wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         acquisition_dispatch_failure_message: str,
         teleport_dispatch_failure_message: str,
@@ -1470,9 +1472,9 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
         reset_to_idle_before_start: bool = True,
     ) -> TrackedTeleportAttempt:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             cdp,
             attempt_label,
             fuel_before,
@@ -1504,8 +1506,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
             teleport_started_ms=None,
         )
 
-    attempt_runner_name = "run_tracked_teleport_attempt"
-    setattr(fuel_probe_runtime, attempt_runner_name, _run_attempt)
+    fuel_probe_runtime.run_tracked_teleport_attempt = _run_attempt
     try:
         with pytest.raises(FuelProbeError, match="fuel attempt ended before teleport dispatch"):
             probe._probe_single_fuel_target(
@@ -1518,7 +1519,7 @@ def test_probe_single_target_rejects_missing_tracked_teleport_result() -> None:
                 teleport_strategy="sync_before_teleport",
             )
     finally:
-        setattr(fuel_probe_runtime, attempt_runner_name, original_attempt_runner)
+        fuel_probe_runtime.run_tracked_teleport_attempt = original_attempt_runner
 
 
 def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_result() -> None:
@@ -1613,9 +1614,9 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
         )
 
     def _run_attempt(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: FuelProbe,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportAttemptProbeProtocol,
+        target: TeleportTargetDict,
         *,
         cdp: CDPSessionProtocol | None,
         attempt_label: str,
@@ -1627,7 +1628,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
         wait_for_acquisition_sync: bool,
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
-        wait_for_outcome: _WaitForTeleportOutcomeProtocol,
+        wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
         acquisition_dispatch_failure_message: str,
         teleport_dispatch_failure_message: str,
@@ -1638,9 +1639,9 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
         reset_to_idle_before_start: bool = True,
     ) -> TrackedTeleportAttempt:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             cdp,
             attempt_label,
             fuel_before,
@@ -1672,8 +1673,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
             teleport_started_ms=None,
         )
 
-    attempt_runner_name = "run_reposition_attempt"
-    setattr(fuel_target_phase, attempt_runner_name, _run_attempt)
+    fuel_target_phase.run_reposition_attempt = _run_attempt
     try:
         with pytest.raises(FuelProbeError, match="fuel reposition ended before teleport dispatch"):
             fuel_target_phase.resolve_fuel_target_after_radar(
@@ -1748,7 +1748,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
                 ),
             )
     finally:
-        setattr(fuel_target_phase, attempt_runner_name, original_attempt_runner)
+        fuel_target_phase.run_reposition_attempt = original_attempt_runner
 
 
 def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:

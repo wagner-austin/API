@@ -16,6 +16,7 @@ from tankpit_bot.action_lab.action_trace_types import ActionPhaseCycleDict
 from tankpit_bot.action_lab.teleport_phase import (
     TeleportOutcomeWaiterKwargs,
     TeleportOutcomeWaiterProtocol,
+    TeleportPhaseProbeProtocol,
 )
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
@@ -168,13 +169,11 @@ class _WaitForOutcome(TeleportOutcomeWaiterProtocol):
 
 def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
     """Shared helper returns full tracked state for a successful attempt."""
-    acquisition_attr = "run_acquisition_phase"
-    teleport_attr = "run_teleport_phase"
     original_acquisition = teleport_attempt.run_acquisition_phase
     original_teleport = teleport_attempt.run_teleport_phase
-    page = _Page()
-    probe = _Probe()
-    target = _target()
+    expected_page = _Page()
+    expected_probe = _Probe()
+    expected_target = _target()
     dispatch_calls: list[str] = []
     teleport_calls: list[int] = []
 
@@ -188,8 +187,8 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         return _snapshot(phase)
 
     def _run_acquisition(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         *,
         cdp: CDPSessionProtocol | None,
         send_command: Callable[[], bool],
@@ -221,15 +220,15 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
             unavailable_error,
             unavailable_message,
         )
-        assert page_arg is page
-        assert provider_arg is probe
+        assert page is expected_page
+        assert provider is expected_probe
         assert send_command()
         return (1500, 1700, [_snapshot("before_map_open")], _capture_page_snapshot)
 
     def _run_teleport(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: teleport_attempt.TeleportAttemptProbeProtocol,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportPhaseProbeProtocol,
+        target: TeleportTargetDict,
         *,
         teleport_cycle: ActionPhaseCycleDict,
         message_start_index: int,
@@ -245,7 +244,7 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
-        dispatch_failure_message: str,
+        dispatch_failure_message: str = "",
     ) -> tuple[TeleportAttemptResultDict, int]:
         _ = (
             teleport_cycle,
@@ -259,23 +258,23 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
             dispatch_failure_error,
             dispatch_failure_message,
         )
-        assert page_arg is page
-        assert probe_arg is probe
-        assert target_arg == target
+        assert page is expected_page
+        assert probe is expected_probe
+        assert target == expected_target
         assert message_start_index == 1
         assert [snapshot["phase"] for snapshot in page_snapshots] == ["before_map_open"]
         teleport_calls.append(message_start_index)
         return (_result(target), 1800)
 
-    setattr(teleport_attempt, acquisition_attr, _run_acquisition)
-    setattr(teleport_attempt, teleport_attr, _run_teleport)
+    teleport_attempt.run_acquisition_phase = _run_acquisition
+    teleport_attempt.run_teleport_phase = _run_teleport
     try:
         attempt = teleport_attempt.run_tracked_teleport_attempt(
-            page,
-            probe,
-            target,
+            expected_page,
+            expected_probe,
+            expected_target,
             cdp=None,
-            attempt_label=target["label"],
+            attempt_label=expected_target["label"],
             fuel_before=1100,
             world_timestamp_before=900,
             send_acquisition_command=_dispatch,
@@ -294,11 +293,11 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
             unexpected_result_message="impossible",
         )
     finally:
-        setattr(teleport_attempt, acquisition_attr, original_acquisition)
-        setattr(teleport_attempt, teleport_attr, original_teleport)
+        teleport_attempt.run_acquisition_phase = original_acquisition
+        teleport_attempt.run_teleport_phase = original_teleport
 
-    assert probe.reset_idle_calls == 1
-    assert probe.started_cycles == [("teleport", "target")]
+    assert expected_probe.reset_idle_calls == 1
+    assert expected_probe.started_cycles == [("teleport", "target")]
     assert dispatch_calls == ["acquire"]
     assert teleport_calls == [1]
     assert attempt.message_start_index == 1
@@ -306,18 +305,16 @@ def test_run_tracked_teleport_attempt_runs_acquisition_then_teleport() -> None:
     assert attempt.acquisition_started_ms == 1500
     assert attempt.acquisition_sync_timestamp_ms == 1700
     assert attempt.teleport_started_ms == 1800
-    assert attempt.teleport_result == _result(target)
+    assert attempt.teleport_result == _result(expected_target)
 
 
 def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> None:
     """Shared helper returns without teleport dispatch when acquisition times out."""
-    acquisition_attr = "run_acquisition_phase"
-    teleport_attr = "run_teleport_phase"
     original_acquisition = teleport_attempt.run_acquisition_phase
     original_teleport = teleport_attempt.run_teleport_phase
-    page = _Page()
-    probe = _Probe()
-    target = _target()
+    expected_page = _Page()
+    expected_probe = _Probe()
+    expected_target = _target()
 
     def _dispatch() -> bool:
         return True
@@ -328,8 +325,8 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         return _snapshot(phase)
 
     def _run_acquisition(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         *,
         cdp: CDPSessionProtocol | None,
         send_command: Callable[[], bool],
@@ -361,15 +358,15 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
             unavailable_error,
             unavailable_message,
         )
-        assert page_arg is page
-        assert provider_arg is probe
+        assert page is expected_page
+        assert provider is expected_probe
         assert send_command()
         return (1500, None, [_snapshot("before_map_open")], _capture_page_snapshot)
 
     def _run_teleport(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: teleport_attempt.TeleportAttemptProbeProtocol,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportPhaseProbeProtocol,
+        target: TeleportTargetDict,
         *,
         teleport_cycle: ActionPhaseCycleDict,
         message_start_index: int,
@@ -385,12 +382,12 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
-        dispatch_failure_message: str,
+        dispatch_failure_message: str = "",
     ) -> tuple[TeleportAttemptResultDict, int]:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             teleport_cycle,
             message_start_index,
             map_open_started_ms,
@@ -406,15 +403,15 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
         )
         raise AssertionError("teleport dispatch should not run after acquisition timeout")
 
-    setattr(teleport_attempt, acquisition_attr, _run_acquisition)
-    setattr(teleport_attempt, teleport_attr, _run_teleport)
+    teleport_attempt.run_acquisition_phase = _run_acquisition
+    teleport_attempt.run_teleport_phase = _run_teleport
     try:
         attempt = teleport_attempt.run_tracked_teleport_attempt(
-            page,
-            probe,
-            target,
+            expected_page,
+            expected_probe,
+            expected_target,
             cdp=None,
-            attempt_label=target["label"],
+            attempt_label=expected_target["label"],
             fuel_before=1100,
             world_timestamp_before=900,
             send_acquisition_command=_dispatch,
@@ -433,10 +430,10 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
             unexpected_result_message="impossible",
         )
     finally:
-        setattr(teleport_attempt, acquisition_attr, original_acquisition)
-        setattr(teleport_attempt, teleport_attr, original_teleport)
+        teleport_attempt.run_acquisition_phase = original_acquisition
+        teleport_attempt.run_teleport_phase = original_teleport
 
-    assert probe.reset_idle_calls == 1
+    assert expected_probe.reset_idle_calls == 1
     assert attempt.message_start_index == 1
     assert attempt.acquisition_started_ms == 1500
     assert attempt.acquisition_sync_timestamp_ms is None
@@ -446,13 +443,11 @@ def test_run_tracked_teleport_attempt_returns_early_on_acquisition_timeout() -> 
 
 def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> None:
     """Shared helper raises when teleport returns an impossible map-sync timeout."""
-    acquisition_attr = "run_acquisition_phase"
-    teleport_attr = "run_teleport_phase"
     original_acquisition = teleport_attempt.run_acquisition_phase
     original_teleport = teleport_attempt.run_teleport_phase
-    page = _Page()
-    probe = _Probe()
-    target = _target()
+    expected_page = _Page()
+    expected_probe = _Probe()
+    expected_target = _target()
 
     def _dispatch() -> bool:
         return True
@@ -463,8 +458,8 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         return _snapshot(phase)
 
     def _run_acquisition(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         *,
         cdp: CDPSessionProtocol | None,
         send_command: Callable[[], bool],
@@ -496,15 +491,15 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
             unavailable_error,
             unavailable_message,
         )
-        assert page_arg is page
-        assert provider_arg is probe
+        assert page is expected_page
+        assert provider is expected_probe
         assert send_command()
         return (1500, 1700, [_snapshot("before_map_open")], _capture_page_snapshot)
 
     def _run_teleport(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: teleport_attempt.TeleportAttemptProbeProtocol,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportPhaseProbeProtocol,
+        target: TeleportTargetDict,
         *,
         teleport_cycle: ActionPhaseCycleDict,
         message_start_index: int,
@@ -520,12 +515,12 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
-        dispatch_failure_message: str,
+        dispatch_failure_message: str = "",
     ) -> tuple[TeleportAttemptResultDict, int]:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             teleport_cycle,
             message_start_index,
             map_open_started_ms,
@@ -543,16 +538,16 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
         impossible_result["status"] = "map_sync_timeout"
         return (impossible_result, 1800)
 
-    setattr(teleport_attempt, acquisition_attr, _run_acquisition)
-    setattr(teleport_attempt, teleport_attr, _run_teleport)
+    teleport_attempt.run_acquisition_phase = _run_acquisition
+    teleport_attempt.run_teleport_phase = _run_teleport
     try:
         with pytest.raises(RuntimeError, match="impossible"):
             teleport_attempt.run_tracked_teleport_attempt(
-                page,
-                probe,
-                target,
+                expected_page,
+                expected_probe,
+                expected_target,
                 cdp=None,
-                attempt_label=target["label"],
+                attempt_label=expected_target["label"],
                 fuel_before=1100,
                 world_timestamp_before=900,
                 send_acquisition_command=_dispatch,
@@ -571,19 +566,17 @@ def test_run_tracked_teleport_attempt_rejects_impossible_map_sync_timeout() -> N
                 unexpected_result_message="impossible",
             )
     finally:
-        setattr(teleport_attempt, acquisition_attr, original_acquisition)
-        setattr(teleport_attempt, teleport_attr, original_teleport)
+        teleport_attempt.run_acquisition_phase = original_acquisition
+        teleport_attempt.run_teleport_phase = original_teleport
 
 
 def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
     """Shared helper leaves probe state untouched when reset is disabled."""
-    acquisition_attr = "run_acquisition_phase"
-    teleport_attr = "run_teleport_phase"
     original_acquisition = teleport_attempt.run_acquisition_phase
     original_teleport = teleport_attempt.run_teleport_phase
-    page = _Page()
-    probe = _Probe()
-    target = _target()
+    expected_page = _Page()
+    expected_probe = _Probe()
+    expected_target = _target()
 
     def _dispatch() -> bool:
         return True
@@ -594,8 +587,8 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         return _snapshot(phase)
 
     def _run_acquisition(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         *,
         cdp: CDPSessionProtocol | None,
         send_command: Callable[[], bool],
@@ -627,15 +620,15 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
             unavailable_error,
             unavailable_message,
         )
-        assert page_arg is page
-        assert provider_arg is probe
+        assert page is expected_page
+        assert provider is expected_probe
         assert send_command()
         return (1500, None, [_snapshot("before_map_open")], _capture_page_snapshot)
 
     def _run_teleport(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: teleport_attempt.TeleportAttemptProbeProtocol,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportPhaseProbeProtocol,
+        target: TeleportTargetDict,
         *,
         teleport_cycle: ActionPhaseCycleDict,
         message_start_index: int,
@@ -651,12 +644,12 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         ],
         wait_for_outcome: TeleportOutcomeWaiterProtocol,
         dispatch_failure_error: type[Exception],
-        dispatch_failure_message: str,
+        dispatch_failure_message: str = "",
     ) -> tuple[TeleportAttemptResultDict, int]:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             teleport_cycle,
             message_start_index,
             map_open_started_ms,
@@ -672,15 +665,15 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
         )
         raise AssertionError("teleport phase should not run after acquisition timeout")
 
-    setattr(teleport_attempt, acquisition_attr, _run_acquisition)
-    setattr(teleport_attempt, teleport_attr, _run_teleport)
+    teleport_attempt.run_acquisition_phase = _run_acquisition
+    teleport_attempt.run_teleport_phase = _run_teleport
     try:
         attempt = teleport_attempt.run_tracked_teleport_attempt(
-            page,
-            probe,
-            target,
+            expected_page,
+            expected_probe,
+            expected_target,
             cdp=None,
-            attempt_label=target["label"],
+            attempt_label=expected_target["label"],
             fuel_before=1100,
             world_timestamp_before=900,
             send_acquisition_command=_dispatch,
@@ -700,8 +693,8 @@ def test_run_tracked_teleport_attempt_skips_idle_reset_when_disabled() -> None:
             reset_to_idle_before_start=False,
         )
     finally:
-        setattr(teleport_attempt, acquisition_attr, original_acquisition)
-        setattr(teleport_attempt, teleport_attr, original_teleport)
+        teleport_attempt.run_acquisition_phase = original_acquisition
+        teleport_attempt.run_teleport_phase = original_teleport
 
-    assert probe.reset_idle_calls == 0
+    assert expected_probe.reset_idle_calls == 0
     assert attempt.teleport_result is None

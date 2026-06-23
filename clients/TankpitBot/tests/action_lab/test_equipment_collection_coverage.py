@@ -13,7 +13,9 @@ from typing import Literal
 import pytest
 from typing_extensions import Unpack
 
+from tankpit_bot._test_hooks import CDPSessionProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
+from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.action_lab import (
     equipment_collection_phase as ecp_module,
 )
@@ -30,6 +32,9 @@ from tankpit_bot.action_lab.equipment_probe_types import (
 )
 from tankpit_bot.action_lab.equipment_target_phase import (
     BlockedEquipmentRepositionResult,
+    BuildEquipmentRepositionMapSyncTimeoutResultProtocol,
+    BuildEquipmentRepositionTeleportTimeoutResultProtocol,
+    BuildNoEquipmentVisibleResultProtocol,
     EquipmentTargetPhaseProbeProtocol,
     _run_blocked_equipment_reposition,
     resolve_equipment_target_after_radar,
@@ -39,7 +44,10 @@ from tankpit_bot.action_lab.session import (
     WaitPageProtocol,
 )
 from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
-from tankpit_bot.action_lab.teleport_phase import TeleportOutcomeWaiterKwargs
+from tankpit_bot.action_lab.teleport_phase import (
+    TeleportOutcomeWaiterKwargs,
+    TeleportOutcomeWaiterProtocol,
+)
 from tankpit_bot.action_lab.types import (
     TeleportAttemptResultDict,
     TeleportTargetDict,
@@ -78,7 +86,6 @@ def _world() -> WorldStateDict:
         terrain=b["terrain"],
         viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
         scanned_viewports=b["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=2000,
     )
 
@@ -845,9 +852,100 @@ def test_collection_impossible_missing_target() -> None:
         )
 
     def fake_resolve(
-        *_args: WaitPageProtocol,
-        **_kwargs: int,
+        page: WaitPageProtocol,
+        probe: EquipmentTargetPhaseProbeProtocol,
+        *,
+        cdp: CDPSessionProtocol | None,
+        target: TeleportTargetDict,
+        map_open_started_ms: int,
+        map_sync_timestamp_ms: int | None,
+        teleport_started_ms: int,
+        radar_started_ms: int,
+        radar_sync_timestamp_ms: int,
+        map_sync_timeout_ms: int,
+        teleport_timeout_ms: int,
+        inventory_count_before: int,
+        teleport_result: TeleportAttemptResultDict,
+        message_start_index: int,
+        teleport_cycle_ids: list[int],
+        radar_cycle_id: int,
+        teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
+        terrain_provider: Callable[[], TerrainMapProtocol | None],
+        find_visible_target: Callable[
+            [EquipmentTargetPhaseProbeProtocol, bool],
+            ContainerStateDict | None,
+        ],
+        requires_reposition: Callable[
+            [EquipmentTargetPhaseProbeProtocol, ContainerStateDict],
+            bool,
+        ],
+        find_landing_tile: Callable[
+            [EquipmentTargetPhaseProbeProtocol, ContainerStateDict],
+            tuple[int, int] | None,
+        ],
+        get_phase_overlaps: Callable[[], list[ActionPhaseOverlapDict]],
+        build_no_equipment_visible_result: BuildNoEquipmentVisibleResultProtocol,
+        build_reposition_map_sync_timeout_result: (
+            BuildEquipmentRepositionMapSyncTimeoutResultProtocol
+        ),
+        build_reposition_teleport_timeout_result: (
+            BuildEquipmentRepositionTeleportTimeoutResultProtocol
+        ),
+        make_reposition_target: Callable[[int, int], TeleportTargetDict],
+        wait_for_teleport_outcome: TeleportOutcomeWaiterProtocol,
+        teleport_strategy_requires_map_sync: Callable[
+            [Literal["sync_before_teleport", "immediate_after_map_open"]],
+            bool,
+        ],
+        no_landing_tile_error: type[Exception],
+        dispatch_failure_error: type[Exception],
+        unavailable_error: type[Exception],
+        unexpected_result_error: type[Exception],
+        unavailable_message: str,
+        no_landing_tile_message: str,
+        impossible_result_message: str,
+        acquisition_dispatch_failure_message: str,
+        teleport_dispatch_failure_message: str,
     ) -> EquipmentTargetResolution:
+        _ = (
+            page,
+            probe,
+            cdp,
+            target,
+            map_open_started_ms,
+            map_sync_timestamp_ms,
+            teleport_started_ms,
+            radar_started_ms,
+            radar_sync_timestamp_ms,
+            map_sync_timeout_ms,
+            teleport_timeout_ms,
+            inventory_count_before,
+            teleport_result,
+            message_start_index,
+            teleport_cycle_ids,
+            radar_cycle_id,
+            teleport_strategy,
+            terrain_provider,
+            find_visible_target,
+            requires_reposition,
+            find_landing_tile,
+            get_phase_overlaps,
+            build_no_equipment_visible_result,
+            build_reposition_map_sync_timeout_result,
+            build_reposition_teleport_timeout_result,
+            make_reposition_target,
+            wait_for_teleport_outcome,
+            teleport_strategy_requires_map_sync,
+            no_landing_tile_error,
+            dispatch_failure_error,
+            unavailable_error,
+            unexpected_result_error,
+            unavailable_message,
+            no_landing_tile_message,
+            impossible_result_message,
+            acquisition_dispatch_failure_message,
+            teleport_dispatch_failure_message,
+        )
         return EquipmentTargetResolution(
             equipment_target=None,
             teleport_result=_TP_RESULT,
@@ -858,8 +956,7 @@ def test_collection_impossible_missing_target() -> None:
         )
 
     ecp_module.run_radar_phase = fake_radar
-    resolve_attr = "resolve_equipment_target_phase"
-    setattr(ecp_module, resolve_attr, fake_resolve)
+    ecp_module.resolve_equipment_target_phase = fake_resolve
     try:
         with pytest.raises(RuntimeError, match="missing"):
             run_tracked_equipment_collection_phase(

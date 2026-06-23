@@ -31,7 +31,10 @@ from tankpit_bot.action_lab.teleport import (
     TeleportProbe,
     run_teleport_probe,
 )
-from tankpit_bot.action_lab.teleport_attempt import TrackedTeleportAttempt
+from tankpit_bot.action_lab.teleport_attempt import (
+    TeleportAttemptProbeProtocol,
+    TrackedTeleportAttempt,
+)
 from tankpit_bot.action_lab.teleport_helpers import (
     TeleportProbeError,
     _find_map_data_message_index,
@@ -122,7 +125,6 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 
@@ -569,7 +571,6 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_after_landing(
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=1500,
     )
     provider = _SequencedProvider([world, missing_self])
@@ -634,7 +635,6 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_on_timeout() -
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=1500,
     )
     provider = _SequencedProvider([world, missing_self, missing_self])
@@ -854,23 +854,23 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
     def _wait_sync_success(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         started_ms: int,
         timeout_ms: int,
     ) -> int | None:
-        _ = (page_arg, provider, started_ms, timeout_ms)
+        _ = (page, provider, started_ms, timeout_ms)
         return 1200
 
     def _wait_outcome(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
         teleport_cycle_id: int,
         message_start_index: int = 0,
         map_open_started_ms: int,
-        map_sync_timestamp_ms: int,
+        map_sync_timestamp_ms: int | None,
         teleport_started_ms: int,
         fuel_before: int,
         world_timestamp_before: int,
@@ -882,7 +882,7 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
         ],
     ) -> TeleportAttemptResultDict:
         _ = (
-            page_arg,
+            page,
             provider,
             target,
             teleport_cycle_id,
@@ -898,10 +898,8 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
         )
         return expected
 
-    wait_sync_name = "wait_for_world_sync"
-    wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_hooks, wait_sync_name, _wait_sync_success)
-    setattr(teleport_module, wait_outcome_name, _wait_outcome)
+    action_hooks.wait_for_world_sync = _wait_sync_success
+    teleport_module._wait_for_teleport_outcome = _wait_outcome
     try:
         result = probe._probe_single_target(
             TeleportTargetDict(label="target_0", x=150, y=171),
@@ -911,8 +909,8 @@ def test_probe_single_target_returns_wait_result_without_settle() -> None:
             settle_delay_ms=0,
         )
     finally:
-        setattr(action_hooks, wait_sync_name, original_wait_sync)
-        setattr(teleport_module, wait_outcome_name, original_wait_outcome)
+        action_hooks.wait_for_world_sync = original_wait_sync
+        teleport_module._wait_for_teleport_outcome = original_wait_outcome
     assert result == expected
     assert probe.teleport_calls == [(150, 171)]
     assert result["message_start_index"] == 10
@@ -927,9 +925,9 @@ def test_probe_single_target_rejects_missing_teleport_result_after_acquisition()
     original_attempt_runner = teleport_module.run_tracked_teleport_attempt
 
     def _run_attempt(
-        page_arg: action_session.WaitPageProtocol,
-        probe_arg: TeleportProbe,
-        target_arg: TeleportTargetDict,
+        page: action_session.WaitPageProtocol,
+        probe: TeleportAttemptProbeProtocol,
+        target: TeleportTargetDict,
         *,
         cdp: CDPSessionProtocol | None,
         attempt_label: str,
@@ -952,9 +950,9 @@ def test_probe_single_target_rejects_missing_teleport_result_after_acquisition()
         reset_to_idle_before_start: bool = True,
     ) -> TrackedTeleportAttempt:
         _ = (
-            page_arg,
-            probe_arg,
-            target_arg,
+            page,
+            probe,
+            target,
             cdp,
             attempt_label,
             fuel_before,
@@ -986,8 +984,7 @@ def test_probe_single_target_rejects_missing_teleport_result_after_acquisition()
             teleport_started_ms=None,
         )
 
-    attempt_runner_name = "run_tracked_teleport_attempt"
-    setattr(teleport_module, attempt_runner_name, _run_attempt)
+    teleport_module.run_tracked_teleport_attempt = _run_attempt
     try:
         with pytest.raises(
             TeleportProbeError,
@@ -1001,7 +998,7 @@ def test_probe_single_target_rejects_missing_teleport_result_after_acquisition()
                 settle_delay_ms=0,
             )
     finally:
-        setattr(teleport_module, attempt_runner_name, original_attempt_runner)
+        teleport_module.run_tracked_teleport_attempt = original_attempt_runner
 
 
 def test_probe_single_target_returns_wait_result_with_settle() -> None:
@@ -1014,93 +1011,17 @@ def test_probe_single_target_returns_wait_result_with_settle() -> None:
     original_wait_outcome = teleport_module._wait_for_teleport_outcome
 
     def _wait_sync_success(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         started_ms: int,
         timeout_ms: int,
     ) -> int | None:
-        _ = (page_arg, provider, started_ms, timeout_ms)
+        _ = (page, provider, started_ms, timeout_ms)
         return 1200
 
     def _wait_outcome(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
-        target: TeleportTargetDict,
-        *,
-        teleport_cycle_id: int,
-        message_start_index: int = 0,
-        map_open_started_ms: int,
-        map_sync_timestamp_ms: int,
-        teleport_started_ms: int,
-        fuel_before: int,
-        world_timestamp_before: int,
-        timeout_ms: int,
-        page_snapshots: list[TeleportPageSnapshotDict],
-        capture_page_snapshot: Callable[
-            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
-            TeleportPageSnapshotDict,
-        ],
-    ) -> TeleportAttemptResultDict:
-        _ = (
-            page_arg,
-            provider,
-            target,
-            teleport_cycle_id,
-            message_start_index,
-            map_open_started_ms,
-            map_sync_timestamp_ms,
-            teleport_started_ms,
-            fuel_before,
-            world_timestamp_before,
-            timeout_ms,
-            page_snapshots,
-            capture_page_snapshot,
-        )
-        return expected
-
-    wait_sync_name = "wait_for_world_sync"
-    wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_hooks, wait_sync_name, _wait_sync_success)
-    setattr(teleport_module, wait_outcome_name, _wait_outcome)
-    try:
-        result = probe._probe_single_target(
-            TeleportTargetDict(label="target_0", x=150, y=171),
-            teleport_strategy="sync_before_teleport",
-            map_sync_timeout_ms=3000,
-            teleport_timeout_ms=10000,
-            settle_delay_ms=250,
-        )
-    finally:
-        setattr(action_hooks, wait_sync_name, original_wait_sync)
-        setattr(teleport_module, wait_outcome_name, original_wait_outcome)
-    assert result == expected
-    assert result["message_start_index"] == 10
-    assert result["message_end_index"] == 14
-    assert page.waits[-1] == 250.0
-
-
-def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
-    from tankpit_bot.action_lab import teleport as teleport_module
-
-    probe = _ProbeMethodHarness()
-    expected = _make_attempt("landed_exact")
-    original_wait_sync = action_hooks.wait_for_world_sync
-    original_wait_outcome = teleport_module._wait_for_teleport_outcome
-    wait_sync_calls: list[int] = []
-
-    def _wait_sync_unexpected(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
-        started_ms: int,
-        timeout_ms: int,
-    ) -> int | None:
-        _ = (page_arg, provider, started_ms, timeout_ms)
-        wait_sync_calls.append(1)
-        return 1200
-
-    def _wait_outcome(
-        page_arg: action_session.WaitPageProtocol,
-        provider: action_session.WorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         target: TeleportTargetDict,
         *,
         teleport_cycle_id: int,
@@ -1118,7 +1039,81 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
         ],
     ) -> TeleportAttemptResultDict:
         _ = (
-            page_arg,
+            page,
+            provider,
+            target,
+            teleport_cycle_id,
+            message_start_index,
+            map_open_started_ms,
+            map_sync_timestamp_ms,
+            teleport_started_ms,
+            fuel_before,
+            world_timestamp_before,
+            timeout_ms,
+            page_snapshots,
+            capture_page_snapshot,
+        )
+        return expected
+
+    action_hooks.wait_for_world_sync = _wait_sync_success
+    teleport_module._wait_for_teleport_outcome = _wait_outcome
+    try:
+        result = probe._probe_single_target(
+            TeleportTargetDict(label="target_0", x=150, y=171),
+            teleport_strategy="sync_before_teleport",
+            map_sync_timeout_ms=3000,
+            teleport_timeout_ms=10000,
+            settle_delay_ms=250,
+        )
+    finally:
+        action_hooks.wait_for_world_sync = original_wait_sync
+        teleport_module._wait_for_teleport_outcome = original_wait_outcome
+    assert result == expected
+    assert result["message_start_index"] == 10
+    assert result["message_end_index"] == 14
+    assert page.waits[-1] == 250.0
+
+
+def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
+    from tankpit_bot.action_lab import teleport as teleport_module
+
+    probe = _ProbeMethodHarness()
+    expected = _make_attempt("landed_exact")
+    original_wait_sync = action_hooks.wait_for_world_sync
+    original_wait_outcome = teleport_module._wait_for_teleport_outcome
+    wait_sync_calls: list[int] = []
+
+    def _wait_sync_unexpected(
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
+        started_ms: int,
+        timeout_ms: int,
+    ) -> int | None:
+        _ = (page, provider, started_ms, timeout_ms)
+        wait_sync_calls.append(1)
+        return 1200
+
+    def _wait_outcome(
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
+        target: TeleportTargetDict,
+        *,
+        teleport_cycle_id: int,
+        message_start_index: int = 0,
+        map_open_started_ms: int,
+        map_sync_timestamp_ms: int | None,
+        teleport_started_ms: int,
+        fuel_before: int,
+        world_timestamp_before: int,
+        timeout_ms: int,
+        page_snapshots: list[TeleportPageSnapshotDict],
+        capture_page_snapshot: Callable[
+            [Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"]],
+            TeleportPageSnapshotDict,
+        ],
+    ) -> TeleportAttemptResultDict:
+        _ = (
+            page,
             provider,
             target,
             teleport_cycle_id,
@@ -1134,10 +1129,8 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
         assert map_sync_timestamp_ms is None
         return expected
 
-    wait_sync_name = "wait_for_world_sync"
-    wait_outcome_name = "_wait_for_teleport_outcome"
-    setattr(action_hooks, wait_sync_name, _wait_sync_unexpected)
-    setattr(teleport_module, wait_outcome_name, _wait_outcome)
+    action_hooks.wait_for_world_sync = _wait_sync_unexpected
+    teleport_module._wait_for_teleport_outcome = _wait_outcome
     try:
         result = probe._probe_single_target(
             TeleportTargetDict(label="target_0", x=150, y=171),
@@ -1147,8 +1140,8 @@ def test_probe_single_target_immediate_strategy_skips_map_sync_wait() -> None:
             settle_delay_ms=0,
         )
     finally:
-        setattr(action_hooks, wait_sync_name, original_wait_sync)
-        setattr(teleport_module, wait_outcome_name, original_wait_outcome)
+        action_hooks.wait_for_world_sync = original_wait_sync
+        teleport_module._wait_for_teleport_outcome = original_wait_outcome
     assert result == expected
     assert wait_sync_calls == []
     assert probe.teleport_calls == [(150, 171)]
@@ -1306,7 +1299,7 @@ def test_execute_builds_default_targets_and_collects_attempts() -> None:
     assert session["startup_timing"]["first_attempt_started_ms"] == 1000
 
 
-class _FakeTeleportProbe:
+class _FakeTeleportProbe(TeleportProbe):
     def __init__(
         self,
         target_url: str,
@@ -1317,9 +1310,9 @@ class _FakeTeleportProbe:
         command_service: CommandService | None = None,
     ) -> None:
         _ = (cdp_service, command_service)
-        self.target_url = target_url
-        self.headless = headless
-        self.prefer_account = prefer_account
+        self._fake_target_url = target_url
+        self._fake_headless = headless
+        self._fake_prefer_account = prefer_account
 
     def execute(
         self,
@@ -1344,7 +1337,7 @@ class _FakeTeleportProbe:
             session_id="fake-session",
             start_timestamp_ms=10,
             end_timestamp_ms=20,
-            base_url=self.target_url,
+            base_url=self._fake_target_url,
             spawn_x=100,
             spawn_y=100,
             teleport_strategy=teleport_strategy,
@@ -1386,9 +1379,21 @@ class _FakeTeleportProbe:
 def test_run_teleport_probe_writes_session_json(fake_fs: FakeFileSystem) -> None:
     from tankpit_bot.action_lab import teleport as teleport_module
 
-    original_probe_class = teleport_module.TeleportProbe
-    probe_class_name = "TeleportProbe"
-    setattr(teleport_module, probe_class_name, _FakeTeleportProbe)
+    original_factory = teleport_module.build_teleport_probe
+
+    def _build_fake_probe(
+        target_url: str,
+        *,
+        headless: bool,
+        prefer_account: bool,
+    ) -> TeleportProbe:
+        return _FakeTeleportProbe(
+            target_url,
+            headless=headless,
+            prefer_account=prefer_account,
+        )
+
+    teleport_module.build_teleport_probe = _build_fake_probe
     try:
         session = run_teleport_probe(
             "https://tankpit.com/play",
@@ -1396,7 +1401,7 @@ def test_run_teleport_probe_writes_session_json(fake_fs: FakeFileSystem) -> None
             explicit_targets=[TeleportTargetDict(label="target_0", x=150, y=171)],
         )
     finally:
-        setattr(teleport_module, probe_class_name, original_probe_class)
+        teleport_module.build_teleport_probe = original_factory
 
     written = fake_fs.read_text(Path("teleport_probe.json"))
     decoded = decode_teleport_probe_session(narrow_json_to_dict(load_json_str(written)))
@@ -1481,3 +1486,20 @@ def test_on_magic_captured_builds_xor_table(fake_fs: FakeFileSystem) -> None:
     if xor_table is None:
         raise AssertionError("xor_table should be set after magic capture")
     assert len(xor_table) == 1000
+
+
+def test_build_teleport_probe_default_factory_constructs_real_probe() -> None:
+    """Default ``build_teleport_probe`` hook constructs a wired TeleportProbe."""
+    from tankpit_bot.action_lab import teleport as teleport_module
+
+    probe = teleport_module._create_teleport_probe(
+        "https://tankpit.com/play",
+        headless=True,
+        prefer_account=False,
+    )
+    assert probe._target_url == "https://tankpit.com/play"
+    assert probe._headless is True
+    assert probe._prefer_account is False
+    assert probe._commands.xor_table is None
+    assert probe._cdp_service.messages == []
+    assert probe._cdp_service.magic is None

@@ -99,28 +99,27 @@ def _snapshot(
 
 def test_start_teleport_page_snapshots_captures_initial_snapshot() -> None:
     """Snapshot helper captures the initial map-open phase when requested."""
-    capture_attr = "capture_teleport_page_snapshot"
-    original_capture = action_session.capture_teleport_page_snapshot
-    cdp = _CDP()
+    original_capture = action_hooks.capture_teleport_page_snapshot
+    expected_cdp = _CDP()
 
     def _capture(
-        cdp_arg: CDPSessionProtocol,
+        cdp: CDPSessionProtocol,
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
-        assert cdp_arg is cdp
+        assert cdp is expected_cdp
         return _snapshot(phase)
 
-    setattr(action_session, capture_attr, _capture)
+    action_hooks.capture_teleport_page_snapshot = _capture
     try:
         snapshots, capture_page_snapshot = teleport_acquisition.start_teleport_page_snapshots(
-            cdp=cdp,
+            cdp=expected_cdp,
             capture_before_map_open=True,
             unavailable_error=RuntimeError,
             unavailable_message="missing",
         )
         assert capture_page_snapshot("landed")["phase"] == "landed"
     finally:
-        setattr(action_session, capture_attr, original_capture)
+        action_hooks.capture_teleport_page_snapshot = original_capture
 
     assert [snapshot["phase"] for snapshot in snapshots] == ["before_map_open"]
 
@@ -135,14 +134,12 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
     ``map_visible`` flag short-circuits this case.
     """
     clock = ReplayClock(2200)
-    wait_attr = "wait_for_world_sync"
-    capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
     original_wait = action_hooks.wait_for_world_sync
-    original_capture = action_session.capture_teleport_page_snapshot
-    provider = _Provider()
-    page = _Page()
-    cdp = _CDP()
+    original_capture = action_hooks.capture_teleport_page_snapshot
+    expected_provider = _Provider()
+    expected_page = _Page()
+    expected_cdp = _CDP()
     dispatch_calls: list[str] = []
     wait_calls: list[str] = []
 
@@ -151,33 +148,33 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
         return True
 
     def _wait_for_world_sync(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         started_ms: int,
         timeout_ms: int,
     ) -> int | None:
-        _ = (page_arg, provider_arg, started_ms, timeout_ms)
+        _ = (page, provider, started_ms, timeout_ms)
         wait_calls.append("waited")
         return None
 
     def _capture(
-        cdp_arg: CDPSessionProtocol,
+        cdp: CDPSessionProtocol,
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
-        assert cdp_arg is cdp
+        assert cdp is expected_cdp
         base = _snapshot(phase)
         base["map_visible"] = True
         return base
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_hooks, wait_attr, _wait_for_world_sync)
-    setattr(action_session, capture_attr, _capture)
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.capture_teleport_page_snapshot = _capture
     try:
         started_ms, sync_timestamp_ms, snapshots, _capture_callback = (
             teleport_acquisition.run_tracked_acquisition_phase(
-                page,
-                provider,
-                cdp=cdp,
+                expected_page,
+                expected_provider,
+                cdp=expected_cdp,
                 send_command=_dispatch,
                 command_name="map_open",
                 capture_before_map_open=True,
@@ -191,8 +188,8 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
         )
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_hooks, wait_attr, original_wait)
-        setattr(action_session, capture_attr, original_capture)
+        action_hooks.wait_for_world_sync = original_wait
+        action_hooks.capture_teleport_page_snapshot = original_capture
 
     assert started_ms == 2200
     assert sync_timestamp_ms == 2200
@@ -204,14 +201,12 @@ def test_run_tracked_acquisition_phase_short_circuits_when_map_already_open() ->
 def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
     """Acquisition helper dispatches once and waits for world sync when requested."""
     clock = ReplayClock(1500)
-    wait_attr = "wait_for_world_sync"
-    capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
     original_wait = action_hooks.wait_for_world_sync
-    original_capture = action_session.capture_teleport_page_snapshot
-    provider = _Provider()
-    page = _Page()
-    cdp = _CDP()
+    original_capture = action_hooks.capture_teleport_page_snapshot
+    expected_provider = _Provider()
+    expected_page = _Page()
+    expected_cdp = _CDP()
     dispatch_calls: list[str] = []
 
     def _dispatch() -> bool:
@@ -219,33 +214,33 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
         return True
 
     def _wait_for_world_sync(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         started_ms: int,
         timeout_ms: int,
     ) -> int | None:
-        assert page_arg is page
-        assert provider_arg is provider
+        assert page is expected_page
+        assert provider is expected_provider
         assert started_ms == 1500
         assert timeout_ms == 4000
         return 1700
 
     def _capture(
-        cdp_arg: CDPSessionProtocol,
+        cdp: CDPSessionProtocol,
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
-        assert cdp_arg is cdp
+        assert cdp is expected_cdp
         return _snapshot(phase)
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_hooks, wait_attr, _wait_for_world_sync)
-    setattr(action_session, capture_attr, _capture)
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.capture_teleport_page_snapshot = _capture
     try:
         started_ms, sync_timestamp_ms, snapshots, capture_page_snapshot = (
             teleport_acquisition.run_tracked_acquisition_phase(
-                page,
-                provider,
-                cdp=cdp,
+                expected_page,
+                expected_provider,
+                cdp=expected_cdp,
                 send_command=_dispatch,
                 command_name="map_open",
                 capture_before_map_open=True,
@@ -260,8 +255,8 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
         assert capture_page_snapshot("timeout")["phase"] == "timeout"
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_hooks, wait_attr, original_wait)
-        setattr(action_session, capture_attr, original_capture)
+        action_hooks.wait_for_world_sync = original_wait
+        action_hooks.capture_teleport_page_snapshot = original_capture
 
     assert started_ms == 1500
     assert sync_timestamp_ms == 1700
@@ -272,37 +267,35 @@ def test_run_tracked_acquisition_phase_waits_for_sync() -> None:
 def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
     """Acquisition helper skips world sync when the caller disables it."""
     clock = ReplayClock(2500)
-    wait_attr = "wait_for_world_sync"
-    capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
     original_wait = action_hooks.wait_for_world_sync
-    original_capture = action_session.capture_teleport_page_snapshot
-    provider = _Provider()
-    page = _Page()
-    cdp = _CDP()
+    original_capture = action_hooks.capture_teleport_page_snapshot
+    expected_provider = _Provider()
+    expected_page = _Page()
+    expected_cdp = _CDP()
 
     def _dispatch() -> bool:
         return True
 
     def _wait_for_world_sync(
-        page_arg: action_session.WaitPageProtocol,
-        provider_arg: action_session.BufferedWorldStateProviderProtocol,
+        page: action_session.WaitPageProtocol,
+        provider: action_session.BufferedWorldStateProviderProtocol,
         started_ms: int,
         timeout_ms: int,
     ) -> int | None:
-        _ = (page_arg, provider_arg, started_ms, timeout_ms)
+        _ = (page, provider, started_ms, timeout_ms)
         raise AssertionError("wait_for_world_sync should not run when wait_for_sync=False")
 
     def _capture(
-        cdp_arg: CDPSessionProtocol,
+        cdp: CDPSessionProtocol,
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
-        assert cdp_arg is cdp
+        assert cdp is expected_cdp
         return _snapshot(phase)
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_hooks, wait_attr, _wait_for_world_sync)
-    setattr(action_session, capture_attr, _capture)
+    action_hooks.wait_for_world_sync = _wait_for_world_sync
+    action_hooks.capture_teleport_page_snapshot = _capture
     try:
         (
             started_ms,
@@ -310,9 +303,9 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
             snapshots,
             _,
         ) = teleport_acquisition.run_tracked_acquisition_phase(
-            page,
-            provider,
-            cdp=cdp,
+            expected_page,
+            expected_provider,
+            cdp=expected_cdp,
             send_command=_dispatch,
             command_name="map_open",
             capture_before_map_open=False,
@@ -325,8 +318,8 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
         )
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_hooks, wait_attr, original_wait)
-        setattr(action_session, capture_attr, original_capture)
+        action_hooks.wait_for_world_sync = original_wait
+        action_hooks.capture_teleport_page_snapshot = original_capture
 
     assert started_ms == 2500
     assert sync_timestamp_ms is None
@@ -336,31 +329,30 @@ def test_run_tracked_acquisition_phase_skips_sync_when_disabled() -> None:
 def test_run_tracked_acquisition_phase_raises_on_dispatch_failure() -> None:
     """Acquisition helper raises immediately on dispatch failure."""
     clock = ReplayClock(3500)
-    capture_attr = "capture_teleport_page_snapshot"
     original_clock = action_hooks.get_current_time_ms
-    original_capture = action_session.capture_teleport_page_snapshot
-    provider = _Provider()
-    page = _Page()
-    cdp = _CDP()
+    original_capture = action_hooks.capture_teleport_page_snapshot
+    expected_provider = _Provider()
+    expected_page = _Page()
+    expected_cdp = _CDP()
 
     def _dispatch() -> bool:
         return False
 
     def _capture(
-        cdp_arg: CDPSessionProtocol,
+        cdp: CDPSessionProtocol,
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
-        assert cdp_arg is cdp
+        assert cdp is expected_cdp
         return _snapshot(phase)
 
     action_hooks.get_current_time_ms = clock
-    setattr(action_session, capture_attr, _capture)
+    action_hooks.capture_teleport_page_snapshot = _capture
     try:
         with pytest.raises(RuntimeError, match="dispatch failed"):
             teleport_acquisition.run_tracked_acquisition_phase(
-                page,
-                provider,
-                cdp=cdp,
+                expected_page,
+                expected_provider,
+                cdp=expected_cdp,
                 send_command=_dispatch,
                 command_name="enemy_acquisition",
                 capture_before_map_open=True,
@@ -373,4 +365,4 @@ def test_run_tracked_acquisition_phase_raises_on_dispatch_failure() -> None:
             )
     finally:
         action_hooks.get_current_time_ms = original_clock
-        setattr(action_session, capture_attr, original_capture)
+        action_hooks.capture_teleport_page_snapshot = original_capture
