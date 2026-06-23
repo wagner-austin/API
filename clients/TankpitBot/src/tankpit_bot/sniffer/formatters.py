@@ -249,7 +249,7 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x4E:
         return f"tank={d['tank_id']} slot={d['slot']} level={d['level']}"
     if d["msg_type"] == 0x4C:
-        return f"fuel_dots={len(d['fuel_dots'])} tanks={len(d['tanks'])}"
+        return f"tanks={len(d['tanks'])}"
     if d["msg_type"] == 0x3C:
         preview = d["message"].replace("\n", " ")[:60]
         return f"message={preview!r}"

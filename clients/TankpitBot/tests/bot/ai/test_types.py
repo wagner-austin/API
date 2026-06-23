@@ -201,7 +201,6 @@ class TestAIConfig:
     def test_make_default_ai_config(self) -> None:
         """Default config has sensible values."""
         config = make_default_ai_config()
-        assert config["fuel_critical_threshold"] == 300
         assert config["fuel_low_threshold"] == 300
         assert config["fuel_full_threshold"] == 1100
         assert config["hunt_min_fuel"] == 100
@@ -226,7 +225,6 @@ class TestAIConfig:
     def test_decode_invalid_waypoints_not_list_raises(self) -> None:
         """Decode rejects non-list patrol_waypoints."""
         data: JSONObject = {
-            "fuel_critical_threshold": 300,
             "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -248,7 +246,6 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_format_raises(self) -> None:
         """Decode rejects waypoints that are not [x, y] pairs."""
         data: JSONObject = {
-            "fuel_critical_threshold": 300,
             "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -270,7 +267,6 @@ class TestAIConfig:
     def test_decode_invalid_waypoint_type_raises(self) -> None:
         """Decode rejects waypoints with non-int coordinates."""
         data: JSONObject = {
-            "fuel_critical_threshold": 300,
             "fuel_low_threshold": 300,
             "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
@@ -314,7 +310,6 @@ class TestAIState:
         assert state["last_scan_ms"] == 1
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
-        assert state["config"]["fuel_critical_threshold"] == 300
         assert state["config"]["fuel_low_threshold"] == 300
 
     def test_make_initial_ai_state_custom_config(self) -> None:
@@ -323,7 +318,6 @@ class TestAIState:
 
         config = make_default_ai_config()
         custom = AIConfigDict(
-            fuel_critical_threshold=150,
             fuel_low_threshold=400,
             fuel_full_threshold=config["fuel_full_threshold"],
             hunt_min_fuel=config["hunt_min_fuel"],
@@ -342,7 +336,6 @@ class TestAIState:
             patrol_waypoints=config["patrol_waypoints"],
         )
         state = make_initial_ai_state(custom)
-        assert state["config"]["fuel_critical_threshold"] == 150
         assert state["config"]["fuel_low_threshold"] == 400
 
     def test_encode_decode_roundtrip(self) -> None:

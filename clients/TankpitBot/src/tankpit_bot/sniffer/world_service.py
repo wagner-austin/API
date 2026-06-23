@@ -115,6 +115,31 @@ class WorldService:
         # arrival of the same signature within
         # ``PICKUP_DEDUP_WINDOW_MS`` is suppressed.
         self.recent_pickup_signatures: dict[tuple[tuple[int, int, int], ...], int] = {}
+        # Career stats from the most recent 0x56 Statistics broadcast.
+        # The wire sends these every ~10 s; the AI uses ``destroyed`` to
+        # gate "I have N kills, time to play conservatively" decisions,
+        # ``deactivated`` for the K/D ratio in scorecards, and
+        # ``playtime_seconds_total`` to enforce a session length cap
+        # without depending on wall-clock drift. ``-1`` means the wire
+        # has not yet sent a Statistics broadcast this session.
+        self.career_destroyed: int = -1
+        self.career_deactivated: int = -1
+        self.career_score: int = -1
+        self.career_playtime_seconds_total: int = -1
+        self.career_stats_last_update_ms: int = 0
+        # 0x2F ActivePlayers roster of (tank_id, rank) tuples from the
+        # most recent server broadcast. Empty until the server sends
+        # the first one (usually after join-confirm).
+        self.active_players: list[tuple[int, int]] = []
+        # 0x31 Top10 latest snapshot. ``-1`` means the wire hasn't sent
+        # a Top10 broadcast yet.
+        self.top10_viewer_score: int = -1
+        self.top10_viewer_position: int = -1
+        self.top10_team_filter: int = -1
+        # 0x60 PingResponse wall-clock. The bot's session-health
+        # monitor reads this to detect long server silences without
+        # racing the WebSocket layer.
+        self.last_ping_response_ms: int = 0
 
     # -----------------------------------------------------------------
     # World state accessors

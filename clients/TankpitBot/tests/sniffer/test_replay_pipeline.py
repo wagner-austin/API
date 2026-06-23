@@ -125,7 +125,14 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     assert "1301" in world["tanks"]
     assert "500" in world["tanks"]
 
-    assert len(world["containers"]) == 23
+    # 24 containers (was 23 prior to the partial-pickup fix). One
+    # container in this session was partially picked up; under the old
+    # ``pickup_container`` the tile was unconditionally removed and the
+    # bot lost track of the residual fuel until the next radar
+    # refresh. The new mutator keeps the tile in state with its volume
+    # reduced to the wire-reported ``remaining_volume`` so the planner
+    # can drain the rest. See ``state/container_mutations.py``.
+    assert len(world["containers"]) == 24
     assert len(world["mines"]) == 8
     assert len(world["scanned_viewports"]) == 4
 
@@ -246,9 +253,14 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
 def test_root_capture_session_replays_to_observed_terminal_state() -> None:
     """The unnamed root capture (capture_session.json) has mixed activity.
 
-    Some radar (3 scanned viewports, 7 containers discovered) and no radar
-    consumption (inventory radar slot still 25). Validates the cross-cutting
-    case where multiple decoder paths fire across the same session.
+    Some radar (4 scanned viewports, 20 containers discovered, 8 mines)
+    and no radar consumption (inventory radar slot still 25). Validates
+    the cross-cutting case where multiple decoder paths fire across the
+    same session. The capture file is regenerated locally on
+    ``make sniff`` runs; the assertions here pin the terminal state of
+    the version currently checked in / locally captured (2026-06-20
+    snapshot: 228 received frames, self ends at (178, 54) with full
+    fuel and full inventory).
     """
     session = _load(REPO_ROOT / "capture_session.json")
     received = _replay_all_received(session)
@@ -257,15 +269,15 @@ def test_root_capture_session_replays_to_observed_terminal_state() -> None:
     self_state = world["self_state"]
     inv = get_inventory_state(get_world_service())
 
-    assert received == 118
+    assert received == 228
     if self_state is None:
         pytest.fail("replay did not populate self_state")
-    assert (self_state["x"], self_state["y"]) == (81, 85)
+    assert (self_state["x"], self_state["y"]) == (178, 54)
     assert self_state["fuel"] == 1100
     assert len(world["tanks"]) == 37
-    assert len(world["containers"]) == 7
-    assert len(world["mines"]) == 0
-    assert len(world["scanned_viewports"]) == 3
+    assert len(world["containers"]) == 20
+    assert len(world["mines"]) == 8
+    assert len(world["scanned_viewports"]) == 4
     assert total_inventory_count(inv) == 125
     assert inv["extra_radars"]["count"] == 25
 

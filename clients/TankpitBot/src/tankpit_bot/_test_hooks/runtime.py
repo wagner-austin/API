@@ -15,8 +15,27 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 from collections.abc import Callable
 from typing import Protocol
+
+
+def _real_get_current_time_ms() -> int:
+    """Real implementation -- wall-clock milliseconds since the Unix epoch.
+
+    Returns:
+        Current Unix timestamp in milliseconds.
+    """
+    return int(time.time() * 1000)
+
+
+#: Hookable clock. Production code that needs "now in ms" -- the
+#: dispatcher's wire-timestamp stamping, the AI scan cooldown, the
+#: bot's tick cadence -- imports this name and calls it. Tests that
+#: drive multi-tick scenarios with controlled time replace this
+#: attribute via save-and-restore so the scenario's clock is the
+#: only ms-source in the system.
+get_current_time_ms: Callable[[], int] = _real_get_current_time_ms
 
 
 class FindBestStaticByteProtocol(Protocol):
@@ -168,9 +187,11 @@ __all__ = [
     "InstallSignalHandlersProtocol",
     "ProcessReceivedMessageProtocol",
     "StartWatchdogProtocol",
+    "_real_get_current_time_ms",
     "find_best_static_byte",
     "force_exit",
     "get_argv",
+    "get_current_time_ms",
     "install_signal_handlers",
     "process_received_message_hook",
     "start_watchdog",

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
+    find_acquisition_target,
     find_closest_threat,
+    find_locked_target_pursuit,
     manhattan_distance,
     threats_in_range,
 )
@@ -18,6 +20,7 @@ from tankpit_bot.state.types import (
     viewport_scan_key,
 )
 from tankpit_bot.state.types.constants import TankLiveness
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _tank(
@@ -81,7 +84,6 @@ def _world(tanks: dict[str, TankStateDict]) -> WorldStateDict:
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
         scanned_viewports={viewport_scan_key(0, 0): 0},
-        map_fuel_dots={},
         timestamp_ms=0,
     )
 
@@ -378,3 +380,232 @@ class TestThreatsInRange:
         threats = analyze_threats(world, _self_at(), now_ms=0)
         in_range = threats_in_range(threats, 20)
         assert in_range == []
+
+
+class TestFindAcquisitionTarget:
+    """Tests for ``find_acquisition_target`` (loose, map-fresh acquisition)."""
+
+    def test_picks_nearest_map_known_enemy(self) -> None:
+        """Acquisition picks the closest enemy with a fresh map observation."""
+        tank = _tank("10", x=105, y=100, team=1)
+        # Map-fresh: timestamp_ms within map_open_cooldown_ms.
+        tank["timestamp_ms"] = 100000
+        world = _world({"10": tank})
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+        )
+
+        if result is None:
+            raise AssertionError("expected an acquisition target")
+        assert result["tank_id"] == 10
+
+    def test_filters_stale_timestamp(self) -> None:
+        """A tank whose timestamp is older than the cooldown is filtered out.
+
+        Covers the loose-freshness gate at ``threats.py::find_acquisition_target``
+        where ``now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms`` skips
+        the tank. Without this, the bot would teleport at a position that may
+        already be stale by minutes -- which is the gate analyze_threats was
+        tightened to prevent for firing (see [[bot-behavior-contract]] §5
+        Phantom firing).
+        """
+        tank = _tank("10", x=105, y=100, team=1)
+        tank["timestamp_ms"] = 80000
+
+        world = _world({"10": tank})
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+        )
+
+        assert result is None
+
+    def test_filters_water_locked_enemy(self) -> None:
+        """A tank without a passable adjacent tile is not a teleport target.
+
+        Covers the terrain-blocked gate at
+        ``threats.py::find_acquisition_target``. Even if the bot teleports
+        to (enemy_x, enemy_y), the server lands the bot on an adjacent
+        tile -- if every adjacent tile is water, the teleport silently
+        fails. The acquisition path declines and falls through to the
+        next strategy.
+        """
+        tank = _tank("10", x=105, y=100, team=1)
+        tank["timestamp_ms"] = 100000
+        world = _world({"10": tank})
+        terrain_data: dict[tuple[int, int], str] = {
+            (104, 100): "W",
+            (106, 100): "W",
+            (105, 99): "W",
+            (105, 101): "W",
+        }
+        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=terrain,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+        )
+
+        assert result is None
+
+    def test_returns_none_when_no_enemies_visible(self) -> None:
+        """Empty world produces no acquisition target."""
+        world = _world({})
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+        )
+
+        assert result is None
+
+
+class TestFindLockedTargetPursuit:
+    """Tests for ``find_locked_target_pursuit`` (locked-target chase)."""
+
+    def test_returns_none_when_no_lock(self) -> None:
+        """``locked_target_id == -1`` means no lock to pursue."""
+        world = _world({})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=-1,
+            killed={},
+        )
+
+        assert result is None
+
+    def test_returns_none_when_locked_target_killed(self) -> None:
+        """A locked target on the kill cooldown is not pursued.
+
+        Once the bot has observed a kill, the cooldown applies even
+        if the registry still lists the tank. Otherwise the pursuit
+        path would re-engage corpses for a few seconds.
+        """
+        tank = _tank("50", x=105, y=100, team=1)
+        tank["timestamp_ms"] = 100000
+        world = _world({"50": tank})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={"50": 99500},
+        )
+
+        assert result is None
+
+    def test_returns_none_when_target_not_in_registry(self) -> None:
+        """A locked id that is no longer in ``world["tanks"]`` cannot be pursued."""
+        world = _world({})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={},
+        )
+
+        assert result is None
+
+    def test_returns_none_when_target_deactivated(self) -> None:
+        """A deactivated (corpse-window) tank is not a pursuit target."""
+        tank = _tank("50", x=105, y=100, team=1, liveness="deactivated")
+        tank["timestamp_ms"] = 100000
+        world = _world({"50": tank})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={},
+        )
+
+        assert result is None
+
+    def test_returns_none_when_target_at_origin(self) -> None:
+        """A tank with no position-bearing wire (still at (0,0)) is unfireable."""
+        tank = _tank("50", x=0, y=0, team=1)
+        tank["timestamp_ms"] = 100000
+        world = _world({"50": tank})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={},
+        )
+
+        assert result is None
+
+    def test_returns_pursuit_threat_even_when_timestamp_is_stale(self) -> None:
+        """Pursuit fires at the cached coords regardless of timestamp staleness.
+
+        The earlier 5 s freshness gate was removed 2026-06-22 -- it
+        was tripping on tanks the server stopped broadcasting 0x2E
+        for (typically because they teleported far away), ending
+        pursuit prematurely. Ammo only decrements on confirmed hit,
+        so over-pursuing burns no resources -- the loop is bounded
+        by 0x41 Deactivation or the kill cooldown, both authoritative
+        death signals.
+        """
+        tank = _tank("50", x=105, y=100, team=1, name="prey")
+        tank["timestamp_ms"] = 80000  # 20 s stale at now_ms=100000 -- old gate would have tripped
+
+        world = _world({"50": tank})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={},
+        )
+
+        if result is None:
+            raise AssertionError("expected pursuit threat even with stale timestamp")
+        assert result["tank_id"] == 50
+        assert result["x"] == 105
+        assert result["y"] == 100
+
+    def test_returns_pursuit_threat_for_alive_locked_target(self) -> None:
+        """An alive locked target returns a pursuit threat at cached coords."""
+        tank = _tank("50", x=105, y=100, team=1, name="prey")
+        tank["timestamp_ms"] = 100000
+        world = _world({"50": tank})
+
+        result = find_locked_target_pursuit(
+            world,
+            _self_at(),
+            locked_target_id=50,
+            killed={},
+        )
+
+        if result is None:
+            raise AssertionError("expected a pursuit threat for alive target")
+        assert result["tank_id"] == 50
+        assert result["x"] == 105
+        assert result["y"] == 100

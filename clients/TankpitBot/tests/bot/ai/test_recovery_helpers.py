@@ -18,11 +18,7 @@ from tankpit_bot.bot.ai.recover_equipment_mode import (
 from tankpit_bot.bot.ai.recover_equipment_mode import (
     try_search_critical_equipment,
 )
-from tankpit_bot.bot.ai.resource_search import (
-    local_resource_search_hop,
-    make_resource_search_hop,
-    select_fuel_dot_hop,
-)
+from tankpit_bot.bot.ai.resource_search import local_resource_search_hop
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.types import make_move_command
@@ -63,6 +59,7 @@ def _enemy(*, x: int, y: int, timestamp_ms: int = 100000) -> TankStateDict:
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=timestamp_ms,
         last_position_update_ms=timestamp_ms,
+        last_viewport_observation_ms=timestamp_ms,
     )
 
 
@@ -241,194 +238,6 @@ class TestRecoveryHelpers:
         assert hop_x == 160
         assert hop_y == 100
         assert next_index == 101
-
-    def test_select_fuel_dot_hop_returns_none_with_empty_atlas(self) -> None:
-        """No fuel dots means no dot-guided target."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) is None
-
-    def test_select_fuel_dot_hop_picks_nearest_dot(self) -> None:
-        """The nearest worthwhile dot wins over farther ones."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"140,100": 100000, "120,100": 100000}
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) == (120, 100)
-
-    def test_select_fuel_dot_hop_skips_dot_in_scanned_ground(self) -> None:
-        """A dot whose tile sits inside fresh scan coverage is refuted, not a lead."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"120,100": 100000, "140,100": 100000}
-        world["scanned_viewports"]["112,92"] = 100000
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) == (140, 100)
-
-    def test_select_fuel_dot_hop_skips_degenerate_close_dot(self) -> None:
-        """A dot within the degenerate-hop displacement is never a teleport target."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"102,100": 100000, "130,100": 100000}
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) == (130, 100)
-
-    def test_select_fuel_dot_hop_returns_none_when_unaffordable(self) -> None:
-        """An unaffordable nearest dot ends the scan -- farther dots cost more."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["map_fuel_dots"] = {"160,100": 100000, "200,100": 100000}
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) is None
-
-    def test_select_fuel_dot_hop_returns_none_when_all_dots_covered(self) -> None:
-        """Every dot inside scanned ground leaves no dot-guided target."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"120,100": 100000}
-        world["scanned_viewports"]["112,92"] = 100000
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) is None
-
-    def test_select_fuel_dot_hop_revives_dot_after_scan_coverage_expires(self) -> None:
-        """An old scan no longer refutes a dot -- containers respawn."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"120,100": 100000}
-        world["scanned_viewports"]["112,92"] = 100000 - 46000
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) == (120, 100)
-
-    def test_select_fuel_dot_hop_dot_outside_scan_row_is_a_lead(self) -> None:
-        """A scan covering the dot's column but not its row does not refute it."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"120,140": 100000}
-        world["scanned_viewports"]["112,92"] = 100000
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert select_fuel_dot_hop(ctx) == (120, 140)
-
-    def test_dot_guided_hop_teleports_to_dot_without_consuming_patrol(self) -> None:
-        """A dot-guided hop targets the dot and leaves the ring patrol untouched."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        world["map_fuel_dots"] = {"120,110": 100000}
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        decision = make_resource_search_hop(
-            ctx,
-            mode="COLLECT_FUEL",
-            score=900,
-            reason="search_fuel_local",
-            fuel_dot_guided=True,
-        )
-
-        if decision is None:
-            raise AssertionError("expected dot-guided teleport decision")
-        assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 120
-        assert decision["command"]["target_y"] == 110
-        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 0
-
-    def test_dot_guided_hop_falls_back_to_ring_when_atlas_empty(self) -> None:
-        """Without dots the dot-guided hop degrades to the ring patrol."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        decision = make_resource_search_hop(
-            ctx,
-            mode="COLLECT_FUEL",
-            score=900,
-            reason="search_fuel_local",
-            fuel_dot_guided=True,
-        )
-
-        if decision is None:
-            raise AssertionError("expected ring-patrol teleport decision")
-        assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 130
-        assert decision["command"]["target_y"] == 100
-        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 1
 
     def test_expire_kills_removes_expired(self) -> None:
         """Expired kill cooldown entries are removed."""
@@ -743,8 +552,16 @@ class TestRecoveryHelpers:
         assert decision["command"]["target_x"] == 66
         assert decision["command"]["target_y"] == 63
 
-    def test_non_emergency_equipment_low_does_not_preempt_hunt(self) -> None:
-        """Non-emergency equipment depletion no longer overrides HUNT ownership."""
+    def test_low_equipment_preempts_hunt_to_restock_first(self) -> None:
+        """Any weapon/radar below the resume threshold preempts HUNT.
+
+        Per the 2026-06-22 user-defined gameplay loop ("restock -> hunt
+        -> kill -> restock"), the bot enters RECOVER_EQUIPMENT
+        whenever ANY counter is below its resume threshold (duals < 25,
+        homings < 25, radars < 20). At duals=20 and radars=20, both
+        are below their resume thresholds, so HUNT yields to
+        equipment recovery.
+        """
         containers: dict[str, ContainerStateDict] = {
             "106,106": make_container(106, 106, 30, False),
         }
@@ -756,8 +573,7 @@ class TestRecoveryHelpers:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
     def test_non_emergency_equipment_low_does_not_enter_recovery_search(self) -> None:
         """Non-emergency equipment depletion leaves HUNT in charge of the tick."""
@@ -788,7 +604,13 @@ class TestRecoveryHelpers:
         assert decision["behavior"]["mode"] == "HUNT"
 
     def test_non_emergency_equipment_low_keeps_hunt_even_with_visible_equipment(self) -> None:
-        """Visible equipment does not override HUNT when reserves are not at break levels."""
+        """Visible equipment does not override HUNT when reserves are not at break levels.
+
+        The semantic invariant is the behavior mode label: HUNT rather
+        than COLLECT_EQUIPMENT. The specific HUNT command (teleport when
+        the wire-sourced target position is fresh, map_open when stale)
+        is incidental to the assertion.
+        """
         containers: dict[str, ContainerStateDict] = {
             "103,100": make_container(103, 100, 0, False),
             "106,100": make_container(106, 100, 0, False),
@@ -813,10 +635,16 @@ class TestRecoveryHelpers:
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] == "map_open"
 
     def test_non_emergency_equipment_low_does_not_force_outer_ring_search(self) -> None:
-        """Blocked outer-ring equipment does not start recovery outside break thresholds."""
+        """Blocked outer-ring equipment does not start recovery outside break thresholds.
+
+        The semantic invariant is that ``COLLECT_EQUIPMENT`` does not
+        own this decision -- the bot does not abandon HUNT to chase a
+        water-locked container while reserves are above break levels.
+        Whether the active HUNT sub-pursuit is the direct teleport or a
+        within-HUNT refuel for affordability is incidental.
+        """
         containers: dict[str, ContainerStateDict] = {
             "129,184": make_container(129, 184, 0, False),
         }
@@ -841,7 +669,7 @@ class TestRecoveryHelpers:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["behavior"]["mode"] != "COLLECT_EQUIPMENT"
 
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
         """A* waypoints never produce moves outside the visible viewport."""

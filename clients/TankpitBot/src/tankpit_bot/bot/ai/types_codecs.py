@@ -125,6 +125,10 @@ def encode_enemy_threat(threat: EnemyThreatDict) -> JSONObject:
         "timestamp_ms": threat["timestamp_ms"],
         "last_wire_seen_ms": threat["last_wire_seen_ms"],
         "last_position_update_ms": threat["last_position_update_ms"],
+        "last_aim_x": threat["last_aim_x"],
+        "last_aim_y": threat["last_aim_y"],
+        "last_aim_weapon": threat["last_aim_weapon"],
+        "last_aim_ms": threat["last_aim_ms"],
     }
 
 
@@ -153,6 +157,10 @@ def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
+        last_aim_x=require_int(data, "last_aim_x") if "last_aim_x" in data else -1,
+        last_aim_y=require_int(data, "last_aim_y") if "last_aim_y" in data else -1,
+        last_aim_weapon=(require_int(data, "last_aim_weapon") if "last_aim_weapon" in data else -1),
+        last_aim_ms=require_int(data, "last_aim_ms") if "last_aim_ms" in data else 0,
     )
 
 
@@ -204,7 +212,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
     """
     waypoints: list[JSONValue] = [[x, y] for x, y in config["patrol_waypoints"]]
     return {
-        "fuel_critical_threshold": config["fuel_critical_threshold"],
         "fuel_low_threshold": config["fuel_low_threshold"],
         "fuel_full_threshold": config["fuel_full_threshold"],
         "hunt_min_fuel": config["hunt_min_fuel"],
@@ -265,7 +272,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         JSONTypeError: If required fields are missing or invalid.
     """
     return AIConfigDict(
-        fuel_critical_threshold=require_int(data, "fuel_critical_threshold"),
         fuel_low_threshold=require_int(data, "fuel_low_threshold"),
         fuel_full_threshold=require_int(data, "fuel_full_threshold"),
         hunt_min_fuel=require_int(data, "hunt_min_fuel"),
@@ -323,9 +329,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "resource_target_kind": state["resource_target_kind"],
         "resource_target_x": state["resource_target_x"],
         "resource_target_y": state["resource_target_y"],
-        "local_scan_cells": dict(state["local_scan_cells"]),
+        "local_scan_tiles": dict(state["local_scan_tiles"]),
         "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
-        "attempted_fuel_dots": dict(state["attempted_fuel_dots"]),
     }
 
 
@@ -417,14 +422,9 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         resource_target_kind=require_str(data, "resource_target_kind"),
         resource_target_x=require_int(data, "resource_target_x"),
         resource_target_y=require_int(data, "resource_target_y"),
-        local_scan_cells=_require_str_int_mapping(data, "local_scan_cells")
-        if "local_scan_cells" in data
-        else {},
+        local_scan_tiles=_require_str_int_mapping(data, "local_scan_tiles"),
         attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
         if "attempted_equipment_targets" in data
-        else {},
-        attempted_fuel_dots=_require_str_int_mapping(data, "attempted_fuel_dots")
-        if "attempted_fuel_dots" in data
         else {},
     )
 

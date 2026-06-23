@@ -194,11 +194,20 @@ def test_analyze_skips_sent_messages_looking_for_response(tmp_path: Path) -> Non
 
 
 def test_main_uses_default_path_when_no_args(tmp_path: Path) -> None:
-    """main() uses runs/bot/latest.capture_session.json when no args given."""
+    """main() uses runs/bot/latest.capture_session.json when no args given.
+
+    Resolves the default path under ``tmp_path`` by swapping CWD for
+    the duration of ``main()`` -- the original test wrote directly
+    into the live ``runs/bot/latest.capture_session.json``, which
+    clobbered real session captures whenever the suite ran on a
+    machine that had just executed ``make bot``.
+    """
+    import os
+
     from scripts.analyze_session_timing import main
 
     capture = _make_capture([_sent(1000, "move(105,100)"), _received(1050)])
-    default_path = Path("runs/bot/latest.capture_session.json")
+    default_path = tmp_path / "runs" / "bot" / "latest.capture_session.json"
     default_path.parent.mkdir(parents=True, exist_ok=True)
     default_path.write_text(dump_json_str(capture), encoding="utf-8")
 
@@ -209,7 +218,12 @@ def test_main_uses_default_path_when_no_args(tmp_path: Path) -> None:
 
     _test_hooks.setup_rich_logging = _fake_setup
     core_hooks.get_argv = lambda: ["analyze_session_timing"]
-    result = main()
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = main()
+    finally:
+        os.chdir(original_cwd)
     assert result == 0
 
 

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.equipment import is_tile_scanned
+from tankpit_bot.bot.ai.equipment import is_area_scanned, is_tile_scanned
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_best_fuel,
-    find_known_equipment_candidates,
-    find_known_fuel_candidates,
     find_nearest_deposit,
     find_nearest_equipment,
     find_nearest_fuel,
@@ -45,7 +43,6 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
         terrain={},
         viewport=ViewportStateDict(left=x - 9, top=y - 9, width=18, height=18),
         scanned_viewports={viewport_scan_key(x - 9, y - 9): 100000},
-        map_fuel_dots={},
         timestamp_ms=0,
     )
     state = make_self_state(
@@ -326,127 +323,8 @@ class TestFindNearestFuel:
         assert find_nearest_fuel(world, state) == farther
 
 
-class TestKnownContainerCandidates:
-    """Tests for full-registry known-container helpers."""
-
-    def test_find_known_fuel_candidates_orders_by_volume_then_distance(self) -> None:
-        """Known fuel selection uses the global registry, not just the viewport."""
-        world, state = _world_and_self()
-        world["containers"]["120,100"] = make_container_state(
-            x=120,
-            y=100,
-            is_fuel=True,
-            volume=700,
-            timestamp_ms=100000,
-        )
-        world["containers"]["130,100"] = make_container_state(
-            x=130,
-            y=100,
-            is_fuel=True,
-            volume=900,
-            timestamp_ms=100000,
-        )
-        world["containers"]["101,100"] = make_container_state(
-            x=101,
-            y=100,
-            is_fuel=True,
-            volume=50,
-            timestamp_ms=100000,
-        )
-
-        candidates = find_known_fuel_candidates(world, state, now_ms=100000, minimum_volume=100)
-
-        assert [(container["x"], container["volume"]) for container in candidates] == [
-            (130, 900),
-            (120, 700),
-        ]
-
-    def test_find_known_equipment_candidates_skips_stale_entries(self) -> None:
-        """Stale known equipment is filtered before nearest-first ordering."""
-        world, state = _world_and_self()
-        world["containers"]["120,100"] = make_container_state(
-            x=120,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-        )
-        world["containers"]["101,100"] = make_container_state(
-            x=101,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=0,
-        )
-
-        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
-
-        assert [(container["x"], container["y"]) for container in candidates] == [(120, 100)]
-
-    def test_find_known_equipment_candidates_skips_beyond_pursuit_bound(self) -> None:
-        """Known equipment past the pursuit distance bound is excluded.
-
-        A fresh belief 60 tiles away is a two-minute walk; the 30s
-        freshness TTL guarantees it is stale on arrival, so local search
-        wins past the bound (live run 20260610 cross-map walk).
-        """
-        world, state = _world_and_self()
-        world["containers"]["160,100"] = make_container_state(
-            x=160,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-        )
-        world["containers"]["120,100"] = make_container_state(
-            x=120,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-        )
-
-        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
-
-        assert [(container["x"], container["y"]) for container in candidates] == [(120, 100)]
-
-    def test_find_known_fuel_candidates_skips_beyond_pursuit_bound(self) -> None:
-        """Known fuel past the pursuit distance bound is excluded even at high volume."""
-        world, state = _world_and_self()
-        world["containers"]["160,100"] = make_container_state(
-            x=160,
-            y=100,
-            is_fuel=True,
-            volume=1000,
-            timestamp_ms=100000,
-        )
-        world["containers"]["120,100"] = make_container_state(
-            x=120,
-            y=100,
-            is_fuel=True,
-            volume=300,
-            timestamp_ms=100000,
-        )
-
-        candidates = find_known_fuel_candidates(world, state, now_ms=100000, minimum_volume=100)
-
-        assert [(container["x"], container["volume"]) for container in candidates] == [(120, 300)]
-
-    def test_find_known_equipment_candidates_skips_failed_pickups(self) -> None:
-        """Failed pickup markers suppress known equipment pursuit."""
-        world, state = _world_and_self()
-        world["containers"]["120,100"] = make_container_state(
-            x=120,
-            y=100,
-            is_fuel=False,
-            volume=0,
-            timestamp_ms=100000,
-            failed_pickups=1,
-        )
-
-        candidates = find_known_equipment_candidates(world, state, now_ms=100000)
-
-        assert candidates == []
+class TestFindNearestFuelExtras:
+    """Edge cases for find_nearest_fuel: viewport bounds, freshness, scan state."""
 
     def test_uses_viewport_bounds_not_distance_from_self(self) -> None:
         """Visible containers at the far viewport edge are still eligible."""
@@ -1086,3 +964,15 @@ class TestIsTileScanned:
         world, _ = _world_and_self(x=100, y=100)
         world["scanned_viewports"] = {}
         assert is_tile_scanned(world, 100, 100, now_ms=120000) is False
+
+    def test_is_area_scanned_skips_expired_scan_entries(self) -> None:
+        """Stale entries past the coverage TTL do not count as scanned.
+
+        Guards the expired-entry continue branch in is_area_scanned --
+        previously only exercised through the deleted fuel-dot revival
+        test.
+        """
+        world, _ = _world_and_self(x=100, y=100)
+        world["scanned_viewports"] = {"100,100": 100000}
+        # Elapsed 46000 ms > 45000 ms TTL => entry expired.
+        assert is_area_scanned(world, 100, 100, now_ms=146000) is False

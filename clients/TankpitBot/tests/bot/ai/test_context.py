@@ -42,7 +42,6 @@ def _world_with_container(
         terrain={},
         viewport={"left": 0, "top": 0, "width": 16, "height": 16},
         scanned_viewports={},
-        map_fuel_dots={},
         timestamp_ms=0,
     )
 

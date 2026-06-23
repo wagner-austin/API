@@ -53,7 +53,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x53 | `S` | Gg | ShootEvent: team, shooter, source pos, target pos, weapon | FULL | — |
 | 0x54 | `T` | Kg | ActionDone: bare completion ping | FULL | — |
 | 0x56 | `V` | Wg | Statistics: playtime, destroyed, deactivated, score | FULL | — |
-| 0x58 | `X` | Ug | TankRemove: server stopped per-tank updates (NOT a death — use 0x41) | FULL | Semantics clarified 2026-06-20 -- see [[game-economy]] and [[bot-behavior-contract]] |
+| 0x58 | `X` | Ug | TankRemove: server stopped per-tank updates (NOT a death — use 0x41). **Bot dispatch is a no-op as of 2026-06-22** — registry entry is kept so pursuit can keep firing homing at the cached coords. | FULL | Semantics clarified 2026-06-20, dispatch promoted to no-op 2026-06-22 -- see [[tank-freshness-model]] and [[bot-behavior-contract]] |
 | 0x5A | `Z` | Vg | ViewportUpdate: position + entity tiles | FULL | — |
 | 0x64 | `d` | Sg | FuelDeposit: absolute fuel total | FULL | — |
 | 0x67 | `g` | Wf | EquipmentGain: counts per slot | FULL | — |

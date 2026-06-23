@@ -5,7 +5,6 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     combat_reserve_restored,
-    needs_emergency_equipment,
 )
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -111,22 +110,13 @@ def apply_mode_to_decision(
 def should_enter_recover_fuel(ctx: DecideCtx) -> bool:
     """Return True when fuel recovery should own planning.
 
-    Yields to equipment recovery when extra radars are depleted and
-    fuel is above critical — without radars, fuel recovery cannot scan
-    effectively, so rebuilding radar stock first is higher value.
-
     Args:
         ctx: Decision context.
 
     Returns:
-        True when fuel is below the low-threshold entry rule and
-        radar-restock does not take priority.
+        True when fuel is at or below the low-threshold entry rule.
     """
-    if ctx.fuel > ctx.config["fuel_low_threshold"]:
-        return False
-    no_extras = ctx.inventory["extra_radars"]["count"] == 0
-    above_critical = ctx.fuel > ctx.config["fuel_critical_threshold"]
-    return not (no_extras and above_critical)
+    return ctx.fuel <= ctx.config["fuel_low_threshold"]
 
 
 def should_exit_recover_fuel(ctx: DecideCtx) -> bool:
@@ -164,22 +154,44 @@ def needs_radar_restock(ctx: DecideCtx) -> bool:
 def should_enter_recover_equipment(ctx: DecideCtx) -> bool:
     """Return True when equipment recovery should own planning.
 
-    Two entries share the mode: a weapon emergency (duals or homings
-    below the break threshold) and a radar restock when extras fall to
-    or below the radar break threshold. The radar entry rebuilds the
-    search kit -- the grid-sweep forager handles the zero case, the
-    viewport sweep handles the rest -- before the bot returns to
-    fighting.
+    Per the user-defined gameplay loop ("restock -> find enemy ->
+    fight -> kill -> restock -> hunt"), restock-mode entry has two
+    tiers:
+
+    * **Emergency** -- any reserve below its *break* threshold
+      (4 duals / 4 homings / 5 radars). The bot can't fight without
+      ammo; restock interrupts even an active combat target.
+    * **Between kills** -- any reserve below its *resume* threshold
+      (25 / 25 / 20) AND no active combat target. The bot finishes
+      the current kill first, then restocks before the next hunt.
+
+    The "active combat target" gate is the difference between
+    "restock, fight, restock" and "restock, shoot ONCE, restock":
+    a single missed-or-hit shot drops dual from 25 to 24, which
+    trips the resume threshold but should NOT abandon the in-flight
+    kill -- the bot finishes the engagement, THEN restocks for the
+    next one.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when a weapon emergency or a radar restock is needed.
+        True when the bot is below the emergency break threshold,
+        or when between kills with reserves below the resume
+        threshold.
     """
+    if (
+        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
+        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
+        or ctx.inventory["extra_radars"]["count"] < ctx.config["radar_break_threshold"]
+    ):
+        return True
+    if ctx.ai_state["combat_target_id"] != -1:
+        return False
     return (
-        needs_emergency_equipment(ctx)
-        or ctx.inventory["extra_radars"]["count"] <= ctx.config["radar_break_threshold"]
+        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_resume_threshold"]
+        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_resume_threshold"]
+        or ctx.inventory["extra_radars"]["count"] < ctx.config["radar_resume_threshold"]
     )
 
 
@@ -277,7 +289,7 @@ def derive_recover_equipment_mode_state(decision: TickDecisionDict) -> AIModeSta
     """
     reason = decision["behavior"]["reason"]
     command_type = decision["command"]["cmd_type"]
-    if reason == "radar_for_equipment":
+    if reason in ("forage_radar", "forage_sweep"):
         return "SENSE"
     if reason == "search_equipment_local":
         return "SEARCH"
@@ -297,9 +309,9 @@ def derive_recover_fuel_mode_state(decision: TickDecisionDict) -> AIModeState:
     """
     reason = decision["behavior"]["reason"]
     command_type = decision["command"]["cmd_type"]
-    if reason == "radar_for_fuel":
+    if reason in ("forage_radar", "forage_sweep"):
         return "SENSE"
-    if reason in ("search_fuel_local", "edge_for_fuel"):
+    if reason == "search_fuel_local":
         return "SEARCH"
     if command_type == "pickup_fuel":
         return "PICKUP"

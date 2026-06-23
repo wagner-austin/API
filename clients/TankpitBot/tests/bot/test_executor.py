@@ -331,15 +331,17 @@ class TestDispatchCommand:
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
-    def test_dispatch_map_open_closes_overlay_then_reopens_when_already_visible(
+    def test_dispatch_map_open_sends_wire_only_when_already_visible(
         self, fake_env: FakeEnv
     ) -> None:
-        """A visible map is closed client-side and the wire open re-dispatched.
+        """A visible map dispatches CMD_MAP_OPEN with no client-side keypress.
 
-        Regression guard for live run 20260610-005248: skipping the
-        dispatch starved HUNT of fresh MAP_DATA forever -- the wire open
-        is a server no-op while the map is open, so the overlay must be
-        closed first and the open re-sent for a fresh sync.
+        Regression guard for capture 20260620-183916: CMD_MAP_OPEN is
+        idempotent on the server -- every wire dispatch produces a fresh
+        MAP_DATA payload regardless of overlay visibility. The previous
+        close-then-reopen hack added a synthetic 'm' keypress before
+        every redundant intel refresh; the wire dispatch alone is what
+        the server actually needs.
         """
         bot, fake_cdp = _make_bot(fake_env)
         result = dispatch_command(
@@ -348,10 +350,9 @@ class TestDispatchCommand:
             _make_snapshot(map_visible=True),
         )
         assert result is True
-        # close_map() dispatches the synthetic keypress pair, then
-        # open_map() sends the wire command via Runtime.evaluate.
+        # No synthetic 'm' keypress dispatched -- only the wire command.
         key_events = [m for m in fake_cdp._sent_methods if m == "Input.dispatchKeyEvent"]
-        assert len(key_events) == 2
+        assert key_events == []
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
     def test_dispatch_teleport(self, fake_env: FakeEnv) -> None:
@@ -1017,6 +1018,7 @@ class TestSecondaryCommandDispatch:
                     timestamp_ms=1000,
                     last_wire_seen_ms=1000,
                     last_position_update_ms=1000,
+                    last_viewport_observation_ms=1000,
                 ),
             },
             containers={
@@ -1032,7 +1034,6 @@ class TestSecondaryCommandDispatch:
             terrain=ws.world_state["terrain"],
             viewport=ws.world_state["viewport"],
             scanned_viewports=ws.world_state["scanned_viewports"],
-            map_fuel_dots=ws.world_state["map_fuel_dots"],
             timestamp_ms=1000,
         )
 

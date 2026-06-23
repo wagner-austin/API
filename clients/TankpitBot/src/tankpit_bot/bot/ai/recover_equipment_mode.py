@@ -10,32 +10,24 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     needs_emergency_equipment,
     set_resource_target,
-    should_scan_resources_in_current_viewport,
 )
 from tankpit_bot.bot.ai.equipment import is_lock_release_warranted
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_adjacent_container,
     find_equipment_candidates,
-    find_known_equipment_candidates,
     find_nearest_equipment,
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.resource_search import (
     is_recently_attempted,
-    make_recovery_edge_decision,
-    make_recovery_map_intel_decision,
     make_resource_search_hop,
     record_attempt_mark,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import (
-    BotCommand,
-    make_pickup_fuel_command,
-    make_radar_command,
-)
+from tankpit_bot.bot.types import BotCommand, make_pickup_fuel_command
 from tankpit_bot.diagnostics.game_log_feedback import is_fuel_at_learned_capacity
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict
@@ -207,13 +199,39 @@ def try_search_critical_equipment(ctx: DecideCtx) -> TickDecisionDict | None:
         if ctx.base["resource_target_kind"] == "equipment"
         else ctx.base
     )
-    search_decision = _plan_equipment_sense_or_search(ctx, 925, base_state)
+    forage_decision = plan_forage_search(
+        ctx,
+        base_state,
+        score=925,
+        behavior_mode="COLLECT_EQUIPMENT",
+        radar_affordable=can_use_radar(ctx),
+    )
+    if forage_decision is not None:
+        return forage_decision
+    search_decision = _plan_equipment_search(
+        ctx,
+        score=925,
+        ai_state=base_state,
+        failure_count=ctx.ai_state["equipment_search_failures"],
+    )
     assert search_decision is not None
     return search_decision
 
 
 def decide_recover_equipment_mode(ctx: DecideCtx) -> TickDecisionDict:
     """Run the durable ``RECOVER_EQUIPMENT`` owner for this tick.
+
+    Cascade reads top-to-bottom as the gameplay loop:
+
+    1. **Strict**: pick up a reachable container in the current viewport
+       (handles opportunistic fuel and locked-target continuation too).
+    2. **Sense**: if the viewport still has unscanned tiles and a radar
+       is affordable, fire one. When out of extras the server resolves
+       the radar as the built-in 5x5 around the tank; an extra reveals
+       the full viewport. When radar is unaffordable, walk toward an
+       unscanned tile so the next free radar covers fresh ground.
+    3. **Hop**: nothing useful left here -- teleport to a fresh viewport
+       and restart from step 1.
 
     The owner persists until the combat reserve exit threshold is restored,
     even after the emergency break threshold has already been crossed back
@@ -240,53 +258,29 @@ def decide_recover_equipment_mode(ctx: DecideCtx) -> TickDecisionDict:
         if ctx.base["resource_target_kind"] == "equipment"
         else ctx.base
     )
-    search_decision = _plan_equipment_sense_or_search(ctx, 925, search_base)
+
+    forage_decision = plan_forage_search(
+        ctx,
+        search_base,
+        score=925,
+        behavior_mode="COLLECT_EQUIPMENT",
+        radar_affordable=can_use_radar(ctx),
+    )
+    if forage_decision is not None:
+        return forage_decision
+
+    search_decision = _plan_equipment_search(
+        ctx,
+        score=925,
+        ai_state=search_base,
+        failure_count=ctx.ai_state["equipment_search_failures"],
+    )
     if search_decision is not None:
         return search_decision
-    return _equipment_recovery_fallback(
-        ctx,
-        (
-            clear_resource_target(ctx.base)
-            if ctx.base["resource_target_kind"] == "equipment"
-            else ctx.base
-        ),
-    )
-
-
-def _equipment_recovery_fallback(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-) -> TickDecisionDict:
-    """Return the always-executable fallback when search cannot act.
-
-    Raising here killed the bot process mid-game (live run
-    20260610-000x: radar illegal, hop unaffordable at fuel=528 vs cost
-    540). "No affordable search action" is a legitimate game state, so
-    the owner falls back to a cheap edge walk and, when fully boxed in,
-    to free map intel.
-
-    Args:
-        ctx: Decision context.
-        ai_state: Base AI state to rewrite.
-
-    Returns:
-        Edge-walk or map-intel decision; never ``None``.
-    """
-    edge = make_recovery_edge_decision(
-        ctx,
-        mode="COLLECT_EQUIPMENT",
-        score=925,
-        reason="edge_for_equipment",
-        ai_state=ai_state,
-    )
-    if edge is not None:
-        return edge
-    return make_recovery_map_intel_decision(
-        ctx,
-        mode="COLLECT_EQUIPMENT",
-        score=925,
-        reason="map_intel_for_equipment",
-        ai_state=ai_state,
+    raise ValueError(
+        f"RECOVER_EQUIPMENT owner produced no decision at "
+        f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
+        f"forager exhausted, no affordable search hop."
     )
 
 
@@ -388,7 +382,7 @@ def _plan_equipment_target(
                 allow_unreachable=True,
             ),
         )
-        return _plan_known_equipment_target(ctx, base_state, score=score)
+        return None
 
     container, command = selection
     target_x = container["x"]
@@ -455,110 +449,6 @@ def _superior_equipment_candidate(
     ):
         return None
     return candidate
-
-
-def _plan_known_equipment_target(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-    *,
-    score: int,
-) -> TickDecisionDict | None:
-    """Approach a previously validated equipment target before blind search."""
-    for container in find_known_equipment_candidates(
-        ctx.filtered,
-        ctx.self_state,
-        now_ms=ctx.timestamp_ms,
-    ):
-        target_x = container["x"]
-        target_y = container["y"]
-        if _is_equipment_target_attempted(ctx, target_x, target_y):
-            continue
-        command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
-        if command is None:
-            continue
-        emit_ai("approach known equipment at (%d,%d)", target_x, target_y)
-        updated_state = _with_equipment_approach_recorded(
-            ctx,
-            AIStateDict(
-                **{
-                    **set_resource_target(ai_state, "equipment", target_x, target_y),
-                    "equipment_search_failures": 0,
-                }
-            ),
-            command,
-            target_x,
-            target_y,
-        )
-        return make_decision(
-            command,
-            "COLLECT_EQUIPMENT",
-            score,
-            target_x,
-            target_y,
-            "known_equipment",
-            updated_state,
-            ctx.equip,
-        )
-    return None
-
-
-def _plan_equipment_sense_or_search(
-    ctx: DecideCtx,
-    score: int,
-    ai_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Sense the current viewport or hop to a fresh sector for equipment.
-
-    Args:
-        ctx: Decision context.
-        score: Behavior score for the sensing/search action.
-        ai_state: Base AI state to rewrite.
-
-    Returns:
-        Radar or teleport-search decision, or ``None`` when neither is legal.
-    """
-    if ctx.inventory["extra_radars"]["count"] == 0:
-        forage_decision = plan_forage_search(ctx, ai_state, score)
-        if forage_decision is not None:
-            return forage_decision
-    has_known = (
-        len(
-            find_known_equipment_candidates(
-                ctx.filtered,
-                ctx.self_state,
-                now_ms=ctx.timestamp_ms,
-            )
-        )
-        > 0
-    )
-    if can_use_radar(ctx) and should_scan_resources_in_current_viewport(ctx) and not has_known:
-        emit_ai(
-            "radar to find equipment (dual=%d homing=%d radar=%d)",
-            ctx.inventory["dual_shots"]["count"],
-            ctx.inventory["homing_shots"]["count"],
-            ctx.inventory["extra_radars"]["count"],
-        )
-        return make_decision(
-            make_radar_command(),
-            "COLLECT_EQUIPMENT",
-            score,
-            0,
-            0,
-            "radar_for_equipment",
-            AIStateDict(
-                **{
-                    **ai_state,
-                    "last_scan_ms": ctx.timestamp_ms,
-                }
-            ),
-            ctx.equip,
-        )
-    return _plan_equipment_search(
-        ctx,
-        score=score,
-        ai_state=ai_state,
-        failure_count=ctx.ai_state["equipment_search_failures"],
-    )
 
 
 def _plan_equipment_search(

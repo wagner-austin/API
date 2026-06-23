@@ -1,8 +1,13 @@
 SHELL := powershell.exe
 .SHELLFLAGS := -NoProfile -ExecutionPolicy Bypass -Command
-OUTPUT ?= capture_session.json
+# OUTPUT is an explicit override for the sniffer's capture-file path.
+# When unset, the sniffer defaults to runs/sniff/latest.capture_session.json
+# and ALSO writes a timestamped archive to
+# runs/sniff/sniff-YYYYMMDD-HHMMSS.capture_session.json that is never
+# overwritten. Reference historical sessions by their archive path.
+OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-dot-probe fuel-drill equipment-probe movement-probe combat-probe bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport smoke debug-run
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport smoke debug-run
 
 help:
 	@Write-Host ""
@@ -23,10 +28,10 @@ help:
 	@Write-Host "  make enemy-teleport-probe-map    3 enemy teleports via map open"
 	@Write-Host "  make enemy-teleport-probe-nearest 3 enemy teleports via nearest"
 	@Write-Host "  make fuel-probe                  3 fuel pickups via 9 attempts"
-	@Write-Host "  make fuel-dot-probe              teleport to 6 map fuel dots, radar each"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
 	@Write-Host "  make combat-probe                3 combat engagements, 20 shots each"
+	@Write-Host "  make track                       enemy tracking probe (wire vs JS truth)"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make analyze                     issue report + cross-session stats"
@@ -84,8 +89,8 @@ check: lint | test
 
 sniff: install
 	@Write-Host ""
-	@Write-Host "==> sniff (output: $(OUTPUT))" -ForegroundColor Cyan
-	$$env:TANKPIT_OUTPUT = '$(OUTPUT)'; poetry run tankpit-sniff
+	@if ('$(OUTPUT)') { Write-Host "==> sniff (output override: $(OUTPUT))" -ForegroundColor Cyan } else { Write-Host "==> sniff (writing to runs/sniff/latest.capture_session.json + timestamped archive)" -ForegroundColor Cyan }
+	if ('$(OUTPUT)') { $$env:TANKPIT_OUTPUT = '$(OUTPUT)' } else { Remove-Item Env:TANKPIT_OUTPUT -ErrorAction SilentlyContinue }; poetry run tankpit-sniff
 
 # Live health gate. Run a $(SMOKE_DURATION)-second bot session, then
 # assert 5 concrete signals on runs/bot/latest.events.jsonl. Override
@@ -149,11 +154,6 @@ fuel-probe: install
 	@Write-Host "==> fuel-probe (target 3 pickups, max 9 attempts)" -ForegroundColor Cyan
 	poetry run tankpit-fuel-probe --target-pickups 3 --max-attempts 9
 
-fuel-dot-probe: install
-	@Write-Host ""
-	@Write-Host "==> fuel-dot-probe (visit 6 map fuel dots, radar each)" -ForegroundColor Cyan
-	poetry run tankpit-fuel-dot-probe --max-dots 6
-
 fuel-drill: install
 	@Write-Host ""
 	@Write-Host "==> fuel-drill (target 3 fills to 1100, max 18 attempts)" -ForegroundColor Cyan
@@ -173,6 +173,17 @@ combat-probe: install
 	@Write-Host ""
 	@Write-Host "==> combat-probe (3 engagements, 20 shots each)" -ForegroundColor Cyan
 	poetry run tankpit-combat-probe --max-engagements 3 --max-shots 20
+
+# Diagnoses wire-presence vs JS-truth divergence. Fires one shot at the
+# closest enemy, then samples per-tank belief at 1Hz for 120s. Writes
+# enemy_tracking_probe.json. Override duration with
+# `make track TRACK_SAMPLE_DURATION_MS=60000`.
+TRACK_SAMPLE_DURATION_MS ?= 120000
+TRACK_SAMPLE_INTERVAL_MS ?= 1000
+track: install
+	@Write-Host ""
+	@Write-Host "==> track (enemy tracking probe, duration: $(TRACK_SAMPLE_DURATION_MS)ms)" -ForegroundColor Cyan
+	poetry run tankpit-enemy-tracking-probe --sample-duration-ms $(TRACK_SAMPLE_DURATION_MS) --sample-interval-ms $(TRACK_SAMPLE_INTERVAL_MS)
 
 bot: install
 	@Write-Host ""

@@ -454,7 +454,6 @@ class TestBotAIIntegration:
                         terrain={},
                         viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
                         scanned_viewports={},
-                        map_fuel_dots={},
                         timestamp_ms=0,
                     )
                 return WorldStateDict(
@@ -465,7 +464,6 @@ class TestBotAIIntegration:
                     terrain={},
                     viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
                     scanned_viewports={},
-                    map_fuel_dots={},
                     timestamp_ms=0,
                 )
 

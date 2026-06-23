@@ -165,13 +165,16 @@ class TestCombatGates:
         assert decision["command"]["cmd_type"] != "shoot"
         assert "1229" in decision["updated_ai_state"]["blocked_combat_targets"]
 
-    def test_combat_blocks_when_position_stale(self) -> None:
-        """Wire fresh, position stale -> block target without firing.
+    def test_combat_fires_at_stationary_target_without_position_refresh(self) -> None:
+        """Wire-fresh target stays fireable even when position hasn't refreshed.
 
-        Regression for the 2026-06-19 stale-registry combat-miss loop:
-        status-only broadcasts (0x2E damage syncs) kept ``last_wire_seen_ms``
-        fresh while no position-bearing message arrived; the bot
-        otherwise fired at the stale registry position.
+        Practice-room bots don't move; their wire activity is
+        status-only broadcasts (0x2E) that refresh
+        ``last_wire_seen_ms`` but carry no position. The position
+        freshness gate was removed 2026-06-22 because viewport
+        presence (in ``analyze_threats``) already proves the target
+        is at the registry position right now -- the extra gate
+        was over-restricting and blocking kills on stationary bots.
         """
         seed_ts = _seed_self_and_enemy()
         ws = get_world_service()
@@ -182,9 +185,10 @@ class TestCombatGates:
         threats = analyze_threats(ws.world_state, self_state, now_ms=seed_ts)
         target = threats[0]
 
-        # Construct a stale-position threat: wire just refreshed (status
-        # sync), position older than POSITION_FRESHNESS_TTL_MS.
-        stale_position_target = EnemyThreatDict(
+        # Build a wire-fresh target whose position update went stale
+        # (status broadcasts kept the wire stamp current while the
+        # tank sat still without moving).
+        stationary_target = EnemyThreatDict(
             tank_id=target["tank_id"],
             x=target["x"],
             y=target["y"],
@@ -197,6 +201,10 @@ class TestCombatGates:
             timestamp_ms=target["timestamp_ms"],
             last_wire_seen_ms=seed_ts,
             last_position_update_ms=seed_ts - POSITION_FRESHNESS_TTL_MS - 1,
+            last_aim_x=target["last_aim_x"],
+            last_aim_y=target["last_aim_y"],
+            last_aim_weapon=target["last_aim_weapon"],
+            last_aim_ms=target["last_aim_ms"],
         )
 
         ctx = DecideCtx(
@@ -209,7 +217,7 @@ class TestCombatGates:
             "",
         )
 
-        decision = engage_target(ctx, stale_position_target)
+        decision = engage_target(ctx, stationary_target)
 
-        assert decision["command"]["cmd_type"] != "shoot"
-        assert "1229" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert "1229" not in decision["updated_ai_state"]["blocked_combat_targets"]

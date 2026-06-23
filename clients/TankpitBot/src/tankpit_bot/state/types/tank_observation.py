@@ -11,8 +11,17 @@ the full freshness model):
 
 * ``timestamp_ms`` -- advances on EVERY observation.
 * ``last_wire_seen_ms`` -- advances only when ``is_wire_sourced`` is True.
-* ``last_position_update_ms`` -- advances only when ``is_wire_sourced``
-  is True AND ``position`` is not None.
+* ``last_position_update_ms`` -- advances only when
+  ``position_is_authoritative`` is True AND ``position`` is not None.
+
+The two flags are intentionally independent so MAP_DATA -- the server's
+own snapshot of the global tank roster -- can advance the kill-shot
+position gate (``is_wire_sourced=False, position_is_authoritative=True``)
+without claiming wire-presence, which it does not prove (MAP_DATA can
+re-list a tank that has actually departed for minutes). Radar
+EnemyDetect (0x48) and DOM-scraped client-registry refinements set both
+flags False: they are tile-coarse or out-of-band estimates that must
+not gate a kill shot.
 
 These rules are enforced inside the mutator and locked by tests in
 ``tests/state/test_tank_observation.py``. They exist because wire
@@ -51,9 +60,20 @@ class TankObservation(TypedDict):
         timestamp_ms: Wall-clock ms when the observation arrived.
         is_wire_sourced: True if this observation came from a wire
             message (any 0x2x/0x3x/0x4x/0x5x/etc. binary message); False
-            if it came from the map snapshot (WorldState blob 0x4C).
-            Drives ``last_wire_seen_ms`` advancement and gates
-            ``last_position_update_ms`` advancement.
+            if it came from the map snapshot (WorldState blob 0x4C) or
+            an out-of-band channel (DOM scrape, radar EnemyDetect).
+            Drives ``last_wire_seen_ms`` advancement; MAP_DATA does not
+            prove wire presence (a departed tank lingers in the snapshot
+            for minutes) so this stays False even for snapshot data.
+        position_is_authoritative: True when ``position`` (if not None)
+            is the server's own statement of where the tank is, and so
+            should advance the kill-shot ``last_position_update_ms``
+            gate. True for every wire-sourced message that carries a
+            position AND for the 0x4C MAP_DATA snapshot. False for
+            radar EnemyDetect (tile-coarse estimate) and DOM-scraped
+            client-registry refinements (out-of-band, no server proof).
+            Decoupled from ``is_wire_sourced`` so MAP_DATA can advance
+            the position gate without claiming wire presence.
         storage_source: Which ``EntitySource`` label to record on the
             tank when this observation creates or refreshes it. The
             label is independent from ``is_wire_sourced`` because
@@ -72,6 +92,7 @@ class TankObservation(TypedDict):
     tank_id: int
     timestamp_ms: int
     is_wire_sourced: bool
+    position_is_authoritative: bool
     storage_source: EntitySource
     position: tuple[int, int] | None
     team: int | None
@@ -88,6 +109,7 @@ def make_tank_observation(
     is_wire_sourced: bool,
     storage_source: EntitySource,
     *,
+    position_is_authoritative: bool | None = None,
     position: tuple[int, int] | None = None,
     team: int | None = None,
     rank: int | None = None,
@@ -102,8 +124,14 @@ def make_tank_observation(
         tank_id: Subject of the observation.
         timestamp_ms: Wall-clock ms when the observation arrived.
         is_wire_sourced: True if from a wire message; False for map
-            snapshot.
+            snapshot, radar EnemyDetect, or DOM-scraped refinements.
         storage_source: Which ``EntitySource`` label to record.
+        position_is_authoritative: True when ``position`` represents
+            the server's authoritative statement about where the tank
+            is (wire-with-position OR map snapshot). When omitted,
+            defaults to ``is_wire_sourced`` -- the historical
+            wire-only semantic. Map-snapshot callers pass ``True``
+            explicitly; radar / DOM-refinement callers pass ``False``.
         position: Fresh ``(x, y)`` if observed, else ``None``.
         team: Fresh team if observed.
         rank: Fresh rank if observed.
@@ -115,10 +143,14 @@ def make_tank_observation(
     Returns:
         Constructed ``TankObservation`` with the supplied fields.
     """
+    resolved_authoritative = (
+        is_wire_sourced if position_is_authoritative is None else position_is_authoritative
+    )
     return TankObservation(
         tank_id=tank_id,
         timestamp_ms=timestamp_ms,
         is_wire_sourced=is_wire_sourced,
+        position_is_authoritative=resolved_authoritative,
         storage_source=storage_source,
         position=position,
         team=team,
@@ -234,6 +266,7 @@ def encode_tank_observation(obs: TankObservation) -> JSONObject:
         "tank_id": obs["tank_id"],
         "timestamp_ms": obs["timestamp_ms"],
         "is_wire_sourced": obs["is_wire_sourced"],
+        "position_is_authoritative": obs["position_is_authoritative"],
         "storage_source": obs["storage_source"],
         "position": [pos[0], pos[1]] if pos is not None else None,
         "team": obs["team"],
@@ -265,6 +298,7 @@ def decode_tank_observation(data: JSONObject) -> TankObservation:
         tank_id=require_int(data, "tank_id"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         is_wire_sourced=require_bool(data, "is_wire_sourced"),
+        position_is_authoritative=require_bool(data, "position_is_authoritative"),
         storage_source=storage_source,
         position=_require_position(data, "position"),
         team=_require_optional_int(data, "team"),

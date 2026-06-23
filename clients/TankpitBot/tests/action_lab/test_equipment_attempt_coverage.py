@@ -77,7 +77,6 @@ def _world() -> WorldStateDict:
         terrain=b["terrain"],
         viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
         scanned_viewports=b["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=2000,
     )
 

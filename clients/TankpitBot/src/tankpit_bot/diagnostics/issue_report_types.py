@@ -125,9 +125,9 @@ class StateBudgetRecordDict(TypedDict):
 class TargetedTeleportRecordDict(TypedDict):
     """One targeted-teleport DIAGNOSTIC event.
 
-    Shared row shape for the ``fuel_dot_hop`` and
-    ``equipment_approach`` diagnostics -- both record a deliberate
-    teleport at a known coordinate with the fuel level at dispatch.
+    Row shape for the ``equipment_approach`` diagnostic -- records a
+    deliberate teleport at a known coordinate with the fuel level at
+    dispatch.
 
     Attributes:
         target_x: Target X coordinate.
@@ -186,9 +186,8 @@ class SessionScorecardDict(TypedDict):
     This is the audit every live run gets compared on: where the time
     went, what combat produced, how low fuel dipped, how the inventory
     moved, what each radar press actually consumed, and whether the
-    dot-atlas refuels or equipment approaches show pathological
-    repetition (the orbit class of bug from live runs 20260612-062453
-    and 20260612-071918).
+    equipment approaches show pathological repetition (the orbit class
+    of bug from live runs 20260612-062453 and 20260612-071918).
 
     Attributes:
         duration_seconds: Whole seconds between the first and last
@@ -215,11 +214,6 @@ class SessionScorecardDict(TypedDict):
         fuel_last: Final ``belief_fuel`` sample, or ``-1`` with no
             samples.
         fuel_sample_count: Number of fuel samples observed.
-        dot_hops: Every ``fuel_dot_hop`` event in order.
-        dot_hop_distinct_targets: Number of distinct dot coordinates
-            targeted.
-        dot_hop_max_repeats: Highest event count for any single dot
-            coordinate, ``0`` with no hops.
         inventory_first: First ``inventory_sample`` counts, or the
             all ``-1`` sentinel with no samples.
         inventory_last: Final ``inventory_sample`` counts, or the
@@ -250,9 +244,6 @@ class SessionScorecardDict(TypedDict):
     fuel_min: int
     fuel_last: int
     fuel_sample_count: int
-    dot_hops: list[TargetedTeleportRecordDict]
-    dot_hop_distinct_targets: int
-    dot_hop_max_repeats: int
     inventory_first: InventoryCountsDict
     inventory_last: InventoryCountsDict
     inventory_sample_count: int
@@ -263,6 +254,19 @@ class SessionScorecardDict(TypedDict):
     equipment_approaches: list[TargetedTeleportRecordDict]
     equipment_approach_distinct_targets: int
     equipment_approach_max_repeats: int
+    # Career-totals snapshot taken at the LAST 0x56 Statistics broadcast
+    # the run saw. -1 means the wire never sent one (very short Practice
+    # runs sometimes finish before the cadence fires).
+    career_destroyed_last: int
+    career_deactivated_last: int
+    career_score_last: int
+    career_playtime_seconds_last: int
+    # Per-record container pickup tallies (each multi-record 0x43 body
+    # contributes N events). ``container_pickups_partial`` is records
+    # where the picker hit the fuel cap and left some fuel; everything
+    # else counts as ``container_pickups_full``.
+    container_pickups_full: int
+    container_pickups_partial: int
 
 
 class IssueReportDict(TypedDict):
@@ -294,7 +298,7 @@ class IssueReportDict(TypedDict):
         map_open_completions: Count of ``WIRE_COMPLETE`` events whose
             ``action_kind`` is ``map_open``.
         scorecard: Per-run outcome scorecard (time budget, combat,
-            fuel trajectory, dot-hop ledger).
+            fuel trajectory, equipment-approach ledger).
     """
 
     source_path: str

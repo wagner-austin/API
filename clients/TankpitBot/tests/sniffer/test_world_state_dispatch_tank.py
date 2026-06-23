@@ -56,16 +56,17 @@ class TestDispatchTankMessages:
         assert state["tanks"]["99"]["rank"] == 5
 
     def test_dispatch_tank_remove(self) -> None:
-        """Test dispatch handles TankRemove (0x58): tank is deleted from registry.
+        """0x58 TankRemove leaves the tank in the registry (changed 2026-06-22).
 
-        Empirical verification 2026-06-20 (ghost_observe capture):
-        0x58 TankRemove does NOT mean "tank died" -- it fires when the
-        server stops broadcasting per-tank updates to this client,
-        which happens on actual deaths but also when a tank simply
-        leaves the client's awareness radius (orange-5 got 5 0x58
-        events across 2 actual kills). The simpler correct behaviour
-        is to drop the tank; the next MapData / per-tank wire will
-        re-add it at its current position.
+        0x58 fires when the server stops broadcasting per-tank
+        updates to this client -- which happens on actual deaths but
+        also on benign tracking churn (ghost_observe capture
+        2026-06-20: orange-5 got 5 TankRemove events across 2
+        actual kills). The earlier behaviour deleted the tank, which
+        caused the bot to abandon pursuit of locked targets that
+        merely teleported out of viewport. The dispatch is now a
+        no-op for 0x58 -- the freshness gates and 0x41 Deactivation
+        own the lifecycle.
         """
         from tankpit_bot.protocol import TankEntryDict, TankRemoveDict
 
@@ -80,7 +81,8 @@ class TestDispatchTankMessages:
         remove_msg = TankRemoveDict(msg_type=0x58, tank_id=42)
         dispatch_world_state_update(get_world_service(), remove_msg)
         tanks = get_world_service().world_state["tanks"]
-        assert "42" not in tanks
+        assert "42" in tanks
+        assert tanks["42"]["liveness"] == "alive"
 
     def test_dispatch_tank_exit_does_not_remove_tank(self) -> None:
         """0x29 TankExit is announcement-only; tank stays in world state.
@@ -541,8 +543,8 @@ class TestDispatchMapData:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_map_data_replaces_fuel_dots_and_lifts_tank_positions(self) -> None:
-        """0x4C replaces fuel-dot atlas and advances every tank's wire position."""
+    def test_map_data_lifts_tank_positions(self) -> None:
+        """0x4C advances every tank's authoritative position from the snapshot."""
         from tankpit_bot.protocol import MapDataDict, MapTankEntry, TankEntryDict
 
         ws = get_world_service()
@@ -553,7 +555,6 @@ class TestDispatchMapData:
 
         snapshot = MapDataDict(
             msg_type=0x4C,
-            fuel_dots=[(5, 6), (7, 8)],
             tanks=[
                 MapTankEntry(x=100, y=120, tank_id=7, rank=2, damage=1, team=0),
             ],
@@ -564,23 +565,6 @@ class TestDispatchMapData:
         assert tank["x"] == 100
         assert tank["y"] == 120
         assert tank["damage_state"] == 1
-
-        # Atlas replaced wholesale.
-        dots = ws.world_state["map_fuel_dots"]
-        assert len(dots) == 2
-
-    def test_empty_snapshot_clears_fuel_dots(self) -> None:
-        """An empty MapData clears the atlas (replace, not merge)."""
-        from tankpit_bot.protocol import MapDataDict
-        from tankpit_bot.state import replace_map_fuel_dots
-
-        ws = get_world_service()
-        ws.world_state = replace_map_fuel_dots(ws.world_state, [(1, 2), (3, 4)], 100)
-        assert len(ws.world_state["map_fuel_dots"]) == 2
-
-        snapshot = MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[])
-        dispatch_world_state_update(ws, snapshot)
-        assert ws.world_state["map_fuel_dots"] == {}
 
     def test_map_data_marks_action_complete(self) -> None:
         """0x4C dispatch must flag map_data_processed so the bot's
@@ -603,7 +587,7 @@ class TestDispatchMapData:
 
         dispatch_world_state_update(
             ws,
-            MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[]),
+            MapDataDict(msg_type=0x4C, tanks=[]),
         )
 
         assert ws.check_and_clear_map_data_processed() is True
@@ -745,6 +729,102 @@ class TestDispatchStatistics:
             score=55931,
         )
         dispatch_world_state_update(ws, msg)
+
+        assert ws.world_state is before
+
+
+class TestDispatchSessionBroadcasts:
+    """Dispatcher coverage for 0x2F/0x31/0x60/0x7E session broadcasts."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_active_players_stores_roster_on_world_service(self) -> None:
+        """0x2F ActivePlayers populates ``ws.active_players``."""
+        from tankpit_bot.protocol import ActivePlayerEntry, ActivePlayersDict
+
+        ws = get_world_service()
+        msg = ActivePlayersDict(
+            msg_type=0x2F,
+            players=[
+                ActivePlayerEntry(tank_id=501, rank=5),
+                ActivePlayerEntry(tank_id=1027, rank=2),
+            ],
+        )
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.active_players == [(501, 5), (1027, 2)]
+
+    def test_top10_stores_viewer_snapshot_on_world_service(self) -> None:
+        """0x31 Top10 caches the viewer's score/position/team_filter."""
+        from tankpit_bot.protocol import Top10Dict, Top10EntryDict
+
+        ws = get_world_service()
+        msg = Top10Dict(
+            msg_type=0x31,
+            team_filter=255,
+            viewer_score=66051,
+            viewer_position=7,
+            entries=[
+                Top10EntryDict(
+                    position=1,
+                    score=1056816,
+                    team=2,
+                    rank=8,
+                    name="Yupr",
+                    tank_id=-1,
+                ),
+            ],
+        )
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.top10_viewer_score == 66051
+        assert ws.top10_viewer_position == 7
+        assert ws.top10_team_filter == 255
+
+    def test_top10_with_zero_rows_still_updates_viewer_snapshot(self) -> None:
+        """An empty Top10 list updates viewer fields but emits zero-row event."""
+        from tankpit_bot.protocol import Top10Dict
+
+        ws = get_world_service()
+        msg = Top10Dict(
+            msg_type=0x31,
+            team_filter=1,
+            viewer_score=0,
+            viewer_position=0,
+            entries=[],
+        )
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.top10_viewer_score == 0
+        assert ws.top10_viewer_position == 0
+        assert ws.top10_team_filter == 1
+
+    def test_ping_response_stamps_world_service(self) -> None:
+        """0x60 PingResponse advances ``ws.last_ping_response_ms``."""
+        from tankpit_bot.protocol import PingResponseDict
+
+        ws = get_world_service()
+        before = ws.last_ping_response_ms
+
+        dispatch_world_state_update(ws, PingResponseDict(msg_type=0x60))
+
+        # Wall clock advances past zero; the exact ms isn't important.
+        assert ws.last_ping_response_ms > before
+
+    def test_connection_lost_is_diagnostic_only(self) -> None:
+        """0x7E ConnectionLost does not mutate world state; diagnostic only."""
+        from tankpit_bot.protocol import ConnectionLostDict
+
+        ws = get_world_service()
+        before = ws.world_state
+
+        dispatch_world_state_update(ws, ConnectionLostDict(msg_type=0x7E))
 
         assert ws.world_state is before
 

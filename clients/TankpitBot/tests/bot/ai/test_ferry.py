@@ -4,21 +4,19 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import (
     FerryAwareTerrain,
     clamp_move_target_at_surface_transition,
     compose_decision_terrain,
     is_riding_ferry,
 )
-from tankpit_bot.bot.ai.recover_fuel_mode import decide_recover_fuel_mode
 from tankpit_bot.state.types import (
     TERRAIN_FERRY,
     TERRAIN_GROUND,
     TerrainTileDict,
     make_terrain_tile,
 )
-from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
+from tests.bot.ai._support import make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
@@ -208,34 +206,3 @@ class TestSurfaceTransitionClamp:
         )
 
         assert clamped == (105, 100)
-
-
-def test_tank_on_ferry_walks_across_water_to_fuel_dot() -> None:
-    """The stranded-on-ferry tank sails to the dot across the lake.
-
-    Regression guard for live run 20260612-131003: the tank stood on a
-    ferry at 7 fuel with a fuel dot two tiles away across water and
-    idled for 28 minutes because the walkability model treated all
-    water as impassable.
-    """
-    world, self_state = make_world(self_x=100, self_y=100, fuel=7, scanned=False)
-    world["terrain"].update(_ferry_tile(100, 100))
-    world["map_fuel_dots"] = {"104,100": 100000}
-    lake = {(x, y): "W" for x in range(96, 108) for y in range(96, 105)}
-    base = InMemoryTerrainMap(lake)
-    ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        make_inventory(),
-        100000,
-        compose_decision_terrain(world, base),
-        "",
-    )
-
-    decision = decide_recover_fuel_mode(ctx)
-
-    assert decision["behavior"]["reason"] == "fuel_dot_walk"
-    assert decision["command"]["cmd_type"] == "move"
-    assert decision["command"]["target_x"] == 104
-    assert decision["command"]["target_y"] == 100

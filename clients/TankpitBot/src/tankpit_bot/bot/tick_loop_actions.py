@@ -29,7 +29,29 @@ from tankpit_bot.sniffer.world_state import (
     mark_move_target_failed,
     mark_scan_viewport_failed,
 )
+from tankpit_bot.sniffer.world_state_combat import check_and_clear_command_error
 from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
+
+# Supervisor (0x52) error codes from tpclient.js ``Gb[]``. The bot
+# reacts to the codes that prove the in-flight action will never
+# resolve. The remaining codes are server-side messages that don't
+# correspond to an in-flight action the bot can clear.
+_COMMAND_ERROR_CANT_DO_THIS = 0  # "You can't do this"
+_COMMAND_ERROR_CANT_GO_THERE = 1  # "You can't go there!"
+_COMMAND_ERROR_EMPTY_CONTAINER = 4  # "Empty container"
+_COMMAND_ERROR_TANK_FULL = 5  # "Tank full"
+_COMMAND_ERROR_INVENTORY_FULL = 7  # "Inventory full"
+_COMMAND_ERROR_INSUFFICIENT_FUEL = 8  # "Insufficient fuel"
+_ACTION_BLOCKING_COMMAND_ERRORS = frozenset(
+    {
+        _COMMAND_ERROR_CANT_DO_THIS,
+        _COMMAND_ERROR_CANT_GO_THERE,
+        _COMMAND_ERROR_EMPTY_CONTAINER,
+        _COMMAND_ERROR_TANK_FULL,
+        _COMMAND_ERROR_INVENTORY_FULL,
+        _COMMAND_ERROR_INSUFFICIENT_FUEL,
+    }
+)
 
 log = get_logger(__name__)
 
@@ -64,6 +86,8 @@ def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
     """Return True while a move/collect/teleport action is still resolving."""
     kind = action["kind"]
     tx, ty = action["target_x"], action["target_y"]
+    if _clear_command_error(bot, action):
+        return False
     if _clear_rejected_movement(bot, action):
         return False
     if _clear_stalled_action(bot, action):
@@ -83,6 +107,8 @@ def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
 
 def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
     """Return True while a radar scan is still pending."""
+    if _clear_command_error(bot, action):
+        return False
     if _clear_stalled_action(bot, action):
         return False
     emit_sync("waiting for radar results")
@@ -91,11 +117,68 @@ def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
 
 def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
     """Return True while a map-open action is waiting on fresh server sync."""
+    if _clear_command_error(bot, action):
+        return False
     if _clear_stalled_action(bot, action):
         return False
     if _clear_completed_map_open(bot, action):
         return False
     emit_sync("waiting for map open sync")
+    return True
+
+
+def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
+    """Clear an in-flight action when the server emitted a 0x52 rejection.
+
+    The Supervisor message carries an authoritative reject ("You can't
+    do this", "You can't go there!", "Empty container", "Tank full",
+    "Inventory full", "Insufficient fuel") whose presence means the
+    in-flight action will never resolve. Without this hook the bot
+    waits the full ``action_stall_timeout_ms`` (10 s) before
+    replanning. Live run 20260620-184223 / pre-bug-bash: 4 of 7
+    collects stalled the full 10 s on rejections the wire had already
+    reported. Live capture 20260620-190728 / 20260620-190830 caught
+    the same shape with two ``error_code=7`` ("Inventory full")
+    rejects at full inventory; code 7 joined the blocking set on
+    2026-06-21 (see [[bot-behavior-contract]] §3.4).
+
+    Args:
+        bot: Bot instance.
+        action: The in-flight action record.
+
+    Returns:
+        True if a blocking command error was consumed and the action
+        was cleared.
+    """
+    error_code = check_and_clear_command_error(get_world_service())
+    if error_code not in _ACTION_BLOCKING_COMMAND_ERRORS:
+        return False
+    kind = action["kind"]
+    tx, ty = action["target_x"], action["target_y"]
+    started_ms = action["started_ms"]
+    elapsed_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
+    emit_sync(
+        "%s to (%d,%d) rejected by server (error_code=%d), replanning",
+        kind,
+        tx,
+        ty,
+        error_code,
+    )
+    emit_wire_complete(
+        action_kind=kind,
+        duration_ms=elapsed_ms,
+        signal="command_rejected",
+        target_x=tx,
+        target_y=ty,
+        error_code=error_code,
+    )
+    if kind == "collect":
+        increment_container_failed_pickups(get_world_service(), tx, ty)
+        emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
+    if kind in ("move", "teleport"):
+        mark_move_target_failed(tx, ty, get_current_time_ms())
+        emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)
+    bot._transition("IDLE", in_flight_action=make_no_action())
     return True
 
 

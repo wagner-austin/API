@@ -6,7 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import viewport_exploration_candidates
 from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -31,7 +31,13 @@ class TestDecideMapOpen:
         assert decision["behavior"]["reason"] == "find_enemies"
 
     def test_no_map_open_when_enemy_visible(self) -> None:
-        """decide() skips generic map-open fallback when a live enemy is visible."""
+        """decide() skips generic map-open fallback when a live enemy is visible.
+
+        The enemy's wire-sourced position is fresh
+        (``last_position_update_ms`` at the current tick), so HUNT can
+        teleport directly instead of dropping to the find_enemies
+        search.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -43,7 +49,10 @@ class TestDecideMapOpen:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -54,8 +63,17 @@ class TestDecideMapOpen:
 
         assert decision["behavior"]["reason"] != "find_enemies"
 
-    def test_fallback_uses_radar_when_map_on_cooldown(self) -> None:
-        """Fallback uses radar instead of map_open when the map is on cooldown."""
+    def test_fallback_opens_map_even_when_recently_opened(self) -> None:
+        """Enemy search dispatches map_open every tick that lacks a target.
+
+        Pre-2026-06-22 HUNT walked to a viewport edge while the
+        ``map_open_cooldown_ms`` was active. That branch was removed
+        because (a) viewport shifting is OFF in this game configuration
+        so the walk reveals no new ground, and (b) the fallback
+        teleport variant burned fuel without aiming at a known enemy.
+        The in-flight-action machinery (not the cooldown) gates
+        duplicate dispatches while a previous map_open is pending.
+        """
         world, self_state = make_world(fuel=800, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -65,88 +83,6 @@ class TestDecideMapOpen:
             }
         )
         inventory = make_inventory()
-
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
-
-        assert decision["command"]["cmd_type"] == "radar"
-        assert decision["behavior"]["reason"] == "radar_for_enemies"
-
-    def test_fallback_walks_when_map_and_radar_on_cooldown(self) -> None:
-        """Fallback walks to the viewport edge when both map and radar are cooling down."""
-        world, self_state = make_world(fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "config": make_default_ai_config(),
-                "last_scan_ms": 99000,
-                "last_map_open_ms": 99000,
-            }
-        )
-        inventory = make_inventory()
-
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
-
-        assert decision["command"]["cmd_type"] == "move"
-        assert decision["behavior"]["reason"] == "edge_for_enemies"
-
-    def test_fallback_does_not_repeat_radar_in_already_scanned_viewport(self) -> None:
-        """Fallback walks instead of rescanning an already confirmed viewport."""
-        world, self_state = make_world(fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "config": make_default_ai_config(),
-                "last_map_open_ms": 99000,
-            }
-        )
-        inventory = make_inventory()
-
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
-
-        assert decision["command"]["cmd_type"] == "move"
-        assert decision["behavior"]["reason"] == "edge_for_enemies"
-
-    def test_fallback_opens_map_when_walk_and_teleport_blocked(self) -> None:
-        """Water-locked exploration targets fall through to map open."""
-        world, self_state = make_world(fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "config": make_default_ai_config(),
-                "last_scan_ms": 99000,
-                "last_map_open_ms": 99000,
-            }
-        )
-        inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-        terrain_data: dict[tuple[int, int], str] = {}
-        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
-            terrain_data[(candidate_x, candidate_y)] = "W"
-            terrain_data[(candidate_x - 1, candidate_y)] = "#"
-            terrain_data[(candidate_x + 1, candidate_y)] = "#"
-            terrain_data[(candidate_x, candidate_y - 1)] = "#"
-            terrain_data[(candidate_x, candidate_y + 1)] = "#"
-        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
-
-        assert decision["command"]["cmd_type"] == "map_open"
-
-    def test_fallback_opens_map_when_all_exploration_targets_failed(self) -> None:
-        """Fallback reopens the map when all exploration targets are recently failed."""
-        world, self_state = make_world(fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "config": make_default_ai_config(),
-                "last_scan_ms": 99000,
-                "last_map_open_ms": 99000,
-            }
-        )
-        inventory = make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-        for candidate_x, candidate_y in viewport_exploration_candidates(ctx):
-            mark_move_target_failed(candidate_x, candidate_y, 99000)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
@@ -194,36 +130,16 @@ class TestDecideBlockedEdgeSearch:
             terrain_data[(candidate_x, candidate_y + 1)] = "#"
         return InMemoryTerrainMap(terrain_data=terrain_data)
 
-    def test_fallback_uses_alternate_edge_when_preferred_candidate_blocked(self) -> None:
-        """Fallback rotates to another edge candidate before reopening the map."""
-        world, self_state = make_world(fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "config": make_default_ai_config(),
-                "last_scan_ms": 99000,
-                "last_map_open_ms": 99000,
-            }
-        )
-        inventory = make_inventory()
-        terrain = InMemoryTerrainMap(
-            terrain_data={
-                (107, 107): "#",
-                (106, 107): "#",
-                (108, 107): "#",
-                (107, 106): "#",
-                (107, 108): "#",
-            }
-        )
+    def test_low_fuel_blocked_search_yields_to_fuel_recovery(self) -> None:
+        """Blocked terrain with low fuel routes the tick to fuel recovery.
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
-
-        assert decision["command"]["cmd_type"] == "move"
-        assert decision["behavior"]["reason"] == "edge_for_enemies"
-        assert (decision["behavior"]["target_x"], decision["behavior"]["target_y"]) != (107, 107)
-
-    def test_low_fuel_blocked_edge_search_falls_through(self) -> None:
-        """Blocked edge scouting with low fuel yields to fuel recovery."""
+        The exploration helper still exists for resource recovery edge
+        walks (``edge_for_fuel`` / ``edge_for_equipment``); only HUNT's
+        enemy-search edge walk was removed on 2026-06-22. This test
+        guards that low-fuel HUNT still delegates to fuel recovery
+        rather than wandering or crashing when the viewport's
+        exploration candidates are all blocked.
+        """
         world, self_state = make_world(self_x=100, self_y=100, fuel=300)
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = make_inventory()

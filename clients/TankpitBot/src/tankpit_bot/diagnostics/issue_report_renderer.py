@@ -119,9 +119,6 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
         f"stale_pos_blocked={scorecard['combat_stale_positions_blocked']} "
         f"damage_changes={scorecard['tank_damage_changes']}",
         f"  fuel: {fuel_text}",
-        f"  dot hops: events={len(scorecard['dot_hops'])} "
-        f"distinct={scorecard['dot_hop_distinct_targets']} "
-        f"max_repeats={scorecard['dot_hop_max_repeats']}",
     ]
     if not scorecard["state_budget"]:
         lines.append("  state budget: (no transitions)")
@@ -131,11 +128,6 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
     lines.append("")
     return lines
 
-
-# A dot teleported to this many times in one session was never revealed
-# or refuted by a scan -- the orbit class of bug from live run
-# 20260612-062453 (fuel bled 151->119 around one in-viewport dot).
-_DOT_ORBIT_REPEAT_THRESHOLD = 3
 
 # Sessions that shoot this much without a single observed deactivation
 # are chasing unkillable or repairing targets.
@@ -157,11 +149,6 @@ def _collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
         Human-readable issue lines (possibly empty).
     """
     issues: list[str] = []
-    if scorecard["dot_hop_max_repeats"] >= _DOT_ORBIT_REPEAT_THRESHOLD:
-        issues.append(
-            f"fuel-dot orbit: one dot targeted {scorecard['dot_hop_max_repeats']} times "
-            "without being revealed or refuted"
-        )
     if 0 <= scorecard["fuel_min"] < _FUEL_FLOOR_THRESHOLD:
         issues.append(
             f"fuel floor critical: belief fuel dipped to {scorecard['fuel_min']} "

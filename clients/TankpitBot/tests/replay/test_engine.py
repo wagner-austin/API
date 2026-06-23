@@ -332,7 +332,15 @@ class TestProcessTickBatch:
         _cleanup()
 
     def test_returns_trace_when_self_state_present(self) -> None:
-        """_process_tick_batch returns a trace when self_state is available."""
+        """_process_tick_batch returns a trace when self_state is available.
+
+        Default inventory has all weapons at zero so the durable owner
+        enters ``RECOVER_EQUIPMENT``. With no tile-coverage and radar
+        affordable, the forager dispatches ``forage_radar`` -- the
+        substate derivation routes that to ``SENSE`` (radar = sensing
+        the viewport), independent of whether the server-side extras
+        count is empty (free 5x5) or stocked (full viewport).
+        """
         _cleanup()
         _inject_self_state(100, 120, 500)
         ai_state = make_initial_ai_state()
@@ -342,7 +350,7 @@ class TestProcessTickBatch:
         assert trace["fuel"] == 500
         assert trace["tick_index"] == 0
         assert trace["ai_mode"] == "RECOVER_EQUIPMENT"
-        assert trace["ai_mode_state"] == "APPROACH"
+        assert trace["ai_mode_state"] == "SENSE"
         assert trace["combat_target_id"] == -1
         _cleanup()
 

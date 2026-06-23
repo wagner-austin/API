@@ -39,6 +39,7 @@ class TestDecideCombatFeedback:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
                 liveness="deactivated",
             ),
         }
@@ -78,7 +79,13 @@ class TestDecideCombatFeedback:
         assert decision["behavior"]["reason"] == "find_enemies"
 
     def test_hit_feedback_continues_normally(self) -> None:
-        """Hit feedback preserves normal combat routing when the target remains visible."""
+        """Hit feedback preserves normal combat routing when the target remains visible.
+
+        The enemy carries a fresh wire-sourced position, so normal
+        combat routing teleports directly toward it -- neither
+        ``kill_confirmed`` nor ``miss_relocate`` short-circuits the
+        decision.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -93,6 +100,7 @@ class TestDecideCombatFeedback:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -111,7 +119,7 @@ class TestDecideCombatFeedback:
 
         assert decision["behavior"]["reason"] != "kill_confirmed"
         assert decision["behavior"]["reason"] != "miss_relocate"
-        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["command"]["cmd_type"] == "teleport"
 
     def test_no_feedback_when_no_shot_pending(self) -> None:
         """Empty combat feedback leaves normal planning unchanged."""
@@ -148,6 +156,7 @@ class TestDecideShotTracking:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -192,6 +201,7 @@ class TestDecideKillCooldown:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -227,6 +237,7 @@ class TestDecideKillCooldown:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -264,6 +275,7 @@ class TestDecideKillCooldown:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -304,6 +316,7 @@ class TestDecideKillCooldown:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)
@@ -344,6 +357,7 @@ class TestDecideKillCooldown:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=99, fuel=800, tanks=tanks)

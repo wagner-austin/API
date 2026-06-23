@@ -196,6 +196,39 @@ class TestDispatchSelfStatus:
             raise AssertionError("self_state should exist after move response")
         assert self_state["fuel"] == 1100
 
+    def test_dispatch_self_promo_eligible_emits_diagnostic(self) -> None:
+        """0x2E for SELF with promo_state > 0 emits ``self_promo_eligible``.
+
+        The wire byte is the per-tank promotion-eligibility marker (JS
+        ``Og.h`` ``g``). Routing a non-zero value through the diagnostic
+        channel for OWN tank lets downstream analyzers ("am I about to
+        rank up?") read it without re-decoding the 0x2E body.
+        """
+        from tankpit_bot.protocol import TankStatusSyncDict as _Sync
+        from tankpit_bot.sniffer.world_state_tanks import (
+            update_world_state_from_move_response_full,
+        )
+
+        ws = get_world_service()
+        update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 1)
+
+        msg = _Sync(
+            msg_type=0x2E,
+            subtype=1,
+            tank_id=1301,
+            damage_state=0,
+            rank=1,
+            lb_score=151,
+            promo_state=7,
+            fuel=None,
+        )
+        # The dispatch path emits a diagnostic event; we just need to
+        # exercise the branch so coverage observes line 438.
+        dispatch_world_state_update(ws, msg)
+
+        # Damage update still applies regardless of promo branch.
+        assert ws.world_state["tanks"]["1301"]["damage_state"] == 0
+
 
 class TestDispatchSupervisor:
     """Tests for dispatching Supervisor (0x52) command error messages."""

@@ -260,9 +260,12 @@ class Bot(DispatchMixin):
         The panel carries account-wide ground truth the wire never
         sends (lifetime play time, kills, deactivations, promotion
         points); the startup sample baselines every run so consecutive
-        runs' deltas verify the game-log kill detection. The panel is
-        toggled open, scraped, and toggled closed so it never obstructs
-        play.
+        runs' deltas verify the game-log kill detection. The ``C`` key
+        does not toggle a stateful panel -- each keypress emits a
+        fresh ``Statistics:`` block into the in-game DOM log -- so a
+        single press is enough to scrape, and a second press would
+        only duplicate the block in the log without ``closing``
+        anything.
 
         Args:
             phase: Capture point label (e.g. ``startup``).
@@ -282,17 +285,6 @@ class Bot(DispatchMixin):
             )
         self._page.wait_for_timeout(_ACCOUNT_STATS_PANEL_RENDER_MS)
         page_text = scrape_page_text(self._cdp)
-        for event_type in ("keyDown", "keyUp"):
-            self._cdp.send(
-                "Input.dispatchKeyEvent",
-                {
-                    "type": event_type,
-                    "key": "c",
-                    "code": "KeyC",
-                    "windowsVirtualKeyCode": ord("C"),
-                    "nativeVirtualKeyCode": ord("C"),
-                },
-            )
         emit_account_stats_sample(parse_account_stats(page_text), phase=phase)
 
     def maybe_capture_account_stats_once(self) -> None:

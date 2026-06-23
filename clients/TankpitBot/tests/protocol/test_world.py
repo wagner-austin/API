@@ -184,6 +184,131 @@ class TestDecodeActiveForces:
             decode_active_forces(bytes([1, 2]))
 
 
+class TestDecodeActivePlayers:
+    """Tests for ``decode_active_players``."""
+
+    def test_decodes_two_player_roster(self) -> None:
+        """Each 3-byte record decodes to ``(tank_id_LE, rank)``."""
+        from tankpit_bot.protocol.decoders.session_events import decode_active_players
+
+        # Two records: (501, 5) + (1027, 2). 501 = 0x01F5 LE -> [0xF5, 0x01].
+        data = bytes([0xF5, 0x01, 0x05, 0x03, 0x04, 0x02])
+        result = decode_active_players(data)
+        assert result["msg_type"] == 0x2F
+        assert result["players"] == [
+            {"tank_id": 501, "rank": 5},
+            {"tank_id": 1027, "rank": 2},
+        ]
+
+    def test_rejects_non_multiple_of_three(self) -> None:
+        """Body whose length isn't divisible by 3 is rejected."""
+        from tankpit_bot.protocol.decoders.session_events import decode_active_players
+
+        with pytest.raises(DecodeError):
+            decode_active_players(bytes([0xF5, 0x01]))
+
+
+class TestDecodeTop10:
+    """Tests for ``decode_top10``."""
+
+    def test_decodes_header_and_one_row(self) -> None:
+        """Header parses + one row decodes to the expected entry."""
+        from tankpit_bot.protocol.decoders.session_events import decode_top10
+
+        # team_filter=255 (all), viewer_score=24bit BE = 0x010203 = 66051,
+        # viewer_position=7, then ONE row:
+        #   position=1, score=24bit BE = 0x102030 = 1056816, team=2,
+        #   rank=8, name_len=4, name=b"Yupr"
+        data = bytes(
+            [
+                0xFF,
+                0x01,
+                0x02,
+                0x03,
+                0x07,
+                0x01,
+                0x10,
+                0x20,
+                0x30,
+                0x02,
+                0x08,
+                0x04,
+                ord("Y"),
+                ord("u"),
+                ord("p"),
+                ord("r"),
+            ]
+        )
+        result = decode_top10(data)
+        assert result["msg_type"] == 0x31
+        assert result["team_filter"] == 255
+        assert result["viewer_score"] == 0x010203
+        assert result["viewer_position"] == 7
+        assert len(result["entries"]) == 1
+        row = result["entries"][0]
+        assert row["position"] == 1
+        assert row["score"] == 0x102030
+        assert row["team"] == 2
+        assert row["rank"] == 8
+        assert row["name"] == "Yupr"
+        assert row["tank_id"] == -1
+
+    def test_rejects_short_header(self) -> None:
+        """Bodies shorter than the 5-byte header are rejected."""
+        from tankpit_bot.protocol.decoders.session_events import decode_top10
+
+        with pytest.raises(DecodeError):
+            decode_top10(bytes([0xFF, 0x00, 0x00, 0x00]))
+
+    def test_rejects_truncated_row_header(self) -> None:
+        """A row whose header runs past the body end is rejected."""
+        from tankpit_bot.protocol.decoders.session_events import decode_top10
+
+        # Header (5 bytes) + only 6 row bytes -- short of the 7-byte row header.
+        data = bytes([0xFF, 0, 0, 0, 0]) + bytes([1, 0, 0, 0, 2, 8])
+        with pytest.raises(DecodeError):
+            decode_top10(data)
+
+    def test_rejects_row_name_overflow(self) -> None:
+        """A row whose name extends past the body end is rejected."""
+        from tankpit_bot.protocol.decoders.session_events import decode_top10
+
+        # Row header says name_len=10 but only 4 name bytes follow.
+        header = bytes([0xFF, 0, 0, 0, 0])
+        row = bytes([1, 0, 0, 0, 2, 8, 10]) + b"ABCD"
+        with pytest.raises(DecodeError):
+            decode_top10(header + row)
+
+
+class TestDecodePingResponse:
+    """Tests for the bare 0x60 PingResponse decoder."""
+
+    def test_returns_bare_typed_message(self) -> None:
+        """Body is discarded; only the msg_type tag survives."""
+        from tankpit_bot.protocol.decoders.session_events import decode_ping_response
+
+        result = decode_ping_response(b"")
+        assert result == {"msg_type": 0x60}
+
+    def test_ignores_unexpected_body_bytes(self) -> None:
+        """Decoder is body-agnostic; non-empty bodies still decode."""
+        from tankpit_bot.protocol.decoders.session_events import decode_ping_response
+
+        result = decode_ping_response(bytes([0xDE, 0xAD]))
+        assert result == {"msg_type": 0x60}
+
+
+class TestDecodeConnectionLost:
+    """Tests for the bare 0x7E ConnectionLost decoder."""
+
+    def test_returns_bare_typed_message(self) -> None:
+        """Body is discarded; only the msg_type tag survives."""
+        from tankpit_bot.protocol.decoders.session_events import decode_connection_lost
+
+        result = decode_connection_lost(b"")
+        assert result == {"msg_type": 0x7E}
+
+
 class TestDecodePromotion:
     """Tests for decode_promotion function.
 
@@ -548,7 +673,6 @@ class TestDecode0x2eMessage:
         data = bytes.fromhex("4c0000" + "0a14" + "0201" + "12")
         result = decode_0x2e_message(data)
         assert result["msg_type"] == 0x4C
-        assert result["fuel_dots"] == []
         assert len(result["tanks"]) == 1
         assert result["tanks"][0]["tank_id"] == 0x0102
 

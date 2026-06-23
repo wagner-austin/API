@@ -31,7 +31,7 @@ The map must be open to teleport. `CMD_MAP_OPEN` (0x6c) opens it; teleport auto-
 
 ## Landing auto-pickup
 
-Teleporting onto a container tile picks it up on landing. A fuel-dot-targeted hop refuels for free.[^5]
+Teleporting onto a container tile picks it up on landing.[^5]
 
 ## Timing
 

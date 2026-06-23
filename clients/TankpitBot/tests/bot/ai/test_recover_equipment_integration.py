@@ -6,7 +6,7 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import select_exploration_command, viewport_exploration_candidates
 from tankpit_bot.bot.ai.types import AIConfigDict, AIStateDict, make_default_ai_config
 from tankpit_bot.bot.ai_strategy import decide
-from tankpit_bot.sniffer.world_state import mark_scan_viewport_failed, reset_world_state
+from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     ContainerStateDict,
     TankStateDict,
@@ -18,6 +18,7 @@ from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
+    viewport_covered_tiles,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -53,6 +54,9 @@ def _enemy(
         is_bot=False,
         damage_state=0,
         timestamp_ms=timestamp_ms,
+        last_wire_seen_ms=timestamp_ms,
+        last_position_update_ms=timestamp_ms,
+        last_viewport_observation_ms=timestamp_ms,
     )
 
 
@@ -99,6 +103,7 @@ class TestRecoverEquipmentPriority:
                 "combat_target_id": 50,
                 "combat_target_x": 103,
                 "combat_target_y": 103,
+                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False)
@@ -117,8 +122,14 @@ class TestRecoverEquipmentPriority:
         world, self_state = make_world(fuel=800, tanks={"50": _enemy(x=120, y=100)})
         inventory = make_inventory(dual_count=3, dual_enabled=True, default_count=30)
         inventory["extra_radars"]["count"] = 30
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "local_scan_tiles": viewport_covered_tiles(world),
+            }
+        )
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["command"]["cmd_type"] == "teleport"
@@ -313,7 +324,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "radar_for_equipment"
+        assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
@@ -324,11 +335,16 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "radar_for_equipment"
+        assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
-    def test_critical_equipment_search_relocates_when_radar_on_cooldown(self) -> None:
-        """Critical equipment depletion relocates when radar is cooling down."""
+    def test_critical_equipment_search_relocates_when_viewport_fully_swept(self) -> None:
+        """Critical equipment depletion relocates when the viewport is fully scanned.
+
+        The OLD gate was the global scan cooldown; the new gate is the
+        tile-coverage map. A fully-covered viewport routes the bot to
+        the search hop instead of re-firing the radar.
+        """
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -336,6 +352,7 @@ class TestRecoverEquipmentSearch:
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
                 "patrol_waypoint_index": 2,
+                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
@@ -350,7 +367,12 @@ class TestRecoverEquipmentSearch:
         assert decision["updated_ai_state"]["equipment_search_failures"] == 1
 
     def test_equipment_search_bails_out_after_max_failures(self) -> None:
-        """Critical equipment search stays in recovery after hitting the failure cap."""
+        """Critical equipment search stays in recovery after hitting the failure cap.
+
+        With the current viewport already swept by the bot's tile-coverage
+        map, the forager yields and the search-hop path runs -- exercising
+        the failure-counter reset branch in ``_plan_equipment_search``.
+        """
         world, self_state = make_world(fuel=800)
         ai_state = AIStateDict(
             **{
@@ -358,6 +380,7 @@ class TestRecoverEquipmentSearch:
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
                 "equipment_search_failures": 3,
+                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
@@ -365,6 +388,7 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["updated_ai_state"]["equipment_search_failures"] == 1
 
     def test_equipment_search_edge_walks_when_teleport_unaffordable(self) -> None:
         """Unaffordable critical equipment search degrades to an edge walk.
@@ -447,7 +471,7 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "radar_for_fuel"
+        assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_cache_only_target_in_unscanned_viewport_collects(self) -> None:
@@ -477,19 +501,36 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
-        assert decision["behavior"]["reason"] == "radar_for_fuel"
+        assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
-    def test_low_fuel_recent_failed_scan_walks_instead_of_repeating_radar(self) -> None:
-        """Recent scan failure suppresses immediate radar retry."""
+    def test_low_fuel_fully_covered_viewport_walks_instead_of_repeating_radar(self) -> None:
+        """Tile-level coverage suppresses immediate radar retry.
+
+        The tile-aware forager treats a fully scanned viewport as
+        exhausted: it returns ``None`` to the fuel-recovery owner,
+        which then teleports to a fresh sector. This is the
+        regression guard that replaces the old server-side
+        ``mark_scan_viewport_failed`` gate -- the new gate is the
+        bot-owned ``local_scan_tiles`` map written by
+        :func:`mark_scan_dispatched`.
+        """
         world, self_state = make_world(fuel=300, scanned=False)
-        viewport = world["viewport"]
-        mark_scan_viewport_failed(viewport["left"], viewport["top"], 100000)
+        viewport_left = world["viewport"]["left"]
+        viewport_top = world["viewport"]["top"]
+        viewport_right = viewport_left + world["viewport"]["width"] - 1
+        viewport_bottom = viewport_top + world["viewport"]["height"] - 1
+        covered = {
+            f"{x},{y}": 100000
+            for y in range(viewport_top, viewport_bottom + 1)
+            for x in range(viewport_left, viewport_right + 1)
+        }
+        ai_state = AIStateDict(**{**make_scanned_ai_state(), "local_scan_tiles": covered})
 
         decision = decide(
             world,
             self_state,
-            make_scanned_ai_state(),
+            ai_state,
             make_inventory(),
             100000,
             None,
@@ -620,7 +661,14 @@ class TestRecoverEquipmentSearch:
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
 
     def test_new_target_selection_skips_recently_killed_enemy(self) -> None:
-        """Threat acquisition skips enemies still on the kill cooldown."""
+        """Threat acquisition skips enemies still on the kill cooldown.
+
+        With both enemies wire-fresh, HUNT/ACQUIRE locks the
+        non-cooldowned ``LiveEnemy`` and teleports directly toward it.
+        The semantic invariant is that the cooldowned ``DeadEnemy`` is
+        not picked; the specific verb (teleport vs map-open-then-teleport)
+        depends on per-target freshness, not on this test's intent.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": _enemy(name="DeadEnemy", timestamp_ms=100000),
             "60": _enemy(tank_id=60, x=104, y=103, name="LiveEnemy", timestamp_ms=100000),
@@ -636,4 +684,5 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["behavior"]["reason"] == "find LiveEnemy"
+        assert "LiveEnemy" in decision["behavior"]["reason"]
+        assert "DeadEnemy" not in decision["behavior"]["reason"]

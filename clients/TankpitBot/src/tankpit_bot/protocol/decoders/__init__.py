@@ -11,15 +11,6 @@ from tankpit_bot.protocol.decoders.combat import (
     decode_shoot_event,
 )
 from tankpit_bot.protocol.decoders.map_data import decode_map_data
-from tankpit_bot.protocol.decoders.misc import (
-    decode_action_done,
-    decode_active_forces,
-    decode_build_pickup,
-    decode_chat_message,
-    decode_decoration,
-    decode_promotion,
-    decode_statistics,
-)
 from tankpit_bot.protocol.decoders.movement import (
     decode_movement,
     decode_movement_response,
@@ -52,6 +43,19 @@ from tankpit_bot.protocol.decoders.routing import (
     _decode_resource_message,
     _decode_tank_message,
     _decode_world_message,
+)
+from tankpit_bot.protocol.decoders.session_events import (
+    decode_action_done,
+    decode_active_forces,
+    decode_active_players,
+    decode_build_pickup,
+    decode_chat_message,
+    decode_connection_lost,
+    decode_decoration,
+    decode_ping_response,
+    decode_promotion,
+    decode_statistics,
+    decode_top10,
 )
 from tankpit_bot.protocol.decoders.tank import (
     decode_0x2e_message,
@@ -201,10 +205,12 @@ __all__ = [
     "decode_0x2e_message",
     "decode_action_done",
     "decode_active_forces",
+    "decode_active_players",
     "decode_build_pickup",
     "decode_cache_update",
     "decode_chat_message",
     "decode_combined_tile_update",
+    "decode_connection_lost",
     "decode_deactivation",
     "decode_decoration",
     "decode_enemy_detection",
@@ -219,6 +225,7 @@ __all__ = [
     "decode_movement",
     "decode_movement_response",
     "decode_overlay_update",
+    "decode_ping_response",
     "decode_promotion",
     "decode_radar_container",
     "decode_radar_mine",
@@ -237,6 +244,7 @@ __all__ = [
     "decode_tank_status_sync",
     "decode_terrain_update",
     "decode_text_message",
+    "decode_top10",
     "decode_viewport_update",
     "decode_world_info",
     "encode_radar_container",

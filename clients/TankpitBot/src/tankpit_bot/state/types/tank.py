@@ -21,7 +21,7 @@ from tankpit_bot.state.types.constants import (
 class TankStateDict(TypedDict):
     """State of a single tank in the game world.
 
-    Three independent freshness timestamps lock the freshness model:
+    Four independent freshness timestamps lock the freshness model:
 
     * ``timestamp_ms`` advances on ANY observation source (wire OR map).
       Used to keep a tank in the registry as a HUNT acquisition
@@ -40,6 +40,22 @@ class TankStateDict(TypedDict):
       but NOT this field. This is the kill-shot gate — only fire at a
       tank whose position is structurally proven recent, never at a
       stale registry entry being kept alive by status-only broadcasts.
+
+    * ``last_viewport_observation_ms`` advances ONLY when an observation
+      carries ``storage_source == "viewport"`` -- proving the tank was
+      in the bot's local sensing window when the wire arrived.
+      MapData snapshots and global TankStatusSync broadcasts do NOT
+      advance it (they fire for tanks anywhere on the map). This is
+      the HUNT acquisition gate: ``analyze_threats`` filters on this
+      timestamp so only tanks the bot can actually see are eligible
+      to engage. Live-run 2026-06-21 tracking probe: 26 of 27 tanks
+      passed every other gate (timestamp_ms, last_wire_seen_ms,
+      last_position_update_ms) while the JS client's tank registry
+      had none of them in view -- 0x4C MapData refreshes everyone's
+      position-and-wire timestamps; 0x2E TankStatusSync broadcasts
+      every ~5 s for every alive tank globally. Without this gate
+      the bot's threat list is the global roster, not the visible
+      one.
 
     The three-timestamp model exists because the broadcast cadences
     differ by message kind. 0x2E TankStatusSync broadcasts globally
@@ -73,6 +89,13 @@ class TankStateDict(TypedDict):
         last_position_update_ms: Wall-clock ms of the most recent
             wire-sourced observation that carried a fresh ``(x, y)``.
             Kill-shot gate.
+        last_viewport_observation_ms: Wall-clock ms of the most recent
+            observation whose ``storage_source`` was ``"viewport"`` --
+            i.e., proof the tank was in the bot's local sensing window
+            when the wire arrived. HUNT acquisition gate. Zero means
+            the tank has never been viewport-confirmed; threat
+            analysis must filter it out regardless of the other
+            freshness timestamps.
         liveness: Three-state lifecycle gate. ``alive`` is the default.
             ``deactivated`` is set on 0x41 Deactivation -- the tank is a
             corpse on the tile for ~22 s until the server cleans it up
@@ -102,7 +125,20 @@ class TankStateDict(TypedDict):
     timestamp_ms: int
     last_wire_seen_ms: int
     last_position_update_ms: int
+    last_viewport_observation_ms: int
     liveness: TankLiveness
+    # Last 0x53 ShootEvent attributed to this tank. ``last_aim_x``,
+    # ``last_aim_y`` are the wire-reported barrel-aim coords at the
+    # moment of fire; for straight shots they coincide with the impact
+    # tile, for homing fire they can diverge. ``last_aim_weapon``
+    # records which weapon fired (0=single, 1=dual, 2=missile,
+    # 3=homing). ``last_aim_ms`` is the wall-clock so consumers can
+    # treat the aim as stale once it ages past combat-tempo. All four
+    # default to -1 / 0 when no shot has yet been observed.
+    last_aim_x: int
+    last_aim_y: int
+    last_aim_weapon: int
+    last_aim_ms: int
 
 
 def make_tank_state(
@@ -119,8 +155,13 @@ def make_tank_state(
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
     last_position_update_ms: int = 0,
+    last_viewport_observation_ms: int = 0,
     direction: int = 0,
     liveness: TankLiveness = "alive",
+    last_aim_x: int = -1,
+    last_aim_y: int = -1,
+    last_aim_weapon: int = -1,
+    last_aim_ms: int = 0,
 ) -> TankStateDict:
     """Create a tank state.
 
@@ -142,6 +183,9 @@ def make_tank_state(
         last_position_update_ms: Wall-clock ms of the most recent
             wire-sourced observation that carried fresh ``(x, y)``.
             Zero means the position has never been wire-confirmed.
+        last_viewport_observation_ms: Wall-clock ms of the most recent
+            observation whose ``storage_source`` was ``"viewport"``.
+            Zero means the tank has never been viewport-confirmed.
         direction: Sprite direction byte. 0-31 = alive facing,
             32-33 = dead corpse.
         liveness: Three-state lifecycle gate. Defaults to ``alive``.
@@ -165,7 +209,12 @@ def make_tank_state(
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
         last_position_update_ms=last_position_update_ms,
+        last_viewport_observation_ms=last_viewport_observation_ms,
         liveness=liveness,
+        last_aim_x=last_aim_x,
+        last_aim_y=last_aim_y,
+        last_aim_weapon=last_aim_weapon,
+        last_aim_ms=last_aim_ms,
     )
 
 
@@ -193,7 +242,12 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "timestamp_ms": state["timestamp_ms"],
         "last_wire_seen_ms": state["last_wire_seen_ms"],
         "last_position_update_ms": state["last_position_update_ms"],
+        "last_viewport_observation_ms": state["last_viewport_observation_ms"],
         "liveness": state["liveness"],
+        "last_aim_x": state["last_aim_x"],
+        "last_aim_y": state["last_aim_y"],
+        "last_aim_weapon": state["last_aim_weapon"],
+        "last_aim_ms": state["last_aim_ms"],
     }
 
 
@@ -224,8 +278,39 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
+        last_viewport_observation_ms=_optional_int(data, "last_viewport_observation_ms", 0),
         liveness=require_tank_liveness(data, "liveness"),
+        last_aim_x=_optional_int(data, "last_aim_x", -1),
+        last_aim_y=_optional_int(data, "last_aim_y", -1),
+        last_aim_weapon=_optional_int(data, "last_aim_weapon", -1),
+        last_aim_ms=_optional_int(data, "last_aim_ms", 0),
     )
+
+
+def _optional_int(data: JSONObject, key: str, default: int) -> int:
+    """Read an optional int field from JSON, falling back to ``default``.
+
+    Used for tank-state fields added after the on-disk format
+    stabilised; older snapshots / fixtures lack the new keys and must
+    decode cleanly without them.
+
+    Args:
+        data: JSON object being decoded.
+        key: Field name to look up.
+        default: Value to return when the key is absent.
+
+    Returns:
+        The int value at ``data[key]`` if present and an int; otherwise
+        ``default``.
+
+    Raises:
+        JSONTypeError: When the key is present but the value is not an
+            int (a hard type mismatch we want to surface, not silently
+            paper over).
+    """
+    if key not in data:
+        return default
+    return require_int(data, key)
 
 
 __all__ = [

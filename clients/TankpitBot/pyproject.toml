@@ -33,6 +33,7 @@ tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
 tankpit-fuel-probe = "scripts.fuel_probe:main"
 tankpit-movement-probe = "scripts.movement_probe:main"
 tankpit-combat-probe = "scripts.combat_probe:main"
+tankpit-enemy-tracking-probe = "scripts.enemy_tracking_probe:main"
 tankpit-issue-report = "tankpit_bot.diagnostics.issue_report_renderer:main"
 tankpit-smoke = "scripts.smoke:main"
 tankpit-bot-runs = "tankpit_bot.diagnostics.bot_runs_cli:main"
@@ -98,7 +99,9 @@ mypy-init-return = true
 source = ["src", "scripts"]
 omit = [
     "src/tankpit_bot/action_lab/combat_probe.py",
+    "src/tankpit_bot/action_lab/enemy_tracking.py",
     "scripts/combat_probe.py",
+    "scripts/enemy_tracking_probe.py",
 ]
 branch = true
 # Playwright's sync API drives the browser on a greenlet; without this,

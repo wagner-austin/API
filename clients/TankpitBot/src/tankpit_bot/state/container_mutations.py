@@ -7,7 +7,6 @@ from platform_core.logging import get_logger
 from tankpit_bot.state.types import (
     ContainerRefreshKind,
     EntitySource,
-    SelfStateDict,
     WorldStateDict,
     coord_key,
     make_container_state,
@@ -59,7 +58,6 @@ def update_container_from_radar(
             terrain=state["terrain"],
             viewport=state["viewport"],
             scanned_viewports=state["scanned_viewports"],
-            map_fuel_dots=state["map_fuel_dots"],
             timestamp_ms=timestamp_ms,
         )
 
@@ -88,7 +86,6 @@ def update_container_from_radar(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -125,7 +122,6 @@ def remove_container(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -175,7 +171,6 @@ def add_mine(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -258,7 +253,6 @@ def add_mine_from_radar(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -295,7 +289,6 @@ def remove_mine(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -305,50 +298,70 @@ def pickup_container(
     x: int,
     y: int,
     timestamp_ms: int,
+    remaining_volume: int = 0,
 ) -> WorldStateDict:
-    """Pick up container and add fuel to self (if fuel container).
+    """Apply a 0x43 ContainerPickup record to world state.
 
-    Removes the container from world state and adds its volume to self fuel.
+    Only the container registry is touched here:
+
+    * ``remaining_volume == 0`` -- container is emptied; remove it so
+      the planner stops targeting it.
+    * ``remaining_volume > 0`` -- partial pickup (picker hit the 1100
+      cap before draining). Keep the container in state with its
+      volume updated to ``remaining_volume`` so the planner can come
+      back for the rest.
+
+    Containers we've never seen before are NOT created here -- a 0x43
+    record on an unknown tile is treated as a no-op so dispatch and
+    radar discovery stay the single sources of new-container truth.
+
+    ``self_state["fuel"]`` is NOT updated here. The wire always emits
+    a separate absolute-fuel message (``0x44 FuelGain`` for partial /
+    free pickups, ``0x2E TankStatusSync`` for the regular cadence,
+    ``0x64 FuelDeposit`` for depot returns) which flows through
+    :func:`tankpit_bot.state.mutations.set_self_fuel`. That path is the
+    single source of truth for the bot's fuel total. Adding a local
+    ``+ transferred`` delta here on top of the wire's absolute value
+    double-counted every fuel pickup -- ~+438 ghost on a 438-volume
+    container observed live on 2026-06-23.
 
     Args:
         state: Current world state.
         x: Container X coordinate.
         y: Container Y coordinate.
         timestamp_ms: Message timestamp.
+        remaining_volume: Fuel left in the container after this pickup;
+            ``0`` (default) means emptied.
 
     Returns:
-        New WorldStateDict with container removed and fuel updated.
+        New WorldStateDict with the container registry updated.
     """
     key = coord_key(x, y)
     container = state["containers"].get(key)
-
-    # Remove container
     new_containers = dict(state["containers"])
-    new_containers.pop(key, None)
 
-    # Add fuel to self if it was a fuel container
-    new_self = state["self_state"]
-    if new_self is not None and container is not None and container["is_fuel"]:
-        new_fuel = new_self["fuel"] + container["volume"]
-        new_self = SelfStateDict(
-            tank_id=new_self["tank_id"],
-            x=new_self["x"],
-            y=new_self["y"],
-            team=new_self["team"],
-            rank=new_self["rank"],
-            fuel=new_fuel,
-            leaderboard_position=new_self["leaderboard_position"],
+    if remaining_volume <= 0:
+        new_containers.pop(key, None)
+    elif container is not None:
+        new_containers[key] = make_container_state(
+            x=container["x"],
+            y=container["y"],
+            is_fuel=container["is_fuel"],
+            volume=remaining_volume,
+            source=container["source"],
+            refresh_kind=container["refresh_kind"],
+            timestamp_ms=timestamp_ms,
+            failed_pickups=container["failed_pickups"],
         )
 
     return WorldStateDict(
-        self_state=new_self,
+        self_state=state["self_state"],
         tanks=state["tanks"],
         containers=new_containers,
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -399,7 +412,6 @@ def increment_container_failed_pickups(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=state["timestamp_ms"],
     )
 

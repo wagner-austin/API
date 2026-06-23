@@ -35,20 +35,43 @@ def update_world_state_from_fuel_total(ws: WorldService, fuel_total: int) -> Non
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
 
 
-def update_world_state_from_container_pickup(ws: WorldService, x: int, y: int) -> None:
-    """Update world state when container is picked up.
+def update_world_state_from_container_pickup(
+    ws: WorldService,
+    x: int,
+    y: int,
+    remaining_volume: int = 0,
+) -> None:
+    """Update world state when a container pickup record arrives.
+
+    The 0x43 wire format reports ``remaining_volume`` (fuel left in
+    the container after this pickup). When emptied
+    (``remaining_volume == 0``) the tile is cleared from world state
+    and the radar tile cache; when fuel remains the container stays
+    in state with its volume updated so the planner can drain the
+    rest, and the radar tile cache is left intact.
 
     Args:
         ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
+        remaining_volume: Fuel remaining in the container AFTER this
+            pickup. Default ``0`` preserves the "emptied" semantic for
+            callers without the wire field.
     """
     from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
 
     ts = get_current_time_ms()
-    ws.world_state = pickup_container(ws.world_state, x, y, ts)
-    clear_container_tile_cache(ws, x, y)
-    emit_world("Picked up container at (%d, %d)", x, y)
+    ws.world_state = pickup_container(ws.world_state, x, y, ts, remaining_volume)
+    if remaining_volume <= 0:
+        clear_container_tile_cache(ws, x, y)
+        emit_world("Picked up container at (%d, %d)", x, y)
+    else:
+        emit_world(
+            "Partial pickup at (%d, %d) -- %d fuel remains",
+            x,
+            y,
+            remaining_volume,
+        )
 
 
 def remove_container_at(ws: WorldService, x: int, y: int) -> None:

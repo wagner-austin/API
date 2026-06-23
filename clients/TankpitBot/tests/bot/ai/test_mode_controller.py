@@ -199,14 +199,20 @@ def test_radar_at_break_enters_recover_equipment_to_restock() -> None:
     assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=5)) is True
 
 
-def test_radars_between_break_and_resume_do_not_re_enter() -> None:
-    """Radars above the break but below resume do not start a fresh restock.
+def test_radars_below_resume_threshold_trigger_restock() -> None:
+    """Any radar count below the resume threshold (20) re-enters recovery.
 
-    The break/resume gap is hysteresis: a fresh entry needs the low
-    break, so a bot fighting with a partial stock is not yanked back
-    into restock at every spent radar.
+    Changed 2026-06-22: per the user-defined gameplay loop, the bot
+    restocks to a full kit (duals=25, homings=25, radars=20) before
+    every engagement cycle. The earlier break/resume hysteresis was
+    too permissive -- it let the bot fight with low ammo down to
+    break, abandoning kills mid-fight when the emergency threshold
+    finally pulled it away. Symmetric thresholds eliminate that
+    failure mode entirely.
     """
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=6)) is False
+    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=6)) is True
+    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=19)) is True
+    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=20)) is False
 
 
 def test_exit_recover_equipment_requires_radar_resume() -> None:
@@ -262,11 +268,19 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
     assert derive_hunt_mode_state(engaging) == "ENGAGE"
 
 
-def test_derive_hunt_mode_state_keeps_search_teleport_in_acquire() -> None:
-    """Enemy-search teleports do not masquerade as close-combat transitions."""
+def test_derive_hunt_mode_state_keeps_non_combat_teleport_in_acquire() -> None:
+    """A HUNT teleport without a locked combat target derives ACQUIRE.
+
+    Defensive: HUNT acquire dispatches map_open as its only enemy
+    search action (post-2026-06-22), so production no longer produces
+    teleports without a locked target. The derive function still
+    needs to land on ACQUIRE (not CLOSE) for any such input, in case
+    a future HUNT path produces a teleport without first setting a
+    combat target.
+    """
     decision = make_tick_decision(
         command=make_teleport_command(110, 100),
-        behavior=make_behavior_score("HUNT", 0, 110, 100, "edge_for_enemies"),
+        behavior=make_behavior_score("HUNT", 0, 110, 100, "hunt_search_teleport"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -358,7 +372,7 @@ def test_derive_recover_equipment_mode_state_maps_sense_search_and_pickup() -> N
     """Equipment recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT_EQUIPMENT", 925, 0, 0, "radar_for_equipment"),
+        behavior=make_behavior_score("COLLECT_EQUIPMENT", 925, 0, 0, "forage_radar"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -402,19 +416,13 @@ def test_derive_recover_fuel_mode_state_maps_sense_search_pickup_and_approach() 
     """Fuel recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 0, 0, "radar_for_fuel"),
+        behavior=make_behavior_score("COLLECT_FUEL", 900, 0, 0, "forage_radar"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     search = make_tick_decision(
         command=make_move_command(130, 100),
         behavior=make_behavior_score("COLLECT_FUEL", 900, 130, 100, "search_fuel_local"),
-        updated_ai_state=make_initial_ai_state(),
-        desired_equipment=[],
-    )
-    reposition = make_tick_decision(
-        command=make_move_command(92, 92),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 92, 92, "edge_for_fuel"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -433,6 +441,5 @@ def test_derive_recover_fuel_mode_state_maps_sense_search_pickup_and_approach() 
 
     assert derive_recover_fuel_mode_state(sense) == "SENSE"
     assert derive_recover_fuel_mode_state(search) == "SEARCH"
-    assert derive_recover_fuel_mode_state(reposition) == "SEARCH"
     assert derive_recover_fuel_mode_state(pickup) == "PICKUP"
     assert derive_recover_fuel_mode_state(approach) == "APPROACH"

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import base64
 import re
-import time
 from typing import TypedDict
 
 from platform_core.json_utils import (
@@ -200,12 +199,21 @@ def send_websocket_bytes(
 
 
 def get_current_time_ms() -> int:
-    """Get current time in milliseconds.
+    """Get current time in milliseconds via the :mod:`_test_hooks` clock.
+
+    Delegates to :data:`_test_hooks.get_current_time_ms` so scenario
+    tests can replace the clock via save-and-restore on that
+    attribute without monkey-patching :mod:`time` globally. Production
+    use is the real wall-clock; tests get controlled time.
 
     Returns:
-        Current Unix timestamp in milliseconds.
+        Current Unix timestamp in milliseconds, or the
+        scenario-controlled value when a test has installed a fake
+        clock on the hook.
     """
-    return int(time.time() * 1000)
+    from tankpit_bot import _test_hooks
+
+    return _test_hooks.get_current_time_ms()
 
 
 _cdp_time_offset_ms: int | None = None

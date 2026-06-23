@@ -14,18 +14,12 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.equipment import (
-    SCAN_COVERAGE_TTL_MS as _SCAN_COVERAGE_TTL_MS,
-)
-from tankpit_bot.bot.ai.equipment import (
-    is_area_scanned,
-)
-from tankpit_bot.bot.ai.movement import select_exploration_command
+from tankpit_bot.bot.ai.equipment import is_area_scanned
 from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.types import coord_key, parse_coord_key
+from tankpit_bot.bot.types import make_teleport_command
+from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.state.types import coord_key
 
 _CARDINAL_DIRECTIONS: tuple[tuple[int, int], ...] = (
     (1, 0),
@@ -200,97 +194,6 @@ def record_attempt_mark(
     return pruned
 
 
-def select_fuel_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
-    """Pick the nearest worthwhile, affordable fuel-dot relocation target.
-
-    The map's fuel-dot atlas (see ``WorldStateDict.map_fuel_dots``) marks
-    where fuel containers were as of the server's MAP_DATA snapshot.
-    Candidates are scanned nearest-first; a dot inside freshly scanned
-    ground or within the degenerate-hop displacement is skipped because
-    local truth already covers it. Teleport cost is monotone in
-    distance, so the first worthwhile dot that is unaffordable ends the
-    scan -- every farther dot costs more.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        ``(x, y)`` of the chosen fuel dot, or ``None`` when the atlas is
-        empty, fully covered by fresh scans, or unaffordable.
-    """
-    dots = ctx.world["map_fuel_dots"]
-    if not dots:
-        return None
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    candidates = sorted(
-        (abs(x - sx) + abs(y - sy), y, x) for x, y in (parse_coord_key(key) for key in dots)
-    )
-    for _distance, y, x in candidates:
-        if not _is_worthwhile_hop(ctx, x, y):
-            continue
-        if not can_afford_teleport_search(ctx, x, y):
-            return None
-        return (x, y)
-    return None
-
-
-def select_fuel_dot_walk_targets(ctx: DecideCtx) -> list[tuple[int, int]]:
-    """Return fuel-dot atlas targets sorted by distance, nearest first.
-
-    Like :func:`select_fuel_dot_hop` but returns ALL worthwhile dots
-    (not just the first affordable one) and does NOT filter by teleport
-    affordability -- the caller decides whether to walk or teleport.
-    Dots that have already been attempted within the scan coverage TTL
-    are excluded so the walker does not revisit recently failed tiles.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        List of ``(x, y)`` tuples sorted nearest-first, possibly empty.
-    """
-    dots = ctx.world["map_fuel_dots"]
-    if not dots:
-        return []
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    candidates = sorted(
-        (abs(x - sx) + abs(y - sy), y, x) for x, y in (parse_coord_key(key) for key in dots)
-    )
-    result: list[tuple[int, int]] = []
-    for _distance, y, x in candidates:
-        if abs(x - sx) + abs(y - sy) < _MIN_HOP_DISPLACEMENT:
-            continue
-        if is_recently_attempted(
-            ctx.ai_state["attempted_fuel_dots"],
-            x,
-            y,
-            ctx.timestamp_ms,
-            ttl_ms=_SCAN_COVERAGE_TTL_MS,
-        ):
-            continue
-        result.append((x, y))
-    return result
-
-
-def emit_fuel_dot_hop_diagnostic(ctx: DecideCtx, dot_x: int, dot_y: int) -> None:
-    """Emit a diagnostic event for a fuel-dot hop or refuel teleport.
-
-    Args:
-        ctx: Decision context.
-        dot_x: Target fuel-dot X coordinate.
-        dot_y: Target fuel-dot Y coordinate.
-    """
-    emit_diagnostic(
-        diagnostic_kind="fuel_dot_hop",
-        target_x=dot_x,
-        target_y=dot_y,
-        self_x=ctx.self_state["x"],
-        self_y=ctx.self_state["y"],
-        dots_known=len(ctx.world["map_fuel_dots"]),
-        fuel=ctx.fuel,
-    )
-
-
 def make_resource_search_hop(
     ctx: DecideCtx,
     *,
@@ -299,7 +202,6 @@ def make_resource_search_hop(
     reason: str,
     failure_count: int | None = None,
     ai_state: AIStateDict | None = None,
-    fuel_dot_guided: bool = False,
 ) -> TickDecisionDict | None:
     """Create a teleport-search decision for recovery behavior.
 
@@ -310,30 +212,11 @@ def make_resource_search_hop(
         reason: Behavior reason label.
         failure_count: Optional consecutive-failure count for recovery search.
         ai_state: Optional AI state base to rewrite before returning.
-        fuel_dot_guided: When True, prefer relocating to the nearest
-            worthwhile fuel dot from the map atlas over the blind ring
-            patrol. Fuel recovery sets this; equipment recovery must not
-            (dots never mark equipment -- verified 0/184 on 2026-06-11).
 
     Returns:
         Recovery teleport decision, or ``None`` when fuel is too low to hop.
     """
-    dot_target = select_fuel_dot_hop(ctx) if fuel_dot_guided else None
-    if dot_target is not None:
-        target_x, target_y = dot_target
-        # A dot hop does not consume a ring-patrol position.
-        next_index = ctx.ai_state["patrol_waypoint_index"]
-        emit_diagnostic(
-            diagnostic_kind="fuel_dot_hop",
-            target_x=target_x,
-            target_y=target_y,
-            self_x=ctx.self_state["x"],
-            self_y=ctx.self_state["y"],
-            dots_known=len(ctx.world["map_fuel_dots"]),
-            fuel=ctx.fuel,
-        )
-    else:
-        target_x, target_y, next_index = local_resource_search_hop(ctx)
+    target_x, target_y, next_index = local_resource_search_hop(ctx)
     if not can_afford_teleport_search(ctx, target_x, target_y):
         short = _short_hop_fallback(ctx)
         if short is not None:
@@ -361,11 +244,9 @@ def make_resource_search_hop(
     base_state = ctx.base if ai_state is None else ai_state
     cleared = clear_resource_target(base_state)
 
-    hop_kind = "fuel-dot" if dot_target is not None else "local resource"
     if failure_count is None:
         emit_ai(
-            "%s hop to (%d,%d) (dual=%d homing=%d radar=%d)",
-            hop_kind,
+            "local resource hop to (%d,%d) (dual=%d homing=%d radar=%d)",
             target_x,
             target_y,
             ctx.inventory["dual_shots"]["count"],
@@ -381,8 +262,7 @@ def make_resource_search_hop(
     else:
         next_failures = failure_count + 1
         emit_ai(
-            "%s hop to (%d,%d) (dual=%d homing=%d radar=%d attempt=%d)",
-            hop_kind,
+            "local resource hop to (%d,%d) (dual=%d homing=%d radar=%d attempt=%d)",
             target_x,
             target_y,
             ctx.inventory["dual_shots"]["count"],
@@ -410,115 +290,9 @@ def make_resource_search_hop(
     )
 
 
-def make_recovery_edge_decision(
-    ctx: DecideCtx,
-    *,
-    mode: BehaviorMode,
-    score: int,
-    reason: str,
-    ai_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Walk to a viewport edge when teleport-search is not affordable.
-
-    Edge walking is the cheap recovery fallback: it costs almost no fuel,
-    reveals a fresh viewport, and keeps the recovery owner acting instead
-    of stalling when the hop planner cannot afford a teleport.
-
-    Args:
-        ctx: Decision context.
-        mode: Behavior mode label for the decision.
-        score: Behavior score for the edge walk.
-        reason: Behavior reason label.
-        ai_state: Base AI state to rewrite.
-
-    Returns:
-        Edge-walk decision, or ``None`` when no viewport edge tile is
-        currently walkable.
-    """
-    exploration = select_exploration_command(
-        ctx,
-        candidate_offset=ai_state["patrol_waypoint_index"],
-    )
-    if exploration is None:
-        return None
-    edge_x, edge_y, edge_command = exploration
-    emit_ai("recovery edge walk to (%d,%d) (fuel=%d)", edge_x, edge_y, ctx.fuel)
-    return make_decision(
-        edge_command,
-        mode,
-        score,
-        edge_x,
-        edge_y,
-        reason,
-        AIStateDict(
-            **{
-                **ai_state,
-                "patrol_waypoint_index": ai_state["patrol_waypoint_index"] + 1,
-            }
-        ),
-        ctx.equip,
-    )
-
-
-def make_recovery_map_intel_decision(
-    ctx: DecideCtx,
-    *,
-    mode: BehaviorMode,
-    score: int,
-    reason: str,
-    ai_state: AIStateDict,
-) -> TickDecisionDict:
-    """Open the map as the terminal recovery action when fully boxed in.
-
-    With the terrain-aware approach and the capped search ring in place
-    this state should be near-unreachable, so reaching it is ALWAYS
-    surfaced as a loud ``recovery_boxed_in`` DIAGNOSTIC that the issue
-    report promotes to a top-level issue. The action itself is the only
-    information-gathering move the game still offers here: the map costs
-    nothing, refreshes tank intelligence, and the HFSM map_open gate
-    throttles replanning until the MAP_DATA response is processed.
-    Raising instead would kill the bot process mid-game (live run
-    20260610-000x).
-
-    Args:
-        ctx: Decision context.
-        mode: Behavior mode label for the decision.
-        score: Behavior score for the map-intel action.
-        reason: Behavior reason label.
-        ai_state: Base AI state to carry through unchanged.
-
-    Returns:
-        Map-open decision; this function always produces an action.
-    """
-    emit_ai("recovery boxed in - opening map for fresh intel (fuel=%d)", ctx.fuel)
-    emit_diagnostic(
-        diagnostic_kind="recovery_boxed_in",
-        behavior_mode=mode,
-        fuel=ctx.fuel,
-        self_x=ctx.self_state["x"],
-        self_y=ctx.self_state["y"],
-        patrol_waypoint_index=ctx.ai_state["patrol_waypoint_index"],
-    )
-    return make_decision(
-        make_map_open_command(),
-        mode,
-        score,
-        0,
-        0,
-        reason,
-        ai_state,
-        ctx.equip,
-    )
-
-
 __all__ = [
-    "emit_fuel_dot_hop_diagnostic",
     "is_recently_attempted",
     "local_resource_search_hop",
-    "make_recovery_edge_decision",
-    "make_recovery_map_intel_decision",
     "make_resource_search_hop",
     "record_attempt_mark",
-    "select_fuel_dot_hop",
-    "select_fuel_dot_walk_targets",
 ]

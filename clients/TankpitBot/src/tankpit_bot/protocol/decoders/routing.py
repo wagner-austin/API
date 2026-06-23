@@ -5,12 +5,14 @@ from __future__ import annotations
 from tankpit_bot.protocol.constants import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
+    MSG_ACTIVE_PLAYERS,
     MSG_BUILD_PICKUP,
     MSG_CACHE_OVERLAY_UPDATE,
     MSG_CACHE_UPDATE,
     MSG_CHAT,
     MSG_DEACTIVATE,
     MSG_DECORATION,
+    MSG_DISCONNECT,
     MSG_ENEMY_DETECT,
     MSG_EQUIP_GAIN,
     MSG_EQUIP_TOGGLE,
@@ -21,6 +23,7 @@ from tankpit_bot.protocol.constants import (
     MSG_MOVE_RESPONSE,
     MSG_MOVEMENT,
     MSG_OVERLAY_UPDATE,
+    MSG_PING,
     MSG_PROMOTION,
     MSG_RADAR_RESULT,
     MSG_SHOOT,
@@ -35,6 +38,7 @@ from tankpit_bot.protocol.constants import (
     MSG_TANK_STATS,
     MSG_TANK_STATUS_FULL,
     MSG_TERRAIN_UPDATE,
+    MSG_TOP10,
     MSG_VIEWPORT,
 )
 from tankpit_bot.protocol.decoders.combat import (
@@ -42,15 +46,6 @@ from tankpit_bot.protocol.decoders.combat import (
     decode_shoot_event,
 )
 from tankpit_bot.protocol.decoders.map_data import decode_map_data
-from tankpit_bot.protocol.decoders.misc import (
-    decode_action_done,
-    decode_active_forces,
-    decode_build_pickup,
-    decode_chat_message,
-    decode_decoration,
-    decode_promotion,
-    decode_statistics,
-)
 from tankpit_bot.protocol.decoders.movement import (
     decode_movement,
     decode_movement_response,
@@ -65,6 +60,19 @@ from tankpit_bot.protocol.decoders.resources import (
     decode_fuel_deposit,
     decode_fuel_gain,
     decode_inventory,
+)
+from tankpit_bot.protocol.decoders.session_events import (
+    decode_action_done,
+    decode_active_forces,
+    decode_active_players,
+    decode_build_pickup,
+    decode_chat_message,
+    decode_connection_lost,
+    decode_decoration,
+    decode_ping_response,
+    decode_promotion,
+    decode_statistics,
+    decode_top10,
 )
 from tankpit_bot.protocol.decoders.tank import (
     decode_0x2e_message,
@@ -187,4 +195,24 @@ def _decode_misc_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_decoration(data)
     if msg_type == MSG_BUILD_PICKUP:
         return decode_build_pickup(data)
+    return _decode_session_broadcast(msg_type, data)
+
+
+def _decode_session_broadcast(msg_type: int, data: bytes) -> BinaryMessage | None:
+    """Decode session-level server broadcasts.
+
+    Split out of :func:`_decode_misc_message` to keep that function
+    under the C901 complexity ceiling. Covers ActivePlayers, Top10,
+    PingResponse, and ConnectionLost -- all decoded but historically
+    routed nowhere; now they fan out into the events stream via the
+    dispatcher.
+    """
+    if msg_type == MSG_ACTIVE_PLAYERS:
+        return decode_active_players(data)
+    if msg_type == MSG_TOP10:
+        return decode_top10(data)
+    if msg_type == MSG_PING:
+        return decode_ping_response(data)
+    if msg_type == MSG_DISCONNECT:
+        return decode_connection_lost(data)
     return None

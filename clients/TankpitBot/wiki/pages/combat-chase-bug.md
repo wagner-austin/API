@@ -38,6 +38,17 @@ Each failed attempt: target position drifts 1 tile between teleport dispatch and
 
 This eliminates the chase loop entirely. Even if the map position is 1 tile stale, the server knows the real positions and places correctly.
 
+## Caveat: server does NOT displace off equipment-container tiles
+
+The "let server displace" rule was proven for combat targets (a tank occupies the tile) and ferry / water terrain. It is **not** symmetric for equipment containers. Live capture 2026-06-21 16:54:26: bot teleported to (253,141) with an equipment container there, server placed the bot **on** the container tile (not adjacent), then `pickup_equipment(253,141)` returned no `container_consumed` response. So:
+
+- Combat teleport to enemy → server displaces adjacent → bot can shoot.
+- Container teleport to empty-of-tanks tile with container → server places **on** container → distance-0 pickup never returns success.
+
+The right behaviour for `pickup_equipment` is to dispatch it from inside the viewport (server handles the walk) rather than teleport directly onto the container tile. See [[equipment-system]] pickup mechanic.[^6]
+
+[^6]: live capture 2026-06-21 16:54:26 — bot at (253,141) sent pickup_equipment two times, zero server response bytes; matched prior successful pickup at distance 3 from (252,136)
+
 [^1]: run 2026-06-16 18:26 — bot chased purple-9 through 3 teleport hops at x=4-9, y=128, spending ~54 fuel over ~12s without firing
 [^2]: diagnostic logs show target position shifting between dispatch and check: target=(5,128) at dispatch → target=(4,128) at check
 [^5]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent"; the bot was computing adjacent tiles client-side instead of letting the server handle it

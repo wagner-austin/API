@@ -124,16 +124,14 @@ def dispatch_command(
         bot: Bot instance for sending commands.
         command: The bot command to execute.
         snapshot: Live page-client state captured at the start of this tick.
-            ``map_open`` and ``teleport`` consult ``snapshot["map_visible"]``
-            so the wire ``CMD_MAP_OPEN`` is not dispatched against an already
-            open map (the server is silent on the second send, which would
-            stall any downstream sync wait).
+            ``snapshot["map_visible"]`` short-circuits the teleport
+            precondition: an already-open map lets the teleport dispatch
+            directly instead of consuming a tick for CMD_MAP_OPEN.
 
     Returns:
-        True if the desired effect was achieved -- either because a command
-        was dispatched, or because the desired client state was already in
-        place (e.g. ``map_open`` requested while ``snapshot["map_visible"]``
-        is already ``True``).
+        True if the desired effect was achieved -- either because a
+        command was dispatched, or because the desired client state was
+        already in place.
     """
     if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
         return _dispatch_tracked_target_command(bot, command)
@@ -142,20 +140,12 @@ def dispatch_command(
     if command["cmd_type"] == "radar":
         return bot.use_radar()
     if command["cmd_type"] == "map_open":
-        if snapshot["map_visible"] is True:
-            # The AI asked for FRESH map intel. The wire open is a
-            # server-side no-op while the map is considered open, so
-            # skipping here starved HUNT of new MAP_DATA forever (live
-            # run 20260610-005248 looped on this for 31 ticks). Close
-            # the overlay client-side (verified: 'm' keypress, no wire
-            # traffic) and re-dispatch the wire open for a fresh sync.
-            emit_ai("map already visible: closing overlay before fresh map_open")
-            emit_diagnostic(
-                diagnostic_kind="map_reopened_for_fresh_intel",
-                origin="executor.dispatch_command.map_open",
-                command_name="map_open",
-            )
-            bot.close_map()
+        # CMD_MAP_OPEN is idempotent on the server: every dispatch
+        # produces a fresh MAP_DATA payload regardless of whether the
+        # client believes the overlay is open. Empirically every wire
+        # CMD_MAP_OPEN in capture 20260620-183916 completed via
+        # ``map_data_processed`` in ~2 s including those issued while
+        # ``map_visible`` was ``True``. There is nothing to guard.
         return bot.open_map()
     # Teleport: an OPEN map is a server-side precondition. A teleport
     # dispatched in the same tick as the wire map_open races the
@@ -520,6 +510,13 @@ def execute(
         command["cmd_type"],
         _format_desired_equipment(decision["desired_equipment"]),
         behavior["reason"],
+        behavior_mode=behavior["mode"],
+        behavior_score=behavior["score"],
+        combat_target_x=behavior["target_x"],
+        combat_target_y=behavior["target_y"],
+        combat_target_id=behavior["target_id"],
+        command_type=command["cmd_type"],
+        behavior_reason=behavior["reason"],
     )
 
     if not _is_dispatchable(bot, decision):

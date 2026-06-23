@@ -492,11 +492,9 @@ class TestFormatFunctions:
 
         msg = MapDataDict(
             msg_type=0x4C,
-            fuel_dots=[(1, 2), (3, 4)],
             tanks=[MapTankEntry(x=1, y=2, tank_id=5, rank=0, damage=0, team=0)],
         )
         result = format_misc_details(msg)
-        assert "fuel_dots=2" in result
         assert "tanks=1" in result
 
     def test_format_tank_details_build_pickup_bridge(self) -> None:

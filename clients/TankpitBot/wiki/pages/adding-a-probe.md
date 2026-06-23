@@ -80,7 +80,6 @@ make my-probe       # live run
 | Teleport | `teleport.py` | Teleport landing accuracy, timing strategies |
 | Enemy Teleport | `enemy_teleport.py` | Teleporting near enemies |
 | Fuel | `fuel_probe.py` | Fuel container pickup |
-| Fuel Dot | `fuel_dot_probe.py` | MAP_DATA fuel dot verification |
 | Equipment | `equipment_probe.py` | Equipment container pickup |
 | Movement | `movement_probe.py` | Walking to targets |
 | Queue | `queue_probe.py` | Multi-command server batching |

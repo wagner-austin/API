@@ -46,7 +46,6 @@ def _make_world(
             terrain={},
             viewport={"left": self_x - 8, "top": self_y - 8, "width": 16, "height": 16},
             scanned_viewports=scanned_viewports,
-            map_fuel_dots={},
             timestamp_ms=100000,
         ),
         self_state,
@@ -88,6 +87,28 @@ def _scanned_ai_state() -> AIStateDict:
     return make_initial_ai_state()
 
 
+def _viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[str, int]:
+    """Return a coverage map marking every tile in the world's viewport.
+
+    Mirrors what :func:`mark_scan_dispatched` writes after an extra
+    radar reveals a whole viewport. Tests use this to model "the bot
+    just radared this viewport" without having to drive the tick loop.
+
+    Args:
+        world: World state whose viewport bounds drive the coverage map.
+        now_ms: Timestamp to stamp every tile with.
+
+    Returns:
+        Coverage dict keyed by ``"x,y"`` with every viewport tile marked.
+    """
+    viewport = world["viewport"]
+    left = viewport["left"]
+    top = viewport["top"]
+    right = left + viewport["width"] - 1
+    bottom = top + viewport["height"] - 1
+    return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
+
+
 class TestLockedEquipmentTarget:
     """Tests for locked equipment target continuation."""
 
@@ -123,11 +144,17 @@ class TestLockedEquipmentTarget:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_locked"
 
-    def test_locked_equipment_target_kept_when_on_water(self) -> None:
-        """Locked equipment target is kept since server handles displacement on teleport."""
+    def test_locked_equipment_target_dispatches_pickup_even_on_water(self) -> None:
+        """In-viewport equipment dispatches a single pickup command; server walks.
+
+        ``pickup_equipment(x, y)`` is the JS client's long-press
+        action -- one command, server routes the tank to the
+        container and completes the pickup. Walkability of the
+        target tile and its neighbours is the server's problem; the
+        bot dispatches once and waits for the wire signal.
+        """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
-        # Target on water with all adjacent tiles also water — server displaces on landing
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=800)
         terrain_data: dict[tuple[int, int], str] = {
@@ -149,13 +176,12 @@ class TestLockedEquipmentTarget:
                 "resource_target_y": 105,
             },
         )
-        # default_count=15: below low but above break
         inventory = _make_inventory(default_count=15)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        # Target is kept locked — server displaces on teleport landing
         assert decision["behavior"]["reason"] == "equipment_locked"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_locked_equipment_target_clears_when_teleport_unaffordable(self) -> None:
         """Locked equipment target is cleared when teleport is unaffordable."""
@@ -233,8 +259,13 @@ class TestRadarForEquipment:
         """Reset world state."""
         reset_world_state()
 
-    def test_radar_for_equipment_in_unscanned_viewport(self) -> None:
-        """Equipment recovery radars in unscanned viewport when stock available."""
+    def test_forage_radar_in_unscanned_viewport(self) -> None:
+        """Equipment recovery forages with a radar in an unscanned viewport.
+
+        The forager owns the scan path regardless of extras count: it
+        fires the radar when any viewport tile is unscanned and the
+        radar fuel cost is payable.
+        """
         world, self_state = _make_world(fuel=800, scanned=False)
         ai_state = AIStateDict(
             **{
@@ -251,7 +282,7 @@ class TestRadarForEquipment:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["behavior"]["reason"] == "radar_for_equipment"
+        assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -319,6 +350,7 @@ class TestEquipmentSearchHopFallback:
                 "mode": "RECOVER_EQUIPMENT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
+                "local_scan_tiles": _viewport_covered_tiles(world),
             }
         )
         # default_count=15: below low but above break; radar=0 so no scan
@@ -350,6 +382,7 @@ class TestEquipmentSearchHopFallback:
                 "mode": "RECOVER_EQUIPMENT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
+                "local_scan_tiles": _viewport_covered_tiles(world),
             }
         )
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
@@ -393,8 +426,19 @@ class TestCriticalEquipmentLockedTarget:
         assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
         assert decision["behavior"]["reason"] == "equipment_locked"
 
-    def test_clears_locked_critical_equipment_when_unexecutable(self) -> None:
-        """Critical locked equipment target is cleared when not executable."""
+    def test_locked_critical_equipment_target_drives_recovery_owner(self) -> None:
+        """A locked critical equipment target stays under RECOVER_EQUIPMENT.
+
+        Earlier the test asserted the lock would clear when the
+        underlying tile was water-locked, but the actual behaviour
+        under the 2026-06-22 resume-threshold mode-entry rule is
+        that RECOVER_EQUIPMENT owns the tick, dispatches a pickup
+        attempt at the locked tile, and lets the server's reject
+        (e.g. ``Empty container`` / ``You can't go there!``) clear
+        the lock via the `_clear_command_error` path. The decision
+        on this tick is therefore a normal recovery action, not a
+        crash, and the mode label is the contract being asserted.
+        """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 0, False)}
@@ -415,12 +459,12 @@ class TestCriticalEquipmentLockedTarget:
                 "resource_target_y": 105,
             },
         )
-        # default_count=5: below break → critical path
+        # default_count=5: every counter below resume → mode-entry triggers.
         inventory = _make_inventory(default_count=5)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["reason"] != "equipment_locked"
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
 
 
 class TestFuelSearchFallbacks:
@@ -435,8 +479,8 @@ class TestFuelSearchFallbacks:
         """Reset world state."""
         reset_world_state()
 
-    def test_locked_fuel_kept_when_on_water(self) -> None:
-        """Locked fuel target is kept since server handles displacement on teleport."""
+    def test_locked_fuel_dispatches_pickup_even_on_water(self) -> None:
+        """In-viewport fuel dispatches a single pickup command; server walks."""
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
@@ -461,13 +505,15 @@ class TestFuelSearchFallbacks:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        # Fuel target is kept locked — server displaces on teleport landing
         assert "fuel=700" in decision["behavior"]["reason"]
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
-        """Fuel search hops to fresh sector when scanned but no fuel found."""
+        """Fuel search hops to fresh sector when viewport tiles fully swept."""
         world, self_state = _make_world(fuel=300, scanned=True)
-        ai_state = _scanned_ai_state()
+        ai_state = AIStateDict(
+            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
+        )
         inventory = _make_inventory()
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
@@ -475,24 +521,37 @@ class TestFuelSearchFallbacks:
         assert decision["behavior"]["mode"] == "COLLECT_FUEL"
         assert decision["behavior"]["reason"] == "search_fuel_local"
 
-    def test_fuel_edge_walk_when_teleport_unaffordable(self) -> None:
-        """Fuel recovery walks to viewport edge when teleport too expensive."""
+    def test_fuel_raises_when_no_hop_affordable_and_no_atlas_dot(self) -> None:
+        """Fuel recovery raises when no productive action remains.
+
+        The viewport-edge walk fallback was removed 2026-06-22 (per-tile
+        fuel cost for no visibility gain) and the map_intel terminal
+        was removed the same day. With no atlas-known dot, no
+        affordable search hop, and a scanned viewport, the bot has
+        nothing legal to do; raising surfaces the wedged state loudly.
+        """
+        import pytest
+
         world, self_state = _make_world(fuel=140, scanned=True)
-        ai_state = _scanned_ai_state()
+        ai_state = AIStateDict(
+            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
+        )
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+            decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "edge_for_fuel"
+    def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
+        """Durable fuel recovery raises when boxed in.
 
-    def test_fuel_recovery_opens_map_when_all_paths_are_blocked(self) -> None:
-        """Durable fuel recovery opens the map for intel instead of crashing.
-
-        With every viewport tile water, radar exhausted, and no
-        affordable hop, the owner's terminal fallback is the free
-        map-intel action -- raising here used to kill the bot process.
+        With every viewport tile already scanned (bot-side coverage),
+        every viewport map tile water, no affordable hop, and no fuel
+        dots, the bot is genuinely wedged. The map_intel terminal
+        was removed 2026-06-22; the owner now raises so the wedged
+        state can't be missed in production logs.
         """
+        import pytest
+
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         terrain_data: dict[tuple[int, int], str] = {}
@@ -501,11 +560,10 @@ class TestFuelSearchFallbacks:
                 terrain_data[(x, y)] = "W"
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world, self_state = _make_world(fuel=140, scanned=True)
-        ai_state = _scanned_ai_state()
+        ai_state = AIStateDict(
+            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
+        )
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
-
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "map_intel_for_fuel"
-        assert decision["command"]["cmd_type"] == "map_open"
+        with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+            decide(world, self_state, ai_state, inventory, 100000, terrain)

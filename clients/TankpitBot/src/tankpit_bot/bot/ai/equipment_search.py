@@ -11,7 +11,6 @@ from platform_core.logging import get_logger
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import (
-    _KNOWN_PURSUIT_MAX_DIST,
     _viewport_bounds,
     is_container_pursuable,
 )
@@ -297,68 +296,6 @@ def find_best_fuel(
     return best
 
 
-def find_known_fuel_candidates(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    *,
-    now_ms: int = 0,
-    minimum_volume: int = 100,
-) -> list[ContainerStateDict]:
-    """Return known fuel containers ordered best-first across the full registry.
-
-    Args:
-        world: Current world state with tracked containers.
-        self_state: Player state used for distance scoring.
-        now_ms: Current timestamp for freshness filtering. ``0`` disables TTL.
-        minimum_volume: Minimum fuel volume worth pursuing.
-
-    Returns:
-        Known fuel containers ordered by ``volume - distance`` descending.
-    """
-    sx, sy = self_state["x"], self_state["y"]
-    scored: list[tuple[int, int, ContainerStateDict]] = []
-    for container in world["containers"].values():
-        if not is_container_pursuable(container, want_fuel=True, now_ms=now_ms):
-            continue
-        if container["volume"] < minimum_volume:
-            continue
-        dist = manhattan_distance(sx, sy, container["x"], container["y"])
-        if dist > _KNOWN_PURSUIT_MAX_DIST:
-            continue
-        scored.append((container["volume"] - dist, dist, container))
-    scored.sort(key=_known_fuel_candidate_key)
-    return [container for _, _, container in scored]
-
-
-def find_known_equipment_candidates(
-    world: WorldStateDict,
-    self_state: SelfStateDict,
-    *,
-    now_ms: int = 0,
-) -> list[ContainerStateDict]:
-    """Return known equipment containers ordered nearest-first.
-
-    Args:
-        world: Current world state with tracked containers.
-        self_state: Player state used for distance ordering.
-        now_ms: Current timestamp for freshness filtering. ``0`` disables TTL.
-
-    Returns:
-        Known equipment containers ordered by Manhattan distance.
-    """
-    sx, sy = self_state["x"], self_state["y"]
-    candidates: list[tuple[int, ContainerStateDict]] = []
-    for container in world["containers"].values():
-        if not is_container_pursuable(container, want_fuel=False, now_ms=now_ms):
-            continue
-        dist = manhattan_distance(sx, sy, container["x"], container["y"])
-        if dist > _KNOWN_PURSUIT_MAX_DIST:
-            continue
-        candidates.append((dist, container))
-    candidates.sort(key=_equipment_candidate_distance)
-    return [container for _, container in candidates]
-
-
 def find_adjacent_container(
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -596,18 +533,11 @@ def _equipment_candidate_distance(item: tuple[int, ContainerStateDict]) -> int:
     return item[0]
 
 
-def _known_fuel_candidate_key(item: tuple[int, int, ContainerStateDict]) -> tuple[int, int]:
-    """Sort key for known fuel candidates — best score first, then nearest."""
-    return (-item[0], item[1])
-
-
 __all__ = [
     "describe_container_search",
     "find_adjacent_container",
     "find_best_fuel",
     "find_equipment_candidates",
-    "find_known_equipment_candidates",
-    "find_known_fuel_candidates",
     "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",

@@ -18,7 +18,6 @@ from tankpit_bot.bot.ai.equipment import is_area_scanned
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
 from tankpit_bot.bot.ai.reachability import (
-    is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
 )
 from tankpit_bot.bot.types import (
@@ -360,9 +359,6 @@ def _is_occupied_by_mine(ctx: DecideCtx, x: int, y: int) -> bool:
     return f"{x},{y}" in ctx.world["mines"]
 
 
-_WALK_DISTANCE_THRESHOLD = 3
-
-
 def _walk_or_teleport_with_terrain(
     ctx: DecideCtx,
     tx: int,
@@ -375,25 +371,23 @@ def _walk_or_teleport_with_terrain(
     """Resolve movement when terrain/pathfinding is available."""
     terrain = ctx.terrain
     assert terrain is not None  # caller guarantees this
-    if pickup_kind is not None and abs(sx - tx) <= 1 and abs(sy - ty) <= 1:
-        emit_ai("adjacent to pickup target at (%d,%d)", tx, ty)
-        return _make_pickup_command(pickup_kind, tx, ty)
     if not is_pickup_target_actionable(ctx, tx, ty):
         return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
-    manhattan = abs(sx - tx) + abs(sy - ty)
-    if (
-        pickup_kind is not None
-        and manhattan > _WALK_DISTANCE_THRESHOLD
-        and can_afford_teleport(ctx, tx, ty)
-    ):
-        emit_ai(
-            "teleporting to (%d,%d) instead of walking %d tiles",
-            tx,
-            ty,
-            manhattan,
-        )
-        return make_teleport_command(tx, ty)
-    if pickup_kind is not None and is_collection_reachable_in_viewport(
+    # In-viewport pickup targets dispatch ONE pickup command and let
+    # the server route the tank to the container. The JS client does
+    # the same: clicking a container is a single long-press
+    # ``pickup_fuel`` / ``pickup_equipment`` command, and the server
+    # walks the tank to the tile and completes the pickup. The
+    # historical bot kept re-issuing ``move`` step-by-step toward
+    # the container, burning ~2 s per tile and never sending the
+    # pickup until adjacent (live run 2026-06-21 19:13:40+: ten move
+    # commands over 20 s to walk to (129,127) for an equipment
+    # container that one pickup_equipment would have collected
+    # directly).
+    if pickup_kind is not None:
+        emit_ai("dispatching %s pickup at (%d,%d)", pickup_kind, tx, ty)
+        return _make_pickup_command(pickup_kind, tx, ty)
+    if is_move_reachable_in_viewport(
         ctx.world,
         terrain,
         sx,
@@ -402,17 +396,7 @@ def _walk_or_teleport_with_terrain(
         ty,
         ctx.world["mines"],
     ):
-        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty, pickup_kind=pickup_kind)
-    if pickup_kind is None and is_move_reachable_in_viewport(
-        ctx.world,
-        terrain,
-        sx,
-        sy,
-        tx,
-        ty,
-        ctx.world["mines"],
-    ):
-        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty, pickup_kind=pickup_kind)
+        return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
     return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
 
 
@@ -423,8 +407,6 @@ def _surface_clamped_move(
     sy: int,
     tx: int,
     ty: int,
-    *,
-    pickup_kind: str | None,
 ) -> BotCommand | None:
     """Issue a direct move bounded at the first surface transition.
 
@@ -435,6 +417,11 @@ def _surface_clamped_move(
     command becomes a plain move to that boundary tile and the next
     tick replans the remainder.
 
+    Pickup paths bypass this helper entirely -- they dispatch a
+    single ``pickup_fuel`` / ``pickup_equipment`` command and let
+    the server route the tank; only plain moves need surface
+    clamping.
+
     Args:
         ctx: Decision context.
         terrain: Ferry-aware terrain view used for planning.
@@ -442,7 +429,6 @@ def _surface_clamped_move(
         sy: Starting Y coordinate.
         tx: Requested target X coordinate.
         ty: Requested target Y coordinate.
-        pickup_kind: Resource kind for pickup commands, or None.
 
     Returns:
         Planned command, or None when the clamped tile is occupied.
@@ -464,8 +450,8 @@ def _surface_clamped_move(
             tx,
             ty,
         )
-        return _direct_move_command(ctx, clamp_x, clamp_y, pickup_kind=None)
-    return _direct_move_command(ctx, tx, ty, pickup_kind=pickup_kind)
+        return _direct_move_command(ctx, clamp_x, clamp_y)
+    return _direct_move_command(ctx, tx, ty)
 
 
 def _walk_or_teleport_without_terrain(
@@ -542,15 +528,15 @@ def _direct_move_command(
     ctx: DecideCtx,
     tx: int,
     ty: int,
-    *,
-    pickup_kind: str | None,
 ) -> BotCommand | None:
-    """Return a direct move/pickup command when the straight path is clear."""
+    """Return a direct move command when the straight path is clear.
+
+    Pickup-kind targets dispatch their own ``pickup_*`` command
+    upstream; this helper only emits plain moves.
+    """
     if not is_pickup_target_actionable(ctx, tx, ty):
         emit_ai("direct target (%d,%d) is outside viewport", tx, ty)
         return None
-    if pickup_kind is not None:
-        return _make_pickup_command(pickup_kind, tx, ty)
     if _is_occupied_by_enemy(ctx, tx, ty):
         emit_ai("move target (%d,%d) is occupied by enemy", tx, ty)
         return None

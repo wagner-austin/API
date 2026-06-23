@@ -29,7 +29,6 @@ def _empty_world() -> WorldStateDict:
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
         scanned_viewports={viewport_scan_key(0, 0): 0},
-        map_fuel_dots={},
         timestamp_ms=0,
     )
 

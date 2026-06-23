@@ -58,6 +58,10 @@ def _enemy_threat(
         timestamp_ms=100000,
         last_wire_seen_ms=last_wire_seen_ms,
         last_position_update_ms=last_position_update_ms,
+        last_aim_x=-1,
+        last_aim_y=-1,
+        last_aim_weapon=-1,
+        last_aim_ms=0,
     )
 
 
@@ -283,8 +287,19 @@ class TestGetLockedTargetWorldStateFallback:
         assert result["tank_id"] == 50
         assert result["x"] == 101
 
-    def test_falls_back_to_world_state_when_not_in_threats(self) -> None:
-        """Target found in world state tanks dict when absent from threats."""
+    def test_returns_none_when_locked_target_drops_off_threats(self) -> None:
+        """No world-state fallback: lock release IS dropping off the threat list.
+
+        The pre-2026-06-21 implementation synthesised a fake threat
+        from ``world.tanks`` when the locked id was missing from
+        ``threats``. The enemy-tracking probe proved that fallback
+        was the source of the "fires one shot then hops" failure
+        loop: it kept locks alive on tanks the JS client itself no
+        longer listed in ``activeGame.P.j``. ``get_locked_target``
+        now returns ``None`` the moment a tank leaves the threat
+        list, letting ``_decide_hunt_engage`` enter confirm_kill
+        and re-acquire from fresh viewport intel.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -299,50 +314,12 @@ class TestGetLockedTargetWorldStateFallback:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
-
-        result = get_locked_target(ctx, [])
-
-        if result is None:
-            raise AssertionError("expected target from world state fallback")
-        assert result["tank_id"] == 50
-        assert result["x"] == 130
-        assert result["name"] == "FarEnemy"
-        assert result["distance"] == 30
-
-    def test_returns_none_when_world_state_tank_at_origin(self) -> None:
-        """Tanks at (0,0) are treated as dead/despawned."""
-        tanks: dict[str, TankStateDict] = {
-            "50": make_tank_state(
-                tank_id=50,
-                x=0,
-                y=0,
-                team=2,
-                rank=1,
-                name="Dead",
-                is_self=False,
-                is_bot=False,
-                damage_state=0,
-                timestamp_ms=100000,
-            ),
-        }
-        world, self_state = make_world(fuel=800, tanks=tanks)
-        ai_state = make_scanned_ai_state()
-        ai_state["combat_target_id"] = 50
-        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
-
-        assert get_locked_target(ctx, []) is None
-
-    def test_returns_none_when_not_in_world_state(self) -> None:
-        """Truly absent target returns None."""
-        world, self_state = make_world(fuel=800)
-        ai_state = make_scanned_ai_state()
-        ai_state["combat_target_id"] = 999
         ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
 
         assert get_locked_target(ctx, []) is None
@@ -514,6 +491,7 @@ class TestKillShotWireGate:
                 timestamp_ms=100000,
                 last_wire_seen_ms=last_wire_seen_ms,
                 last_position_update_ms=position_stamp,
+                last_viewport_observation_ms=position_stamp,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
@@ -560,27 +538,6 @@ class TestKillShotWireGate:
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
         assert decision["updated_ai_state"]["combat_target_id"] != 50
 
-    def test_position_stale_adjacent_target_is_blocked_not_shot(self) -> None:
-        """A wire-present but position-stale target is blocked, not shot.
-
-        TankStatusSync broadcasts every 2 s globally and refresh
-        ``last_wire_seen_ms`` even for off-screen tanks. If the only
-        wire activity is status-only, the kill-shot gate must refuse to
-        fire at the stale registry position. This is the precise
-        invariant whose violation caused the 22-miss feedback loop in
-        run bot-20260619-050303.
-        """
-        ctx, target = self._adjacent_world_and_ctx(
-            last_wire_seen_ms=100000,
-            last_position_update_ms=100000 - 5000,
-        )
-
-        decision = engage_target(ctx, target)
-
-        assert decision["command"]["cmd_type"] != "shoot"
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
-        assert decision["updated_ai_state"]["combat_target_id"] != 50
-
 
 class TestMissOnMovedTarget:
     """Tests for the miss-on-moved-target re-aim path in _combat_shoot."""
@@ -617,6 +574,7 @@ class TestMissOnMovedTarget:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
@@ -799,6 +757,7 @@ class TestFindCombatPickup:
                     timestamp_ms=100000,
                     last_wire_seen_ms=100000,
                     last_position_update_ms=100000,
+                    last_viewport_observation_ms=100000,
                 ),
             },
             containers={
@@ -842,7 +801,6 @@ class TestFindCombatPickup:
             terrain=world["terrain"],
             viewport=world["viewport"],
             scanned_viewports=world["scanned_viewports"],
-            map_fuel_dots=world["map_fuel_dots"],
             timestamp_ms=world["timestamp_ms"],
         )
         ctx = DecideCtx(

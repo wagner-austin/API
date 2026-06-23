@@ -2,8 +2,8 @@
 title: Tank Registry Freshness Model
 tags: [architecture, world-state, freshness, combat]
 related: [[decode-coverage]], [[combat-chase-bug]], [[shoot-event-format]]
-sources: [src/tankpit_bot/state/types/tank.py, src/tankpit_bot/state/types/tank_observation.py, src/tankpit_bot/state/mutations.py, runs/bot/bot-20260619-050303 stale-position miss loop]
-fact_checked: 2026-06-19
+sources: [src/tankpit_bot/state/types/tank.py, src/tankpit_bot/state/types/tank_observation.py, src/tankpit_bot/state/mutations.py, runs/bot/bot-20260619-050303 stale-position miss loop, runs/bot/bot-20260620-191622 target-block loop]
+fact_checked: 2026-06-20
 confidence: high
 ---
 
@@ -17,9 +17,9 @@ caused the historical stale-registry combat bug.
 
 | Field | Advances on | Gate |
 |---|---|---|
-| `timestamp_ms` | ANY observation (wire OR map snapshot) | Acquisition (HUNT candidate) |
+| `timestamp_ms` | ANY observation (wire, map snapshot, radar, DOM refinement) | Acquisition (HUNT candidate) |
 | `last_wire_seen_ms` | WIRE-sourced observations only | Wire presence (anti-ghost) |
-| `last_position_update_ms` | WIRE-sourced observations that carried fresh `(x, y)` | Kill-shot |
+| `last_position_update_ms` | Observations with `position_is_authoritative=True` AND non-null `position` | Kill-shot |
 
 Production cadences differ by message kind, which is why one timestamp
 is not enough:
@@ -40,19 +40,32 @@ Every tank-state mutation flows through
 observation -- a `TankObservation` TypedDict -- declares:
 
 ```
-is_wire_sourced: bool        # True for wire messages; False for map
-storage_source: EntitySource # 'viewport' | 'radar' | 'world_state'
+is_wire_sourced: bool              # True for wire; drives last_wire_seen_ms
+position_is_authoritative: bool    # True when the carried position is the
+                                   # server's own statement (wire-with-pos
+                                   # OR MAP_DATA); drives last_position_update_ms
+storage_source: EntitySource       # 'viewport' | 'radar' | 'world_state'
 position: tuple[int, int] | None
-team: int | None             # plus rank / damage / direction / name / is_bot
+team: int | None                   # plus rank / damage / direction / name / is_bot
 ```
+
+The two flags are intentionally independent so MAP_DATA -- the server's
+own snapshot of the global tank roster -- can advance the kill-shot
+position gate without claiming wire presence (which it does not prove
+-- a departed tank can linger in the snapshot for minutes). Radar
+EnemyDetect and DOM-scraped client-registry refinements set both
+flags False: they are tile-coarse or out-of-band estimates that must
+not gate a kill shot. `position_is_authoritative` defaults to
+`is_wire_sourced` when omitted, so existing wire call sites compose
+the historical semantics for free.
 
 The mutator enforces the freshness rules in code:
 
 ```python
-if obs.is_wire_sourced:
-    last_wire_seen_ms = obs.timestamp_ms
-    if obs.position is not None:
-        last_position_update_ms = obs.timestamp_ms
+if obs["is_wire_sourced"]:
+    last_wire_seen_ms = obs["timestamp_ms"]
+if obs["position_is_authoritative"] and obs["position"] is not None:
+    last_position_update_ms = obs["timestamp_ms"]
 ```
 
 Field aspects merge cleanly: present overwrites, `None` preserves. A
@@ -64,8 +77,9 @@ from the registry self-tank id.
 - **`is_wire_present(last_wire_seen_ms, now_ms)`** -- TTL 7000 ms (two
   fight-cadence periods). Acquisition / HUNT candidate selection.
 - **`is_position_fresh(last_position_update_ms, now_ms)`** -- TTL
-  3000 ms. **Kill-shot gate.** A wire-fresh but position-stale target
-  is blocked, not fired at.
+  7000 ms (matched to wire-presence TTL after the 2026-06-20
+  target-block loop). **Kill-shot gate.** A wire-fresh but
+  position-stale target is blocked, not fired at.
 
 Both gates live in `bot/ai/threats.py`. Combat strategy reads them in
 order: first `is_wire_present` (ghost gate), then `is_position_fresh`
@@ -95,27 +109,47 @@ impossible to reintroduce without breaking a locked invariant test in
 For each wire message kind, the dispatcher in
 `sniffer/world_state_tanks.py` builds a `TankObservation` with:
 
-| Message | is_wire_sourced | position | advances |
-|---|---|---|---|
-| 0x21 TankInfo | True | None | `timestamp_ms`, `last_wire_seen_ms` |
-| 0x28 TankEntry | True | `(x, y)` | all three |
-| 0x2E TankStatusSync (damage) | True | None | `timestamp_ms`, `last_wire_seen_ms` |
-| 0x3D MovementResponse | True | `(x, y)` | all three |
-| 0x3E TankStatusFull | True | None | `timestamp_ms`, `last_wire_seen_ms` |
-| 0x47 Movement (waypoint final) | True | `(x, y)` | all three |
-| 0x48 EnemyDetect (radar) | False | `(x, y)` | `timestamp_ms` only |
-| 0x53 ShootEvent (enemy source tile) | True | `(x, y)` | all three |
-| container `tank_update_*` | True | `(x, y)` | all three |
-| container `tank_status_short` | True | None | `timestamp_ms`, `last_wire_seen_ms` |
-| container `tank_registry` | True | `(x, y)` | all three |
-| 0x4C MapData (map snapshot) | False | `(x, y)` | `timestamp_ms` only |
-| client-side registry refinement | False | `(x, y)` | `timestamp_ms` only |
+| Message | is_wire_sourced | position_is_authoritative | position | advances |
+|---|---|---|---|---|
+| 0x21 TankInfo | True | True (unused, position is None) | None | `timestamp_ms`, `last_wire_seen_ms` |
+| 0x28 TankEntry | True | True | `(x, y)` | all three |
+| 0x2E TankStatusSync (damage) | True | True (unused, position is None) | None | `timestamp_ms`, `last_wire_seen_ms` |
+| 0x3D MovementResponse | True | True | `(x, y)` | all three |
+| 0x3E TankStatusFull | True | True (unused, position is None) | None | `timestamp_ms`, `last_wire_seen_ms` |
+| 0x47 Movement (waypoint final) | True | True | `(x, y)` | all three |
+| 0x48 EnemyDetect (radar) | False | **False** | `(x, y)` | `timestamp_ms` only |
+| 0x53 ShootEvent (enemy source tile) | True | True | `(x, y)` | all three |
+| container `tank_update_*` | True | True | `(x, y)` | all three |
+| container `tank_status_short` | True | True (unused, position is None) | None | `timestamp_ms`, `last_wire_seen_ms` |
+| container `tank_registry` | True | True | `(x, y)` | all three |
+| 0x4C MapData (map snapshot) | False | **True** | `(x, y)` | `timestamp_ms`, `last_position_update_ms` |
+| client-side registry refinement | False | **False** | `(x, y)` | `timestamp_ms` only |
 
-0x48 EnemyDetect routes through the non-wire path on purpose: radar
-returns a tile-coarse estimate that may not match the target's actual
-wire position by the next tick. The kill-shot gate must continue to
-require a fresh **wire-bearing** position; radar alone does not
-suffice.
+0x48 EnemyDetect and client-side registry refinements set
+`position_is_authoritative=False` on purpose: the first is a
+tile-coarse radar estimate that may not match the target's actual wire
+position by the next tick; the second is a DOM scrape with no server
+proof. The kill-shot gate requires the server's own statement of
+position -- wire-with-position or MAP_DATA snapshot.
+
+## Registry lifecycle: 0x58 TankRemove is a no-op (changed 2026-06-22)
+
+Tanks enter `world["tanks"]` on first observation (`apply_tank_observation`)
+and leave only when `0x41 Deactivation` flips `liveness="deactivated"` and
+the kill cooldown elapses. **`0x58 TankRemove` is a no-op** -- the entry
+stays put. Earlier behaviour deleted the entry; that caused the bot to
+abandon pursuit of locked targets that merely teleported out of viewport
+(live capture 2026-06-22: bot fired exactly one homing then dropped the
+lock because `0x58` fired in the next tick).
+
+Rationale: `0x58` carries no information that the freshness gates above
+can't already derive. A tank that has truly left the world stops
+broadcasting `0x2E TankStatusSync`; `timestamp_ms` ages out naturally.
+A tank that simply teleported keeps broadcasting `0x2E` (which refreshes
+`timestamp_ms` and `last_wire_seen_ms` but NOT position) -- pursuit fires
+homing at the cached coords, server picks homing weapon, homing tracks.
+The only authoritative death signal is `0x41`, and the lifecycle is now
+gated entirely by `liveness`.
 
 ## Tests that lock the contract
 

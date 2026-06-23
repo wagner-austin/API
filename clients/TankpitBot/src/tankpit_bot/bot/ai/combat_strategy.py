@@ -22,7 +22,6 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
-    is_position_fresh,
     is_wire_present,
 )
 from tankpit_bot.bot.ai.types import (
@@ -85,7 +84,7 @@ def _set_combat_target(
     )
 
 
-def _has_passable_adjacent(
+def has_passable_adjacent(
     x: int,
     y: int,
     terrain: TerrainMapProtocol | None,
@@ -121,7 +120,7 @@ def select_new_combat_target(
         for threat in threats
         if str(threat["tank_id"]) not in ctx.blocked_targets
         and str(threat["tank_id"]) not in ctx.killed
-        and _has_passable_adjacent(threat["x"], threat["y"], ctx.terrain)
+        and has_passable_adjacent(threat["x"], threat["y"], ctx.terrain)
     ]
     if not viable:
         return None
@@ -132,18 +131,26 @@ def get_locked_target(
     ctx: DecideCtx,
     threats: list[EnemyThreatDict],
 ) -> EnemyThreatDict | None:
-    """Find the current combat target in threats or world state.
+    """Return the lock target IFF the threat list still includes it.
 
-    Checks the threat list first (wire-present, viewport-visible).
-    Falls back to the world state tanks dict (map-known position)
-    so the bot can keep firing at a target that moved off-viewport.
+    The threat list is the single source of truth for "this tank is
+    viewport-confirmed right now". The pre-2026-06-21 implementation
+    also fell back to the world-state tanks registry to synthesise
+    a fake threat for tanks that had moved off-viewport, but the
+    enemy-tracking probe proved that fallback was the second source
+    of the "fires one shot then hops" loop: it kept the lock alive
+    on tanks the JS client itself no longer listed in
+    ``activeGame.P.j``, which sent the bot teleporting after
+    phantoms. Now: no fallback. If the locked tank leaves the
+    viewport, ``_decide_hunt_engage`` enters confirm_kill and the
+    bot re-acquires from fresh intel.
 
     Args:
         ctx: Decision context.
         threats: Current threat list.
 
     Returns:
-        The locked target if it's still tracked, or None.
+        The matching threat from ``threats``, or ``None``.
     """
     target_id = ctx.ai_state["combat_target_id"]
     if target_id == -1:
@@ -151,27 +158,7 @@ def get_locked_target(
     for t in threats:
         if t["tank_id"] == target_id:
             return t
-    key = str(target_id)
-    tank = ctx.world["tanks"].get(key)
-    if tank is None or (tank["x"] == 0 and tank["y"] == 0):
-        return None
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
-    from tankpit_bot.bot.ai.threats import manhattan_distance
-    from tankpit_bot.bot.ai.types import make_enemy_threat
-
-    return make_enemy_threat(
-        tank_id=tank["tank_id"],
-        x=tank["x"],
-        y=tank["y"],
-        distance=manhattan_distance(sx, sy, tank["x"], tank["y"]),
-        damage_state=tank["damage_state"],
-        rank=tank["rank"],
-        team=tank["team"],
-        name=tank["name"],
-        is_bot=tank["is_bot"],
-        timestamp_ms=tank["timestamp_ms"],
-        last_wire_seen_ms=ctx.timestamp_ms,
-    )
+    return None
 
 
 def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, int]:
@@ -512,30 +499,6 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         )
         return block_combat_target_and_replan(ctx, target)
 
-    if not is_position_fresh(target["last_position_update_ms"], ctx.timestamp_ms):
-        # Wire-present but position-stale: status-only broadcasts kept
-        # the wire-presence stamp fresh while no position-bearing
-        # message has arrived recently (the historical 2026-06-19
-        # stale-registry combat-miss loop). Block and replan -- do NOT
-        # fire at a position the wire has not structurally proven.
-        position_age_ms = ctx.timestamp_ms - target["last_position_update_ms"]
-        emit_ai(
-            "stale-position %s pos %dms old - blocking without firing",
-            target["name"],
-            position_age_ms,
-        )
-        emit_diagnostic(
-            diagnostic_kind="combat_stale_position",
-            target_name=target["name"],
-            target_id=target["tank_id"],
-            target_x=target["x"],
-            target_y=target["y"],
-            self_x=ctx.self_state["x"],
-            self_y=ctx.self_state["y"],
-            position_age_ms=position_age_ms,
-        )
-        return block_combat_target_and_replan(ctx, target)
-
     if ctx.combat_feedback == "miss":
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
         target_stationary = (target["x"], target["y"]) == last_shot_at
@@ -661,6 +624,7 @@ __all__ = [
     "get_locked_target",
     "has_cardinal_combat_shot",
     "has_combat_shot",
+    "has_passable_adjacent",
     "open_map_for_target",
     "select_new_combat_target",
     "teleport_to_target",

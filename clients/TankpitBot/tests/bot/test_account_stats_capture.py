@@ -105,8 +105,16 @@ def _sample_records(latest_events_path: str) -> list[RuntimeEventRecordDict]:
     ]
 
 
-def test_capture_toggles_panel_and_emits_stats(fake_env: FakeEnv, fake_fs: FakeFileSystem) -> None:
-    """The capture opens the panel, scrapes, closes it, and emits."""
+def test_capture_emits_single_c_press_and_scrapes(
+    fake_env: FakeEnv, fake_fs: FakeFileSystem
+) -> None:
+    """The capture presses C once, scrapes, and emits -- no closing press.
+
+    The C key is not a stateful toggle: each press emits a fresh
+    ``Statistics:`` block into the in-game DOM log. A second press
+    would just duplicate the block in the log without ``closing``
+    anything, so the capture stops at one keyDown / keyUp pair.
+    """
     artifacts = configure_bot_runtime_logging("20260610-120000")
     bot = Bot("https://test.tankpit.com/", headless=True)
     cdp = FakeCDPSessionSimple()
@@ -123,8 +131,6 @@ def test_capture_toggles_panel_and_emits_stats(fake_env: FakeEnv, fake_fs: FakeF
         "Input.dispatchKeyEvent",
         "Input.dispatchKeyEvent",
         "Runtime.evaluate",
-        "Input.dispatchKeyEvent",
-        "Input.dispatchKeyEvent",
     ]
     records = _sample_records(artifacts["latest_events_path"])
     assert len(records) == 1

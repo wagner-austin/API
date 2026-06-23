@@ -184,7 +184,7 @@ def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
     assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["behavior"]["reason"] == "radar_for_equipment"
+    assert decision["behavior"]["reason"] == "forage_radar"
     assert decision["updated_ai_state"]["mode"] == "RECOVER_EQUIPMENT"
     assert decision["updated_ai_state"]["mode_state"] == "SENSE"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000

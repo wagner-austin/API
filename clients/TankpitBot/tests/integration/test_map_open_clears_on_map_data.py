@@ -44,7 +44,7 @@ class TestMapOpenClearsOnMapData:
 
         dispatch_world_state_update(
             ws,
-            MapDataDict(msg_type=0x4C, fuel_dots=[], tanks=[]),
+            MapDataDict(msg_type=0x4C, tanks=[]),
         )
 
         assert ws.check_and_clear_map_data_processed() is True
@@ -66,7 +66,6 @@ class TestMapOpenClearsOnMapData:
             ws,
             MapDataDict(
                 msg_type=0x4C,
-                fuel_dots=[(5, 6), (7, 8)],
                 tanks=[
                     MapTankEntry(x=131, y=126, tank_id=1301, rank=1, damage=3, team=2),
                 ],

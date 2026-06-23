@@ -69,7 +69,6 @@ class TestUpdateSelfFromMovementResponse:
             terrain=state["terrain"],
             viewport=state["viewport"],
             scanned_viewports=state["scanned_viewports"],
-            map_fuel_dots=state["map_fuel_dots"],
             timestamp_ms=state["timestamp_ms"],
         )
 
@@ -436,18 +435,18 @@ class TestUpdateTerrainFromViewport:
 
 
 class TestRemoveTank:
-    """Tests for remove_tank."""
+    """Tests for remove_tank (the 0x58 TankRemove handler)."""
 
-    def test_removes_existing_tank(self) -> None:
-        """Deletes the tank from the registry.
+    def test_keeps_tank_in_registry(self) -> None:
+        """0x58 leaves the registry entry intact (changed 2026-06-22).
 
-        ``remove_tank`` is the 0x58 TankRemove handler. 0x58 doesn't
-        mean "tank died" -- it means the server stopped broadcasting
-        per-tank updates to this client (verified 2026-06-20
-        ghost_observe capture: orange-5 got 5 TankRemove events across
-        2 actual kills). Simpler correct behaviour: drop the tank from
-        the registry. The next MapData or per-tank wire re-adds it at
-        its current position with ``liveness="alive"``.
+        Earlier behaviour deleted the tank, which caused the bot to
+        abandon pursuit of locked targets that merely teleported out
+        of viewport (live capture 2026-06-22). 0x58 is benign tracking
+        churn: orange-5 got 5 TankRemove events across 2 actual kills
+        (ghost_observe capture 2026-06-20). Only 0x41 Deactivation is
+        an authoritative death signal; keeping 0x58 a no-op lets the
+        freshness / liveness gates do the work.
         """
         from tankpit_bot.state import apply_tank_observation
         from tankpit_bot.state.types import make_tank_observation
@@ -471,15 +470,16 @@ class TestRemoveTank:
 
         updated = remove_tank(state, tank_id=42, timestamp_ms=1000)
 
-        assert "42" not in updated["tanks"]
-        assert updated["timestamp_ms"] == 1000
+        assert "42" in updated["tanks"]
+        assert updated["tanks"]["42"]["liveness"] == "alive"
+        assert updated is state
 
-    def test_returns_unchanged_for_nonexistent(self) -> None:
-        """Returns unchanged state if tank doesn't exist."""
+    def test_no_op_for_nonexistent_tank(self) -> None:
+        """A 0x58 for a tank we have never heard of is also a no-op."""
         state = make_empty_world_state()
         updated = remove_tank(state, tank_id=999, timestamp_ms=1000)
 
-        assert updated is state  # Same reference
+        assert updated is state
 
 
 class TestDeactivateTank:
@@ -617,34 +617,40 @@ class TestPickupContainer:
         result = pickup_container(state, 50, 60, 1000)
         assert coord_key(50, 60) not in result["containers"]
 
-    def test_pickup_fuel_container_adds_fuel(self) -> None:
-        """Picking up fuel container adds fuel to self."""
+    def test_pickup_container_does_not_modify_self_fuel(self) -> None:
+        """``pickup_container`` only touches the container registry, not fuel.
+
+        Fuel updates flow through the wire's absolute-fuel messages
+        (0x44 FuelGain / 0x2E TankStatusSync / 0x64 FuelDeposit), which
+        call :func:`set_self_fuel` separately. Adding ``transferred``
+        fuel here on top of the wire's absolute total double-counts the
+        pickup -- a 438-volume container produced a +438 ghost beyond
+        the wire's already-correct 633 fuel in live run 20260623-0035
+        before this branch was removed.
+        """
         state = make_empty_world_state()
         state = update_self_from_movement_response(
             state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
         )
         initial_fuel = get_self_state(state)["fuel"]
-
-        # Add a fuel container with volume 100
         state = update_container_from_radar(state, x=50, y=60, volume=100, timestamp_ms=600)
 
         result = pickup_container(state, 50, 60, 700)
-        assert get_self_state(result)["fuel"] == initial_fuel + 100
+
+        assert get_self_state(result)["fuel"] == initial_fuel
         assert coord_key(50, 60) not in result["containers"]
 
     def test_pickup_equipment_container_no_fuel_change(self) -> None:
-        """Picking up equipment container does not add fuel."""
+        """Equipment-container pickup also leaves fuel untouched."""
         state = make_empty_world_state()
         state = update_self_from_movement_response(
             state, tank_id=1, x=10, y=10, team=0, rank=0, leaderboard_position=1, timestamp_ms=500
         )
         initial_fuel = get_self_state(state)["fuel"]
-
-        # Add an equipment container (volume=-1)
         state = update_container_from_radar(state, x=50, y=60, volume=-1, timestamp_ms=600)
 
         result = pickup_container(state, 50, 60, 700)
-        # Fuel unchanged since equipment containers have is_fuel=False
+
         assert get_self_state(result)["fuel"] == initial_fuel
         assert coord_key(50, 60) not in result["containers"]
 
@@ -667,3 +673,29 @@ class TestPickupContainer:
         result = pickup_container(state, 50, 60, 700)
         assert coord_key(50, 60) not in result["containers"]
         assert result["self_state"] is None
+
+
+class TestSetTankLastAim:
+    """Tests for ``set_tank_last_aim`` -- the 0x53 ShootEvent persistence path."""
+
+    def test_unknown_tank_is_a_no_op(self) -> None:
+        """A shoot event from a tank we have never seen leaves state unchanged.
+
+        The next per-tank wire message will create the tank record;
+        dropping the aim quietly is preferable to fabricating a tank
+        from a shoot-event alone (no team / rank / name information).
+        """
+        from tankpit_bot.state.mutations import set_tank_last_aim
+
+        state = make_empty_world_state()
+
+        result = set_tank_last_aim(
+            state,
+            tank_id=999,
+            aim_x=100,
+            aim_y=120,
+            weapon=1,
+            timestamp_ms=5000,
+        )
+
+        assert result is state

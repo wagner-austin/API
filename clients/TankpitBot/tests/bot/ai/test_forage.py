@@ -1,20 +1,42 @@
-"""Tests for the equipment-foraging grid sweep and its mode trigger."""
+"""Tests for the tile-aware forage planner."""
 
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.forage import (
-    plan_forage_search,
-    select_forage_cell_target,
-)
+from tankpit_bot.bot.ai.forage import plan_forage_search, select_forage_target
 from tankpit_bot.bot.ai.mode_controller import (
     should_enter_recover_equipment,
     should_exit_recover_equipment,
 )
+from tankpit_bot.bot.ai.scan_coverage import tile_key
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+_VIEWPORT_LEFT = 92
+_VIEWPORT_TOP = 92
+_VIEWPORT_RIGHT = 107
+_VIEWPORT_BOTTOM = 107
+
+
+def _full_viewport_coverage(now_ms: int) -> dict[str, int]:
+    """Return a coverage map that marks every tile in the default viewport.
+
+    The default test viewport is the 16x16 block (92..107) x (92..107)
+    produced by ``make_world(self_x=100, self_y=100)``.
+
+    Args:
+        now_ms: Timestamp to stamp every tile with.
+
+    Returns:
+        Coverage map keyed by ``"x,y"`` covering all 256 viewport tiles.
+    """
+    return {
+        tile_key(x, y): now_ms
+        for y in range(_VIEWPORT_TOP, _VIEWPORT_BOTTOM + 1)
+        for x in range(_VIEWPORT_LEFT, _VIEWPORT_RIGHT + 1)
+    }
 
 
 def _ctx(
@@ -25,8 +47,9 @@ def _ctx(
     fuel: int = 800,
     self_x: int = 100,
     self_y: int = 100,
-    local_scan_cells: dict[str, int] | None = None,
+    local_scan_tiles: dict[str, int] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
+    terrain: InMemoryTerrainMap | None = None,
 ) -> DecideCtx:
     """Build a decision context for forage tests.
 
@@ -37,8 +60,9 @@ def _ctx(
         fuel: Current fuel.
         self_x: Tank X coordinate.
         self_y: Tank Y coordinate.
-        local_scan_cells: Seed coverage grid.
+        local_scan_tiles: Seed tile-coverage map.
         tanks: Visible tanks (enemies) keyed by id.
+        terrain: Optional terrain map; when ``None`` no terrain rules apply.
 
     Returns:
         Decision context at timestamp 100000.
@@ -53,10 +77,10 @@ def _ctx(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "local_scan_cells": local_scan_cells if local_scan_cells is not None else {},
+            "local_scan_tiles": local_scan_tiles if local_scan_tiles is not None else {},
         }
     )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
 
 def _enemy(tank_id: int, x: int, y: int) -> dict[str, TankStateDict]:
@@ -105,8 +129,8 @@ class TestRadarRestockTrigger:
     def test_restock_ignores_visible_threats(self) -> None:
         """Rebuilding the kit outranks chasing a wanderer it cannot beat.
 
-        Unlike the first forager, restock does NOT yield to a visible
-        enemy below the buffer -- "get the radars before fighting".
+        Restock does NOT yield to a visible enemy below the buffer --
+        "get the radars before fighting".
         """
         ctx = _ctx(radars=0, tanks=_enemy(7, 104, 100))
 
@@ -114,153 +138,157 @@ class TestRadarRestockTrigger:
         assert should_exit_recover_equipment(ctx) is False
 
 
-class TestCellSelection:
-    """Tests for select_forage_cell_target."""
+class TestSelectForageTarget:
+    """Tests for ``select_forage_target``."""
 
-    def test_picks_nearest_uncovered_neighbor_center(self) -> None:
-        """With the home cell covered, the nearest neighbor center wins.
+    def test_picks_position_maximising_next_radar_coverage(self) -> None:
+        """A destination is chosen so its 5x5 footprint covers many uncovered tiles.
 
-        The tank cell at (100,100) is (20,20); its center is (102,102).
-        Covering it forces selection to an adjacent ring-1 cell center.
+        Coverage layout: every viewport tile scanned EXCEPT a 4x4
+        unscanned cluster at (103..106) x (103..106). A free radar at
+        (104, 104) has a 5x5 footprint of (102..106) x (102..106),
+        which fully contains all 16 cluster tiles -- score 16, the
+        maximum possible. Tank at (100, 100); distance 8 from (104,
+        104). The nearest-unscanned picker would have walked to (103,
+        103) (distance 6), missing 4 of the 16 cluster tiles on the
+        next radar. The coverage-maximising picker walks 8 tiles to
+        sweep the cluster in one shot.
         """
-        ctx = _ctx(radars=0, local_scan_cells={"20,20": 100000})
+        coverage = _full_viewport_coverage(100000)
+        for y in range(103, 107):
+            for x in range(103, 107):
+                del coverage[f"{x},{y}"]
+        ctx = _ctx(radars=0, local_scan_tiles=coverage)
 
-        target = select_forage_cell_target(ctx)
+        target = select_forage_target(ctx)
 
         if target is None:
-            raise AssertionError("expected a nearest uncovered cell center")
-        cx, cy = target
-        assert (cx // 5, cy // 5) != (20, 20)
-        assert max(abs(cx // 5 - 20), abs(cy // 5 - 20)) == 1
+            raise AssertionError("expected a destination covering the unscanned cluster")
+        assert target == (104, 104)
 
-    def test_returns_none_when_all_local_cells_covered(self) -> None:
-        """Every cell within the search ring covered yields no target."""
-        covered = {
-            f"{cx},{cy}": 100000 for cx in range(20 - 12, 20 + 13) for cy in range(20 - 12, 20 + 13)
-        }
-        ctx = _ctx(radars=0, local_scan_cells=covered)
+    def test_returns_none_when_viewport_is_fully_covered(self) -> None:
+        """Every viewport tile covered yields no walk target."""
+        ctx = _ctx(radars=0, local_scan_tiles=_full_viewport_coverage(100000))
 
-        assert select_forage_cell_target(ctx) is None
+        assert select_forage_target(ctx) is None
 
 
 class TestForageSearch:
-    """Tests for plan_forage_search."""
+    """Tests for ``plan_forage_search`` (the parameterized forager)."""
 
-    def test_radars_the_uncovered_home_cell_first(self) -> None:
-        """An uncovered home cell is scanned with the free built-in radar."""
+    def test_dispatches_radar_when_viewport_has_unscanned_tiles(self) -> None:
+        """An unscanned viewport with affordable radar triggers a scan."""
         ctx = _ctx(radars=0)
 
-        decision = plan_forage_search(ctx, ctx.ai_state, 925)
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT_EQUIPMENT",
+            radar_affordable=True,
+        )
 
         if decision is None:
             raise AssertionError("expected a forage radar decision")
         assert decision["command"]["cmd_type"] == "radar"
         assert decision["behavior"]["reason"] == "forage_radar"
-        assert decision["updated_ai_state"]["local_scan_cells"] == {"20,20": 100000}
+        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        # Free 5x5 radar at (100,100) inside viewport (92..107)^2 reveals
+        # exactly 25 tiles (the interior 5x5 around the tank).
+        recorded = decision["updated_ai_state"]["local_scan_tiles"]
+        assert len(recorded) == 25
+        assert "100,100" in recorded
 
-    def test_moves_to_next_cell_once_home_is_covered(self) -> None:
-        """A covered home cell makes the sweep walk to the next center."""
-        ctx = _ctx(radars=0, local_scan_cells={"20,20": 100000})
+    def test_extra_radar_records_every_viewport_tile(self) -> None:
+        """Extras > 0 reveals the entire viewport, all 256 tiles marked."""
+        ctx = _ctx(radars=5)
 
-        decision = plan_forage_search(ctx, ctx.ai_state, 925)
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT_EQUIPMENT",
+            radar_affordable=True,
+        )
 
         if decision is None:
-            raise AssertionError("expected a forage sweep move decision")
+            raise AssertionError("expected a forage radar decision with extras")
+        assert decision["command"]["cmd_type"] == "radar"
+        recorded = decision["updated_ai_state"]["local_scan_tiles"]
+        assert len(recorded) == 16 * 16
+
+    def test_dispatches_radar_with_fuel_mode_tag(self) -> None:
+        """Behavior-mode label is stamped from the caller-supplied value."""
+        ctx = _ctx(radars=0)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=900,
+            behavior_mode="COLLECT_FUEL",
+            radar_affordable=True,
+        )
+
+        if decision is None:
+            raise AssertionError("expected a forage radar decision")
+        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["score"] == 900
+
+    def test_walks_to_unscanned_tile_when_radar_unaffordable(self) -> None:
+        """Radar gated False but viewport not fully covered yields a walk."""
+        coverage = {"100,100": 100000}
+        ctx = _ctx(radars=0, local_scan_tiles=coverage)
+
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT_EQUIPMENT",
+            radar_affordable=False,
+        )
+
+        if decision is None:
+            raise AssertionError("expected a forage walk decision")
         assert decision["command"]["cmd_type"] == "move"
         assert decision["behavior"]["reason"] == "forage_sweep"
 
-    def test_returns_none_when_swept_and_unscannable(self) -> None:
-        """A covered home cell with no fuel for radar and all cells swept.
+    def test_returns_none_when_viewport_fully_covered_with_no_radar(self) -> None:
+        """No unscanned tiles AND radar unaffordable returns None for teleport-out."""
+        ctx = _ctx(radars=0, local_scan_tiles=_full_viewport_coverage(100000))
 
-        At fuel 5 the radar is unaffordable and every nearby cell is
-        covered, so the forager yields to the recovery fallback.
-        """
-        covered = {
-            f"{cx},{cy}": 100000 for cx in range(20 - 12, 20 + 13) for cy in range(20 - 12, 20 + 13)
-        }
-        ctx = _ctx(radars=0, fuel=5, local_scan_cells=covered)
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT_EQUIPMENT",
+            radar_affordable=False,
+        )
 
-        assert plan_forage_search(ctx, ctx.ai_state, 925) is None
+        assert decision is None
 
-
-class TestForageEdgeCases:
-    """Tests for edge-case paths in forage cell selection and planning."""
-
-    def test_ring_cell_out_of_bounds_is_skipped(self) -> None:
-        """Cells at negative indices near the map edge are silently skipped.
-
-        The tank at position (2, 2) sits in cell (0, 0).  Covering that
-        cell forces the sweep to ring-1, which includes cells at
-        negative indices (e.g. (-1, -1)).  The bounds check must skip
-        those and still return a valid in-bounds cell center.
-        """
-        ctx = _ctx(radars=0, self_x=2, self_y=2, local_scan_cells={"0,0": 100000})
-
-        target = select_forage_cell_target(ctx)
-
-        if target is None:
-            raise AssertionError("expected an in-bounds ring-1 cell center")
-        tx, ty = target
-        cell_x, cell_y = tx // 5, ty // 5
-        assert cell_x >= 0 and cell_y >= 0
-        assert max(abs(cell_x - 0), abs(cell_y - 0)) == 1
-
-    def test_plan_forage_returns_none_when_walk_or_teleport_returns_none(self) -> None:
-        """An enemy occupying the only uncovered cell center blocks the move.
-
-        Cell (21, 20) center is (107, 102).  An enemy parked on that
-        tile makes ``walk_or_teleport`` return ``None`` because the
-        no-terrain path rejects enemy-occupied move targets.
-        """
-        ring1_cells = [
-            (cx, cy)
-            for cx in range(19, 22)
-            for cy in range(19, 22)
-            if max(abs(cx - 20), abs(cy - 20)) == 1
-        ]
-        covered = {"20,20": 100000}
-        for cx, cy in ring1_cells:
-            if (cx, cy) != (21, 20):
-                covered[f"{cx},{cy}"] = 100000
+    def test_returns_none_when_walk_falls_back_to_unaffordable_teleport(self) -> None:
+        """A rock-walled tile reachable only by teleport without reserve yields None."""
+        coverage = _full_viewport_coverage(100000)
+        # Open one tile on the far side of a rock wall.
+        del coverage["104,100"]
+        rocks = {(102, y): InMemoryTerrainMap.ROCK for y in range(92, 108)}
+        terrain = InMemoryTerrainMap(rocks)
+        # Fuel just enough to cover the raw teleport cost but not the
+        # ``hunt_min_fuel`` search reserve.
         ctx = _ctx(
             radars=0,
-            local_scan_cells=covered,
-            tanks=_enemy(7, 107, 102),
+            fuel=100,
+            local_scan_tiles=coverage,
+            terrain=terrain,
         )
 
-        assert plan_forage_search(ctx, ctx.ai_state, 925) is None
-
-    def test_plan_forage_returns_none_when_teleport_is_unaffordable(self) -> None:
-        """A teleport fallback that exceeds the search reserve is rejected.
-
-        Rocks wall off the walk path so ``walk_or_teleport`` falls back
-        to teleport.  Fuel covers the raw teleport cost but not the
-        search reserve (``hunt_min_fuel=100``), so
-        ``can_afford_teleport_search`` returns False.
-        """
-        ring1_cells = [
-            (cx, cy)
-            for cx in range(19, 22)
-            for cy in range(19, 22)
-            if max(abs(cx - 20), abs(cy - 20)) == 1
-        ]
-        covered = {"20,20": 100000}
-        for cx, cy in ring1_cells:
-            if (cx, cy) != (21, 20):
-                covered[f"{cx},{cy}"] = 100000
-
-        rocks = {(103, y): InMemoryTerrainMap.ROCK for y in range(92, 108)}
-        terrain = InMemoryTerrainMap(rocks)
-
-        world, self_state = make_world(self_x=100, self_y=100, fuel=100, scanned=False)
-        inventory = make_inventory(default_count=30)
-        inventory["extra_radars"]["count"] = 0
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "local_scan_cells": covered,
-            }
+        decision = plan_forage_search(
+            ctx,
+            ctx.ai_state,
+            score=925,
+            behavior_mode="COLLECT_EQUIPMENT",
+            radar_affordable=False,
         )
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        assert plan_forage_search(ctx, ctx.ai_state, 925) is None
+        assert decision is None

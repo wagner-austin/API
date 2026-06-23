@@ -206,7 +206,6 @@ def clear_container_tile_cache(ws: WorldService, x: int, y: int) -> None:
         terrain=new_terrain,
         viewport=ws.world_state["viewport"],
         scanned_viewports=ws.world_state["scanned_viewports"],
-        map_fuel_dots=ws.world_state["map_fuel_dots"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
 
@@ -262,7 +261,6 @@ def reconcile_radar_viewport_resources(
         terrain=ws.world_state["terrain"],
         viewport=ws.world_state["viewport"],
         scanned_viewports=ws.world_state["scanned_viewports"],
-        map_fuel_dots=ws.world_state["map_fuel_dots"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
 

@@ -33,6 +33,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -63,6 +64,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
             "60": make_tank_state(
                 tank_id=60,
@@ -75,6 +77,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -118,6 +121,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
             "60": make_tank_state(
                 tank_id=60,
@@ -130,6 +134,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -168,6 +173,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -211,6 +217,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -281,6 +288,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, tanks=tanks)
@@ -379,6 +387,7 @@ class TestDecideBlockedCombatTargets:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)

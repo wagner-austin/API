@@ -351,9 +351,6 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "fuel_min": scorecard["fuel_min"],
         "fuel_last": scorecard["fuel_last"],
         "fuel_sample_count": scorecard["fuel_sample_count"],
-        "dot_hops": [encode_targeted_teleport_record(r) for r in scorecard["dot_hops"]],
-        "dot_hop_distinct_targets": scorecard["dot_hop_distinct_targets"],
-        "dot_hop_max_repeats": scorecard["dot_hop_max_repeats"],
         "inventory_first": encode_inventory_counts(scorecard["inventory_first"]),
         "inventory_last": encode_inventory_counts(scorecard["inventory_last"]),
         "inventory_sample_count": scorecard["inventory_sample_count"],
@@ -366,6 +363,12 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         ],
         "equipment_approach_distinct_targets": scorecard["equipment_approach_distinct_targets"],
         "equipment_approach_max_repeats": scorecard["equipment_approach_max_repeats"],
+        "career_destroyed_last": scorecard["career_destroyed_last"],
+        "career_deactivated_last": scorecard["career_deactivated_last"],
+        "career_score_last": scorecard["career_score_last"],
+        "career_playtime_seconds_last": scorecard["career_playtime_seconds_last"],
+        "container_pickups_full": scorecard["container_pickups_full"],
+        "container_pickups_partial": scorecard["container_pickups_partial"],
     }
 
 
@@ -411,11 +414,6 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
         fuel_min=require_int(data, "fuel_min"),
         fuel_last=require_int(data, "fuel_last"),
         fuel_sample_count=require_int(data, "fuel_sample_count"),
-        dot_hops=[
-            decode_targeted_teleport_record(item) for item in _require_object_list(data, "dot_hops")
-        ],
-        dot_hop_distinct_targets=require_int(data, "dot_hop_distinct_targets"),
-        dot_hop_max_repeats=require_int(data, "dot_hop_max_repeats"),
         inventory_first=decode_inventory_counts(_require_object(data, "inventory_first")),
         inventory_last=decode_inventory_counts(_require_object(data, "inventory_last")),
         inventory_sample_count=require_int(data, "inventory_sample_count"),
@@ -432,6 +430,30 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
             "equipment_approach_distinct_targets",
         ),
         equipment_approach_max_repeats=require_int(data, "equipment_approach_max_repeats"),
+        career_destroyed_last=(
+            require_int(data, "career_destroyed_last") if "career_destroyed_last" in data else -1
+        ),
+        career_deactivated_last=(
+            require_int(data, "career_deactivated_last")
+            if "career_deactivated_last" in data
+            else -1
+        ),
+        career_score_last=(
+            require_int(data, "career_score_last") if "career_score_last" in data else -1
+        ),
+        career_playtime_seconds_last=(
+            require_int(data, "career_playtime_seconds_last")
+            if "career_playtime_seconds_last" in data
+            else -1
+        ),
+        container_pickups_full=(
+            require_int(data, "container_pickups_full") if "container_pickups_full" in data else 0
+        ),
+        container_pickups_partial=(
+            require_int(data, "container_pickups_partial")
+            if "container_pickups_partial" in data
+            else 0
+        ),
     )
 
 

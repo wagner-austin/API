@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from platform_core.logging import get_logger
+from playwright._impl._errors import TargetClosedError
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import PageProtocol
@@ -95,7 +96,12 @@ def run_tick_loop(
     ticks_done = 0
     while True:
         _publish_tick_context(bot, ticks_done + 1)
-        _tick_once(bot)
+        try:
+            _tick_once(bot)
+        except TargetClosedError:
+            log.info("Browser closed during tick, ending run gracefully")
+            _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
+            return
         ticks_done += 1
         if max_ticks > 0 and ticks_done >= max_ticks:
             log.info(
@@ -114,7 +120,12 @@ def run_tick_loop(
             log.info("Stop file %s detected, ending run", stop_file_path)
             _emit_session_scorecard(bot, ticks_done, exit_reason="stop_file")
             return
-        page.wait_for_timeout(TICK_RATE_MS)
+        try:
+            page.wait_for_timeout(TICK_RATE_MS)
+        except TargetClosedError:
+            log.info("Browser closed between ticks, ending run gracefully")
+            _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
+            return
 
 
 def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:

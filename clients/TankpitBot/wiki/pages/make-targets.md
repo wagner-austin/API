@@ -38,7 +38,6 @@ confidence: high
 | `make teleport-probe-safe` | 3 teleports with sync_before_teleport |
 | `make teleport-probe-aggressive` | 3 teleports with immediate_after_map_open |
 | `make fuel-probe` | 3 fuel pickups via 9 attempts |
-| `make fuel-dot-probe` | Teleport to 6 map fuel dots, radar each |
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
 | `make queue-probe` | Test multi-command batching against server |

@@ -24,15 +24,13 @@ Categorization rules:
   :class:`WireCompleteRecordDict` rows.
 * ``WIRE`` channel events whose message starts with ``map_open`` count
   toward the ``map_open_dispatches`` total.
-* ``STATE`` transitions, ``shoot(`` WIRE dispatches,
-  ``tank_deactivated`` / ``self_alignment_sample`` / ``fuel_dot_hop``
-  DIAGNOSTIC events feed the per-run :class:`SessionScorecardDict`.
+* ``STATE`` transitions, ``shoot(`` WIRE dispatches, and
+  ``tank_deactivated`` / ``self_alignment_sample`` DIAGNOSTIC events
+  feed the per-run :class:`SessionScorecardDict`.
 """
 
 from __future__ import annotations
 
-from collections import Counter
-from datetime import datetime
 from pathlib import Path
 
 from platform_core.logging import get_logger
@@ -44,13 +42,14 @@ from tankpit_bot.diagnostics.issue_report_types import (
     IssueReportDict,
     MapOpenSkippedRecordDict,
     SessionRoomRecordDict,
-    SessionScorecardDict,
-    StateBudgetRecordDict,
-    TargetedTeleportRecordDict,
     TeleportAttemptRecordDict,
     WireCompleteRecordDict,
-    make_unsampled_inventory_counts,
-    make_zero_inventory_counts,
+)
+from tankpit_bot.diagnostics.session_scorecard import (
+    ScorecardAccumulatorDict,
+    build_session_scorecard,
+    new_scorecard_accumulator,
+    route_scorecard_record,
 )
 from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
@@ -192,9 +191,21 @@ def _classify_wire_complete(record: RuntimeEventRecordDict) -> WireCompleteRecor
 class _ReportAccumulatorDict(TypedDict):
     """Mutable scratch space used during :func:`build_issue_report`.
 
+    Composition: the issue report owns report-only buckets
+    (teleport_attempts, fuel_target_selections, etc.) and **delegates
+    every scorecard-shaped event** to a nested
+    :class:`ScorecardAccumulatorDict` consumed by
+    :func:`session_scorecard.build_session_scorecard`. The nested
+    accumulator is the single source of truth for combat counters,
+    fuel samples, dot hops, career stats, pickup tallies, inventory
+    samples, and radar/scan tallies -- both the live in-bot scorecard
+    and the post-run issue report read the same data from the same
+    accumulator type, populated by the same router.
+
     Attributes:
         teleport_attempts: Teleport attempts observed so far.
-        map_open_skipped: ``map_open_skipped_already_open`` events observed so far.
+        map_open_skipped: ``map_open_skipped_already_open`` events
+            observed so far.
         fuel_target_selections: Fuel target selections observed so far.
         wire_completes: WIRE_COMPLETE events observed so far.
         session_room: Last ``session_room_joined`` event seen, or None.
@@ -202,16 +213,8 @@ class _ReportAccumulatorDict(TypedDict):
         map_open_dispatches: Count of ``WIRE`` events whose message
             starts with ``map_open``.
         recovery_boxed_in_count: Count of ``recovery_boxed_in`` events.
-        state_transitions: ``(timestamp, message)`` pairs from the
-            ``STATE`` channel, in stream order.
-        kills: Count of ``tank_deactivated`` events.
-        shots: Count of ``WIRE`` events whose message starts with
-            ``shoot(``.
-        fuel_samples: ``belief_fuel`` values from every
-            ``self_alignment_sample`` event, in stream order.
-        dot_hops: Every ``fuel_dot_hop`` event, in stream order.
-        first_timestamp: Timestamp of the first record, or ``""``.
-        last_timestamp: Timestamp of the last record, or ``""``.
+        scorecard: Nested scorecard accumulator. Populated by
+            :func:`route_scorecard_record` for every event.
     """
 
     teleport_attempts: list[TeleportAttemptRecordDict]
@@ -222,17 +225,7 @@ class _ReportAccumulatorDict(TypedDict):
     mode: str
     map_open_dispatches: int
     recovery_boxed_in_count: int
-    state_transitions: list[tuple[str, str]]
-    kills: int
-    shots: int
-    combat_misses: int
-    combat_ghosts_blocked: int
-    combat_stale_positions_blocked: int
-    tank_damage_changes: int
-    fuel_samples: list[int]
-    dot_hops: list[TargetedTeleportRecordDict]
-    first_timestamp: str
-    last_timestamp: str
+    scorecard: ScorecardAccumulatorDict
 
 
 def _new_accumulator() -> _ReportAccumulatorDict:
@@ -246,64 +239,24 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         mode="unconfigured",
         map_open_dispatches=0,
         recovery_boxed_in_count=0,
-        state_transitions=[],
-        kills=0,
-        shots=0,
-        combat_misses=0,
-        combat_ghosts_blocked=0,
-        combat_stale_positions_blocked=0,
-        tank_damage_changes=0,
-        fuel_samples=[],
-        dot_hops=[],
-        first_timestamp="",
-        last_timestamp="",
+        scorecard=new_scorecard_accumulator(),
     )
-
-
-def _route_combat_diagnostic_for_report(
-    kind: str,
-    accumulator: _ReportAccumulatorDict,
-) -> bool:
-    """Increment combat counters for the issue-report accumulator.
-
-    Mirror of :func:`session_scorecard._route_combat_diagnostic` for
-    the parallel ``_ReportAccumulatorDict`` accumulator. Kept as a
-    separate helper because the two accumulators are independent
-    TypedDicts; lifting them into a shared protocol would be a
-    deeper refactor than this counter wire-up.
-
-    Args:
-        kind: ``diagnostic_kind`` field value (already narrowed to
-            ``str`` by the caller).
-        accumulator: Report accumulator to update in place.
-
-    Returns:
-        True when ``kind`` matched a combat counter and was applied,
-        False otherwise.
-    """
-    if kind == "tank_deactivated":
-        accumulator["kills"] += 1
-        return True
-    if kind == "combat_miss":
-        accumulator["combat_misses"] += 1
-        return True
-    if kind == "combat_ghost_detected":
-        accumulator["combat_ghosts_blocked"] += 1
-        return True
-    if kind == "combat_stale_position":
-        accumulator["combat_stale_positions_blocked"] += 1
-        return True
-    if kind == "tank_damage_changed":
-        accumulator["tank_damage_changes"] += 1
-        return True
-    return False
 
 
 def _classify_diagnostic_record(
     record: RuntimeEventRecordDict,
     accumulator: _ReportAccumulatorDict,
 ) -> None:
-    """Route one ``DIAGNOSTIC`` channel record into the right bucket."""
+    """Route one ``DIAGNOSTIC`` channel record into report-only buckets.
+
+    Scorecard-shaped diagnostic kinds (combat counters, fuel samples,
+    dot hops, career stats, pickup tallies, inventory samples, radar
+    dispatches) are NOT handled here -- :func:`_route_record` delegates
+    every event to
+    :func:`session_scorecard.route_scorecard_record`, which is the
+    single source of truth for scorecard accumulation. This function
+    handles ONLY kinds that don't appear on the scorecard.
+    """
     kind = record["fields"].get("diagnostic_kind")
     if not isinstance(kind, str):
         return
@@ -317,29 +270,20 @@ def _classify_diagnostic_record(
         accumulator["session_room"] = _classify_session_room(record)
     elif kind == "recovery_boxed_in":
         accumulator["recovery_boxed_in_count"] += 1
-    elif _route_combat_diagnostic_for_report(kind, accumulator):
-        return
-    elif kind == "self_alignment_sample":
-        accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
-    elif kind == "fuel_dot_hop":
-        accumulator["dot_hops"].append(
-            TargetedTeleportRecordDict(
-                target_x=require_int_field(record["fields"], "target_x"),
-                target_y=require_int_field(record["fields"], "target_y"),
-                fuel=require_int_field(record["fields"], "fuel"),
-                timestamp=record["timestamp"],
-            )
-        )
 
 
 def _route_record(
     record: RuntimeEventRecordDict,
     accumulator: _ReportAccumulatorDict,
 ) -> None:
-    """Route a decoded event record into the report accumulator."""
-    if not accumulator["first_timestamp"]:
-        accumulator["first_timestamp"] = record["timestamp"]
-    accumulator["last_timestamp"] = record["timestamp"]
+    """Route a decoded event record into the report accumulator.
+
+    Two-way split: report-only state advances on this accumulator;
+    every event (regardless of channel) is also forwarded to the
+    nested scorecard accumulator via
+    :func:`session_scorecard.route_scorecard_record` so the scorecard
+    sees the same stream the report does.
+    """
     if record["mode"]:
         accumulator["mode"] = record["mode"]
     channel = record["channel"]
@@ -348,102 +292,20 @@ def _route_record(
     elif channel == "WIRE":
         if record["message"].startswith("map_open"):
             accumulator["map_open_dispatches"] += 1
-        if record["message"].startswith("shoot("):
-            accumulator["shots"] += 1
-    elif channel == "STATE":
-        accumulator["state_transitions"].append((record["timestamp"], record["message"]))
     elif channel == "DIAGNOSTIC":
         _classify_diagnostic_record(record, accumulator)
+    route_scorecard_record(record, accumulator["scorecard"])
 
 
-def _budget_sort_key(record: StateBudgetRecordDict) -> tuple[int, str]:
-    """Sort key for the state budget: descending seconds, then name.
+# State-budget construction lives in
+# :func:`session_scorecard._build_state_budget`, called from
+# ``build_session_scorecard``. The issue report just delegates.
 
-    Args:
-        record: State budget record to key.
-
-    Returns:
-        Tuple of ``(-seconds, state)``.
-    """
-    return (-record["seconds"], record["state"])
-
-
-def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetRecordDict]:
-    """Sum seconds spent in each bot state from STATE-channel transitions.
-
-    The interval between consecutive ``A -> B`` transitions is credited
-    to the EARLIER transition's destination -- the state the bot was
-    actually in during that interval. Non-transition STATE lines (the
-    initial bare state announcement) carry no interval and are skipped.
-
-    Args:
-        transitions: ``(timestamp, message)`` pairs in stream order.
-
-    Returns:
-        Per-state totals sorted by descending seconds then state name.
-    """
-    totals: Counter[str] = Counter()
-    previous_state = ""
-    previous_moment: datetime | None = None
-    for timestamp, message in transitions:
-        if " -> " not in message:
-            continue
-        _, _, destination = message.partition(" -> ")
-        moment = datetime.fromisoformat(timestamp)
-        if previous_moment is not None:
-            totals[previous_state] += int((moment - previous_moment).total_seconds())
-        previous_state = destination
-        previous_moment = moment
-    records = [
-        StateBudgetRecordDict(state=state, seconds=seconds) for state, seconds in totals.items()
-    ]
-    records.sort(key=_budget_sort_key)
-    return records
-
-
-def _build_session_scorecard(accumulator: _ReportAccumulatorDict) -> SessionScorecardDict:
-    """Distill the per-run outcome scorecard from the accumulator.
-
-    Args:
-        accumulator: Fully routed event accumulator.
-
-    Returns:
-        Session scorecard.
-    """
-    duration_seconds = 0
-    if accumulator["first_timestamp"] and accumulator["last_timestamp"]:
-        first = datetime.fromisoformat(accumulator["first_timestamp"])
-        last = datetime.fromisoformat(accumulator["last_timestamp"])
-        duration_seconds = int((last - first).total_seconds())
-    fuel_samples = accumulator["fuel_samples"]
-    dot_hops = accumulator["dot_hops"]
-    hop_counts = Counter((hop["target_x"], hop["target_y"]) for hop in dot_hops)
-    return SessionScorecardDict(
-        duration_seconds=duration_seconds,
-        state_budget=_build_state_budget(accumulator["state_transitions"]),
-        kills=accumulator["kills"],
-        shots=accumulator["shots"],
-        combat_misses=accumulator["combat_misses"],
-        combat_ghosts_blocked=accumulator["combat_ghosts_blocked"],
-        combat_stale_positions_blocked=accumulator["combat_stale_positions_blocked"],
-        tank_damage_changes=accumulator["tank_damage_changes"],
-        fuel_min=min(fuel_samples) if fuel_samples else -1,
-        fuel_last=fuel_samples[-1] if fuel_samples else -1,
-        fuel_sample_count=len(fuel_samples),
-        dot_hops=dot_hops,
-        dot_hop_distinct_targets=len(hop_counts),
-        dot_hop_max_repeats=max(hop_counts.values()) if hop_counts else 0,
-        inventory_first=make_unsampled_inventory_counts(),
-        inventory_last=make_unsampled_inventory_counts(),
-        inventory_sample_count=0,
-        equipment_gain_events=0,
-        equipment_gained=make_zero_inventory_counts(),
-        scans_extra=0,
-        scans_builtin=0,
-        equipment_approaches=[],
-        equipment_approach_distinct_targets=0,
-        equipment_approach_max_repeats=0,
-    )
+# Scorecard construction lives in session_scorecard.build_session_scorecard;
+# the issue report just forwards the nested accumulator. That's the
+# single source of truth for the SessionScorecardDict shape and every
+# field on it -- the report and the in-bot scorecard agree by
+# construction.
 
 
 def build_issue_report(source_path: Path) -> IssueReportDict:
@@ -489,7 +351,7 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         fuel_rejected_count=len(fuel_target_selections) - fuel_selected,
         map_open_dispatches=accumulator["map_open_dispatches"],
         map_open_completions=map_open_completions,
-        scorecard=_build_session_scorecard(accumulator),
+        scorecard=build_session_scorecard(accumulator["scorecard"]),
         recovery_boxed_in_count=accumulator["recovery_boxed_in_count"],
     )
 

@@ -49,7 +49,7 @@ def start_teleport_page_snapshots(
         phase: Literal["before_map_open", "before_teleport", "after_map_data", "landed", "timeout"],
     ) -> TeleportPageSnapshotDict:
         """Capture one page snapshot for the requested teleport phase."""
-        return action_session.capture_teleport_page_snapshot(cdp, phase)
+        return action_hooks.capture_teleport_page_snapshot(cdp, phase)
 
     page_snapshots: list[TeleportPageSnapshotDict] = []
     if capture_before_map_open:

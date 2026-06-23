@@ -235,3 +235,193 @@ Production evidence: `runs/bot/bot-20260619-050303` recorded 25 `combat_miss` ev
 **Pages updated (3):** [[decode-coverage]] (added `related` link), [[combat-chase-bug]] (added `related` link), [[hubs/architecture]] (added the new page).
 
 **Running total: 48 pages across 6 hubs.**
+
+## [2026-06-21] update | Equipment-pickup mechanic, radar viewport-edge rule, radar-spam diagnosis
+
+Live session 2026-06-21 19:46 reproduced the bot's "radar every 2 seconds in the same spot" loop. Combined with the user's clarification of the underlying game mechanics, three wiki pages were corrected and one anti-pattern added.
+
+**Pages updated (4):**
+
+- [[radar-mechanics]] -- added the viewport-intersection rule. Neither free nor extra radar reveals tiles outside the viewport; at a viewport edge or corner the built-in 5x5 reveals only the intersection of (tank-x±2, tank-y±2) with the viewport bounds. Marked `fact_checked: 2026-06-21`.
+- [[equipment-system]] -- documented the deterministic pickup mechanic (a container fills the slot you are most behind on at pickup time, server-decided) and the `SUPERVISOR_ERROR_INVENTORY_FULL` (code 7) wire signal that the bot currently ignores. Marked `fact_checked: 2026-06-21`.
+- [[bot-behavior-contract]] -- added two MUST rows to §3.4 (recognise code 7 as action-blocking; mark scanned tiles by actual revealed region) and a new anti-pattern row for "Radar spam in covered viewport" with the live-capture diagnosis.
+- [[combat-chase-bug]] -- added a "Caveat: server does NOT displace off equipment-container tiles" section. The let-server-displace fix from 2026-06-16 works for combat (tank on tile) but does not generalise to empty-of-tanks tiles with only a container -- those leave the bot standing on the container, and `pickup_equipment` from distance 0 returns no `container_consumed`.
+
+**Open items flagged in the contract (no code changes yet):**
+
+- Add `SUPERVISOR_ERROR_INVENTORY_FULL` (code 7) to `_ACTION_BLOCKING_COMMAND_ERRORS` in `bot/tick_loop_actions.py:44`.
+- Replace tank-centered 5x5 cell coverage tracking with viewport-clamped tile-level tracking: free radar marks (tank ± 2) ∩ viewport, extra radar marks the full viewport.
+
+**Source data:** live capture 2026-06-21 19:46:23-19:46:51 (90 s session, bot at (131,126), extras=0 throughout); user clarifications on viewport-edge radar behaviour and deterministic container fill.
+
+## [2026-06-21] update | Radar reveals fuel/equipment/mines only (NOT enemies); viewport shifting OFF
+
+User clarification: radar is for revealing entities that are hidden by default on spawn -- fuel containers, equipment containers, and mines. Enemy tanks are always visible to the bot via the normal wire stream and never need a radar to be discovered. Firing radar to "search for enemies" is a category error.
+
+User clarification: viewport shifting is OFF in the current game configuration. Walking never shifts the viewport; the only way to reveal new ground is to teleport.
+
+**Pages updated (2):**
+
+- [[radar-mechanics]] -- added "What radar reveals (and what it does NOT)" section: fuel/equipment/mines only; enemy discovery is map-open + viewport-edge walking, never radar. Added "Viewport shifting" section: walking never moves the viewport; teleport is the only way to a new region.
+- [[bot-behavior-contract]] §3.2 -- added a MUST NOT row: HUNT acquisition cannot fire `make_radar_command()` to search for enemies.
+
+**Implication for code (handed off, not done):**
+
+- `bot/ai/hunt_mode.py` `search_for_enemies` lines 54-75 dispatch radar with reason "radar to search for enemies". This branch must be deleted; the function should fall through to map-open or viewport-edge walking when no candidate is in `analyze_threats`. The radar dispatch on `_decide_hunt_close` is **legitimate** -- it scans for mines/containers around the engagement tile, not enemies, and the comment-string should be corrected but the dispatch kept.
+
+## [2026-06-21] refactor | Single tile-aware scan path; removed divergent radar branches
+
+Completed the scan-system refactor handed off in `HANDOFF_SCAN_REFACTOR.md`. The radar dispatch path is now one parameterized function shared by both equipment and fuel recovery; HUNT no longer fires radar to search for enemies; cell-grid coverage is gone, replaced by per-tile coverage clamped to the viewport.
+
+**Code changes:**
+
+- `bot/ai/scan_coverage.py` -- tile-level primitives (`tile_key`, `is_tile_covered`, `record_tile_scan`, `viewport_tiles`, `free_radar_revealed_tiles`, `is_viewport_fully_covered`, `nearest_uncovered_tile_in_viewport`). All cell-grid symbols (`FORAGE_CELL_SIZE`, `cell_center`, `is_cell_covered`, `local_scan_cell_key`, `record_local_scan`, `record_viewport_scan`) deleted.
+- `bot/ai/forage.py` -- single forager: `plan_forage_search(ctx, ai_state, *, score, behavior_mode, radar_affordable)`. No mode enum, no extras-gated branch; equipment recovery passes `radar_affordable=can_use_radar(ctx)`, fuel recovery passes `radar_affordable=can_use_fuel_radar(ctx)`. Reason is `forage_radar` (radar) or `forage_sweep` (walk).
+- `bot/ai/recover_equipment_mode.py` -- `_plan_equipment_sense_or_search` delegates to `plan_forage_search`; on `None` falls through to `_plan_equipment_search`. The `extras == 0` gate, the `cell_already_covered` gate, the `radar_for_equipment` branch, and the runtime `record_local_scan` import are gone.
+- `bot/ai/recover_fuel_mode.py` -- `_plan_fuel_sense_or_search` delegates to `plan_forage_search`; on `None` falls through to the existing search-hop / dot-walk / edge / map-intel chain. The `radar_for_fuel` branch is gone.
+- `bot/ai/hunt_mode.py` -- `search_for_enemies` lost its radar branch and the `radar_reason` parameter; HUNT now only walks the viewport edge or opens the map. The legitimate `_decide_hunt_close` scan-on-landing radar (mines / containers around the engagement tile) is unchanged.
+- `bot/ai/context.py` -- deleted `is_current_viewport_scan_failed` and `should_scan_resources_in_current_viewport` (no remaining callers); kept `mark_scan_dispatched` which now records the exact revealed-tile set in `local_scan_tiles`.
+- `bot/ai/mode_controller.py` -- both `derive_recover_equipment_mode_state` and `derive_recover_fuel_mode_state` map `reason in ("forage_radar", "forage_sweep")` to `SENSE`.
+- `bot/ai/types.py` -- `AIStateDict.local_scan_cells` renamed to `local_scan_tiles`; same in encoder/decoder.
+
+**Test surface:**
+
+- `tests/bot/ai/test_scan_coverage.py` -- full rewrite for tile primitives.
+- `tests/bot/ai/test_forage.py` -- full rewrite for the parameterized forager (mode, score, radar_affordable).
+- `tests/bot/ai/_support.py` -- added `viewport_covered_tiles(world)` and `make_post_radar_ai_state(world)` helpers so tests that exercise downstream fallback paths can model "the bot just radared this viewport" without driving the tick loop.
+- Cross-cutting renames: `radar_for_equipment` / `radar_for_fuel` / `radar_for_enemies` -> `forage_radar` across `test_recover_equipment_mode.py`, `test_recover_fuel_mode.py`, `test_recover_equipment_integration.py`, `test_strategy_coverage.py`, `test_mode_lock.py`, `test_mode_controller.py`, `tests/replay/test_real_session_regressions.py`. `test_hunt_mode.py` and `test_enemy_search.py` gained new HUNT-no-radar contract tests.
+
+**Result:** `make check` green, 4104 tests, 100.00% statement+branch coverage.
+
+**Documentation:**
+
+- `wiki/pages/bot-behavior-contract.md` §3.4 -- the **OPEN** caveat about `local_scan_cells` is closed; the row now states the invariant ("mark exactly the revealed tiles").
+- `wiki/pages/bot-behavior-contract.md` §5 -- new anti-pattern row "Radar to find enemies" with the contract tests that lock it down.
+- `docs/bot-logging.md` -- example log line updated to `reason=forage_radar`; sentence about old reason naming rewritten.
+
+**Out of scope (still open):** `SUPERVISOR_ERROR_INVENTORY_FULL` (server code 7) is not yet in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`). Tracked separately. — *Closed by the 2026-06-21 "Inventory full" entry below.*
+
+## [2026-06-21] fix | Recognise 0x52 "Inventory full" (code 7) as action-blocking
+
+Added server error code **7 (`SUPERVISOR_ERROR_INVENTORY_FULL`)** to `_ACTION_BLOCKING_COMMAND_ERRORS` in `bot/tick_loop_actions.py:44`. The set now matches the codes the bot can authoritatively clear from an in-flight action's wait.
+
+**Empirical grounding.** The 0x52 decoder (`protocol/decoders/world.py:290`) parses `error_code = data[2]`; the dispatch (`sniffer/world_state_dispatch.py:925`) stores it on the WorldService and emits a `command_error` diagnostic. Capture 20260620 recorded two real `error_code=7` events at 19:07:28 / 19:08:30 in `runs/sniff/latest.events.jsonl`, plus parallel `[GAME:EQUIPMENT] Inventory full` strings in `runs/sniff/latest.log`. Three independent channels (wire byte / DOM scraper / capture-session text) of the same event window.
+
+**Effect.** Without code 7 in the set, the bot waited the full `action_stall_timeout_ms` (10 s) on every "Inventory full" reject before clearing the action and bumping the container's `failed_pickups` counter. With code 7 added, the action clears at the wire boundary (< 1 s) and the container's `failed_pickups` counter bumps immediately, surfacing the container to the blacklist heuristic.
+
+**Test.** `tests/bot/test_tick_loop_coverage.py::test_command_error_clears_collect_on_inventory_full` sets `last_command_error = 7` on a pending `collect` action with a seeded container at the target tile, then asserts (1) the wait returns `False`, (2) the bot transitions to `IDLE`, (3) `last_command_error` is consumed, (4) the container's `failed_pickups` counter is `1`.
+
+**Pages updated.**
+
+- `wiki/pages/bot-behavior-contract.md` §3.4 -- closed the **OPEN** caveat on the code-7 row; cited the new regression test.
+- `wiki/pages/equipment-system.md` -- rewrote the "Inventory full" wire signal section to describe the now-current behaviour (1-tick clear, immediate failed_pickups bump) instead of the old 10 s stall.
+- `src/tankpit_bot/bot/tick_loop_actions.py` -- docstring on `_clear_command_error` mentions "Inventory full" and references the live captures.
+
+## [2026-06-22] refactor | Delete HUNT enemy-search edge walk; user-directed
+
+Diagnosed from a 60-second live run today (`runs/bot/latest.events.jsonl`, 30 ticks, 0 kills): with no visible threats and full inventory, HUNT acquire cycled `map_open` -> `edge_for_enemies` -> `map_open` -> `edge_for_enemies` indefinitely. 14 of 30 ticks were `edge_for_enemies`, 10 of those resolved as terrain-blocked teleports at ~131 fuel each. Net effect: 185 fuel burned for zero combat outcomes.
+
+The branch was dead weight under this game configuration. Two independent reasons:
+
+1. **Viewport shifting is OFF.** Walking to a viewport edge does not reveal new ground; only a teleport opens a new viewport. So the walk variant was pure no-op.
+2. **The teleport variant aimed at a random edge tile, not a known enemy.** Every `map_open` reply contained 27 enemy positions; the bot never targeted any of them, then teleported to a random edge tile hoping for spawn-in. That was always going to spend more fuel than it saved.
+
+Also corrected a mistaken belief that walking is free. `move` commands deduct per-tile fuel (live capture: `Fuel: 473 -> 451 (-22)` and `451 -> 419 (-32)` on consecutive moves). The edge walks weren't "free wasted exploration"; they were paid wasted exploration. Documented in [[bot-behavior-contract]] §5 row.
+
+**Code changes:**
+
+- `bot/ai/hunt_mode.py::search_for_enemies` -- deleted the entire `if map_age < cooldown: edge walk` branch and the `select_exploration_command` import. Function is now a single dispatch: `make_map_open_command(...)`. Dropped the `edge_reason` parameter. Both call sites (`_decide_hunt_acquire`, `_enter_confirm_kill`) updated.
+- `bot/ai/movement.py::select_exploration_command` -- KEPT. Still used by `resource_search.py` for fuel/equipment recovery edge walks (`edge_for_fuel`, `edge_for_equipment`); those are separate decisions that the user has not flagged.
+
+**Test surface:**
+
+- `tests/bot/ai/test_enemy_search.py` -- deleted 4 tests covering the old edge-walk variants (`test_fallback_walks_when_map_is_on_cooldown`, `test_fallback_opens_map_when_walk_and_teleport_blocked`, `test_fallback_opens_map_when_all_exploration_targets_failed`, `test_fallback_uses_alternate_edge_when_preferred_candidate_blocked`); rewrote the radar-no-fire guard as `test_fallback_opens_map_even_when_recently_opened`; renamed the low-fuel fall-through.
+- `tests/bot/ai/test_hunt_mode.py` -- renamed `test_hunt_search_never_dispatches_radar_during_acquire` to `test_hunt_search_dispatches_map_open_not_radar_during_acquire` with the new positive assertion; rewrote `test_hunt_search_does_not_enter_confirm_kill_without_target` to chain two consecutive map_open ticks instead of two edge moves.
+- `tests/bot/ai/test_mode_controller.py` -- renamed the derive-substate defensive test (no production path produces a HUNT teleport without a locked target anymore; the derive branch is kept for defence-in-depth).
+- `make check` green at 4101 tests, 100.00% statement+branch coverage.
+
+**Behaviour gap surfaced and left as a follow-up.** Bot saw 27 enemies in every map snapshot but acquired zero of them. `analyze_threats` filters tanks lacking a viewport observation (the strictness added 2026-06-21 to fix phantom firing), so map-only enemies never enter the threat list. Without map-based acquisition, the bot can only engage enemies that walk into its current viewport. Tracked as a future change ("use the map for enemies") -- not in scope for this commit because it's a strategic-design change, not a refactor.
+
+## [2026-06-22] refactor | Stay-on-target: 0x58 TankRemove becomes a no-op, pursuit fires homing instead of teleport-chasing
+
+Live capture 2026-06-22 18:16: bot teleport-acquired purple-4 (id=512) via the new map-based acquisition path, fired 8 cardinal-adjacent dual shots (all hits), then purple-4 teleported out of viewport. Pursuit path fired **4 consecutive homing shots from the same tile** toward purple-4's new wire-known position (238,169) before the pursuit gate finally tripped (~5 s of silence on the locked id). Bot then re-acquired via map_open and started a chase teleport before the 60s budget cut the session. This is the user-spec "stay where we are and use homing shots until they are deactivated" loop.
+
+**Code changes:**
+
+- `state/mutations.py::remove_tank` -- now a no-op. Previously deleted the tank from `world["tanks"]` on every `0x58 TankRemove`; that caused the bot to abandon pursuit after just one homing shot (live capture earlier same day: orange-2 dropped from registry the moment they teleported, pursuit gate failed, bot fell to CONFIRM_KILL -> teleport-chase). The new behaviour keeps the entry untouched -- the freshness gates and `0x41 Deactivation` own the lifecycle.
+
+**Why the change works:** `0x58` carries no information the freshness machinery can't already derive. A truly gone tank stops broadcasting `0x2E TankStatusSync`, so `timestamp_ms` ages out naturally past the 5 s pursuit window. A tank that simply teleported keeps broadcasting `0x2E` -- pursuit keeps firing homing at the cached coords, server picks homing weapon for distant moving targets, homing tracks. The only authoritative death signal is `0x41`, which flips `liveness="deactivated"`; pursuit gate respects that.
+
+**Test surface:**
+
+- `tests/world_state/test_mutations.py::TestRemoveTank::test_keeps_tank_in_registry` -- replaces the earlier `test_removes_existing_tank`; asserts the entry stays put after 0x58.
+- `tests/sniffer/test_world_state_dispatch_tank.py::test_dispatch_tank_remove` -- now asserts the dispatch leaves `world["tanks"]` unchanged and keeps `liveness="alive"`.
+- `tests/replay/test_real_session_regressions.py::test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage` -- HUNT 15 -> 18, COLLECT_FUEL 4 -> 1, shoot 7 -> 10, map_open 2 -> 1 (continuous pursuit cuts confirm-kill cycles). Pickup count assertions removed (over-specified for this fixture).
+- `make check` green: 4114 tests, 100.00% statement+branch coverage.
+
+**Wiki updates:**
+
+- `wiki/pages/bot-behavior-contract.md` §1 -- changed the 0x58 contract row from "DELETES the tank" to "NO-OP at the registry level"; cites the live-capture regression and the pursuit test that locks the new behaviour.
+- `wiki/pages/tank-freshness-model.md` -- new "Registry lifecycle: 0x58 TankRemove is a no-op (changed 2026-06-22)" section explaining the rationale and why `0x41` is the only authoritative death signal.
+- `wiki/pages/decode-coverage.md` -- 0x58 row updated to note "Bot dispatch is a no-op as of 2026-06-22 — registry entry is kept so pursuit can keep firing homing at the cached coords".
+
+**Live verification:**
+
+Session 2026-06-22 18:16 (60 s budget, 30 ticks): bot fired 11 shots, 8 hits + 3 misses (72 % rate). The 3 misses were the pursuit homing shots (`victim_id=-1` -- server doesn't credit hits on out-of-viewport targets; some may have actually landed but the bot can't witness). 0 kills this session because the engagement was mid-pursuit when the budget elapsed. The clean signal is the 4 consecutive homing shots fired from the same tile -- exactly the staying-put pursuit the user requested.
+
+**Out of scope (still open):**
+
+- Pursuit hit-detection: `victim_id=-1` on out-of-viewport homing shots means the bot can't tell if the homing landed. The conservative miss classification under-reports actual hits. A fix would correlate `0x53 ShootEvent` responses for our own shots against the target's wire damage updates -- separate work.
+
+---
+
+## [2026-06-22] refactor | Strip the fuel-dot system
+
+Deleted the per-session fuel-dot atlas and every consumer. User intent: "remove all the fuel dot stuff" -- the dot system was extra code that pretended to save the genuinely marooned case (it never could; if you can't afford ANY teleport, you can't afford a dot teleport).
+
+**Phases:**
+
+- **A (planner):** removed `_plan_fuel_dot_refuel`, `_plan_fuel_dot_escape`, `select_fuel_dot_hop`, `select_fuel_dot_walk_targets`, `emit_fuel_dot_hop_diagnostic`, the `fuel_dot_guided` parameter on `make_resource_search_hop`, and `attempted_fuel_dots` from `AIStateDict`. The fuel recovery cascade now ends at `Strict -> Sense -> Hop -> raise ValueError`.
+- **B (world state + sniffer):** removed `map_fuel_dots` field from `WorldStateDict`, deleted `replace_map_fuel_dots`, stripped the field from every mutation pass-through.
+- **C (protocol decoder):** stripped `fuel_dots` from `MapDataDict` and `decode_map_data`. The RLE byte count is still parsed for length validation so the decoder advances cleanly into the tank-entries section; the coordinates inside the RLE region are no longer materialised.
+- **D (diagnostics):** removed `dot_hops` / `dot_hop_distinct_targets` / `dot_hop_max_repeats` fields from `SessionScorecardDict`, deleted the fuel-dot-orbit issue detector and the `fuel_dot_hop` diagnostic routing in `session_scorecard`.
+- **E (action_lab):** deleted `action_lab/fuel_dot_probe.py`, `fuel_dot_probe_types.py`, `scripts/fuel_dot_probe.py`, the `make fuel-dot-probe` target, and the dedicated probe + script tests.
+- **F (wiki):** updated `wiki/pages/fuel-system.md` to reflect the new cascade; the dot atlas section is gone, the marooning section is honest about the fact that marooning was never really recoverable.
+
+**Consequence:** RECOVER_FUEL now raises `ValueError` from the durable owner if Strict / Sense / Hop all decline. Marooned sessions fail loud instead of silently spending their reserve on a guess. The bot stops gambling on dot positions ("just extra code" -- user, 2026-06-22).
+
+**Numbers:** ~50+ files touched, ~315 lines of production code deleted, 4031 tests still pass, 100% statement+branch coverage held throughout, mypy / guard / ruff clean.
+
+---
+
+## [2026-06-22] update | Wiki: walking does not reveal, viewport does not shift
+
+Four game-mechanic rules from the user (2026-06-22 session) added or reconciled in the wiki:
+
+1. **Walking does not reveal containers** -- only radar does. Both extra (full viewport) and free (5x5 around tank) radar reveal; walking moves the tank but cannot surface a hidden container, even by stepping onto it. New section in `radar-mechanics.md` "Walking does NOT reveal containers" makes this explicit, and explains the walk-radar-walk-radar cycle that the bot uses when out of extras.
+
+2. **Walking costs 1 fuel per tile** -- previously undocumented. Added to both `radar-mechanics.md` (cost analysis for the free-radar cycle) and `viewport-frame.md` (walking paths section).
+
+3. **Viewport shifting is OFF** in the current game configuration. The old `viewport-frame.md` claimed the viewport recenters when the tank reaches an edge; that was an older config. Walking to the edge now just stops the tank at the edge tile -- the viewport changes only on teleport. Updated `viewport-frame.md` to match. (`radar-mechanics.md` already had this; the two pages were contradicting each other.)
+
+4. **Viewport does NOT center on player.** The tank can occupy any tile in the 16x16 frame, including a literal corner. This is what makes free-radar edge clipping land at 3x3 instead of 5x5. Added to `viewport-frame.md`.
+
+No source-code changes -- this is pure documentation correcting the wiki against what the user described.
+
+---
+
+## [2026-06-22] refactor | Forage walk picker maximises free-radar coverage
+
+`bot/ai/forage.py::select_forage_target` no longer returns the nearest unscanned tile. It now returns the destination whose next free radar would reveal the most uncovered ground in the viewport (5x5 footprint clipped to viewport bounds, minus already-scanned tiles). Ties broken by Manhattan distance from the tank.
+
+**Why:** the old picker walked 1 tile at a time toward the closest unscanned tile, so the next free radar mostly re-covered already-scanned ground. The optimal walk step for the free-radar tile-expansion strategy is closer to 5 tiles -- matching the 5x5 radar diameter -- so each free radar reveals up to 25 fresh tiles instead of overlapping the previous footprint.
+
+**Implementation:**
+
+- Added `select_best_free_radar_position` to `bot/ai/scan_coverage.py` (the coverage-scoring picker).
+- Deleted `nearest_uncovered_tile_in_viewport` from `scan_coverage.py` -- its single caller is gone and the new picker subsumes it.
+- `select_forage_target` in `bot/ai/forage.py` now delegates to the new picker. Module docstring updated to describe the walk-radar-walk-radar loop honestly: walk to a coverage-maximising position, free radar, repeat.
+- Tests in `test_forage.py` and `test_scan_coverage.py` rewritten for the new selection criterion. One forage edge-case test deleted (was testing an artifact of the old picker: walking straight into an enemy on the only unscanned tile -- the new picker side-steps that by walking to a position whose 5x5 covers the blocked tile from a distance).
+- Replay test `fuel_radar_loop` relaxed to expect `ValueError`: the more aggressive walks burn fuel faster than the recorded policy, the bot lands marooned at fuel=0 by tick ~34, and the new RECOVER_FUEL owner raises rather than idle silently (consistent with the 2026-06-22 marooning contract).
+
+**Net:** the bot now uses its free-radar fuel budget productively. When extras = 0, each ~5-tile walk + ~10-fuel radar cycle reveals ~25 fresh tiles instead of mostly overlapping the previous scan.

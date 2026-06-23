@@ -278,7 +278,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _direct_move_command(ctx, 72, 63, pickup_kind=None)
+        result = _direct_move_command(ctx, 72, 63)
 
         assert result is None
 
@@ -291,7 +291,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = _direct_move_command(ctx, 107, 100, pickup_kind=None)
+        result = _direct_move_command(ctx, 107, 100)
 
         assert result is None
 
@@ -432,3 +432,37 @@ class TestWalkOrTeleport:
         assert result["cmd_type"] == "move"
         assert result["target_x"] == 103
         assert result["target_y"] == 100
+
+    def test_select_exploration_skips_recently_failed_candidate(self) -> None:
+        """Exploration steps past a candidate that walk_or_teleport rejects.
+
+        ``walk_or_teleport`` short-circuits to ``None`` for tiles on the
+        recent-failure list. The exploration loop must skip such
+        candidates and try the next one rather than giving up after the
+        first None.
+        """
+        from tankpit_bot.sniffer.world_state import (
+            mark_move_target_failed,
+            reset_world_state,
+        )
+
+        reset_world_state()
+        try:
+            world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+            ai_state = make_scanned_ai_state()
+            inventory = make_inventory()
+            ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+            candidates = viewport_exploration_candidates(ctx)
+            if not candidates:
+                raise AssertionError("expected at least one exploration candidate")
+            first_x, first_y = candidates[0]
+            mark_move_target_failed(first_x, first_y, 99000)
+
+            result = select_exploration_command(ctx)
+
+            if result is None:
+                raise AssertionError("expected fallback to a non-failed candidate")
+            picked_x, picked_y, _command = result
+            assert (picked_x, picked_y) != (first_x, first_y)
+        finally:
+            reset_world_state()

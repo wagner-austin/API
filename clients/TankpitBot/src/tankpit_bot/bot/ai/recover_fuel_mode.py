@@ -5,42 +5,24 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.combat_strategy import clear_combat_target
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    can_afford_teleport,
     can_use_radar,
     clear_resource_target,
     locked_resource_target,
     make_decision,
     set_resource_target,
-    should_scan_resources_in_current_viewport,
 )
-from tankpit_bot.bot.ai.equipment import (
-    SCAN_COVERAGE_TTL_MS,
-    is_lock_release_warranted,
-)
+from tankpit_bot.bot.ai.equipment import is_lock_release_warranted
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_best_fuel,
-    find_known_fuel_candidates,
 )
+from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.recover_equipment_mode import select_equipment_target
-from tankpit_bot.bot.ai.resource_search import (
-    emit_fuel_dot_hop_diagnostic,
-    make_recovery_edge_decision,
-    make_recovery_map_intel_decision,
-    make_resource_search_hop,
-    record_attempt_mark,
-    select_fuel_dot_hop,
-    select_fuel_dot_walk_targets,
-)
-from tankpit_bot.bot.ai.threats import manhattan_distance
+from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import (
-    BotCommand,
-    make_radar_command,
-    make_teleport_command,
-)
+from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -56,7 +38,7 @@ def minimum_recovery_fuel_volume(ctx: DecideCtx) -> int:
     Returns:
         Minimum actionable fuel volume for the current recovery state.
     """
-    if ctx.fuel <= ctx.config["fuel_critical_threshold"]:
+    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         return 1
     return 100
 
@@ -111,34 +93,6 @@ def select_fuel_target(
     return (container, command)
 
 
-def try_collect_critical_fuel(ctx: DecideCtx) -> TickDecisionDict | None:
-    """Allow critical fuel to interrupt any mode, including combat.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        Fuel recovery decision, or ``None`` when fuel is not critical.
-    """
-    if ctx.fuel > ctx.config["fuel_critical_threshold"]:
-        return None
-    return _plan_fuel_recovery(ctx, owner_required=False)
-
-
-def try_collect_fuel(ctx: DecideCtx) -> TickDecisionDict | None:
-    """Collect fuel when below the low threshold.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        Fuel recovery decision, or ``None`` when fuel is healthy.
-    """
-    if ctx.fuel > ctx.config["fuel_low_threshold"]:
-        return None
-    return _plan_fuel_recovery(ctx, owner_required=False)
-
-
 def _sweep_equipment_before_leaving(
     ctx: DecideCtx,
 ) -> tuple[ContainerStateDict, BotCommand] | None:
@@ -167,6 +121,18 @@ def _sweep_equipment_before_leaving(
 def decide_recover_fuel_mode(ctx: DecideCtx) -> TickDecisionDict:
     """Run the durable ``RECOVER_FUEL`` owner for this tick.
 
+    Cascade:
+
+    1. Opportunistic equipment pickup if a reachable target is in the
+       current viewport and fuel is above the low threshold.
+    2. Continue or release a held fuel lock from a previous tick.
+    3. Strict fuel pickup (best executable visible fuel target).
+    4. Equipment sweep before leaving the area when no fuel target
+       exists and equipment reserves are low.
+    5. Sense (radar) when the viewport has unscanned tiles and the
+       radar fuel cost stays above the operating reserve.
+    6. Hop to a fresh viewport when nothing actionable remains here.
+
     Args:
         ctx: Decision context.
 
@@ -174,39 +140,14 @@ def decide_recover_fuel_mode(ctx: DecideCtx) -> TickDecisionDict:
         Mode-owned fuel recovery decision.
 
     Raises:
-        ValueError: If the durable owner cannot legally produce a recovery
-            action.
-    """
-    result = _plan_fuel_recovery(ctx, owner_required=True)
-    if result is None:
-        raise ValueError("RECOVER_FUEL owner failed to produce a decision with owner_required=True")
-    return result
-
-
-def _plan_fuel_recovery(
-    ctx: DecideCtx,
-    *,
-    owner_required: bool,
-) -> TickDecisionDict | None:
-    """Plan the current tick's fuel recovery action.
-
-    Args:
-        ctx: Decision context.
-        owner_required: Whether failing to produce an action is a hard error.
-
-    Returns:
-        Fuel recovery decision, or ``None`` when the non-owner helper cannot
-        produce a legal recovery action.
-
-    Raises:
-        ValueError: If ``owner_required`` is true and no legal recovery action
-            can be produced.
+        ValueError: When every cascade branch declines -- the bot is
+            marooned and cannot produce a legal recovery action.
     """
     base_state, locked_target = locked_resource_target(ctx, "fuel")
     base_state = clear_combat_target(base_state)
     visible_equipment = (
         select_equipment_target(ctx, allow_unreachable=False)
-        if ctx.fuel > ctx.config["fuel_critical_threshold"]
+        if ctx.fuel > ctx.config["fuel_low_threshold"]
         else None
     )
     if visible_equipment is not None:
@@ -226,53 +167,15 @@ def _plan_fuel_recovery(
             base_state,
             ctx.equip,
         )
-    if locked_target is not None and _superior_fuel_candidate(ctx, locked_target) is not None:
-        emit_ai(
-            "releasing fuel lock at (%d,%d): markedly closer fuel is visible",
-            locked_target["x"],
-            locked_target["y"],
-        )
-        base_state = clear_resource_target(base_state)
-        locked_target = None
-    if locked_target is not None:
-        target_x = locked_target["x"]
-        target_y = locked_target["y"]
-        locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
-        if locked_command is not None:
-            emit_ai(
-                "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",
-                target_x,
-                target_y,
-                locked_target["volume"],
-                ctx.fuel,
-            )
-            return make_decision(
-                locked_command,
-                "COLLECT_FUEL",
-                900,
-                target_x,
-                target_y,
-                f"fuel={locked_target['volume']}",
-                set_resource_target(base_state, "fuel", target_x, target_y),
-                ctx.equip,
-            )
-        emit_ai("locked fuel target at (%d,%d) no longer executable", target_x, target_y)
-        base_state = clear_resource_target(base_state)
+    locked_decision, base_state = _continue_or_release_fuel_lock(ctx, base_state, locked_target)
+    if locked_decision is not None:
+        return locked_decision
 
     selection = select_fuel_target(ctx, allow_unreachable=True)
     if selection is not None:
         container, command = selection
         target_x = container["x"]
         target_y = container["y"]
-        container_distance = manhattan_distance(
-            ctx.self_state["x"],
-            ctx.self_state["y"],
-            target_x,
-            target_y,
-        )
-        dot_refuel = _plan_fuel_dot_refuel(ctx, base_state, beat_distance=container_distance)
-        if dot_refuel is not None:
-            return dot_refuel
         emit_ai(
             "collect fuel at (%d,%d) vol=%d (fuel=%d)",
             target_x,
@@ -321,192 +224,99 @@ def _plan_fuel_recovery(
             minimum_volume=minimum_recovery_fuel_volume(ctx),
         ),
     )
-    dot_refuel = _plan_fuel_dot_refuel(ctx, base_state, beat_distance=None)
-    if dot_refuel is not None:
-        return dot_refuel
-    known_target_decision = _plan_known_fuel_target(ctx, base_state)
-    if known_target_decision is not None:
-        return known_target_decision
-    return _plan_fuel_sense_or_search(ctx, base_state, owner_required=owner_required)
 
-
-def _plan_fuel_dot_refuel(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-    *,
-    beat_distance: int | None,
-) -> TickDecisionDict | None:
-    """Teleport to the nearest unrefuted map fuel dot as a refuel action.
-
-    The dot atlas marks high-volume fuel (live probe 2026-06-11: 6/6
-    visited dots held fuel, volumes 762-1189; the only off-dot fuel
-    seen was volume 34/57), and teleporting onto a container tile picks
-    it up on landing -- a dot teleport is a one-action refuel. It
-    therefore outranks walking to a visible container whenever the dot
-    is strictly closer, and outranks remembered targets, radar, and
-    blind search hops outright.
-
-    Args:
-        ctx: Decision context.
-        ai_state: Base AI state to rewrite for the produced command.
-        beat_distance: When set, the dot must be strictly closer than
-            this Manhattan distance (the competing visible container).
-            ``None`` accepts the nearest affordable dot outright.
-
-    Returns:
-        Dot-refuel teleport decision, or ``None`` when no affordable
-        unrefuted dot exists (or none beats the competing target).
-    """
-    dot = select_fuel_dot_hop(ctx)
-    if dot is None:
-        return None
-    dot_x, dot_y = dot
-    dot_distance = manhattan_distance(ctx.self_state["x"], ctx.self_state["y"], dot_x, dot_y)
-    if beat_distance is not None and dot_distance >= beat_distance:
-        return None
-    emit_fuel_dot_hop_diagnostic(ctx, dot_x, dot_y)
-    emit_ai(
-        "teleporting to fuel dot at (%d,%d) dist=%d (fuel=%d)",
-        dot_x,
-        dot_y,
-        dot_distance,
-        ctx.fuel,
+    # Sense: radar (paid full viewport or free 5x5) when the viewport has
+    # unscanned tiles and the cost stays above the operating reserve;
+    # otherwise walk to expand free-radar coverage on the next tick.
+    forage_decision = plan_forage_search(
+        ctx,
+        base_state,
+        score=900,
+        behavior_mode="COLLECT_FUEL",
+        radar_affordable=can_use_fuel_radar(ctx),
     )
-    return make_decision(
-        make_teleport_command(dot_x, dot_y),
-        "COLLECT_FUEL",
-        900,
-        dot_x,
-        dot_y,
-        "fuel_dot_refuel",
-        clear_resource_target(ai_state),
-        ctx.equip,
+    if forage_decision is not None:
+        return forage_decision
+
+    # Hop: teleport to a fresh viewport when nothing here is actionable.
+    search = make_resource_search_hop(
+        ctx,
+        mode="COLLECT_FUEL",
+        score=900,
+        reason="search_fuel_local",
+        ai_state=base_state,
+    )
+    if search is not None:
+        return search
+
+    raise ValueError(
+        f"RECOVER_FUEL owner produced no decision at "
+        f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
+        f"forager exhausted, no affordable search hop."
     )
 
 
-def _plan_fuel_dot_walk(
+def _continue_or_release_fuel_lock(
     ctx: DecideCtx,
-    ai_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Walk toward the nearest unrefuted fuel dot as the stranded endgame.
+    base_state: AIStateDict,
+    locked_target: ContainerStateDict | None,
+) -> tuple[TickDecisionDict | None, AIStateDict]:
+    """Resolve the held fuel lock for this tick.
 
-    Walking is free at any fuel level and the tank auto-collects a
-    container on any tile it enters (verified by the live dot probe:
-    a teleport landing exactly on a dot tile picked it up). When fuel
-    is too low for radar or any teleport, this is the only action that
-    can still make refuel progress -- live run 20260612-131003 sat at
-    7 fuel for 28 minutes spamming free map opens because no walking
-    fallback existed.
+    Three outcomes:
 
-    Only walk commands are accepted: teleport-shaped fallbacks from
-    the movement planner are rejected because every teleport decision
-    (with its operating reserve) already had its chance upstream.
+    1. No lock held → returns ``(None, base_state)`` unchanged.
+    2. Lock released because a markedly closer fuel candidate is visible
+       (see :func:`is_lock_release_warranted`) → returns ``(None,
+       cleared_state)`` so the caller picks the closer target on the
+       same tick.
+    3. Lock still active → if the locked target is still executable,
+       returns ``(continuation_decision, base_state)``; if it isn't,
+       clears the lock and returns ``(None, cleared_state)``.
 
     Args:
         ctx: Decision context.
-        ai_state: Base AI state to rewrite for the produced command.
+        base_state: Base AI state to rewrite when the lock clears.
+        locked_target: Currently locked fuel container, or ``None``.
 
     Returns:
-        Dot-walk move decision, or ``None`` when no dot has an
-        executable walk route.
+        ``(decision, updated_base_state)`` -- the decision is non-None
+        only when the locked target produced an executable continuation
+        command this tick.
     """
-    for dot_x, dot_y in select_fuel_dot_walk_targets(ctx):
-        command = walk_or_teleport(ctx, dot_x, dot_y, pickup_kind=None)
-        if command is None or command["cmd_type"] != "move":
-            continue
-        updated_state = clear_resource_target(ai_state)
-        if command["target_x"] == dot_x and command["target_y"] == dot_y:
-            updated_state = AIStateDict(
-                **{
-                    **updated_state,
-                    "attempted_fuel_dots": record_attempt_mark(
-                        ctx.ai_state["attempted_fuel_dots"],
-                        dot_x,
-                        dot_y,
-                        ctx.timestamp_ms,
-                        ttl_ms=SCAN_COVERAGE_TTL_MS,
-                    ),
-                }
-            )
+    if locked_target is None:
+        return None, base_state
+    if _superior_fuel_candidate(ctx, locked_target) is not None:
         emit_ai(
-            "walking to fuel dot at (%d,%d) via (%d,%d) (fuel=%d)",
-            dot_x,
-            dot_y,
-            command["target_x"],
-            command["target_y"],
-            ctx.fuel,
+            "releasing fuel lock at (%d,%d): markedly closer fuel is visible",
+            locked_target["x"],
+            locked_target["y"],
         )
-        return make_decision(
-            command,
-            "COLLECT_FUEL",
-            900,
-            dot_x,
-            dot_y,
-            "fuel_dot_walk",
-            updated_state,
-            ctx.equip,
-        )
-    return None
-
-
-def _plan_fuel_dot_escape(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Spend remaining fuel on the nearest affordable dot teleport.
-
-    Reached only when every reserved action AND the free walking
-    endgame have declined -- the marooned case. Live run
-    20260612-131003 teleport-scattered onto a one-tile island in a
-    lake at 87 fuel: no walk route existed in any direction, and the
-    operating-reserve checks vetoed every escape teleport (cost 36-63)
-    until scans bled the tank to 7, below even the shortest escape.
-    Idling guarantees zero progress, so the marooned tank is allowed
-    to spend its last fuel on the nearest unrefuted dot instead.
-
-    Args:
-        ctx: Decision context.
-        ai_state: Base AI state to rewrite for the produced command.
-
-    Returns:
-        Escape teleport decision, or ``None`` when no dot is
-        affordable even without a reserve.
-    """
-    targets = select_fuel_dot_walk_targets(ctx)
-    if not targets:
-        return None
-    dot_x, dot_y = targets[0]
-    if not can_afford_teleport(ctx, dot_x, dot_y):
-        return None
-    emit_fuel_dot_hop_diagnostic(ctx, dot_x, dot_y)
+        return None, clear_resource_target(base_state)
+    target_x = locked_target["x"]
+    target_y = locked_target["y"]
+    locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
+    if locked_command is None:
+        emit_ai("locked fuel target at (%d,%d) no longer executable", target_x, target_y)
+        return None, clear_resource_target(base_state)
     emit_ai(
-        "marooned: escape teleport to fuel dot at (%d,%d) (fuel=%d)",
-        dot_x,
-        dot_y,
+        "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",
+        target_x,
+        target_y,
+        locked_target["volume"],
         ctx.fuel,
     )
-    attempted = record_attempt_mark(
-        ctx.ai_state["attempted_fuel_dots"],
-        dot_x,
-        dot_y,
-        ctx.timestamp_ms,
-        ttl_ms=SCAN_COVERAGE_TTL_MS,
-    )
-    return make_decision(
-        make_teleport_command(dot_x, dot_y),
+    decision = make_decision(
+        locked_command,
         "COLLECT_FUEL",
         900,
-        dot_x,
-        dot_y,
-        "fuel_dot_escape",
-        AIStateDict(
-            **{
-                **clear_resource_target(ai_state),
-                "attempted_fuel_dots": attempted,
-            }
-        ),
+        target_x,
+        target_y,
+        f"fuel={locked_target['volume']}",
+        set_resource_target(base_state, "fuel", target_x, target_y),
         ctx.equip,
     )
+    return decision, base_state
 
 
 def _superior_fuel_candidate(
@@ -551,125 +361,9 @@ def _superior_fuel_candidate(
     return candidate
 
 
-def _plan_known_fuel_target(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-) -> TickDecisionDict | None:
-    """Approach a previously validated fuel target before blind searching."""
-    for container in find_known_fuel_candidates(
-        ctx.filtered,
-        ctx.self_state,
-        now_ms=ctx.timestamp_ms,
-        minimum_volume=minimum_recovery_fuel_volume(ctx),
-    ):
-        target_x = container["x"]
-        target_y = container["y"]
-        command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
-        if command is None:
-            continue
-        emit_ai(
-            "approach known fuel at (%d,%d) vol=%d (fuel=%d)",
-            target_x,
-            target_y,
-            container["volume"],
-            ctx.fuel,
-        )
-        return make_decision(
-            command,
-            "COLLECT_FUEL",
-            900,
-            target_x,
-            target_y,
-            f"known_fuel={container['volume']}",
-            set_resource_target(ai_state, "fuel", target_x, target_y),
-            ctx.equip,
-        )
-    return None
-
-
-def _plan_fuel_sense_or_search(
-    ctx: DecideCtx,
-    ai_state: AIStateDict,
-    *,
-    owner_required: bool,
-) -> TickDecisionDict | None:
-    """Sense or reposition when no immediate fuel target exists.
-
-    Args:
-        ctx: Decision context.
-        ai_state: Base AI state to rewrite.
-        owner_required: Whether failing to produce an action is a hard error.
-
-    Returns:
-        Fuel recovery decision, or ``None`` when the non-owner helper cannot
-        produce a legal recovery action.
-
-    Raises:
-        ValueError: If ``owner_required`` is true and no legal search action
-            can be produced.
-    """
-    if can_use_fuel_radar(ctx) and should_scan_resources_in_current_viewport(ctx):
-        emit_ai("radar to find fuel (fuel=%d)", ctx.fuel)
-        return make_decision(
-            make_radar_command(),
-            "COLLECT_FUEL",
-            900,
-            0,
-            0,
-            "radar_for_fuel",
-            AIStateDict(
-                **{
-                    **ai_state,
-                    "last_scan_ms": ctx.timestamp_ms,
-                }
-            ),
-            ctx.equip,
-        )
-
-    search = make_resource_search_hop(
-        ctx,
-        mode="COLLECT_FUEL",
-        score=900,
-        reason="search_fuel_local",
-        ai_state=ai_state,
-    )
-    if search is not None:
-        return search
-
-    dot_walk = _plan_fuel_dot_walk(ctx, ai_state)
-    if dot_walk is not None:
-        return dot_walk
-
-    edge = make_recovery_edge_decision(
-        ctx,
-        mode="COLLECT_FUEL",
-        score=900,
-        reason="edge_for_fuel",
-        ai_state=ai_state,
-    )
-    if edge is not None:
-        return edge
-
-    escape = _plan_fuel_dot_escape(ctx, ai_state)
-    if escape is not None:
-        return escape
-
-    if not owner_required:
-        return None
-    return make_recovery_map_intel_decision(
-        ctx,
-        mode="COLLECT_FUEL",
-        score=900,
-        reason="map_intel_for_fuel",
-        ai_state=ai_state,
-    )
-
-
 __all__ = [
     "can_use_fuel_radar",
     "decide_recover_fuel_mode",
     "minimum_recovery_fuel_volume",
     "select_fuel_target",
-    "try_collect_critical_fuel",
-    "try_collect_fuel",
 ]

@@ -84,7 +84,6 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=empty["terrain"],
         viewport=empty["viewport"],
         scanned_viewports=empty["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 
@@ -99,7 +98,6 @@ def _make_world_no_self(timestamp_ms: int) -> WorldStateDict:
         terrain=empty["terrain"],
         viewport=empty["viewport"],
         scanned_viewports=empty["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=timestamp_ms,
     )
 

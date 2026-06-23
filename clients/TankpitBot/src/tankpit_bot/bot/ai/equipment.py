@@ -24,8 +24,6 @@ _CONTAINER_FRESHNESS_TTL_MS = 30000
 
 _LOCK_RELEASE_MIN_GAP = 10
 
-_KNOWN_PURSUIT_MAX_DIST = 48
-
 _SCAN_COVERAGE_OVERLAP_TILES = 4
 
 _SCAN_COVERAGE_TTL_MS = 45000
@@ -173,7 +171,6 @@ def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
 
 __all__ = [
     "SCAN_COVERAGE_TTL_MS",
-    "_KNOWN_PURSUIT_MAX_DIST",
     "_viewport_bounds",
     "is_area_scanned",
     "is_container_pursuable",

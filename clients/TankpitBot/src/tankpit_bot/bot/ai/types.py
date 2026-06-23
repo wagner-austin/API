@@ -118,6 +118,17 @@ class EnemyThreatDict(TypedDict):
             tank is in view. Drives the ghost gate.
         last_position_update_ms: When a wire-sourced observation last
             carried fresh ``(x, y)``. Drives the kill-shot gate.
+        last_aim_x: Wire-reported barrel-aim X from this enemy's most
+            recent 0x53 ShootEvent, or ``-1`` when never seen firing.
+            Combat consumers (avoid-fire, predicted-LOS) read this to
+            reason about which tile the enemy may target next.
+        last_aim_y: Wire-reported barrel-aim Y from the same event.
+        last_aim_weapon: Weapon byte from the same event
+            (0=single, 1=dual, 2=missile, 3=homing). ``-1`` when never
+            seen firing.
+        last_aim_ms: Wall-clock of the most recent 0x53 ShootEvent
+            attributed to this enemy. Consumers should age the aim
+            with their own staleness threshold.
     """
 
     tank_id: int
@@ -132,6 +143,10 @@ class EnemyThreatDict(TypedDict):
     timestamp_ms: int
     last_wire_seen_ms: int
     last_position_update_ms: int
+    last_aim_x: int
+    last_aim_y: int
+    last_aim_weapon: int
+    last_aim_ms: int
 
 
 def make_enemy_threat(
@@ -147,6 +162,10 @@ def make_enemy_threat(
     timestamp_ms: int = 0,
     last_wire_seen_ms: int = 0,
     last_position_update_ms: int = 0,
+    last_aim_x: int = -1,
+    last_aim_y: int = -1,
+    last_aim_weapon: int = -1,
+    last_aim_ms: int = 0,
 ) -> EnemyThreatDict:
     """Create an EnemyThreatDict.
 
@@ -166,6 +185,13 @@ def make_enemy_threat(
         last_position_update_ms: When a wire-sourced observation last
             carried fresh ``(x, y)``. Zero means position has never
             been wire-confirmed.
+        last_aim_x: Wire-reported barrel-aim X from the enemy's most
+            recent 0x53 ShootEvent. Defaults to ``-1`` (never seen).
+        last_aim_y: Wire-reported barrel-aim Y from the same event.
+        last_aim_weapon: Weapon byte (0=single, 1=dual, 2=missile,
+            3=homing) from the same event. ``-1`` when never seen.
+        last_aim_ms: Wall-clock of the most recent 0x53 event for
+            this enemy. ``0`` when never seen.
 
     Returns:
         EnemyThreatDict with the provided values.
@@ -183,6 +209,10 @@ def make_enemy_threat(
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=last_wire_seen_ms,
         last_position_update_ms=last_position_update_ms,
+        last_aim_x=last_aim_x,
+        last_aim_y=last_aim_y,
+        last_aim_weapon=last_aim_weapon,
+        last_aim_ms=last_aim_ms,
     )
 
 
@@ -225,10 +255,13 @@ class AIConfigDict(TypedDict):
     """Tunable AI parameters.
 
     Attributes:
-        fuel_critical_threshold: Below this, shields activate and fuel is emergency.
-        fuel_low_threshold: Below this, fuel collection gets priority boost.
-            Also the reserve a combat teleport must leave behind -- engaging
+        fuel_low_threshold: Below this the bot enters RECOVER_FUEL. Also
+            the reserve a combat teleport must leave behind -- engaging
             below it would flip priority to COLLECT_FUEL the next tick.
+            (The historical ``fuel_critical_threshold`` was collapsed
+            into this single value 2026-06-22; the two-tier "polite low
+            vs. emergency critical" distinction was dead because both
+            thresholds had drifted to the same number.)
         fuel_full_threshold: Above this level, fuel collection score drops to zero.
         hunt_min_fuel: Operating reserve for search/recovery teleport hops.
         combat_range: Maximum Manhattan distance to engage an enemy.
@@ -256,7 +289,6 @@ class AIConfigDict(TypedDict):
         equip_search_max_failures: Maximum consecutive equipment-search hops.
     """
 
-    fuel_critical_threshold: int
     fuel_low_threshold: int
     fuel_full_threshold: int
     hunt_min_fuel: int
@@ -282,7 +314,6 @@ def make_default_ai_config() -> AIConfigDict:
         AIConfigDict with default values suitable for lieutenant rank.
     """
     return AIConfigDict(
-        fuel_critical_threshold=300,
         fuel_low_threshold=300,
         fuel_full_threshold=1100,
         hunt_min_fuel=100,
@@ -328,15 +359,17 @@ class AIStateDict(TypedDict):
             teleports and viewport recentering.
         resource_target_x: X coordinate of the locked resource target.
         resource_target_y: Y coordinate of the locked resource target.
-        local_scan_cells: Built-in radar coverage grid keyed by ``"cx,cy"``
-            cell index, values are scan timestamps. Used by the equipment
-            foraging sweep.
+        local_scan_tiles: Tile-level scan coverage map keyed by ``"x,y"``
+            tile position, values are scan timestamps. Tracks every
+            individual tile the bot has scanned -- the radar (free or
+            extra) reveals only tiles inside the viewport, so each
+            scan marks the intersection of the radar footprint with
+            the viewport bounds. Reset to ``{}`` on each new session
+            (see :func:`make_initial_ai_state`); never persisted
+            across logins.
         attempted_equipment_targets: Equipment targets that have been
             teleport-approached. {``"x,y"``: timestamp_ms}. Prevents
             repeated orbits around the same container.
-        attempted_fuel_dots: Fuel dots that have been approached or
-            teleported to. {``"x,y"``: timestamp_ms}. Prevents revisiting
-            dots within the scan coverage TTL.
     """
 
     config: AIConfigDict
@@ -361,9 +394,8 @@ class AIStateDict(TypedDict):
     resource_target_kind: str
     resource_target_x: int
     resource_target_y: int
-    local_scan_cells: dict[str, int]
+    local_scan_tiles: dict[str, int]
     attempted_equipment_targets: dict[str, int]
-    attempted_fuel_dots: dict[str, int]
 
 
 def make_initial_ai_state(
@@ -400,9 +432,8 @@ def make_initial_ai_state(
         resource_target_kind="",
         resource_target_x=0,
         resource_target_y=0,
-        local_scan_cells={},
+        local_scan_tiles={},
         attempted_equipment_targets={},
-        attempted_fuel_dots={},
     )
 
 

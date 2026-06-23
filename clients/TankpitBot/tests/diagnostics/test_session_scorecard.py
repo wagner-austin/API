@@ -68,7 +68,7 @@ def _routed(records: list[RuntimeEventRecordDict]) -> ScorecardAccumulatorDict:
 class TestRouting:
     """Tests for route_scorecard_record."""
 
-    def test_routes_state_shots_kills_fuel_and_dot_hops(self) -> None:
+    def test_routes_state_shots_kills_and_fuel(self) -> None:
         """Every scorecard-relevant record lands in its bucket."""
         accumulator = _routed(
             [
@@ -82,15 +82,6 @@ class TestRouting:
                     channel="DIAGNOSTIC",
                     fields={"diagnostic_kind": "self_alignment_sample", "belief_fuel": 740},
                 ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "fuel_dot_hop",
-                        "target_x": 140,
-                        "target_y": 138,
-                        "fuel": 496,
-                    },
-                ),
             ]
         )
 
@@ -98,14 +89,6 @@ class TestRouting:
         assert accumulator["shots"] == 1
         assert accumulator["kills"] == 1
         assert accumulator["fuel_samples"] == [740]
-        assert accumulator["dot_hops"] == [
-            TargetedTeleportRecordDict(
-                target_x=140,
-                target_y=138,
-                fuel=496,
-                timestamp="2026-06-12T06:25:00",
-            )
-        ]
 
     def test_tracks_duration_bounds_from_every_record(self) -> None:
         """Even unrelated channels move the duration bounds."""
@@ -120,6 +103,71 @@ class TestRouting:
         assert accumulator["last_timestamp"] == "2026-06-12T06:27:30"
         assert accumulator["shots"] == 0
 
+    def test_routes_self_statistics_to_career_totals(self) -> None:
+        """``self_statistics`` populates the career-* fields from the wire."""
+        accumulator = _routed(
+            [
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "self_statistics",
+                        "playtime_hours": 12,
+                        "playtime_minutes": 34,
+                        "playtime_seconds": 56,
+                        "playtime_seconds_total": 12 * 3600 + 34 * 60 + 56,
+                        "destroyed": 4271,
+                        "deactivated": 1893,
+                        "score": 1003500,
+                    },
+                )
+            ]
+        )
+
+        assert accumulator["career_destroyed_last"] == 4271
+        assert accumulator["career_deactivated_last"] == 1893
+        assert accumulator["career_score_last"] == 1003500
+        assert accumulator["career_playtime_seconds_last"] == 12 * 3600 + 34 * 60 + 56
+
+    def test_routes_container_pickup_dispatched_to_full_and_partial(self) -> None:
+        """``container_pickup_dispatched`` splits records into full/partial tallies."""
+        accumulator = _routed(
+            [
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "container_pickup_dispatched",
+                        "x": 80,
+                        "y": 90,
+                        "remaining_volume": 0,
+                        "is_partial": False,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "container_pickup_dispatched",
+                        "x": 81,
+                        "y": 91,
+                        "remaining_volume": 881,
+                        "is_partial": True,
+                    },
+                ),
+                _record(
+                    channel="DIAGNOSTIC",
+                    fields={
+                        "diagnostic_kind": "container_pickup_dispatched",
+                        "x": 82,
+                        "y": 92,
+                        "remaining_volume": 0,
+                        "is_partial": False,
+                    },
+                ),
+            ]
+        )
+
+        assert accumulator["container_pickups_full"] == 2
+        assert accumulator["container_pickups_partial"] == 1
+
     def test_ignores_irrelevant_diagnostics(self) -> None:
         """Unrelated diagnostic kinds leave the buckets untouched."""
         accumulator = _routed(
@@ -133,7 +181,6 @@ class TestRouting:
 
         assert accumulator["kills"] == 0
         assert accumulator["fuel_samples"] == []
-        assert accumulator["dot_hops"] == []
 
     def test_routes_inventory_gains_scans_and_approaches(self) -> None:
         """The four observability diagnostics land in their buckets."""
@@ -308,9 +355,6 @@ class TestBuildScorecard:
             fuel_min=-1,
             fuel_last=-1,
             fuel_sample_count=0,
-            dot_hops=[],
-            dot_hop_distinct_targets=0,
-            dot_hop_max_repeats=0,
             inventory_first=make_unsampled_inventory_counts(),
             inventory_last=make_unsampled_inventory_counts(),
             inventory_sample_count=0,
@@ -321,6 +365,12 @@ class TestBuildScorecard:
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
+            career_destroyed_last=-1,
+            career_deactivated_last=-1,
+            career_score_last=-1,
+            career_playtime_seconds_last=-1,
+            container_pickups_full=0,
+            container_pickups_partial=0,
         )
 
     def test_state_budget_credits_interval_to_earlier_destination(self) -> None:
@@ -358,8 +408,8 @@ class TestBuildScorecard:
         ]
         assert scorecard["duration_seconds"] == 45
 
-    def test_fuel_and_dot_hop_aggregates(self) -> None:
-        """Fuel min/last and dot repeat counts come from the buckets."""
+    def test_fuel_aggregates(self) -> None:
+        """Fuel min/last/count come from the self_alignment_sample bucket."""
         accumulator = _routed(
             [
                 _record(
@@ -374,33 +424,6 @@ class TestBuildScorecard:
                     channel="DIAGNOSTIC",
                     fields={"diagnostic_kind": "self_alignment_sample", "belief_fuel": 908},
                 ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "fuel_dot_hop",
-                        "target_x": 248,
-                        "target_y": 200,
-                        "fuel": 151,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "fuel_dot_hop",
-                        "target_x": 248,
-                        "target_y": 200,
-                        "fuel": 143,
-                    },
-                ),
-                _record(
-                    channel="DIAGNOSTIC",
-                    fields={
-                        "diagnostic_kind": "fuel_dot_hop",
-                        "target_x": 140,
-                        "target_y": 138,
-                        "fuel": 496,
-                    },
-                ),
             ]
         )
 
@@ -409,8 +432,6 @@ class TestBuildScorecard:
         assert scorecard["fuel_min"] == 119
         assert scorecard["fuel_last"] == 908
         assert scorecard["fuel_sample_count"] == 3
-        assert scorecard["dot_hop_distinct_targets"] == 2
-        assert scorecard["dot_hop_max_repeats"] == 2
 
     def test_inventory_and_approach_aggregates(self) -> None:
         """Inventory first/last and approach repeat counts come from the buckets."""
@@ -471,7 +492,6 @@ class TestRenderAndIssues:
         kills: int = 2,
         shots: int = 10,
         fuel_min: int = 405,
-        dot_hop_max_repeats: int = 1,
         fuel_sample_count: int = 5,
         state_budget: list[StateBudgetRecordDict] | None = None,
         equipment_approach_max_repeats: int = 1,
@@ -495,9 +515,6 @@ class TestRenderAndIssues:
             fuel_min=fuel_min,
             fuel_last=866,
             fuel_sample_count=fuel_sample_count,
-            dot_hops=[],
-            dot_hop_distinct_targets=0,
-            dot_hop_max_repeats=dot_hop_max_repeats,
             inventory_first=InventoryCountsDict(armor=0, dual=12, missile=0, homing=22, radar=10),
             inventory_last=InventoryCountsDict(
                 armor=0, dual=19, missile=0, homing=25, radar=radar_last
@@ -510,6 +527,12 @@ class TestRenderAndIssues:
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=equipment_approach_max_repeats,
+            career_destroyed_last=-1,
+            career_deactivated_last=-1,
+            career_score_last=-1,
+            career_playtime_seconds_last=-1,
+            container_pickups_full=0,
+            container_pickups_partial=0,
         )
 
     def test_render_includes_budget_and_aggregates(self) -> None:
@@ -531,14 +554,6 @@ class TestRenderAndIssues:
     def test_healthy_scorecard_raises_no_issues(self) -> None:
         """A healthy session contributes no top-level issues."""
         assert collect_scorecard_issues(self._scorecard()) == []
-
-    def test_dot_orbit_issue(self) -> None:
-        """Three hops at one dot is the orbit signature."""
-        issues = collect_scorecard_issues(self._scorecard(dot_hop_max_repeats=3))
-
-        assert issues == [
-            "fuel-dot orbit: one dot targeted 3 times without being revealed or refuted"
-        ]
 
     def test_fuel_floor_issue(self) -> None:
         """A fuel dip below the critical band is surfaced."""

@@ -464,9 +464,22 @@ def get_probe_runtime_artifacts() -> ProbeRunArtifactsDict | None:
     return _PROBE_ARTIFACTS
 
 
-def emit_ai(message: str, *args: str | int | float | bool) -> None:
-    """Emit a structured AI event."""
-    _emit_runtime_event("AI", message, *args)
+def emit_ai(
+    message: str,
+    *args: str | int | float | bool,
+    **fields: str | int | float | bool,
+) -> None:
+    """Emit a structured AI event.
+
+    Args:
+        message: ``printf``-style message string.
+        *args: Format arguments for the message string.
+        **fields: Optional structured key/value payload spread into the
+            JSONL event at the top level. Use for fields that tooling
+            should query (e.g. ``combat_target_x``) so the smoke gate
+            and ``bot-query`` reach them without parsing the message.
+    """
+    _emit_runtime_event("AI", message, *args, **fields)
 
 
 def emit_sync(message: str, *args: str | int | float | bool) -> None:
@@ -479,9 +492,22 @@ def emit_state(message: str, *args: str | int | float | bool) -> None:
     _emit_runtime_event("STATE", message, *args)
 
 
-def emit_wire(message: str, *args: str | int | float | bool) -> None:
-    """Emit a structured wire/protocol command event."""
-    _emit_runtime_event("WIRE", message, *args)
+def emit_wire(
+    message: str,
+    *args: str | int | float | bool,
+    **fields: str | int | float | bool,
+) -> None:
+    """Emit a structured wire/protocol command event.
+
+    Args:
+        message: ``printf``-style message string.
+        *args: Format arguments for the message string.
+        **fields: Optional structured payload (e.g. ``action_kind``,
+            ``target_x``) spread into the JSONL event at the top
+            level so smoke + ``bot-query`` can reach them without
+            parsing the message text.
+    """
+    _emit_runtime_event("WIRE", message, *args, **fields)
 
 
 def emit_world(message: str, *args: str | int | float | bool) -> None:

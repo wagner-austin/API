@@ -24,6 +24,49 @@ def make_scanned_ai_state() -> AIStateDict:
     return AIStateDict(**{**make_initial_ai_state(), "last_scan_ms": 1})
 
 
+def viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[str, int]:
+    """Return a coverage map marking every tile in the world's viewport.
+
+    Useful for tests that need the forager to treat the current
+    viewport as fully scanned by the bot (e.g. when the test exercises
+    the search-hop / edge-walk / map-intel fallback path beneath the
+    forager). Mirrors what :func:`mark_scan_dispatched` writes when an
+    extra-radar reveal fills the viewport.
+
+    Args:
+        world: World state whose viewport bounds drive the coverage map.
+        now_ms: Timestamp to stamp every tile with.
+
+    Returns:
+        Coverage dict keyed by ``"x,y"`` with every viewport tile marked.
+    """
+    viewport = world["viewport"]
+    left = viewport["left"]
+    top = viewport["top"]
+    right = left + viewport["width"] - 1
+    bottom = top + viewport["height"] - 1
+    return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
+
+
+def make_post_radar_ai_state(world: WorldStateDict, now_ms: int = 100000) -> AIStateDict:
+    """Create AI state that represents "the bot just radared this viewport".
+
+    The returned state has every viewport tile marked as covered, so
+    :func:`plan_forage_search` returns ``None`` and the caller falls
+    through to the search-hop / edge-walk / map-intel fallbacks.
+
+    Args:
+        world: World state whose viewport bounds drive the coverage map.
+        now_ms: Scan timestamp stamped onto every tile.
+
+    Returns:
+        AI state with ``local_scan_tiles`` filled for the current viewport.
+    """
+    return AIStateDict(
+        **{**make_scanned_ai_state(), "local_scan_tiles": viewport_covered_tiles(world, now_ms)}
+    )
+
+
 def make_world(
     *,
     self_x: int = 100,
@@ -67,7 +110,6 @@ def make_world(
         terrain={},
         viewport=viewport,
         scanned_viewports=scanned_viewports,
-        map_fuel_dots={},
         timestamp_ms=0,
     )
     return world, self_state

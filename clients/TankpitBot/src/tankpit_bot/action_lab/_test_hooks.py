@@ -6,9 +6,9 @@ to exercise live-probe control flow deterministically.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Literal, Protocol
 
-from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
+from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, CDPSessionProtocol
 from tankpit_bot.action_lab.session import (
     BufferedWorldStateProviderProtocol,
     StartupStateDriverProtocol,
@@ -16,6 +16,9 @@ from tankpit_bot.action_lab.session import (
 )
 from tankpit_bot.action_lab.session import (
     advance_startup_state as _real_advance_startup_state,
+)
+from tankpit_bot.action_lab.session import (
+    capture_teleport_page_snapshot as _real_capture_teleport_page_snapshot,
 )
 from tankpit_bot.action_lab.session import (
     wait_for_initial_self_state as _real_wait_for_initial_self_state,
@@ -26,6 +29,7 @@ from tankpit_bot.action_lab.session import (
 from tankpit_bot.action_lab.session import (
     wait_for_world_sync as _real_wait_for_world_sync,
 )
+from tankpit_bot.action_lab.types import TeleportPageSnapshotDict
 from tankpit_bot.bot.world_sync import drain_messages as _real_drain_buffered_messages
 from tankpit_bot.browser import get_current_time_ms as _real_get_current_time_ms
 from tankpit_bot.browser.lifecycle import (
@@ -213,8 +217,45 @@ navigate_and_login = _real_navigate_and_login
 wait_for_game_ready = _real_wait_for_game_ready
 
 
+# ---------------------------------------------------------------------------
+# Page-snapshot hooks
+# ---------------------------------------------------------------------------
+
+
+class CaptureTeleportPageSnapshotProtocol(Protocol):
+    """Protocol for capturing a teleport-phase page snapshot."""
+
+    def __call__(
+        self,
+        cdp: CDPSessionProtocol,
+        phase: Literal[
+            "before_map_open",
+            "before_teleport",
+            "after_map_data",
+            "landed",
+            "timeout",
+        ],
+    ) -> TeleportPageSnapshotDict:
+        """Capture the page-client state annotated with a teleport phase.
+
+        Args:
+            cdp: Active CDP session attached to the live tankpit page.
+            phase: Attempt phase associated with this snapshot.
+
+        Returns:
+            Validated teleport page snapshot annotated with the phase.
+        """
+        ...
+
+
+capture_teleport_page_snapshot: CaptureTeleportPageSnapshotProtocol = (
+    _real_capture_teleport_page_snapshot
+)
+
+
 __all__ = [
     "AdvanceStartupStateProtocol",
+    "CaptureTeleportPageSnapshotProtocol",
     "CheckAndClearRadarScanCompleteProtocol",
     "CheckAndClearTeleportLandedProtocol",
     "DrainBufferedMessagesProtocol",
@@ -223,6 +264,7 @@ __all__ = [
     "WaitForRadarSyncProtocol",
     "WaitForWorldSyncProtocol",
     "advance_startup_state",
+    "capture_teleport_page_snapshot",
     "check_and_clear_radar_scan_complete",
     "check_and_clear_teleport_landed",
     "drain_buffered_messages",

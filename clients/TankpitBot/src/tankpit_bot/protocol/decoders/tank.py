@@ -358,7 +358,7 @@ def _dispatch_protocol_misc(subtype: int, inner: bytes) -> BinaryMessage | None:
     samples in the corpus, 0x42 on 2/2 own-tank build/pickup events,
     and 0x54 is the ~1-byte ActionDone heartbeat.
     """
-    from tankpit_bot.protocol.decoders.misc import (
+    from tankpit_bot.protocol.decoders.session_events import (
         decode_action_done,
         decode_build_pickup,
         decode_statistics,

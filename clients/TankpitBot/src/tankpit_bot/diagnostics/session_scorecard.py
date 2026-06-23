@@ -28,11 +28,6 @@ from tankpit_bot.runtime_logging import (
     require_int_field,
 )
 
-# A dot teleported to this many times in one session was never revealed
-# or refuted by a scan -- the orbit class of bug from live run
-# 20260612-062453 (fuel bled 151->119 around one in-viewport dot).
-_DOT_ORBIT_REPEAT_THRESHOLD = 3
-
 # An equipment container teleport-approached this many times never
 # became collectable -- the unreachable-pocket orbit from live run
 # 20260612-071918 ((128,126)/(129,127) re-approached 7x each).
@@ -73,7 +68,6 @@ class ScorecardAccumulatorDict(TypedDict):
             observations.
         fuel_samples: ``belief_fuel`` values from every
             ``self_alignment_sample`` event, in stream order.
-        dot_hops: Every ``fuel_dot_hop`` event, in stream order.
         inventory_samples: Counts from every ``inventory_sample``
             event, in stream order.
         equipment_gain_events: Count of ``equipment_gain`` events.
@@ -95,7 +89,6 @@ class ScorecardAccumulatorDict(TypedDict):
     combat_stale_positions_blocked: int
     tank_damage_changes: int
     fuel_samples: list[int]
-    dot_hops: list[TargetedTeleportRecordDict]
     inventory_samples: list[InventoryCountsDict]
     equipment_gain_events: int
     equipment_gained: InventoryCountsDict
@@ -104,6 +97,18 @@ class ScorecardAccumulatorDict(TypedDict):
     equipment_approaches: list[TargetedTeleportRecordDict]
     first_timestamp: str
     last_timestamp: str
+    # Career totals from the wire's 0x56 broadcast (latest seen this
+    # run; ``-1`` when never sent during the session) and per-record
+    # container pickup tallies. These mirror the fields tracked by
+    # :class:`tankpit_bot.diagnostics.issue_report._ReportAccumulatorDict`
+    # so both accumulator paths populate the same scorecard fields
+    # from the same diagnostic kinds.
+    career_destroyed_last: int
+    career_deactivated_last: int
+    career_score_last: int
+    career_playtime_seconds_last: int
+    container_pickups_full: int
+    container_pickups_partial: int
 
 
 def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
@@ -112,6 +117,9 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
     Returns:
         Accumulator with empty collections and zeroed counters.
     """
+    # First six career/pickup fields are zero/sentinel until the wire's
+    # 0x56 Statistics or a 0x43 ContainerPickup fires during the run.
+    # See :class:`ScorecardAccumulatorDict` for the contract.
     return ScorecardAccumulatorDict(
         state_transitions=[],
         kills=0,
@@ -121,7 +129,6 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         combat_stale_positions_blocked=0,
         tank_damage_changes=0,
         fuel_samples=[],
-        dot_hops=[],
         inventory_samples=[],
         equipment_gain_events=0,
         equipment_gained=make_zero_inventory_counts(),
@@ -130,6 +137,12 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         equipment_approaches=[],
         first_timestamp="",
         last_timestamp="",
+        career_destroyed_last=-1,
+        career_deactivated_last=-1,
+        career_score_last=-1,
+        career_playtime_seconds_last=-1,
+        container_pickups_full=0,
+        container_pickups_partial=0,
     )
 
 
@@ -138,7 +151,7 @@ def _classify_targeted_teleport(record: RuntimeEventRecordDict) -> TargetedTelep
 
     Args:
         record: Decoded event record whose ``diagnostic_kind`` is
-            ``fuel_dot_hop`` or ``equipment_approach``.
+            ``equipment_approach``.
 
     Returns:
         Strict-typed targeted-teleport row.
@@ -238,8 +251,6 @@ def _route_scorecard_diagnostic(
         return
     if kind == "self_alignment_sample":
         accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
-    elif kind == "fuel_dot_hop":
-        accumulator["dot_hops"].append(_classify_targeted_teleport(record))
     elif kind == "equipment_approach":
         accumulator["equipment_approaches"].append(_classify_targeted_teleport(record))
     elif kind == "inventory_sample":
@@ -255,6 +266,38 @@ def _route_scorecard_diagnostic(
             accumulator["scans_extra"] += 1
         else:
             accumulator["scans_builtin"] += 1
+    else:
+        _route_metrics_diagnostic(kind, record, accumulator)
+
+
+def _route_metrics_diagnostic(
+    kind: str | int | float | bool | None,
+    record: RuntimeEventRecordDict,
+    accumulator: ScorecardAccumulatorDict,
+) -> None:
+    """Route career-stats and pickup-tally diagnostics into the scorecard accumulator.
+
+    Split out of :func:`_route_scorecard_diagnostic` to keep the
+    primary router under the C901 complexity ceiling.
+
+    Args:
+        kind: ``diagnostic_kind`` field value.
+        record: Decoded event record carrying the structured payload.
+        accumulator: Scorecard accumulator to update in place.
+    """
+    if kind == "self_statistics":
+        accumulator["career_destroyed_last"] = require_int_field(record["fields"], "destroyed")
+        accumulator["career_deactivated_last"] = require_int_field(record["fields"], "deactivated")
+        accumulator["career_score_last"] = require_int_field(record["fields"], "score")
+        accumulator["career_playtime_seconds_last"] = require_int_field(
+            record["fields"], "playtime_seconds_total"
+        )
+        return
+    if kind == "container_pickup_dispatched":
+        if record["fields"].get("is_partial") is True:
+            accumulator["container_pickups_partial"] += 1
+        else:
+            accumulator["container_pickups_full"] += 1
 
 
 def _route_combat_diagnostic(
@@ -355,8 +398,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         last = datetime.fromisoformat(accumulator["last_timestamp"])
         duration_seconds = int((last - first).total_seconds())
     fuel_samples = accumulator["fuel_samples"]
-    dot_hops = accumulator["dot_hops"]
-    hop_counts = Counter((hop["target_x"], hop["target_y"]) for hop in dot_hops)
     inventory_samples = accumulator["inventory_samples"]
     approaches = accumulator["equipment_approaches"]
     approach_counts = Counter((row["target_x"], row["target_y"]) for row in approaches)
@@ -372,9 +413,6 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         fuel_min=min(fuel_samples) if fuel_samples else -1,
         fuel_last=fuel_samples[-1] if fuel_samples else -1,
         fuel_sample_count=len(fuel_samples),
-        dot_hops=dot_hops,
-        dot_hop_distinct_targets=len(hop_counts),
-        dot_hop_max_repeats=max(hop_counts.values()) if hop_counts else 0,
         inventory_first=(
             inventory_samples[0] if inventory_samples else make_unsampled_inventory_counts()
         ),
@@ -389,6 +427,12 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         equipment_approaches=approaches,
         equipment_approach_distinct_targets=len(approach_counts),
         equipment_approach_max_repeats=(max(approach_counts.values()) if approach_counts else 0),
+        career_destroyed_last=accumulator["career_destroyed_last"],
+        career_deactivated_last=accumulator["career_deactivated_last"],
+        career_score_last=accumulator["career_score_last"],
+        career_playtime_seconds_last=accumulator["career_playtime_seconds_last"],
+        container_pickups_full=accumulator["container_pickups_full"],
+        container_pickups_partial=accumulator["container_pickups_partial"],
     )
 
 
@@ -428,9 +472,6 @@ def render_scorecard_section(scorecard: SessionScorecardDict) -> list[str]:
         f"armor={gained['armor']} dual={gained['dual']} missile={gained['missile']} "
         f"homing={gained['homing']} radar={gained['radar']}",
         f"  scans: extra={scorecard['scans_extra']} builtin={scorecard['scans_builtin']}",
-        f"  dot hops: events={len(scorecard['dot_hops'])} "
-        f"distinct={scorecard['dot_hop_distinct_targets']} "
-        f"max_repeats={scorecard['dot_hop_max_repeats']}",
         f"  equipment approaches: events={len(scorecard['equipment_approaches'])} "
         f"distinct={scorecard['equipment_approach_distinct_targets']} "
         f"max_repeats={scorecard['equipment_approach_max_repeats']}",
@@ -454,11 +495,6 @@ def collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
         Human-readable issue lines (possibly empty).
     """
     issues: list[str] = []
-    if scorecard["dot_hop_max_repeats"] >= _DOT_ORBIT_REPEAT_THRESHOLD:
-        issues.append(
-            f"fuel-dot orbit: one dot targeted {scorecard['dot_hop_max_repeats']} times "
-            "without being revealed or refuted"
-        )
     if scorecard["equipment_approach_max_repeats"] >= _EQUIPMENT_ORBIT_REPEAT_THRESHOLD:
         issues.append(
             "equipment-approach orbit: one container teleport-approached "

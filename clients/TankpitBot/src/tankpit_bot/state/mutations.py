@@ -70,7 +70,6 @@ def update_self_from_movement_response(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -126,7 +125,6 @@ def update_self_position(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -154,10 +152,16 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
        departed tank that the map still lists cannot masquerade as
        wire-present.
     3. ``last_position_update_ms`` advances iff BOTH
-       ``obs["is_wire_sourced"]`` is True AND ``obs["position"]`` is
-       not None. Damage-only wire messages (TankStatusSync) leave it
-       untouched, so the position-freshness gate cannot be lied to by
-       a status-only broadcast.
+       ``obs["position_is_authoritative"]`` is True AND
+       ``obs["position"]`` is not None. Damage-only wire messages
+       (TankStatusSync, is_wire_sourced=True but position=None) leave
+       it untouched. The 0x4C MAP_DATA snapshot advances it
+       (position_is_authoritative=True, is_wire_sourced=False) so a
+       stationary target stays kill-shot-fresh after the bot opens the
+       map, without that snapshot lying about wire presence. Radar
+       EnemyDetect and DOM-scraped client-registry refinements set
+       both flags to False -- their position is a tile-coarse or
+       out-of-band estimate that must not gate a kill shot.
 
     Field values: each present ``obs`` field overwrites the existing
     tank's corresponding value; each ``None`` field preserves the
@@ -206,13 +210,27 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     timestamp_ms = obs["timestamp_ms"]
     if obs["is_wire_sourced"]:
         new_last_wire_seen_ms = timestamp_ms
-        if obs_position is not None:
-            new_last_position_update_ms = timestamp_ms
-        else:
-            new_last_position_update_ms = existing["last_position_update_ms"] if existing else 0
     else:
         new_last_wire_seen_ms = existing["last_wire_seen_ms"] if existing else 0
+    if obs["position_is_authoritative"] and obs_position is not None:
+        new_last_position_update_ms = timestamp_ms
+    else:
         new_last_position_update_ms = existing["last_position_update_ms"] if existing else 0
+    # Viewport-observation gate. Only observations that the dispatch
+    # layer routed through ``storage_source == "viewport"`` advance
+    # this timestamp -- proof the tank was in the bot's local sensing
+    # window when the wire arrived. 0x4C MapData and 0x2E TankStatusSync
+    # are global broadcasts that route through ``"world_state"`` or
+    # preserve the previous source, so they never advance the gate.
+    # This is what ``analyze_threats`` reads to keep the threat list
+    # to actually-visible enemies; without it, every alive tank on the
+    # map shows up as a HUNT candidate after every ``open_map``.
+    if obs["storage_source"] == "viewport":
+        new_last_viewport_observation_ms = timestamp_ms
+    else:
+        new_last_viewport_observation_ms = (
+            existing["last_viewport_observation_ms"] if existing else 0
+        )
 
     # Liveness transition. Three rules, evaluated in order:
     #   1. New tank or wire-sourced position update with alive sprite
@@ -240,6 +258,15 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     else:
         new_liveness = existing["liveness"]
 
+    # Preserve aim-of-last-shot fields. Observations don't carry them
+    # (only 0x53 ShootEvent writes them via ``set_tank_last_aim``); a
+    # later regular wire update (movement, damage, viewport) must not
+    # clobber the recorded barrel-aim.
+    aim_x = existing["last_aim_x"] if existing else -1
+    aim_y = existing["last_aim_y"] if existing else -1
+    aim_weapon = existing["last_aim_weapon"] if existing else -1
+    aim_ms = existing["last_aim_ms"] if existing else 0
+
     new_tank = make_tank_state(
         tank_id=obs["tank_id"],
         x=new_x,
@@ -255,7 +282,12 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=new_last_wire_seen_ms,
         last_position_update_ms=new_last_position_update_ms,
+        last_viewport_observation_ms=new_last_viewport_observation_ms,
         liveness=new_liveness,
+        last_aim_x=aim_x,
+        last_aim_y=aim_y,
+        last_aim_weapon=aim_weapon,
+        last_aim_ms=aim_ms,
     )
 
     new_tanks = dict(state["tanks"])
@@ -269,7 +301,6 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -320,7 +351,6 @@ def update_terrain_from_viewport(
         terrain=new_terrain,
         viewport=new_viewport,
         scanned_viewports=new_scanned_viewports,
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -368,7 +398,6 @@ def set_self_fuel(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -410,7 +439,6 @@ def set_self_rank(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -453,7 +481,12 @@ def _set_tank_liveness(
         timestamp_ms=timestamp_ms,
         last_wire_seen_ms=existing["last_wire_seen_ms"],
         last_position_update_ms=existing["last_position_update_ms"],
+        last_viewport_observation_ms=existing["last_viewport_observation_ms"],
         liveness=liveness,
+        last_aim_x=existing["last_aim_x"],
+        last_aim_y=existing["last_aim_y"],
+        last_aim_weapon=existing["last_aim_weapon"],
+        last_aim_ms=existing["last_aim_ms"],
     )
 
     new_tanks = dict(state["tanks"])
@@ -467,7 +500,77 @@ def _set_tank_liveness(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def set_tank_last_aim(
+    state: WorldStateDict,
+    tank_id: int,
+    aim_x: int,
+    aim_y: int,
+    weapon: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Record the barrel-aim of the last 0x53 ShootEvent for ``tank_id``.
+
+    The four fields ``last_aim_x``, ``last_aim_y``, ``last_aim_weapon``,
+    ``last_aim_ms`` on the tank state are written; everything else is
+    preserved. No-op when the tank is unknown to the registry (the
+    next per-tank wire will create it; the missed aim is OK to drop).
+
+    Args:
+        state: Current world state.
+        tank_id: Shooter tank id.
+        aim_x: Wire-reported barrel-aim X.
+        aim_y: Wire-reported barrel-aim Y.
+        weapon: Weapon byte (0=single, 1=dual, 2=missile, 3=homing).
+        timestamp_ms: Message timestamp; written to ``last_aim_ms`` so
+            consumers can age the aim out.
+
+    Returns:
+        New ``WorldStateDict`` with the tank's aim fields advanced (and
+        the outer ``timestamp_ms`` advanced to match).
+    """
+    key = str(tank_id)
+    existing = state["tanks"].get(key)
+    if existing is None:
+        return state
+
+    new_tank = make_tank_state(
+        tank_id=existing["tank_id"],
+        x=existing["x"],
+        y=existing["y"],
+        team=existing["team"],
+        rank=existing["rank"],
+        damage_state=existing["damage_state"],
+        direction=existing["direction"],
+        name=existing["name"],
+        is_bot=existing["is_bot"],
+        is_self=existing["is_self"],
+        source=existing["source"],
+        timestamp_ms=existing["timestamp_ms"],
+        last_wire_seen_ms=existing["last_wire_seen_ms"],
+        last_position_update_ms=existing["last_position_update_ms"],
+        last_viewport_observation_ms=existing["last_viewport_observation_ms"],
+        liveness=existing["liveness"],
+        last_aim_x=aim_x,
+        last_aim_y=aim_y,
+        last_aim_weapon=weapon,
+        last_aim_ms=timestamp_ms,
+    )
+
+    new_tanks = dict(state["tanks"])
+    new_tanks[key] = new_tank
+
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=new_tanks,
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_viewports=state["scanned_viewports"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -496,46 +599,42 @@ def remove_tank(
     tank_id: int,
     timestamp_ms: int,
 ) -> WorldStateDict:
-    """Delete a tank from the registry on 0x58 TankRemove.
+    """No-op handler for 0x58 TankRemove (the registry entry is kept).
 
-    0x58 TankRemove fires whenever the server stops broadcasting
-    per-tank updates for a tank to this client -- this happens on
-    actual deaths but also when a tank simply leaves the client's
-    awareness radius. Empirical verification 2026-06-20: orange-5 got
-    five TankRemove events across two actual kills; the other three
-    were tracking churn, not deaths. Treating every 0x58 as a death
-    would corrupt the world model.
+    Per the 2026-06-20 ghost_observe capture, 0x58 TankRemove fires
+    whenever the server stops broadcasting per-tank updates for a
+    tank to this client -- this happens on actual deaths AND on
+    benign tracking churn (orange-5 got five TankRemove events
+    across two actual kills; three were churn). The old behavior
+    was to delete the tank from the registry; that caused the bot
+    to abandon pursuit of locked targets that merely teleported
+    out of viewport (live capture 2026-06-22). 0x41 Deactivation
+    is the only authoritative death signal -- it flips
+    ``liveness`` to ``"deactivated"`` and the freshness gates do
+    the rest.
 
-    The simpler correct behaviour is to drop the tank from the
-    registry. If it was a death, that's correct. If it was tracking
-    churn, the next MapData entry or per-tank wire re-adds the tank
-    at its current position with ``liveness="alive"``.
+    Keeping the tank in the registry lets ``find_locked_target_pursuit``
+    keep firing homing shots toward the cached coords until either
+    a real deactivation arrives or the global broadcast timestamp
+    goes stale past the pursuit freshness window. The wire still
+    refreshes ``timestamp_ms`` for every alive tank via 0x2E
+    TankStatusSync (~every 2 s) so a truly gone tank ages out
+    naturally.
 
     Args:
         state: Current world state.
-        tank_id: Tank ID to delete.
-        timestamp_ms: Message timestamp.
+        tank_id: Tank ID the server announced removal for. Unused;
+            the entry stays in the registry.
+        timestamp_ms: Message timestamp. Unused for the same reason.
 
     Returns:
-        New WorldStateDict with the tank deleted. No-op when the tank
-        is not in state.
+        The input state unchanged. Treating this signal as "ignore"
+        is correct because 0x58 carries no information that the
+        existing freshness / liveness machinery cannot derive from
+        the other wire messages.
     """
-    key = str(tank_id)
-    if key not in state["tanks"]:
-        return state
-    new_tanks = dict(state["tanks"])
-    del new_tanks[key]
-    return WorldStateDict(
-        self_state=state["self_state"],
-        tanks=new_tanks,
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=state["map_fuel_dots"],
-        timestamp_ms=timestamp_ms,
-    )
+    del tank_id, timestamp_ms
+    return state
 
 
 def mark_viewport_scanned(
@@ -566,40 +665,6 @@ def mark_viewport_scanned(
         terrain=state["terrain"],
         viewport=state["viewport"],
         scanned_viewports=new_scanned_viewports,
-        map_fuel_dots=state["map_fuel_dots"],
-        timestamp_ms=timestamp_ms,
-    )
-
-
-def replace_map_fuel_dots(
-    state: WorldStateDict,
-    dots: list[tuple[int, int]],
-    timestamp_ms: int,
-) -> WorldStateDict:
-    """Replace the map-wide fuel-container atlas from a MAP_DATA dot layer.
-
-    The dot layer is server-cached and arrives complete on every MAP_DATA
-    response, so the previous atlas is replaced wholesale rather than
-    merged -- a dot that disappeared from the layer is gone.
-
-    Args:
-        state: Current world state.
-        dots: Decoded ``(x, y)`` world coordinates of every fuel dot.
-        timestamp_ms: MAP_DATA processing timestamp.
-
-    Returns:
-        New WorldStateDict with the replaced fuel-dot atlas.
-    """
-    new_dots = {coord_key(x, y): timestamp_ms for x, y in dots}
-    return WorldStateDict(
-        self_state=state["self_state"],
-        tanks=state["tanks"],
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
-        map_fuel_dots=new_dots,
         timestamp_ms=timestamp_ms,
     )
 
@@ -612,8 +677,8 @@ __all__ = [
     "apply_tank_observation",
     "mark_viewport_scanned",
     "remove_tank",
-    "replace_map_fuel_dots",
     "set_self_fuel",
+    "set_tank_last_aim",
     "update_self_from_movement_response",
     "update_self_position",
     "update_terrain_from_viewport",

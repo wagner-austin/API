@@ -639,22 +639,6 @@ def test_scorecard_tracks_self_alignment_fuel_samples(fake_fs: FakeFileSystem) -
     assert report["scorecard"]["fuel_sample_count"] == 3
 
 
-def test_scorecard_tracks_fuel_dot_hops(fake_fs: FakeFileSystem) -> None:
-    """``fuel_dot_hop`` DIAGNOSTIC events flow into the scorecard dot_hops list."""
-    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
-    _emit_session_room("1", "field01.gif")
-    emit_diagnostic(diagnostic_kind="fuel_dot_hop", target_x=151, target_y=109, fuel=280)
-    emit_diagnostic(diagnostic_kind="fuel_dot_hop", target_x=160, target_y=115, fuel=260)
-
-    report = build_issue_report(Path(artifacts["latest_events_path"]))
-
-    assert len(report["scorecard"]["dot_hops"]) == 2
-    assert report["scorecard"]["dot_hops"][0]["target_x"] == 151
-    assert report["scorecard"]["dot_hops"][0]["fuel"] == 280
-    assert report["scorecard"]["dot_hop_distinct_targets"] == 2
-    assert report["scorecard"]["dot_hop_max_repeats"] == 1
-
-
 def test_scorecard_counts_shoot_wire_events(fake_fs: FakeFileSystem) -> None:
     """WIRE events whose message starts with ``shoot(`` increment the shots counter."""
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
@@ -725,22 +709,6 @@ def test_render_scorecard_section_shows_state_budget_lines(fake_fs: FakeFileSyst
     rendered = render_issue_report(build_issue_report(events_path))
 
     assert "COMBAT: 10s" in rendered
-
-
-def test_scorecard_issue_dot_orbit_detected(fake_fs: FakeFileSystem) -> None:
-    """A dot targeted 3+ times surfaces a fuel-dot orbit top-level issue."""
-    artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
-    _emit_session_room("1", "field01.gif")
-    # Same coordinate three times triggers the orbit threshold.
-    for _ in range(3):
-        emit_diagnostic(diagnostic_kind="fuel_dot_hop", target_x=151, target_y=109, fuel=280)
-
-    report = build_issue_report(Path(artifacts["latest_events_path"]))
-    rendered = render_issue_report(report)
-
-    assert report["scorecard"]["dot_hop_max_repeats"] == 3
-    assert "fuel-dot orbit" in rendered
-    assert "one dot targeted 3 times" in rendered
 
 
 def test_scorecard_issue_fuel_floor_critical(fake_fs: FakeFileSystem) -> None:

@@ -227,7 +227,6 @@ class TestDecodeMessage:
         # MapData (0x4C) -- empty body (just the u16 RLE header)
         result = decode_message(MSG_MAP_DATA, bytes([0, 0]))
         assert result["msg_type"] == 0x4C
-        assert result["fuel_dots"] == []
         assert result["tanks"] == []
 
     def test_dispatches_misc_messages(self) -> None:
@@ -256,6 +255,32 @@ class TestDecodeMessage:
         action_data = b""
         result = decode_message(MSG_ACTION_DONE, action_data)
         assert result["msg_type"] == 0x54
+
+        # Session-broadcast messages route via _decode_session_broadcast.
+        from tankpit_bot.protocol import (
+            MSG_ACTIVE_PLAYERS,
+            MSG_DISCONNECT,
+            MSG_PING,
+            MSG_TOP10,
+        )
+
+        # 0x2F ActivePlayers
+        active_players_data = bytes([0xF5, 0x01, 0x05])  # tank_id=501, rank=5
+        result = decode_message(MSG_ACTIVE_PLAYERS, active_players_data)
+        assert result["msg_type"] == 0x2F
+
+        # 0x31 Top10 (header-only)
+        top10_data = bytes([0xFF, 0x00, 0x00, 0x00, 0x00])
+        result = decode_message(MSG_TOP10, top10_data)
+        assert result["msg_type"] == 0x31
+
+        # 0x60 PingResponse (bare)
+        result = decode_message(MSG_PING, b"")
+        assert result["msg_type"] == 0x60
+
+        # 0x7E ConnectionLost (bare)
+        result = decode_message(MSG_DISCONNECT, b"")
+        assert result["msg_type"] == 0x7E
 
         # SupervisorText (0x3C 'wg', free-form server message)
         result = decode_message(0x3C, b"Hello!")

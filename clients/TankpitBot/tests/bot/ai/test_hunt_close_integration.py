@@ -41,6 +41,7 @@ class TestDecideTeleportToFarTarget:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -65,8 +66,18 @@ class TestDecideTeleportToFarTarget:
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_far_target_starts_with_map_open(self) -> None:
-        """A new out-of-range target starts by opening the map."""
+    def test_target_position_stale_but_still_in_viewport_opens_map_then_locks(self) -> None:
+        """A target with stale position but a fresh viewport observation opens map first.
+
+        ``target_position_is_fresh`` reads the ``timestamp_ms`` of
+        the most recent observation by any source. A target whose
+        viewport observation is fresh (so it passes the new
+        ``analyze_threats`` gate) but whose last position-bearing
+        update is 6000 ms old refreshes via map_open before
+        committing fuel to a teleport at coordinates the enemy
+        may have left. The locked id is set so the next tick
+        teleports to the refreshed coords.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -78,7 +89,10 @@ class TestDecideTeleportToFarTarget:
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
-                timestamp_ms=100000,
+                timestamp_ms=94000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=94000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -90,8 +104,13 @@ class TestDecideTeleportToFarTarget:
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_recent_map_intel_teleports_without_reopening_map(self) -> None:
-        """Fresh map intel allows direct teleport to enemy coordinates."""
+    def test_fresh_target_position_teleports_without_reopening_map(self) -> None:
+        """Fresh wire-sourced position allows direct teleport to enemy coordinates.
+
+        The trust signal is per-target ``last_position_update_ms`` --
+        when the wire is keeping the target's (x, y) current the bot
+        does not need a map_open round-trip before teleport.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -104,6 +123,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=99000,
+                last_viewport_observation_ms=99000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -136,6 +158,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
             "50": make_tank_state(
                 tank_id=50,
@@ -148,6 +173,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -190,6 +218,7 @@ class TestDecideTeleportToFarTarget:
                 timestamp_ms=100000,
                 last_wire_seen_ms=100000,
                 last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)
@@ -228,6 +257,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=180, self_y=80, fuel=800, tanks=tanks)
@@ -269,6 +301,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=180, self_y=80, fuel=800, tanks=tanks)
@@ -317,6 +352,10 @@ class TestDecideTeleportToFarTarget:
             timestamp_ms=0,
             last_wire_seen_ms=0,
             last_position_update_ms=0,
+            last_aim_x=-1,
+            last_aim_y=-1,
+            last_aim_weapon=-1,
+            last_aim_ms=0,
         )
 
         landing_x, landing_y = _combat_landing_tile(ctx, target)
@@ -337,6 +376,9 @@ class TestDecideTeleportToFarTarget:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(fuel=800, tanks=tanks)

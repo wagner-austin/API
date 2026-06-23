@@ -15,13 +15,15 @@ from tankpit_bot.bot.ai.combat_strategy import (
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_use_radar,
-    has_recent_map_snapshot,
-    is_current_viewport_scan_failed,
     make_decision,
+    target_position_is_fresh,
 )
 from tankpit_bot.bot.ai.equipment import is_current_viewport_scanned
-from tankpit_bot.bot.ai.movement import select_exploration_command
-from tankpit_bot.bot.ai.threats import analyze_threats
+from tankpit_bot.bot.ai.threats import (
+    analyze_threats,
+    find_acquisition_target,
+    find_locked_target_pursuit,
+)
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_radar_command
@@ -33,62 +35,31 @@ def search_for_enemies(
     *,
     ai_state: AIStateDict,
     map_reason: str,
-    radar_reason: str,
-    edge_reason: str,
 ) -> TickDecisionDict:
-    """Search for enemies with explicit search-stage reasons.
+    """Open the map for a global enemy snapshot.
+
+    HUNT never fires radar to look for enemies (radar reveals only
+    hidden entities -- fuel / equipment containers and mines) and the
+    viewport-edge walk was dead weight under this game configuration
+    (viewport shifting is OFF, so walking to an edge reveals no new
+    ground -- only a teleport opens a new viewport, and a directionless
+    edge-teleport burns fuel without aiming at a known enemy). The
+    only useful enemy-search action when no target is in
+    ``analyze_threats`` is to refresh the global map snapshot.
+
+    The dispatch is always issued. The bot's in-flight-action machinery
+    short-circuits a second dispatch while one is already pending, and
+    every fresh ``map_data_processed`` event hands the acquire path a
+    new set of enemy positions to chase.
 
     Args:
         ctx: Decision context.
         ai_state: Base AI state to rewrite for the produced command.
-        map_reason: Behavior reason to use for a map-open refresh.
-        radar_reason: Behavior reason to use for a radar scan.
-        edge_reason: Behavior reason to use for viewport-edge repositioning.
+        map_reason: Behavior reason for the map-open refresh.
 
     Returns:
-        Enemy-search decision using map-open, radar, or edge movement.
+        Map-open decision tagged with ``map_reason``.
     """
-    map_age = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
-    if map_age < ctx.config["map_open_cooldown_ms"]:
-        scan_age = ctx.timestamp_ms - ctx.ai_state["last_scan_ms"]
-        if (
-            scan_age >= ctx.config["scan_cooldown_ms"]
-            and can_use_radar(ctx)
-            and not is_current_viewport_scanned(ctx.filtered)
-            and not is_current_viewport_scan_failed(ctx)
-        ):
-            emit_ai("radar to search for enemies")
-            return make_decision(
-                make_radar_command(),
-                "HUNT",
-                0,
-                0,
-                0,
-                radar_reason,
-                AIStateDict(
-                    **{
-                        **ai_state,
-                        "last_scan_ms": ctx.timestamp_ms,
-                    }
-                ),
-                ctx.equip,
-            )
-
-        emit_ai("walk to viewport edge while searching for enemies")
-        exploration = select_exploration_command(ctx)
-        if exploration is not None:
-            edge_x, edge_y, edge_command = exploration
-            return make_decision(
-                edge_command,
-                "HUNT",
-                0,
-                edge_x,
-                edge_y,
-                edge_reason,
-                ai_state,
-                ctx.equip,
-            )
-
     emit_ai("opening map to search for enemies")
     return make_decision(
         make_map_open_command(),
@@ -130,21 +101,85 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
 
 
 def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
-    """Acquire a fresh combat target or fall back to enemy search."""
+    """Acquire a fresh combat target or fall back to enemy search.
+
+    Two-stage acquisition:
+
+    1. **Strict (viewport-confirmed) threats.** ``analyze_threats``
+       returns only enemies with recent ``last_viewport_observation_ms``;
+       these are immediately fireable. If a viable one exists, pick it
+       and teleport (or open the map first if the wire position is
+       stale).
+    2. **Loose (map-fresh) acquisition.** When no viewport-confirmed
+       threat exists, look at every enemy whose ``timestamp_ms`` is
+       within ``map_open_cooldown_ms`` (i.e. seen in a recent map
+       snapshot). Teleport at the nearest viable one. ``SCAN_ON_LANDING``
+       handles viewport confirmation before any shot, so map-only
+       intel never produces a phantom firing.
+
+    Only when both stages produce nothing does the bot dispatch
+    another ``map_open``.
+    """
     threats = _visible_threats(ctx)
     target = select_new_combat_target(ctx, threats)
     if target is not None:
         emit_ai("new target %s (id=%d)", target["name"], target["tank_id"])
-        if _has_recent_map_snapshot(ctx):
-            emit_ai("fresh map intel available - teleporting to %s", target["name"])
+        if target_position_is_fresh(ctx, target):
+            emit_ai("fresh wire position - teleporting to %s", target["name"])
             return teleport_to_target(ctx, target)
         return open_map_for_target(ctx, target)
+
+    map_target = find_acquisition_target(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.blocked_targets,
+        ctx.killed,
+        ctx.terrain,
+        ctx.timestamp_ms,
+        ctx.config["map_open_cooldown_ms"],
+    )
+    if map_target is not None:
+        emit_ai(
+            "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
+            map_target["name"],
+            map_target["tank_id"],
+            map_target["x"],
+            map_target["y"],
+        )
+        return teleport_to_target(ctx, map_target)
+
     return search_for_enemies(
         ctx,
         ai_state=ctx.base,
         map_reason="find_enemies",
-        radar_reason="radar_for_enemies",
-        edge_reason="edge_for_enemies",
+    )
+
+
+def _locked_target_pursuit(ctx: DecideCtx) -> EnemyThreatDict | None:
+    """Return the locked target as a pursuit threat when they left the viewport.
+
+    Behavior contract (user-confirmed 2026-06-22): when a locked
+    target teleports out of view, the bot does NOT chase and does
+    NOT enter CONFIRM_KILL on first viewport-miss. Instead it stays
+    put and keeps firing at the target's last known wire position --
+    the server picks ``homing`` when the target is mid-move or out
+    of point-blank range, and homing tracks. The lock holds until
+    an actual deactivation signal arrives (liveness flips, or the
+    tank lands in ``killed_tank_ids``).
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Pursuit ``EnemyThreatDict`` synthesised from the wire
+        registry, or ``None`` when the locked target is truly gone
+        (id cleared, dead, or position too stale).
+    """
+    return find_locked_target_pursuit(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.ai_state["combat_target_id"],
+        ctx.killed,
     )
 
 
@@ -152,63 +187,91 @@ def _decide_hunt_scan_on_landing(ctx: DecideCtx) -> TickDecisionDict:
     """Engage the target after the combat-landing scan completed."""
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
-    if target is None:
-        return _decide_hunt_acquire(ctx)
-    if has_cardinal_combat_shot(ctx.self_state, target):
-        return engage_target(ctx, target)
-    return close_target(ctx, target)
+    if target is not None:
+        if has_cardinal_combat_shot(ctx.self_state, target):
+            return engage_target(ctx, target)
+        return close_target(ctx, target)
+    pursuit = _locked_target_pursuit(ctx)
+    if pursuit is not None:
+        emit_ai(
+            "locked target %s left viewport - firing toward last wire position",
+            pursuit["name"],
+        )
+        return engage_target(ctx, pursuit)
+    return _decide_hunt_acquire(ctx)
 
 
 def _decide_hunt_refresh(ctx: DecideCtx) -> TickDecisionDict:
     """Refresh target information before closing or engaging."""
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
-    if target is None:
-        return _decide_hunt_acquire(ctx)
-    if has_cardinal_combat_shot(ctx.self_state, target):
-        return engage_target(ctx, target)
-    return close_target(ctx, target)
+    if target is not None:
+        if has_cardinal_combat_shot(ctx.self_state, target):
+            return engage_target(ctx, target)
+        return close_target(ctx, target)
+    pursuit = _locked_target_pursuit(ctx)
+    if pursuit is not None:
+        emit_ai(
+            "locked target %s left viewport - firing toward last wire position",
+            pursuit["name"],
+        )
+        return engage_target(ctx, pursuit)
+    return _decide_hunt_acquire(ctx)
 
 
 def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
     """Close distance on the locked combat target."""
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
-    if target is None:
-        return _enter_confirm_kill(ctx)
-    if (
-        has_cardinal_combat_shot(ctx.self_state, target)
-        and can_use_radar(ctx)
-        and not is_current_viewport_scanned(ctx.filtered)
-    ):
-        emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
-        return make_decision(
-            make_radar_command(),
-            "HUNT",
-            800,
-            target["x"],
-            target["y"],
-            "scan_on_landing",
-            AIStateDict(
-                **{
-                    **ctx.base,
-                    "last_scan_ms": ctx.timestamp_ms,
-                }
-            ),
-            ctx.equip,
+    if target is not None:
+        if (
+            has_cardinal_combat_shot(ctx.self_state, target)
+            and can_use_radar(ctx)
+            and not is_current_viewport_scanned(ctx.filtered)
+        ):
+            emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
+            return make_decision(
+                make_radar_command(),
+                "HUNT",
+                800,
+                target["x"],
+                target["y"],
+                "scan_on_landing",
+                AIStateDict(
+                    **{
+                        **ctx.base,
+                        "last_scan_ms": ctx.timestamp_ms,
+                    }
+                ),
+                ctx.equip,
+            )
+        return close_target(ctx, target)
+    pursuit = _locked_target_pursuit(ctx)
+    if pursuit is not None:
+        emit_ai(
+            "locked target %s left viewport - firing toward last wire position",
+            pursuit["name"],
         )
-    return close_target(ctx, target)
+        return engage_target(ctx, pursuit)
+    return _enter_confirm_kill(ctx)
 
 
 def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
     """Engage the locked combat target or confirm its disappearance."""
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
-    if target is None:
-        return _enter_confirm_kill(ctx)
-    if has_cardinal_combat_shot(ctx.self_state, target):
-        return engage_target(ctx, target)
-    return close_target(ctx, target)
+    if target is not None:
+        if has_cardinal_combat_shot(ctx.self_state, target):
+            return engage_target(ctx, target)
+        return close_target(ctx, target)
+    pursuit = _locked_target_pursuit(ctx)
+    if pursuit is not None:
+        emit_ai(
+            "locked target %s left viewport - firing toward last wire position",
+            pursuit["name"],
+        )
+        return engage_target(ctx, pursuit)
+    return _enter_confirm_kill(ctx)
 
 
 def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
@@ -238,8 +301,6 @@ def _enter_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
         ctx,
         ai_state=cleared,
         map_reason="confirm_kill",
-        radar_reason="confirm_kill",
-        edge_reason="confirm_kill",
     )
 
 
@@ -253,11 +314,6 @@ def _visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
         Visible enemy threats ordered by the threat analyzer.
     """
     return analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
-
-
-def _has_recent_map_snapshot(ctx: DecideCtx) -> bool:
-    """Return True when the map-open snapshot is still fresh for hunt routing."""
-    return has_recent_map_snapshot(ctx)
 
 
 __all__ = [

@@ -160,12 +160,22 @@ class TestInvariantWireSeenRequiresWire:
 
 
 # =============================================================================
-# Invariant 3: last_position_update_ms requires wire AND position
+# Invariant 3: last_position_update_ms requires position_is_authoritative AND position
 # =============================================================================
 
 
-class TestInvariantPositionFreshnessRequiresBoth:
-    """``last_position_update_ms`` advances iff wire AND position is not None."""
+class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
+    """``last_position_update_ms`` advances iff ``position_is_authoritative`` AND ``position``.
+
+    ``position_is_authoritative`` decouples the kill-shot gate from the
+    wire-presence gate: MAP_DATA snapshots are not wire-sourced (a
+    departed tank can linger in the snapshot for minutes) but their
+    listed coordinates ARE the server's authoritative statement of
+    where each tank IS at snapshot time, so they advance the position
+    freshness gate without claiming wire presence. Radar EnemyDetect
+    and DOM-scraped client-registry refinements do NOT (tile-coarse /
+    out-of-band estimates).
+    """
 
     def test_wire_with_position_advances_position_freshness(self) -> None:
         """0x3D-like observation refreshes ``last_position_update_ms``."""
@@ -197,29 +207,76 @@ class TestInvariantPositionFreshnessRequiresBoth:
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["last_position_update_ms"] == 800
 
-    def test_map_with_position_preserves_position_freshness(self) -> None:
-        """Map-snapshot positions are not wire-proven; freshness stays."""
+    def test_authoritative_map_position_advances_position_freshness(self) -> None:
+        """MAP_DATA's listed coordinates ARE the server's authoritative position.
+
+        A wire-quiet stationary target stays kill-shot-fresh after the
+        bot opens the map, even though the wire-presence stamp
+        deliberately does NOT advance (a departed tank can linger in
+        the snapshot for minutes). Live run 20260620-191622 fix: the
+        bot was blocking targets it was actively engaging because the
+        gate could only advance on wire-position-bearing messages.
+        """
         state, key = make_world_with_seed(tank_id=42, last_position_update_ms=800)
         obs = make_tank_observation(
             tank_id=42,
             timestamp_ms=5000,
             is_wire_sourced=False,
+            position_is_authoritative=True,
             storage_source="world_state",
+            position=(50, 60),
+        )
+        result = apply_tank_observation(state, obs)
+        assert result["tanks"][key]["last_position_update_ms"] == 5000
+
+    def test_non_authoritative_position_preserves_position_freshness(self) -> None:
+        """Radar / DOM-refinement positions are not authoritative; freshness stays.
+
+        Radar EnemyDetect (0x48) returns a tile-coarse estimate that
+        may not match the target's actual wire position by the next
+        tick. Client-registry refinements come from DOM scrape, an
+        out-of-band channel with no server proof. Neither must gate a
+        kill shot.
+        """
+        state, key = make_world_with_seed(tank_id=42, last_position_update_ms=800)
+        obs = make_tank_observation(
+            tank_id=42,
+            timestamp_ms=5000,
+            is_wire_sourced=False,
+            position_is_authoritative=False,
+            storage_source="radar",
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["last_position_update_ms"] == 800
 
-    def test_map_with_position_starts_position_freshness_at_zero_for_new_tank(
+    def test_authoritative_map_position_starts_freshness_for_new_tank(
         self,
     ) -> None:
-        """A first-sight map observation must start position freshness at zero."""
+        """A first-sight authoritative map observation seeds position freshness."""
         state = make_empty_world_state()
         obs = make_tank_observation(
             tank_id=99,
             timestamp_ms=5000,
             is_wire_sourced=False,
+            position_is_authoritative=True,
             storage_source="world_state",
+            position=(50, 60),
+        )
+        result = apply_tank_observation(state, obs)
+        assert result["tanks"]["99"]["last_position_update_ms"] == 5000
+
+    def test_non_authoritative_position_starts_freshness_at_zero_for_new_tank(
+        self,
+    ) -> None:
+        """A first-sight radar / DOM-refinement observation cannot seed freshness."""
+        state = make_empty_world_state()
+        obs = make_tank_observation(
+            tank_id=99,
+            timestamp_ms=5000,
+            is_wire_sourced=False,
+            position_is_authoritative=False,
+            storage_source="radar",
             position=(50, 60),
         )
         result = apply_tank_observation(state, obs)
@@ -538,6 +595,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": [1, 2, 3],
             "team": None,
@@ -556,6 +614,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": ["x", 2],
             "team": None,
@@ -574,6 +633,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": [1, "y"],
             "team": None,
@@ -592,6 +652,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": "10,20",
             "team": None,
@@ -610,6 +671,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": None,
             "team": "two",
@@ -628,6 +690,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": None,
             "team": None,
@@ -646,6 +709,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": None,
             "team": None,
@@ -687,6 +751,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": None,
             "team": True,
@@ -710,6 +775,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": [True, 5],
             "team": None,
@@ -728,6 +794,7 @@ class TestTankObservationCodec:
             "tank_id": 42,
             "timestamp_ms": 5000,
             "is_wire_sourced": True,
+            "position_is_authoritative": True,
             "storage_source": "viewport",
             "position": [5, True],
             "team": None,

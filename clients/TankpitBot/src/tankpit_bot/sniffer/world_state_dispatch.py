@@ -50,7 +50,6 @@ from tankpit_bot.state import (
     add_mine,
     deactivate_tank,
     remove_mine,
-    replace_map_fuel_dots,
     set_self_rank,
 )
 
@@ -107,72 +106,149 @@ def _dispatch_shoot_event(
     sy: int,
     tx: int,
     ty: int,
+    aim_x: int,
+    aim_y: int,
     weapon: int,
 ) -> None:
     """Apply a 0x53 ShootEvent to world state.
 
-    Own shot -> tile-occupancy hit detection: lookup tank at target tile,
-    record victim id. Enemy shot -> position update from source tile.
+    The wire carries TWO target-ish coordinates: ``(tx, ty)`` is the
+    tile the shot ultimately resolves against, while ``(aim_x, aim_y)``
+    is the shooter's barrel aim at the moment of fire. For straight
+    shots (weapon=0 single, weapon=1 dual) the two coincide; for
+    homing / missile fire they can diverge as the projectile redirects
+    mid-flight. The split is empirically promoted from ``unk1`` /
+    ``unk2`` in task #73 against production captures.
+
+    Effects on world state:
+
+    * Own shot -> tile-occupancy hit detection: lookup tank at the
+      target tile (``tx, ty``), record victim id. The aim coords are
+      logged for observability so live runs surface barrel-vs-impact
+      drift on homing fire.
+    * Enemy shot -> their source tile (``sx, sy``) is a fresh
+      wire-sourced position update for the shooter; ``(aim_x, aim_y)``
+      is recorded on the enemy tank as ``last_aim_x`` /
+      ``last_aim_y`` so the combat AI can reason about their barrel
+      direction next tick.
 
     Args:
         ws: World service instance.
         shooter_id: Who fired the shot.
         sx: Shooter source tile X.
         sy: Shooter source tile Y.
-        tx: Shot target tile X.
-        ty: Shot target tile Y.
+        tx: Shot target tile X (resolved impact tile).
+        ty: Shot target tile Y (resolved impact tile).
+        aim_x: Shooter's barrel-aim X at the moment of fire.
+        aim_y: Shooter's barrel-aim Y at the moment of fire.
         weapon: Weapon byte (0=single, 1=dual, 2=missile, 3=homing).
     """
     self_state = ws.world_state["self_state"]
     own_tank_id = self_state["tank_id"] if self_state is not None else -1
+    aim_drift = (aim_x, aim_y) != (tx, ty)
     if shooter_id == own_tank_id:
         victim_id = _find_tank_at_tile(ws, tx, ty, exclude_id=own_tank_id)
         log.info(
-            "OUR_SHOT: weapon=%d src=(%d,%d) tgt=(%d,%d) victim_id=%d",
+            "OUR_SHOT: weapon=%d src=(%d,%d) tgt=(%d,%d) aim=(%d,%d)%s victim_id=%d",
             weapon,
             sx,
             sy,
             tx,
             ty,
+            aim_x,
+            aim_y,
+            " [drift]" if aim_drift else "",
             victim_id,
         )
         mark_combat_hit(ws, weapon, victim_id)
     elif shooter_id > 0:
         _update_tank_position(ws, shooter_id, sx, sy)
+        _record_enemy_aim(ws, shooter_id, aim_x, aim_y, weapon)
+        if aim_drift:
+            log.info(
+                "ENEMY_SHOT: tid=%d weapon=%d src=(%d,%d) tgt=(%d,%d) aim=(%d,%d) [drift]",
+                shooter_id,
+                weapon,
+                sx,
+                sy,
+                tx,
+                ty,
+                aim_x,
+                aim_y,
+            )
 
 
-def _dispatch_map_data(
-    ws: WorldService, fuel_dots: list[tuple[int, int]], tanks: list[protocol.MapTankEntry]
+def _record_enemy_aim(
+    ws: WorldService,
+    shooter_id: int,
+    aim_x: int,
+    aim_y: int,
+    weapon: int,
 ) -> None:
+    """Persist the enemy's last barrel-aim coordinates on the tank state.
+
+    Threats consumers (combat AI, recover-fuel route planner) read
+    ``last_aim_*`` on the tank state to reason about which tiles the
+    enemy may fire on next tick. The fields are wire-fresh on every
+    0x53 ShootEvent so they decay naturally with the tank's
+    ``last_wire_seen_ms``.
+
+    Args:
+        ws: World service instance.
+        shooter_id: Enemy tank id that fired.
+        aim_x: Wire-reported barrel-aim X at the moment of fire.
+        aim_y: Wire-reported barrel-aim Y at the moment of fire.
+        weapon: Weapon byte (used downstream to discriminate which
+            aim-target tile applies; logged here for traceability).
+    """
+    from tankpit_bot.state.mutations import set_tank_last_aim
+
+    ws.world_state = set_tank_last_aim(
+        ws.world_state,
+        shooter_id,
+        aim_x,
+        aim_y,
+        weapon,
+        browser.get_current_time_ms(),
+    )
+
+
+def _dispatch_map_data(ws: WorldService, tanks: list[protocol.MapTankEntry]) -> None:
     """Apply a 0x4C MapData snapshot to world state.
 
-    Two effects, both wholesale: the fuel-dot atlas is replaced and
-    every tank slot is lifted into world state via the observation
+    Every tank slot is lifted into world state via the observation
     pipeline. **Map snapshots are not wire-sourced** -- they're cached
     server state that can keep re-listing a tank at a stale position
     after the tank has actually left. The observations therefore
     declare ``is_wire_sourced=False`` so the wire-presence freshness
-    counter (``last_wire_seen_ms``) does not advance, even as
-    ``timestamp_ms`` does. The ghost-wire-presence regression in
-    ``tests/replay/test_ghost_wire_presence_regression.py`` proves
-    why: a tank that's wire-silent but map-fresh must still be
-    acquisition-fresh, while the kill gate must reject it.
+    counter (``last_wire_seen_ms``) does not advance: a wire-silent but
+    map-listed tank must NOT masquerade as present.
+
+    Position is a different question: at the instant the server emits
+    MAP_DATA, every listed tank's ``(x, y)`` is the server's
+    authoritative statement of where that tank IS. So
+    ``position_is_authoritative=True`` and the kill-shot
+    ``last_position_update_ms`` gate advances. The wire-presence gate
+    still filters departed-tank afterimages; this just stops a
+    wire-quiet stationary target from being treated as
+    position-stale during a fight (live run 20260620-191622: 22
+    map_opens / 19 teleports / 0 kills because the kill-shot gate
+    blocked targets the bot was actively engaging).
 
     Args:
         ws: World service instance.
-        fuel_dots: Decoded ``(x, y)`` fuel dot positions.
         tanks: Decoded :class:`protocol.MapTankEntry` slots, one per
             tank visible on the map.
     """
     from tankpit_bot.state.types import make_tank_observation
 
     ts = browser.get_current_time_ms()
-    ws.world_state = replace_map_fuel_dots(ws.world_state, fuel_dots, ts)
     for entry in tanks:
         obs = make_tank_observation(
             tank_id=entry["tank_id"],
             timestamp_ms=ts,
             is_wire_sourced=False,
+            position_is_authoritative=True,
             storage_source="world_state",
             position=(entry["x"], entry["y"]),
             team=entry["team"],
@@ -185,7 +261,6 @@ def _dispatch_map_data(
     ws.mark_map_data_processed()
     emit_diagnostic(
         diagnostic_kind="map_data_snapshot",
-        fuel_dot_count=len(fuel_dots),
         tank_count=len(tanks),
     )
 
@@ -253,8 +328,17 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
         case {"msg_type": 0x2E, "fuel": int(fuel)} if fuel is not None:
             update_world_state_from_fuel_total(ws, fuel)
             return True
-        case {"msg_type": 0x44, "fuel_total": int(fuel_total)}:
+        case {
+            "msg_type": 0x44,
+            "fuel_total": int(fuel_total),
+            "is_free": bool(is_free),
+        }:
             update_world_state_from_fuel_total(ws, fuel_total)
+            emit_diagnostic(
+                diagnostic_kind="fuel_gain",
+                fuel_total=fuel_total,
+                is_free=is_free,
+            )
             return True
         case {"msg_type": 0x64, "fuel_total": int(fuel_total)}:
             update_world_state_from_fuel_total(ws, fuel_total)
@@ -292,8 +376,31 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
         }:
             update_world_state_from_tank_entry(ws, tid, team, rank, tx, ty)
             return True
-        case {"msg_type": 0x21, "tank_id": int(tid), "team": int(team), "name": str(name)}:
+        case {
+            "msg_type": 0x21,
+            "tank_id": int(tid),
+            "team": int(team),
+            "name": str(name),
+            "persistent_tank_id": int(persistent_id),
+            "decoration_state": bytes(decoration),
+        }:
             update_world_state_from_tank_info(ws, tid, team, name)
+            # Persistent identity + decoration are the cross-session
+            # opponent-tracking signal: persistent_tank_id stays
+            # constant across respawns and sessions (game-engine fact,
+            # mined from JS Tf.h ``a.aa``); decoration_state is the
+            # tank's cosmetic skin bytes, useful for visual ID. Emit
+            # as a diagnostic so the bot's session log carries the
+            # mapping name <-> persistent_id and downstream analyzers
+            # ("did we fight this player last match?") can join on it.
+            emit_diagnostic(
+                diagnostic_kind="tank_identity",
+                tank_id=tid,
+                team=team,
+                name=name,
+                persistent_tank_id=persistent_id,
+                decoration_state_hex=decoration.hex(),
+            )
             return True
         case {
             "msg_type": 0x3E,
@@ -303,6 +410,29 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             "name": str(name),
         }:
             update_world_state_from_tank_status(ws, tid, team, rank, name)
+            return True
+        case {
+            "msg_type": 0x2E,
+            "tank_id": int(tid),
+            "damage_state": int(dmg),
+            "promo_state": int(promo),
+        }:
+            update_world_state_from_tank_damage(ws, tid, dmg)
+            # promo_state is the per-tank promotion-eligibility byte
+            # (0 = no pending promotion, > 0 indicates eligibility per
+            # JS Og.h ``g`` field). For OWN tank, this lets the AI
+            # know "I'm about to rank up if I get one more kill", which
+            # could influence aggression. For enemy tanks, it's a
+            # marker that a player is on a hot streak. The promo banner
+            # itself fires separately as 0x2B Promotion; this is the
+            # passive eligibility signal that precedes it.
+            self_state = ws.world_state["self_state"]
+            if self_state is not None and self_state["tank_id"] == tid and promo > 0:
+                emit_diagnostic(
+                    diagnostic_kind="self_promo_eligible",
+                    tank_id=tid,
+                    promo_state=promo,
+                )
             return True
         case {"msg_type": 0x2E, "tank_id": int(tid), "damage_state": int(dmg)}:
             update_world_state_from_tank_damage(ws, tid, dmg)
@@ -387,11 +517,18 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             "deactivated": int(deactivated),
             "score": int(score),
         }:
+            playtime_total = hours * 3600 + minutes * 60 + seconds
+            ws.career_destroyed = destroyed
+            ws.career_deactivated = deactivated
+            ws.career_score = score
+            ws.career_playtime_seconds_total = playtime_total
+            ws.career_stats_last_update_ms = browser.get_current_time_ms()
             emit_diagnostic(
                 diagnostic_kind="self_statistics",
                 playtime_hours=hours,
                 playtime_minutes=minutes,
                 playtime_seconds=seconds,
+                playtime_seconds_total=playtime_total,
                 destroyed=destroyed,
                 deactivated=deactivated,
                 score=score,
@@ -401,6 +538,101 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             # ``message`` is reserved by the runtime logger as the
             # human-readable channel line; use ``text`` for the payload.
             emit_diagnostic(diagnostic_kind="supervisor_text", text=message)
+            return True
+    return _dispatch_session_broadcasts(ws, decoded)
+
+
+def _emit_active_players(
+    ws: WorldService,
+    players: list[protocol.ActivePlayerEntry],
+) -> None:
+    """Persist an 0x2F ActivePlayers roster and emit a structured diagnostic.
+
+    Args:
+        ws: World service instance.
+        players: Decoded roster entries in server-sent order.
+    """
+    ws.active_players = [(player["tank_id"], player["rank"]) for player in players]
+    emit_diagnostic(
+        diagnostic_kind="active_players",
+        count=len(players),
+        tank_ids=",".join(str(player["tank_id"]) for player in players),
+    )
+
+
+def _emit_top10(
+    ws: WorldService,
+    team_filter: int,
+    viewer_score: int,
+    viewer_position: int,
+    entries: list[protocol.Top10EntryDict],
+) -> None:
+    """Persist a 0x31 Top10 snapshot on the world service + emit a diagnostic.
+
+    The Top10 broadcast can come with zero rows (very fresh sessions
+    or empty leaderboards); guard the ``entries[0]`` peek so we still
+    emit a structured event with row_count=0.
+
+    Args:
+        ws: World service instance.
+        team_filter: Wire's team_filter byte (255 = all teams).
+        viewer_score: 24-bit BE score for the viewing player.
+        viewer_position: 1-based leaderboard rank for the viewer.
+        entries: Decoded Top10 rows in server-sent order.
+    """
+    ws.top10_viewer_score = viewer_score
+    ws.top10_viewer_position = viewer_position
+    ws.top10_team_filter = team_filter
+    top_name: str = entries[0]["name"] if entries else ""
+    top_score: int = entries[0]["score"] if entries else 0
+    emit_diagnostic(
+        diagnostic_kind="top10",
+        team_filter=team_filter,
+        viewer_score=viewer_score,
+        viewer_position=viewer_position,
+        row_count=len(entries),
+        top_name=str(top_name),
+        top_score=int(top_score),
+    )
+
+
+def _dispatch_session_broadcasts(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
+    """Dispatch session-level server broadcasts.
+
+    Covers 0x2F ActivePlayers, 0x31 Top10, 0x60 PingResponse, and 0x7E
+    ConnectionLost -- all of which carry no tank-state geometry but
+    DO carry session information the bot's events stream should
+    capture. Split out of :func:`_dispatch_tank_announcements` to keep
+    the latter under the C901 complexity ceiling.
+
+    Args:
+        ws: World service instance.
+        decoded: Decoded binary protocol message.
+
+    Returns:
+        True when the message matched one of the broadcast shapes,
+        False otherwise (so the caller can fall through to other
+        dispatchers).
+    """
+    match decoded:
+        case {"msg_type": 0x2F, "players": list(players)}:
+            _emit_active_players(ws, players)
+            return True
+        case {
+            "msg_type": 0x31,
+            "team_filter": int(team_filter),
+            "viewer_score": int(viewer_score),
+            "viewer_position": int(viewer_position),
+            "entries": list(entries),
+        }:
+            _emit_top10(ws, team_filter, viewer_score, viewer_position, entries)
+            return True
+        case {"msg_type": 0x60}:
+            ws.last_ping_response_ms = browser.get_current_time_ms()
+            emit_diagnostic(diagnostic_kind="ping_response")
+            return True
+        case {"msg_type": 0x7E}:
+            emit_diagnostic(diagnostic_kind="connection_lost")
             return True
     return False
 
@@ -448,9 +680,11 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             "source_y": int(sy),
             "target_x": int(tx),
             "target_y": int(ty),
+            "aim_x": int(aim_x),
+            "aim_y": int(aim_y),
             "weapon": int(weapon),
         }:
-            _dispatch_shoot_event(ws, shooter_id, sx, sy, tx, ty, weapon)
+            _dispatch_shoot_event(ws, shooter_id, sx, sy, tx, ty, aim_x, aim_y, weapon)
             return True
         case {
             "msg_type": 0x48,
@@ -611,7 +845,19 @@ def _apply_container_pickups(
     if _is_duplicate_pickup_broadcast(ws, pickups):
         return
     for record in pickups:
-        update_world_state_from_container_pickup(ws, record["x"], record["y"])
+        update_world_state_from_container_pickup(
+            ws,
+            record["x"],
+            record["y"],
+            record["remaining_volume"],
+        )
+        emit_diagnostic(
+            diagnostic_kind="container_pickup_dispatched",
+            x=record["x"],
+            y=record["y"],
+            remaining_volume=record["remaining_volume"],
+            is_partial=record["remaining_volume"] > 0,
+        )
 
 
 def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
@@ -683,8 +929,8 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
                 update_world_state_from_radar(ws, containers, mines)
                 render_ascii_if_available(ws, "Radar")
             return
-        case {"msg_type": 0x4C, "fuel_dots": list(fuel_dots), "tanks": list(map_tanks)}:
-            _dispatch_map_data(ws, fuel_dots, map_tanks)
+        case {"msg_type": 0x4C, "tanks": list(map_tanks)}:
+            _dispatch_map_data(ws, map_tanks)
             return
 
 

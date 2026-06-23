@@ -33,7 +33,7 @@ Example human log lines:
 ```text
 STATE: IDLE -> TELEPORTING
 SYNC: waiting for teleport to (121,137)
-AI: COLLECT_FUEL score=900 target=(120,137) cmd=radar equip=dual,homing,radar reason=radar_for_fuel
+AI: COLLECT_FUEL score=900 target=(0,0) cmd=radar equip=dual,homing,radar reason=forage_radar
 WIRE: Sent: teleport(121,137)
 WORLD: Fuel: 499 -> 376 (-123)
 ```
@@ -70,9 +70,12 @@ Planning rules:
 - after teleporting to a new viewport, cached resources there are treated as
   unconfirmed until radar refreshes that viewport
 
-This is why recent logs may show `radar_for_fuel` or `radar_for_equipment`
-before acting on apparently visible containers. The planner is avoiding ghost
-targets from sparse cache updates.
+Since the 2026-06-21 scan refactor every radar dispatch (whether fuel or
+equipment recovery owns the tick) is logged with `reason=forage_radar`. The
+single forager owns scanning regardless of mode; the behaviour-mode label
+(`COLLECT_FUEL` vs `COLLECT_EQUIPMENT`) on the same log line distinguishes
+the caller, and `AIStateDict.local_scan_tiles` (not the server-side viewport
+flag) is the gate that prevents respamming.
 
 ## Exploration Fallback
 

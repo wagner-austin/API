@@ -62,7 +62,13 @@ def send_command_bytes(
     if len(data) > 2 and data[2] == COMMAND_PREFIX:
         data = xor_encode_command(xor_table, data)
     send_ws_bytes(cdp, data, cmd_name)
-    emit_wire("%s", cmd_name)
+    # Parse the action prefix out of names like "shoot(...)" so
+    # smoke / bot-query can filter by ``action_kind`` without
+    # parsing the message text. Names without parens (e.g.
+    # ``map_open``) stand as the action_kind verbatim.
+    paren = cmd_name.find("(")
+    action_kind = cmd_name[:paren] if paren > 0 else cmd_name
+    emit_wire("%s", cmd_name, action_kind=action_kind)
     return True
 
 

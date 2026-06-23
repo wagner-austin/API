@@ -14,13 +14,13 @@ from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
     BehaviorMode,
+    EnemyThreatDict,
     make_behavior_score,
 )
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.sniffer.world_state import is_scan_viewport_failed
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -367,7 +367,6 @@ def filter_killed_tanks(world: WorldStateDict, killed: dict[str, int]) -> WorldS
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots=world["map_fuel_dots"],
         timestamp_ms=world["timestamp_ms"],
     )
 
@@ -389,45 +388,43 @@ def local_actionable_bounds(ctx: DecideCtx) -> tuple[int, int, int, int]:
     return viewport_visible_bounds(ctx.world["viewport"])
 
 
-def has_recent_map_snapshot(ctx: DecideCtx) -> bool:
-    """Return True when the last map_open is within cooldown.
+def target_position_is_fresh(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
+    """Return True when the target's tracked position is still trustworthy.
+
+    HUNT/ACQUIRE consults this before teleporting at a target. The
+    question it answers is the only one that matters for teleport
+    decisions: do we still know where this enemy is?
+
+    The trust signal is ``target["timestamp_ms"]`` -- the wall-clock of
+    the most recent observation by ANY source (wire OR map snapshot).
+    Both sources carry an authoritative ``(x, y)``: wire-sourced
+    messages (0x3D MovementResponse, 0x28 TankEntry, 0x47 Movement,
+    viewport scan, radar) and MAP_DATA from CMD_MAP_OPEN. Using the
+    wire-only ``last_position_update_ms`` here would lock out every
+    target known only through the global map snapshot
+    (``state/mutations.py`` deliberately does NOT advance that field
+    on a non-wire observation), so the bot would never trust the
+    intel it just opened the map to fetch and would re-open every
+    tick. Live run 20260620-191622 showed exactly that: 22 map_opens
+    in 2.5 minutes, the AI re-deciding ``find <name>`` immediately
+    after every MAP_DATA arrived.
+
+    A fresh position means we can teleport directly. A stale position
+    means we should refresh via map_open before committing fuel to a
+    teleport at coordinates the enemy may have left. The cooldown is
+    shared with map-open spam control because both questions ("when is
+    a map snapshot useful?" and "when is a single tank's position
+    stale?") are governed by the same observation-cadence floor.
 
     Args:
         ctx: Decision context.
+        target: Enemy threat under consideration.
 
     Returns:
-        True if map open is on cooldown.
+        True when the target's most recent observation is within
+        ``map_open_cooldown_ms`` of the current tick.
     """
-    return ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"] < ctx.config["map_open_cooldown_ms"]
-
-
-def is_current_viewport_scan_failed(ctx: DecideCtx) -> bool:
-    """Return True when the current viewport has a recent failed radar scan.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if the current viewport recently had a stalled radar scan.
-    """
-    viewport = ctx.world["viewport"]
-    return is_scan_viewport_failed(viewport["left"], viewport["top"], ctx.timestamp_ms)
-
-
-def should_scan_resources_in_current_viewport(ctx: DecideCtx) -> bool:
-    """Return True when the current viewport needs authoritative radar coverage.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if the viewport is unscanned and not recently failed.
-    """
-    from tankpit_bot.bot.ai.equipment import is_current_viewport_scanned
-
-    if is_current_viewport_scanned(ctx.world):
-        return False
-    return not is_current_viewport_scan_failed(ctx)
+    return ctx.timestamp_ms - target["timestamp_ms"] < ctx.config["map_open_cooldown_ms"]
 
 
 def can_use_radar(ctx: DecideCtx) -> bool:
@@ -535,29 +532,54 @@ def require_command(
 
 
 def mark_scan_dispatched(ctx: DecideCtx, ai_state: AIStateDict) -> AIStateDict:
-    """Return AI state with the current cell's built-in scan recorded.
+    """Return AI state with the dispatched scan's tile coverage recorded.
 
-    Called when the forager dispatches a free built-in radar scan so the
-    coverage grid knows this cell has been swept.
+    The radar command resolves server-side using whichever radar the
+    bot has available: when ``extra_radars > 0`` the server consumes
+    one extra and reveals the whole viewport; otherwise the free
+    built-in 5x5 fires. Either way the radar only reveals tiles
+    inside the viewport bounds. Coverage tracking marks exactly the
+    set of revealed tiles:
+
+    * Extra radar: every tile in the viewport.
+    * Free radar: ``(tank-x ± 2, tank-y ± 2)`` intersected with the
+      viewport.
 
     Args:
-        ctx: Decision context (provides tank position and timestamp).
+        ctx: Decision context (provides tank position, timestamp, and
+            inventory).
         ai_state: AI state to update.
 
     Returns:
-        New AIStateDict with the scan recorded in ``local_scan_cells``
-        and ``last_scan_ms`` updated.
+        New AIStateDict with the revealed tiles recorded in
+        ``local_scan_tiles`` and ``last_scan_ms`` advanced.
     """
-    from tankpit_bot.bot.ai.scan_coverage import record_local_scan
+    from tankpit_bot.bot.ai.scan_coverage import (
+        free_radar_revealed_tiles,
+        record_tile_scan,
+        viewport_tiles,
+    )
+    from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    if ctx.inventory["extra_radars"]["count"] > 0:
+        revealed = viewport_tiles(left, top, right, bottom)
+    else:
+        revealed = free_radar_revealed_tiles(
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            left,
+            top,
+            right,
+            bottom,
+        )
     return AIStateDict(
         **{
             **ai_state,
             "last_scan_ms": ctx.timestamp_ms,
-            "local_scan_cells": record_local_scan(
-                ai_state["local_scan_cells"],
-                ctx.self_state["x"],
-                ctx.self_state["y"],
+            "local_scan_tiles": record_tile_scan(
+                ai_state["local_scan_tiles"],
+                revealed,
                 ctx.timestamp_ms,
             ),
         },
@@ -573,8 +595,6 @@ __all__ = [
     "compute_equipment",
     "expire_kills",
     "filter_killed_tanks",
-    "has_recent_map_snapshot",
-    "is_current_viewport_scan_failed",
     "local_actionable_bounds",
     "locked_resource_target",
     "make_decision",
@@ -583,6 +603,6 @@ __all__ = [
     "normalize_resource_target",
     "require_command",
     "set_resource_target",
-    "should_scan_resources_in_current_viewport",
+    "target_position_is_fresh",
     "teleport_fuel_cost_to",
 ]

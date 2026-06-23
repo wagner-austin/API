@@ -56,14 +56,6 @@ class WorldStateDict(TypedDict):
             or a fresh visible viewport tile update. Used to distinguish
             authoritative local resource truth from stale remembered cache
             observations.
-        map_fuel_dots: Map-wide fuel-container atlas decoded from the
-            MAP_DATA dot layer (the map's yellow pixels), indexed by
-            "x,y" string key with snapshot timestamp_ms values. The layer
-            is server-cached: it is replaced wholesale on every MAP_DATA
-            parse and marks where fuel containers were as of the server's
-            snapshot, not live container state (measured 2026-06-11:
-            ~40% of dots still held fuel when visited minutes later;
-            equipment is never on a dot).
         timestamp_ms: Last update timestamp in milliseconds.
     """
 
@@ -74,7 +66,6 @@ class WorldStateDict(TypedDict):
     terrain: dict[str, TerrainTileDict]
     viewport: ViewportStateDict
     scanned_viewports: dict[str, int]
-    map_fuel_dots: dict[str, int]
     timestamp_ms: int
 
 
@@ -92,7 +83,6 @@ def make_empty_world_state() -> WorldStateDict:
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
         scanned_viewports={},
-        map_fuel_dots={},
         timestamp_ms=0,
     )
 
@@ -114,7 +104,6 @@ def encode_world_state(state: WorldStateDict) -> JSONObject:
         "terrain": {k: encode_terrain_tile(v) for k, v in state["terrain"].items()},
         "viewport": encode_viewport_state(state["viewport"]),
         "scanned_viewports": dict(state["scanned_viewports"]),
-        "map_fuel_dots": dict(state["map_fuel_dots"]),
         "timestamp_ms": state["timestamp_ms"],
     }
 
@@ -122,8 +111,7 @@ def encode_world_state(state: WorldStateDict) -> JSONObject:
 def _decode_timestamp_dict(data: JSONObject, field: str) -> dict[str, int]:
     """Validate and decode a string-keyed timestamp mapping field.
 
-    Used for ``scanned_viewports`` ("left,top" keys) and
-    ``map_fuel_dots`` ("x,y" keys), which share the same shape.
+    Used for ``scanned_viewports`` ("left,top" keys).
 
     Args:
         data: World-state JSON object.
@@ -173,7 +161,6 @@ def decode_world_state(data: JSONObject) -> WorldStateDict:
         terrain=decode_entity_dict(data.get("terrain"), decode_terrain_tile),
         viewport=decode_viewport_state(viewport_raw),
         scanned_viewports=_decode_timestamp_dict(data, "scanned_viewports"),
-        map_fuel_dots=_decode_timestamp_dict(data, "map_fuel_dots"),
         timestamp_ms=require_int(data, "timestamp_ms"),
     )
 

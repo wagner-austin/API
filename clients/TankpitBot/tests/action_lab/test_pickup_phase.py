@@ -121,7 +121,6 @@ def _make_world(x: int, y: int, fuel: int) -> WorldStateDict:
         terrain=world["terrain"],
         viewport=world["viewport"],
         scanned_viewports=world["scanned_viewports"],
-        map_fuel_dots={},
         timestamp_ms=1000,
     )
 
