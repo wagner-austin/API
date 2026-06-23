@@ -189,6 +189,37 @@ def test_default_to_ipa_calls_real_impl() -> None:
     assert result.startswith("t")
 
 
+def test_default_build_lang_script_filter_delegates_to_real() -> None:
+    """Test _default_build_lang_script_filter delegates to the real implementation.
+
+    Constructs a predicate via the real langid.build_lang_script_filter through
+    the default hook and asserts it routes the line through the supplied model.
+    """
+    import numpy as np
+    from numpy.typing import NDArray
+
+    from tests.conftest import make_probs
+
+    captured: list[str] = []
+
+    class _ProbeLid:
+        """Probe LID that records calls and returns a fixed Kazakh label."""
+
+        def predict(self, text: str, k: int = 1) -> tuple[tuple[str, ...], NDArray[np.float64]]:
+            captured.append(text)
+            return (("__label__kk",), make_probs(0.99))
+
+    predicate = _test_hooks._default_build_lang_script_filter(
+        target_lang="kk",
+        script=None,
+        threshold=0.95,
+        model=_ProbeLid(),
+    )
+
+    assert predicate("қазақ тілі") is True
+    assert captured == ["қазақ тілі"]
+
+
 def test_default_path_exists_and_unlink(tmp_path: Path) -> None:
     """Test _default_path_exists and _default_path_unlink."""
     test_file = tmp_path / "test.txt"

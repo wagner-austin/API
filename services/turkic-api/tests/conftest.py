@@ -44,6 +44,10 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     original_ensure_corpus_file = _test_hooks.ensure_corpus_file
     original_load_langid_model = _test_hooks.load_langid_model
     original_to_ipa = _test_hooks.to_ipa
+    original_build_lang_script_filter = _test_hooks.build_lang_script_filter
+    original_stream_oscar_hook = _test_hooks.stream_oscar_hook
+    original_stream_culturax_hook = _test_hooks.stream_culturax_hook
+    original_stream_wikipedia_xml_hook = _test_hooks.stream_wikipedia_xml_hook
     original_path_exists = _test_hooks.path_exists
     original_path_unlink = _test_hooks.path_unlink
 
@@ -62,6 +66,10 @@ def _reset_test_hooks() -> Generator[None, None, None]:
     _test_hooks.ensure_corpus_file = original_ensure_corpus_file
     _test_hooks.load_langid_model = original_load_langid_model
     _test_hooks.to_ipa = original_to_ipa
+    _test_hooks.build_lang_script_filter = original_build_lang_script_filter
+    _test_hooks.stream_oscar_hook = original_stream_oscar_hook
+    _test_hooks.stream_culturax_hook = original_stream_culturax_hook
+    _test_hooks.stream_wikipedia_xml_hook = original_stream_wikipedia_xml_hook
     _test_hooks.path_exists = original_path_exists
     _test_hooks.path_unlink = original_path_unlink
 

@@ -15,10 +15,8 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-import turkic_api.core.corpus_download as cd
-import turkic_api.core.langid as lid
-import turkic_api.core.translit as tr
 from tests.conftest import make_probs
+from turkic_api import _test_hooks
 from turkic_api.core.langid import LangIdModel
 
 
@@ -117,10 +115,10 @@ def test_dry_run_bottleneck_and_no_outputs(
     def stub_to_ipa_local(text: str, lang: str) -> str:
         return text
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model_local
-    lid.build_lang_script_filter = stub_build_lang_script_filter_local
-    tr.to_ipa = stub_to_ipa_local
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model_local
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter_local
+    _test_hooks.to_ipa = stub_to_ipa_local
 
     mod = _load_script_module(script)
     report = tmp_path / "r.json"
@@ -156,10 +154,10 @@ def test_write_balanced_outputs(tmp_path: Path, _argv_context: Callable[[list[st
     def stub_stream_oscar2(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar2
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar2
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
     mod = _load_script_module(script)
 
     out_dir = tmp_path / "out"
@@ -198,10 +196,10 @@ def test_full_scan_branch(tmp_path: Path, _argv_context: Callable[[list[str]], N
     def stub_stream_oscar3(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar3
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar3
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
     mod = _load_script_module(script)
 
     report = tmp_path / "scan.json"
@@ -254,8 +252,7 @@ def test_filtered_stream_filters_out() -> None:
     ) -> Callable[[str], bool]:
         return lambda _s: False
 
-    name = "build_lang_script_filter"
-    setattr(mod, name, _false_filter)
+    _test_hooks.build_lang_script_filter = _false_filter
 
     def src_stream(_lang: str) -> Generator[str, None, None]:
         yield from ["a", "b", "c"]
@@ -276,10 +273,10 @@ def test_empty_languages_raises(tmp_path: Path, _argv_context: Callable[[list[st
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     argv = [
         "prog",
@@ -318,8 +315,7 @@ def test_internal_helpers_cover_branches(
     def src_stream(_lang: str) -> Generator[str, None, None]:
         yield from ["a", "a", "a"]
 
-    name2 = "build_lang_script_filter"
-    setattr(mod, name2, stub_build_lang_script_filter)
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
     count_until_limit: Callable[
         [Callable[[str], Generator[str, None, None]], LangIdModel, float, str, int],
         tuple[bool, int],
@@ -365,10 +361,10 @@ def test_assume_path_other_language_smaller(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     report = tmp_path / "assume.json"
@@ -408,10 +404,10 @@ def test_assume_path_language_reaches_limit(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     report = tmp_path / "assume_limit.json"
@@ -449,10 +445,10 @@ def test_full_scan_non_decreasing(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
     mod = _load_script_module(script)
 
     report = tmp_path / "scan2.json"
@@ -490,10 +486,10 @@ def test_main_guard_executes(tmp_path: Path, _argv_context: Callable[[list[str]]
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     report = tmp_path / "main.json"
     argv = [
@@ -529,10 +525,10 @@ def test_progress_disabled_emits_no_phase(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     argv = [
@@ -569,10 +565,10 @@ def test_progress_enabled_dry_run_logs_counting(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     argv = [
@@ -612,10 +608,10 @@ def test_progress_enabled_write_logs(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     out_dir = tmp_path / "out"
@@ -658,10 +654,10 @@ def test_progress_enabled_count_until_limit(
     def stub_stream_oscar(lang: str) -> Generator[str, None, None]:
         yield from streams.get(lang, [])
 
-    cd.stream_oscar = stub_stream_oscar
-    lid.load_langid_model = stub_load_langid_model
-    lid.build_lang_script_filter = stub_build_lang_script_filter
-    tr.to_ipa = stub_to_ipa
+    _test_hooks.stream_oscar_hook = stub_stream_oscar
+    _test_hooks.load_langid_model = stub_load_langid_model
+    _test_hooks.build_lang_script_filter = stub_build_lang_script_filter
+    _test_hooks.to_ipa = stub_to_ipa
 
     mod = _load_script_module(script)
     argv = [

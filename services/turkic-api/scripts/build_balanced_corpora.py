@@ -45,9 +45,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from turkic_api.core.corpus_download import stream_culturax, stream_oscar
-from turkic_api.core.langid import LangIdModel, build_lang_script_filter, load_langid_model
-from turkic_api.core.translit import to_ipa
+from turkic_api import _test_hooks
+from turkic_api._test_hooks import LangIdModelProtocol
 
 Language = str
 
@@ -230,20 +229,22 @@ def _log_progress_rich(phase: str, lang: str, extra: str = "") -> None:
 
 def _get_streamer(source: str) -> Callable[[Language], Generator[str, None, None]]:
     if source == "oscar":
-        return lambda lang: stream_oscar(lang)
+        return lambda lang: _test_hooks.stream_oscar_hook(lang)
     if source == "culturax":
-        return lambda lang: stream_culturax(lang)
+        return lambda lang: _test_hooks.stream_culturax_hook(lang)
     raise ValueError(f"Unsupported source: {source}")
 
 
 def _filtered_stream(
     source_stream: Callable[[Language], Generator[str, None, None]],
     lang: Language,
-    lid: LangIdModel,
+    lid: LangIdModelProtocol,
     threshold: float,
     script: str | None = None,
 ) -> Generator[str, None, None]:
-    keep = build_lang_script_filter(target_lang=lang, script=script, threshold=threshold, model=lid)
+    keep = _test_hooks.build_lang_script_filter(
+        target_lang=lang, script=script, threshold=threshold, model=lid
+    )
     for s in source_stream(lang):
         if keep(s):
             _stats.lines_kept += 1
@@ -254,14 +255,14 @@ def _filtered_stream(
 
 def _full_ipa_char_count(
     source_stream: Callable[[Language], Generator[str, None, None]],
-    lid: LangIdModel,
+    lid: LangIdModelProtocol,
     threshold: float,
     lang: Language,
     script: str | None = None,
 ) -> int:
     _stats.reset_for_phase()
     for line in _filtered_stream(source_stream, lang, lid, threshold, script):
-        ipa = to_ipa(line, lang)
+        ipa = _test_hooks.to_ipa(line, lang)
         _stats.ipa_chars += _ipa_char_count(ipa)
         if _PROGRESS_EVERY_LINES > 0 and (_stats.lines_kept % _PROGRESS_EVERY_LINES == 0):
             _log_progress_rich("count_all", lang)
@@ -270,7 +271,7 @@ def _full_ipa_char_count(
 
 def _count_until_limit(
     source_stream: Callable[[Language], Generator[str, None, None]],
-    lid: LangIdModel,
+    lid: LangIdModelProtocol,
     threshold: float,
     lang: Language,
     limit: int,
@@ -279,7 +280,7 @@ def _count_until_limit(
     _stats.reset_for_phase()
     _stats.target_ipa_chars = limit
     for line in _filtered_stream(source_stream, lang, lid, threshold, script):
-        ipa = to_ipa(line, lang)
+        ipa = _test_hooks.to_ipa(line, lang)
         _stats.ipa_chars += _ipa_char_count(ipa)
         if _PROGRESS_EVERY_LINES > 0 and (_stats.lines_kept % _PROGRESS_EVERY_LINES == 0):
             _log_progress_rich("count_until", lang, f"target={limit:,}")
@@ -302,7 +303,7 @@ def _truncate_line_by_ipa(ipa_line: str, remaining: int) -> tuple[str, int]:
 
 def _write_balanced_corpus(
     source_stream: Callable[[Language], Generator[str, None, None]],
-    lid: LangIdModel,
+    lid: LangIdModelProtocol,
     threshold: float,
     lang: Language,
     out_path: Path,
@@ -317,7 +318,7 @@ def _write_balanced_corpus(
         for line in _filtered_stream(source_stream, lang, lid, threshold, script):
             if _stats.ipa_chars >= target_ipa_chars:
                 break
-            ipa = to_ipa(line, lang)
+            ipa = _test_hooks.to_ipa(line, lang)
             line_ipa_count = _ipa_char_count(ipa)
             remaining = target_ipa_chars - _stats.ipa_chars
             if line_ipa_count <= remaining:
@@ -354,7 +355,7 @@ def _script_for_lang(lang_code: Language, prefer_218e: bool) -> str | None:
 def _determine_bottleneck(
     languages: list[Language],
     streamer: Callable[[Language], Generator[str, None, None]],
-    lid: LangIdModel,
+    lid: LangIdModelProtocol,
     threshold: float,
     assume_uz_bottleneck: bool,
     prefer_218e: bool,
@@ -407,7 +408,7 @@ def build_balanced(
     languages = list(languages)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    lid = load_langid_model(str(data_dir), prefer_218e=prefer_218e)
+    lid = _test_hooks.load_langid_model(str(data_dir), prefer_218e=prefer_218e)
     streamer = _get_streamer(source)
 
     bottleneck_lang, bottleneck_chars = _determine_bottleneck(

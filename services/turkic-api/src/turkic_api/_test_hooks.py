@@ -134,8 +134,41 @@ class EnsureCorpusProtocol(Protocol):
 class ToIpaProtocol(Protocol):
     """Protocol for to_ipa transliteration function."""
 
-    def __call__(self, text: str, language: str) -> str:
-        """Transliterate text to IPA."""
+    def __call__(self, text: str, lang: str) -> str:
+        """Transliterate text to IPA.
+
+        Args:
+            text: Source text to transliterate.
+            lang: ISO 639 language code controlling the transliteration table.
+
+        Returns:
+            IPA representation of ``text`` for the given language.
+        """
+        ...
+
+
+class BuildLangScriptFilterProtocol(Protocol):
+    """Protocol for build_lang_script_filter predicate factory."""
+
+    def __call__(
+        self,
+        *,
+        target_lang: str,
+        script: str | None,
+        threshold: float,
+        model: LangIdModelProtocol,
+    ) -> Callable[[str], bool]:
+        """Build a predicate keeping lines that match language and script.
+
+        Args:
+            target_lang: ISO 639 language code to keep.
+            script: Optional ISO 15924 script code that lines must also match.
+            threshold: Minimum FastText probability for the language label.
+            model: Language identification model.
+
+        Returns:
+            Callable taking a line and returning True if it passes the filter.
+        """
         ...
 
 
@@ -416,11 +449,42 @@ def _default_wikipedia_requests_get(
     return _Adapter()
 
 
-def _default_to_ipa(text: str, language: str) -> str:
-    """Production implementation - calls real to_ipa."""
+def _default_to_ipa(text: str, lang: str) -> str:
+    """Production implementation - calls real to_ipa.
+
+    Args:
+        text: Source text to transliterate.
+        lang: ISO 639 language code controlling the transliteration table.
+
+    Returns:
+        IPA representation of ``text`` for the given language.
+    """
     from turkic_api.core.translit import to_ipa as _to_ipa
 
-    return _to_ipa(text, language)
+    return _to_ipa(text, lang)
+
+
+def _default_build_lang_script_filter(
+    *,
+    target_lang: str,
+    script: str | None,
+    threshold: float,
+    model: LangIdModelProtocol,
+) -> Callable[[str], bool]:
+    """Production implementation - calls real build_lang_script_filter.
+
+    Args:
+        target_lang: ISO 639 language code to keep.
+        script: Optional ISO 15924 script code that lines must also match.
+        threshold: Minimum FastText probability for the language label.
+        model: Language identification model.
+
+    Returns:
+        Callable taking a line and returning True if it passes the filter.
+    """
+    from turkic_api.core.langid import build_lang_script_filter as _build
+
+    return _build(target_lang=target_lang, script=script, threshold=threshold, model=model)
 
 
 # =============================================================================
@@ -541,6 +605,9 @@ load_langid_model: LangIdModelLoaderProtocol = _default_load_langid_model
 # Hook for to_ipa transliteration. Tests can inject identity function.
 to_ipa: ToIpaProtocol = _default_to_ipa
 
+# Hook for build_lang_script_filter. Tests can inject deterministic predicates.
+build_lang_script_filter: BuildLangScriptFilterProtocol = _default_build_lang_script_filter
+
 # Hook for path existence checking. Tests can override to fake filesystem state.
 path_exists: Callable[[Path], bool] = _default_path_exists
 
@@ -600,6 +667,7 @@ language_map: dict[str, str] = {
 # =============================================================================
 __all__ = [
     # Protocols
+    "BuildLangScriptFilterProtocol",
     "DataBankDownloaderFactoryProtocol",
     "DataBankDownloaderProtocol",
     "DataBankUploaderFactoryProtocol",
@@ -621,6 +689,7 @@ __all__ = [
     "WikipediaRequestsResponseProtocol",
     "WorkerRunnerProtocol",
     # Default implementations
+    "_default_build_lang_script_filter",
     "_default_data_bank_downloader_factory",
     "_default_data_bank_uploader_factory",
     "_default_decode_optional_literal",
@@ -638,6 +707,7 @@ __all__ = [
     "_default_to_ipa",
     "_default_wikipedia_requests_get",
     # Module-level hooks
+    "build_lang_script_filter",
     "data_bank_client_factory",
     "data_bank_downloader_factory",
     "decode_optional_literal",
