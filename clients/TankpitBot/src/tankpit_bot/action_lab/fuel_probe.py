@@ -109,9 +109,8 @@ def _log_fuel_target_diagnostic(
 
 def _find_visible_fuel_target(
     probe: FuelTargetPhaseProbeProtocol,
-    allow_unreachable: bool = False,
 ) -> ContainerStateDict | None:
-    """Return the best currently visible fuel container."""
+    """Return the best currently visible walk-reachable fuel container."""
     terrain = get_terrain_map()
     if terrain is None:
         raise FuelProbeError("terrain map is unavailable")
@@ -123,7 +122,6 @@ def _find_visible_fuel_target(
         world,
         self_state,
         terrain,
-        allow_unreachable=allow_unreachable,
         now_ms=world["timestamp_ms"],
         minimum_volume=1,
     )
@@ -175,10 +173,9 @@ def _find_visible_fuel_landing_tile(
 
 def _find_visible_fuel_target_for_phase(
     probe: FuelTargetPhaseProbeProtocol,
-    allow_unreachable: bool,
 ) -> ContainerStateDict | None:
     """Typed bridge for shared fuel-target phase selection."""
-    return _find_visible_fuel_target(probe, allow_unreachable)
+    return _find_visible_fuel_target(probe)
 
 
 def _visible_fuel_requires_reposition_for_phase(

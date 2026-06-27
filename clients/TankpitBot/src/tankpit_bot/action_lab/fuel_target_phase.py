@@ -308,7 +308,7 @@ def resolve_fuel_target_after_radar(
     snapshot_before: PageClientSnapshotDict,
     capture_snapshot: Callable[[], PageClientSnapshotDict],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
-    find_visible_target: Callable[[FuelTargetPhaseProbeProtocol, bool], ContainerStateDict | None],
+    find_visible_target: Callable[[FuelTargetPhaseProbeProtocol], ContainerStateDict | None],
     requires_reposition: Callable[[FuelTargetPhaseProbeProtocol, ContainerStateDict], bool],
     find_landing_tile: Callable[
         [FuelTargetPhaseProbeProtocol, ContainerStateDict],
@@ -335,7 +335,7 @@ def resolve_fuel_target_after_radar(
     teleport_dispatch_failure_message: str,
 ) -> FuelTargetResolution:
     """Resolve the post-radar fuel target and any blocked-fuel reposition."""
-    fuel_target = find_visible_target(probe, True)
+    fuel_target = find_visible_target(probe)
     self_state = probe._require_self_state()
     decision_basis = build_fuel_decision_basis(
         probe.get_world_state(),

@@ -107,7 +107,7 @@ class ResolveFuelTargetPhaseProtocol(Protocol):
         capture_snapshot: Callable[[], PageClientSnapshotDict],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
-            [FuelTargetPhaseProbeProtocol, bool],
+            [FuelTargetPhaseProbeProtocol],
             ContainerStateDict | None,
         ],
         requires_reposition: Callable[
@@ -220,7 +220,7 @@ def run_tracked_fuel_collection_phase(
     capture_snapshot: Callable[[], PageClientSnapshotDict],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[
-        [FuelTargetPhaseProbeProtocol, bool],
+        [FuelTargetPhaseProbeProtocol],
         ContainerStateDict | None,
     ],
     requires_reposition: Callable[
@@ -340,7 +340,7 @@ def run_tracked_fuel_collection_phase(
         )
 
     fuel_target_probe: FuelTargetPhaseProbeProtocol = probe
-    fuel_target = find_visible_target(fuel_target_probe, True)
+    fuel_target = find_visible_target(fuel_target_probe)
     log_target_diagnostic(radar_cycle["cycle_id"], fuel_target)
     resolution = resolve_fuel_target_phase(
         page,

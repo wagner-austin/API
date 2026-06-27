@@ -103,7 +103,7 @@ class ResolveEquipmentTargetPhaseProtocol(Protocol):
         teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
-            [EquipmentTargetPhaseProbeProtocol, bool],
+            [EquipmentTargetPhaseProbeProtocol],
             ContainerStateDict | None,
         ],
         requires_reposition: Callable[
@@ -215,7 +215,7 @@ def run_tracked_equipment_collection_phase(
     teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[
-        [EquipmentTargetPhaseProbeProtocol, bool],
+        [EquipmentTargetPhaseProbeProtocol],
         ContainerStateDict | None,
     ],
     requires_reposition: Callable[

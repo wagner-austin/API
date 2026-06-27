@@ -173,7 +173,6 @@ def build_fuel_decision_basis(
                 self_y,
                 terrain,
                 want_fuel=True,
-                allow_unreachable=True,
                 minimum_volume=1,
                 blocked_mines=world["mines"],
             )

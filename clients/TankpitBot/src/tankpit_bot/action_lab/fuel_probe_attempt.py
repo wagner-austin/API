@@ -264,7 +264,7 @@ class RunTrackedFuelCollectionPhaseProtocol(Protocol):
         capture_snapshot: Callable[[], PageClientSnapshotDict],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
-            [FuelTargetPhaseProbeProtocol, bool],
+            [FuelTargetPhaseProbeProtocol],
             ContainerStateDict | None,
         ],
         requires_reposition: Callable[
@@ -445,7 +445,7 @@ def run_single_fuel_target_attempt(
     finalize_attempt_delay: FinalizeAttemptDelayProtocol,
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[
-        [FuelTargetPhaseProbeProtocol, bool],
+        [FuelTargetPhaseProbeProtocol],
         ContainerStateDict | None,
     ],
     requires_reposition: Callable[

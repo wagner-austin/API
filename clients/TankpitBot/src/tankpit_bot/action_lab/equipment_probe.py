@@ -63,10 +63,9 @@ class EquipmentProbeError(Exception):
 
 def _find_visible_equipment_target_for_phase(
     probe: EquipmentTargetPhaseProbeProtocol,
-    allow_unreachable: bool,
 ) -> ContainerStateDict | None:
     """Typed bridge for shared equipment-target phase selection."""
-    return find_visible_equipment_target(probe, allow_unreachable=allow_unreachable)
+    return find_visible_equipment_target(probe)
 
 
 def _visible_equipment_requires_reposition_for_phase(

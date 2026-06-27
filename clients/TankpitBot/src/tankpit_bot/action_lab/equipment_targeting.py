@@ -30,19 +30,15 @@ class VisibleEquipmentTargetingProbeProtocol(Protocol):
 
 def find_visible_equipment_target(
     probe: VisibleEquipmentTargetingProbeProtocol,
-    *,
-    allow_unreachable: bool,
 ) -> ContainerStateDict | None:
-    """Return the nearest visible equipment target for the current viewport.
+    """Return the nearest walk-reachable visible equipment target for the current viewport.
 
     Args:
         probe: Live probe providing world and self state.
-        allow_unreachable: Whether blocked containers with teleport landing
-            tiles remain eligible.
 
     Returns:
-        Nearest visible equipment container, or ``None`` when none are
-        actionable.
+        Nearest walk-reachable visible equipment container, or ``None``
+        when none are actionable.
 
     Raises:
         EquipmentTargetingError: If terrain or self state is unavailable.
@@ -58,7 +54,6 @@ def find_visible_equipment_target(
         world,
         self_state,
         terrain,
-        allow_unreachable=allow_unreachable,
         now_ms=world["timestamp_ms"],
     )
 

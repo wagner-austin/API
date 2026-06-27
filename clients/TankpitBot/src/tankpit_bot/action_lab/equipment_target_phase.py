@@ -340,7 +340,7 @@ def resolve_equipment_target_after_radar(
     teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
     terrain_provider: Callable[[], TerrainMapProtocol | None],
     find_visible_target: Callable[
-        [EquipmentTargetPhaseProbeProtocol, bool],
+        [EquipmentTargetPhaseProbeProtocol],
         ContainerStateDict | None,
     ],
     requires_reposition: Callable[
@@ -422,7 +422,7 @@ def resolve_equipment_target_after_radar(
         terminal result that blocks the pickup phase.
     """
     _ = terrain_provider
-    equipment_target = find_visible_target(probe, True)
+    equipment_target = find_visible_target(probe)
     if equipment_target is None:
         return EquipmentTargetResolution(
             equipment_target=None,

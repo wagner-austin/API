@@ -64,7 +64,6 @@ def log_fuel_target_diagnostic(
         self_state,
         terrain,
         want_fuel=True,
-        allow_unreachable=True,
         minimum_volume=1,
     )
     decision_basis = build_fuel_decision_basis(
