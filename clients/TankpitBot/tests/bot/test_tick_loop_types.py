@@ -101,7 +101,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_pickup_fuel(self) -> None:
         """Encode then decode produces identical TickDecisionDict with pickup_fuel."""
         cmd = make_pickup_fuel_command(80, 90)
-        behavior = make_behavior_score("COLLECT_FUEL", 600, 80, 90, "low fuel")
+        behavior = make_behavior_score("COLLECT", 600, 80, 90, "low fuel")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [1, 5])
         encoded = encode_tick_decision(original)
@@ -111,7 +111,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_pickup_equipment(self) -> None:
         """Encode then decode produces identical TickDecisionDict with pickup_equipment."""
         cmd = make_pickup_equipment_command(60, 70)
-        behavior = make_behavior_score("COLLECT_EQUIPMENT", 800, 60, 70, "equipment_low")
+        behavior = make_behavior_score("COLLECT", 800, 60, 70, "equipment_low")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [2, 5])
         encoded = encode_tick_decision(original)

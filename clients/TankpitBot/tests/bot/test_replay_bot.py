@@ -51,12 +51,12 @@ def test_fuel_probe_replay_transitions_out_of_initializing(
     assert {"SCANNING", "MOVING", "COLLECTING", "IDLE"}.intersection(states)
 
 
-def test_fuel_probe_replay_enters_recover_equipment_mode(
+def test_fuel_probe_replay_enters_collect_mode(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """Real ``decide()`` selects RECOVER_EQUIPMENT after detecting empty inventory."""
+    """Real ``decide()`` selects COLLECT after detecting empty inventory."""
     modes = [t.ai_mode for t in fuel_probe_session.ticks]
-    assert "RECOVER_EQUIPMENT" in modes
+    assert "COLLECT" in modes
 
 
 def test_fuel_probe_replay_acquires_an_equipment_resource_target(
@@ -86,7 +86,7 @@ def test_fuel_probe_replay_dispatches_at_least_one_command(
 def test_fuel_probe_replay_first_dispatched_command_is_radar(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """The first command the bot sends in RECOVER_EQUIPMENT sense is a radar scan."""
+    """The first command the bot sends in COLLECT sense is a radar scan."""
     if not fuel_probe_session.all_dispatched:
         pytest.fail("expected at least one dispatched command")
     _first_tick, first_command = fuel_probe_session.all_dispatched[0]

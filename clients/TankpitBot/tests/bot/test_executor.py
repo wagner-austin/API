@@ -266,7 +266,7 @@ class TestExecutorHelpers:
         world = _make_world()
         decision = make_tick_decision(
             command=make_move_command(100, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 100, 100, "noop"),
+            behavior=make_behavior_score("COLLECT", 900, 100, 100, "noop"),
             updated_ai_state=AIStateDict(**{**make_initial_ai_state(), "resource_target_kind": ""}),
             desired_equipment=[],
         )
@@ -278,7 +278,7 @@ class TestExecutorHelpers:
         world = _make_world()
         decision = make_tick_decision(
             command=make_teleport_command(120, 120),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 120, 120, "search_fuel_local"),
+            behavior=make_behavior_score("COLLECT", 900, 120, 120, "search_collect_local"),
             updated_ai_state=AIStateDict(**{**make_initial_ai_state(), "resource_target_kind": ""}),
             desired_equipment=[],
         )
@@ -649,7 +649,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -678,7 +678,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_EQUIPMENT", 900, 104, 100, "equipment_low"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "equipment_low"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -760,7 +760,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -789,7 +789,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -818,7 +818,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -850,7 +850,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -871,7 +871,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_pickup_fuel_command(104, 100),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -923,7 +923,7 @@ class TestExecute:
     def test_execute_rejects_missing_pickup_target(self, fake_env: FakeEnv) -> None:
         """Execute drops pickup commands when the container no longer exists."""
         bot, fake_cdp = _make_bot(fake_env)
-        behavior = make_behavior_score("COLLECT_FUEL", 900, 80, 90, "fuel=500")
+        behavior = make_behavior_score("COLLECT", 900, 80, 90, "fuel=500")
         decision = make_tick_decision(
             command=make_pickup_fuel_command(80, 90),
             behavior=behavior,
@@ -975,7 +975,7 @@ class TestExecute:
             team=1,
             timestamp_ms=1000,
         )
-        behavior = make_behavior_score("COLLECT_EQUIPMENT", 800, 200, 200, "search_equipment_local")
+        behavior = make_behavior_score("COLLECT", 800, 200, 200, "search_collect_local")
         decision = make_tick_decision(
             command=make_teleport_command(200, 200),
             behavior=behavior,
