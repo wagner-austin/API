@@ -28,7 +28,7 @@ class ReplayTickTraceDict(TypedDict):
         self_x: Player X coordinate at decision time.
         self_y: Player Y coordinate at decision time.
         fuel: Player fuel at decision time.
-        behavior_mode: Chosen behavior label (HUNT, COLLECT_FUEL, etc.).
+        behavior_mode: Chosen behavior label (``HUNT`` or ``COLLECT``).
         behavior_score: Priority score of the chosen behavior (0-1000).
         behavior_reason: Human-readable reason tag for the decision.
         ai_mode: Durable AI owner active for this tick.
