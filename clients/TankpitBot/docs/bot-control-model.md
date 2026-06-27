@@ -152,7 +152,6 @@ Examples:
 - `combat_target_id`
 - `combat_target_x`
 - `combat_target_y`
-- `patrol_waypoint_index`
 - `equipment_search_failures`
 - `blocked_combat_targets`
 
@@ -166,12 +165,12 @@ Important point:
 The planner currently emits one of these behavior labels per decision:
 
 - `HUNT`
-- `COLLECT_FUEL`
-- `COLLECT_EQUIPMENT`
+- `COLLECT`
 
 These labels are decision outputs for the current tick.
 They are not the same thing as the durable top-level control mode stored in AI
-state.
+state. The historical `COLLECT_FUEL` / `COLLECT_EQUIPMENT` split was collapsed
+into one `COLLECT` label 2026-06-24 along with the COLLECT mode unification.
 
 ### Durable Mode Migration
 
@@ -183,13 +182,12 @@ The planner state now also carries a durable top-level mode lock:
 
 Current migration contract:
 
-- `mode == "UNSET"`: choose the top-level owner from current recovery
-  priorities
-- `mode == "HUNT"`: HUNT owns planning until a recovery mode takes priority
-- `mode == "RECOVER_FUEL"`: fuel recovery owns planning until the full-fuel
-  exit threshold is restored
-- `mode == "RECOVER_EQUIPMENT"`: equipment recovery owns planning until combat
-  reserves are restored to resume thresholds
+- `mode == "UNSET"`: choose the top-level owner from current entry conditions
+- `mode == "HUNT"`: HUNT owns planning until COLLECT takes priority
+- `mode == "COLLECT"`: unified fuel+equipment collection owns planning until
+  BOTH the full-fuel exit threshold is restored AND combat reserves are back
+  above their resume thresholds (the old `RECOVER_FUEL` / `RECOVER_EQUIPMENT`
+  split was unified 2026-06-24)
 - unsupported or invalid durable modes are ignored for the tick, then owner
   selection re-runs from the current world state
 
@@ -248,8 +246,7 @@ The current planner is now a durable-owner selector, not a flat priority chain.
 
 Current shape:
 
-1. choose the active top-level owner (`RECOVER_FUEL`, `RECOVER_EQUIPMENT`, or
-   `HUNT`)
+1. choose the active top-level owner (`COLLECT` or `HUNT`)
 2. run exactly one owner route for the tick
 3. derive the durable substate from the owner's returned decision
 4. persist the chosen owner in AI state
@@ -304,7 +301,7 @@ Current broad sequence:
 
 1. `HUNT.ACQUIRE` picks a viable target or searches for enemies
 2. `HUNT.REFRESH` refreshes target information and re-evaluates geometry
-3. `HUNT.CLOSE` teleports near the target and verifies firing geometry
+3. `HUNT.CLOSE` shoots when cardinally adjacent or already engaged; teleports near the target only on a fresh acquire
 4. `HUNT.ENGAGE` shoots or refreshes on miss
 5. `HUNT.CONFIRM_KILL` explicitly clears a vanished/killed target before reacquiring
 
@@ -422,13 +419,12 @@ Main reasons:
 
 ## Planned Replacement Direction
 
-The intended replacement is a hierarchical control model with durable top-level
-modes such as:
+The hierarchical control model is now live. Durable top-level modes:
 
 - `HUNT`
-- `RECOVER_FUEL`
-- `RECOVER_EQUIPMENT`
+- `COLLECT` (unified fuel + equipment collection — replaced the original
+  `RECOVER_FUEL` / `RECOVER_EQUIPMENT` split 2026-06-24)
 
-That migration plan is documented in:
+The historical migration plan is documented in:
 
 - `docs/bot-hfsm-refactor-plan.md`

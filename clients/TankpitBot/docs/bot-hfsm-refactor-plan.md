@@ -15,6 +15,21 @@ Each phase below has:
 - acceptance criteria
 - things that are out of scope for that phase
 
+## Post-plan note (2026-06-24): RECOVER_FUEL + RECOVER_EQUIPMENT unified to COLLECT
+
+Phases 3 and 4 below land as written -- both modes shipped, with the
+substates and ownership invariants described. After live runs, the two
+modes were collapsed into a single durable owner: **`COLLECT`**. The
+historical separation was a leaky abstraction (each mode opportunistically
+grabbed the other kind; the cascades were near-duplicates) and did not
+match the user's actual gameplay loop ("drain equipment, then maybe biggest
+fuel, then hop").
+
+For the current shape, see [[bot-behavior-contract#3.4]] and
+[[fuel-system#fuel-recovery-cascade]]. Phase text below is preserved
+verbatim as historical record; the mode literals it names no longer exist
+in the codebase.
+
 ## Why This Refactor Exists
 
 The current bot works, but control is spread across too many overlapping state
