@@ -38,6 +38,20 @@ Each failed attempt: target position drifts 1 tile between teleport dispatch and
 
 This eliminates the chase loop entirely. Even if the map position is 1 tile stale, the server knows the real positions and places correctly.
 
+## Follow-up fix (2026-06-26): stay put after engagement
+
+The 2026-06-16 fix removed the multi-hop chase but left a related teleport-after-every-move pattern. Live run 2026-06-26 14:42: bot landed adjacent to purple-5 at (148,166), fired 9 dual shots (all hits) while the target sat at (147,166); on shot 10 the target teleported to (163,154) and the server auto-picked homing (one tracked hit). The planner's next decision saw distance 27, fell to `_combat_teleport`, and spent 114 fuel + a `map_open` + a `scan_on_landing` (~6s of wire time) to land adjacent to (163,153) — three shots' worth of wall-clock burned to position for one more dual instead of just firing another homing from the same tile.
+
+**User-contract loop (2026-06-26):** open map → teleport adjacent → dual until they teleport away → stay put and fire homing until deactivated. Enemies don't move *within* the viewport; when they leave cardinal adjacency, they teleported, so chasing with another teleport is wasted fuel.
+
+**Fix:** `_combat_close` (`combat_strategy.py:389`) now branches:
+
+1. Cardinally adjacent → shoot (server picks dual at point-blank).
+2. Already engaged (`last_shot_target_id == combat_target_id`) → shoot (server picks homing, which tracks).
+3. Fresh acquire, not adjacent → teleport (the one-time initial close).
+
+The engaged-vs-fresh predicate lives in `is_already_engaged` (`combat_strategy.py`) and replaces the duplicated inline expression that previously lived in `_resume_locked_target_off_viewport` (`hunt_mode.py:223`). Both the on-viewport and off-viewport paths now consult the same predicate.
+
 ## Caveat: server does NOT displace off equipment-container tiles
 
 The "let server displace" rule was proven for combat targets (a tank occupies the tile) and ferry / water terrain. It is **not** symmetric for equipment containers. Live capture 2026-06-21 16:54:26: bot teleported to (253,141) with an equipment container there, server placed the bot **on** the container tile (not adjacent), then `pickup_equipment(253,141)` returned no `container_consumed` response. So:

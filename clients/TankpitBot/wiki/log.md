@@ -502,3 +502,72 @@ Two consecutive shots at the SAME target without a mode flip. Pre-fix the bot wo
 No source code change to `should_exit_recover_equipment` -- the exit gate still releases only when all three reserves are at or above resume.
 
 **Symmetric fuel-mode fix is planned, not yet shipped.** `should_enter_recover_fuel` still uses the single-threshold check `fuel <= fuel_low_threshold` (300) with no combat-lock gate. Same 60s run showed the bot bailing from purple-8 at fuel=251 to refuel -- combat is near-free, 251 was plenty to finish the kill. Apply the same two-tier pattern (emergency at `hunt_min_fuel = 100`, between-kills above) when the next session opens.
+
+---
+
+## [2026-06-24] refactor | Unify RECOVER_FUEL + RECOVER_EQUIPMENT → COLLECT
+
+The historical two-mode recovery split was a leaky abstraction: the cascades had near-identical structure (lock → strict pickup → forage → hop), each mode opportunistically grabbed the OTHER kind, and the user's own gameplay loop ("drain equipment, then maybe biggest fuel, then hop") is one mode. The two modes were collapsed into a single durable owner: `COLLECT`.
+
+**Production surface**
+
+- `AIMode` literal: `RECOVER_FUEL`, `RECOVER_EQUIPMENT` → single `COLLECT`. `RECOVERY_MODE_STATES` → `COLLECT_MODE_STATES`.
+- `BehaviorMode` literal: `COLLECT_FUEL`, `COLLECT_EQUIPMENT` → single `COLLECT`.
+- `src/tankpit_bot/bot/ai/collect_mode.py` — new file with the unified cascade.
+- `src/tankpit_bot/bot/ai/recover_fuel_mode.py`, `recover_equipment_mode.py` — deleted.
+- `mode_controller.py` — single `should_enter_collect` / `should_exit_collect` / `derive_collect_mode_state` replacing four predicates and two state-derivers. Exit requires BOTH fuel and combat reserves restored (was implicit via the two-mode handoff before).
+- `ai_strategy.py` — one COLLECT branch instead of two RECOVER_* branches.
+- `combat_strategy.py::_refuel_for_hunt` — delegates to `decide_collect_mode`.
+
+**Unified cascade**
+
+1. Continue a held equipment or fuel lock from a previous tick.
+2. Pick up the best equipment in viewport (`allow_unreachable=True`).
+3. Pick up the best fuel in viewport (skipped at learned capacity).
+4. Forage: radar when the viewport has unscanned tiles, or walk toward an unscanned tile.
+5. Hop: teleport to a fresh viewport when nothing actionable remains. Raise `ValueError` when even the hop is unaffordable.
+
+Equipment ranks ahead of fuel by design -- matches the user's hand-played loop. Walking an extra tile or two for equipment costs 1 fuel/tile, a rounding error against the viewport-fuel a few ticks later.
+
+**Dead state and helpers removed**
+
+- `AIStateDict.equipment_search_failures` — only its own reset logic read it; pure diagnostic counter, deleted.
+- `AIConfigDict.equip_search_max_failures` — gated the deleted reset logic.
+- `context.needs_emergency_equipment` — replaced by inlined break-threshold checks in `should_enter_collect`.
+- `recover_equipment_mode.try_search_critical_equipment` — never called in production, only by tests.
+- `recover_fuel_mode.can_use_fuel_radar` and `minimum_recovery_fuel_volume` — became one-liner passthroughs after the reserve-gate cleanup, inlined.
+- `make_resource_search_hop(failure_count=...)` parameter — dead now that the counter is gone.
+- `equipment.SCAN_COVERAGE_TTL_MS` alias — its only cross-module consumer was `recover_fuel_mode`.
+
+**Tests**
+
+- `test_recover_fuel_mode.py`, `test_recover_equipment_mode.py`, `test_recover_equipment_integration.py`, `test_recovery_helpers.py` renamed to `test_collect_mode_*.py`. Six tests for the deleted `try_search_critical_equipment` removed. Bulk literal substitution across ~22 test files. `equipment_search_failures` references in tests stripped.
+- Two new coverage tests added: `find_adjacent_container` diagonal-blocked branch, `_is_worthwhile_hop` impassable-landing branch.
+- `make check`: 4028 tests, 100% coverage, lint clean.
+
+**Wiki / docs updated**
+
+- [[bot-behavior-contract#3.1]], [[bot-behavior-contract#3.4]] — rewritten for the unified COLLECT mode.
+- [[fuel-system]] — recovery cascade and threshold descriptions updated.
+- `docs/bot-control-model.md`, `docs/bot-logging.md` — mode literals and example log lines updated.
+
+Constraint context: user-stated "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias" -- the unification is a true merge, not a rename layer.
+
+---
+
+## [2026-06-26] update | Combat stay-put: shoot when engaged at distance, don't re-teleport
+
+Extended the 2026-06-16 chase-loop fix (see [[combat-chase-bug]]). Live run 2026-06-26 14:42 caught the bot teleporting after a target moved off cardinal adjacency mid-fight, burning 114 fuel + ~6s of wire round-trips to position for the next dual shot instead of firing another homing from the same tile.
+
+**Code:** `src/tankpit_bot/bot/ai/combat_strategy.py`
+- Added `is_already_engaged(ctx)` -- single source of truth for the `last_shot_target_id == combat_target_id` predicate.
+- `_combat_close` now branches three ways: adjacent -> shoot; engaged + not adjacent -> shoot (server picks homing); fresh acquire + not adjacent -> teleport.
+
+**Code:** `src/tankpit_bot/bot/ai/hunt_mode.py`
+- `_resume_locked_target_off_viewport` (line 223) now calls `is_already_engaged(ctx)` instead of the inline expression.
+
+**Tests:** `tests/bot/ai/test_combat_strategy.py` (new `TestIsAlreadyEngaged` class, 3 cases), `tests/bot/ai/test_hunt_close_integration.py` (new engaged-stays-put and fresh-acquire-teleports cases).
+
+**Wiki:** [[combat-chase-bug]] follow-up section, [[bot-control-model.md]] HUNT.CLOSE description updated.
+
+Constraint context: user-stated "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias" -- helper is extracted deduplication, not a wrapper; the old "teleport on every non-adjacent tick" branch is deleted, not preserved behind a flag.

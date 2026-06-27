@@ -9,24 +9,26 @@ confidence: high
 
 # Fuel System
 
-## Thresholds (current, as of 2026-06-23)
+## Thresholds (current, as of 2026-06-24)
 
 - `fuel_low_threshold`: 300 — single fuel threshold. Below this the
-  bot enters `RECOVER_FUEL`. Also the reserve a combat teleport must
-  leave behind; engaging below it would flip priority to
-  `COLLECT_FUEL` the next tick.[^1]
-- `fuel_full_threshold`: 1100 — `RECOVER_FUEL` exits when fuel
-  reaches this level.
+  bot enters `COLLECT`. Also the reserve a combat teleport must
+  leave behind; engaging below it would flip priority to `COLLECT`
+  the next tick.[^1]
+- `fuel_full_threshold`: 1100 — `COLLECT` releases (along with the
+  combat-reserve gate) when fuel reaches this level.
 - `hunt_min_fuel`: 100 — operating reserve for search/recovery
   teleport hops.
 - The historical `fuel_critical_threshold` was collapsed into
   `fuel_low_threshold` 2026-06-22. The two-tier "polite low vs.
   emergency critical" distinction was dead because both thresholds
   had drifted to the same value (300). One threshold now governs
-  RECOVER_FUEL entry, combat-teleport reserve, and
-  collect-during-fuel-mode predicates.[^5]
-- Only collect containers with volume >= 500 (smaller not worth the
-  action cost).[^2]
+  COLLECT entry, combat-teleport reserve, and the in-cascade
+  fuel-pickup predicate.[^5]
+- COLLECT drains every viewport fuel container (`minimum_volume=1`):
+  the old "skip volumes < 500" floor was dropped 2026-06-23 after a
+  live run left 20-fuel partials in viewport while burning ~200 fuel
+  per hop to find a fresh one.[^2]
 
 ## Fuel data flow (single source of truth)
 
@@ -56,20 +58,27 @@ single source of truth.[^6]
 
 ## Fuel recovery cascade
 
-When `fuel < fuel_low_threshold` the bot enters `RECOVER_FUEL`. The
-owner runs the same Strict → Sense → Hop cascade the equipment owner
-uses (see [[bot-behavior-contract#3.4]]):
+When `fuel <= fuel_low_threshold` the bot enters the unified `COLLECT`
+mode (the historical `RECOVER_FUEL` / `RECOVER_EQUIPMENT` split was
+collapsed 2026-06-24). The owner runs a single cascade per tick (see
+[[bot-behavior-contract#3.4]]):
 
-1. **Strict** — pick up the best reachable fuel container visible in
-   the current viewport. Opportunistically grab adjacent equipment
-   or pickups en route. Continue a locked target if one is held and
-   no markedly closer candidate beats it.
-2. **Sense** — fire a radar to reveal the current viewport when there
+1. **Lock continuation** — continue a held equipment or fuel target
+   from a previous tick when it is still executable and no markedly
+   closer candidate beats it.
+2. **Equipment pickup** — pick up the best equipment in the current
+   viewport (`allow_unreachable=True`; the server paths around
+   obstacles).
+3. **Fuel pickup** — pick up the best fuel in the current viewport
+   when below the learned capacity (skipped at cap because "Tank
+   full" is a wasted dispatch). Equipment ranks ahead of fuel per
+   the user's gameplay loop.
+4. **Sense** — fire a radar to reveal the current viewport when there
    are still unscanned tiles (paid radar covers the full viewport;
    free radar covers a 5×5 around the tank, clipped to viewport
    bounds). When radar is unaffordable, walk toward an unscanned
    tile so the next free radar covers fresh ground.
-3. **Hop** — teleport to a fresh viewport via the ring-patrol search
+5. **Hop** — teleport to a fresh viewport via the ring-patrol search
    hop. When no hop is affordable the owner raises loudly rather
    than idle silently.
 
@@ -89,12 +98,12 @@ fire a fuel-dot teleport. The reserve-vetoed band it covered was
 narrow -- fuel high enough for the teleport but below the hunt
 reserve -- and the actual stranded case (fuel below any teleport
 cost) was always fatal anyway. The escape was removed with the rest
-of the fuel-dot system 2026-06-22; the RECOVER_FUEL owner now raises
-`ValueError` loudly when Strict / Sense / Hop all decline.[^4]
+of the fuel-dot system 2026-06-22; the COLLECT owner now raises
+`ValueError` loudly when lock / pickup / sense / hop all decline.[^4]
 
 [^1]: AIConfigDict in bot/ai/types.py — thresholds lowered from 500→300 in Phase 3d (2026-06-14)
 [^2]: user (Austin), 2026-06-11 — "only collect fuel containers with volume >= 500"
 [^3]: Phase A/B/C of the fuel-dot strip (2026-06-22): planner, state, protocol decoder all stopped surfacing dot coordinates. RLE byte count is still parsed for length validation so the decoder advances cleanly into the MAP_DATA tank-entries section.
 [^4]: Run 131003 2026-06-12 — marooned at 87 fuel on one-tile island (actually a ferry; see [[ferry-mechanics]]). Reserve-bypass escape removed 2026-06-22.
-[^5]: AIConfigDict 2026-06-22 — `fuel_critical_threshold` field removed; consumers (`should_enter_recover_fuel`, `minimum_recovery_fuel_volume`, opportunistic-equipment gate in `_plan_fuel_recovery`) collapsed to use `fuel_low_threshold` directly. The unused `try_collect_critical_fuel` / `try_collect_fuel` non-owner helpers were deleted at the same time; the `_plan_fuel_recovery` wrapper was inlined into `decide_recover_fuel_mode`.
+[^5]: AIConfigDict 2026-06-22 — `fuel_critical_threshold` field removed; the COLLECT entry predicate (`should_enter_collect`) and the in-cascade fuel-pickup branch now consume `fuel_low_threshold` directly. The unused `try_collect_critical_fuel` / `try_collect_fuel` non-owner helpers and the `_plan_fuel_recovery` wrapper were deleted at the same time. The fuel-mode and equipment-mode owners themselves were then merged into one `decide_collect_mode` 2026-06-24.
 [^6]: Live observation 2026-06-23 00:35:57 in `runs/bot/latest.log`: worldstate logged `Fuel: 195 -> 633 (+438)` from the 0x44 FuelGain, then the next AI decision read `ctx.fuel = 1071` (633 + 438). The 438 ghost was the container's volume being added a second time by `pickup_container`'s local fuel-delta branch on top of the wire's already-correct absolute fuel. Removed in `state/container_mutations.pickup_container` 2026-06-23; the function now only mutates the container registry.
