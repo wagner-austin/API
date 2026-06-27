@@ -128,7 +128,7 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "APPROACH",
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
@@ -141,17 +141,16 @@ class TestLockedEquipmentTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "equipment_locked"
 
-    def test_locked_equipment_target_dispatches_pickup_even_on_water(self) -> None:
-        """In-viewport equipment dispatches a single pickup command; server walks.
+    def test_locked_equipment_target_on_water_releases_lock(self) -> None:
+        """A water-locked equipment target is released by the lock-continuation.
 
-        ``pickup_equipment(x, y)`` is the JS client's long-press
-        action -- one command, server routes the tank to the
-        container and completes the pickup. Walkability of the
-        target tile and its neighbours is the server's problem; the
-        bot dispatches once and waits for the wire signal.
+        User contract (2026-06-26): ``walk_or_teleport`` returns
+        ``None`` for non-walk-reachable pickup targets. The lock
+        continuation path treats that as "no longer executable"
+        and releases the lock, dropping the bot through to forage.
         """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -168,7 +167,7 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "APPROACH",
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
@@ -180,8 +179,8 @@ class TestLockedEquipmentTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["reason"] == "equipment_locked"
-        assert decision["command"]["cmd_type"] == "pickup_equipment"
+        assert decision["behavior"]["reason"] != "equipment_locked"
+        assert decision["command"]["cmd_type"] != "pickup_equipment"
 
     def test_locked_equipment_target_clears_when_teleport_unaffordable(self) -> None:
         """Locked equipment target is cleared when teleport is unaffordable."""
@@ -198,7 +197,7 @@ class TestLockedEquipmentTarget:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "APPROACH",
                 "mode_started_ms": 90000,
                 "resource_target_kind": "equipment",
@@ -230,7 +229,7 @@ class TestLockedFuelTarget:
     def test_continues_locked_fuel_target(self) -> None:
         """Locked fuel target is continued when still actionable."""
         containers = {"105,105": _c(105, 105, 700, True)}
-        world, self_state = _make_world(fuel=250, containers=containers)
+        world, self_state = _make_world(fuel=150, containers=containers)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
@@ -243,7 +242,7 @@ class TestLockedFuelTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert "fuel=700" in decision["behavior"]["reason"]
 
 
@@ -270,7 +269,7 @@ class TestRadarForEquipment:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
             }
@@ -281,7 +280,7 @@ class TestRadarForEquipment:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
@@ -311,11 +310,14 @@ class TestExplorationSkipsTeleportLowFuel:
                 terrain_data[(x, y)] = "W"
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
-        world, self_state = _make_world(fuel=140)
+        # Fuel below the short-hop cost so even cheap exploration teleports
+        # are unaffordable (reserve gate dropped 2026-06-24; the new floor
+        # is raw teleport cost).
+        world, self_state = _make_world(fuel=30)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
             }
@@ -347,7 +349,7 @@ class TestEquipmentSearchHopFallback:
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
                 "local_scan_tiles": _viewport_covered_tiles(world),
@@ -360,8 +362,8 @@ class TestEquipmentSearchHopFallback:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["behavior"]["reason"] == "search_equipment_local"
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_equipment_search_walks_edge_when_teleport_unaffordable(self) -> None:
@@ -379,7 +381,7 @@ class TestEquipmentSearchHopFallback:
             **{
                 **_scanned_ai_state(),
                 "config": config,
-                "mode": "RECOVER_EQUIPMENT",
+                "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
                 "local_scan_tiles": _viewport_covered_tiles(world),
@@ -390,8 +392,8 @@ class TestEquipmentSearchHopFallback:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["behavior"]["reason"] == "search_equipment_local"
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
 
@@ -423,16 +425,16 @@ class TestCriticalEquipmentLockedTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "equipment_locked"
 
     def test_locked_critical_equipment_target_drives_recovery_owner(self) -> None:
-        """A locked critical equipment target stays under RECOVER_EQUIPMENT.
+        """A locked critical equipment target stays under COLLECT.
 
         Earlier the test asserted the lock would clear when the
         underlying tile was water-locked, but the actual behaviour
         under the 2026-06-22 resume-threshold mode-entry rule is
-        that RECOVER_EQUIPMENT owns the tick, dispatches a pickup
+        that COLLECT owns the tick, dispatches a pickup
         attempt at the locked tile, and lets the server's reject
         (e.g. ``Empty container`` / ``You can't go there!``) clear
         the lock via the `_clear_command_error` path. The decision
@@ -464,7 +466,7 @@ class TestCriticalEquipmentLockedTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
 
 class TestFuelSearchFallbacks:
@@ -479,12 +481,17 @@ class TestFuelSearchFallbacks:
         """Reset world state."""
         reset_world_state()
 
-    def test_locked_fuel_dispatches_pickup_even_on_water(self) -> None:
-        """In-viewport fuel dispatches a single pickup command; server walks."""
+    def test_locked_fuel_on_water_releases_lock(self) -> None:
+        """A water-locked fuel target is released by the lock-continuation.
+
+        User contract (2026-06-26): no pickup dispatched at a target
+        the bot cannot walk to. The lock-continuation releases the
+        lock and falls through to forage / search-hop.
+        """
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
-        world, self_state = _make_world(fuel=250, containers=containers)
+        world, self_state = _make_world(fuel=150, containers=containers)
         terrain_data: dict[tuple[int, int], str] = {
             (105, 105): "W",
             (104, 105): "W",
@@ -505,12 +512,12 @@ class TestFuelSearchFallbacks:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert "fuel=700" in decision["behavior"]["reason"]
-        assert decision["command"]["cmd_type"] == "pickup_fuel"
+        assert "fuel=700" not in decision["behavior"]["reason"]
+        assert decision["command"]["cmd_type"] != "pickup_fuel"
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
-        world, self_state = _make_world(fuel=300, scanned=True)
+        world, self_state = _make_world(fuel=150, scanned=True)
         ai_state = AIStateDict(
             **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
         )
@@ -518,8 +525,8 @@ class TestFuelSearchFallbacks:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "search_fuel_local"
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason"] == "search_collect_local"
 
     def test_fuel_raises_when_no_hop_affordable_and_no_atlas_dot(self) -> None:
         """Fuel recovery raises when no productive action remains.
@@ -532,13 +539,16 @@ class TestFuelSearchFallbacks:
         """
         import pytest
 
-        world, self_state = _make_world(fuel=140, scanned=True)
+        # Fuel below the short-hop cost (8 * 6 = 48). The
+        # ``hunt_min_fuel`` reserve drop (2026-06-24) means stranding
+        # now requires fuel < raw teleport cost.
+        world, self_state = _make_world(fuel=30, scanned=True)
         ai_state = AIStateDict(
             **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
         )
         inventory = _make_inventory()
 
-        with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+        with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
             decide(world, self_state, ai_state, inventory, 100000, None)
 
     def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
@@ -559,11 +569,12 @@ class TestFuelSearchFallbacks:
             for y in range(92, 108):
                 terrain_data[(x, y)] = "W"
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-        world, self_state = _make_world(fuel=140, scanned=True)
+        # Fuel below the short-hop cost so no teleport is affordable.
+        world, self_state = _make_world(fuel=30, scanned=True)
         ai_state = AIStateDict(
             **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
         )
         inventory = _make_inventory()
 
-        with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+        with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
             decide(world, self_state, ai_state, inventory, 100000, terrain)

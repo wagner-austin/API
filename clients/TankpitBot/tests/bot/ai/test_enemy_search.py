@@ -140,11 +140,11 @@ class TestDecideBlockedEdgeSearch:
         rather than wandering or crashing when the viewport's
         exploration candidates are all blocked.
         """
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
         inventory = make_inventory()
         terrain = self._blocked_exploration_terrain(world, self_state)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"

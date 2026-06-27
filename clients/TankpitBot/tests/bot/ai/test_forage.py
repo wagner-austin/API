@@ -5,8 +5,8 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.forage import plan_forage_search, select_forage_target
 from tankpit_bot.bot.ai.mode_controller import (
-    should_enter_recover_equipment,
-    should_exit_recover_equipment,
+    should_enter_collect,
+    should_exit_collect,
 )
 from tankpit_bot.bot.ai.scan_coverage import tile_key
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -44,7 +44,7 @@ def _ctx(
     radars: int,
     dual: int = 25,
     homing: int = 25,
-    fuel: int = 800,
+    fuel: int = 1200,
     self_x: int = 100,
     self_y: int = 100,
     local_scan_tiles: dict[str, int] | None = None,
@@ -115,16 +115,16 @@ class TestRadarRestockTrigger:
 
     def test_restock_enters_at_zero_extras(self) -> None:
         """Zero extras (below break) enters the restock mode."""
-        assert should_enter_recover_equipment(_ctx(radars=0)) is True
+        assert should_enter_collect(_ctx(radars=0)) is True
 
     def test_restock_holds_below_the_resume_buffer(self) -> None:
         """The mode does not exit until radars reach the resume buffer."""
-        assert should_exit_recover_equipment(_ctx(radars=0)) is False
-        assert should_exit_recover_equipment(_ctx(radars=3)) is False
+        assert should_exit_collect(_ctx(radars=0)) is False
+        assert should_exit_collect(_ctx(radars=3)) is False
 
     def test_restock_releases_once_the_buffer_is_full(self) -> None:
         """At the resume buffer the bot leaves restock and may hunt again."""
-        assert should_exit_recover_equipment(_ctx(radars=20)) is True
+        assert should_exit_collect(_ctx(radars=20)) is True
 
     def test_restock_ignores_visible_threats(self) -> None:
         """Rebuilding the kit outranks chasing a wanderer it cannot beat.
@@ -134,8 +134,8 @@ class TestRadarRestockTrigger:
         """
         ctx = _ctx(radars=0, tanks=_enemy(7, 104, 100))
 
-        assert should_enter_recover_equipment(ctx) is True
-        assert should_exit_recover_equipment(ctx) is False
+        assert should_enter_collect(ctx) is True
+        assert should_exit_collect(ctx) is False
 
 
 class TestSelectForageTarget:
@@ -184,7 +184,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT_EQUIPMENT",
+            behavior_mode="COLLECT",
             radar_affordable=True,
         )
 
@@ -192,7 +192,7 @@ class TestForageSearch:
             raise AssertionError("expected a forage radar decision")
         assert decision["command"]["cmd_type"] == "radar"
         assert decision["behavior"]["reason"] == "forage_radar"
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         # Free 5x5 radar at (100,100) inside viewport (92..107)^2 reveals
         # exactly 25 tiles (the interior 5x5 around the tank).
         recorded = decision["updated_ai_state"]["local_scan_tiles"]
@@ -207,7 +207,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT_EQUIPMENT",
+            behavior_mode="COLLECT",
             radar_affordable=True,
         )
 
@@ -225,13 +225,13 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=900,
-            behavior_mode="COLLECT_FUEL",
+            behavior_mode="COLLECT",
             radar_affordable=True,
         )
 
         if decision is None:
             raise AssertionError("expected a forage radar decision")
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["behavior"]["score"] == 900
 
@@ -244,7 +244,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT_EQUIPMENT",
+            behavior_mode="COLLECT",
             radar_affordable=False,
         )
 
@@ -261,24 +261,30 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT_EQUIPMENT",
+            behavior_mode="COLLECT",
             radar_affordable=False,
         )
 
         assert decision is None
 
     def test_returns_none_when_walk_falls_back_to_unaffordable_teleport(self) -> None:
-        """A rock-walled tile reachable only by teleport without reserve yields None."""
+        """A rock-walled tile reachable only by teleport that exceeds available fuel yields None.
+
+        The ``hunt_min_fuel`` reserve was dropped 2026-06-24, so the
+        unaffordable threshold is now the raw teleport cost, not
+        cost + reserve. From (100,100) to (104,100) the teleport
+        cost is 24 fuel; at fuel=10 even the short-hop fallback is
+        unaffordable.
+        """
         coverage = _full_viewport_coverage(100000)
         # Open one tile on the far side of a rock wall.
         del coverage["104,100"]
         rocks = {(102, y): InMemoryTerrainMap.ROCK for y in range(92, 108)}
         terrain = InMemoryTerrainMap(rocks)
-        # Fuel just enough to cover the raw teleport cost but not the
-        # ``hunt_min_fuel`` search reserve.
+        # Fuel below the raw teleport cost so no hop is affordable.
         ctx = _ctx(
             radars=0,
-            fuel=100,
+            fuel=10,
             local_scan_tiles=coverage,
             terrain=terrain,
         )
@@ -287,7 +293,7 @@ class TestForageSearch:
             ctx,
             ctx.ai_state,
             score=925,
-            behavior_mode="COLLECT_EQUIPMENT",
+            behavior_mode="COLLECT",
             radar_affordable=False,
         )
 

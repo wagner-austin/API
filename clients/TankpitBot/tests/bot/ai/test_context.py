@@ -5,7 +5,6 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_afford_teleport,
-    can_afford_teleport_search,
     locked_resource_target,
     normalize_resource_target,
     set_resource_target,
@@ -360,28 +359,3 @@ class TestTeleportFuelHelpers:
 
         assert can_afford_teleport(ctx, 96, 97) is True
         assert can_afford_teleport(ctx, 94, 107) is False
-
-    def test_can_afford_teleport_search_applies_operating_reserve(self) -> None:
-        """Search affordability includes the configured post-teleport reserve."""
-        world = _world_with_container(10, 20, True, 100)
-        self_state = SelfStateDict(
-            tank_id=1,
-            x=100,
-            y=100,
-            team=1,
-            rank=0,
-            fuel=279,
-            leaderboard_position=0,
-        )
-        world["self_state"] = self_state
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_initial_ai_state(),
-            _dummy_inventory(),
-            100000,
-            None,
-            "",
-        )
-
-        assert can_afford_teleport_search(ctx, 130, 100) is False

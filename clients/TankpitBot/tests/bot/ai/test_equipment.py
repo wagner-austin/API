@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.equipment import is_area_scanned, is_tile_scanned
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
+    find_adjacent_container,
     find_best_fuel,
     find_nearest_deposit,
     find_nearest_equipment,
@@ -268,17 +269,21 @@ class TestFindNearestFuel:
         world["containers"]["15,10"] = expected
         assert find_nearest_fuel(world, state, terrain) == expected
 
-    def test_with_terrain_allow_unreachable_keeps_blocked_target(self) -> None:
-        """allow_unreachable=True returns a blocked fuel container for teleport fallback."""
+    def test_with_terrain_skips_wall_blocked_fuel(self) -> None:
+        """Wall-blocked fuel is skipped -- the bot can't walk there.
+
+        Per the 2026-06-26 user contract, containers are picked only when
+        a walk path exists in the current viewport. Teleport-to-container
+        was removed: a blocked container is not actionable, full stop.
+        """
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain = InMemoryTerrainMap(terrain_data=wall)
-        expected = make_container_state(x=15, y=10, is_fuel=True, volume=50)
-        world["containers"]["15,10"] = expected
-        assert find_nearest_fuel(world, state, terrain, allow_unreachable=True) == expected
+        world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=50)
+        assert find_nearest_fuel(world, state, terrain) is None
 
-    def test_with_terrain_allow_unreachable_skips_water_locked_fuel(self) -> None:
-        """Water-locked fuel is skipped even with allow_unreachable=True."""
+    def test_with_terrain_skips_water_locked_fuel(self) -> None:
+        """Water-locked fuel with no land-neighbor approach is skipped."""
         world, state = _world_and_self(x=10, y=10)
         terrain_data: dict[tuple[int, int], str] = {
             (15, 10): "W",
@@ -289,7 +294,7 @@ class TestFindNearestFuel:
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=50)
-        assert find_nearest_fuel(world, state, terrain, allow_unreachable=True) is None
+        assert find_nearest_fuel(world, state, terrain) is None
 
     def test_with_terrain_skips_blocked_picks_reachable(self) -> None:
         """Skips closer blocked container, picks farther reachable one."""
@@ -512,16 +517,15 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
             "equipment: total=1 nearby=1 actionable=1 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=(101,100) actionable"
+            "low_volume=0 nearest=(101,100) actionable"
         )
 
-    def test_reports_blocked_equipment_with_teleport_landing(self) -> None:
-        """Summary marks blocked equipment as actionable since server displaces on landing."""
+    def test_reports_water_locked_equipment_as_blocked(self) -> None:
+        """Water-locked equipment is reported as blocked (no walk path)."""
         world, state = _world_and_self(x=10, y=10)
         world["containers"]["15,10"] = make_container_state(
             x=15,
@@ -543,12 +547,11 @@ class TestDescribeContainerSearch:
             state,
             terrain,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
-            "equipment: total=1 nearby=1 actionable=1 blocked=1 "
-            "no_landing=0 low_volume=0 nearest=(15,10) actionable"
+            "equipment: total=1 nearby=1 actionable=0 blocked=1 "
+            "low_volume=0 nearest=(15,10) blocked_walk"
         )
 
     def test_reports_low_volume_fuel_as_non_actionable(self) -> None:
@@ -566,13 +569,12 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=True,
-            allow_unreachable=True,
             minimum_volume=100,
         )
 
         assert result == (
             "fuel: total=1 nearby=1 actionable=0 blocked=0 "
-            "no_landing=0 low_volume=1 nearest=(101,100) low_volume"
+            "low_volume=1 nearest=(101,100) low_volume"
         )
 
     def test_ignores_other_container_type_and_out_of_viewport_target(self) -> None:
@@ -596,16 +598,14 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
-            "equipment: total=1 nearby=0 actionable=0 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=none"
+            "equipment: total=1 nearby=0 actionable=0 blocked=0 low_volume=0 nearest=none"
         )
 
-    def test_reports_blocked_walk_when_unreachable_targets_disallowed(self) -> None:
-        """Summary marks blocked targets as non-actionable without teleport fallback."""
+    def test_reports_blocked_walk_when_no_walk_path(self) -> None:
+        """Summary marks blocked targets as non-actionable under the walk-only contract."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain = InMemoryTerrainMap(terrain_data=wall)
@@ -621,39 +621,11 @@ class TestDescribeContainerSearch:
             state,
             terrain,
             want_fuel=False,
-            allow_unreachable=False,
         )
 
         assert result == (
             "equipment: total=1 nearby=1 actionable=0 blocked=1 "
-            "no_landing=0 low_volume=0 nearest=(15,10) blocked_walk"
-        )
-
-    def test_reports_blocked_target_as_actionable_when_landing_tile_exists(self) -> None:
-        """Summary keeps blocked targets actionable when teleport landing is available."""
-        world, state = _world_and_self(x=10, y=10)
-        wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
-        terrain_data: dict[tuple[int, int], str] = dict(wall)
-        terrain_data[(15, 10)] = "W"
-        terrain = InMemoryTerrainMap(terrain_data=terrain_data)
-        world["containers"]["15,10"] = make_container_state(
-            x=15,
-            y=10,
-            is_fuel=False,
-            volume=0,
-        )
-
-        result = describe_container_search(
-            world,
-            state,
-            terrain,
-            want_fuel=False,
-            allow_unreachable=True,
-        )
-
-        assert result == (
-            "equipment: total=1 nearby=1 actionable=1 blocked=1 "
-            "no_landing=0 low_volume=0 nearest=(15,10) actionable"
+            "low_volume=0 nearest=(15,10) blocked_walk"
         )
 
     def test_keeps_nearest_description_when_later_candidate_is_farther(self) -> None:
@@ -677,12 +649,11 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
             "equipment: total=2 nearby=2 actionable=2 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=(101,100) actionable"
+            "low_volume=0 nearest=(101,100) actionable"
         )
 
     def test_reports_failed_pickup_container_as_non_actionable(self) -> None:
@@ -701,12 +672,11 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
             "equipment: total=1 nearby=1 actionable=0 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=(101,100) failed_pickup"
+            "low_volume=0 nearest=(101,100) failed_pickup"
         )
 
     def test_reports_actionable_visible_target_without_viewport_scan_flag(self) -> None:
@@ -725,12 +695,11 @@ class TestDescribeContainerSearch:
             state,
             None,
             want_fuel=False,
-            allow_unreachable=True,
         )
 
         assert result == (
             "equipment: total=1 nearby=1 actionable=1 blocked=0 "
-            "no_landing=0 low_volume=0 nearest=(101,100) actionable"
+            "low_volume=0 nearest=(101,100) actionable"
         )
 
     def test_with_terrain_skips_unreachable(self) -> None:
@@ -749,14 +718,13 @@ class TestDescribeContainerSearch:
         world["containers"]["15,10"] = expected
         assert find_nearest_equipment(world, state, terrain) == expected
 
-    def test_with_terrain_allow_unreachable_keeps_blocked_target(self) -> None:
-        """allow_unreachable=True returns a blocked equipment container for teleport fallback."""
+    def test_with_terrain_skips_wall_blocked_equipment(self) -> None:
+        """Wall-blocked equipment is skipped under the walk-only contract."""
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain = InMemoryTerrainMap(terrain_data=wall)
-        expected = make_container_state(x=15, y=10, is_fuel=False, volume=0)
-        world["containers"]["15,10"] = expected
-        assert find_nearest_equipment(world, state, terrain, allow_unreachable=True) == expected
+        world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=False, volume=0)
+        assert find_nearest_equipment(world, state, terrain) is None
 
 
 # =============================================================================
@@ -867,18 +835,23 @@ class TestFindBestFuel:
         world["containers"]["108,100"] = expected
         assert find_best_fuel(world, state) == expected
 
-    def test_with_terrain_allow_unreachable_prefers_blocked_high_value_target(self) -> None:
-        """allow_unreachable=True keeps a blocked high-value fuel target for teleport fallback."""
+    def test_with_terrain_skips_blocked_picks_reachable_lower_value(self) -> None:
+        """Wall-blocked high-value fuel is skipped for the reachable lower-value one.
+
+        Walk-only contract (2026-06-26): a blocked container is not
+        actionable regardless of its volume. The lower-volume reachable
+        target wins.
+        """
         world, state = _world_and_self(x=10, y=10)
         wall: dict[tuple[int, int], str] = {(12, y): "#" for y in range(256)}
         terrain = InMemoryTerrainMap(terrain_data=wall)
-        expected = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
-        world["containers"]["15,10"] = expected
-        world["containers"]["8,10"] = make_container_state(x=8, y=10, is_fuel=True, volume=600)
-        assert find_best_fuel(world, state, terrain, allow_unreachable=True) == expected
+        world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
+        expected = make_container_state(x=8, y=10, is_fuel=True, volume=600)
+        world["containers"]["8,10"] = expected
+        assert find_best_fuel(world, state, terrain) == expected
 
-    def test_with_terrain_allow_unreachable_keeps_blocked_fuel_since_server_displaces(self) -> None:
-        """Water-locked fuel is skipped even with allow_unreachable=True."""
+    def test_with_terrain_skips_water_locked_high_value_fuel(self) -> None:
+        """Water-locked fuel with no land-neighbor is skipped regardless of volume."""
         world, state = _world_and_self(x=10, y=10)
         terrain_data: dict[tuple[int, int], str] = {
             (15, 10): "W",
@@ -889,7 +862,7 @@ class TestFindBestFuel:
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         world["containers"]["15,10"] = make_container_state(x=15, y=10, is_fuel=True, volume=1000)
-        assert find_best_fuel(world, state, terrain, allow_unreachable=True) is None
+        assert find_best_fuel(world, state, terrain) is None
 
     def test_skips_failed_pickup_fuel(self) -> None:
         """find_best_fuel skips containers with failed_pickups > 0."""
@@ -976,3 +949,36 @@ class TestIsTileScanned:
         world["scanned_viewports"] = {"100,100": 100000}
         # Elapsed 46000 ms > 45000 ms TTL => entry expired.
         assert is_area_scanned(world, 100, 100, now_ms=146000) is False
+
+
+def test_find_adjacent_container_skips_diagonal_with_blocked_cardinals() -> None:
+    """A diagonal fuel container with both cardinal stepping-stones blocked is skipped.
+
+    ``find_adjacent_container`` is used by the combat secondary-pickup
+    path. Diagonal pickups require stepping through one of the two
+    cardinal intermediates first. If both intermediates and the target
+    tile are blocked, the pickup is not collectable from the current
+    tile and the candidate is dropped.
+    """
+    world, self_state = _world_and_self(x=100, y=100)
+    world["containers"]["101,101"] = make_container_state(
+        x=101,
+        y=101,
+        is_fuel=True,
+        volume=300,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+    terrain = InMemoryTerrainMap(
+        terrain_data={
+            (101, 100): "W",
+            (100, 101): "W",
+            (101, 101): "W",
+            (102, 101): "W",
+            (101, 102): "W",
+        },
+    )
+
+    assert (
+        find_adjacent_container(world, self_state, terrain, want_fuel=True, now_ms=100000) is None
+    )
