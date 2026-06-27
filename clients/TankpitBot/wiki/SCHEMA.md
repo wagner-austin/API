@@ -4,37 +4,49 @@ This wiki is the persistent knowledge base for TankpitBot. AI (Claude) maintains
 
 The wiki is the **synthesis layer**. Raw sources live in capture files (`runs/`), wire dumps, client JS (`tpclient-*.js`), and the codebase. The wiki connects them — it explains what the data means, links related mechanics, and tracks verified-vs-unverified knowledge over time.
 
+## Critical rules — fire automatically every time you touch the wiki
+
+1. **Three-tier architecture only.** `index.md` (entry, ~25 lines) → `hubs/*.md` (topic navigation, ~30-50 lines) → `pages/*.md` (atomic content, 30-80 lines). No subdirectories under `pages/`. No nested hubs. No extra top-level dirs beyond `hubs/` and `pages/` — operational docs (handoffs, traces) live in the project's `docs/` tree, not in `wiki/`.
+2. **Polyhierarchy via inclusion links.** A content page can be linked from multiple hubs. Hubs link to pages with `[Title](../pages/<slug>.md) -- one-line description`. Tags say "this is about X"; inclusion links from a hub show HOW it relates.
+3. **Atomicity: one concept per page, 30-80 lines.** When a page exceeds ~3,000 words or covers more than one distinct concept, split. "Atomic, not shallow" — a page carries full analytical depth on its one topic. Reference catalogs (the V-table, the JS source map, the client-constants table) are one concept and stay whole even when long.
+4. **Every new page MUST be hub-linked.** A page in `pages/` that no hub links to is an orphan: readers navigating from `index.md` never reach it. After writing a page, add an inclusion link from at least one hub and bump that hub's page count in `index.md`.
+5. **Frontmatter required on every page.** Minimum: `title`, `tags`, `related`, `sources`, `fact_checked` (YYYY-MM-DD), `confidence` (high | medium | low).
+6. **Citations travel with claims.** Every non-common-knowledge factual claim carries a footnote citation with a locator (file path + function/line, run ID + event, capture timestamp, URL fragment). No "per a prior source"; no "as documented earlier." Either inline the citation or weaken the claim.
+7. **Cite primary sources, not downstream artifacts of the wiki itself.** The wiki is the synthesis layer. If a brief / report / summary is GENERATED from wiki content, that artifact is never cited back as a source. Cite whatever the artifact originally cited. (We do not currently render artifacts from wiki content; this rule is here to keep us honest if that ever changes.)
+8. **Wiki-first retrieval.** Future AIs read `index.md` first, then follow the relevant hub link, then read the page. Do not re-derive facts the wiki already carries.
+
 ## Layout
 
 ```
 wiki/
-  SCHEMA.md           # this file
-  index.md            # ~30-line entry point listing all hubs (read first every session)
+  SCHEMA.md           # this file (the contract)
+  index.md            # ~25-line entry point listing all hubs (read first every session)
   log.md              # append-only operation log
-  hubs/               # topic hub pages (navigation layer)
+  hubs/               # topic navigation pages
     game-mechanics.md
     protocol.md
     combat.md
+    js-client.md
     architecture.md
+    codebase.md
   pages/              # all content pages, flat, slug-named
     teleport-mechanics.md
     viewport-frame.md
     ...
 ```
 
-**Three-tier knowledge graph (v0.1, 2026-06-16):**
+## Three-tier knowledge graph
 
-1. **index.md** (~30 lines) -- lists all hubs. Read every session. An AI reads this to find which hub matches the current task.
-2. **Hub pages** (20-40 lines each) -- topic navigation. Each hub contains **inclusion links** (a link on its own line) to content pages, with one-line descriptions. A content page can be linked from multiple hubs (polyhierarchy). Hub pages answer "what do we know about this topic area?"
-3. **Content pages** (30-80 lines each) -- atomic facts, one concept per page. Content pages answer "what are the specific facts about this thing?"
+1. **`index.md`** (~25 lines) — lists all hubs with one-line descriptions and page counts. Read every session.
+2. **Hubs** (`hubs/*.md`, ~30-50 lines each) — topic navigation. Each hub holds **inclusion links** to content pages, one per line: `[Title](../pages/<slug>.md) -- one-line description`. A content page can appear in multiple hubs (polyhierarchy).
+3. **Content pages** (`pages/*.md`, 30-80 lines each) — atomic facts, one concept per page. Cite primary sources for every claim.
 
-**Why this architecture (Karpathy LLM-wiki + IWE knowledge graph pattern):**
-- **vs memory files:** memory files are flat, limited index, no cross-referencing, no citations, no staleness tracking. The wiki replaces them as the single source of truth.
-- **vs folders:** a page can have multiple parents without duplication
-- **vs flat index:** hubs partition navigation into manageable chunks
-- **vs code comments:** comments explain implementation; the wiki explains game mechanics and protocol behavior that the code implements but doesn't document
+### Why this architecture (Karpathy LLM-wiki + IWE knowledge graph pattern)
 
-**Atomicity rule:** one concept per page, target 30-80 lines. When a page exceeds ~100 lines or covers more than one distinct concept, split.
+- **vs memory files:** flat index, no cross-referencing, no citations, no staleness tracking. The wiki replaces them as the single source of truth for game mechanics, protocol, and architecture.
+- **vs folders:** a page can have multiple parents without duplication.
+- **vs flat index:** hubs partition navigation into manageable chunks.
+- **vs code comments:** comments explain implementation; the wiki explains game mechanics and protocol behavior that the code implements but doesn't document.
 
 ## Page types
 
@@ -47,7 +59,7 @@ Every page is one of:
 
 ## Filename conventions
 
-All lowercase, kebab-case, no special characters. No prefix needed (single game, unlike multi-jurisdiction CML wiki).
+All lowercase, kebab-case, no special characters. No prefix needed (single game, unlike multi-jurisdiction wikis).
 
 ## Frontmatter
 
@@ -73,11 +85,11 @@ confidence: high | medium | low
 
 ## Cross-references
 
-Internal links use `[[slug]]` syntax. Link rather than restate. If a fact about radar is in `radar-mechanics.md`, don't repeat it in `fuel-system.md` — link to it.
+Internal links use `[[slug]]` syntax. **Link rather than restate.** If a fact about radar lives in `radar-mechanics.md`, don't repeat it in `fuel-system.md` — link to it.
 
 ## Citations
 
-Every non-obvious factual claim must carry a footnote citation. Two formats:
+Every non-obvious factual claim must carry a footnote citation with a **locator**. Three formats:
 
 **Data citation** (preferred for measured constants):
 ```
@@ -96,14 +108,40 @@ Every non-obvious factual claim must carry a footnote citation. Two formats:
 
 Footnotes go at the bottom of the page, numbered sequentially.
 
-If you cannot produce a citation for a claim, weaken it ("appears to..." / "user reports...") or drop it.
+If you cannot produce a citation for a claim, weaken it ("appears to..." / "user reports...") or drop it. **Never cite a downstream artifact of the wiki itself.**
+
+## Hub-link discipline (MANDATORY)
+
+Every new page MUST be linked from at least one hub before the work ends. When adding a page:
+
+1. Pick the hub(s). Polyhierarchy is fine — link from multiple hubs when the page applies.
+2. Add the inclusion link: `[Title](../pages/<slug>.md) -- one-line description`.
+3. Bump the hub's page count on its line in `index.md`.
+
+## Index entry format
+
+```markdown
+[Hub Title](hubs/<slug>.md) -- one-line description (N pages)
+```
+
+## Log entry format
+
+`log.md` is append-only. Log every operation that changes the wiki's shape (new hubs, decomposition, audits, structural cleanups). Routine page edits don't need a log entry — git history covers those.
+
+```markdown
+## [YYYY-MM-DD] <operation> | <subject>
+Pages written: <list>
+Pages updated: <list>
+Notes: <one-line summary>
+```
 
 ## Common mistakes to avoid
 
 - **Restating context that lives in a linked page.** If `radar-mechanics.md` exists, don't re-explain radar in `fuel-system.md` — link.
 - **Appending "Update:" sections.** The page is the current truth; `log.md` is the journal.
 - **Citing without a locator.** "Per a live run" is not a citation. "run 20260611-004505, 255/255 at distance 1" is.
-- **Duplicating across wiki + memory files.** The wiki is the single source of truth. Memory files that duplicate wiki content should be removed.
+- **Creating a page without a hub link.** Always link from at least one hub immediately — orphans accumulate fast and become invisible.
+- **Putting operational scratch in `wiki/`.** Handoff briefs, raw analysis traces, and one-off planning docs go in the project's `docs/` tree, not under `wiki/`.
 
 ## Storage
 
@@ -115,4 +153,4 @@ The wiki **replaces** the `.claude/projects/.../memory/` files for game mechanic
 
 ## Schema version
 
-v0.1 — initial schema, 2026-06-16. Modeled on the CML Office Wiki (v0.5) with adaptations for game-bot context (no jurisdiction prefix, run-ID citations instead of vault/drive, simplified page types).
+v1.0 — 2026-06-26. Aligned with the `/wiki-init` v1.0 spec: critical rules block, explicit no-extra-top-level-dirs, downstream-artifact citation ban, atomicity exception for reference catalogs. Prior v0.1 (2026-06-16) bootstrapped the three-tier graph; v1.0 codifies the rules and removes the `artifacts/` + `handoffs/` dirs that had accreted outside the spec layout.

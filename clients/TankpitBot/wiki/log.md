@@ -633,3 +633,26 @@ Resource-search hop logic had grown three competing helpers (`_hop_target_for_cy
 **Pages updated:** [[fuel-system]] cascade step 5 now describes the cardinal-then-diagonal method by name.
 
 Constraint context: user-stated "no fallbacks, no legacy code, no thin wrappers" -- ring multiplication, grid fallback, and short-hop fallback are deleted, not gated behind a flag.
+
+---
+
+## [2026-06-26] audit | Wiki audited against `/wiki-init` v1.0 spec
+
+Cross-checked the wiki structure against the `/wiki-init` scaffolding skill at `~/.claude/skills/wiki-init/SKILL.md` to confirm spec compliance.
+
+**Findings:**
+
+- **Three-tier graph compliant.** index.md (22 lines) -> 6 hubs -> 52 content pages (flat under `pages/`). Zero orphans -- every page is linked from at least one hub.
+- **Frontmatter compliant.** All 52 pages carry `title`, `tags`, `related`, `sources`, `fact_checked`, `confidence` (the spec's required set; we add `confidence` as a quality signal).
+- **Citation discipline compliant.** Initial grep for `[^N]` footnote syntax surfaced 26 "uncited" pages, but those pages cite via inline JS class/line refs (e.g. `xc function, line 33`) and rich frontmatter `sources:` lists (e.g. `tpclient.js lines 33-34 (pc/qc/rc/sc arrays, xc function)`). The spec's rule 6 explicitly allows inline citations; no per-claim refactor was needed.
+- **Atomicity compliant.** 24 pages exceed 100 lines, but the spec's split threshold is `~3000 words or covers more than one distinct concept`. Word counts run 890-2562 across the candidates and each page covers one cohesive subsystem (rendering, input, the V-table catalog, etc.), so no splits warranted.
+
+**Changes applied:**
+
+- **SCHEMA.md bumped to v1.0** -- aligned with the `/wiki-init` v1.0 spec. Added the critical-rules block (eight numbered rules that fire automatically), the downstream-artifact citation ban (rule 7, even though we don't render artifacts from wiki content today), and an explicit "no extra top-level dirs" clause to keep `wiki/` clean.
+- **`wiki/handoffs/` and `wiki/artifacts/` removed.** The two files (one completed handoff brief, one V-table trace dump) were unreferenced from any wiki page and violated the spec layout (only `hubs/` and `pages/` are allowed under `wiki/`). Moved to `docs/handoffs/2026-06-21-scan-refactor.md` and `docs/vtable_trace.txt` -- the project's existing operational-docs tree.
+
+**Pages updated:** SCHEMA.md.
+**Pages relocated outside wiki:** 2026-06-21-scan-refactor.md (handoff brief), vtable_trace.txt (V-table dump).
+
+No content pages were touched. The audit confirms the wiki was substantively spec-compliant from v0.1; v1.0 codifies the rules and tidies the layout.

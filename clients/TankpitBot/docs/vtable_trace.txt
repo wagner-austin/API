@@ -1,0 +1,381 @@
+V table: 36 handlers
+
+============================================================
+V['!'] (0x21) = Tf
+============================================================
+  Parse: Tf.h(a) -> new Tf(b, c, d, 256 * (256 * a[7] + a[8]) + a[9], p(a.subarray(10)))
+    this.i = a (arg 0) <- a[0] & 255
+    this.l = b (arg 1) <- X(a[1], a[2])
+    this.j = c (arg 2) <- d
+    this.m = d (arg 3) <- 256 * (256 * a[7] + a[8]) + a[9]
+    this.o = e (arg 4) <- p(a.subarray(10))
+  Execute: tank entity assignments
+    a.name = this.o <- p(a.subarray(10))  [name]
+    a.h = this.i <- a[0] & 255  [team]
+    a.v = this.j <- d  [decoration_state]
+    a.aa = this.m <- 256 * (256 * a[7] + a[8]) + a[9]  [persistent_tank_id]
+
+============================================================
+V['('] (0x28) = Uf
+============================================================
+  Parse: Uf.h(a) -> new Uf(a[3] & 3, 255 === a[0], X(a[1], a[2]), a[3] >> 4 & 15, a[3] >> 2 & 3, 256 * (256 * a[4] + a[5]) + a[6], a[7], a[8])
+    this.j = a (arg 0) <- a[3] & 3
+    this.l = c (arg 2) <- X(a[1], a[2])
+    this.o = d (arg 3) <- a[3] >> 4 & 15
+    this.i = e (arg 4) <- a[3] >> 2 & 3
+    this.m = f (arg 5) <- 256 * (256 * a[4] + a[5]) + a[6]
+    this.x = g (arg 6) <- a[7]
+    this.y = h (arg 7) <- a[8]
+  Execute: tank entity assignments
+    b.h = this.j <- a[3] & 3  [team]
+    b.u = this.i <- a[3] >> 2 & 3  [damage_state (dual: rank_category on init)]
+    b.l = this.o <- a[3] >> 4 & 15  [rank]
+    b.s = this.m <- 256 * (256 * a[4] + a[5]) + a[6]  [lb_score]
+
+============================================================
+V[')'] (0x29) = Vf
+============================================================
+  Parse: Vf.h(a) -> new Vf(a[0], X(a[1], a[2]), 1 === a[3], 1 === a[4])
+    this.j = a (arg 0) <- a[0]
+    this.m = b (arg 1) <- X(a[1], a[2])
+    this.i = c (arg 2) <- 1 === a[3]
+    this.l = d (arg 3) <- 1 === a[4]
+
+============================================================
+V['*'] (0x2A) = Xg
+============================================================
+  Parse: Xg.h(a) -> new Xg(b)
+    this.j = a (arg 0) <- b
+
+============================================================
+V['+'] (0x2B) = Rf
+============================================================
+  Parse: Rf.h(a) -> new Rf(a[0], 1 === a[1])
+    this.j = a (arg 0) <- a[0]
+    this.i = b (arg 1) <- 1 === a[1]
+
+============================================================
+V['.'] (0x2E) = Og
+============================================================
+  Parse: Og.h(a) -> new Og(b, c, d, e, f, g, h, k)
+    this.l = a (arg 0) <- b
+    this.m = b (arg 1) <- X(a[1], a[2])
+    this.s = c (arg 2) <- d
+    this.v = d (arg 3) <- e
+    this.u = e (arg 4) <- 256 * (256 * a[5] + a[6])
+    this.j = f (arg 5) <- g
+    this.i = g (arg 6) <- 1 === a[9]
+    this.o = h (arg 7) <- X(a[10], a[11])
+  Execute: tank entity assignments
+    b.h = this.l <- b  [team]
+    b.u = this.s <- d  [damage_state (dual: rank_category on init)]
+    b.l = this.v <- e  [rank]
+    b.s = this.u <- 256 * (256 * a[5] + a[6])  [lb_score]
+
+============================================================
+V['/'] (0x2F) = Yg
+============================================================
+  Parse: Yg.h(a) -> new Yg(b, c)
+    this.j = a (arg 0) <- b
+    this.i = b (arg 1) <- c
+  Execute: tank entity assignments
+    c.l = this.i <- c  [rank]
+
+============================================================
+V['1'] (0x31) = Zg
+============================================================
+  Parse: Zg.h(a) -> new Zg(b, c, d, e, f, g, h, k)
+    this.j = a (arg 0) <- b
+    this.l = b (arg 1) <- 256 * (256 * a[1] + a[2])
+    this.o = c (arg 2) <- d
+    this.u = d (arg 3) <- e
+    this.i = e (arg 4) <- f
+    this.m = f (arg 5) <- g
+    this.s = g (arg 6) <- h
+    this.v = h (arg 7) <- k
+
+============================================================
+V['<'] (0x3C) = wg
+============================================================
+  Parse: wg.h(a) -> new wg(p(a))
+    this.message = a (arg 0) <- p(a)
+
+============================================================
+V['='] (0x3D) = Mg
+============================================================
+  Parse: Mg.h(a) -> new Mg(a[0], X(a[1], a[2]), a[3], a[4], a[5], a[6], a[7], 256 * (256 * a[8] + a[9]) + a[10]...)
+    this.m = a (arg 0) <- a[0]
+    this.i = b (arg 1) <- X(a[1], a[2])
+    this.x = c (arg 2) <- a[3]
+    this.y = d (arg 3) <- a[4]
+    this.direction = e (arg 4) <- a[5]
+    this.l = f (arg 5) <- a[6]
+    this.s = g (arg 6) <- a[7]
+    this.o = h (arg 7) <- 256 * (256 * a[8] + a[9]) + a[10]
+    this.j = k (arg 8) <- a[11]
+  Execute: tank entity assignments
+    d.h = this.m <- a[0]  [team]
+    d.u = this.l <- a[6]  [damage_state (dual: rank_category on init)]
+    d.l = this.s <- a[7]  [rank]
+    d.s = this.o <- 256 * (256 * a[8] + a[9]) + a[10]  [lb_score]
+    d.direction = this.direction <- a[5]  [direction]
+
+============================================================
+V['>'] (0x3E) = Qf
+============================================================
+  Parse: Qf.h(a) -> new Qf(b, c, d, e, f, 256 * (256 * a[7] + a[8]) + a[9], 256 * (256 * a[10] + a[11]) + a[12], p(a.subarray(13)))
+    this.i = a (arg 0) <- a[0] >> 4 & 15
+    this.j = b (arg 1) <- a[0] & 3
+    this.m = c (arg 2) <- a[0] >> 2 & 3
+    this.o = d (arg 3) <- X(a[1], a[2])
+    this.s = e (arg 4) <- f
+    this.l = f (arg 5) <- 256 * (256 * a[7] + a[8]) + a[9]
+    this.u = g (arg 6) <- 256 * (256 * a[10] + a[11]) + a[12]
+    this.v = h (arg 7) <- p(a.subarray(13))
+  Execute: tank entity assignments
+    b.h = this.j <- a[0] & 3  [team]
+    b.l = this.i <- a[0] >> 4 & 15  [rank]
+    b.u = this.m <- a[0] >> 2 & 3  [damage_state (dual: rank_category on init)]
+    b.v = this.s <- f  [decoration_state]
+    b.s = this.l <- 256 * (256 * a[7] + a[8]) + a[9]  [lb_score]
+    b.aa = this.u <- 256 * (256 * a[10] + a[11]) + a[12]  [persistent_tank_id]
+    b.name = this.v <- p(a.subarray(13))  [name]
+    b.id = this.o <- X(a[1], a[2])  [tank_id]
+
+============================================================
+V['?'] (0x3F) = vg
+============================================================
+  Parse: vg.h(a) -> new vg(1 === a[0])
+    this.j = a (arg 0) <- 1 === a[0]
+
+============================================================
+V['@'] (0x40) = ah
+============================================================
+  Parse: ah.h(a) -> new ah(b, c, d)
+    this.i = a (arg 0) <- b
+    this.m = b (arg 1) <- c
+    this.j = c (arg 2) <- d
+  Execute: tank entity assignments
+    e.m = this.j <- d
+
+============================================================
+V['A'] (0x41) = Pg
+============================================================
+  Parse: Pg.h(a) -> new Pg(b, c, d, a, e)
+    this.i = b (arg 1) <- X(a[1], a[2])
+    this.l = c (arg 2) <- 1 === a[3]
+    this.j = d (arg 3) <- X(a[4], a[5])
+    this.m = e (arg 4) <- e
+
+============================================================
+V['B'] (0x42) = Jg
+============================================================
+  Parse: Jg.h(a) -> new Jg(X(a[0], a[1]), a[2], a[3], a[4], a[5], a[6], a[7], a[8])
+    this.i = a (arg 0) <- X(a[0], a[1])
+    this.x = b (arg 1) <- a[2]
+    this.y = c (arg 2) <- a[3]
+    this.l = d (arg 3) <- a[4]
+    this.o = e (arg 4) <- a[5]
+    this.m = f (arg 5) <- a[6]
+    this.j = g (arg 6) <- a[7]
+    this.s = h (arg 7) <- a[8]
+
+============================================================
+V['C'] (0x43) = $g
+============================================================
+  Parse: $g.h(a) -> new $g(b, c, d)
+    this.i = a (arg 0) <- b
+    this.m = b (arg 1) <- c
+    this.j = c (arg 2) <- d
+  Execute: tank entity assignments
+    e.cache = this.j <- d
+
+============================================================
+V['D'] (0x44) = Rg
+============================================================
+  Parse: Rg.h(a) -> new Rg(X(a[0], a[1]), 0 === a[2])
+    this.j = a (arg 0) <- X(a[0], a[1])
+    this.i = b (arg 1) <- 0 === a[2]
+
+============================================================
+V['E'] (0x45) = dh
+============================================================
+  Parse: dh.h(a) -> new dh(b, c)
+    this.j = a (arg 0) <- b
+    this.i = b (arg 1) <- c
+
+============================================================
+V['F'] (0x46) = Fg
+============================================================
+  Parse: Fg.h(a) -> new Fg(a[0], 1 === a[1])
+    this.j = a (arg 0) <- a[0]
+    this.i = b (arg 1) <- 1 === a[1]
+
+============================================================
+V['G'] (0x47) = Lg
+============================================================
+  Parse: Lg.h(a) -> new Lg(b, c, d, e, f, g, h, k...)
+    this.o = a (arg 0) <- X(a[0], a[1])
+    this.x = b (arg 1) <- c
+    this.y = c (arg 2) <- d
+    this.direction = d (arg 3) <- e
+    this.i = e (arg 4) <- f
+    this.m = f (arg 5) <- 256 * (256 * a[6] + a[7])
+    this.s = g (arg 6) <- h
+    this.j = h (arg 7) <- k
+    this.l = k (arg 8) <- 1 === a[11]
+    this.u = r (arg 9) <- t
+  Execute: tank entity assignments
+    b.u = this.i <- f  [damage_state (dual: rank_category on init)]
+    b.l = this.s <- h  [rank]
+    b.s = this.m <- 256 * (256 * a[6] + a[7])  [lb_score]
+
+============================================================
+V['H'] (0x48) = Tg
+============================================================
+  Parse: Tg.h(a) -> new Tg(a[0], a[1], a[2], a[3], X(a[4], a[5]))
+    this.x = a (arg 0) <- a[0]
+    this.y = b (arg 1) <- a[1]
+    this.j = c (arg 2) <- a[2]
+    this.m = d (arg 3) <- a[3]
+    this.i = e (arg 4) <- X(a[4], a[5])
+
+============================================================
+V['I'] (0x49) = Xf
+============================================================
+  Parse: Xf.h(a) -> new Xf(b, c, d, e)
+    this.l = a (arg 0) <- 1 === a[0]
+    this.i = b (arg 1) <- c
+    this.j = c (arg 2) <- d
+    this.m = d (arg 3) <- e
+
+============================================================
+V['J'] (0x4A) = bh
+============================================================
+  Parse: bh.h(a) -> new bh(b, c, d)
+    this.i = a (arg 0) <- b
+    this.m = b (arg 1) <- c
+    this.j = c (arg 2) <- d
+  Execute: tank entity assignments
+    e.j = this.j <- d  [viewport_col]
+
+============================================================
+V['K'] (0x4B) = Dg
+============================================================
+  Parse: Dg.h(a) -> new Dg(b, c, d, e)
+    this.i = a (arg 0) <- b
+    this.m = b (arg 1) <- X(a[1], a[2])
+    this.j = c (arg 2) <- d
+    this.l = d (arg 3) <- e
+
+============================================================
+V['L'] (0x4C) = Ig
+============================================================
+  Parse: Ig.h(a) -> new Ig(f, g, b, d, e, h, k, r)
+    this.o = a (arg 0) <- f
+    this.u = b (arg 1) <- g
+    this.s = c (arg 2) <- X(a[0], a[1])
+    this.v = d (arg 3) <- d
+    this.j = e (arg 4) <- e
+    this.m = f (arg 5) <- h
+    this.l = g (arg 6) <- k
+    this.i = h (arg 7) <- r
+  Execute: tank entity assignments
+    c.h = this.i <- r  [team]
+    c.u = this.l <- k  [damage_state (dual: rank_category on init)]
+    c.l = this.m <- h  [rank]
+
+============================================================
+V['M'] (0x4D) = Qg
+============================================================
+  Parse: Qg.h(a) -> new Qg(b, c, d, e)
+    this.j = a (arg 0) <- X(a[0], a[1])
+    this.i = b (arg 1) <- a[2]
+    this.x = c (arg 2) <- a[3]
+    this.y = d (arg 3) <- a[4]
+
+============================================================
+V['N'] (0x4E) = Sf
+============================================================
+  Parse: Sf.h(a) -> new Sf(X(a[0], a[1]), a[2], a[3])
+    this.m = a (arg 0) <- X(a[0], a[1])
+    this.i = b (arg 1) <- a[2]
+    this.j = c (arg 2) <- a[3]
+
+============================================================
+V['O'] (0x4F) = ch
+============================================================
+  Parse: ch.h(a) -> new ch(c, d, e, f, g, h)
+    this.m = a (arg 0) <- c
+    this.o = b (arg 1) <- d
+    this.l = c (arg 2) <- e
+    this.s = d (arg 3) <- f
+    this.j = e (arg 4) <- g
+    this.i = f (arg 5) <- h
+
+============================================================
+V['R'] (0x52) = xg
+============================================================
+  Parse: xg.h(a) -> new xg(128 !== b ? Gb[b] : p(a.subarray(3)), 1 === a[0], 1 === a[1])
+    this.message = a (arg 0) <- 128 !== b ? Gb[b] : p(a.subarray(3))
+    this.i = b (arg 1) <- 1 === a[0]
+    this.j = c (arg 2) <- 1 === a[1]
+
+============================================================
+V['S'] (0x53) = Gg
+============================================================
+  Parse: Gg.h(a) -> new Gg(a[0], X(a[1], a[2]), a[3], a[4], a[5], a[6], a[7], a[8]...)
+    this.i = a (arg 0) <- a[0]
+    this.m = b (arg 1) <- X(a[1], a[2])
+    this.x = c (arg 2) <- a[3]
+    this.y = d (arg 3) <- a[4]
+    this.l = e (arg 4) <- a[5]
+    this.o = f (arg 5) <- a[6]
+    this.s = g (arg 6) <- a[7]
+    this.u = h (arg 7) <- a[8]
+    this.j = k (arg 8) <- a[9]
+
+============================================================
+V['T'] (0x54) = Kg
+============================================================
+  [constructor not found or empty]
+
+============================================================
+V['V'] (0x56) = Wg
+============================================================
+  Parse: Wg.h(a) -> new Wg()
+    this.i = a (arg 0) <- ?
+    this.l = b (arg 1) <- ?
+    this.s = c (arg 2) <- ?
+    this.m = d (arg 3) <- ?
+    this.j = e (arg 4) <- ?
+    this.o = f (arg 5) <- ?
+
+============================================================
+V['X'] (0x58) = Ug
+============================================================
+  Parse: Ug.h(a) -> new Ug(X(a[0], a[1]))
+    this.j = a (arg 0) <- X(a[0], a[1])
+
+============================================================
+V['Z'] (0x5A) = Vg
+============================================================
+  Parse: Vg.h(a) -> new Vg(b, c, d, e, f, g, h)
+    this.o = a (arg 0) <- b
+    this.s = b (arg 1) <- c
+    this.j = c (arg 2) <- d
+    this.u = d (arg 3) <- e
+    this.i = e (arg 4) <- f
+    this.m = f (arg 5) <- g
+    this.l = g (arg 6) <- h
+
+============================================================
+V['`'] (0x60) = we
+============================================================
+  [constructor not found or empty]
+
+============================================================
+V['~'] (0x7E) = xe
+============================================================
+  [constructor not found or empty]
+
