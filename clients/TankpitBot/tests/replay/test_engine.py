@@ -249,7 +249,7 @@ class TestBuildTrace:
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(
             command=make_move_command(52, 63),
-            behavior=make_behavior_score("COLLECT_FUEL", 900, 52, 63, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 52, 63, "fuel=500"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -265,7 +265,7 @@ class TestBuildTrace:
         self_state = SelfStateDict(
             x=100,
             y=100,
-            fuel=250,
+            fuel=150,
             team=0,
             tank_id=1,
             rank=3,
@@ -335,7 +335,7 @@ class TestProcessTickBatch:
         """_process_tick_batch returns a trace when self_state is available.
 
         Default inventory has all weapons at zero so the durable owner
-        enters ``RECOVER_EQUIPMENT``. With no tile-coverage and radar
+        enters ``COLLECT``. With no tile-coverage and radar
         affordable, the forager dispatches ``forage_radar`` -- the
         substate derivation routes that to ``SENSE`` (radar = sensing
         the viewport), independent of whether the server-side extras
@@ -349,7 +349,7 @@ class TestProcessTickBatch:
         assert trace["self_y"] == 120
         assert trace["fuel"] == 500
         assert trace["tick_index"] == 0
-        assert trace["ai_mode"] == "RECOVER_EQUIPMENT"
+        assert trace["ai_mode"] == "COLLECT"
         assert trace["ai_mode_state"] == "SENSE"
         assert trace["combat_target_id"] == -1
         _cleanup()
@@ -403,7 +403,7 @@ class TestReplaySessionMultiTick:
                 self_state = SelfStateDict(
                     x=70,
                     y=80,
-                    fuel=250,
+                    fuel=150,
                     team=0,
                     tank_id=1,
                     rank=3,
@@ -432,7 +432,7 @@ class TestReplaySessionMultiTick:
         assert result["total_messages"] == 3
         assert result["total_ticks"] >= 2
         assert result["traces"][0]["self_x"] == 70
-        assert result["traces"][0]["ai_mode"] == "RECOVER_FUEL"
+        assert result["traces"][0]["ai_mode"] == "COLLECT"
         assert result["traces"][0]["ai_mode_state"] in ("SENSE", "APPROACH", "")
         _cleanup()
 

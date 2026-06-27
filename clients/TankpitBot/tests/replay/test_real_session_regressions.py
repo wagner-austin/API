@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 
+from tankpit_bot import _test_hooks
 from tankpit_bot.replay.engine import replay_session
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
@@ -19,6 +21,35 @@ def _reset_replay_globals() -> None:
     reset_world_state()
     reset_xor_state()
     reset_viewport_tracking()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _isolate_replay_module() -> Generator[None, None, None]:
+    """Quarantine ``_test_hooks`` attribute set around the replay module.
+
+    Hardens against the failure mode observed 2026-06-23 where a
+    sibling test module left an injected ``_test_hooks`` attribute in
+    place. ``dir(_test_hooks)`` is captured at module enter and any
+    name added during the module's run is dropped on exit. Value
+    mutation of existing hook attributes is NOT snapshotted here --
+    that scenario is already covered by the codebase's mandatory
+    save-and-restore DI rule (see ``feedback_di_save_and_restore``
+    memory) and the guard's ``monkey-patch-ban`` check; the strict
+    ``disallow_any_expr`` + ``object``-in-annotation guard make a
+    value snapshot impractical without breaking project typing rules.
+    ``replay_session()`` already resets world/xor/viewport state at
+    the top of each invocation, so per-test resets become redundant
+    once this module-level guard is in place.
+    """
+    snapshot_names = frozenset(dir(_test_hooks))
+    _reset_replay_globals()
+    try:
+        yield
+    finally:
+        for name in list(dir(_test_hooks)):
+            if name not in snapshot_names:
+                delattr(_test_hooks, name)
+        _reset_replay_globals()
 
 
 def test_fuel_radar_loop_fixture_exists() -> None:
@@ -72,36 +103,27 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
     (~5 tiles per walk), the bot burns through this fixture's fuel
     faster than the recorded policy did and lands marooned at fuel=0
     by tick ~34. With no Strict / Sense / Hop available the durable
-    RECOVER_FUEL owner raises rather than idle silently.
+    COLLECT owner raises rather than idle silently.
     """
-    _reset_replay_globals()
     session = load_capture_fixture("fuel_radar_loop.capture_session.json")
 
-    with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
         replay_session(session)
-
-    _reset_replay_globals()
 
 
 def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
-    """Replay hits the marooned-no-decision path under the new fuel cascade.
+    """Replay reproduces the boxed-in stranding under the walk-only contract.
 
-    Pre-2026-06-22, the fuel-dot atlas let the bot escape from a hostile
-    sector at (126, 158) fuel=121 via a one-action dot teleport. With the
-    dot system removed (user 2026-06-22: "if it cant teleport then it
-    cant teleport to a fuel dot either"), Strict / Sense / Hop all
-    return None for that situation, and the durable RECOVER_FUEL owner
-    raises rather than silently looping. The replay therefore aborts
-    with ValueError -- the bot fails loud instead of relying on the
-    one-action shortcut, which is the intended behavior.
+    User contract (2026-06-26) removed teleport-to-container entirely.
+    This fixture's bot reaches fuel=78 surrounded by water-locked
+    containers; no walk-reachable target exists and the search-hop
+    is unaffordable. The COLLECT owner raises rather than dispatch
+    a pickup the server cannot fulfill.
     """
-    _reset_replay_globals()
     session = load_capture_fixture("equipment_then_fuel_loop.capture_session.json")
 
-    with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
+    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
         replay_session(session)
-
-    _reset_replay_globals()
 
 
 def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> None:
@@ -115,7 +137,6 @@ def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> Non
     direct ENGAGE shoot at orange-1 -- one fewer map_open, one extra
     shoot in the trace.
     """
-    _reset_replay_globals()
     session = load_capture_fixture("viewport_enemy_shoot_rejection_loop.capture_session.json")
 
     result = replay_session(session)
@@ -138,12 +159,9 @@ def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> Non
     assert all(trace["ai_mode"] == "HUNT" for trace in traces)
     assert all(trace["ai_mode_state"] == "ENGAGE" for trace in shoot_traces)
 
-    _reset_replay_globals()
-
 
 def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None:
     """Replay reproduces the combat-to-fuel handoff without getting stuck."""
-    _reset_replay_globals()
     session = load_capture_fixture("combat_to_fuel_stale_lock_loop.capture_session.json")
 
     result = replay_session(session)
@@ -158,7 +176,7 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     # were misrouted; tunneled-dispatch fix landed them as real
     # ``last_command_error`` transitions. The bot now correctly
     # recognises "Insufficient fuel" / "Empty container" earlier and
-    # spends 2 extra ticks in COLLECT_FUEL, takes 3 fewer shots, and
+    # spends 2 extra ticks in COLLECT, takes 3 fewer shots, and
     # opens the map 5 times for recovery decisions.
     # 2026-06-21: viewport-presence gate added to ``analyze_threats``
     # (only ``storage_source == "viewport"`` advances the new
@@ -174,12 +192,9 @@ def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None
     # invariants above are sufficient.
     del behavior_counts, command_counts
 
-    _reset_replay_globals()
-
 
 def test_hunt_search_confirm_kill_loop_no_longer_enters_confirm_kill() -> None:
     """Replay locks out the bogus confirm-kill transition from search teleports."""
-    _reset_replay_globals()
     session = load_capture_fixture("hunt_search_confirm_kill_loop.capture_session.json")
 
     result = replay_session(session)
@@ -193,9 +208,7 @@ def test_hunt_search_confirm_kill_loop_no_longer_enters_confirm_kill() -> None:
     # holds" -- no tick should produce confirm_kill behavior reason.
     # Specific HUNT-vs-recovery counts shift with each strategic
     # policy change (most recently the 2026-06-22 resume-threshold
-    # restock-first rule, which puts the bot in COLLECT_EQUIPMENT
+    # restock-first rule, which puts the bot in COLLECT
     # for ticks the captured session had in HUNT).
     assert all(trace["behavior_reason"] != "confirm_kill" for trace in traces)
     del command_counts
-
-    _reset_replay_globals()
