@@ -317,7 +317,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
@@ -344,6 +344,104 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
     assert decision["behavior"]["reason"] == "find_enemies"
 
 
+def test_hunt_acquire_resumes_visible_locked_target() -> None:
+    """ACQUIRE shoots a still-visible locked target instead of re-acquiring fresh.
+
+    Recovery cycles (fuel + equipment) preserve ``combat_target_id``
+    so HUNT can resume the same engagement after restocking. When
+    ACQUIRE runs and the held lock is still in the threat list, the
+    bot engages directly -- no map_open, no fresh
+    ``select_new_combat_target``.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "50": _enemy_tank(x=101, y=100),
+    }
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 101,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["behavior"]["reason"] == "shoot Enemy"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
+def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent() -> None:
+    """ACQUIRE closes distance on a visible-but-distant locked target.
+
+    If the lock is in the threat list but not in a cardinal-fire
+    position, ACQUIRE returns a close (teleport) decision -- same as
+    the REFRESH state's close branch.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "50": _enemy_tank(),  # default position (115, 100), distance 15 from (100,100)
+    }
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 115,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
+def test_hunt_acquire_pursues_off_viewport_locked_target() -> None:
+    """ACQUIRE pursuit-fires when the held lock is off-viewport but still alive.
+
+    Same staying-put pursuit pattern used by ENGAGE / CLOSE / REFRESH /
+    SCAN_ON_LANDING: when the lock isn't in the current threat list but
+    ``_locked_target_pursuit`` synthesises a pursuit threat (target in
+    the registry, alive, position fresh), the bot fires homing toward
+    the last wire position instead of re-acquiring.
+    """
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["behavior"]["reason"] == "shoot Runner"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     """Refresh delegates to fuel recovery when combat teleport is unaffordable."""
     tanks: dict[str, TankStateDict] = {
@@ -368,7 +466,7 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
 
 
 def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
@@ -444,7 +542,7 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
 
 
 def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None:
@@ -662,6 +760,7 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
             "combat_target_id": 50,
             "combat_target_x": 150,
             "combat_target_y": 150,
+            "last_shot_target_id": 50,
         }
     )
     inventory = make_inventory()
@@ -674,7 +773,67 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
 
 
 def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
-    """CLOSE state pursues via homing fire when target leaves viewport."""
+    """CLOSE state pursues via homing fire when target leaves viewport after engagement."""
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "CLOSE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+            "last_shot_target_id": 50,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "shoot"
+
+
+def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
+    """REFRESH state pursues via homing fire when target leaves viewport after engagement."""
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "REFRESH",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+            "last_shot_target_id": 50,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "shoot"
+
+
+def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
+    """CLOSE state re-teleports when lock was set but no shot ever fired at it.
+
+    Regression guard for live run 2026-06-23 21:36:31: bot was at
+    (46,100), planner emitted teleport to red-4 at (56,177); the
+    executor swapped the teleport for a pre-teleport ``map_open``
+    (precondition not met). The map_open took 6116ms and the next
+    decision ran in HUNT/CLOSE -- which previously fell straight to
+    pursuit and fired ``shoot`` at (56,177) from dist=87, looping 19
+    times. ``last_shot_target_id != combat_target_id`` is the
+    discriminator: we set the lock but never fired, so the lock is
+    the pre-engagement intent, not a mid-fight chase. Re-issue the
+    teleport instead of firing into the void.
+    """
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -693,11 +852,34 @@ def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["command"]["cmd_type"] == "teleport"
 
 
-def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
-    """REFRESH state pursues via homing fire when target leaves viewport."""
+def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
+    """ENGAGE substate re-teleports when lock was set but no shot ever fired."""
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ENGAGE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+
+
+def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
+    """REFRESH substate re-teleports when lock was set but no shot ever fired."""
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -716,7 +898,7 @@ def test_hunt_refresh_fires_homing_when_locked_target_left_viewport() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["command"]["cmd_type"] == "teleport"
 
 
 def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None:

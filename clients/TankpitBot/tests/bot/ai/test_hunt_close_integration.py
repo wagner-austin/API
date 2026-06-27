@@ -446,6 +446,112 @@ class TestDecideTeleportToFarTarget:
 
         assert "50" in filtered["tanks"]
 
+    def test_engaged_target_at_distance_shoots_instead_of_teleporting(self) -> None:
+        """An engaged locked target at distance > 1 stays put and shoots.
+
+        User-contract gameplay loop (2026-06-26): the bot teleports
+        cardinally adjacent once on first acquire, fires dual shots
+        until the target teleports away, then stays in place and fires
+        homing toward the target's last wire position until the kill.
+        The server picks ``homing`` when not adjacent and homing tracks,
+        so chasing with another teleport burns fuel without changing
+        the firing geometry.
+
+        Concretely: enemy moved 5 tiles away (still on the bot's
+        viewport) after the dual-shot phase. ``last_shot_target_id ==
+        combat_target_id`` proves the bot already engaged this lock,
+        so the planner must dispatch ``shoot`` rather than
+        ``teleport`` even at distance 5.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=105,
+                y=100,
+                team=2,
+                rank=1,
+                name="EngagedEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 105,
+                "combat_target_y": 100,
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "EngagedEnemy",
+                "mode": "HUNT",
+                "mode_state": "CLOSE",
+                "mode_started_ms": 90000,
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["target_x"] == 105
+        assert decision["behavior"]["target_y"] == 100
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_fresh_acquire_at_distance_teleports_to_close(self) -> None:
+        """A never-engaged locked target at distance > 1 teleports to close.
+
+        Companion to the engaged-stay-put case: a fresh acquire
+        (``last_shot_target_id`` does not match ``combat_target_id``)
+        is the one-time initial close that the engagement contract
+        allows. The bot teleports cardinally adjacent so the next
+        tick's dual shot resolves at point-blank.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=105,
+                y=100,
+                team=2,
+                rank=1,
+                name="FreshEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 105,
+                "combat_target_y": 100,
+                "last_shot_target_id": -1,
+                "mode": "HUNT",
+                "mode_state": "CLOSE",
+                "mode_started_ms": 90000,
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 105
+        assert decision["command"]["target_y"] == 100
+
     def test_no_teleport_when_fuel_too_low(self) -> None:
         """Teleport close is skipped when fuel cannot satisfy the guard."""
         tanks: dict[str, TankStateDict] = {

@@ -221,8 +221,16 @@ class TestDecideKillCooldown:
                 decision["behavior"]["target_y"],
             ) != (105, 105)
 
-    def test_miss_recloses_on_far_target(self) -> None:
-        """Miss feedback re-closes on distant target (teleport, not shoot)."""
+    def test_miss_keeps_firing_engaged_far_target(self) -> None:
+        """Miss feedback on an engaged distant target keeps firing, not chasing.
+
+        User contract (2026-06-26): once the bot has dispatched a shot
+        at a lock, mid-fight enemy movement is handled by staying put
+        and firing again. The server picks ``homing`` when not adjacent
+        and homing tracks, so a missed dual at distance is followed by
+        another shoot (not a teleport to re-close).
+        ``last_shot_target_id == combat_target_id`` proves engagement.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -256,7 +264,7 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_miss_reshoots_when_adjacent(self) -> None:
@@ -300,8 +308,14 @@ class TestDecideKillCooldown:
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_closing_recloses_when_not_cardinally_adjacent(self) -> None:
-        """Diagonal landing positions continue HUNT close behavior instead of shooting."""
+    def test_closing_keeps_firing_when_engaged_at_diagonal(self) -> None:
+        """Diagonal landing on an engaged target keeps firing, not chasing.
+
+        User contract (2026-06-26): once engaged, the bot stays put and
+        fires homing at any non-adjacent position. A diagonal landing
+        (distance 2) on an engaged target dispatches another shoot
+        rather than spending fuel on a re-close teleport.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -338,8 +352,8 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
 
-        assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["behavior"]["reason"] == "teleport Enemy"
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["behavior"]["reason"] == "shoot Enemy"
 
     def test_closing_shoots_when_cardinally_adjacent(self) -> None:
         """Closing combat engages once the landed position is cardinally usable."""

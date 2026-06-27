@@ -155,6 +155,51 @@ class TestDecideBlockedCombatTargets:
         assert "Reachable" in decision["behavior"]["reason"]
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
+    def test_failed_combat_landing_blocks_target_and_reopens_map_when_no_viable_threat(
+        self,
+    ) -> None:
+        """Failed landing with no other enemies falls through to find_enemies map open.
+
+        Covers ``block_combat_target_and_replan``'s no-viable-threats
+        fallthrough: the locked target's landing is marked failed and
+        no other enemy is in the threat list, so the bot blocks the
+        target, clears the lock, and reopens the map to find new
+        threats rather than firing or close-engaging.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="OnlyTarget",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "combat_target_id": 50,
+                "combat_target_x": 120,
+                "combat_target_y": 100,
+            }
+        )
+        inventory = make_inventory()
+        mark_move_target_failed(120, 100, 99000)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["reason"] == "find_enemies"
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
+
     def test_walk_close_ringed_target_is_teleported_to_directly(self) -> None:
         """A walk-range target with water-ringed adjacent tiles is still teleported to.
 

@@ -8,6 +8,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
     engage_target,
     get_locked_target,
     has_combat_shot,
+    is_already_engaged,
     select_new_combat_target,
     teleport_to_target,
 )
@@ -333,6 +334,54 @@ class TestGetLockedTargetWorldStateFallback:
         assert get_locked_target(ctx, []) is None
 
 
+class TestIsAlreadyEngaged:
+    """Tests for the engaged-vs-fresh discriminator."""
+
+    def setup_method(self) -> None:
+        """Reset shared world-state globals before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
+
+    def test_true_when_last_shot_target_matches_combat_target(self) -> None:
+        """A dispatched shoot at the current lock proves the bot is engaged."""
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ai_state["last_shot_target_id"] = 50
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert is_already_engaged(ctx) is True
+
+    def test_false_when_last_shot_target_differs(self) -> None:
+        """A fresh lock with no shot dispatched at this id is not engaged."""
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 50
+        ai_state["last_shot_target_id"] = -1
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert is_already_engaged(ctx) is False
+
+    def test_false_when_last_shot_target_is_old_kill(self) -> None:
+        """Carryover ``last_shot_target_id`` from a prior kill does not count.
+
+        After a kill, the planner picks up a new lock with a different
+        id; ``last_shot_target_id`` still points at the dead enemy
+        until the next shoot dispatches. The mismatch correctly says
+        "fresh acquire" for the new target.
+        """
+        world, self_state = make_world(fuel=800)
+        ai_state = make_scanned_ai_state()
+        ai_state["combat_target_id"] = 60
+        ai_state["last_shot_target_id"] = 50
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        assert is_already_engaged(ctx) is False
+
+
 def test_combat_landing_candidates_delegate_to_shared_helper() -> None:
     """Combat landing candidates expose shared adjacent-tile ordering."""
     world, self_state = make_world(fuel=800)
@@ -405,7 +454,7 @@ class TestCombatTeleportGuards:
 
         if result is None:
             raise AssertionError("expected fuel recovery decision")
-        assert result["behavior"]["mode"] == "COLLECT_FUEL"
+        assert result["behavior"]["mode"] == "COLLECT"
         assert result["updated_ai_state"]["combat_target_id"] == -1
         assert result["updated_ai_state"]["blocked_combat_targets"] == {}
 
@@ -522,21 +571,33 @@ class TestKillShotWireGate:
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["behavior"]["reason"] == "shoot Adjacent"
 
-    def test_wire_stale_adjacent_target_is_blocked_not_shot(self) -> None:
-        """A wire-silent adjacent ghost is blocked without firing.
+    def test_wire_stale_adjacent_target_is_still_shot(self) -> None:
+        """A wire-silent target is still engaged.
 
-        The map keeps the tank at a fresh ``timestamp_ms`` (it is an
-        acquirable threat), but its last wire confirmation is far older
-        than the presence TTL, so the gate must refuse the shot and
-        replan instead of wasting a round on an afterimage.
+        Wire-silence is not a stop signal. A locked target that
+        teleports off the bot's viewport stops broadcasting wire
+        updates -- the server only emits wire events for tanks the
+        local viewport can see -- which is the expected case the
+        pursuit cascade exists to handle. The lock holds until an
+        authoritative deactivation signal arrives (``liveness``
+        flips to ``deactivated`` or the tank lands in
+        ``killed_tank_ids``).
+
+        Pre-2026-06-23 the wire-presence gate in ``_combat_shoot``
+        blocked any target whose ``last_wire_seen_ms`` exceeded the
+        7000ms presence TTL. That gate killed pursuit shots: live
+        run 2026-06-23 19:31:43 saw purple-8 (id=516) teleport off
+        viewport during an engagement, go wire-silent for 8224ms, get
+        flagged as a "ghost" and blocked despite being genuinely alive
+        and the bot's active combat lock. The gate was removed
+        2026-06-23; this test guards against re-introduction.
         """
         ctx, target = self._adjacent_world_and_ctx(last_wire_seen_ms=100000 - 60000)
 
         decision = engage_target(ctx, target)
 
-        assert decision["command"]["cmd_type"] != "shoot"
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
-        assert decision["updated_ai_state"]["combat_target_id"] != 50
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert "50" not in decision["updated_ai_state"]["blocked_combat_targets"]
 
 
 class TestMissOnMovedTarget:
