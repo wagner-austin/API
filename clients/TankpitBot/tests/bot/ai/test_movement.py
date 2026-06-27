@@ -48,7 +48,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap({(right, 100): "#"})
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected edge-sidestep approach move")
@@ -76,7 +76,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap(terrain_data)
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected direct teleport to the known target")
@@ -97,7 +97,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap({(100, bottom): "#"})
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected edge-sidestep approach move on the bottom row")
@@ -115,7 +115,7 @@ class TestWalkOrTeleport:
         terrain = InMemoryTerrainMap()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, 110, 100, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, 110, 100, pickup_kind=None)
 
         if result is None:
             raise AssertionError("expected sidestep move off the own-tile clamp")
@@ -154,7 +154,7 @@ class TestWalkOrTeleport:
 
     def test_uses_final_move_target_when_viewport_path_exists(self) -> None:
         """In-viewport detours still issue the final move target."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
@@ -200,7 +200,7 @@ class TestWalkOrTeleport:
                 timestamp_ms=100000,
             ),
         }
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
@@ -216,7 +216,7 @@ class TestWalkOrTeleport:
 
     def test_ignores_mine_on_old_waypoint_tile(self) -> None:
         """Mine occupancy off the final target does not block the move."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"103,99": make_mine_state(x=103, y=99, mine_type=0, tank_id=-1, team=1)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -233,7 +233,7 @@ class TestWalkOrTeleport:
 
     def test_rejects_recently_failed_move_target(self) -> None:
         """Recently failed move targets are skipped before planning."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
@@ -260,7 +260,7 @@ class TestWalkOrTeleport:
                 timestamp_ms=100000,
             ),
         }
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
@@ -272,7 +272,7 @@ class TestWalkOrTeleport:
 
     def test_direct_move_command_rejects_off_viewport_target(self) -> None:
         """Direct move helper refuses targets outside the visible viewport."""
-        world, self_state = make_world(self_x=64, self_y=64, fuel=300)
+        world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
@@ -284,7 +284,7 @@ class TestWalkOrTeleport:
 
     def test_direct_move_command_rejects_mined_target(self) -> None:
         """Direct move helper rejects final targets occupied by known mines."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -311,7 +311,7 @@ class TestWalkOrTeleport:
                 timestamp_ms=100000,
             ),
         }
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300, tanks=tanks)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
@@ -322,7 +322,7 @@ class TestWalkOrTeleport:
 
     def test_rejects_mined_move_without_terrain(self) -> None:
         """Without terrain, mine occupancy on the target blocks the move."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -334,7 +334,7 @@ class TestWalkOrTeleport:
 
     def test_moves_to_final_target_when_mine_blocks_straight_line(self) -> None:
         """Known mines on the straight line still allow an in-viewport detour."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory(default_count=5)
@@ -364,7 +364,7 @@ class TestWalkOrTeleport:
 
     def test_viewport_exploration_candidates_rotate_with_offset(self) -> None:
         """Exploration candidate order can rotate to avoid repeating one edge."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
@@ -377,7 +377,7 @@ class TestWalkOrTeleport:
 
     def test_viewport_exploration_candidates_return_empty_for_single_tile_viewport(self) -> None:
         """Degenerate one-tile viewports yield no exploration candidates."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["viewport"] = ViewportStateDict(left=100, top=100, width=1, height=1)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
@@ -389,7 +389,7 @@ class TestWalkOrTeleport:
 
     def test_select_exploration_prefers_unscanned_neighboring_viewport(self) -> None:
         """Exploration prefers edges that expose fresh unscanned space."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         current = world["viewport"]
         world["scanned_viewports"] = {
             viewport_scan_key(current["left"], current["top"]): 100000,
