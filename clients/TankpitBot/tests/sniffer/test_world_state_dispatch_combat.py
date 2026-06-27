@@ -176,3 +176,62 @@ class TestTeleportLandedTracking:
         mark_teleport_landed(get_world_service())
         reset_world_state()
         assert check_and_clear_teleport_landed(get_world_service()) is False
+
+
+class TestAmmoDeltaHit:
+    """Tests for inventory-delta hit confirmation."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_returns_false_when_no_snapshot_pending(self) -> None:
+        """No snapshot pending -> ammo delta is not consulted."""
+        from tankpit_bot.sniffer.world_state_combat import check_and_clear_ammo_delta_hit
+
+        ws = get_world_service()
+        assert ws.pending_shot_inventory_snapshot is None
+        assert check_and_clear_ammo_delta_hit(ws) is False
+
+    def test_returns_true_when_homing_count_dropped(self) -> None:
+        """Server-confirmed homing hit: ammo decremented since snapshot."""
+        from tankpit_bot.sniffer.world_state_combat import check_and_clear_ammo_delta_hit
+
+        ws = get_world_service()
+        update_inventory_from_protocol(ws, [25, 25, 25, 25, 25], [False] * 5)
+        # Bot dispatched a shoot just now: snapshot pre-shot inventory.
+        ws.pending_shot_inventory_snapshot = ws.inventory_state
+        # Server confirms hit via 0x49 inventory update with homing -1.
+        update_inventory_from_protocol(ws, [25, 25, 25, 24, 25], [False] * 5)
+
+        assert check_and_clear_ammo_delta_hit(ws) is True
+        # Subsequent call returns False -- snapshot cleared on read.
+        assert check_and_clear_ammo_delta_hit(ws) is False
+
+    def test_returns_true_when_dual_or_missile_count_dropped(self) -> None:
+        """Dual or missile decrement is just as authoritative as homing."""
+        from tankpit_bot.sniffer.world_state_combat import check_and_clear_ammo_delta_hit
+
+        ws = get_world_service()
+        update_inventory_from_protocol(ws, [25, 25, 25, 25, 25], [False] * 5)
+        ws.pending_shot_inventory_snapshot = ws.inventory_state
+        update_inventory_from_protocol(ws, [25, 24, 25, 25, 25], [False] * 5)
+
+        assert check_and_clear_ammo_delta_hit(ws) is True
+
+    def test_returns_false_when_no_decrement_visible(self) -> None:
+        """No change between snapshot and current -> miss (no debit)."""
+        from tankpit_bot.sniffer.world_state_combat import check_and_clear_ammo_delta_hit
+
+        ws = get_world_service()
+        update_inventory_from_protocol(ws, [25, 25, 25, 25, 25], [False] * 5)
+        ws.pending_shot_inventory_snapshot = ws.inventory_state
+        # No inventory update (server confirmed miss; no debit).
+
+        assert check_and_clear_ammo_delta_hit(ws) is False
+        # Snapshot was still consumed on read.
+        assert ws.pending_shot_inventory_snapshot is None

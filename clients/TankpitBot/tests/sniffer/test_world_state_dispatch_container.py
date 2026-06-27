@@ -306,6 +306,70 @@ class TestDispatchShootEvent:
         assert ws.world_state["tanks"]["534"]["x"] == 155
         assert ws.world_state["tanks"]["534"]["y"] == 155
 
+    def test_own_homing_does_not_overwrite_locked_target_position(self) -> None:
+        """Own homing/missile shot leaves the locked target's registry untouched.
+
+        User contract (2026-06-26): the bot stays put and fires homing
+        at off-viewport targets repeatedly until the kill. The server's
+        homing seeker resolves to wherever the target actually is, but
+        that tile is often off-viewport. Overwriting the registry with
+        that off-viewport coord poisons the next shoot dispatch -- the
+        planner aims at the off-viewport tile and the server rejects
+        with ``command_error`` because shoot commands must target a
+        tile inside the 18x18 viewport (see [[shot-range]]). The
+        registry keeps the last on-viewport coord, the bot keeps
+        aiming there, and the server auto-tracks every homing.
+        """
+        from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
+        from tankpit_bot.state.types import make_tank_state
+
+        ws = get_world_service()
+        dispatch_world_state_update(
+            ws,
+            MovementResponseDict(
+                msg_type=0x3D,
+                team=2,
+                tank_id=1301,
+                x=155,
+                y=154,
+                direction=0,
+                damage_state=0,
+                rank=1,
+                lb_score=5,
+                carrying=0,
+            ),
+        )
+        ws.world_state["tanks"]["517"] = make_tank_state(
+            tank_id=517,
+            x=180,
+            y=147,
+            team=1,
+            rank=1,
+            name="purple-9",
+            is_self=False,
+            is_bot=True,
+            damage_state=0,
+            timestamp_ms=1000,
+        )
+        ws.last_shot_combat_target_id = 517
+        msg = ShootEventDict(
+            msg_type=0x53,
+            team=2,
+            shooter_id=1301,
+            source_x=155,
+            source_y=154,
+            target_x=198,
+            target_y=152,
+            aim_x=198,
+            aim_y=152,
+            weapon=3,
+        )
+
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.world_state["tanks"]["517"]["x"] == 180
+        assert ws.world_state["tanks"]["517"]["y"] == 147
+
 
 class TestDispatchProtocolDeactivation:
     """Tests for protocol-path 0x41 Deactivation dispatch.
