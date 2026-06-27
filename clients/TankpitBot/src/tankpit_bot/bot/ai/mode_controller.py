@@ -107,30 +107,6 @@ def apply_mode_to_decision(
     )
 
 
-def should_enter_recover_fuel(ctx: DecideCtx) -> bool:
-    """Return True when fuel recovery should own planning.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True when fuel is at or below the low-threshold entry rule.
-    """
-    return ctx.fuel <= ctx.config["fuel_low_threshold"]
-
-
-def should_exit_recover_fuel(ctx: DecideCtx) -> bool:
-    """Return True when fuel recovery can release control.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True when fuel has recovered to the full-threshold exit rule.
-    """
-    return ctx.fuel >= ctx.config["fuel_full_threshold"]
-
-
 def needs_radar_restock(ctx: DecideCtx) -> bool:
     """Return True while extra radars sit below the healthy buffer.
 
@@ -151,35 +127,28 @@ def needs_radar_restock(ctx: DecideCtx) -> bool:
     return ctx.inventory["extra_radars"]["count"] < ctx.config["radar_resume_threshold"]
 
 
-def should_enter_recover_equipment(ctx: DecideCtx) -> bool:
-    """Return True when equipment recovery should own planning.
+def should_enter_collect(ctx: DecideCtx) -> bool:
+    """Return True when the unified COLLECT mode should own planning.
 
-    Per the user-defined gameplay loop ("restock -> find enemy ->
-    fight -> kill -> restock -> hunt"), restock-mode entry has two
-    tiers:
+    Entry triggers across fuel and equipment:
 
-    * **Emergency** -- any reserve below its *break* threshold
-      (4 duals / 4 homings / 5 radars). The bot can't fight without
-      ammo; restock interrupts even an active combat target.
-    * **Between kills** -- any reserve below its *resume* threshold
-      (25 / 25 / 20) AND no active combat target. The bot finishes
-      the current kill first, then restocks before the next hunt.
-
-    The "active combat target" gate is the difference between
-    "restock, fight, restock" and "restock, shoot ONCE, restock":
-    a single missed-or-hit shot drops dual from 25 to 24, which
-    trips the resume threshold but should NOT abandon the in-flight
-    kill -- the bot finishes the engagement, THEN restocks for the
-    next one.
+    * **Fuel low** -- at or below the fuel-low threshold.
+    * **Weapon emergency** -- any weapon reserve below its break
+      threshold, or extra radars at or below the radar break threshold.
+      Interrupts even an active combat target.
+    * **Between kills** -- any weapon reserve below its resume
+      threshold, or extra radars below the resume buffer, AND no active
+      combat target. Finishes the current kill first, then restocks
+      before the next hunt.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when the bot is below the emergency break threshold,
-        or when between kills with reserves below the resume
-        threshold.
+        True when fuel or equipment reserves require collection.
     """
+    if ctx.fuel <= ctx.config["fuel_low_threshold"]:
+        return True
     if (
         ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
         or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
@@ -195,11 +164,11 @@ def should_enter_recover_equipment(ctx: DecideCtx) -> bool:
     )
 
 
-def should_exit_recover_equipment(ctx: DecideCtx) -> bool:
-    """Return True when equipment recovery can release control.
+def should_exit_collect(ctx: DecideCtx) -> bool:
+    """Return True when COLLECT can release control.
 
-    The mode holds until BOTH reserves are healthy: weapons back above
-    the resume threshold AND radars rebuilt to their resume buffer.
+    The mode holds until BOTH reserves are healthy: fuel back above the
+    full threshold AND weapons + radars back above their resume buffers.
     The break/resume gap gives hysteresis -- entry at the low break,
     exit only at the higher resume -- so the bot rebuilds to a full
     stock instead of leaving the moment it scrapes together one radar.
@@ -208,9 +177,10 @@ def should_exit_recover_equipment(ctx: DecideCtx) -> bool:
         ctx: Decision context.
 
     Returns:
-        True when weapon reserves are restored and radars are no longer
-        below the resume buffer.
+        True when fuel and combat reserves are restored.
     """
+    if ctx.fuel < ctx.config["fuel_full_threshold"]:
+        return False
     return combat_reserve_restored(ctx) and not needs_radar_restock(ctx)
 
 
@@ -226,11 +196,9 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
         ctx: Decision context.
 
     Returns:
-        True when combat-ready and no recovery mode has stronger entry.
+        True when combat-ready and COLLECT has no stronger entry condition.
     """
-    if should_enter_recover_fuel(ctx):
-        return False
-    if should_enter_recover_equipment(ctx):
+    if should_enter_collect(ctx):
         return False
     return combat_reserve_restored(ctx)
 
@@ -242,7 +210,7 @@ def should_exit_hunt(ctx: DecideCtx) -> bool:
         ctx: Decision context.
 
     Returns:
-        True when a recovery mode now has stronger entry conditions.
+        True when COLLECT now has a stronger entry condition.
     """
     return not should_enter_hunt(ctx)
 
@@ -278,42 +246,22 @@ def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:
     return "ACQUIRE"
 
 
-def derive_recover_equipment_mode_state(decision: TickDecisionDict) -> AIModeState:
-    """Derive the ``RECOVER_EQUIPMENT`` substate from planner output.
+def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
+    """Derive the ``COLLECT`` substate from planner output.
 
     Args:
-        decision: Decision produced by the equipment recovery owner path.
+        decision: Decision produced by the collect-owner path.
 
     Returns:
-        Derived equipment recovery substate for the updated AI state.
+        Derived collect substate for the updated AI state.
     """
     reason = decision["behavior"]["reason"]
     command_type = decision["command"]["cmd_type"]
     if reason in ("forage_radar", "forage_sweep"):
         return "SENSE"
-    if reason == "search_equipment_local":
+    if reason == "search_collect_local":
         return "SEARCH"
-    if command_type == "pickup_equipment":
-        return "PICKUP"
-    return "APPROACH"
-
-
-def derive_recover_fuel_mode_state(decision: TickDecisionDict) -> AIModeState:
-    """Derive the ``RECOVER_FUEL`` substate from planner output.
-
-    Args:
-        decision: Decision produced by the fuel recovery owner path.
-
-    Returns:
-        Derived fuel recovery substate for the updated AI state.
-    """
-    reason = decision["behavior"]["reason"]
-    command_type = decision["command"]["cmd_type"]
-    if reason in ("forage_radar", "forage_sweep"):
-        return "SENSE"
-    if reason == "search_fuel_local":
-        return "SEARCH"
-    if command_type == "pickup_fuel":
+    if command_type in ("pickup_fuel", "pickup_equipment"):
         return "PICKUP"
     return "APPROACH"
 
@@ -322,14 +270,11 @@ __all__ = [
     "apply_mode_to_decision",
     "clear_ai_mode",
     "clear_mode_on_decision",
+    "derive_collect_mode_state",
     "derive_hunt_mode_state",
-    "derive_recover_equipment_mode_state",
-    "derive_recover_fuel_mode_state",
     "set_ai_mode",
+    "should_enter_collect",
     "should_enter_hunt",
-    "should_enter_recover_equipment",
-    "should_enter_recover_fuel",
+    "should_exit_collect",
     "should_exit_hunt",
-    "should_exit_recover_equipment",
-    "should_exit_recover_fuel",
 ]

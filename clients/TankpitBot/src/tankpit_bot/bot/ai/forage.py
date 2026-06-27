@@ -32,7 +32,6 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
-    can_afford_teleport_search,
     clear_resource_target,
     make_decision,
     mark_scan_dispatched,
@@ -89,12 +88,9 @@ def plan_forage_search(
 ) -> TickDecisionDict | None:
     """Plan the next foraging action inside the current viewport.
 
-    The forager is mode-agnostic. Equipment recovery and fuel recovery
-    both call it with their own ``behavior_mode``, ``score``, and a
-    caller-supplied ``radar_affordable`` predicate (equipment recovery
-    burns fuel down to 10; fuel recovery refuses to dip below the hunt
-    operating reserve). The function itself never branches on caller
-    identity.
+    The forager is mode-agnostic. Callers supply their own
+    ``behavior_mode``, ``score``, and ``radar_affordable`` predicate;
+    the function itself never branches on caller identity.
 
     Three branches in order:
 
@@ -116,12 +112,10 @@ def plan_forage_search(
         ctx: Decision context.
         ai_state: Base AI state to rewrite for the produced command.
         score: Behavior score for the produced decision.
-        behavior_mode: Behavior-mode label stamped on the decision
-            (``COLLECT_EQUIPMENT`` or ``COLLECT_FUEL``).
+        behavior_mode: Behavior-mode label stamped on the decision.
         radar_affordable: Caller-evaluated predicate that says the
             radar's fuel cost is payable under the caller's reserve
-            policy this tick. Fuel-mode callers keep the hunt operating
-            reserve intact; equipment-mode callers may spend below it.
+            policy this tick.
 
     Returns:
         Foraging radar or move decision, or ``None`` when no productive
@@ -163,12 +157,6 @@ def plan_forage_search(
     target_x, target_y = target
     command = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
     if command is None:
-        return None
-    if command["cmd_type"] == "teleport" and not can_afford_teleport_search(
-        ctx,
-        target_x,
-        target_y,
-    ):
         return None
     emit_ai("forage walk to unscanned tile (%d,%d) mode=%s", target_x, target_y, behavior_mode)
     return make_decision(

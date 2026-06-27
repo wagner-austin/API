@@ -13,8 +13,7 @@ from platform_core.json_utils import JSONObject, require_str
 AIMode = Literal[
     "UNSET",
     "HUNT",
-    "RECOVER_FUEL",
-    "RECOVER_EQUIPMENT",
+    "COLLECT",
 ]
 
 AI_MODE_STATES: tuple[
@@ -66,8 +65,7 @@ AIModeState = Literal[
 AI_MODES: tuple[AIMode, ...] = (
     "UNSET",
     "HUNT",
-    "RECOVER_FUEL",
-    "RECOVER_EQUIPMENT",
+    "COLLECT",
 )
 
 HUNT_MODE_STATES: tuple[AIModeState, ...] = (
@@ -79,7 +77,7 @@ HUNT_MODE_STATES: tuple[AIModeState, ...] = (
     "CONFIRM_KILL",
 )
 
-RECOVERY_MODE_STATES: tuple[AIModeState, ...] = (
+COLLECT_MODE_STATES: tuple[AIModeState, ...] = (
     "SENSE",
     "SEARCH",
     "APPROACH",
@@ -142,14 +140,14 @@ def is_valid_ai_mode_state(mode: AIMode, mode_state: AIModeState) -> bool:
         return mode_state == ""
     if mode == "HUNT":
         return mode_state in HUNT_MODE_STATES
-    return mode_state in RECOVERY_MODE_STATES
+    return mode_state in COLLECT_MODE_STATES
 
 
 __all__ = [
     "AI_MODES",
     "AI_MODE_STATES",
+    "COLLECT_MODE_STATES",
     "HUNT_MODE_STATES",
-    "RECOVERY_MODE_STATES",
     "AIMode",
     "AIModeState",
     "is_valid_ai_mode_state",

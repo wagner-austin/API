@@ -8,24 +8,20 @@ mode/substate fields.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.mode_controller import (
     apply_mode_to_decision,
     clear_ai_mode,
+    derive_collect_mode_state,
     derive_hunt_mode_state,
-    derive_recover_equipment_mode_state,
-    derive_recover_fuel_mode_state,
-    should_enter_recover_equipment,
-    should_enter_recover_fuel,
+    should_enter_collect,
+    should_exit_collect,
     should_exit_hunt,
-    should_exit_recover_equipment,
-    should_exit_recover_fuel,
 )
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
-from tankpit_bot.bot.ai.recover_equipment_mode import decide_recover_equipment_mode
-from tankpit_bot.bot.ai.recover_fuel_mode import decide_recover_fuel_mode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -67,20 +63,12 @@ def decide(
         combat_feedback,
     )
     mode = _select_owner_mode(ctx)
-    if mode == "RECOVER_FUEL":
-        decision = decide_recover_fuel_mode(ctx)
+    if mode == "COLLECT":
+        decision = decide_collect_mode(ctx)
         return apply_mode_to_decision(
             decision,
-            "RECOVER_FUEL",
-            derive_recover_fuel_mode_state(decision),
-            timestamp_ms,
-        )
-    if mode == "RECOVER_EQUIPMENT":
-        decision = decide_recover_equipment_mode(ctx)
-        return apply_mode_to_decision(
-            decision,
-            "RECOVER_EQUIPMENT",
-            derive_recover_equipment_mode_state(decision),
+            "COLLECT",
+            derive_collect_mode_state(decision),
             timestamp_ms,
         )
     decision = decide_hunt_mode(ctx)
@@ -121,16 +109,12 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
         Durable top-level owner for the current tick.
     """
     current_mode = ctx.mode
-    if current_mode == "RECOVER_FUEL" and not should_exit_recover_fuel(ctx):
-        return "RECOVER_FUEL"
-    if should_enter_recover_fuel(ctx):
-        return "RECOVER_FUEL"
-    if current_mode == "RECOVER_EQUIPMENT" and not should_exit_recover_equipment(ctx):
-        return "RECOVER_EQUIPMENT"
+    if current_mode == "COLLECT" and not should_exit_collect(ctx):
+        return "COLLECT"
     if current_mode == "HUNT" and not should_exit_hunt(ctx):
         return "HUNT"
-    if should_enter_recover_equipment(ctx):
-        return "RECOVER_EQUIPMENT"
+    if should_enter_collect(ctx):
+        return "COLLECT"
     return "HUNT"
 
 
