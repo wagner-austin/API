@@ -50,6 +50,7 @@ from tankpit_bot.sniffer.world_state import (
     get_world_service,
 )
 from tankpit_bot.sniffer.world_state_combat import (
+    check_and_clear_ammo_delta_hit,
     check_and_clear_combat_hit,
     check_and_clear_last_shot_victim_id,
     check_and_clear_our_shot_response,
@@ -575,6 +576,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
     got_hit = check_and_clear_combat_hit(get_world_service())
     victim_id = check_and_clear_last_shot_victim_id(get_world_service())
     got_response = check_and_clear_our_shot_response(get_world_service())
+    ammo_hit = check_and_clear_ammo_delta_hit(get_world_service())
 
     def _inc_hit() -> None:
         bot._ai_state = AIStateDict(
@@ -610,7 +612,28 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         )
         _inc_hit()
         return "hit"
+    if ammo_hit:
+        # Server only debits dual / missile / homing ammo on a confirmed
+        # hit, so the ammo delta is the authoritative ground-truth hit
+        # signal even when the wire's ``victim_id`` lookup misses
+        # (off-viewport target whose new position is not yet in our
+        # local registry). Promotes the conservative "miss" the wire
+        # tile-occupancy gate would have emitted into the actual hit
+        # the server recorded.
+        emit_diagnostic(
+            diagnostic_kind="combat_feedback",
+            result="hit",
+            reason="ammo_delta",
+            target_name=target_name,
+            target_id=target_id,
+            actual_victim_id=victim_id,
+            on_intended_target=True,
+        )
+        _inc_hit()
+        return "hit"
     if got_response:
+        # No tile-occupied hit, no ammo debit, and a wire response did
+        # arrive -- the shot genuinely missed.
         emit_diagnostic(
             diagnostic_kind="combat_feedback",
             result="miss",

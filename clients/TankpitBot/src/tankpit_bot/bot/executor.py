@@ -16,6 +16,7 @@ from tankpit_bot.diagnostics.game_log_feedback import (
 )
 from tankpit_bot.diagnostics.teleport_attempts import record_teleport_dispatch
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict, coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
@@ -136,6 +137,15 @@ def dispatch_command(
     if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
         return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":
+        # Record the combat target so the 0x53 dispatcher can attribute
+        # the seeker's resolved tile to the right tank when refreshing
+        # off-viewport positions from homing/missile tracking. Snapshot
+        # the inventory so combat_feedback can confirm hits via ammo
+        # delta when the wire's victim_id lookup misses (off-viewport
+        # target).
+        ws = get_world_service()
+        ws.last_shot_combat_target_id = command["target_id"]
+        ws.pending_shot_inventory_snapshot = ws.inventory_state
         return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
     if command["cmd_type"] == "radar":
         return bot.use_radar()
@@ -233,13 +243,13 @@ def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
 
     Combat presence -- whether the target is a live tank rather than a
     map-only afterimage -- is decided once, upstream, by the HUNT owner's
-    wire-presence kill gate (:func:`is_wire_present`). The executor's
-    remaining job is the structural re-check that the target still exists
-    at the commanded tile after any same-tick world-state update: a target
-    that vanished or drifted is rejected. ``source`` no longer gates the
-    shot -- the old ``source``/viewport proxy was the insufficient ghost
-    defense the wire-presence gate replaced (it admitted afterimages that
-    sat inside the viewport).
+    viewport-presence acquisition gate in :func:`analyze_threats`. The
+    executor's remaining job is the structural re-check that the target
+    still exists at the commanded tile after any same-tick world-state
+    update: a target that vanished or drifted is rejected. ``source`` no
+    longer gates the shot -- the old ``source``/viewport proxy admitted
+    afterimages that sat inside the viewport and is superseded by the
+    viewport-presence acquisition gate.
 
     Args:
         world: Current world-state snapshot.

@@ -278,29 +278,6 @@ def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
     return sorted(desired)
 
 
-def needs_emergency_equipment(ctx: DecideCtx) -> bool:
-    """Check if a WEAPON reserve has dropped below the break threshold.
-
-    Only duals and homings can preempt the session: extra radars are a
-    search resource, and radar-driven equipment recovery SPENDS radars
-    while looking for them. Live run 20260611-232301 entered recovery
-    with radars at the threshold while holding 25 duals and 25 homings,
-    burned radars scanning for radars, and produced 0 kills in 240s.
-    Radars are topped up opportunistically (cross-kind pickups and
-    pre-departure sweeps), never as a session-owning emergency.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if the dual or homing count is below the break threshold.
-    """
-    return (
-        ctx.inventory["dual_shots"]["count"] <= ctx.config["dual_break_threshold"]
-        or ctx.inventory["homing_shots"]["count"] <= ctx.config["dual_break_threshold"]
-    )
-
-
 def combat_reserve_restored(ctx: DecideCtx) -> bool:
     """Check if the WEAPON reserves are back above the resume threshold.
 
@@ -482,30 +459,6 @@ def can_afford_teleport(
     return ctx.fuel >= required_fuel
 
 
-def can_afford_teleport_search(
-    ctx: DecideCtx,
-    target_x: int,
-    target_y: int,
-) -> bool:
-    """Check if the bot can afford a recovery/search teleport.
-
-    Args:
-        ctx: Decision context.
-        target_x: Destination X coordinate.
-        target_y: Destination Y coordinate.
-
-    Returns:
-        True if current fuel covers the exact teleport cost and leaves the
-        configured hunt operating reserve afterward.
-    """
-    return can_afford_teleport(
-        ctx,
-        target_x,
-        target_y,
-        reserve_fuel=ctx.config["hunt_min_fuel"],
-    )
-
-
 def require_command(
     command: BotCommand | None,
     tx: int,
@@ -589,7 +542,6 @@ def mark_scan_dispatched(ctx: DecideCtx, ai_state: AIStateDict) -> AIStateDict:
 __all__ = [
     "DecideCtx",
     "can_afford_teleport",
-    "can_afford_teleport_search",
     "can_use_radar",
     "clear_resource_target",
     "compute_equipment",
@@ -599,7 +551,6 @@ __all__ = [
     "locked_resource_target",
     "make_decision",
     "mark_scan_dispatched",
-    "needs_emergency_equipment",
     "normalize_resource_target",
     "require_command",
     "set_resource_target",

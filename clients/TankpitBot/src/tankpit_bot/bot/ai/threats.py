@@ -39,16 +39,15 @@ def _is_enemy(tank: TankStateDict, self_team: int) -> bool:
     return not tank["is_self"] and tank["team"] != self_team
 
 
-# A tank actually in the viewport talks on the wire constantly; a stale
-# registry afterimage is silent. Raw-capture measurement 2026-06-11:
-# purple-3 mid-fight produced 12 wire messages in 40s (~one per 3.3s);
-# after leaving, 0 in 60s; the orange-6 afterimage that absorbed 52
-# wasted shots produced 2 in 270s. Two fight-cadence periods of silence
-# means the tank is no longer here (respawn cycles in ~10s, so nothing
-# lingers longer for a good reason).
+# Legacy wire-presence horizon -- kept as a constant for test clock
+# arithmetic (advance_clock past this value to age a target out of the
+# viewport-confirmed threat list). The combat-side gate that used this
+# was removed 2026-06-23: off-viewport pursuit shots fire toward the
+# last known wire position via _locked_target_pursuit, so wire silence
+# is no longer a stop signal.
 _WIRE_PRESENCE_TTL_MS = 7000
 
-#: Public alias for cross-module consumers (combat_strategy, recover_fuel_mode).
+#: Public alias for cross-module consumers (tests).
 WIRE_PRESENCE_TTL_MS = _WIRE_PRESENCE_TTL_MS
 
 # The HUNT acquisition gate. Only tanks confirmed by viewport-bound
@@ -77,38 +76,13 @@ VIEWPORT_PRESENCE_TTL_MS = _VIEWPORT_PRESENCE_TTL_MS
 # gate kept firing block_combat_target_and_replan after each shoot.
 # Match the wire-presence TTL so a stationary target stays engageable
 # as long as it is still talking on the wire (TankStatusSync every
-# ~2 s); the long-stale "afterimage" case is already caught by
-# is_wire_present.
+# ~2 s). The long-stale "afterimage" case is now handled at acquisition
+# time by the viewport-presence gate in analyze_threats; the wire-side
+# combat gate was removed 2026-06-23.
 _POSITION_FRESHNESS_TTL_MS = 7000
 
 #: Public alias for cross-module consumers (combat_strategy).
 POSITION_FRESHNESS_TTL_MS = _POSITION_FRESHNESS_TTL_MS
-
-
-def is_wire_present(last_wire_seen_ms: int, now_ms: int) -> bool:
-    """Return True when a tank's last wire timestamp is fresh.
-
-    A tank actually in the viewport talks on the wire constantly; a
-    stale registry afterimage is silent. Two fight-cadence periods of
-    silence means the tank is no longer here, so a
-    ``last_wire_seen_ms`` older than :data:`_WIRE_PRESENCE_TTL_MS` is
-    treated as absent. ``_combat_shoot`` blocks (does not fire) any
-    target that fails this gate. The dedicated kill-shot
-    position-freshness gate was removed 2026-06-22 because the
-    viewport-presence requirement in :func:`analyze_threats` already
-    proves the position is current for any fireable target -- and
-    requiring an additional position-bearing message also blocked
-    stationary enemies (practice-room bots) whose only wire activity
-    is the global :class:`0x2E TankStatusSync` broadcast.
-
-    Args:
-        last_wire_seen_ms: Timestamp of the tank's most recent wire message.
-        now_ms: Current tick timestamp.
-
-    Returns:
-        True if the wire timestamp is within the presence TTL.
-    """
-    return now_ms - last_wire_seen_ms <= _WIRE_PRESENCE_TTL_MS
 
 
 def analyze_threats(
@@ -118,15 +92,17 @@ def analyze_threats(
 ) -> list[EnemyThreatDict]:
     """Analyze all enemy tanks and return sorted threat list.
 
-    Filters to enemy tanks only (different team, not self) whose WIRE
-    timestamp is fresh -- the wire vouches for presence, the registry
-    only refines positions of wire-vouched tanks -- computes Manhattan
-    distance from the player, and sorts by distance ascending.
+    Filters to enemy tanks only (different team, not self) confirmed
+    alive and observed via viewport-bound wire within
+    :data:`VIEWPORT_PRESENCE_TTL_MS` -- the viewport observation gate
+    proves the position is current and the tank is actually visible to
+    the bot. Computes Manhattan distance from the player and sorts by
+    distance ascending.
 
     Args:
         world: Current world state with tank positions.
         self_state: Player's own state for position and team.
-        now_ms: Current tick timestamp for wire-freshness filtering.
+        now_ms: Current tick timestamp for viewport-freshness filtering.
 
     Returns:
         List of EnemyThreatDict sorted by distance ascending.
@@ -390,29 +366,46 @@ def find_acquisition_target(
         Nearest acquisition target as :class:`EnemyThreatDict`, or
         ``None`` when no map-fresh enemy is viable.
     """
+    from platform_core.json_utils import JSONObject, dump_json_str
+
     from tankpit_bot.bot.ai.combat_strategy import has_passable_adjacent
+    from tankpit_bot.runtime_logging import emit_diagnostic
 
     self_x = self_state["x"]
     self_y = self_state["y"]
     self_team = self_state["team"]
 
     candidates: list[EnemyThreatDict] = []
+    candidate_log: list[JSONObject] = []
     for tank in world["tanks"].values():
         if not _is_enemy(tank, self_team):
             continue
-        if tank["liveness"] != "alive":
-            continue
-        if tank["x"] == 0 and tank["y"] == 0:
-            continue
-        if str(tank["tank_id"]) in killed:
-            continue
-        if str(tank["tank_id"]) in blocked:
-            continue
-        if now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
-            continue
-        if not has_passable_adjacent(tank["x"], tank["y"], terrain):
-            continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
+        rejected_reason: str | None = None
+        if tank["liveness"] != "alive":
+            rejected_reason = "not_alive"
+        elif tank["x"] == 0 and tank["y"] == 0:
+            rejected_reason = "unsynced_position"
+        elif str(tank["tank_id"]) in killed:
+            rejected_reason = "killed_cooldown"
+        elif str(tank["tank_id"]) in blocked:
+            rejected_reason = "blocked"
+        elif now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
+            rejected_reason = "stale_map_data"
+        elif not has_passable_adjacent(tank["x"], tank["y"], terrain):
+            rejected_reason = "no_passable_adjacent"
+        candidate_log.append(
+            {
+                "tank_id": tank["tank_id"],
+                "name": tank["name"],
+                "x": tank["x"],
+                "y": tank["y"],
+                "dist": dist,
+                "rejected_reason": rejected_reason,
+            }
+        )
+        if rejected_reason is not None:
+            continue
         candidates.append(
             make_enemy_threat(
                 tank_id=tank["tank_id"],
@@ -434,10 +427,22 @@ def find_acquisition_target(
             )
         )
 
-    if not candidates:
-        return None
     candidates.sort(key=_threat_sort_key)
-    return candidates[0]
+    winner = candidates[0] if candidates else None
+    emit_diagnostic(
+        diagnostic_kind="acquisition_candidates",
+        self_x=self_x,
+        self_y=self_y,
+        total_enemies=len(candidate_log),
+        accepted_count=len(candidates),
+        picked_id=winner["tank_id"] if winner is not None else -1,
+        picked_name=winner["name"] if winner is not None else "",
+        picked_x=winner["x"] if winner is not None else -1,
+        picked_y=winner["y"] if winner is not None else -1,
+        picked_dist=winner["distance"] if winner is not None else -1,
+        candidates_json=dump_json_str({"candidates": candidate_log}),
+    )
+    return winner
 
 
 __all__ = [
@@ -448,7 +453,6 @@ __all__ = [
     "find_acquisition_target",
     "find_closest_threat",
     "find_locked_target_pursuit",
-    "is_wire_present",
     "manhattan_distance",
     "threats_in_range",
 ]
