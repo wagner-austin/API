@@ -221,7 +221,7 @@ def _sync_policy(
     return s == "sync_before_teleport"
 
 
-def _no_find(p: EquipmentTargetPhaseProbeProtocol, a: bool) -> ContainerStateDict | None:
+def _no_find(p: EquipmentTargetPhaseProbeProtocol) -> ContainerStateDict | None:
     return None
 
 

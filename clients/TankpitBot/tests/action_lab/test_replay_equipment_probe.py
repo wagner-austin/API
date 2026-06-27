@@ -32,7 +32,7 @@ from tankpit_bot.sniffer.xor import reset_xor_state
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EQUIPMENT_CAPTURE = REPO_ROOT / "fuel_probe.capture_session.json"
 """The committed capture is named ``fuel_probe.*`` but the recording
-was made during an HFSM ``RECOVER_EQUIPMENT`` session -- the bot does
+was made during an HFSM ``COLLECT`` session -- the bot does
 equipment scans + pickups throughout, so it is the right capture for
 the equipment-probe replay harness."""
 

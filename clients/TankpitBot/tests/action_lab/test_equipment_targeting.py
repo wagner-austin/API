@@ -98,7 +98,7 @@ def test_find_visible_equipment_target_raises_when_terrain_unavailable() -> None
     equipment_targeting_module.get_terrain_map = lambda: None
 
     with pytest.raises(EquipmentTargetingError, match="terrain map is unavailable"):
-        find_visible_equipment_target(probe, allow_unreachable=False)
+        find_visible_equipment_target(probe)
 
 
 def test_find_visible_equipment_target_raises_when_self_state_unavailable() -> None:
@@ -109,7 +109,7 @@ def test_find_visible_equipment_target_raises_when_self_state_unavailable() -> N
     probe._world["self_state"] = None
 
     with pytest.raises(EquipmentTargetingError, match="self state is unavailable"):
-        find_visible_equipment_target(probe, allow_unreachable=False)
+        find_visible_equipment_target(probe)
 
 
 # ---------------------------------------------------------------------------

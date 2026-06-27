@@ -66,8 +66,15 @@ def test_radar_timeout() -> None:
     assert result.attempt["status"] == "radar_timeout"
 
 
-def test_pickup_timeout_with_equipment_visible() -> None:
-    """Equipment found but pickup times out produces pickup_timeout."""
+def test_walk_unreachable_equipment_yields_no_equipment_visible() -> None:
+    """Walk-unreachable equipment is skipped, yielding no_equipment_visible.
+
+    Under the 2026-06-26 walk-only contract, the probe's
+    ``find_visible_equipment_target`` only returns walk-reachable
+    containers. This capture's equipment requires a teleport
+    reposition that is no longer attempted, so the probe terminates
+    on ``no_equipment_visible`` instead of progressing to pickup.
+    """
     result = replay_equipment_attempt(
         CAPTURE,
         TARGET,
@@ -75,7 +82,7 @@ def test_pickup_timeout_with_equipment_visible() -> None:
         radar_timeout_ms=600_000,
         pickup_timeout_ms=1,
     )
-    assert result.attempt["status"] == "pickup_timeout"
+    assert result.attempt["status"] == "no_equipment_visible"
 
 
 def test_teleport_timeout_with_sync_strategy() -> None:

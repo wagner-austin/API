@@ -113,7 +113,7 @@ class _FuelProbeModuleProtocol(Protocol):
     """Typed access to patchable fuel probe module globals."""
 
     _wait_for_teleport_outcome: _WaitForTeleportOutcomeProtocol
-    _find_visible_fuel_target: Callable[[FuelProbe, bool], ContainerStateDict | None]
+    _find_visible_fuel_target: Callable[[FuelProbe], ContainerStateDict | None]
     _visible_fuel_requires_reposition: Callable[[FuelProbe, ContainerStateDict], bool]
     _find_visible_fuel_landing_tile: Callable[
         [FuelProbe, ContainerStateDict], tuple[int, int] | None
@@ -1270,22 +1270,6 @@ def _run_probe_single_target_scenario(
         ("map_sync_timeout", None, None, None, None, None),
         ("teleport_timeout", 1200, "teleport_timeout", None, None, None),
         ("radar_timeout", 1200, "landed_exact", None, None, None),
-        (
-            "reposition_map_sync_timeout",
-            1200,
-            "landed_exact",
-            1600,
-            make_container_state(105, 100, True, 300),
-            None,
-        ),
-        (
-            "reposition_teleport_timeout",
-            1200,
-            "reposition_teleport_timeout",
-            1600,
-            make_container_state(105, 100, True, 300),
-            None,
-        ),
         ("no_fuel_visible", 1200, "landed_exact", 1600, None, None),
         (
             "picked_up_fuel",
@@ -1717,7 +1701,7 @@ def test_resolve_fuel_target_after_radar_rejects_missing_tracked_reposition_resu
                 snapshot_before=_snapshot(1000),
                 capture_snapshot=lambda: _snapshot(1900),
                 terrain_provider=lambda: None,
-                find_visible_target=lambda current_probe, allow_unreachable: fuel_target,
+                find_visible_target=lambda current_probe: fuel_target,
                 requires_reposition=_requires_reposition,
                 find_landing_tile=_landing_tile,
                 get_phase_overlaps=probe._get_attempt_phase_overlaps,
@@ -1836,9 +1820,8 @@ def test_probe_single_target_repositions_for_blocked_visible_fuel() -> None:
 
     def _find_target(
         current_probe: FuelProbe,
-        allow_unreachable: bool,
     ) -> ContainerStateDict | None:
-        _ = (current_probe, allow_unreachable)
+        _ = current_probe
         fuel_target = make_container_state(101, 100, True, 300)
         current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
         return fuel_target
@@ -2252,9 +2235,8 @@ def test_probe_single_target_raises_when_dispatch_fails() -> None:
 
         def _find_target(
             current_probe: FuelProbe,
-            allow_unreachable: bool,
         ) -> ContainerStateDict | None:
-            _ = (current_probe, allow_unreachable)
+            _ = current_probe
             fuel_target = make_container_state(101, 100, True, 300)
             current_probe.get_world_state()["containers"][coord_key(101, 100)] = fuel_target
             return fuel_target

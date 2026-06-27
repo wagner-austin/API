@@ -34,7 +34,6 @@ class _FindBestFuelProtocol(Protocol):
         self_state: SelfStateDict,
         terrain: TerrainMapProtocol,
         *,
-        allow_unreachable: bool,
         now_ms: int,
         minimum_volume: int,
     ) -> ContainerStateDict | None: ...
@@ -112,26 +111,23 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
         self_state: SelfStateDict,
         terrain: TerrainMapProtocol,
         *,
-        allow_unreachable: bool,
         now_ms: int,
         minimum_volume: int,
     ) -> ContainerStateDict | None:
         captured["world"] = world
         captured["self_state"] = self_state
         captured["terrain"] = terrain
-        captured["allow_unreachable"] = allow_unreachable
         captured["now_ms"] = now_ms
         captured["minimum_volume"] = minimum_volume
         return expected
 
     fuel_targeting_module.find_best_fuel = _find_best_fuel
 
-    result = find_visible_fuel_target(probe, allow_unreachable=True)
+    result = find_visible_fuel_target(probe)
 
     assert result == expected
     assert captured["world"] == probe.get_world_state()
     assert captured["self_state"] == probe.get_self_state()
-    assert captured["allow_unreachable"] is True
     assert captured["now_ms"] == 1500
     assert captured["minimum_volume"] == 1
 
@@ -142,13 +138,13 @@ def test_find_visible_fuel_target_requires_terrain_and_self_state() -> None:
     fuel_targeting_module.get_terrain_map = lambda: None
 
     with pytest.raises(FuelTargetingError, match="terrain map is unavailable"):
-        find_visible_fuel_target(probe, allow_unreachable=False)
+        find_visible_fuel_target(probe)
 
     fuel_targeting_module.get_terrain_map = lambda: _terrain({(100, 100)})
     probe.get_world_state()["self_state"] = None
 
     with pytest.raises(FuelTargetingError, match="self state is unavailable"):
-        find_visible_fuel_target(probe, allow_unreachable=False)
+        find_visible_fuel_target(probe)
 
 
 def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state() -> None:

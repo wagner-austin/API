@@ -224,7 +224,6 @@ class _Probe:
 
 def _no_find(
     p: EquipmentTargetPhaseProbeProtocol,
-    a: bool,
 ) -> ContainerStateDict | None:
     """Return no equipment."""
     return None
@@ -232,7 +231,6 @@ def _no_find(
 
 def _found(
     p: EquipmentTargetPhaseProbeProtocol,
-    a: bool,
 ) -> ContainerStateDict | None:
     """Return equipment at (10, 20)."""
     return make_container_state(
@@ -389,9 +387,8 @@ def _resolve(
 
     def _fv(
         p: EquipmentTargetPhaseProbeProtocol,
-        a: bool,
     ) -> ContainerStateDict | None:
-        return _found(p, a) if find_vis else None
+        return _found(p) if find_vis else None
 
     r = resolve_equipment_target_after_radar(
         page=_Page(),
@@ -872,7 +869,7 @@ def test_collection_impossible_missing_target() -> None:
         teleport_strategy: Literal["sync_before_teleport", "immediate_after_map_open"],
         terrain_provider: Callable[[], TerrainMapProtocol | None],
         find_visible_target: Callable[
-            [EquipmentTargetPhaseProbeProtocol, bool],
+            [EquipmentTargetPhaseProbeProtocol],
             ContainerStateDict | None,
         ],
         requires_reposition: Callable[
