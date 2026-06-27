@@ -23,14 +23,20 @@ def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
     (0x53). The semantics are unchanged: the authoritative hit signal
     is tile-occupancy. JS ``Gg.prototype.h`` switch case 18 prints
     "You hit X" exactly when the shot's target tile contains a named
-    tank; we translate that to ``victim_id > 0``. Weapon byte is used
-    only for ammo decrement -- it cannot distinguish single shots from
-    misses (wiki: weapon=0 is ambiguous).
+    tank; we translate that to ``victim_id > 0``.
+
+    Server-side ammo: the server only decrements dual / missile /
+    homing counts on a confirmed hit (user-confirmed 2026-06-24 from
+    inventory deltas in run 2026-06-24 11:32). The local decrement
+    must mirror that rule -- otherwise the local shadow count drifts
+    below the authoritative server count between every miss and the
+    next 0x49/0x67/0x74 correction.
 
     Args:
         ws: World service instance.
         weapon_byte: ShootEvent ``weapon`` field (0=single, 1=dual,
-            2=missile, 3=homing). Decrements that ammo type when > 0.
+            2=missile, 3=homing). Decrements that ammo type on a
+            confirmed hit only.
         victim_id: Tank id present at the shot's target tile, or -1 if
             the tile was empty (miss).
     """
@@ -38,8 +44,8 @@ def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
     ws.last_shot_victim_id = victim_id
     if victim_id > 0:
         ws.got_confirmed_hit = True
-    if weapon_byte > 0:
-        _decrement_ammo_for_weapon(ws, weapon_byte)
+        if weapon_byte > 0:
+            _decrement_ammo_for_weapon(ws, weapon_byte)
 
 
 def check_and_clear_combat_hit(ws: WorldService) -> bool:
@@ -99,6 +105,38 @@ def peek_our_shot_response(ws: WorldService) -> bool:
         True if any shot response has been observed and not yet consumed.
     """
     return ws.got_our_shot_response
+
+
+def check_and_clear_ammo_delta_hit(ws: WorldService) -> bool:
+    """Return True if a tracking weapon's ammo dropped since the last shoot.
+
+    The server only debits dual / missile / homing ammo on a confirmed
+    hit, so a negative delta between the pending-shoot snapshot and
+    the current count is authoritative proof that the shot landed --
+    including in the off-viewport pursuit case where the wire's
+    ``victim_id`` lookup misses because the target isn't in the local
+    registry at the impact tile (live run 2026-06-24 12:43).
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        True when any of ``dual_shots`` / ``missile_shots`` /
+        ``homing_shots`` shows a strictly negative delta vs the
+        snapshot. Clears the snapshot after reading. False when no
+        snapshot is pending or no decrement is visible.
+    """
+    snap = ws.pending_shot_inventory_snapshot
+    if snap is None:
+        return False
+    current = ws.inventory_state
+    decreased = (
+        current["dual_shots"]["count"] < snap["dual_shots"]["count"]
+        or current["missile_shots"]["count"] < snap["missile_shots"]["count"]
+        or current["homing_shots"]["count"] < snap["homing_shots"]["count"]
+    )
+    ws.pending_shot_inventory_snapshot = None
+    return decreased
 
 
 def check_and_clear_our_shot_response(ws: WorldService) -> bool:
@@ -238,6 +276,7 @@ def check_and_clear_command_error(ws: WorldService) -> int:
 
 
 __all__ = [
+    "check_and_clear_ammo_delta_hit",
     "check_and_clear_combat_hit",
     "check_and_clear_command_error",
     "check_and_clear_last_shot_victim_id",

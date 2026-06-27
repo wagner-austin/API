@@ -147,6 +147,16 @@ def _dispatch_shoot_event(
     own_tank_id = self_state["tank_id"] if self_state is not None else -1
     aim_drift = (aim_x, aim_y) != (tx, ty)
     if shooter_id == own_tank_id:
+        # OUR_SHOT's (tx, ty) is the server's homing-tracked landing
+        # tile, which is often off-viewport once the target teleports
+        # away. Overwriting the registry with it poisoned the
+        # user-contract stay-put loop: the planner's next shoot would
+        # dispatch at the off-viewport coord, and the server rejects
+        # shoot commands targeted outside the 18x18 viewport (see
+        # [[shot-range]]). Pre-098d3d7 the registry was not refreshed
+        # from own shots; the bot kept aiming at the last on-viewport
+        # tile and the server auto-tracked with homing on every shot
+        # -- unlimited homings until the kill. Restored 2026-06-26.
         victim_id = _find_tank_at_tile(ws, tx, ty, exclude_id=own_tank_id)
         log.info(
             "OUR_SHOT: weapon=%d src=(%d,%d) tgt=(%d,%d) aim=(%d,%d)%s victim_id=%d",

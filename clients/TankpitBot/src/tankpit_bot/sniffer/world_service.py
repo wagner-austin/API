@@ -96,6 +96,28 @@ class WorldService:
         # hits (e.g. homing seeker locking onto a closer enemy than the
         # bot commanded).
         self.last_shot_victim_id: int = -1
+        # Tank id our planner intended to shoot at on the most recent
+        # ``shoot`` dispatch (the ``target_id`` arg to ``shoot_at``).
+        # Used by the 0x53 ShootEvent dispatcher to attribute homing /
+        # missile seeker resolutions: when a tracking weapon resolves
+        # at ``(tx, ty)``, the server's seeker chased the locked target
+        # to that tile, so ``(tx, ty)`` is a fresh wire datum for the
+        # locked target's position (and works even when the target is
+        # off-viewport and 0x2E TankStatusSync stops broadcasting). The
+        # dispatcher uses it to update the locked target's tracked
+        # position so the next shot aims at fresh server-known coords.
+        self.last_shot_combat_target_id: int = -1
+        # Inventory snapshot taken at the most recent shoot dispatch.
+        # Used by combat_feedback to confirm hits via ammo delta: the
+        # server only debits dual / missile / homing ammo on a hit, so
+        # a decrement in any of those slots between snapshot time and
+        # feedback time confirms the shot landed -- even when the
+        # 0x53 ``victim_id`` lookup misses because the target is off
+        # the bot's viewport (live run 2026-06-24 12:43: 4 pursuit
+        # homings logged as misses because ``_find_tank_at_tile`` could
+        # not see purple-9 off-viewport). ``None`` when no shoot is
+        # pending or the delta has already been consumed.
+        self.pending_shot_inventory_snapshot: InventoryState | None = None
         self.killed_tank_ids: set[int] = set()
         self.tank_death_anchors: dict[int, tuple[int, int]] = {}
         self.teleport_landed: bool = False
