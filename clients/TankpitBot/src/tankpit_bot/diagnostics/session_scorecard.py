@@ -49,7 +49,16 @@ class ScorecardAccumulatorDict(TypedDict):
     Attributes:
         state_transitions: ``(timestamp, message)`` pairs from the
             ``STATE`` channel, in stream order.
-        kills: Count of ``tank_deactivated`` DIAGNOSTIC events.
+        kills: Count of distinct deactivated ``victim_id`` values.
+            ``tank_deactivated`` arrives twice per kill -- once from
+            the ``0x41 Deactivation`` wire packet and once from the
+            game-log "X deactivated" text -- so the count is
+            deduplicated by ``victim_id`` rather than summing raw
+            events. Live run 2026-06-23 23:00:22 reported kills=2 for
+            a single purple-8 kill before the dedup landed.
+        kill_victim_ids: Set of ``victim_id`` values already counted
+            into ``kills``. Used purely for dedup; the scorecard
+            output reports ``kills``.
         shots: Count of ``WIRE`` events whose message starts with
             ``shoot(``.
         combat_misses: Count of ``combat_miss`` DIAGNOSTIC events
@@ -83,6 +92,7 @@ class ScorecardAccumulatorDict(TypedDict):
 
     state_transitions: list[tuple[str, str]]
     kills: int
+    kill_victim_ids: set[int]
     shots: int
     combat_misses: int
     combat_ghosts_blocked: int
@@ -123,6 +133,7 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
     return ScorecardAccumulatorDict(
         state_transitions=[],
         kills=0,
+        kill_victim_ids=set(),
         shots=0,
         combat_misses=0,
         combat_ghosts_blocked=0,
@@ -247,7 +258,7 @@ def _route_scorecard_diagnostic(
         accumulator: Scorecard accumulator to update in place.
     """
     kind = record["fields"].get("diagnostic_kind")
-    if _route_combat_diagnostic(kind, accumulator):
+    if _route_combat_diagnostic(kind, record, accumulator):
         return
     if kind == "self_alignment_sample":
         accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
@@ -302,6 +313,7 @@ def _route_metrics_diagnostic(
 
 def _route_combat_diagnostic(
     kind: str | int | float | bool | None,
+    record: RuntimeEventRecordDict,
     accumulator: ScorecardAccumulatorDict,
 ) -> bool:
     """Increment the combat counters that the freshness gates emit.
@@ -314,6 +326,11 @@ def _route_combat_diagnostic(
             the field is absent. Non-string values can never match the
             string literals tested below, so they fall through and the
             caller routes the record onward.
+        record: Full event record carrying the structured payload.
+            Used by ``tank_deactivated`` to dedupe on ``victim_id``;
+            the wire packet (``0x41 Deactivation``) and the game-log
+            text both emit a ``tank_deactivated`` diagnostic for the
+            same kill, so the raw event count is twice the kill count.
         accumulator: Scorecard accumulator to update in place.
 
     Returns:
@@ -321,7 +338,10 @@ def _route_combat_diagnostic(
         False otherwise. The caller routes non-matching kinds onward.
     """
     if kind == "tank_deactivated":
-        accumulator["kills"] += 1
+        victim_id = record["fields"].get("victim_id")
+        if isinstance(victim_id, int) and victim_id not in accumulator["kill_victim_ids"]:
+            accumulator["kill_victim_ids"].add(victim_id)
+            accumulator["kills"] += 1
         return True
     if kind == "combat_miss":
         accumulator["combat_misses"] += 1
