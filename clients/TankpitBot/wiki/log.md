@@ -571,3 +571,65 @@ Extended the 2026-06-16 chase-loop fix (see [[combat-chase-bug]]). Live run 2026
 **Wiki:** [[combat-chase-bug]] follow-up section, [[bot-control-model.md]] HUNT.CLOSE description updated.
 
 Constraint context: user-stated "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias" -- helper is extracted deduplication, not a wrapper; the old "teleport on every non-adjacent tick" branch is deleted, not preserved behind a flag.
+
+---
+
+## [2026-06-26] update | Walk-only container contract: no teleport-to-container
+
+User contract: the bot collects containers the same way a human player does -- click a container that has a walk path from the current tile, the server walks the tank, the pickup completes. No teleport-to-container, no reposition-then-pickup flow.
+
+**Code:** `src/tankpit_bot/bot/ai/equipment_search.py`
+- Dropped the `allow_unreachable` parameter from `find_nearest_fuel`, `find_nearest_equipment`, `find_equipment_candidates`, `find_best_fuel`, `find_nearest_deposit`, `find_adjacent_container`, `describe_container_search`, and `_describe_candidate_reason`.
+- Deleted the teleport-landing-tile fallback branch in `_is_actionable_with_terrain`: a container is actionable iff `is_collection_reachable_in_viewport` finds a walk path.
+- Dropped the `no_landing=` field from `describe_container_search`'s diagnostic string -- it was always 0 under the new semantics.
+
+**Code:** `src/tankpit_bot/bot/ai/movement.py`
+- Rewrote `_walk_or_teleport_with_terrain` so pickups return `None` when the target is off-viewport or not collection-reachable, and dispatch a single `pickup_*` command when reachable.
+- Removed the pickup branch from `_approach_command`; plain moves keep the teleport-fallback for combat-approach and exploration.
+
+**Code:** `src/tankpit_bot/bot/ai/collect_mode.py`
+- Dropped `_with_equipment_approach_recorded` and `_is_equipment_target_attempted` -- the approach-marking system existed to prevent teleport orbits around blocked containers and is dead under walk-only.
+- Removed the `attempted_equipment_targets` field reads.
+
+**Tests:** Bulk update across `tests/bot/ai/test_equipment.py`, `test_collect_mode_*.py`, `test_movement.py`, `test_strategy_coverage.py`, and the action_lab probe tests. The `tests/replay/test_real_session_regressions.py::test_equipment_then_fuel_loop_replays_known_bad_behavior` test flipped from no-strand to asserting `ValueError("COLLECT owner produced no decision")` because the new contract strands the bot at fuel=78 surrounded by water-locked containers (correct under walk-only -- no unreachable dispatch).
+
+**Pages updated:** [[equipment-system]] container blacklist section, [[fuel-system]] cascade step 2 description, [[viewport-frame]] walking paths section.
+
+Constraint context: user-stated "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias" -- `allow_unreachable` deleted everywhere, the teleport-fallback branch deleted from `_is_actionable_with_terrain`, the dead approach-marking helpers deleted from `collect_mode`.
+
+---
+
+## [2026-06-26] fix | Unlimited homing shots restored by deleting the OUR_SHOT-driven registry update
+
+Live run 2026-06-26 15:13 caught the bot firing one homing shot at a teleporting target, then getting every subsequent `shoot(off_viewport_x, off_viewport_y)` rejected by the server with `command_error` (the server rejects shoot commands targeted outside the 18x18 viewport, see [[shot-range]]). Pre-fix the bot was supposed to "stay put and fire multiple homing shots" per the user contract documented in [[enemy-bot-behavior]] footnote 4 -- the contract was real, it had just been broken by an unrelated change.
+
+**Root cause:** commit `098d3d7` (combat-rework, 2026-06-23) added two lines to `src/tankpit_bot/sniffer/world_state_dispatch.py:161-162` that overwrote the locked target's registry x/y from `OUR_SHOT`'s homing-tracked landing tile every time the bot fired a homing or missile. The intent was to refresh stale registry coords for the next shot, but the seeker's resolved tile is the target's current off-viewport position the moment the target leaves the viewport. After the first homing fired, the registry held off-viewport coords, the planner's next shoot dispatched at those coords, and the server rejected with `command_error`.
+
+**Fix:** delete the two-line registry update. Pre-098d3d7 the registry stayed at the last on-viewport coord (because off-viewport tanks stop broadcasting 0x2E `TankStatusSync`), so subsequent shoots dispatched at an in-viewport tile, the server accepted them, and the server's homing seeker tracked to the actual target every shot. Unlimited homings until the kill.
+
+**Code:** `src/tankpit_bot/sniffer/world_state_dispatch.py` `_dispatch_shoot_event` -- delete the `if weapon in (2, 3) and ws.last_shot_combat_target_id > 0` block. The wire firing mechanism (`_combat_shoot` -> `make_shoot_command` -> `build_shoot_command`) is unchanged and has been since the first commit; only the registry-population side changed.
+
+**Tests:** `tests/sniffer/test_world_state_dispatch_container.py` -- renamed `test_own_homing_refreshes_locked_target_position` to `test_own_homing_does_not_overwrite_locked_target_position` and inverted the assertion (registry stays at the last on-viewport tile after a homing dispatch). The 2026-06-24 12:43 "4 homings missed" diagnosis that motivated the original update was incorrect: homing aim is just a hint, the server tracks regardless, so a stale registry never caused those misses.
+
+**Page update:** [[combat-chase-bug]] gains a follow-up subsection recording the registry-update revert and the recovered unlimited-homing behavior.
+
+---
+
+## [2026-06-26] refactor | Resource search rewrite: single 16-tile cardinal-then-diagonal fresh-viewport hop
+
+Resource-search hop logic had grown three competing helpers (`_hop_target_for_cycle` ring patrol, `_nearest_unscanned_grid_target` global grid fallback, `_short_hop_fallback` for fuel-poor cases) plus a `patrol_waypoint_index` state field. Each was added to patch a previous helper's bug instead of fixing the root cause: ring 2 / ring 3 hops produced 32 / 48 tile jumps that overshot fresh viewports, the global grid stride (12) overlapped adjacent grid cells, and the 8-tile short hop guaranteed 50% overlap with the bot's current viewport.
+
+**Code:** `src/tankpit_bot/bot/ai/resource_search.py`
+- Replaced everything with a single `make_resource_search_hop` that iterates four 16-tile cardinals first then four 16-tile diagonals, returning the first direction whose landing is passable, fuel-affordable, and in an unscanned viewport. Returns `None` when all eight directions fail (caller raises rather than fall back to a shorter or smaller hop).
+- Cardinal-first ordering is a fuel optimization: 16 cardinal = 96 fuel, diagonal = 135 fuel; the diagonals exist so the bot can escape a fully-scanned cardinal ring without a third hopping mechanism.
+- Deleted `_MAX_SEARCH_RINGS`, `_GLOBAL_GRID_STRIDE`, `_SHORT_HOP_DISTANCE`, `_MIN_HOP_DISPLACEMENT`, `_hop_target_for_cycle`, `_is_worthwhile_hop`, `_nearest_unscanned_grid_target`, `_short_hop_fallback`, and `local_resource_search_hop`. Kept `is_recently_attempted` / `record_attempt_mark` -- they support failed-pickup tracking, not hopping.
+
+**State change:** `AIStateDict` loses `patrol_waypoint_index`, which existed because the prior cycle-with-index design grew the index unboundedly across sessions. The new method is stateless; the codec entries in `types_codecs.py` are deleted to match.
+
+**Config change:** `equip_search_hop_distance` default is 16 (one viewport width). The single-hop tiling property is the design: each hop lands the bot's center 16 tiles away in cardinal directions, so the new viewport tiles cleanly with no overlap; diagonal hops land in corner-adjacent viewports, also non-overlapping. `equip_search_max_failures` is gone -- the new method has no failure-count to drive.
+
+**Tests:** `tests/bot/ai/test_resource_search.py` rewritten from scratch -- 11 behavior tests covering east-first, west-fallback when east is scanned, clamped-edge skip, impassable skip, unaffordable skip, cardinal-preferred-over-diagonal, all-eight-blocked yields None, resource-target cleared on success; plus 5 attempt-mark unit tests (kept).
+
+**Pages updated:** [[fuel-system]] cascade step 5 now describes the cardinal-then-diagonal method by name.
+
+Constraint context: user-stated "no fallbacks, no legacy code, no thin wrappers" -- ring multiplication, grid fallback, and short-hop fallback are deleted, not gated behind a flag.

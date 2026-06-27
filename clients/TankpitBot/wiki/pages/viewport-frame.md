@@ -31,7 +31,7 @@ Containers and entities at viewport+1 (the 18x18 outer ring) are **visible but n
 
 ## Walking paths
 
-Walkable paths must stay inside one viewport. If BFS finds no path within viewport bounds, the container is unreachable by walking and requires a teleport reposition. Walking is not free -- it consumes **1 fuel per tile**.[^6]
+Walkable paths must stay inside one viewport. If BFS finds no path within viewport bounds the container is unreachable and is dropped from the candidate list (the teleport-reposition fallback was removed 2026-06-26 — the bot falls through to the fresh-viewport hop instead of attempting an unreachable pickup). Walking is not free -- it consumes **1 fuel per tile**.[^6]
 
 ## Mines under containers
 

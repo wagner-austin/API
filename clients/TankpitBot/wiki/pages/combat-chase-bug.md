@@ -52,6 +52,16 @@ The 2026-06-16 fix removed the multi-hop chase but left a related teleport-after
 
 The engaged-vs-fresh predicate lives in `is_already_engaged` (`combat_strategy.py`) and replaces the duplicated inline expression that previously lived in `_resume_locked_target_off_viewport` (`hunt_mode.py:223`). Both the on-viewport and off-viewport paths now consult the same predicate.
 
+## Follow-up fix (2026-06-26): unlimited homing restored by reverting the OUR_SHOT registry update
+
+The "stay put" change above exposed a separate bug introduced earlier in the same branch. Live run 2026-06-26 15:13 caught the bot firing one homing shot at a teleporting target then dispatching `shoot(off_viewport_x, off_viewport_y, id=N)` repeatedly, each rejected by the server with `command_error` because shoot tiles must be inside the 18×18 viewport (see [[shot-range]]). Pre-2026-06-23 the bot reliably fired multiple homing shots in this scenario per the user-confirmed contract; the regression was traced to a two-line addition in `sniffer/world_state_dispatch.py:161-162` (commit `098d3d7`) that overwrote the locked target's registry x/y from `OUR_SHOT`'s homing-tracked landing tile every time the bot fired a homing or missile. The seeker's resolved tile is the target's current off-viewport position, so the registry update poisoned the next shoot dispatch.
+
+**Fix:** delete the registry-update lines. Pre-098d3d7 the registry stayed at the last on-viewport coord (off-viewport tanks stop broadcasting `0x2E TankStatusSync`), so subsequent shoots dispatched at an in-viewport tile, the server accepted them, and the server's homing seeker tracked to the actual target. Unlimited homings until the kill.
+
+The diagnosis that originally motivated the registry update (live run 2026-06-24 12:43, "4 homings missed because the registry kept purple-9 at (180,147) while she had moved off to (198,152)") was incorrect: homing aim is just a hint, the server tracks regardless, so a stale registry never caused those misses. The wire firing mechanism (`_combat_shoot` → `make_shoot_command` → `build_shoot_command`) is unchanged and has been since the first commit; only the registry-population side changed.
+
+**Test:** `tests/sniffer/test_world_state_dispatch_container.py::test_own_homing_does_not_overwrite_locked_target_position` -- inverted from the original `test_own_homing_refreshes_locked_target_position` to assert the registry stays at the last on-viewport tile after a homing dispatch.
+
 ## Caveat: server does NOT displace off equipment-container tiles
 
 The "let server displace" rule was proven for combat targets (a tank occupies the tile) and ferry / water terrain. It is **not** symmetric for equipment containers. Live capture 2026-06-21 16:54:26: bot teleported to (253,141) with an equipment container there, server placed the bot **on** the container tile (not adjacent), then `pickup_equipment(253,141)` returned no `container_consumed` response. So:

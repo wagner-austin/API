@@ -66,21 +66,27 @@ collapsed 2026-06-24). The owner runs a single cascade per tick (see
 1. **Lock continuation** — continue a held equipment or fuel target
    from a previous tick when it is still executable and no markedly
    closer candidate beats it.
-2. **Equipment pickup** — pick up the best equipment in the current
-   viewport (`allow_unreachable=True`; the server paths around
-   obstacles).
-3. **Fuel pickup** — pick up the best fuel in the current viewport
-   when below the learned capacity (skipped at cap because "Tank
-   full" is a wasted dispatch). Equipment ranks ahead of fuel per
-   the user's gameplay loop.
+2. **Equipment pickup** — pick up the best walk-reachable equipment
+   in the current viewport. A container only counts as actionable
+   when a walk path to it exists inside the current viewport; the
+   teleport-to-container fallback was removed 2026-06-26 because the
+   server rejects pickups it cannot route to, leaving the container
+   on the session-permanent blacklist after one failure.
+3. **Fuel pickup** — pick up the best walk-reachable fuel in the
+   current viewport when below the learned capacity (skipped at cap
+   because "Tank full" is a wasted dispatch). Equipment ranks ahead
+   of fuel per the user's gameplay loop.
 4. **Sense** — fire a radar to reveal the current viewport when there
    are still unscanned tiles (paid radar covers the full viewport;
    free radar covers a 5×5 around the tank, clipped to viewport
    bounds). When radar is unaffordable, walk toward an unscanned
    tile so the next free radar covers fresh ground.
-5. **Hop** — teleport to a fresh viewport via the ring-patrol search
-   hop. When no hop is affordable the owner raises loudly rather
-   than idle silently.
+5. **Hop** — teleport to a fresh viewport via the fresh-viewport hop.
+   Tries the four 16-tile cardinals first (cheapest single-step
+   tiling-neighbor) and falls through to the four 16-tile diagonals
+   only when no cardinal qualifies (passable, fuel-affordable, lands
+   in an unscanned viewport). When all eight directions fail the
+   owner raises loudly rather than idle silently.
 
 There is no fuel-dot atlas: the bot does not consult a map-wide
 fuel-container list. The MAP_DATA blob still carries the RLE fuel-dot

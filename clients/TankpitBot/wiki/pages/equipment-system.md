@@ -48,7 +48,9 @@ Extra radars come ONLY from equipment containers. No other source. This makes eq
 
 ## Container blacklisting
 
-When `find_teleport_landing_tile()` returns None for a container, it goes on a per-session permanent blacklist. Cleared on death/respawn only. The old 30-second TTL caused retry loops — bot tried container (91,65) THREE times in one session.[^5]
+The bot picks containers walk-only: `_is_actionable_with_terrain` (`bot/ai/equipment_search.py`) accepts a container only when `is_collection_reachable_in_viewport` finds a walk path inside the current viewport, so unreachable containers are skipped at selection time and never reach a dispatch. When a dispatched pickup fails anyway (server `error_code=1 CANT_GO` from a race condition or partial-pickup `error_code=5 TANK_FULL`), the container's `failed_pickups` counter bumps via `increment_container_failed_pickups` and `is_container_pursuable` excludes it for the remainder of the session.[^5]
+
+The pre-2026-06-26 blacklist was driven by `find_teleport_landing_tile()` returning None on the teleport-to-container path; that path was removed when the user contract collapsed pickups to walk-only. Containers without a walk path now drop out of `find_best_fuel` / `find_nearest_equipment` directly, with no blacklist round-trip.
 
 [^1]: user (Austin), 2026-06-11 — "any inventory item < 10 = must collect equipment ASAP"; user was frustrated bot kept prioritizing fuel over equipment at 0 duals/0 radars
 [^2]: user (Austin), 2026-06-11 — "don't constantly top up fuel — only collect when actually needed"
