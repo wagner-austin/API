@@ -59,7 +59,7 @@ def test_place_self_establishes_self_state(scenario: BotScenario) -> None:
 def test_place_self_defaults_fuel_to_well_above_critical(
     scenario: BotScenario,
 ) -> None:
-    """The default fuel keeps the bot out of RECOVER_FUEL on the first tick."""
+    """The default fuel keeps the bot out of COLLECT on the first tick."""
     scenario.place_self(x=10, y=10)
     self_state = scenario.self_state
     if self_state is None:
@@ -98,8 +98,7 @@ def test_decide_returns_a_production_tick_decision(
     behavior_mode = decision["behavior"]["mode"]
     assert behavior_mode in {
         "HUNT",
-        "COLLECT_FUEL",
-        "COLLECT_EQUIPMENT",
+        "COLLECT",
         "PATROL",
         "IDLE",
     }
@@ -114,8 +113,7 @@ def test_decide_returns_a_production_tick_decision(
     }
     assert decision["updated_ai_state"]["mode"] in {
         "HUNT",
-        "RECOVER_FUEL",
-        "RECOVER_EQUIPMENT",
+        "COLLECT",
         "UNSET",
     }
 

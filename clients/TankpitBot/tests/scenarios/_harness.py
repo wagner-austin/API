@@ -300,7 +300,7 @@ class BotScenario:
         startup -- 0x3D MovementResponse to register own position,
         0x44 FuelGain to set fuel, 0x49 Inventory to establish slot
         counts. Without the inventory the bot's mode controller will
-        prioritise ``RECOVER_EQUIPMENT`` over combat because every
+        prioritise ``COLLECT`` over combat because every
         slot reads zero, which is not how a real session starts.
 
         Tests that want to study low-inventory behaviour ingest a

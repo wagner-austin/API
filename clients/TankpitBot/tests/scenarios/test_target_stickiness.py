@@ -78,26 +78,33 @@ def test_bot_stays_on_target_after_one_shot_when_target_is_still_alive() -> None
     )
 
 
-def test_bot_releases_lock_when_target_drops_off_threat_list() -> None:
-    """The lock is released the moment the threat list loses the target.
+def test_bot_holds_lock_when_target_drops_off_threat_list() -> None:
+    """The lock is preserved when the threat list loses the target.
 
-    Live-run 2026-06-21 tracking probe proved the pre-fix
-    world-state fallback was the second source of the "fires one
-    shot then hops" failure loop: it kept locks alive on tanks the
-    JS client itself no longer listed in ``activeGame.P.j``,
-    sending the bot teleporting after phantoms. The fix removed
-    the fallback. This test locks the new behaviour in: when the
-    viewport-presence gate fires on the locked target,
-    ``get_locked_target`` returns ``None``, ``_decide_hunt_engage``
-    enters ``CONFIRM_KILL``, and the bot reacquires from fresh
-    intel instead of chasing a stale registry position.
+    Behavior contract (user-confirmed, refined 2026-06-23): when a
+    locked target ages out of the viewport-confirmed threat list,
+    the bot does NOT release the lock or fall to CONFIRM_KILL. It
+    treats the target as off-viewport (it teleported away or moved
+    out of sight) and fires homing toward the last known wire
+    position via ``_locked_target_pursuit``. Homing tracks, so the
+    server picks an angle that can still land if the target is
+    nearby. The lock holds until an authoritative deactivation
+    signal (``liveness`` flips to ``deactivated`` or the tank lands
+    in ``killed_tank_ids``).
+
+    Pre-2026-06-23 there were two competing gates that broke this:
+    the viewport-presence gate dropped the lock when the target
+    aged out, and the wire-presence gate in ``_combat_shoot``
+    blocked pursuit shots after the wire TTL elapsed. Both removed
+    -- the test was flipped 2026-06-23 to assert lock preservation
+    instead of release.
 
     Setup: two enemies at tick 0; bot acquires the closer one.
-    Advance the clock past ``VIEWPORT_PRESENCE_TTL_MS`` without
+    Advance the clock past ``WIRE_PRESENCE_TTL_MS`` without
     re-confirming the locked target so it leaves the threat list.
     Rival gets a fresh MovementResponse so it stays in the threat
-    list. Next decision MUST not be locked to the disappeared
-    target.
+    list. Next decision MUST still be locked to the original
+    target, firing pursuit homing.
     """
     scenario = BotScenario()
     scenario.place_self(x=100, y=100, fuel=800)
@@ -122,7 +129,8 @@ def test_bot_releases_lock_when_target_drops_off_threat_list() -> None:
     )
 
     tick1 = scenario.decide()
-    assert tick1["updated_ai_state"]["combat_target_id"] != TARGET_TANK_ID, (
-        "bot is still locked to a phantom whose viewport-presence gate fired; "
-        "the world-fallback that masked this divergence was removed 2026-06-21"
+    assert tick1["updated_ai_state"]["combat_target_id"] == TARGET_TANK_ID, (
+        "lock preservation contract: locked target stays locked through pursuit even "
+        "when it ages out of the viewport-confirmed threat list; the bot fires homing "
+        "toward last wire position rather than releasing"
     )
