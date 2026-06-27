@@ -200,7 +200,7 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     inherits the same clean baseline regardless of which directory it
     lives in -- no duplicated per-file fixtures, no missed resets.
     """
-    from tankpit_bot.bot.ai.recover_equipment_mode import reset_container_blacklist
+    from tankpit_bot.bot.ai.collect_mode import reset_container_blacklist
     from tankpit_bot.diagnostics.teleport_attempts import reset_teleport_attempt_tracking
     from tankpit_bot.sniffer.world_state import reset_world_state
     from tankpit_bot.sniffer.xor import reset_xor_state
