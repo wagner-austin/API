@@ -22,14 +22,12 @@ from tankpit_bot.bot.ai.modes import (
 
 BehaviorMode = Literal[
     "HUNT",
-    "COLLECT_FUEL",
-    "COLLECT_EQUIPMENT",
+    "COLLECT",
 ]
 
 BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
     "HUNT",
-    "COLLECT_FUEL",
-    "COLLECT_EQUIPMENT",
+    "COLLECT",
 )
 
 
@@ -255,9 +253,9 @@ class AIConfigDict(TypedDict):
     """Tunable AI parameters.
 
     Attributes:
-        fuel_low_threshold: Below this the bot enters RECOVER_FUEL. Also
+        fuel_low_threshold: Below this the bot enters COLLECT. Also
             the reserve a combat teleport must leave behind -- engaging
-            below it would flip priority to COLLECT_FUEL the next tick.
+            below it would flip priority to COLLECT the next tick.
             (The historical ``fuel_critical_threshold`` was collapsed
             into this single value 2026-06-22; the two-tier "polite low
             vs. emergency critical" distinction was dead because both
@@ -285,8 +283,15 @@ class AIConfigDict(TypedDict):
             leaving restock and returning to the hunt. Radars find
             enemies and equipment, so a healthy buffer is rebuilt
             first; below it the bot restocks instead of fighting.
-        equip_search_hop_distance: Teleport hop distance for local equipment search.
-        equip_search_max_failures: Maximum consecutive equipment-search hops.
+        equip_search_hop_distance: Teleport hop distance for resource
+            search (equipment AND fuel). Set to one viewport width
+            (16) so each hop lands in an adjacent, previously-
+            unscanned viewport with no gap between scans. Larger
+            strides leave unscanned strips between hops and burn
+            disproportionately more fuel (teleport cost scales as
+            6 * euclidean distance). Combat teleports use the
+            target's actual coordinates via ``combat_landing_tile``
+            and are NOT affected by this field.
     """
 
     fuel_low_threshold: int
@@ -304,7 +309,6 @@ class AIConfigDict(TypedDict):
     radar_break_threshold: int
     radar_resume_threshold: int
     equip_search_hop_distance: int
-    equip_search_max_failures: int
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -314,7 +318,7 @@ def make_default_ai_config() -> AIConfigDict:
         AIConfigDict with default values suitable for lieutenant rank.
     """
     return AIConfigDict(
-        fuel_low_threshold=300,
+        fuel_low_threshold=200,
         fuel_full_threshold=1100,
         hunt_min_fuel=100,
         combat_range=20,
@@ -328,8 +332,7 @@ def make_default_ai_config() -> AIConfigDict:
         dual_resume_threshold=25,
         radar_break_threshold=5,
         radar_resume_threshold=20,
-        equip_search_hop_distance=30,
-        equip_search_max_failures=3,
+        equip_search_hop_distance=16,
     )
 
 
@@ -341,7 +344,6 @@ class AIStateDict(TypedDict):
         mode: Durable top-level AI mode owner.
         mode_state: Durable substate within the active top-level mode.
         mode_started_ms: Timestamp when the current durable mode was entered.
-        patrol_waypoint_index: Current index in patrol waypoint circuit.
         last_scan_ms: Timestamp of last radar scan (milliseconds).
         last_shoot_ms: Timestamp of last shot fired (milliseconds).
         last_map_open_ms: Timestamp of last map open command (milliseconds).
@@ -376,7 +378,6 @@ class AIStateDict(TypedDict):
     mode: AIMode
     mode_state: AIModeState
     mode_started_ms: int
-    patrol_waypoint_index: int
     last_scan_ms: int
     last_shoot_ms: int
     last_map_open_ms: int
@@ -390,7 +391,6 @@ class AIStateDict(TypedDict):
     blocked_combat_targets: dict[str, int]
     last_shot_target_id: int
     last_shot_target_name: str
-    equipment_search_failures: int
     resource_target_kind: str
     resource_target_x: int
     resource_target_y: int
@@ -414,7 +414,6 @@ def make_initial_ai_state(
         mode="UNSET",
         mode_state="",
         mode_started_ms=0,
-        patrol_waypoint_index=0,
         last_scan_ms=1,  # Non-zero so radar doesn't auto-fire on first tick
         last_shoot_ms=0,
         last_map_open_ms=0,
@@ -428,7 +427,6 @@ def make_initial_ai_state(
         blocked_combat_targets={},
         last_shot_target_id=-1,
         last_shot_target_name="",
-        equipment_search_failures=0,
         resource_target_kind="",
         resource_target_x=0,
         resource_target_y=0,

@@ -227,7 +227,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "radar_break_threshold": config["radar_break_threshold"],
         "radar_resume_threshold": config["radar_resume_threshold"],
         "equip_search_hop_distance": config["equip_search_hop_distance"],
-        "equip_search_max_failures": config["equip_search_max_failures"],
     }
 
 
@@ -287,7 +286,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         radar_break_threshold=require_int(data, "radar_break_threshold"),
         radar_resume_threshold=require_int(data, "radar_resume_threshold"),
         equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
-        equip_search_max_failures=require_int(data, "equip_search_max_failures"),
     )
 
 
@@ -311,7 +309,6 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "mode": state["mode"],
         "mode_state": state["mode_state"],
         "mode_started_ms": state["mode_started_ms"],
-        "patrol_waypoint_index": state["patrol_waypoint_index"],
         "last_scan_ms": state["last_scan_ms"],
         "last_shoot_ms": state["last_shoot_ms"],
         "last_map_open_ms": state["last_map_open_ms"],
@@ -325,7 +322,6 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "blocked_combat_targets": dict(state["blocked_combat_targets"]),
         "last_shot_target_id": state["last_shot_target_id"],
         "last_shot_target_name": state["last_shot_target_name"],
-        "equipment_search_failures": state["equipment_search_failures"],
         "resource_target_kind": state["resource_target_kind"],
         "resource_target_x": state["resource_target_x"],
         "resource_target_y": state["resource_target_y"],
@@ -398,7 +394,6 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         mode=mode,
         mode_state=mode_state,
         mode_started_ms=require_int(data, "mode_started_ms"),
-        patrol_waypoint_index=require_int(data, "patrol_waypoint_index"),
         last_scan_ms=require_int(data, "last_scan_ms"),
         last_shoot_ms=require_int(data, "last_shoot_ms"),
         last_map_open_ms=require_int(data, "last_map_open_ms"),
@@ -418,7 +413,6 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),
-        equipment_search_failures=require_int(data, "equipment_search_failures"),
         resource_target_kind=require_str(data, "resource_target_kind"),
         resource_target_x=require_int(data, "resource_target_x"),
         resource_target_y=require_int(data, "resource_target_y"),
