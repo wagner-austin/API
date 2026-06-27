@@ -10,7 +10,6 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_afford_teleport,
-    can_afford_teleport_search,
     local_actionable_bounds,
     teleport_fuel_cost_to,
 )
@@ -18,6 +17,7 @@ from tankpit_bot.bot.ai.equipment import is_area_scanned
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
 from tankpit_bot.bot.ai.reachability import (
+    is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
 )
 from tankpit_bot.bot.types import (
@@ -110,18 +110,6 @@ def select_exploration_command(
     ):
         command = walk_or_teleport(ctx, candidate_x, candidate_y, pickup_kind=None)
         if command is None:
-            continue
-        if command["cmd_type"] == "teleport" and not can_afford_teleport_search(
-            ctx,
-            candidate_x,
-            candidate_y,
-        ):
-            emit_ai(
-                "skipping exploration teleport to (%d,%d) - fuel too low (%d)",
-                candidate_x,
-                candidate_y,
-                ctx.fuel,
-            )
             continue
         return (candidate_x, candidate_y, command)
     emit_ai("no executable exploration target in current viewport")
@@ -368,25 +356,37 @@ def _walk_or_teleport_with_terrain(
     *,
     pickup_kind: str | None,
 ) -> BotCommand | None:
-    """Resolve movement when terrain/pathfinding is available."""
+    """Resolve movement when terrain/pathfinding is available.
+
+    Pickups are dispatched as ONE ``pickup_*`` command (the JS client
+    does the same: clicking a container is a single long-press; the
+    server walks the tank and completes the pickup). The dispatch is
+    gated on a walk path existing inside the current viewport -- a
+    pickup with no walk path is unreachable from where the bot
+    stands, and the user contract is to skip such containers and
+    let the search-hop relocate (no teleport-to-container fallback).
+    Plain moves keep their teleport fallback for combat-approach and
+    exploration.
+    """
     terrain = ctx.terrain
     assert terrain is not None  # caller guarantees this
-    if not is_pickup_target_actionable(ctx, tx, ty):
-        return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
-    # In-viewport pickup targets dispatch ONE pickup command and let
-    # the server route the tank to the container. The JS client does
-    # the same: clicking a container is a single long-press
-    # ``pickup_fuel`` / ``pickup_equipment`` command, and the server
-    # walks the tank to the tile and completes the pickup. The
-    # historical bot kept re-issuing ``move`` step-by-step toward
-    # the container, burning ~2 s per tile and never sending the
-    # pickup until adjacent (live run 2026-06-21 19:13:40+: ten move
-    # commands over 20 s to walk to (129,127) for an equipment
-    # container that one pickup_equipment would have collected
-    # directly).
     if pickup_kind is not None:
+        if not is_pickup_target_actionable(ctx, tx, ty):
+            return None
+        if not is_collection_reachable_in_viewport(
+            ctx.world,
+            terrain,
+            sx,
+            sy,
+            tx,
+            ty,
+            ctx.world["mines"],
+        ):
+            return None
         emit_ai("dispatching %s pickup at (%d,%d)", pickup_kind, tx, ty)
         return _make_pickup_command(pickup_kind, tx, ty)
+    if not is_pickup_target_actionable(ctx, tx, ty):
+        return _approach_command(ctx, tx, ty)
     if is_move_reachable_in_viewport(
         ctx.world,
         terrain,
@@ -461,11 +461,19 @@ def _walk_or_teleport_without_terrain(
     *,
     pickup_kind: str | None,
 ) -> BotCommand | None:
-    """Resolve movement when only local occupancy checks are available."""
-    if not is_pickup_target_actionable(ctx, tx, ty):
-        return _approach_command(ctx, tx, ty, pickup_kind=pickup_kind)
+    """Resolve movement when only local occupancy checks are available.
+
+    Pickups still require the target to be inside the visible
+    viewport (the JS click semantic), but without a terrain map
+    there is no walk-path check. Plain moves keep their off-viewport
+    approach fallback.
+    """
     if pickup_kind is not None:
+        if not is_pickup_target_actionable(ctx, tx, ty):
+            return None
         return _make_pickup_command(pickup_kind, tx, ty)
+    if not is_pickup_target_actionable(ctx, tx, ty):
+        return _approach_command(ctx, tx, ty)
     if _is_occupied_by_enemy(ctx, tx, ty):
         emit_ai("move target (%d,%d) is occupied by enemy", tx, ty)
         return None
@@ -479,24 +487,24 @@ def _approach_command(
     ctx: DecideCtx,
     tx: int,
     ty: int,
-    *,
-    pickup_kind: str | None,
 ) -> BotCommand | None:
-    """Return an approach command for an off-viewport target.
+    """Return an approach command for an off-viewport plain-move target.
 
     Prefers a cheap walk to a terrain-validated viewport-edge tile facing
     the target. When no facing-edge tile is walkable, teleports to the
     landing tile near the REAL target instead -- the bot knows the exact
     coordinates, and abandoning a known target because one edge tile is
     rock wastes radar and fuel on blind re-searches.
+
+    Pickups never reach this helper: the user contract (2026-06-26)
+    forbids teleport-to-container, so off-viewport pickups are skipped
+    upstream.
     """
-    target_kind = "pickup" if pickup_kind is not None else "move"
     approach = _select_walkable_approach_tile(ctx, tx, ty)
     if approach is not None:
         approach_x, approach_y = approach
         emit_ai(
-            "%s target (%d,%d) is outside viewport, approaching via (%d,%d)",
-            target_kind,
+            "move target (%d,%d) is outside viewport, approaching via (%d,%d)",
             tx,
             ty,
             approach_x,
@@ -508,8 +516,7 @@ def _approach_command(
     if ctx.terrain is None:
         return None
     emit_ai(
-        "no walkable approach edge for %s target (%d,%d), teleporting to it directly",
-        target_kind,
+        "no walkable approach edge for move target (%d,%d), teleporting to it directly",
         tx,
         ty,
     )

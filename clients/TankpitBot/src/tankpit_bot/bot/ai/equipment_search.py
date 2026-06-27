@@ -111,20 +111,18 @@ def find_nearest_fuel(
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
     *,
-    allow_unreachable: bool = False,
     now_ms: int = 0,
 ) -> ContainerStateDict | None:
-    """Find the nearest reachable fuel container.
+    """Find the nearest walk-reachable fuel container.
 
     Args:
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        allow_unreachable: Whether teleport fallback is allowed.
         now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
-        Nearest reachable fuel ContainerStateDict, or None if none visible.
+        Nearest walk-reachable fuel ContainerStateDict, or None if none visible.
     """
     best: ContainerStateDict | None = None
     best_dist = _MAX_DIST
@@ -148,7 +146,6 @@ def find_nearest_fuel(
                 sy,
                 cx,
                 cy,
-                allow_unreachable=allow_unreachable,
                 blocked_mines=world["mines"],
             ):
                 continue
@@ -163,26 +160,23 @@ def find_nearest_equipment(
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
     *,
-    allow_unreachable: bool = False,
     now_ms: int = 0,
 ) -> ContainerStateDict | None:
-    """Find the nearest reachable equipment container.
+    """Find the nearest walk-reachable equipment container.
 
     Args:
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        allow_unreachable: Whether teleport fallback is allowed.
         now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
-        Nearest reachable equipment ContainerStateDict, or None if none visible.
+        Nearest walk-reachable equipment ContainerStateDict, or None if none visible.
     """
     candidates = find_equipment_candidates(
         world,
         self_state,
         terrain,
-        allow_unreachable=allow_unreachable,
         now_ms=now_ms,
     )
     if not candidates:
@@ -195,20 +189,18 @@ def find_equipment_candidates(
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
     *,
-    allow_unreachable: bool = False,
     now_ms: int = 0,
 ) -> list[ContainerStateDict]:
-    """Return visible equipment candidates ordered nearest-first.
+    """Return visible walk-reachable equipment candidates ordered nearest-first.
 
     Args:
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        allow_unreachable: Whether teleport fallback is allowed.
         now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
-        List of visible equipment containers ordered by Manhattan distance.
+        List of visible walk-reachable equipment containers ordered by Manhattan distance.
     """
     candidates: list[tuple[int, ContainerStateDict]] = []
     sx, sy = self_state["x"], self_state["y"]
@@ -228,7 +220,6 @@ def find_equipment_candidates(
             sy,
             cx,
             cy,
-            allow_unreachable=allow_unreachable,
             blocked_mines=world["mines"],
         ):
             continue
@@ -242,11 +233,10 @@ def find_best_fuel(
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
     *,
-    allow_unreachable: bool = False,
     now_ms: int = 0,
     minimum_volume: int = 100,
 ) -> ContainerStateDict | None:
-    """Find the best fuel container, prioritizing volume over distance.
+    """Find the best walk-reachable fuel container, prioritizing volume over distance.
 
     Score = volume - distance, so high-volume nearby containers win.
 
@@ -254,12 +244,11 @@ def find_best_fuel(
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        allow_unreachable: Whether teleport fallback is allowed.
         now_ms: Current timestamp for freshness filtering. 0 disables.
         minimum_volume: Minimum fuel volume that counts as actionable.
 
     Returns:
-        Best fuel ContainerStateDict, or None if none visible.
+        Best walk-reachable fuel ContainerStateDict, or None if none visible.
     """
     best: ContainerStateDict | None = None
     best_score = -_MAX_DIST
@@ -284,7 +273,6 @@ def find_best_fuel(
             sy,
             cx,
             cy,
-            allow_unreachable=allow_unreachable,
             blocked_mines=world["mines"],
         ):
             continue
@@ -304,7 +292,7 @@ def find_adjacent_container(
     want_fuel: bool,
     now_ms: int,
 ) -> ContainerStateDict | None:
-    """Return a fresh, reachable container of the requested kind within one tile.
+    """Return a fresh, walk-reachable container of the requested kind within one tile.
 
     Args:
         world: Current world state with container positions.
@@ -314,7 +302,7 @@ def find_adjacent_container(
         now_ms: Current timestamp for freshness filtering.
 
     Returns:
-        An adjacent fresh reachable container, or ``None``.
+        An adjacent fresh walk-reachable container, or ``None``.
     """
     sx, sy = self_state["x"], self_state["y"]
     for container in world["containers"].values():
@@ -329,7 +317,6 @@ def find_adjacent_container(
             sy,
             container["x"],
             container["y"],
-            allow_unreachable=False,
             blocked_mines=world["mines"],
         ):
             continue
@@ -341,25 +328,21 @@ def find_nearest_deposit(
     world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
-    *,
-    allow_unreachable: bool = False,
 ) -> ContainerStateDict | None:
-    """Find the nearest fuel container for depositing surplus fuel.
+    """Find the nearest walk-reachable fuel container for depositing surplus fuel.
 
     Args:
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        allow_unreachable: Whether teleport fallback is allowed.
 
     Returns:
-        Nearest reachable fuel ContainerStateDict for depositing, or None.
+        Nearest walk-reachable fuel ContainerStateDict for depositing, or None.
     """
     return find_nearest_fuel(
         world,
         self_state,
         terrain,
-        allow_unreachable=allow_unreachable,
     )
 
 
@@ -369,7 +352,6 @@ def describe_container_search(
     terrain: TerrainMapProtocol | None = None,
     *,
     want_fuel: bool,
-    allow_unreachable: bool,
     minimum_volume: int = 0,
 ) -> str:
     """Summarize why container targeting did or did not find an actionable target.
@@ -379,7 +361,6 @@ def describe_container_search(
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
         want_fuel: True to inspect fuel containers, False for equipment.
-        allow_unreachable: Whether teleport fallback is allowed.
         minimum_volume: Minimum fuel volume for a candidate to count as actionable.
 
     Returns:
@@ -391,7 +372,6 @@ def describe_container_search(
     actionable = 0
     low_volume = 0
     blocked = 0
-    no_landing = 0
     nearest_desc = "none"
     nearest_dist = _MAX_DIST
     left, top, right, bottom = _viewport_bounds(world)
@@ -412,7 +392,6 @@ def describe_container_search(
                 sy,
                 terrain,
                 want_fuel=want_fuel,
-                allow_unreachable=allow_unreachable,
                 minimum_volume=minimum_volume,
                 blocked_mines=world["mines"],
             )
@@ -430,7 +409,7 @@ def describe_container_search(
     target_kind = "fuel" if want_fuel else "equipment"
     return (
         f"{target_kind}: total={total} nearby={nearby} actionable={actionable} "
-        f"blocked={blocked} no_landing={no_landing} low_volume={low_volume} "
+        f"blocked={blocked} low_volume={low_volume} "
         f"nearest={nearest_desc}"
     )
 
@@ -463,13 +442,19 @@ def _is_actionable_with_terrain(
     goal_x: int,
     goal_y: int,
     *,
-    allow_unreachable: bool,
     blocked_mines: dict[str, MineStateDict],
 ) -> bool:
-    """Return True when walkable directly or via teleport fallback."""
+    """Return True when a walk path to the container exists in the viewport.
+
+    User contract (2026-06-26): the bot collects containers by walking
+    to them — one ``pickup_*`` command, server routes the tank — just
+    like a human clicking a container. Teleport-to-container is gone;
+    containers without a viewport walk path are skipped and the
+    search-hop relocates the bot to a fresh viewport.
+    """
     if terrain is None:
         return True
-    if is_collection_reachable_in_viewport(
+    return is_collection_reachable_in_viewport(
         world,
         terrain,
         start_x,
@@ -477,20 +462,6 @@ def _is_actionable_with_terrain(
         goal_x,
         goal_y,
         blocked_mines,
-    ):
-        return True
-    if not allow_unreachable:
-        return False
-    return (
-        find_teleport_landing_tile(
-            terrain,
-            start_x,
-            start_y,
-            goal_x,
-            goal_y,
-            blocked_mines,
-        )
-        is not None
     )
 
 
@@ -502,7 +473,6 @@ def _describe_candidate_reason(
     terrain: TerrainMapProtocol | None,
     *,
     want_fuel: bool,
-    allow_unreachable: bool,
     minimum_volume: int,
     blocked_mines: dict[str, MineStateDict],
 ) -> tuple[str, bool, bool, bool, bool]:
@@ -521,11 +491,7 @@ def _describe_candidate_reason(
         blocked_mines,
     ):
         return ("actionable", True, False, False, False)
-    if not allow_unreachable:
-        return ("blocked_walk", False, True, False, False)
-    # Server handles displacement on teleport landing, so in-bounds
-    # containers always have a valid landing tile.
-    return ("actionable", True, True, False, False)
+    return ("blocked_walk", False, True, False, False)
 
 
 def _equipment_candidate_distance(item: tuple[int, ContainerStateDict]) -> int:

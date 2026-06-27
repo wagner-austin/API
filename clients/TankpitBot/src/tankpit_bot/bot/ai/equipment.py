@@ -28,9 +28,6 @@ _SCAN_COVERAGE_OVERLAP_TILES = 4
 
 _SCAN_COVERAGE_TTL_MS = 45000
 
-#: Public alias for cross-module consumers (recover_fuel_mode).
-SCAN_COVERAGE_TTL_MS = _SCAN_COVERAGE_TTL_MS
-
 
 def is_lock_release_warranted(
     self_state: SelfStateDict,
@@ -170,7 +167,6 @@ def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
 
 
 __all__ = [
-    "SCAN_COVERAGE_TTL_MS",
     "_viewport_bounds",
     "is_area_scanned",
     "is_container_pursuable",
