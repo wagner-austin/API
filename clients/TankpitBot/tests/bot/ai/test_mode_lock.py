@@ -53,7 +53,7 @@ def test_hunt_mode_switches_to_recover_fuel_when_recovery_takes_priority() -> No
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=250, containers=containers)
+    world, self_state = make_world(fuel=150, containers=containers)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -66,9 +66,9 @@ def test_hunt_mode_switches_to_recover_fuel_when_recovery_takes_priority() -> No
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["command"]["cmd_type"] == "pickup_fuel"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_FUEL"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "PICKUP"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
@@ -106,7 +106,7 @@ def test_invalid_mode_state_reselects_recover_fuel_when_low_fuel_demands_it() ->
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=250, containers=containers)
+    world, self_state = make_world(fuel=150, containers=containers)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -119,8 +119,8 @@ def test_invalid_mode_state_reselects_recover_fuel_when_low_fuel_demands_it() ->
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "PICKUP"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
@@ -143,8 +143,8 @@ def test_invalid_mode_state_reselects_recover_equipment_when_reserves_are_broken
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "SENSE"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
@@ -155,7 +155,7 @@ def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> No
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "ENGAGE",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
@@ -183,9 +183,9 @@ def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "forage_radar"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_EQUIPMENT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "SENSE"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
@@ -208,8 +208,8 @@ def test_hunt_mode_switches_to_recover_equipment_when_reserves_break() -> None:
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "SENSE"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
@@ -226,19 +226,19 @@ def test_unset_mode_enters_recover_fuel_after_fuel_decision() -> None:
             failed_pickups=0,
         )
     }
-    world, self_state = make_world(fuel=250, containers=containers)
+    world, self_state = make_world(fuel=150, containers=containers)
     ai_state = make_scanned_ai_state()
     inventory = make_inventory()
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "PICKUP"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
 
-def test_recover_fuel_mode_owns_tick_below_full_threshold() -> None:
+def test_collect_mode_owns_tick_below_full_threshold() -> None:
     """Fuel recovery persists until the configured full threshold is reached."""
     containers: dict[str, ContainerStateDict] = {
         "102,101": make_container_state(
@@ -254,7 +254,7 @@ def test_recover_fuel_mode_owns_tick_below_full_threshold() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
@@ -264,20 +264,20 @@ def test_recover_fuel_mode_owns_tick_below_full_threshold() -> None:
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["command"]["cmd_type"] == "pickup_fuel"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_FUEL"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "PICKUP"
     assert decision["updated_ai_state"]["mode_started_ms"] == 90000
 
 
-def test_recover_fuel_mode_switches_to_hunt_after_full_recovery() -> None:
+def test_collect_mode_switches_to_hunt_after_full_recovery() -> None:
     """Fuel recovery hands control directly to HUNT after full recovery."""
     world, self_state = make_world(fuel=1100)
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
@@ -293,7 +293,7 @@ def test_recover_fuel_mode_switches_to_hunt_after_full_recovery() -> None:
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000
 
 
-def test_recover_equipment_mode_owns_tick_below_resume_threshold() -> None:
+def test_collect_mode_owns_tick_below_resume_threshold() -> None:
     """Equipment recovery persists after break has cleared but resume has not."""
     containers: dict[str, ContainerStateDict] = {
         "102,101": make_container_state(
@@ -309,7 +309,7 @@ def test_recover_equipment_mode_owns_tick_below_resume_threshold() -> None:
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
@@ -322,20 +322,20 @@ def test_recover_equipment_mode_owns_tick_below_resume_threshold() -> None:
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
-    assert decision["updated_ai_state"]["mode"] == "RECOVER_EQUIPMENT"
+    assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "PICKUP"
     assert decision["updated_ai_state"]["mode_started_ms"] == 90000
 
 
-def test_recover_equipment_mode_switches_to_hunt_after_reserve_restored() -> None:
-    """Equipment recovery hands control directly to HUNT after reserves recover."""
-    world, self_state = make_world(fuel=800)
+def test_collect_mode_switches_to_hunt_after_reserve_restored() -> None:
+    """COLLECT hands control to HUNT after fuel and combat reserves recover."""
+    world, self_state = make_world(fuel=1200)
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,

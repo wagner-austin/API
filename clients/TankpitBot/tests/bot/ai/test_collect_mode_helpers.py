@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from tankpit_bot.bot.ai.collect_mode import (
+    select_equipment_target as _select_equipment_target_command,
+)
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     compute_equipment,
@@ -12,14 +15,6 @@ from tankpit_bot.bot.ai.context import (
     require_command,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
-from tankpit_bot.bot.ai.recover_equipment_mode import (
-    select_equipment_target as _select_equipment_target_command,
-)
-from tankpit_bot.bot.ai.recover_equipment_mode import (
-    try_search_critical_equipment,
-)
-from tankpit_bot.bot.ai.resource_search import local_resource_search_hop
-from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.types import make_move_command
 from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
@@ -92,153 +87,6 @@ class TestRecoveryHelpers:
         inventory["homing_shots"]["count"] = 0
         assert compute_equipment(800, inventory) == [2, 5]
 
-    def test_local_equipment_search_hop_rotates_cardinal(self) -> None:
-        """Local equipment search rotates through cardinal directions."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(dual_count=5, default_count=30),
-            100000,
-            None,
-            "",
-        )
-
-        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
-
-        assert hop_x == 130
-        assert hop_y == 100
-        assert next_index == 1
-
-    def test_local_equipment_search_hop_skips_clamped_edge_hops(self) -> None:
-        """Edge-clamped hops onto covered ground are skipped, not taken.
-
-        At (250,250) the east hop clamps 280->254 (4 tiles onto the
-        already-scanned viewport) and south clamps the same way; both
-        are degenerate re-visits. The search advances to west ring 1,
-        the first hop into unscanned ground, consuming three cycle
-        positions. The old behavior returned the clamped corner hop and
-        produced the live 20260610 corner-trap loop.
-        """
-        world, self_state = make_world(self_x=250, self_y=250, fuel=800)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(dual_count=5, default_count=30),
-            100000,
-            None,
-            "",
-        )
-
-        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
-
-        assert hop_x == 220
-        assert hop_y == 250
-        assert next_index == 3
-
-    def test_local_search_hop_falls_back_when_everything_is_covered(self) -> None:
-        """With every cycle position covered, the raw indexed hop is returned.
-
-        Coverage expires within the scan TTL, so the fallback hop
-        self-heals instead of leaving the owner with no target.
-        """
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        hop_targets = [
-            (130, 100),
-            (100, 130),
-            (70, 100),
-            (100, 70),
-            (160, 100),
-            (100, 160),
-            (40, 100),
-            (100, 40),
-            (190, 100),
-            (100, 190),
-            (10, 100),
-            (100, 10),
-        ]
-        for target_x, target_y in hop_targets:
-            world["scanned_viewports"][f"{target_x - 8},{target_y - 8}"] = 100000
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(dual_count=5, default_count=30),
-            100000,
-            None,
-            "",
-        )
-
-        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
-
-        assert (hop_x, hop_y) == (130, 100)
-        assert next_index == 1
-
-    def test_local_search_hop_escapes_map_corner(self) -> None:
-        """A corner position never re-targets the same clamped corner tile.
-
-        Live run 20260610: at (1,254) the west/south hops clamped back
-        onto the corner, and the bot teleported to (1,254)/(3,254)/
-        (5,254) repeatedly, re-radaring the same ground. With the
-        patrol index pointing west, the search must skip the
-        zero-displacement clamp and hop north into fresh ground.
-        """
-        world, self_state = make_world(self_x=1, self_y=254, fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "patrol_waypoint_index": 2,
-            }
-        )
-        ctx = DecideCtx(
-            world,
-            self_state,
-            ai_state,
-            make_inventory(dual_count=5, default_count=30),
-            100000,
-            None,
-            "",
-        )
-
-        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
-
-        assert (hop_x, hop_y) != (1, 254)
-        assert hop_y == 224
-        assert next_index == 4
-
-    def test_local_equipment_search_hop_ring_wraps_at_cap(self) -> None:
-        """The hop ring wraps instead of growing with the session-long index.
-
-        Regression guard for live run 20260610-000x: an ever-growing
-        patrol index produced 90+ tile hops costing more fuel than the
-        bot held, leaving the recovery owner with no affordable action.
-        Index 100 wraps to cycle 4 (east, ring 2) -> 60 tiles, not 780.
-        """
-        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
-        ai_state = AIStateDict(
-            **{
-                **make_scanned_ai_state(),
-                "patrol_waypoint_index": 100,
-            }
-        )
-        ctx = DecideCtx(
-            world,
-            self_state,
-            ai_state,
-            make_inventory(dual_count=5, default_count=30),
-            100000,
-            None,
-            "",
-        )
-
-        hop_x, hop_y, next_index = local_resource_search_hop(ctx)
-
-        assert hop_x == 160
-        assert hop_y == 100
-        assert next_index == 101
-
     def test_expire_kills_removes_expired(self) -> None:
         """Expired kill cooldown entries are removed."""
         assert expire_kills({"50": 1000, "60": 5000}, 22000, 20000) == {"60": 5000}
@@ -286,21 +134,6 @@ class TestRecoveryHelpers:
         with pytest.raises(ValueError, match="No executable command for fuel target"):
             require_command(None, 10, 20, "fuel")
 
-    def test_try_search_critical_equipment_returns_none_when_fuel_low(self) -> None:
-        """Critical equipment search stops once fuel is already low."""
-        world, self_state = make_world(fuel=250)
-        ctx = DecideCtx(
-            world,
-            self_state,
-            make_scanned_ai_state(),
-            make_inventory(dual_count=0, dual_enabled=False, default_count=0),
-            100000,
-            None,
-            "",
-        )
-
-        assert try_search_critical_equipment(ctx) is None
-
     def test_select_equipment_target_command_picks_up_mined_tile(self) -> None:
         """Equipment target selection allows pickup on mined tiles."""
         containers: dict[str, ContainerStateDict] = {
@@ -320,7 +153,7 @@ class TestRecoveryHelpers:
             "",
         )
 
-        result = _select_equipment_target_command(ctx, allow_unreachable=True)
+        result = _select_equipment_target_command(ctx)
 
         if result is None:
             raise AssertionError("expected equipment pickup command")
@@ -335,7 +168,7 @@ class TestRecoveryHelpers:
         containers: dict[str, ContainerStateDict] = {
             "107,107": make_container(107, 107, 0, False),
         }
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300, containers=containers)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150, containers=containers)
         terrain = InMemoryTerrainMap(
             terrain_data={
                 (107, 107): "W",
@@ -361,7 +194,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_direct_move_when_pickup_disabled(self) -> None:
         """Open-ground scouting uses a direct move when pickup mode is disabled."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ctx = DecideCtx(
             world,
             self_state,
@@ -403,7 +236,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_picks_up_mined_tile_with_terrain(self) -> None:
         """Terrain routing still produces a legal command for mined pickup tiles."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ctx = DecideCtx(
             world,
@@ -423,7 +256,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_picks_up_mined_tile_without_terrain(self) -> None:
         """Occupancy-only routing still allows pickup on mined tiles."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ctx = DecideCtx(
             world,
@@ -467,7 +300,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_moves_to_visible_edge_target(self) -> None:
         """Visible edge movement targets are actionable without an approach step."""
-        world, self_state = make_world(self_x=64, self_y=64, fuel=300)
+        world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
             self_state,
@@ -488,7 +321,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_without_terrain_moves_to_visible_edge_target(self) -> None:
         """Visible edge movement works even without a terrain map."""
-        world, self_state = make_world(self_x=64, self_y=64, fuel=300)
+        world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
             self_state,
@@ -509,7 +342,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_without_terrain_approaches_off_viewport_target(self) -> None:
         """Off-viewport movement clamps to the visible edge without terrain."""
-        world, self_state = make_world(self_x=64, self_y=64, fuel=300)
+        world, self_state = make_world(self_x=64, self_y=64, fuel=150)
         ctx = DecideCtx(
             world,
             self_state,
@@ -547,7 +380,7 @@ class TestRecoveryHelpers:
             InMemoryTerrainMap(),
         )
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
         assert decision["command"]["target_x"] == 66
         assert decision["command"]["target_y"] == 63
@@ -556,7 +389,7 @@ class TestRecoveryHelpers:
         """Any weapon/radar below the resume threshold preempts HUNT.
 
         Per the 2026-06-22 user-defined gameplay loop ("restock -> hunt
-        -> kill -> restock"), the bot enters RECOVER_EQUIPMENT
+        -> kill -> restock"), the bot enters COLLECT
         whenever ANY counter is below its resume threshold (duals < 25,
         homings < 25, radars < 20). At duals=20 and radars=20, both
         are below their resume thresholds, so HUNT yields to
@@ -573,7 +406,7 @@ class TestRecoveryHelpers:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_non_emergency_equipment_low_does_not_enter_recovery_search(self) -> None:
         """Non-emergency equipment depletion leaves HUNT in charge of the tick."""
@@ -607,7 +440,7 @@ class TestRecoveryHelpers:
         """Visible equipment does not override HUNT when reserves are not at break levels.
 
         The semantic invariant is the behavior mode label: HUNT rather
-        than COLLECT_EQUIPMENT. The specific HUNT command (teleport when
+        than COLLECT. The specific HUNT command (teleport when
         the wire-sourced target position is fresh, map_open when stale)
         is incidental to the assertion.
         """
@@ -637,13 +470,14 @@ class TestRecoveryHelpers:
         assert decision["behavior"]["mode"] == "HUNT"
 
     def test_non_emergency_equipment_low_does_not_force_outer_ring_search(self) -> None:
-        """Blocked outer-ring equipment does not start recovery outside break thresholds.
+        """Blocked outer-ring equipment does not start COLLECT outside break thresholds.
 
-        The semantic invariant is that ``COLLECT_EQUIPMENT`` does not
-        own this decision -- the bot does not abandon HUNT to chase a
-        water-locked container while reserves are above break levels.
-        Whether the active HUNT sub-pursuit is the direct teleport or a
-        within-HUNT refuel for affordability is incidental.
+        The semantic invariant is that the durable AI owner is HUNT --
+        the bot does not abandon HUNT to chase a water-locked container
+        while reserves are above break levels. Whether HUNT internally
+        defers to ``decide_collect_mode`` for a refuel sub-pursuit is
+        incidental: the resulting decision still carries the HUNT
+        durable owner via ``apply_mode_to_decision``.
         """
         containers: dict[str, ContainerStateDict] = {
             "129,184": make_container(129, 184, 0, False),
@@ -669,11 +503,11 @@ class TestRecoveryHelpers:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] != "COLLECT_EQUIPMENT"
+        assert decision["updated_ai_state"]["mode"] == "HUNT"
 
     def test_waypoint_clamped_to_viewport_bounds(self) -> None:
         """A* waypoints never produce moves outside the visible viewport."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         terrain = InMemoryTerrainMap(
             terrain_data={(row, col): "#" for row in range(92, 100) for col in range(92, 100)}
         )
@@ -700,7 +534,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_rejects_failed_move_target(self) -> None:
         """Recently failed move targets are skipped."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         ctx = DecideCtx(
             world,
             self_state,
@@ -719,7 +553,7 @@ class TestRecoveryHelpers:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=300,
+            fuel=150,
             tanks={"50": _enemy(x=107, y=100, timestamp_ms=100000)},
         )
         ctx = DecideCtx(
@@ -739,7 +573,7 @@ class TestRecoveryHelpers:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=300,
+            fuel=150,
             tanks={"50": _enemy(x=107, y=100, timestamp_ms=100000)},
         )
         ctx = DecideCtx(
@@ -756,7 +590,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_returns_none_for_out_of_bounds_target(self) -> None:
         """Out-of-bounds target returns None via teleport fallback (landing=None)."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         terrain = InMemoryTerrainMap(
             terrain_data={
                 (100, 100): InMemoryTerrainMap.GROUND,
@@ -780,7 +614,7 @@ class TestRecoveryHelpers:
 
     def test_walk_or_teleport_rejects_mined_move_without_terrain(self) -> None:
         """Mine occupancy blocks direct moves without terrain."""
-        world, self_state = make_world(self_x=100, self_y=100, fuel=300)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
         ctx = DecideCtx(
             world,

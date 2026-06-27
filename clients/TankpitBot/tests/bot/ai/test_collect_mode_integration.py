@@ -88,7 +88,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_no_equipment_when_none_visible(self) -> None:
@@ -110,12 +110,10 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "search_equipment_local"
+        assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 130
+        assert decision["command"]["target_x"] == 116
         assert decision["command"]["target_y"] == 100
-        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 1
-        assert decision["updated_ai_state"]["equipment_search_failures"] == 1
 
     def test_equipment_at_break_threshold_relocates_in_scanned_viewport(self) -> None:
         """Break-threshold equipment depletion still enters recovery."""
@@ -131,7 +129,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_critical_homing_shots_interrupts_for_equipment(self) -> None:
@@ -149,7 +147,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "equipment_critical"
+        assert decision["behavior"]["reason"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_homing_at_break_threshold_triggers_equipment_recovery(self) -> None:
@@ -160,7 +158,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_active_combat_interrupted_by_critical_equipment(self) -> None:
         """Locked combat yields to critical equipment recovery."""
@@ -182,15 +180,23 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "equipment_critical"
+        assert decision["behavior"]["reason"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_active_combat_with_subcritical_fuel_interrupts_for_collection(self) -> None:
-        """Fuel recovery outranks combat once fuel drops below the threshold."""
+        """Fuel recovery outranks combat once fuel drops below the threshold.
+
+        The held combat lock (``combat_target_id``) is preserved across
+        the recovery cycle so HUNT can resume the same engagement after
+        refueling rather than re-acquiring fresh. The recovery branch
+        still owns this tick -- the bot dispatches ``pickup_fuel``, not
+        ``shoot`` -- but the lock survives for the post-recovery
+        cascade.
+        """
         containers: dict[str, ContainerStateDict] = {
             "104,104": make_container(104, 104, 900, True),
         }
-        world, self_state = make_world(fuel=250, containers=containers, tanks={"50": _enemy()})
+        world, self_state = make_world(fuel=150, containers=containers, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -205,9 +211,9 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
-        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_blocked_equipment_uses_final_pickup_command(self) -> None:
         """Blocked equipment in view still uses the final pickup target."""
@@ -275,7 +281,7 @@ class TestRecoverEquipmentPriority:
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
         }
-        world, self_state = make_world(fuel=250, containers=containers, tanks={"50": _enemy()})
+        world, self_state = make_world(fuel=150, containers=containers, tanks={"50": _enemy()})
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -290,24 +296,31 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
 
-    def test_critical_fuel_beats_critical_equipment(self) -> None:
-        """Fuel recovery outranks even critical equipment depletion."""
+    def test_equipment_ranks_ahead_of_fuel_even_at_critical_fuel(self) -> None:
+        """COLLECT picks visible equipment before fuel, regardless of fuel level.
+
+        The user's gameplay loop is "pick up all equipment, then maybe the
+        biggest fuel container, then hop". The unified cascade enforces
+        that ordering at every fuel level. Walking an extra tile or two
+        for equipment costs 1 fuel/tile -- a rounding error against the
+        viewport-fuel a few ticks later.
+        """
         containers: dict[str, ContainerStateDict] = {
             "101,100": make_container(101, 100, 700, True),
             "102,100": make_container(102, 100, 0, False),
         }
-        world, self_state = make_world(fuel=250, containers=containers)
+        world, self_state = make_world(fuel=150, containers=containers)
         inventory = make_inventory(dual_count=3, default_count=30)
         inventory["extra_radars"]["count"] = 4
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
-        assert decision["behavior"]["reason"] == "fuel=700"
-        assert decision["command"]["cmd_type"] == "pickup_fuel"
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["behavior"]["reason"] == "equipment_restock"
+        assert decision["command"]["cmd_type"] == "pickup_equipment"
 
 
 class TestRecoverEquipmentSearch:
@@ -351,7 +364,6 @@ class TestRecoverEquipmentSearch:
                 **make_scanned_ai_state(),
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
-                "patrol_waypoint_index": 2,
                 "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
@@ -359,12 +371,10 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "search_equipment_local"
+        assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
-        assert decision["command"]["target_x"] == 70
+        assert decision["command"]["target_x"] == 116
         assert decision["command"]["target_y"] == 100
-        assert decision["updated_ai_state"]["patrol_waypoint_index"] == 3
-        assert decision["updated_ai_state"]["equipment_search_failures"] == 1
 
     def test_equipment_search_bails_out_after_max_failures(self) -> None:
         """Critical equipment search stays in recovery after hitting the failure cap.
@@ -379,7 +389,6 @@ class TestRecoverEquipmentSearch:
                 **make_scanned_ai_state(),
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
-                "equipment_search_failures": 3,
                 "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
@@ -387,8 +396,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-        assert decision["updated_ai_state"]["equipment_search_failures"] == 1
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_equipment_search_edge_walks_when_teleport_unaffordable(self) -> None:
         """Unaffordable critical equipment search degrades to an edge walk.
@@ -415,13 +423,13 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
         """Equipment search defers to fuel recovery when fuel is already low."""
-        world, self_state = make_world(fuel=250)
+        world, self_state = make_world(fuel=150)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -434,14 +442,14 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_reachable_container_behind_wall_uses_final_pickup_target(self) -> None:
         """In-viewport terrain detours preserve the final pickup target."""
         containers: dict[str, ContainerStateDict] = {
             "103,100": make_container(103, 100, 700, True),
         }
-        world, self_state = make_world(fuel=250, containers=containers)
+        world, self_state = make_world(fuel=150, containers=containers)
         terrain = InMemoryTerrainMap({(102, 100): "#"})
 
         decision = decide(
@@ -459,7 +467,7 @@ class TestRecoverEquipmentSearch:
 
     def test_low_fuel_without_targets_uses_radar(self) -> None:
         """Low fuel scans when no actionable fuel target exists."""
-        world, self_state = make_world(fuel=300, scanned=False)
+        world, self_state = make_world(fuel=150, scanned=False)
 
         decision = decide(
             world,
@@ -470,7 +478,7 @@ class TestRecoverEquipmentSearch:
             None,
         )
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["command"]["cmd_type"] == "radar"
 
@@ -479,7 +487,7 @@ class TestRecoverEquipmentSearch:
         containers: dict[str, ContainerStateDict] = {
             "104,100": make_container(104, 100, 700, True),
         }
-        world, self_state = make_world(fuel=300, containers=containers)
+        world, self_state = make_world(fuel=150, containers=containers)
         world["scanned_viewports"] = {}
 
         decision = decide(
@@ -491,12 +499,12 @@ class TestRecoverEquipmentSearch:
             None,
         )
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "pickup_fuel"
 
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
         """A newly entered unconfirmed viewport radars immediately."""
-        world, self_state = make_world(fuel=300, scanned=False)
+        world, self_state = make_world(fuel=150, scanned=False)
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
@@ -515,7 +523,7 @@ class TestRecoverEquipmentSearch:
         bot-owned ``local_scan_tiles`` map written by
         :func:`mark_scan_dispatched`.
         """
-        world, self_state = make_world(fuel=300, scanned=False)
+        world, self_state = make_world(fuel=150, scanned=False)
         viewport_left = world["viewport"]["left"]
         viewport_top = world["viewport"]["top"]
         viewport_right = viewport_left + world["viewport"]["width"] - 1
@@ -536,7 +544,7 @@ class TestRecoverEquipmentSearch:
             None,
         )
 
-        assert decision["behavior"]["reason"] == "search_fuel_local"
+        assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_low_fuel_blocked_search_with_visible_threats_falls_back_to_map(self) -> None:
@@ -544,7 +552,7 @@ class TestRecoverEquipmentSearch:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=300,
+            fuel=150,
             tanks={"50": _enemy(x=120, y=100)},
         )
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
@@ -563,7 +571,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_exploration_candidates_omit_self_and_duplicates(self) -> None:
         """Exploration candidates omit the current tile and duplicate entries."""
@@ -632,7 +640,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_killed_target_releases_combat_lock_for_recovery(self) -> None:
         """Killed locked targets release combat so recovery can proceed."""
@@ -643,7 +651,7 @@ class TestRecoverEquipmentSearch:
             "50": _enemy(timestamp_ms=100000),
             "60": _enemy(tank_id=60, x=105, y=105, name="Enemy2", timestamp_ms=100000),
         }
-        world, self_state = make_world(fuel=250, tanks=tanks, containers=containers)
+        world, self_state = make_world(fuel=150, tanks=tanks, containers=containers)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -658,7 +666,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
-        assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+        assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_new_target_selection_skips_recently_killed_enemy(self) -> None:
         """Threat acquisition skips enemies still on the kill cooldown.

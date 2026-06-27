@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.recover_equipment_mode import (
-    decide_recover_equipment_mode,
+from tankpit_bot.bot.ai.collect_mode import (
+    decide_collect_mode,
     select_equipment_target,
-    try_search_critical_equipment,
 )
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -44,7 +43,7 @@ def _exhausted_viewport_tiles(self_x: int, self_y: int, now_ms: int) -> dict[str
     return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
 
 
-def test_recover_equipment_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
+def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     """The durable owner forages built-in radar when no search hop can be afforded.
 
     Regression guard for live run 20260610-000x: the owner used to raise
@@ -61,7 +60,7 @@ def test_recover_equipment_mode_forages_radar_when_search_hop_is_unaffordable() 
                 **base_state["config"],
                 "equip_search_hop_distance": 150,
             },
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -72,14 +71,14 @@ def test_recover_equipment_mode_forages_radar_when_search_hop_is_unaffordable() 
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "forage_radar"
     assert decision["command"]["cmd_type"] == "radar"
 
 
-def test_recover_equipment_mode_forages_radar_when_fully_boxed_in() -> None:
+def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     """A fully boxed-in owner forages built-in radar instead of crashing.
 
     Every viewport tile is water, radar is exhausted, and at fuel=140
@@ -96,7 +95,7 @@ def test_recover_equipment_mode_forages_radar_when_fully_boxed_in() -> None:
                 **base_state["config"],
                 "equip_search_hop_distance": 150,
             },
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -112,83 +111,14 @@ def test_recover_equipment_mode_forages_radar_when_fully_boxed_in() -> None:
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "forage_radar"
     assert decision["command"]["cmd_type"] == "radar"
 
 
-def test_try_search_critical_equipment_forages_radar_when_hop_is_unaffordable() -> None:
-    """The emergency search helper forages built-in radar, never raises.
-
-    This validates the helper-level contract separately from the durable
-    owner: emergency equipment search owns the tick but cannot afford the
-    hop and has no extra radars, so it must degrade to the free built-in
-    radar forage.
-    """
-    world, self_state = make_world(fuel=800, scanned=True)
-    base_state = make_scanned_ai_state()
-    ai_state = AIStateDict(
-        **{
-            **base_state,
-            "config": {
-                **base_state["config"],
-                "equip_search_hop_distance": 150,
-            },
-        }
-    )
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 3
-    inventory["homing_shots"]["count"] = 3
-    inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-    decision = try_search_critical_equipment(ctx)
-
-    if decision is None:
-        raise AssertionError("expected forage-radar fallback decision")
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["behavior"]["reason"] == "forage_radar"
-    assert decision["command"]["cmd_type"] == "radar"
-
-
-def test_recover_equipment_mode_short_hops_when_standard_hop_unaffordable() -> None:
-    """The durable owner does a short hop when the standard hop is unaffordable.
-
-    With the forage grid fully swept and the standard 150-tile hop
-    unaffordable at fuel=800, the bot tries a short 8-tile hop instead
-    of falling back to a useless edge walk.
-    """
-    world, self_state = make_world(fuel=800, scanned=True)
-    base_state = make_scanned_ai_state()
-    ai_state = AIStateDict(
-        **{
-            **base_state,
-            "config": {
-                **base_state["config"],
-                "equip_search_hop_distance": 150,
-            },
-            "mode": "RECOVER_EQUIPMENT",
-            "mode_state": "SEARCH",
-            "mode_started_ms": 90000,
-            "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
-        }
-    )
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 15
-    inventory["homing_shots"]["count"] = 15
-    inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-    decision = decide_recover_equipment_mode(ctx)
-
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["behavior"]["reason"] == "search_equipment_local"
-    assert decision["command"]["cmd_type"] == "teleport"
-
-
-def test_recover_equipment_mode_raises_when_genuinely_boxed_in() -> None:
+def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     """Boxed-in recovery raises instead of spamming map_open.
 
     Both walking-to-edge and the always-on map_intel terminal were
@@ -200,7 +130,10 @@ def test_recover_equipment_mode_raises_when_genuinely_boxed_in() -> None:
     """
     import pytest
 
-    world, self_state = make_world(fuel=120, scanned=True)
+    # Fuel below the short-hop cost (8 tiles * 6 = 48). The
+    # ``hunt_min_fuel`` reserve was dropped 2026-06-24, so genuine
+    # stranding requires fuel below the raw short-hop cost.
+    world, self_state = make_world(fuel=30, scanned=True)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -209,7 +142,7 @@ def test_recover_equipment_mode_raises_when_genuinely_boxed_in() -> None:
                 **base_state["config"],
                 "equip_search_hop_distance": 150,
             },
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
             "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
@@ -221,11 +154,11 @@ def test_recover_equipment_mode_raises_when_genuinely_boxed_in() -> None:
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    with pytest.raises(ValueError, match="RECOVER_EQUIPMENT owner produced no decision"):
-        decide_recover_equipment_mode(ctx)
+    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+        decide_collect_mode(ctx)
 
 
-def test_recover_equipment_mode_raises_when_fully_boxed_in() -> None:
+def test_collect_mode_raises_when_fully_boxed_in() -> None:
     """A fully boxed-in owner raises so the stuck state is loud.
 
     Every viewport tile is water, the forage map is swept, radar is
@@ -236,7 +169,8 @@ def test_recover_equipment_mode_raises_when_fully_boxed_in() -> None:
     """
     import pytest
 
-    world, self_state = make_world(fuel=140, scanned=True)
+    # Fuel below the short-hop cost so no teleport is affordable.
+    world, self_state = make_world(fuel=30, scanned=True)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -245,7 +179,7 @@ def test_recover_equipment_mode_raises_when_fully_boxed_in() -> None:
                 **base_state["config"],
                 "equip_search_hop_distance": 150,
             },
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
             "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
@@ -262,48 +196,19 @@ def test_recover_equipment_mode_raises_when_fully_boxed_in() -> None:
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    with pytest.raises(ValueError, match="RECOVER_EQUIPMENT owner produced no decision"):
-        decide_recover_equipment_mode(ctx)
+    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+        decide_collect_mode(ctx)
 
 
-def test_try_search_critical_equipment_short_hops_when_standard_unaffordable() -> None:
-    """The emergency search helper does a short hop when the standard is unaffordable.
+def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
+    """COLLECT picks visible equipment first, even when fuel sits adjacent.
 
-    With the forage grid fully swept and the 150-tile hop unaffordable,
-    the emergency helper uses a cheap short hop to keep searching.
-    """
-    world, self_state = make_world(fuel=800, scanned=True)
-    base_state = make_scanned_ai_state()
-    ai_state = AIStateDict(
-        **{
-            **base_state,
-            "config": {
-                **base_state["config"],
-                "equip_search_hop_distance": 150,
-            },
-            "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
-        }
-    )
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 3
-    inventory["homing_shots"]["count"] = 3
-    inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-    decision = try_search_critical_equipment(ctx)
-
-    if decision is None:
-        raise AssertionError("expected short-hop decision")
-    assert decision["behavior"]["mode"] == "COLLECT_EQUIPMENT"
-    assert decision["behavior"]["reason"] == "search_equipment_local"
-    assert decision["command"]["cmd_type"] == "teleport"
-
-
-def test_recover_equipment_mode_grabs_adjacent_fuel_opportunistically() -> None:
-    """Equipment recovery picks up fuel it is standing next to.
-
-    Mirrors the fuel-mode rule from live run 20260610-011x: resource
-    modes must not walk past the other resource kind at arm's reach.
+    Under the unified cascade equipment ranks ahead of fuel: the
+    gameplay loop drains all in-viewport equipment first, then the
+    fuel-pickup step considers what remains. The old fuel-mode rule
+    that opportunistically grabbed equipment, and the equipment-mode
+    rule that opportunistically grabbed adjacent fuel, are collapsed
+    into this single ordering.
     """
     world, self_state = make_world(
         fuel=800,
@@ -330,7 +235,7 @@ def test_recover_equipment_mode_grabs_adjacent_fuel_opportunistically() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -338,15 +243,155 @@ def test_recover_equipment_mode_grabs_adjacent_fuel_opportunistically() -> None:
     inventory = make_inventory(default_count=15)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["reason"] == "opportunistic_fuel"
-    assert decision["command"]["cmd_type"] == "pickup_fuel"
-    assert decision["behavior"]["target_x"] == 100
-    assert decision["behavior"]["target_y"] == 101
+    assert decision["behavior"]["reason"] == "equipment_restock"
+    assert decision["command"]["cmd_type"] == "pickup_equipment"
+    assert decision["behavior"]["target_x"] == 106
+    assert decision["behavior"]["target_y"] == 106
 
 
-def test_recover_equipment_mode_releases_lock_for_markedly_closer_equipment() -> None:
+def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None:
+    """No equipment in viewport + a fuel container exists -> walk to it before teleporting.
+
+    User's hand-played loop (2026-06-23): teleport into a fresh
+    viewport, scan, pick up all equipment, then optionally grab the
+    biggest fuel container before hopping to the next clean
+    viewport. The bot previously ignored non-adjacent fuel during
+    equipment recovery and immediately teleport-searched, leaving a
+    pickup-eligible fuel container behind every viewport. Live run
+    2026-06-23 tick 21: F at (167,251), bot at (165,254), bot
+    ignored it and hopped away. This test pins that the bot now
+    walks to the in-viewport fuel before bailing.
+    """
+    world, self_state = make_world(
+        fuel=800,
+        scanned=True,
+        containers={
+            "105,105": make_container_state(
+                x=105,
+                y=105,
+                is_fuel=True,
+                volume=900,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory(default_count=15)
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_collect_mode(ctx)
+
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["behavior"]["reason"] == "fuel=900"
+    assert decision["behavior"]["target_x"] == 105
+    assert decision["behavior"]["target_y"] == 105
+
+
+def test_collect_mode_skips_opportunistic_fuel_at_learned_capacity() -> None:
+    """When fuel is at the learned cap, the in-viewport fuel pickup is skipped.
+
+    Picking up at capacity wastes the action ("Tank full" in the
+    game log), so the opportunistic-viewport-fuel branch must defer.
+    The bot falls through to the no-equipment search-hop path.
+    """
+    from tankpit_bot.browser.dom_scraper import GameLogEntry
+    from tankpit_bot.diagnostics.game_log_feedback import (
+        register_world_feedback_from_game_log,
+        reset_game_log_feedback,
+    )
+
+    reset_game_log_feedback()
+    world, self_state = make_world(
+        fuel=1100,
+        scanned=True,
+        containers={
+            "105,105": make_container_state(
+                x=105,
+                y=105,
+                is_fuel=True,
+                volume=900,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    capacity_world, _ = make_world(fuel=1100, scanned=True)
+    register_world_feedback_from_game_log(
+        [GameLogEntry(text="Tank full", category="fuel")],
+        capacity_world,
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory(default_count=15)
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_collect_mode(ctx)
+
+    reset_game_log_feedback()
+    assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
+
+
+def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
+    """Fuel in viewport but walk_or_teleport blocked -> fall through, no fuel pickup.
+
+    Covers the ``fuel_command is not None`` false branch. The fuel
+    container's coords are marked as a previously-failed move, so
+    ``walk_or_teleport`` returns ``None`` and the bot skips the
+    opportunistic fuel pickup, falling through to the no-equipment
+    search-hop path.
+    """
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+
+    reset_world_state()
+    world, self_state = make_world(
+        fuel=800,
+        scanned=True,
+        containers={
+            "105,105": make_container_state(
+                x=105,
+                y=105,
+                is_fuel=True,
+                volume=900,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    mark_move_target_failed(105, 105, 99000)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory(default_count=15)
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_collect_mode(ctx)
+
+    reset_world_state()
+    assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
+
+
+def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
     """A locked far container yields to markedly closer equipment.
 
     Mirrors the fuel-mode rule; regression guard for live run
@@ -377,7 +422,7 @@ def test_recover_equipment_mode_releases_lock_for_markedly_closer_equipment() ->
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "resource_target_kind": "equipment",
@@ -388,14 +433,14 @@ def test_recover_equipment_mode_releases_lock_for_markedly_closer_equipment() ->
     inventory = make_inventory(default_count=15)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["target_x"] == 106
     assert decision["behavior"]["target_y"] == 106
     assert decision["updated_ai_state"]["resource_target_x"] == 106
 
 
-def test_recover_equipment_mode_keeps_lock_against_marginally_closer_equipment() -> None:
+def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
     """A candidate inside the anti-churn threshold does not break the lock."""
     world, self_state = make_world(
         fuel=800,
@@ -422,7 +467,7 @@ def test_recover_equipment_mode_keeps_lock_against_marginally_closer_equipment()
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "resource_target_kind": "equipment",
@@ -433,126 +478,11 @@ def test_recover_equipment_mode_keeps_lock_against_marginally_closer_equipment()
     inventory = make_inventory(default_count=15)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["reason"] == "equipment_locked"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
-
-
-def test_try_search_critical_equipment_returns_none_when_not_in_emergency() -> None:
-    """Emergency search helper is a no-op when reserves are not broken."""
-    world, self_state = make_world(fuel=800, scanned=True)
-    ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        make_inventory(),
-        100000,
-        None,
-        "",
-    )
-
-    assert try_search_critical_equipment(ctx) is None
-
-
-def test_try_search_critical_equipment_returns_radar_when_scan_is_needed() -> None:
-    """Emergency search helper senses the current viewport before teleport search.
-
-    With extras > 0 the forager dispatches an extra radar (whole viewport
-    revealed) -- the same wire command as the free 5x5 scan, but the
-    server consumes one extra and the coverage map fills with all 256
-    viewport tiles.
-    """
-    world, self_state = make_world(fuel=800, scanned=False)
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 3
-    inventory["homing_shots"]["count"] = 3
-    inventory["extra_radars"]["count"] = 5
-    ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        None,
-        "",
-    )
-
-    decision = try_search_critical_equipment(ctx)
-
-    if decision is None:
-        raise AssertionError("expected radar search decision")
-    assert decision["command"]["cmd_type"] == "radar"
-    assert decision["behavior"]["reason"] == "forage_radar"
-    # Extras > 0 -- the recorded coverage matches the whole 16x16 viewport.
-    assert len(decision["updated_ai_state"]["local_scan_tiles"]) == 16 * 16
-
-
-def test_try_search_critical_equipment_does_not_spam_radar_in_covered_viewport() -> None:
-    """Forager respects the viewport-level coverage map.
-
-    Live capture 2026-06-21 19:46:33+: bot fired the radar every 2 s
-    for 80+ s after a failed pickup, because the old gate checked a
-    server-side viewport-scan flag that a 5x5 scan never closes. The
-    tile-aware forager replaces that gate with
-    ``is_viewport_fully_covered(local_scan_tiles, ...)``. When every
-    tile in the current viewport has a fresh scan mark the forager
-    returns ``None`` and the caller hops to a fresh sector instead of
-    re-firing.
-    """
-    world, self_state = make_world(self_x=131, self_y=126, fuel=800, scanned=False)
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 3
-    inventory["homing_shots"]["count"] = 3
-    inventory["extra_radars"]["count"] = 5
-    ai_state = AIStateDict(
-        **{
-            **make_scanned_ai_state(),
-            "local_scan_tiles": _exhausted_viewport_tiles(131, 126, 99500),
-        }
-    )
-    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-    decision = try_search_critical_equipment(ctx)
-
-    if decision is None:
-        raise AssertionError("expected a fallback search decision, got None")
-    assert decision["command"]["cmd_type"] != "radar", (
-        "bot fired radar on a fully-covered viewport; the radar-spam regression "
-        "from 2026-06-21 19:46:33 has come back"
-    )
-
-
-def test_try_search_critical_equipment_uses_regular_radar_when_extra_is_empty() -> None:
-    """At zero extras, emergency search scans the free built-in radar.
-
-    The forager is the only scan path, so the scan is the free
-    built-in 5x5 (reason ``forage_radar``). Same radar command, with
-    the coverage map recording only the intersection of (tank±2) with
-    the viewport bounds.
-    """
-    world, self_state = make_world(fuel=800, scanned=False)
-    inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 3
-    inventory["homing_shots"]["count"] = 3
-    inventory["extra_radars"]["count"] = 0
-    ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        None,
-        "",
-    )
-
-    decision = try_search_critical_equipment(ctx)
-
-    if decision is None:
-        raise AssertionError("expected built-in-radar forage decision")
-    assert decision["command"]["cmd_type"] == "radar"
-    assert decision["behavior"]["reason"] == "forage_radar"
 
 
 def test_select_equipment_target_returns_none_for_unreachable_off_viewport_target() -> None:
@@ -597,19 +527,18 @@ def test_select_equipment_target_returns_none_for_unreachable_off_viewport_targe
         "",
     )
 
-    assert select_equipment_target(ctx, allow_unreachable=True) is None
+    assert select_equipment_target(ctx) is None
     reset_world_state()
 
 
-def test_select_equipment_target_dispatches_pickup_for_in_viewport_target() -> None:
-    """In-viewport equipment dispatches pickup_equipment regardless of walkability.
+def test_select_equipment_target_rejects_walk_unreachable_in_viewport() -> None:
+    """Walk-unreachable in-viewport equipment is not selected (walk-only).
 
-    Pre-2026-06-21 the bot tried to walk-or-teleport to the
-    container; rock walls + no fuel for teleport meant it gave up
-    (returned ``None``). The new path is simpler: ``pickup_equipment``
-    is one command and the server handles the routing, so the
-    decision is "is the container in the viewport" -- if yes,
-    dispatch and let the server walk.
+    Live run 2026-06-23 23:45:22 stranded the bot dispatching
+    ``pickup_equipment`` at water-locked containers; the server
+    returned CANT_GO and a single rejection flagged the container
+    failed_pickup. Teleport-to-container was removed entirely
+    2026-06-26; containers without a walk path are never selected.
     """
     world, self_state = make_world(
         fuel=0,
@@ -636,13 +565,7 @@ def test_select_equipment_target_dispatches_pickup_for_in_viewport_target() -> N
         "",
     )
 
-    selected = select_equipment_target(ctx, allow_unreachable=True)
-    if selected is None:
-        raise AssertionError("expected select_equipment_target to dispatch a pickup")
-    _container, command = selected
-    assert command["cmd_type"] == "pickup_equipment"
-    assert command["target_x"] == 103
-    assert command["target_y"] == 100
+    assert select_equipment_target(ctx) is None
 
 
 def _make_blocked_equipment_setup(
@@ -683,7 +606,7 @@ def _make_blocked_equipment_setup(
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_EQUIPMENT",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
             "attempted_equipment_targets": attempted_equipment_targets,
@@ -692,49 +615,24 @@ def _make_blocked_equipment_setup(
     return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
 
-def test_equipment_approach_dispatches_pickup_without_attempt_mark() -> None:
-    """Pickup commands rely on server reject signals, not the attempt mark.
+def test_rock_walled_equipment_is_skipped_for_forage() -> None:
+    """Rock-walled in-viewport equipment is not selected under the walk-only contract.
 
-    The attempt-mark mechanism was added to prevent teleport orbits
-    around blocked containers. ``pickup_equipment`` is server-routed
-    -- if the container can't be reached or is empty, the server
-    surfaces that via the ``failed_pickups`` counter on the
-    container, which the planner already gates on. The attempt
-    mark stays teleport-only to avoid double-bookkeeping.
+    User contract (2026-06-26): a container only counts as actionable
+    if a walk path to it exists inside the current viewport. The
+    rock-walled container is in-viewport but the bot cannot walk to
+    it; the cascade falls through to the forage radar.
     """
     ctx = _make_blocked_equipment_setup({})
 
-    decision = decide_recover_equipment_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "pickup_equipment"
-    assert decision["updated_ai_state"]["attempted_equipment_targets"] == {}
-
-
-def test_select_equipment_target_skips_recently_attempted_container() -> None:
-    """A live approach mark excludes the container from re-selection."""
-    ctx = _make_blocked_equipment_setup({"103,100": 99000})
-
-    assert select_equipment_target(ctx, allow_unreachable=True) is None
-
-
-def test_select_equipment_target_allows_expired_attempt_mark() -> None:
-    """An expired approach mark no longer vetoes the container."""
-    expired_mark = {"103,100": 100000 - 120001}
-    ctx = _make_blocked_equipment_setup(expired_mark)
-
-    decision = decide_recover_equipment_mode(ctx)
-
-    assert decision["behavior"]["target_x"] == 103
-    assert decision["behavior"]["target_y"] == 100
-    assert decision["command"]["cmd_type"] == "pickup_equipment"
-    # Pickup dispatch leaves the (now-expired) mark unchanged; the
-    # attempt mark is teleport-only bookkeeping.
-    assert decision["updated_ai_state"]["attempted_equipment_targets"] == expired_mark
+    assert decision["command"]["cmd_type"] != "pickup_equipment"
 
 
 def test_blacklisted_container_is_skipped_by_select() -> None:
     """A blacklisted container is excluded from equipment candidate selection."""
-    from tankpit_bot.bot.ai.recover_equipment_mode import (
+    from tankpit_bot.bot.ai.collect_mode import (
         _blacklist_container,
         is_container_blacklisted,
     )
@@ -756,14 +654,14 @@ def test_blacklisted_container_is_skipped_by_select() -> None:
     inventory = make_inventory(dual_count=3, default_count=30)
     ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
 
-    result = select_equipment_target(ctx, allow_unreachable=True)
+    result = select_equipment_target(ctx)
 
     assert result is None
 
 
 def test_blacklist_duplicate_does_not_re_emit_diagnostic() -> None:
     """Blacklisting the same container twice skips the second diagnostic."""
-    from tankpit_bot.bot.ai.recover_equipment_mode import (
+    from tankpit_bot.bot.ai.collect_mode import (
         _blacklist_container,
         is_container_blacklisted,
     )
@@ -776,7 +674,7 @@ def test_blacklist_duplicate_does_not_re_emit_diagnostic() -> None:
 
 def test_select_skips_previously_blacklisted_container() -> None:
     """A previously blacklisted container is excluded from candidates."""
-    from tankpit_bot.bot.ai.recover_equipment_mode import (
+    from tankpit_bot.bot.ai.collect_mode import (
         _blacklist_container,
         is_container_blacklisted,
     )
@@ -798,5 +696,5 @@ def test_select_skips_previously_blacklisted_container() -> None:
     inventory = make_inventory(dual_count=3, default_count=30)
     ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
 
-    result = select_equipment_target(ctx, allow_unreachable=True)
+    result = select_equipment_target(ctx)
     assert result is None

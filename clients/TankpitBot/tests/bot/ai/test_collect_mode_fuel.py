@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.recover_fuel_mode import (
-    can_use_fuel_radar,
-    decide_recover_fuel_mode,
-    minimum_recovery_fuel_volume,
+from tankpit_bot.bot.ai.collect_mode import (
+    decide_collect_mode,
     select_fuel_target,
 )
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import (
@@ -22,10 +20,10 @@ from tests.bot.ai._support import (
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
-def test_recover_fuel_mode_continues_locked_fuel_target() -> None:
+def test_collect_mode_continues_locked_fuel_target() -> None:
     """The durable owner keeps an executable locked fuel target."""
     world, self_state = make_world(
-        fuel=250,
+        fuel=150,
         containers={
             "105,105": make_container_state(
                 x=105,
@@ -40,7 +38,7 @@ def test_recover_fuel_mode_continues_locked_fuel_target() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
@@ -51,17 +49,27 @@ def test_recover_fuel_mode_continues_locked_fuel_target() -> None:
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "fuel=700"
     assert decision["command"]["cmd_type"] == "pickup_fuel"
 
 
-def test_recover_fuel_mode_clears_combat_lock_when_fuel_mode_owns_tick() -> None:
-    """Fuel recovery drops stale combat ownership when taking control."""
+def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
+    """Fuel recovery does NOT clear ``combat_target_id``.
+
+    Recovery preserves the held lock so the bot can resume the same
+    engagement after refueling rather than re-acquiring a fresh target.
+    Equipment recovery has always preserved the lock; fuel recovery was
+    flipped to match 2026-06-23 so that "bail to refuel mid-fight,
+    finish the kill after" is a single coherent behaviour. HUNT's
+    resume path (``_decide_hunt_acquire``) reads the persisted
+    ``combat_target_id`` and continues the engagement when the lock is
+    still viable.
+    """
     world, self_state = make_world(
-        fuel=250,
+        fuel=150,
         containers={
             "105,105": make_container_state(
                 x=105,
@@ -76,7 +84,7 @@ def test_recover_fuel_mode_clears_combat_lock_when_fuel_mode_owns_tick() -> None
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "combat_target_id": 50,
@@ -87,19 +95,20 @@ def test_recover_fuel_mode_clears_combat_lock_when_fuel_mode_owns_tick() -> None
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "pickup_fuel"
-    assert decision["updated_ai_state"]["combat_target_id"] == -1
-    assert decision["updated_ai_state"]["combat_target_x"] == 0
-    assert decision["updated_ai_state"]["combat_target_y"] == 0
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["combat_target_x"] == 120
+    assert decision["updated_ai_state"]["combat_target_y"] == 100
 
 
-def test_recover_fuel_mode_grabs_adjacent_equipment_opportunistically() -> None:
-    """Fuel recovery picks up visible equipment before chasing fuel.
+def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
+    """COLLECT picks up visible equipment before chasing visible fuel.
 
     Regression guard for live run 20260610-011x: the bot walked past
-    equipment containers because the mode only looked for fuel.
+    equipment containers because the old fuel-recovery mode only looked
+    for fuel. Under the unified cascade equipment ranks ahead of fuel.
     """
     world, self_state = make_world(
         fuel=400,
@@ -125,7 +134,7 @@ def test_recover_fuel_mode_grabs_adjacent_equipment_opportunistically() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -133,15 +142,15 @@ def test_recover_fuel_mode_grabs_adjacent_equipment_opportunistically() -> None:
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["reason"] == "opportunistic_equipment"
+    assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["behavior"]["target_x"] == 101
     assert decision["behavior"]["target_y"] == 100
 
 
-def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
+def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
     """A locked far container yields to abundant nearby fuel.
 
     Regression guard for live run 20260610-011x: the bot walked across
@@ -149,7 +158,7 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
     way.
     """
     world, self_state = make_world(
-        fuel=250,
+        fuel=150,
         containers={
             "107,107": make_container_state(
                 x=107,
@@ -172,7 +181,7 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
@@ -183,7 +192,7 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["reason"] == "fuel=900"
     assert decision["behavior"]["target_x"] == 107
@@ -191,10 +200,10 @@ def test_recover_fuel_mode_releases_lock_for_markedly_closer_fuel() -> None:
     assert decision["updated_ai_state"]["resource_target_x"] == 107
 
 
-def test_recover_fuel_mode_keeps_lock_against_marginally_closer_fuel() -> None:
+def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     """A candidate inside the anti-churn threshold does not break the lock."""
     world, self_state = make_world(
-        fuel=250,
+        fuel=150,
         containers={
             "104,104": make_container_state(
                 x=104,
@@ -217,7 +226,7 @@ def test_recover_fuel_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
@@ -228,20 +237,20 @@ def test_recover_fuel_mode_keeps_lock_against_marginally_closer_fuel() -> None:
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["reason"] == "fuel=700"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
 
-def test_recover_fuel_mode_uses_radar_when_viewport_needs_authoritative_scan() -> None:
+def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> None:
     """The durable owner senses before repositioning in an unscanned viewport."""
-    world, self_state = make_world(fuel=250, scanned=False)
+    world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -249,20 +258,20 @@ def test_recover_fuel_mode_uses_radar_when_viewport_needs_authoritative_scan() -
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "forage_radar"
     assert decision["command"]["cmd_type"] == "radar"
 
 
-def test_recover_fuel_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
+def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     """Fuel recovery still scans with free radar when extras are depleted."""
-    world, self_state = make_world(fuel=250, scanned=False)
+    world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -271,26 +280,27 @@ def test_recover_fuel_mode_uses_regular_radar_when_extra_charges_are_empty() -> 
     inventory["extra_radars"]["count"] = 1
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["reason"] == "forage_radar"
     assert decision["command"]["cmd_type"] == "radar"
 
 
-def test_recover_fuel_mode_raises_when_genuinely_boxed_in() -> None:
+def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     """The durable fuel owner raises when no productive recovery exists.
 
     With the current viewport already scanned, every tile water,
-    no affordable search hop, and no atlas-known fuel dot, the bot
-    has nothing legal to do. The map_intel terminal was removed
-    2026-06-22; the recovery owner raises to make the stuck state
-    loud instead of silently spamming map_open.
+    and fuel below even the short-hop cost (8 tiles * 6 = 48), the
+    bot has nothing legal to do. The ``hunt_min_fuel`` reserve
+    drop (2026-06-24) means the bot can now short-hop at very low
+    fuel, so the genuine-stranding threshold is fuel < short-hop
+    cost rather than fuel < cost + reserve.
     """
-    world, self_state = make_world(fuel=140, scanned=True)
+    world, self_state = make_world(fuel=30, scanned=True)
     ai_state = AIStateDict(
         **{
             **make_post_radar_ai_state(world),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -304,8 +314,8 @@ def test_recover_fuel_mode_raises_when_genuinely_boxed_in() -> None:
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    with pytest.raises(ValueError, match="RECOVER_FUEL owner produced no decision"):
-        decide_recover_fuel_mode(ctx)
+    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+        decide_collect_mode(ctx)
 
 
 def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -> None:
@@ -341,18 +351,18 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
         "",
     )
 
-    assert select_fuel_target(ctx, allow_unreachable=True) is None
+    assert select_fuel_target(ctx) is None
     reset_world_state()
 
 
-def test_select_fuel_target_dispatches_pickup_for_in_viewport_target() -> None:
-    """In-viewport fuel dispatches pickup_fuel regardless of walkability.
+def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
+    """Walk-unreachable in-viewport fuel is not selected (walkable-only).
 
-    Pre-2026-06-21 the planner gave up when the only path was a
-    teleport the bot couldn't afford. The new logic dispatches
-    ``pickup_fuel`` directly: it's a single server-routed command,
-    no teleport needed, and the server walks the bot toward the
-    container.
+    The server's long-press pickup walks the tank in a straight
+    line; if water or rocks block that path it returns CANT_GO and
+    one rejection flags the container ``failed_pickups`` for the
+    whole session. The fix shipped 2026-06-24 is to never select
+    containers the bot cannot walk to in the first place.
     """
     world, self_state = make_world(
         fuel=0,
@@ -379,13 +389,7 @@ def test_select_fuel_target_dispatches_pickup_for_in_viewport_target() -> None:
         "",
     )
 
-    selected = select_fuel_target(ctx, allow_unreachable=True)
-    if selected is None:
-        raise AssertionError("expected select_fuel_target to dispatch a pickup")
-    _container, command = selected
-    assert command["cmd_type"] == "pickup_fuel"
-    assert command["target_x"] == 103
-    assert command["target_y"] == 100
+    assert select_fuel_target(ctx) is None
 
 
 def test_selects_low_volume_fuel_when_critically_low() -> None:
@@ -407,20 +411,20 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
     )
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "pickup_fuel"
     assert decision["behavior"]["reason"] == "fuel=57"
 
 
-def test_recover_fuel_mode_walks_to_unscanned_tile_when_radar_too_costly() -> None:
+def test_collect_mode_walks_to_unscanned_tile_when_radar_too_costly() -> None:
     """Fuel recovery walks within the viewport when the radar fuel cost is unaffordable.
 
     With fuel below the radar + operating-reserve floor the forager
@@ -435,7 +439,7 @@ def test_recover_fuel_mode_walks_to_unscanned_tile_when_radar_too_costly() -> No
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -443,69 +447,15 @@ def test_recover_fuel_mode_walks_to_unscanned_tile_when_radar_too_costly() -> No
     inventory = make_inventory()
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "move"
     assert decision["behavior"]["reason"] == "forage_sweep"
-    assert decision["behavior"]["mode"] == "COLLECT_FUEL"
+    assert decision["behavior"]["mode"] == "COLLECT"
 
 
-def test_can_use_fuel_radar_keeps_operating_reserve() -> None:
-    """Fuel radar needs cost plus reserve; inventory never matters.
-
-    Regression guard for live run 20260612-131003: 64 unreserved scans
-    burned fuel to 7 and stranded the session for 28 minutes.
-    """
-    world, self_state = make_world(fuel=110, scanned=False)
-    inventory = make_inventory()
-    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
-
-    assert can_use_fuel_radar(ctx) is True
-    assert minimum_recovery_fuel_volume(ctx) == 1
-
-    low_fuel_world, low_fuel_self_state = make_world(fuel=109, scanned=False)
-    low_fuel_ctx = DecideCtx(
-        low_fuel_world,
-        low_fuel_self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        None,
-        "",
-    )
-
-    assert can_use_fuel_radar(low_fuel_ctx) is False
-    assert minimum_recovery_fuel_volume(low_fuel_ctx) == 1
-
-    healthy_world, healthy_self_state = make_world(fuel=800, scanned=False)
-    healthy_ctx = DecideCtx(
-        healthy_world,
-        healthy_self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        None,
-        "",
-    )
-
-    assert minimum_recovery_fuel_volume(healthy_ctx) == 100
-
-    inventory["extra_radars"]["count"] = 1
-    uncharged_ctx = DecideCtx(
-        world,
-        self_state,
-        make_scanned_ai_state(),
-        inventory,
-        100000,
-        None,
-        "",
-    )
-
-    assert can_use_fuel_radar(uncharged_ctx) is True
-
-
-def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
-    """When no fuel target exists but equipment is in the viewport, sweep it."""
+def test_collect_takes_visible_equipment_before_search_hop() -> None:
+    """When equipment is in the viewport, COLLECT grabs it before hopping."""
     containers = {
         "102,100": make_container_state(
             x=102,
@@ -520,7 +470,7 @@ def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -530,16 +480,16 @@ def test_fuel_recovery_sweeps_equipment_before_search_hop() -> None:
     inventory["homing_shots"]["count"] = 3
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["reason"] == "opportunistic_equipment"
+    assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["command"]["target_x"] == 102
     assert decision["command"]["target_y"] == 100
 
 
-def test_fuel_recovery_sweeps_equipment_at_critical_fuel() -> None:
-    """Sweep fires when fuel is critical and no fuel containers exist."""
+def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
+    """Visible equipment is still grabbed at critical fuel (equipment ranks first)."""
     containers = {
         "103,100": make_container_state(
             x=103,
@@ -554,7 +504,7 @@ def test_fuel_recovery_sweeps_equipment_at_critical_fuel() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
         }
@@ -564,9 +514,9 @@ def test_fuel_recovery_sweeps_equipment_at_critical_fuel() -> None:
     inventory["homing_shots"]["count"] = 3
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["reason"] == "sweep_equipment"
+    assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["behavior"]["target_x"] == 103
 
 
@@ -586,7 +536,7 @@ def test_locked_fuel_clears_when_water_locked() -> None:
     world, self_state = make_world(
         self_x=100,
         self_y=100,
-        fuel=300,
+        fuel=150,
         scanned=True,
         containers={
             "120,100": make_container_state(
@@ -601,7 +551,7 @@ def test_locked_fuel_clears_when_water_locked() -> None:
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
-            "mode": "RECOVER_FUEL",
+            "mode": "COLLECT",
             "mode_state": "",
             "mode_started_ms": 90000,
             "resource_target_kind": "fuel",
@@ -613,6 +563,6 @@ def test_locked_fuel_clears_when_water_locked() -> None:
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    decision = decide_recover_fuel_mode(ctx)
+    decision = decide_collect_mode(ctx)
 
     assert decision["updated_ai_state"]["resource_target_kind"] == ""

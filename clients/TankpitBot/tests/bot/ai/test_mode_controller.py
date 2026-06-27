@@ -9,16 +9,13 @@ from tankpit_bot.bot.ai.mode_controller import (
     apply_mode_to_decision,
     clear_ai_mode,
     clear_mode_on_decision,
+    derive_collect_mode_state,
     derive_hunt_mode_state,
-    derive_recover_equipment_mode_state,
-    derive_recover_fuel_mode_state,
     set_ai_mode,
+    should_enter_collect,
     should_enter_hunt,
-    should_enter_recover_equipment,
-    should_enter_recover_fuel,
+    should_exit_collect,
     should_exit_hunt,
-    should_exit_recover_equipment,
-    should_exit_recover_fuel,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score, make_initial_ai_state
 from tankpit_bot.bot.tick_loop_types import make_tick_decision
@@ -33,7 +30,7 @@ from tankpit_bot.bot.types import (
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
-def _make_ctx(*, fuel: int = 800, dual_count: int = 30, radar_count: int = 30) -> DecideCtx:
+def _make_ctx(*, fuel: int = 1200, dual_count: int = 30, radar_count: int = 30) -> DecideCtx:
     """Create a focused DecideCtx for durable mode tests.
 
     Args:
@@ -163,29 +160,29 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
     assert updated["updated_ai_state"]["mode_started_ms"] == 9000
 
 
-def test_should_enter_recover_fuel_uses_low_threshold() -> None:
+def test_should_enter_collect_uses_low_threshold() -> None:
     """Fuel recovery entry uses the configured low threshold."""
-    assert should_enter_recover_fuel(_make_ctx(fuel=250)) is True
-    assert should_enter_recover_fuel(_make_ctx(fuel=300)) is True
-    assert should_enter_recover_fuel(_make_ctx(fuel=500)) is False
+    assert should_enter_collect(_make_ctx(fuel=150)) is True
+    assert should_enter_collect(_make_ctx(fuel=200)) is True
+    assert should_enter_collect(_make_ctx(fuel=500)) is False
 
 
-def test_should_exit_recover_fuel_uses_full_threshold() -> None:
+def test_should_exit_collect_uses_full_threshold() -> None:
     """Fuel recovery exit uses the configured full threshold."""
-    assert should_exit_recover_fuel(_make_ctx(fuel=1100)) is True
-    assert should_exit_recover_fuel(_make_ctx(fuel=800)) is False
+    assert should_exit_collect(_make_ctx(fuel=1100)) is True
+    assert should_exit_collect(_make_ctx(fuel=800)) is False
 
 
-def test_should_enter_recover_equipment_uses_break_threshold() -> None:
+def test_should_enter_collect_uses_break_threshold() -> None:
     """Equipment recovery entry uses the configured break threshold."""
-    assert should_enter_recover_equipment(_make_ctx(dual_count=5, radar_count=5)) is True
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=30)) is False
+    assert should_enter_collect(_make_ctx(dual_count=5, radar_count=5)) is True
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=30)) is False
 
 
-def test_should_exit_recover_equipment_uses_resume_threshold() -> None:
+def test_should_exit_collect_uses_resume_threshold() -> None:
     """Equipment recovery exit uses the configured resume threshold."""
-    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=25)) is True
-    assert should_exit_recover_equipment(_make_ctx(dual_count=5, radar_count=5)) is False
+    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=25)) is True
+    assert should_exit_collect(_make_ctx(dual_count=5, radar_count=5)) is False
 
 
 def test_radar_at_break_enters_recover_equipment_to_restock() -> None:
@@ -196,7 +193,7 @@ def test_radar_at_break_enters_recover_equipment_to_restock() -> None:
     zero extras (it spends none), reversing the conservative exclusion
     that left the bot looping 0->3->2->1 (live run 20260613-011044).
     """
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=5)) is True
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=5)) is True
 
 
 def test_radars_below_resume_threshold_trigger_restock() -> None:
@@ -210,9 +207,9 @@ def test_radars_below_resume_threshold_trigger_restock() -> None:
     finally pulled it away. Symmetric thresholds eliminate that
     failure mode entirely.
     """
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=6)) is True
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=19)) is True
-    assert should_enter_recover_equipment(_make_ctx(dual_count=30, radar_count=20)) is False
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=6)) is True
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=19)) is True
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=20)) is False
 
 
 def test_exit_recover_equipment_requires_radar_resume() -> None:
@@ -222,21 +219,21 @@ def test_exit_recover_equipment_requires_radar_resume() -> None:
     the bot reaches a healthy stock before returning to the hunt
     instead of leaving at the first radar it scrapes together.
     """
-    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=5)) is False
-    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=19)) is False
-    assert should_exit_recover_equipment(_make_ctx(dual_count=25, radar_count=20)) is True
+    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=5)) is False
+    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=19)) is False
+    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=20)) is True
 
 
 def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:
     """HUNT owns the tick only when no recovery mode has stronger entry rules."""
     assert should_enter_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is True
-    assert should_enter_hunt(_make_ctx(fuel=250, dual_count=30, radar_count=30)) is False
+    assert should_enter_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is False
 
 
 def test_should_exit_hunt_when_recovery_takes_priority() -> None:
     """HUNT exits when recovery conditions become active."""
     assert should_exit_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is False
-    assert should_exit_hunt(_make_ctx(fuel=250, dual_count=30, radar_count=30)) is True
+    assert should_exit_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is True
 
 
 def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> None:
@@ -314,7 +311,7 @@ def test_derive_hunt_mode_state_uses_acquire_for_delegated_fuel_pickup() -> None
     """
     decision = make_tick_decision(
         command=make_pickup_fuel_command(110, 100),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 110, 100, "fuel=500"),
+        behavior=make_behavior_score("COLLECT", 900, 110, 100, "fuel=500"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -368,78 +365,78 @@ def test_derive_hunt_mode_state_maps_confirm_kill_reason() -> None:
     assert derive_hunt_mode_state(decision) == "CONFIRM_KILL"
 
 
-def test_derive_recover_equipment_mode_state_maps_sense_search_and_pickup() -> None:
+def test_derive_collect_mode_state_maps_sense_search_and_pickup() -> None:
     """Equipment recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT_EQUIPMENT", 925, 0, 0, "forage_radar"),
+        behavior=make_behavior_score("COLLECT", 925, 0, 0, "forage_radar"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     search = make_tick_decision(
         command=make_move_command(130, 100),
         behavior=make_behavior_score(
-            "COLLECT_EQUIPMENT",
+            "COLLECT",
             925,
             130,
             100,
-            "search_equipment_local",
+            "search_collect_local",
         ),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     pickup = make_tick_decision(
         command=make_pickup_equipment_command(102, 101),
-        behavior=make_behavior_score("COLLECT_EQUIPMENT", 925, 102, 101, "equipment_critical"),
+        behavior=make_behavior_score("COLLECT", 925, 102, 101, "equipment_critical"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
 
-    assert derive_recover_equipment_mode_state(sense) == "SENSE"
-    assert derive_recover_equipment_mode_state(search) == "SEARCH"
-    assert derive_recover_equipment_mode_state(pickup) == "PICKUP"
+    assert derive_collect_mode_state(sense) == "SENSE"
+    assert derive_collect_mode_state(search) == "SEARCH"
+    assert derive_collect_mode_state(pickup) == "PICKUP"
 
 
-def test_derive_recover_equipment_mode_state_uses_approach_for_nonpickup_targeting() -> None:
+def test_derive_collect_mode_state_uses_approach_for_nonpickup_targeting() -> None:
     """Equipment movement toward a known target maps to APPROACH."""
     decision = make_tick_decision(
         command=make_move_command(108, 107),
-        behavior=make_behavior_score("COLLECT_EQUIPMENT", 925, 108, 107, "equipment_restock"),
+        behavior=make_behavior_score("COLLECT", 925, 108, 107, "equipment_restock"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
 
-    assert derive_recover_equipment_mode_state(decision) == "APPROACH"
+    assert derive_collect_mode_state(decision) == "APPROACH"
 
 
-def test_derive_recover_fuel_mode_state_maps_sense_search_pickup_and_approach() -> None:
+def test_derive_collect_mode_state_maps_sense_search_pickup_and_approach() -> None:
     """Fuel recovery substates are derived from concrete command intent."""
     sense = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 0, 0, "forage_radar"),
+        behavior=make_behavior_score("COLLECT", 900, 0, 0, "forage_radar"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     search = make_tick_decision(
         command=make_move_command(130, 100),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 130, 100, "search_fuel_local"),
+        behavior=make_behavior_score("COLLECT", 900, 130, 100, "search_collect_local"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     pickup = make_tick_decision(
         command=make_pickup_fuel_command(102, 101),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 102, 101, "fuel=700"),
+        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel=700"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     approach = make_tick_decision(
         command=make_move_command(102, 101),
-        behavior=make_behavior_score("COLLECT_FUEL", 900, 102, 101, "fuel=700"),
+        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel=700"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
 
-    assert derive_recover_fuel_mode_state(sense) == "SENSE"
-    assert derive_recover_fuel_mode_state(search) == "SEARCH"
-    assert derive_recover_fuel_mode_state(pickup) == "PICKUP"
-    assert derive_recover_fuel_mode_state(approach) == "APPROACH"
+    assert derive_collect_mode_state(sense) == "SENSE"
+    assert derive_collect_mode_state(search) == "SEARCH"
+    assert derive_collect_mode_state(pickup) == "PICKUP"
+    assert derive_collect_mode_state(approach) == "APPROACH"

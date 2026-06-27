@@ -19,8 +19,7 @@ def test_ai_modes_include_unset_and_refactor_targets() -> None:
     assert AI_MODES == (
         "UNSET",
         "HUNT",
-        "RECOVER_FUEL",
-        "RECOVER_EQUIPMENT",
+        "COLLECT",
     )
 
 
@@ -72,6 +71,6 @@ def test_validates_hunt_mode_state_pair() -> None:
 
 def test_validates_recovery_mode_state_pair() -> None:
     """Recovery modes accept only recovery substates."""
-    assert is_valid_ai_mode_state("RECOVER_FUEL", "SEARCH") is True
-    assert is_valid_ai_mode_state("RECOVER_EQUIPMENT", "PICKUP") is True
-    assert is_valid_ai_mode_state("RECOVER_FUEL", "ENGAGE") is False
+    assert is_valid_ai_mode_state("COLLECT", "SEARCH") is True
+    assert is_valid_ai_mode_state("COLLECT", "PICKUP") is True
+    assert is_valid_ai_mode_state("COLLECT", "ENGAGE") is False
