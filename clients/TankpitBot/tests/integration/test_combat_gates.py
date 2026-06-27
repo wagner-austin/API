@@ -134,8 +134,24 @@ class TestCombatGates:
         assert shoot_cmd["target_x"] == 131
         assert shoot_cmd["target_y"] == 124
 
-    def test_combat_blocks_when_wire_presence_stale(self) -> None:
-        """Wire stale beyond TTL -> block target and replan (no shoot)."""
+    def test_combat_fires_when_wire_presence_stale(self) -> None:
+        """Wire stale beyond TTL -> still shoot (no block).
+
+        Pre-2026-06-23 the wire-presence gate in ``_combat_shoot``
+        blocked any target whose ``last_wire_seen_ms`` exceeded
+        ``WIRE_PRESENCE_TTL_MS`` (7000ms). That gate killed pursuit
+        shots when a locked target teleported off the bot's viewport:
+        the server only emits wire events for tanks the local
+        viewport can see, so an off-viewport target naturally goes
+        wire-silent. Live run 2026-06-23 19:31:43 saw the bot engage
+        purple-8, fire two homing pursuits, then block the target at
+        wire-age 8224ms despite an active combat lock and a live
+        target.
+
+        The gate was removed 2026-06-23; the lock now holds until an
+        authoritative deactivation signal arrives. This test guards
+        against re-introduction.
+        """
         seed_ts = _seed_self_and_enemy()
         ws = get_world_service()
         self_state = ws.world_state["self_state"]
@@ -146,9 +162,6 @@ class TestCombatGates:
         assert len(threats) == 1
         target = threats[0]
 
-        # Advance the decision clock past the wire-presence TTL relative
-        # to the dispatcher's actual timestamp so engage_target treats
-        # the target as wire-silent.
         stale_now_ms = seed_ts + WIRE_PRESENCE_TTL_MS + 1
         ctx = DecideCtx(
             ws.world_state,
@@ -162,8 +175,8 @@ class TestCombatGates:
 
         decision = engage_target(ctx, target)
 
-        assert decision["command"]["cmd_type"] != "shoot"
-        assert "1229" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["command"]["cmd_type"] == "shoot"
+        assert "1229" not in decision["updated_ai_state"]["blocked_combat_targets"]
 
     def test_combat_fires_at_stationary_target_without_position_refresh(self) -> None:
         """Wire-fresh target stays fireable even when position hasn't refreshed.

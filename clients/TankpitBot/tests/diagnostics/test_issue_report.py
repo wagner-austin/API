@@ -134,11 +134,10 @@ def test_recovery_boxed_in_diagnostic_is_promoted_to_top_level_issue(
     _emit_session_room("1", "field01.gif")
     emit_diagnostic(
         diagnostic_kind="recovery_boxed_in",
-        behavior_mode="COLLECT_FUEL",
+        behavior_mode="COLLECT",
         fuel=140,
         self_x=100,
         self_y=100,
-        patrol_waypoint_index=3,
     )
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
@@ -557,11 +556,20 @@ def test_require_object_list_rejects_non_object_element() -> None:
 
 
 def test_scorecard_counts_tank_deactivated_kills(fake_fs: FakeFileSystem) -> None:
-    """A ``tank_deactivated`` DIAGNOSTIC event increments the scorecard ``kills`` counter."""
+    """``tank_deactivated`` increments kills; duplicates by ``victim_id`` collapse.
+
+    Each real kill emits two ``tank_deactivated`` diagnostics (one
+    from the ``0x41 Deactivation`` wire packet, one from the
+    game-log "X deactivated" text). Live run 2026-06-23 23:00:22
+    reported kills=2 for a single purple-8 kill before the dedup.
+    The scorecard must collapse them by ``victim_id`` so the report
+    matches reality.
+    """
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
-    emit_diagnostic(diagnostic_kind="tank_deactivated", target_id=42)
-    emit_diagnostic(diagnostic_kind="tank_deactivated", target_id=99)
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)  # duplicate -- ignored
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=99)
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
 
@@ -628,7 +636,7 @@ def test_scorecard_tracks_self_alignment_fuel_samples(fake_fs: FakeFileSystem) -
     """``self_alignment_sample`` DIAGNOSTIC events feed fuel_min and fuel_last."""
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
-    emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=300)
+    emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=150)
     emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=150)
     emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=200)
 
@@ -715,7 +723,7 @@ def test_scorecard_issue_fuel_floor_critical(fake_fs: FakeFileSystem) -> None:
     """Fuel dipping below 100 surfaces a fuel floor critical top-level issue."""
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
-    emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=300)
+    emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=150)
     emit_diagnostic(diagnostic_kind="self_alignment_sample", belief_fuel=50)
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
