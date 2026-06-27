@@ -20,10 +20,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.threats import (
-    analyze_threats,
-    is_wire_present,
-)
+from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     EnemyThreatDict,
@@ -40,6 +37,33 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
+
+
+def is_already_engaged(ctx: DecideCtx) -> bool:
+    """Return True when the bot has already dispatched a shot at the locked target.
+
+    The discriminator is ``last_shot_target_id`` -- set only when
+    :func:`_combat_shoot` actually dispatches a ``shoot`` command for
+    the current ``combat_target_id``. A match proves the bot is in a
+    mid-fight stay-put scenario rather than a fresh acquisition: the
+    initial teleport has happened, at least one shot has resolved, and
+    the target is now somewhere other than point-blank. In that case
+    the right move is to keep firing (the server picks ``homing`` when
+    not adjacent, and homing tracks) instead of teleporting to chase
+    a moving enemy.
+
+    A mismatch means the lock is pre-engagement -- either a fresh
+    acquisition that has not yet teleported, or a re-acquire after
+    a kill -- and the planner should produce the initial close
+    teleport rather than fire from afar.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True if ``last_shot_target_id`` equals ``combat_target_id``.
+    """
+    return ctx.ai_state["last_shot_target_id"] == ctx.ai_state["combat_target_id"]
 
 
 def clear_combat_target(ai_state: AIStateDict) -> AIStateDict:
@@ -273,9 +297,9 @@ def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
     Returns:
         Fuel recovery decision with combat target cleared.
     """
-    # Lazy import: recover_fuel_mode imports clear_combat_target from
+    # Lazy import: collect_mode imports clear_combat_target from
     # this module at import time.
-    from tankpit_bot.bot.ai.recover_fuel_mode import decide_recover_fuel_mode
+    from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 
     cleared_ctx = DecideCtx(
         ctx.world,
@@ -286,7 +310,7 @@ def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
         ctx.terrain,
         ctx.combat_feedback,
     )
-    return decide_recover_fuel_mode(cleared_ctx)
+    return decide_collect_mode(cleared_ctx)
 
 
 def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
@@ -334,7 +358,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         )
         return block_combat_target_and_replan(ctx, target)
     # Engaging must leave fuel above fuel_low_threshold, the line where
-    # COLLECT_FUEL outranks HUNT. Run 20260611-004505: a teleport gated
+    # COLLECT outranks HUNT. Run 20260611-004505: a teleport gated
     # only on hunt_min_fuel landed at 224 fuel, the fuel mode hijacked
     # the very next tick, and the ~190 fuel spent to reach purple-8
     # bought a fight the bot was then forbidden to fight.
@@ -390,12 +414,43 @@ def teleport_to_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionD
 
 
 def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
-    """Phase closing: confirm geometry before shooting."""
+    """Phase closing: shoot when in range or already engaged; teleport on first close.
+
+    User-contract gameplay loop (2026-06-26): open map, teleport
+    cardinally adjacent to the target, dual until the target teleports
+    away, then stay in place and fire homing until the target is
+    deactivated. Enemies don't move *within* the viewport -- when they
+    leave cardinal adjacency, they teleported -- so chasing them with
+    another teleport burns fuel without changing the firing geometry.
+
+    Three branches:
+
+    1. **Cardinally adjacent** -- shoot (server picks ``dual`` for the
+       guaranteed point-blank hit).
+    2. **Already engaged** (:func:`is_already_engaged`) -- shoot from
+       the current tile. The server picks ``homing`` when the target
+       is not adjacent and homing tracks, so a stay-put fire continues
+       to land hits without spending fuel on another teleport.
+    3. **Fresh acquire, not adjacent** -- teleport directly to the
+       target. This is the one-time close the engagement contract
+       allows; subsequent ticks fall through branch (2).
+    """
     if has_cardinal_combat_shot(ctx.self_state, target):
         return _combat_shoot(ctx, target)
     dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
+    if is_already_engaged(ctx):
+        emit_ai(
+            "engaged %s moved off cardinal from (%d,%d) target=(%d,%d) dist=%d; staying put",
+            target["name"],
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            target["x"],
+            target["y"],
+            dist,
+        )
+        return _combat_shoot(ctx, target)
     emit_ai(
-        "not in cardinal firing position for %s from (%d,%d) target=(%d,%d) dist=%d; re-closing",
+        "fresh acquire of %s from (%d,%d) target=(%d,%d) dist=%d; teleporting to close",
         target["name"],
         ctx.self_state["x"],
         ctx.self_state["y"],
@@ -459,46 +514,32 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase engaging: shoot; a miss on a STATIONARY target blocks it.
 
     This is the single chokepoint every shoot path reaches (direct
-    engage, close-in shot, refresh-then-engage), so the wire-presence
-    kill gate lives here. A target whose last in-view wire confirmation
-    is older than the presence TTL is a map-only afterimage the blob
-    keeps re-listing (raw-capture 2026-06-13: ghost 517 was map-listed 49
-    times over 425s with zero wire traffic and absorbed every miss of the
-    run); it is blocked and replanned WITHOUT firing, so no shot is wasted
-    discovering what ``last_wire_seen_ms`` already knows. Acquisition may
-    still teleport toward such a tank -- the gate only forbids the shot.
+    engage, close-in shot, refresh-then-engage, locked-target pursuit).
 
-    Past the gate the target is genuinely present. Live adjacent targets
-    hit 255/255 (2026-06-11 data), so a shot that comes back with no
-    damage against a target that has not moved proves the target is not
-    killable right now -- a corpse from an unwitnessed kill or a shielded
-    tank. Reopening the map (the old miss response) changes nothing about
-    a visible target: run 20260611-103244 shot the same frozen tile 12
-    times in a row, each miss buying a 2s map reopen. Blocking uses the
-    same cooldown as kills, so a shielded tank gets retried after its
-    shields are plausibly down. A miss against a target that MOVED since
-    the shot is the one ambiguous case -- a live enemy may simply have
-    stepped off the tile as the shot resolved -- so a mover is re-aimed at
-    its fresh registry position instead of being abandoned.
+    Wire-silence is **not** a stop signal. A locked target that
+    teleports off the bot's viewport stops broadcasting wire updates
+    -- the server only emits wire events for tanks the local viewport
+    can see -- which is the expected case the pursuit cascade exists
+    to handle. The lock holds until an authoritative deactivation
+    signal arrives (``liveness`` flips to ``deactivated`` or the
+    tank lands in ``killed_tank_ids``); pursuit fires homing toward
+    the last wire position until then, and the server picks ``homing``
+    when the target is mid-move or out of point-blank range because
+    homing tracks.
+
+    Live adjacent targets hit 255/255 (2026-06-11 data), so a shot
+    that comes back with no damage against a target that has not moved
+    proves the target is not killable right now -- a corpse from an
+    unwitnessed kill or a shielded tank. Reopening the map (the old
+    miss response) changes nothing about a visible target: run
+    20260611-103244 shot the same frozen tile 12 times in a row, each
+    miss buying a 2s map reopen. Blocking uses the same cooldown as
+    kills, so a shielded tank gets retried after its shields are
+    plausibly down. A miss against a target that MOVED since the shot
+    is the one ambiguous case -- a live enemy may simply have stepped
+    off the tile as the shot resolved -- so a mover is re-aimed at its
+    fresh registry position instead of being abandoned.
     """
-    if not is_wire_present(target["last_wire_seen_ms"], ctx.timestamp_ms):
-        emit_ai(
-            "ghost %s wire-silent (last wire %dms ago) - blocking without firing",
-            target["name"],
-            ctx.timestamp_ms - target["last_wire_seen_ms"],
-        )
-        emit_diagnostic(
-            diagnostic_kind="combat_ghost_detected",
-            target_name=target["name"],
-            target_id=target["tank_id"],
-            target_x=target["x"],
-            target_y=target["y"],
-            self_x=ctx.self_state["x"],
-            self_y=ctx.self_state["y"],
-            wire_age_ms=ctx.timestamp_ms - target["last_wire_seen_ms"],
-        )
-        return block_combat_target_and_replan(ctx, target)
-
     if ctx.combat_feedback == "miss":
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
         target_stationary = (target["x"], target["y"]) == last_shot_at
@@ -625,6 +666,7 @@ __all__ = [
     "has_cardinal_combat_shot",
     "has_combat_shot",
     "has_passable_adjacent",
+    "is_already_engaged",
     "open_map_for_target",
     "select_new_combat_target",
     "teleport_to_target",
