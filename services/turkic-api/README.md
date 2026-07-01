@@ -266,10 +266,11 @@ The Discord bot subscribes to these events via `TurkicEventSubscriber` in `clien
 ## Architecture
 
 ### Pure Python Transliteration
-- No PyICU dependency
-- Rules-based transliteration engine
+- No PyICU dependency (no libicu system requirement at deploy time)
+- Rules-based transliteration engine over the same `.rules` files shipped by the upstream `turkic-transliteration` library
 - Unicode normalization (NFC)
 - Deterministic output
+- Parity guarantee: `tests/test_pyicu_parity.py` asserts byte-identical output against the PyICU library for every shared IPA rule file plus a per-language sentence-level North-Wind-and-Sun set — the reimplementation is engine-swappable, not semantically drifting
 
 ### Dependency Injection
 - FastAPI `Depends()` for all dependencies
