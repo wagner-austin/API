@@ -48,6 +48,11 @@ types-requests = "^2.32.0.20241016"
 types-redis = "^4.6.0.20241004"
 types-psutil = "^7.0.0"
 httpx = "^0.28"
+# For the PyICU parity test only: verifies this project's pure-Python rule
+# engine produces identical output to turkic-transliteration's PyICU engine
+# on shared rule files. Local-path install because we test against the
+# working copy, not the last-published PyPI release.
+turkic-translit = { path = "../../../turkic-transliteration", develop = true }
 
 [tool.mypy]
 python_version = "3.11"
