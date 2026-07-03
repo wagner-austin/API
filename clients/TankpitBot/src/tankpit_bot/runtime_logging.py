@@ -392,6 +392,9 @@ def configure_sniff_runtime_logging(stamp: str | None = None) -> SniffRunArtifac
         Path(artifacts["archive_log_path"]),
         Path(artifacts["latest_events_path"]),
         Path(artifacts["archive_events_path"]),
+        Path(artifacts["latest_capture_path"]),
+        Path(artifacts["latest_raw_capture_path"]),
+        Path(artifacts["latest_summary_path"]),
     )
     _install_artifact_handlers(
         "sniff",
