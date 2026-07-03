@@ -58,6 +58,8 @@ def _default_container_refresh_kind(source: EntitySource) -> ContainerRefreshKin
     """
     if source == "radar":
         return "radar_response"
+    if source == "viewport":
+        return "viewport_patch"
     return "world_state"
 
 

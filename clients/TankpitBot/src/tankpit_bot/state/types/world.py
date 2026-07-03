@@ -50,12 +50,12 @@ class WorldStateDict(TypedDict):
         mines: All known mines indexed by "x,y" string key.
         terrain: Terrain tiles indexed by "x,y" string key.
         viewport: Current viewport bounds.
-        scanned_viewports: Viewport origins confirmed by authoritative local
-            resource data, indexed by "left,top" string key with
-            timestamp_ms values. Confirmation can come from a radar response
-            or a fresh visible viewport tile update. Used to distinguish
-            authoritative local resource truth from stale remembered cache
-            observations.
+        scanned_tiles: Per-tile radar coverage indexed by ``"x,y"`` with
+            scan timestamps. The wire-side radar handler writes the exact
+            tile set the server radar revealed: extra radar covers every
+            tile in the viewport; free radar covers the 5x5 block around
+            the tank intersected with the viewport. Consumers query it
+            via :mod:`tankpit_bot.state.scan_coverage` helpers.
         timestamp_ms: Last update timestamp in milliseconds.
     """
 
@@ -65,7 +65,7 @@ class WorldStateDict(TypedDict):
     mines: dict[str, MineStateDict]
     terrain: dict[str, TerrainTileDict]
     viewport: ViewportStateDict
-    scanned_viewports: dict[str, int]
+    scanned_tiles: dict[str, int]
     timestamp_ms: int
 
 
@@ -82,7 +82,7 @@ def make_empty_world_state() -> WorldStateDict:
         mines={},
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
-        scanned_viewports={},
+        scanned_tiles={},
         timestamp_ms=0,
     )
 
@@ -103,7 +103,7 @@ def encode_world_state(state: WorldStateDict) -> JSONObject:
         "mines": {k: encode_mine_state(v) for k, v in state["mines"].items()},
         "terrain": {k: encode_terrain_tile(v) for k, v in state["terrain"].items()},
         "viewport": encode_viewport_state(state["viewport"]),
-        "scanned_viewports": dict(state["scanned_viewports"]),
+        "scanned_tiles": dict(state["scanned_tiles"]),
         "timestamp_ms": state["timestamp_ms"],
     }
 
@@ -111,7 +111,7 @@ def encode_world_state(state: WorldStateDict) -> JSONObject:
 def _decode_timestamp_dict(data: JSONObject, field: str) -> dict[str, int]:
     """Validate and decode a string-keyed timestamp mapping field.
 
-    Used for ``scanned_viewports`` ("left,top" keys).
+    Used for ``scanned_tiles`` ("x,y" keys).
 
     Args:
         data: World-state JSON object.
@@ -160,7 +160,7 @@ def decode_world_state(data: JSONObject) -> WorldStateDict:
         mines=decode_entity_dict(data.get("mines"), decode_mine_state),
         terrain=decode_entity_dict(data.get("terrain"), decode_terrain_tile),
         viewport=decode_viewport_state(viewport_raw),
-        scanned_viewports=_decode_timestamp_dict(data, "scanned_viewports"),
+        scanned_tiles=_decode_timestamp_dict(data, "scanned_tiles"),
         timestamp_ms=require_int(data, "timestamp_ms"),
     )
 

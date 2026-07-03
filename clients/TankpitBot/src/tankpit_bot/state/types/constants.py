@@ -58,6 +58,7 @@ CONTAINER_REFRESH_KINDS: tuple[str, ...] = (
     "radar_response",
     "radar_cache_refresh",
     "radar_known_resources",
+    "viewport_patch",
     "world_state",
 )
 
@@ -93,6 +94,7 @@ ContainerRefreshKind = Literal[
     "radar_response",
     "radar_cache_refresh",
     "radar_known_resources",
+    "viewport_patch",
     "world_state",
 ]
 """Specific confirmation path that most recently refreshed a container."""
@@ -162,6 +164,8 @@ def decode_container_refresh_kind(data: JSONObject, key: str) -> ContainerRefres
         return "radar_cache_refresh"
     if raw == "radar_known_resources":
         return "radar_known_resources"
+    if raw == "viewport_patch":
+        return "viewport_patch"
     if raw == "world_state":
         return "world_state"
     raise JSONTypeError(f"{key} must be one of {CONTAINER_REFRESH_KINDS}, got {raw!r}")

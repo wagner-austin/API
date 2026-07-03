@@ -1,4 +1,10 @@
-"""Terrain tile TypedDict + factory + encode/decode."""
+"""Terrain tile TypedDict + factory + encode/decode.
+
+A tile stores only its terrain type (ground/rock/water/ferry/etc).
+Container and mine layers live in their own world-state registries
+(``world.containers`` and ``world.mines``) populated by the per-tile
+mutators in :mod:`tankpit_bot.state.container_mutations`.
+"""
 
 from __future__ import annotations
 
@@ -13,23 +19,17 @@ class TerrainTileDict(TypedDict):
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         terrain_type: Terrain/structure type (0=ground, 1-3=rock variants, 5=ferry, 7=ferry+rock).
-        cache_value: Tile cache value (0=none, -1=equipment, >0=fuel volume).
-        overlay_value: Tile overlay value (255=clear, other values protocol-defined).
     """
 
     x: int
     y: int
     terrain_type: int
-    cache_value: int
-    overlay_value: int
 
 
 def make_terrain_tile(
     x: int,
     y: int,
     terrain_type: int,
-    cache_value: int,
-    overlay_value: int,
 ) -> TerrainTileDict:
     """Create a terrain tile.
 
@@ -37,8 +37,6 @@ def make_terrain_tile(
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         terrain_type: Terrain type (0-7).
-        cache_value: Tile cache value (0=none, -1=equipment, >0=fuel volume).
-        overlay_value: Tile overlay value (255=clear).
 
     Returns:
         TerrainTileDict with the provided values.
@@ -47,8 +45,6 @@ def make_terrain_tile(
         x=x,
         y=y,
         terrain_type=terrain_type,
-        cache_value=cache_value,
-        overlay_value=overlay_value,
     )
 
 
@@ -65,8 +61,6 @@ def encode_terrain_tile(tile: TerrainTileDict) -> JSONObject:
         "x": tile["x"],
         "y": tile["y"],
         "terrain_type": tile["terrain_type"],
-        "cache_value": tile["cache_value"],
-        "overlay_value": tile["overlay_value"],
     }
 
 
@@ -86,8 +80,6 @@ def decode_terrain_tile(data: JSONObject) -> TerrainTileDict:
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         terrain_type=require_int(data, "terrain_type"),
-        cache_value=require_int(data, "cache_value"),
-        overlay_value=require_int(data, "overlay_value"),
     )
 
 
