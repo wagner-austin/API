@@ -87,16 +87,12 @@ class TestEncodeTerrainTile:
             x=10,
             y=20,
             terrain_type=3,
-            cache_value=5,
-            overlay_value=255,
         )
         encoded = encode_terrain_tile(tile)
 
         assert encoded["x"] == 10
         assert encoded["y"] == 20
         assert encoded["terrain_type"] == 3
-        assert encoded["cache_value"] == 5
-        assert encoded["overlay_value"] == 255
 
 
 class TestEncodeViewportState:

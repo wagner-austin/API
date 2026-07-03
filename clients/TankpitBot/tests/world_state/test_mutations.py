@@ -68,7 +68,7 @@ class TestUpdateSelfFromMovementResponse:
             mines=state["mines"],
             terrain=state["terrain"],
             viewport=state["viewport"],
-            scanned_viewports=state["scanned_viewports"],
+            scanned_tiles=state["scanned_tiles"],
             timestamp_ms=state["timestamp_ms"],
         )
 
@@ -410,8 +410,6 @@ class TestUpdateTerrainFromViewport:
         assert updated["terrain"]["99,49"]["terrain_type"] == TERRAIN_GROUND
         assert updated["terrain"]["100,49"]["terrain_type"] == TERRAIN_ROCK_A
         assert updated["terrain"]["101,49"]["terrain_type"] == TERRAIN_FERRY
-        assert updated["terrain"]["100,49"]["cache_value"] == -1
-        assert updated["terrain"]["100,49"]["overlay_value"] == 3
 
     def test_updates_viewport_position(self) -> None:
         """Updates viewport position."""
@@ -423,15 +421,20 @@ class TestUpdateTerrainFromViewport:
         assert updated["viewport"]["left"] == 100
         assert updated["viewport"]["top"] == 50
 
-    def test_marks_viewport_as_confirmed(self) -> None:
-        """Visible viewport updates confirm local resource coverage."""
+    def test_does_not_touch_scan_coverage(self) -> None:
+        """0x5A viewport patches carry terrain only -- never scan coverage.
+
+        Only the wire-side radar handler writes ``scanned_tiles`` -- a
+        viewport patch confirms terrain but says nothing about whether
+        containers / mines on those tiles were revealed.
+        """
         state = make_empty_world_state()
 
         updated = update_terrain_from_viewport(
             state, viewport_left=100, viewport_top=50, entities=[], timestamp_ms=1000
         )
 
-        assert updated["scanned_viewports"]["100,50"] == 1000
+        assert updated["scanned_tiles"] == {}
 
 
 class TestRemoveTank:

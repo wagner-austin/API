@@ -130,28 +130,21 @@ class TestMakeTerrainTile:
             x=10,
             y=20,
             terrain_type=TERRAIN_ROCK_A,
-            cache_value=0,
-            overlay_value=255,
         )
 
         assert tile["x"] == 10
         assert tile["y"] == 20
         assert tile["terrain_type"] == TERRAIN_ROCK_A
-        assert tile["cache_value"] == 0
-        assert tile["overlay_value"] == 255
 
-    def test_tile_with_equipment_cache(self) -> None:
-        """Creates tile with equipment cache marker."""
+    def test_tile_with_ground_terrain(self) -> None:
+        """Creates a ground tile."""
         tile = make_terrain_tile(
             x=15,
             y=25,
             terrain_type=TERRAIN_GROUND,
-            cache_value=-1,
-            overlay_value=4,
         )
 
-        assert tile["cache_value"] == -1
-        assert tile["overlay_value"] == 4
+        assert tile["terrain_type"] == TERRAIN_GROUND
 
 
 class TestMakeSelfState:
