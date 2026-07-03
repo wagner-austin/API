@@ -76,12 +76,18 @@ def test_configure_sniff_runtime_logging_resets_latest_files(
     """Sniffer runtime logging resets latest files and uses sniff mode in events."""
     fake_fs.write_text(Path("runs\\sniff\\latest.log"), "stale")
     fake_fs.write_text(Path("runs\\sniff\\latest.events.jsonl"), "stale")
+    fake_fs.write_text(Path("runs\\sniff\\latest.capture_session.json"), "stale")
+    fake_fs.write_text(Path("runs\\sniff\\latest.raw_capture.json"), "stale")
+    fake_fs.write_text(Path("runs\\sniff\\latest.session_summary.json"), "stale")
 
     artifacts = configure_sniff_runtime_logging("20260331-230405")
     emit_world("Captured %d WebSocket messages in %.1fs", 88, 37.3)
 
     files = fake_fs.get_written_files()
     assert "stale" not in files[artifacts["latest_log_path"]]
+    assert files[artifacts["latest_capture_path"]] == ""
+    assert files[artifacts["latest_raw_capture_path"]] == ""
+    assert files[artifacts["latest_summary_path"]] == ""
     assert "WORLD: Captured 88 WebSocket messages in 37.3s" in files[artifacts["latest_log_path"]]
 
     event_line = files[artifacts["latest_events_path"]].strip()
