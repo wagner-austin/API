@@ -134,8 +134,15 @@ def test_decide_raises_without_self_state(scenario: BotScenario) -> None:
 def test_decide_many_runs_n_ticks_and_advances_clock(
     scenario: BotScenario,
 ) -> None:
-    """``decide_many`` returns one decision per tick and advances the clock."""
+    """``decide_many`` returns one decision per tick and advances the clock.
+
+    An enemy is placed so HUNT has real work every tick — with an
+    empty world, a fresh map snapshot ends the session with
+    ``no_viable_targets`` (user contract 2026-07-02) instead of
+    dispatching map refreshes forever.
+    """
     scenario.place_self(x=100, y=100)
+    scenario.place_enemy(tank_id=50, x=105, y=100)
     start = scenario.timestamp_ms
 
     decisions = scenario.decide_many(ticks=3)
