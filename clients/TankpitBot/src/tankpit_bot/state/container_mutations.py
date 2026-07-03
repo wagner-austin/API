@@ -57,7 +57,7 @@ def update_container_from_radar(
             mines=state["mines"],
             terrain=state["terrain"],
             viewport=state["viewport"],
-            scanned_viewports=state["scanned_viewports"],
+            scanned_tiles=state["scanned_tiles"],
             timestamp_ms=timestamp_ms,
         )
 
@@ -85,7 +85,7 @@ def update_container_from_radar(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -121,7 +121,7 @@ def remove_container(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -170,7 +170,7 @@ def add_mine(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -252,7 +252,7 @@ def add_mine_from_radar(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -288,7 +288,7 @@ def remove_mine(
         mines=new_mines,
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -361,7 +361,7 @@ def pickup_container(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -411,14 +411,149 @@ def increment_container_failed_pickups(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=state["timestamp_ms"],
+    )
+
+
+def apply_tile_overlay_update(
+    state: WorldStateDict,
+    x: int,
+    y: int,
+    overlay_value: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Reconcile ``world.mines`` from one tile's wire-decoded overlay byte.
+
+    The 0x5A ``ViewportUpdate`` and 0x40 ``OverlayUpdate`` messages both
+    carry the same per-tile mine-layer byte:
+
+    * ``overlay_value`` in ``0..7`` -> mine present; team encoded in the
+      low 2 bits (``team = overlay_value & 3``).
+    * ``overlay_value >= 8`` (the decoder maps 8..15 to ``255``) -> tile
+      has no mine: drop any tracked mine.
+
+    The 0x5A / 0x40 path does NOT carry the placer's ``tank_id`` or the
+    mine ``mine_type`` -- only 0x4B ``MinePlacement`` provides those. If
+    a wire-rich mine already lives at the tile, preserve those fields
+    while refreshing ``team`` and ``timestamp_ms``; otherwise seed with
+    ``mine_type=0``, ``tank_id=-1``. Mirrors the merge policy in
+    :func:`add_mine_from_radar`.
+
+    Args:
+        state: Current world state.
+        x: Tile X coordinate.
+        y: Tile Y coordinate.
+        overlay_value: Decoded overlay byte (``0..7`` = mine, else clear).
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New ``WorldStateDict`` with ``world.mines`` reconciled for this tile.
+    """
+    if not 0 <= overlay_value <= 7:
+        return remove_mine(state, x, y, timestamp_ms)
+
+    team = overlay_value & 3
+    key = coord_key(x, y)
+    existing = state["mines"].get(key)
+    if existing is None:
+        merged_mine_type = 0
+        merged_tank_id = -1
+    else:
+        merged_mine_type = existing["mine_type"]
+        merged_tank_id = existing["tank_id"]
+
+    new_mine = make_mine_state(
+        x=x,
+        y=y,
+        mine_type=merged_mine_type,
+        tank_id=merged_tank_id,
+        team=team,
+        source="viewport",
+        timestamp_ms=timestamp_ms,
+    )
+    new_mines = dict(state["mines"])
+    new_mines[key] = new_mine
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=new_mines,
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_tiles=state["scanned_tiles"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def apply_tile_cache_update(
+    state: WorldStateDict,
+    x: int,
+    y: int,
+    cache_value: int,
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Reconcile ``world.containers`` from one tile's wire-decoded cache byte.
+
+    The 0x5A ``ViewportUpdate`` and 0x43 ``CacheUpdate`` messages both
+    carry the same per-tile container-layer byte:
+
+    * ``cache_value == 0``  -> tile is empty: drop any tracked container.
+    * ``cache_value == -1`` -> equipment container at this tile.
+    * ``cache_value > 0``   -> fuel container with that volume.
+
+    The wire is per-tile authoritative for the tiles it enumerates.
+    Tiles not enumerated by the message are not touched. The radar
+    response remains envelope-authoritative via
+    :func:`reconcile_radar_viewport_resources`.
+
+    Args:
+        state: Current world state.
+        x: Tile X coordinate.
+        y: Tile Y coordinate.
+        cache_value: Decoded cache byte (``-1`` / ``0`` / fuel volume).
+        timestamp_ms: Message timestamp.
+
+    Returns:
+        New ``WorldStateDict`` with ``world.containers`` reconciled for
+        this tile.
+    """
+    if cache_value == 0:
+        return remove_container(state, x, y, timestamp_ms)
+
+    is_fuel = cache_value > 0
+    volume = cache_value if is_fuel else 0
+    key = coord_key(x, y)
+    existing = state["containers"].get(key)
+    failed_pickups = existing["failed_pickups"] if existing is not None else 0
+    new_container = make_container_state(
+        x=x,
+        y=y,
+        is_fuel=is_fuel,
+        volume=volume,
+        source="viewport",
+        timestamp_ms=timestamp_ms,
+        failed_pickups=failed_pickups,
+    )
+    new_containers = dict(state["containers"])
+    new_containers[key] = new_container
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=new_containers,
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_tiles=state["scanned_tiles"],
+        timestamp_ms=timestamp_ms,
     )
 
 
 __all__ = [
     "add_mine",
     "add_mine_from_radar",
+    "apply_tile_cache_update",
+    "apply_tile_overlay_update",
     "increment_container_failed_pickups",
     "pickup_container",
     "remove_container",

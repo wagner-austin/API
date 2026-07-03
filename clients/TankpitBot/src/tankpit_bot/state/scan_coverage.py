@@ -1,0 +1,323 @@
+"""Per-tile radar coverage primitives and the world-state mutator.
+
+The bot tracks which TILES have been radared, keyed by ``"x,y"`` with
+the scan timestamp. Both the built-in 5x5 radar and the inventory-
+consuming extra radar reveal tiles only inside the visible viewport
+(the radar never sees past viewport edges -- user-confirmed game
+mechanic 2026-06-21). Each scan therefore marks the **intersection** of
+the radar's footprint with the viewport bounds:
+
+* Free 5x5 radar at tank ``(X, Y)``: marks tiles
+  ``(X-2..X+2, Y-2..Y+2) intersected with the viewport``.
+  At a viewport corner this can be as few as ~3 tiles, not 25.
+* Extra radar: marks every tile inside the viewport bounds.
+
+Coverage is written into ``WorldStateDict["scanned_tiles"]`` by the
+wire-side radar handler when the server confirms a scan. The forager
+reads it to:
+
+* Decide whether the current viewport is worth another scan
+  (``is_viewport_fully_covered`` returns True → no scan, just move
+  toward unscanned tiles or teleport away).
+* Pick a walking destination -- the viewport tile whose next free
+  radar would reveal the most uncovered ground.
+
+Game-config note: viewport shifting is OFF in this session, so once
+the bot teleports the viewport is fixed until the next teleport.
+Tiles outside the current viewport remain in the map until the TTL
+expires; they never become reachable by walking.
+"""
+
+from __future__ import annotations
+
+from tankpit_bot.state.types import WorldStateDict
+
+# A swept tile is re-foraged after this interval -- long enough to push
+# the sweep across the viewport before doubling back, short enough that
+# equipment that respawns later is eventually re-discovered.
+FORAGE_COVERAGE_TTL_MS = 180000
+
+# Built-in radar reveals a 5x5 around the tank (chebyshev radius 2,
+# wire-verified 2026-06-12). Bounds are inclusive.
+FREE_RADAR_RADIUS = 2
+
+
+def tile_key(x: int, y: int) -> str:
+    """Return the dict key for a tile.
+
+    Args:
+        x: Tile X.
+        y: Tile Y.
+
+    Returns:
+        ``"x,y"`` string used as the dict key.
+    """
+    return f"{x},{y}"
+
+
+def is_tile_covered(
+    scanned_tiles: dict[str, int],
+    x: int,
+    y: int,
+    now_ms: int,
+) -> bool:
+    """Return True when ``(x, y)`` carries a live scan mark.
+
+    Args:
+        scanned_tiles: Coverage map keyed by ``"x,y"`` -> scan ms.
+        x: Tile X.
+        y: Tile Y.
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        True if the tile was scanned within :data:`FORAGE_COVERAGE_TTL_MS`.
+    """
+    scanned_ms = scanned_tiles.get(tile_key(x, y))
+    return scanned_ms is not None and now_ms - scanned_ms <= FORAGE_COVERAGE_TTL_MS
+
+
+def viewport_tiles(
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+) -> list[tuple[int, int]]:
+    """Return every tile inside the viewport bounds (inclusive).
+
+    Args:
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+
+    Returns:
+        List of ``(x, y)`` tile tuples in row-major order.
+    """
+    return [
+        (x, y)
+        for y in range(viewport_top, viewport_bottom + 1)
+        for x in range(viewport_left, viewport_right + 1)
+    ]
+
+
+def free_radar_revealed_tiles(
+    tank_x: int,
+    tank_y: int,
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+) -> list[tuple[int, int]]:
+    """Return tiles a built-in 5x5 radar reveals from ``(tank_x, tank_y)``.
+
+    The radar footprint is the 5x5 block centered on the tank, then
+    intersected with the viewport -- the radar does not see past
+    viewport edges.
+
+    Args:
+        tank_x: Tank X tile.
+        tank_y: Tank Y tile.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+
+    Returns:
+        Tiles the free radar reveals from the tank's position.
+    """
+    left = max(tank_x - FREE_RADAR_RADIUS, viewport_left)
+    right = min(tank_x + FREE_RADAR_RADIUS, viewport_right)
+    top = max(tank_y - FREE_RADAR_RADIUS, viewport_top)
+    bottom = min(tank_y + FREE_RADAR_RADIUS, viewport_bottom)
+    if left > right or top > bottom:
+        return []
+    return [(x, y) for y in range(top, bottom + 1) for x in range(left, right + 1)]
+
+
+def is_viewport_fully_covered(
+    scanned_tiles: dict[str, int],
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+) -> bool:
+    """Return True when every tile in the viewport carries a live scan mark.
+
+    Args:
+        scanned_tiles: Coverage map.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        True when no viewport tile is unscanned.
+    """
+    for y in range(viewport_top, viewport_bottom + 1):
+        for x in range(viewport_left, viewport_right + 1):
+            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+                return False
+    return True
+
+
+def free_radar_new_coverage(
+    scanned_tiles: dict[str, int],
+    tile_x: int,
+    tile_y: int,
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+) -> int:
+    """Return how many uncovered tiles a free radar at ``(tile_x, tile_y)`` would reveal.
+
+    The free radar footprint is the 5x5 block centered on the tank,
+    intersected with the viewport (see :func:`free_radar_revealed_tiles`).
+    This helper counts the subset of that footprint that is *not* in
+    fresh scan coverage -- the actual coverage gain from walking the
+    tank to ``(tile_x, tile_y)`` and firing the free radar next tick.
+
+    Args:
+        scanned_tiles: Current tile coverage map.
+        tile_x: Candidate destination X.
+        tile_y: Candidate destination Y.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        Count of uncovered tiles inside the 5x5 footprint clipped to
+        the viewport.
+    """
+    x_lo = max(tile_x - FREE_RADAR_RADIUS, viewport_left)
+    x_hi = min(tile_x + FREE_RADAR_RADIUS, viewport_right)
+    y_lo = max(tile_y - FREE_RADAR_RADIUS, viewport_top)
+    y_hi = min(tile_y + FREE_RADAR_RADIUS, viewport_bottom)
+    count = 0
+    for y in range(y_lo, y_hi + 1):
+        for x in range(x_lo, x_hi + 1):
+            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+                count += 1
+    return count
+
+
+def select_best_free_radar_position(
+    scanned_tiles: dict[str, int],
+    tank_x: int,
+    tank_y: int,
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+) -> tuple[int, int] | None:
+    """Return the viewport tile whose next free radar would reveal the most uncovered ground.
+
+    Picks the destination that maximises the next-radar coverage gain
+    rather than the nearest unscanned tile -- the optimal walk step for
+    the free-radar tile-expansion strategy is ~5 tiles (matching the
+    5x5 radar diameter), not 1. Ties are broken by Manhattan distance
+    from the tank (closer wins, to avoid pointless long walks).
+
+    Returns ``None`` when no destination in the viewport would reveal
+    any new ground -- the caller should treat the viewport as scanned
+    and fall through to a teleport hop.
+
+    Args:
+        scanned_tiles: Current tile coverage map.
+        tank_x: Tank X.
+        tank_y: Tank Y.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        ``(x, y)`` of the highest-scoring destination, or ``None`` when
+        every viewport position would reveal zero new tiles.
+    """
+    best: tuple[int, int] | None = None
+    best_score = 0
+    best_dist = 0
+    for y in range(viewport_top, viewport_bottom + 1):
+        for x in range(viewport_left, viewport_right + 1):
+            # The tank's own tile is never a productive walk destination:
+            # the next free radar's 5x5 footprint is the same whether the
+            # tank moves 0 tiles or stays put, so walking here extends
+            # coverage by exactly nothing. Excluding it prevents the
+            # tie-break from collapsing on distance=0 when every other
+            # interior tile has the same uncovered-tiles score.
+            if (x, y) == (tank_x, tank_y):
+                continue
+            score = free_radar_new_coverage(
+                scanned_tiles,
+                x,
+                y,
+                viewport_left,
+                viewport_top,
+                viewport_right,
+                viewport_bottom,
+                now_ms,
+            )
+            if score == 0:
+                continue
+            dist = abs(x - tank_x) + abs(y - tank_y)
+            if best is None or score > best_score or (score == best_score and dist < best_dist):
+                best = (x, y)
+                best_score = score
+                best_dist = dist
+    return best
+
+
+def record_scanned_tiles(
+    state: WorldStateDict,
+    scanned: list[tuple[int, int]],
+    timestamp_ms: int,
+) -> WorldStateDict:
+    """Return state with ``scanned`` tiles marked at ``timestamp_ms`` and stale entries pruned.
+
+    Args:
+        state: Current world state.
+        scanned: Tiles the server radar just revealed.
+        timestamp_ms: Scan completion timestamp.
+
+    Returns:
+        New WorldStateDict with the coverage map updated.
+    """
+    pruned = {
+        key: scanned_ms
+        for key, scanned_ms in state["scanned_tiles"].items()
+        if timestamp_ms - scanned_ms <= FORAGE_COVERAGE_TTL_MS
+    }
+    for tx, ty in scanned:
+        pruned[tile_key(tx, ty)] = timestamp_ms
+    return WorldStateDict(
+        self_state=state["self_state"],
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_tiles=pruned,
+        timestamp_ms=timestamp_ms,
+    )
+
+
+__all__ = [
+    "FORAGE_COVERAGE_TTL_MS",
+    "FREE_RADAR_RADIUS",
+    "free_radar_new_coverage",
+    "free_radar_revealed_tiles",
+    "is_tile_covered",
+    "is_viewport_fully_covered",
+    "record_scanned_tiles",
+    "select_best_free_radar_position",
+    "tile_key",
+    "viewport_tiles",
+]

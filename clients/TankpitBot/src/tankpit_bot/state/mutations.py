@@ -15,7 +15,6 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_tank_state,
     make_terrain_tile,
-    viewport_scan_key,
 )
 from tankpit_bot.state.types.constants import DIRECTION_DEAD_THRESHOLD, TankLiveness
 from tankpit_bot.state.viewport_geometry import (
@@ -69,7 +68,7 @@ def update_self_from_movement_response(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -124,7 +123,7 @@ def update_self_position(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -300,7 +299,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -314,33 +313,37 @@ def update_terrain_from_viewport(
 ) -> WorldStateDict:
     """Update terrain from a visible viewport update.
 
+    A 0x5A viewport patch carries terrain plus container (``cache_value``)
+    and mine (``overlay_value``) layers; the production wire path lifts
+    those into ``world.containers`` and ``world.mines`` via the per-tile
+    mutators. This helper exists for tests that need to pre-seed terrain
+    from a synthetic 0x5A patch -- it ignores the container / mine bytes
+    so the rich registries are populated by the explicit per-tile mutators
+    in tests that exercise them.
+
     Args:
         state: Current world state.
         viewport_left: Viewport left X coordinate.
         viewport_top: Viewport top Y coordinate.
         entities: List of ``0x5A`` patch-grid
             ``(col, row, terrain_type, cache_value, overlay_value)`` tuples.
+            ``cache_value`` and ``overlay_value`` are accepted for
+            wire-shape compatibility but ignored here.
         timestamp_ms: Message timestamp.
 
     Returns:
-        New WorldStateDict with updated terrain, viewport, and confirmed
-        local-resource coverage for that viewport origin.
+        New WorldStateDict with updated terrain and viewport.
     """
     new_terrain = dict(state["terrain"])
     new_viewport = make_visible_viewport_state(viewport_left, viewport_top)
-    key = viewport_scan_key(viewport_left, viewport_top)
-    new_scanned_viewports = dict(state["scanned_viewports"])
-    new_scanned_viewports[key] = timestamp_ms
 
-    for col, row, terrain_type, cache_value, overlay_value in entities:
+    for col, row, terrain_type, _cache_value, _overlay_value in entities:
         x, y = viewport_patch_world_coords(viewport_left, viewport_top, col, row)
         key = coord_key(x, y)
         new_terrain[key] = make_terrain_tile(
             x=x,
             y=y,
             terrain_type=terrain_type,
-            cache_value=cache_value,
-            overlay_value=overlay_value,
         )
 
     return WorldStateDict(
@@ -350,7 +353,7 @@ def update_terrain_from_viewport(
         mines=state["mines"],
         terrain=new_terrain,
         viewport=new_viewport,
-        scanned_viewports=new_scanned_viewports,
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -397,7 +400,7 @@ def set_self_fuel(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -438,7 +441,7 @@ def set_self_rank(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -499,7 +502,7 @@ def _set_tank_liveness(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -570,7 +573,7 @@ def set_tank_last_aim(
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],
-        scanned_viewports=state["scanned_viewports"],
+        scanned_tiles=state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -637,45 +640,12 @@ def remove_tank(
     return state
 
 
-def mark_viewport_scanned(
-    state: WorldStateDict,
-    viewport_left: int,
-    viewport_top: int,
-    timestamp_ms: int,
-) -> WorldStateDict:
-    """Record that a viewport origin has authoritative local-resource coverage.
-
-    Args:
-        state: Current world state.
-        viewport_left: Viewport left X coordinate.
-        viewport_top: Viewport top Y coordinate.
-        timestamp_ms: Scan completion timestamp.
-
-    Returns:
-        New WorldStateDict with updated viewport confirmation metadata.
-    """
-    key = viewport_scan_key(viewport_left, viewport_top)
-    new_scanned_viewports = dict(state["scanned_viewports"])
-    new_scanned_viewports[key] = timestamp_ms
-    return WorldStateDict(
-        self_state=state["self_state"],
-        tanks=state["tanks"],
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_viewports=new_scanned_viewports,
-        timestamp_ms=timestamp_ms,
-    )
-
-
 # =============================================================================
 # Exports
 # =============================================================================
 
 __all__ = [
     "apply_tank_observation",
-    "mark_viewport_scanned",
     "remove_tank",
     "set_self_fuel",
     "set_tank_last_aim",
