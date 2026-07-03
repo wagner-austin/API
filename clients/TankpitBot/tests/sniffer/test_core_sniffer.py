@@ -123,7 +123,7 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
 
         entry = GameLogEntry(text="Player destroyed Enemy", category="combat")
 
@@ -153,7 +153,7 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
         sniffer._init_combat_tracker()
 
         sniffer._process_game_log_entry(
@@ -182,7 +182,7 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
 
         sniffer._process_game_log_entry(
             GameLogEntry(text="You hit Tank123 for 50 damage", category="combat")
@@ -211,7 +211,7 @@ class TestWebSocketSnifferMethods:
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._live_decode = False
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
         sniffer._init_combat_tracker()
 
         sniffer._process_game_log_entry(
@@ -248,7 +248,7 @@ class TestWebSocketSnifferMethods:
         sniffer._cdp_service = CDPService()
         sniffer._live_decode = True
         sniffer._magic = "testmagic"
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
         sniffer._game_log_scraper = None
 
         # Initialize trackers with magic
@@ -276,11 +276,11 @@ class TestWebSocketSnifferMethods:
         # Call _on_message_captured - this should hit the mine_status branch
         sniffer._on_message_captured(message)
 
-    def test_autosave_capture_no_output_path_is_noop(self) -> None:
+    def test_autosave_capture_no_paths_is_noop(self) -> None:
         """Returns immediately when autosave is not configured."""
         sniffer = object.__new__(WebSocketSniffer)
         sniffer._cdp_service = CDPService()
-        sniffer._output_path = None
+        sniffer._autosave_paths = ()
         sniffer._target_url = "https://tankpit.com"
         sniffer._session_id = "noop"
         sniffer._start_timestamp_ms = 1000
@@ -298,7 +298,10 @@ class TestWebSocketSnifferMethods:
         sniffer._headless = False
         sniffer._prefer_account = False
         sniffer._live_decode = False
-        sniffer._output_path = Path("capture_session.json")
+        sniffer._autosave_paths = (
+            Path("capture_session.json"),
+            Path("runs/sniff/latest.capture_session.json"),
+        )
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._game_log_scraper = None
@@ -322,13 +325,15 @@ class TestWebSocketSnifferMethods:
         saved_session = decode_capture_session(
             narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("capture_session.json"))))
         )
-        saved_raw = decode_capture_session(
-            narrow_json_to_dict(load_json_str(fake_fs.read_text(Path("raw_capture.json"))))
+        saved_latest = decode_capture_session(
+            narrow_json_to_dict(
+                load_json_str(fake_fs.read_text(Path("runs/sniff/latest.capture_session.json")))
+            )
         )
 
         assert len(saved_session["messages"]) == 1
         assert saved_session["messages"][0]["payload"] == "AAAA"
-        assert saved_raw == saved_session
+        assert saved_latest == saved_session
 
     def test_process_game_log_entry_autosaves_game_log(self, fake_fs: FakeFileSystem) -> None:
         """Autosaves updated game log entries during capture."""
@@ -340,7 +345,7 @@ class TestWebSocketSnifferMethods:
         sniffer._headless = False
         sniffer._prefer_account = False
         sniffer._live_decode = False
-        sniffer._output_path = Path("capture_session.json")
+        sniffer._autosave_paths = (Path("capture_session.json"),)
         sniffer._game_log_entries = []
         sniffer._combat_tracker = None
         sniffer._game_log_scraper = None

@@ -125,8 +125,6 @@ class TestDispatchTankMessages:
         assert tile["x"] == 8
         assert tile["y"] == 166
         assert tile["terrain_type"] == 2
-        assert tile["cache_value"] == 0
-        assert tile["overlay_value"] == 255
 
     def test_dispatch_tunneled_mine_placement_adds_mines(self) -> None:
         """Test tunneled 0x4B mine placement updates world mine state."""

@@ -125,16 +125,19 @@ def test_fuel_probe_capture_replays_to_observed_terminal_state() -> None:
     assert "1301" in world["tanks"]
     assert "500" in world["tanks"]
 
-    # 24 containers (was 23 prior to the partial-pickup fix). One
-    # container in this session was partially picked up; under the old
-    # ``pickup_container`` the tile was unconditionally removed and the
-    # bot lost track of the residual fuel until the next radar
-    # refresh. The new mutator keeps the tile in state with its volume
-    # reduced to the wire-reported ``remaining_volume`` so the planner
-    # can drain the rest. See ``state/container_mutations.py``.
-    assert len(world["containers"]) == 24
-    assert len(world["mines"]) == 8
-    assert len(world["scanned_viewports"]) == 4
+    # 60 containers / 66 mines under the source-scoped radar reconcile
+    # (2026-07-01): a radar response lists only newly revealed HIDDEN
+    # entities, so reconcile removes only radar-sourced entries the new
+    # radar omits. The extra 15 containers and 25 mines are the visible
+    # 0x5A/0x43-sourced entries the replayed scans used to wipe. The
+    # earlier asserts (45/41) reflected the whole-envelope reconcile;
+    # before that (24/8) only radar-sourced entries were tracked at all.
+    assert len(world["containers"]) == 60
+    assert len(world["mines"]) == 66
+    # 1024 = 4 extra-radar full-viewport reveals (4 * 256 tiles), with no
+    # TTL overlap pruning across the short replay. Previously asserted 4
+    # because the coarse per-origin tracker only kept the viewport key.
+    assert len(world["scanned_tiles"]) == 1024
 
     assert total_inventory_count(inv) == 107
     assert inv["armor_shields"]["count"] == 25
@@ -183,9 +186,11 @@ def test_fuel_probe_inventory_jumps_to_112_after_first_sync_frame() -> None:
 def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     """The teleport probe capture exercises teleport-landed signals end to end.
 
-    No radar/pickup activity in this session, so containers/mines/scanned all
-    stay empty — but the teleport sequencing produced a final landing at
-    (134, 69) and 68 received frames worth of tank-registry updates.
+    No radar/pickup activity in this session, but each 0x5A landing
+    enumerates containers visible in the new viewport -- under the
+    unified container store those lift into ``world.containers``
+    immediately, so the terminal count is 11 (previously 0 because the
+    old per-tile cache_value path didn't promote anything).
     """
     session = _load(REPO_ROOT / "teleport_probe.capture_session.json")
     received = _replay_all_received(session)
@@ -200,8 +205,8 @@ def test_teleport_probe_capture_replays_to_observed_terminal_state() -> None:
     assert (self_state["x"], self_state["y"]) == (134, 69)
     assert self_state["fuel"] == 897
     assert len(world["tanks"]) == 37
-    assert len(world["containers"]) == 0
-    assert len(world["mines"]) == 0
+    assert len(world["containers"]) == 11
+    assert len(world["mines"]) == 6
     assert total_inventory_count(get_inventory_state(get_world_service())) == 124
 
 
@@ -232,7 +237,10 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
 
     No radar, no pickup, no teleport — inventory stays at the original 125.
     Proves the movement_response / position_update decoders update self
-    coordinates correctly when no inventory-affecting frames arrive.
+    coordinates correctly when no inventory-affecting frames arrive. The
+    22 containers come from 0x5A viewport patches enumerating tiles as
+    the bot walks through visible terrain (was 0 in the pre-unified
+    container-store world).
     """
     session = _load(REPO_ROOT / "movement_probe.capture_session.json")
     received = _replay_all_received(session)
@@ -245,24 +253,26 @@ def test_movement_probe_capture_replays_to_observed_terminal_state() -> None:
         pytest.fail("replay did not populate self_state")
     assert (self_state["x"], self_state["y"]) == (131, 118)
     assert self_state["fuel"] == 1076
-    assert len(world["containers"]) == 0
+    assert len(world["containers"]) == 22
     assert total_inventory_count(get_inventory_state(get_world_service())) == 125
 
 
 @pytest.mark.usefixtures("_isolate_world_state")
-def test_root_capture_session_replays_to_observed_terminal_state() -> None:
-    """The unnamed root capture (capture_session.json) has mixed activity.
+def test_mixed_activity_sniff_capture_replays_to_observed_terminal_state() -> None:
+    """The 2026-06-20 mixed-activity sniff capture exercises many decoder paths.
 
     Some radar (4 scanned viewports, 20 containers discovered, 8 mines)
     and no radar consumption (inventory radar slot still 25). Validates
     the cross-cutting case where multiple decoder paths fire across the
-    same session. The capture file is regenerated locally on
-    ``make sniff`` runs; the assertions here pin the terminal state of
-    the version currently checked in / locally captured (2026-06-20
-    snapshot: 228 received frames, self ends at (178, 54) with full
-    fuel and full inventory).
+    same session. The fixture is the archived sniff-20260620-190228
+    capture, checked in under tests/replay/fixtures — the old fixture
+    path (repo-root ``capture_session.json``, untracked) was a side
+    effect of the ``.env`` ``TANKPIT_OUTPUT`` redirect fixed 2026-07-01
+    and was overwritten by every sniff run. Terminal state: 228 received
+    frames, self ends at (178, 54) with full fuel and full inventory.
     """
-    session = _load(REPO_ROOT / "capture_session.json")
+    fixtures_dir = REPO_ROOT / "tests" / "replay" / "fixtures"
+    session = _load(fixtures_dir / "mixed_activity_sniff.capture_session.json")
     received = _replay_all_received(session)
 
     world = get_world_state()
@@ -275,9 +285,19 @@ def test_root_capture_session_replays_to_observed_terminal_state() -> None:
     assert (self_state["x"], self_state["y"]) == (178, 54)
     assert self_state["fuel"] == 1100
     assert len(world["tanks"]) == 37
-    assert len(world["containers"]) == 20
-    assert len(world["mines"]) == 8
-    assert len(world["scanned_viewports"]) == 4
+    # 46 containers / 21 mines under the source-scoped radar reconcile
+    # (2026-07-01): a radar response lists only newly revealed HIDDEN
+    # entities, so reconcile removes only radar-sourced entries the new
+    # radar omits. The old asserts (15/15) reflected the whole-envelope
+    # reconcile that wrongly deleted visible 0x5A/0x43-sourced entries
+    # on every scan; the recovered 31 containers and 6 mines are the
+    # visible-layer entries the scans used to wipe.
+    assert len(world["containers"]) == 46
+    assert len(world["mines"]) == 21
+    # 960 tiles = the replayed session's mix of extra and free radars
+    # under the new per-tile coverage tracker; the old per-viewport-origin
+    # tracker only kept 4 keys.
+    assert len(world["scanned_tiles"]) == 960
     assert total_inventory_count(inv) == 125
     assert inv["extra_radars"]["count"] == 25
 

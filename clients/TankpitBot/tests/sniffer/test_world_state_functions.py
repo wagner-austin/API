@@ -295,7 +295,7 @@ class TestRadarViewportReconciliation:
 
         update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [])
 
-        assert ws.world_state["scanned_viewports"]["100,200"] > 0
+        assert ws.world_state["scanned_tiles"]["100,200"] > 0
 
     def test_radar_clears_failed_scan_mark_for_current_viewport(self) -> None:
         """Successful radar clears the recent failed-scan quarantine."""
@@ -369,7 +369,13 @@ class TestRadarViewportReconciliation:
         assert "102,202" not in ws.world_state["containers"]
 
     def test_radar_clears_missing_current_viewport_mines(self) -> None:
-        """Radar removes stale current-viewport mines not returned by the scan."""
+        """Radar removes stale radar-sourced viewport mines not returned by the scan.
+
+        Only radar-sourced entries are reconciled: the radar response
+        lists just the newly revealed hidden entities, so visible
+        (viewport/placement-sourced) mines are never removed by it
+        (2026-07-01).
+        """
         from tankpit_bot.protocol import RadarMineDict
         from tankpit_bot.state.types import make_mine_state
 
@@ -382,6 +388,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=77,
             team=2,
+            source="radar",
         )
         ws.world_state["mines"]["150,150"] = make_mine_state(
             x=150,
@@ -389,6 +396,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=88,
             team=3,
+            source="radar",
         )
 
         update_world_state_from_radar(ws, [], [RadarMineDict(x=102, y=202, team=1)])
@@ -398,7 +406,7 @@ class TestRadarViewportReconciliation:
         assert "150,150" in ws.world_state["mines"]
 
     def test_radar_clears_multiple_missing_current_viewport_mines(self) -> None:
-        """Radar removes each stale mine after the first deletion snapshot."""
+        """Radar removes each stale radar-sourced mine after the first deletion snapshot."""
         from tankpit_bot.state.types import make_mine_state
 
         ws = get_world_service()
@@ -410,6 +418,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=77,
             team=2,
+            source="radar",
         )
         ws.world_state["mines"]["102,202"] = make_mine_state(
             x=102,
@@ -417,6 +426,7 @@ class TestRadarViewportReconciliation:
             mine_type=1,
             tank_id=88,
             team=3,
+            source="radar",
         )
 
         update_world_state_from_radar(ws, [], [])

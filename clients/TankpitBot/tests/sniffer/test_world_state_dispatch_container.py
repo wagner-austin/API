@@ -19,40 +19,57 @@ class TestDispatchTilePatchUpdates:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_dispatch_overlay_update_preserves_existing_cache_and_terrain(self) -> None:
-        """Top-level 0x40 updates only the overlay layer for existing tiles."""
+    def test_dispatch_overlay_update_creates_mine_and_keeps_terrain(self) -> None:
+        """Top-level 0x40 lifts overlay bytes into world.mines and leaves terrain alone."""
         from tankpit_bot.protocol import OverlayUpdateDict, TerrainUpdateDict
 
         ws = get_world_service()
         dispatch_world_state_update(ws, TerrainUpdateDict(msg_type=0x4A, updates=[(70, 80, 6)]))
-        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 9)]))
+        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 1)]))
 
         tile = ws.world_state["terrain"]["70,80"]
         assert tile["terrain_type"] == 6
-        assert tile["cache_value"] == 0
-        assert tile["overlay_value"] == 9
+        # Overlay byte 1 = mine present, team = 1 (low 2 bits).
+        mine = ws.world_state["mines"]["70,80"]
+        assert mine["team"] == 1
+        assert mine["source"] == "viewport"
 
-    def test_dispatch_cache_update_updates_terrain_only(self) -> None:
-        """Top-level 0x43 updates tile cache without creating targets."""
+    def test_dispatch_overlay_clear_removes_existing_mine(self) -> None:
+        """0x40 with overlay byte >= 8 explicitly empties the mine layer."""
+        from tankpit_bot.protocol import OverlayUpdateDict
+
+        ws = get_world_service()
+        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 2)]))
+        assert "70,80" in ws.world_state["mines"]
+
+        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(70, 80, 255)]))
+        assert "70,80" not in ws.world_state["mines"]
+
+    def test_dispatch_cache_update_creates_container(self) -> None:
+        """Top-level 0x43 lifts cache bytes directly into world.containers."""
         from tankpit_bot.protocol import CacheUpdateDict
 
         ws = get_world_service()
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 600)]))
 
-        tile = ws.world_state["terrain"]["33,44"]
-        assert tile["terrain_type"] == 0
-        assert tile["cache_value"] == 600
-        assert tile["overlay_value"] == 255
-        assert "33,44" not in ws.world_state["containers"]
+        container = ws.world_state["containers"]["33,44"]
+        assert container["is_fuel"] is True
+        assert container["volume"] == 600
+        assert container["source"] == "viewport"
+        assert container["refresh_kind"] == "viewport_patch"
 
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 0)]))
 
-        cleared_tile = ws.world_state["terrain"]["33,44"]
-        assert cleared_tile["cache_value"] == 0
         assert "33,44" not in ws.world_state["containers"]
 
-    def test_dispatch_cache_clear_does_not_override_radar_container(self) -> None:
-        """A 0x43 cache clear does not erase radar-confirmed container truth."""
+    def test_dispatch_cache_clear_removes_previously_radared_container(self) -> None:
+        """A 0x43 cache_value=0 supersedes a radar entry: the tile is now empty.
+
+        Per-tile wire updates are authoritative for the tiles they
+        enumerate. The radar may have seen a container before pickup;
+        the 0x43 CacheUpdate is the wire's later "this tile is empty"
+        signal and removes it.
+        """
         from tankpit_bot.protocol import CacheUpdateDict, MovementResponseDict, RadarContainerDict
         from tankpit_bot.sniffer.world_state_radar import update_world_state_from_radar
 
@@ -78,18 +95,18 @@ class TestDispatchTilePatchUpdates:
         self_state["fuel"] = 250
 
         update_world_state_from_radar(ws, [RadarContainerDict(x=33, y=44, volume=600)], [])
+        assert "33,44" in ws.world_state["containers"]
+
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 0)]))
 
-        assert ws.world_state["terrain"]["33,44"]["cache_value"] == 0
-        assert "33,44" in ws.world_state["containers"]
-        assert ws.world_state["containers"]["33,44"]["volume"] == 600
+        assert "33,44" not in ws.world_state["containers"]
         self_state = ws.world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
         assert self_state["fuel"] == 250
 
     def test_dispatch_combined_tile_update_applies_cache_and_overlay_sections(self) -> None:
-        """Top-level 0x4F applies both cache and overlay sections visually only."""
+        """Top-level 0x4F applies both cache and overlay sections to their registries."""
         from tankpit_bot.protocol import CombinedTileUpdateDict, TerrainUpdateDict
 
         ws = get_world_service()
@@ -99,15 +116,18 @@ class TestDispatchTilePatchUpdates:
             CombinedTileUpdateDict(
                 msg_type=0x4F,
                 cache_updates=[(90, 91, -1)],
-                overlay_updates=[(90, 91, 12)],
+                overlay_updates=[(90, 91, 3)],
             ),
         )
 
         tile = ws.world_state["terrain"]["90,91"]
         assert tile["terrain_type"] == 4
-        assert tile["cache_value"] == -1
-        assert tile["overlay_value"] == 12
-        assert "90,91" not in ws.world_state["containers"]
+        container = ws.world_state["containers"]["90,91"]
+        assert container["is_fuel"] is False
+        assert container["source"] == "viewport"
+        mine = ws.world_state["mines"]["90,91"]
+        assert mine["team"] == 3
+        assert mine["source"] == "viewport"
 
 
 class TestDispatchShootEvent:
@@ -173,7 +193,12 @@ class TestDispatchShootEvent:
         assert ws.last_shot_victim_id == 534
 
     def test_own_shot_on_empty_tile_is_miss(self) -> None:
-        """Own shot landing on empty tile records no victim."""
+        """A free single (weapon=0) records a miss and no victim.
+
+        Consumption = hit (user contract 2026-07-02): the server picks
+        ``weapon=0`` exactly when the shot resolves against empty
+        ground and spends nothing.
+        """
         from tankpit_bot.protocol import MovementResponseDict, ShootEventDict
         from tankpit_bot.sniffer.world_state_combat import (
             check_and_clear_combat_hit,
@@ -207,7 +232,7 @@ class TestDispatchShootEvent:
             target_y=174,
             aim_x=170,
             aim_y=174,
-            weapon=3,
+            weapon=0,
         )
         dispatch_world_state_update(ws, msg)
         assert check_and_clear_combat_hit(ws) is False

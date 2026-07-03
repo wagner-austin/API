@@ -235,7 +235,7 @@ class TestDispatchViewportUpdate:
 
         dispatch_world_state_update(get_world_service(), msg)
 
-        assert "51,29" not in get_world_service().world_state["scanned_viewports"]
+        assert "51,29" not in get_world_service().world_state["scanned_tiles"]
 
     def test_dispatch_viewport_update_clears_failed_scan_mark(self) -> None:
         """Fresh visible viewport data clears a recent failed-scan mark."""
@@ -270,8 +270,8 @@ class TestViewportContainerExtraction:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_fuel_cache_from_viewport_entity_updates_terrain_only(self) -> None:
-        """Viewport entity fuel cache updates terrain only until radar confirms it."""
+    def test_fuel_cache_from_viewport_entity_creates_fuel_container(self) -> None:
+        """A 0x5A fuel cache byte lifts directly into world.containers."""
         from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
         from tankpit_bot.protocol.types import ViewportEntityDict
 
@@ -304,13 +304,15 @@ class TestViewportContainerExtraction:
         )
         dispatch_world_state_update(get_world_service(), msg)
 
-        # Fuel container at abs (51+15-1, 29+3-1) = (65, 31) with volume ≈ 994
-        tile = get_world_service().world_state["terrain"]["65,31"]
-        assert tile["cache_value"] == 994
-        assert "65,31" not in get_world_service().world_state["containers"]
+        # Fuel container at abs (51+15-1, 29+3-1) = (65, 31) with volume 994
+        container = get_world_service().world_state["containers"]["65,31"]
+        assert container["is_fuel"] is True
+        assert container["volume"] == 994
+        assert container["source"] == "viewport"
+        assert container["refresh_kind"] == "viewport_patch"
 
-    def test_equipment_cache_from_viewport_entity_updates_terrain_only(self) -> None:
-        """Viewport entity equipment cache updates terrain only until radar confirms it."""
+    def test_equipment_cache_from_viewport_entity_creates_equipment_container(self) -> None:
+        """A 0x5A cache_value=-1 byte creates an equipment container directly."""
         from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
         from tankpit_bot.protocol.types import ViewportEntityDict
 
@@ -344,52 +346,20 @@ class TestViewportContainerExtraction:
         dispatch_world_state_update(get_world_service(), msg)
 
         # Equipment container at abs (51+4-1, 29+11-1) = (54, 39)
-        tile = get_world_service().world_state["terrain"]["54,39"]
-        assert tile["cache_value"] == -1
-        assert "54,39" not in get_world_service().world_state["containers"]
+        container = get_world_service().world_state["containers"]["54,39"]
+        assert container["is_fuel"] is False
+        assert container["volume"] == 0
+        assert container["source"] == "viewport"
+        assert container["refresh_kind"] == "viewport_patch"
 
-    def test_positive_cache_value_does_not_create_fuel_container(self) -> None:
-        """Positive cache values remain visual hints until radar confirms them."""
-        from tankpit_bot.protocol import MovementResponseDict, ViewportUpdateDict
-        from tankpit_bot.protocol.types import ViewportEntityDict
+    def test_empty_viewport_cache_removes_existing_container(self) -> None:
+        """A 0x5A cache_value=0 byte removes the container at that tile.
 
-        self_msg = MovementResponseDict(
-            msg_type=0x3D,
-            team=1,
-            tank_id=1229,
-            x=60,
-            y=38,
-            direction=0,
-            damage_state=0,
-            rank=1,
-            lb_score=5,
-            carrying=0,
-        )
-        dispatch_world_state_update(get_world_service(), self_msg)
-
-        # Positive cache_value — treated as fuel container
-        unknown_ent = ViewportEntityDict(
-            col=5,
-            row=5,
-            cache_value=999,
-            overlay_value=255,
-            terrain_type=0,
-        )
-        msg = ViewportUpdateDict(
-            msg_type=0x5A,
-            viewport_left=51,
-            viewport_top=29,
-            entities=[unknown_ent],
-        )
-        dispatch_world_state_update(get_world_service(), msg)
-
-        # Viewport offset = (60-9, 38-9) = (51, 29). Abs pos = (51+5-1, 29+5-1) = (55, 33).
-        tile = get_world_service().world_state["terrain"]["55,33"]
-        assert tile["cache_value"] == 999
-        assert "55,33" not in get_world_service().world_state["containers"]
-
-    def test_empty_viewport_cache_does_not_override_radar_container(self) -> None:
-        """A 0x5A cache clear does not override radar-confirmed container truth."""
+        The 0x5A patch is per-tile authoritative; ``cache_value=0`` is the
+        wire's explicit "tile is empty" signal and supersedes any prior
+        radar entry (e.g. the container was picked up between the radar
+        scan and the next viewport refresh).
+        """
         from tankpit_bot.protocol import (
             MovementResponseDict,
             RadarContainerDict,
@@ -442,9 +412,7 @@ class TestViewportContainerExtraction:
             ),
         )
 
-        assert get_world_service().world_state["terrain"]["55,33"]["cache_value"] == 0
-        assert "55,33" in get_world_service().world_state["containers"]
-        assert get_world_service().world_state["containers"]["55,33"]["volume"] == 900
+        assert "55,33" not in get_world_service().world_state["containers"]
         self_state = get_world_service().world_state["self_state"]
         if self_state is None:
             raise AssertionError("self_state should not be None")
