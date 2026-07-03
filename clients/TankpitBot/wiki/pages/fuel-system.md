@@ -81,12 +81,21 @@ collapsed 2026-06-24). The owner runs a single cascade per tick (see
    free radar covers a 5×5 around the tank, clipped to viewport
    bounds). When radar is unaffordable, walk toward an unscanned
    tile so the next free radar covers fresh ground.
-5. **Hop** — teleport to a fresh viewport via the fresh-viewport hop.
-   Tries the four 16-tile cardinals first (cheapest single-step
-   tiling-neighbor) and falls through to the four 16-tile diagonals
-   only when no cardinal qualifies (passable, fuel-affordable, lands
-   in an unscanned viewport). When all eight directions fail the
-   owner raises loudly rather than idle silently.
+5. **Hop** — teleport to the cleanest fresh viewport nearby.
+   Candidates are the eight compass neighbors at one and two
+   viewport-widths (16 candidates). A candidate qualifies when its
+   landing tile is passable, the teleport is fuel-affordable, and the
+   destination viewport is unscanned. Qualifiers are ranked by the
+   **walkable fraction** of the landing viewport from the static
+   terrain map (mostly-"." viewports, matching the recorded human
+   restock policy — see [[gameplay-loop]]); ties keep the cheapest
+   hop because candidates are iterated cheapest-first (16 cardinal,
+   16 diagonal, 32 cardinal, 32 diagonal). When no candidate
+   qualifies the owner ends the session with exit reason
+   ``out_of_fuel`` (``SessionExitError``, 2026-07-02; previously an
+   uncaught ``ValueError`` crash) rather than idle silently.
+   (Hop picker rewritten 2026-07-01; previously
+   first-qualifying-direction with no destination-quality signal.)
 
 There is no fuel-dot atlas: the bot does not consult a map-wide
 fuel-container list. The MAP_DATA blob still carries the RLE fuel-dot
@@ -104,8 +113,10 @@ fire a fuel-dot teleport. The reserve-vetoed band it covered was
 narrow -- fuel high enough for the teleport but below the hunt
 reserve -- and the actual stranded case (fuel below any teleport
 cost) was always fatal anyway. The escape was removed with the rest
-of the fuel-dot system 2026-06-22; the COLLECT owner now raises
-`ValueError` loudly when lock / pickup / sense / hop all decline.[^4]
+of the fuel-dot system 2026-06-22; when lock / pickup / sense / hop
+all decline the COLLECT owner ends the session with exit reason
+`out_of_fuel` (`SessionExitError`, 2026-07-02 — previously an uncaught
+`ValueError` crash).[^4]
 
 [^1]: AIConfigDict in bot/ai/types.py — thresholds lowered from 500→300 in Phase 3d (2026-06-14)
 [^2]: user (Austin), 2026-06-11 — "only collect fuel containers with volume >= 500"

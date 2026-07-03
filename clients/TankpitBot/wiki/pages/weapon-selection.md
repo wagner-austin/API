@@ -3,7 +3,7 @@ title: Weapon Selection (Server-Side)
 tags: [combat, weapons, protocol]
 related: [[shoot-event-format]], [[weapon-log-markers]], [[shot-range]]
 sources: [see footnotes]
-fact_checked: 2026-06-16
+fact_checked: 2026-07-02
 confidence: high
 ---
 
@@ -27,6 +27,32 @@ Weapon selection is **server-side**, not client-side. The fire command sends an 
 - **Keep duals enabled at all times** during combat. The server selects the right weapon[^1]
 - **Homing also tracks teleporting enemies** — fire at their last position, server auto-homings if they teleported[^1]
 
+## The weapon byte is the per-shot ammo ledger — and therefore the hit oracle
+
+The server only spends dual / missile / homing ammo on a shot that
+lands, and it records the spend in the ShootEvent ``weapon`` field.
+The page client's inventory display decrements from exactly this
+field. So per shot:[^2]
+
+- ``weapon > 0`` → one consumable debited → **hit** (even when the
+  impact tile is off the local viewport and ``victim_id`` resolves to
+  ``-1`` — the tile-occupancy lookup cannot see off-viewport targets)
+- ``weapon = 0`` → free single, nothing debited → **miss**
+
+Wire proof (run 2026-07-02 01:21): five pursuit homings each carried
+``weapon=3`` while ``victim_id=-1``; orange-3 died to the fifth. The
+pre-2026-07-02 bot classified those winning shots as misses because
+it keyed hits on ``victim_id`` and derived the ammo decrement from
+that guess — leaving the ammo-delta cross-check circularly dependent
+on the signal it existed to correct. The classifier now keys directly
+on consumption; ``victim_id`` is kill-attribution metadata only.
+
+A consumption-miss at a registry position that has NOT moved means
+the target is genuinely gone from that tile (frozen registry entry or
+unwitnessed corpse) — the bot blocks the target instead of repeating
+the shot (run 2026-07-02 01:23: 25+ ``weapon=0`` shots looped at a
+stale tile before this rule).
+
 ## Miss causes
 
 A miss (weapon_byte=0) means one of:[^1]
@@ -41,3 +67,4 @@ A miss (weapon_byte=0) means one of:[^1]
 - A miss does NOT mean "hit but no damage" — it means "nothing was at that coordinate."
 
 [^1]: user (Austin), 2026-06-16 — full weapon selection explanation: "homing shot is used whenever you click on an enemy tank but the enemy had already submitted a move command... it will automatically use a homing shot"
+[^2]: user (Austin), 2026-07-02 — "check the inventory delta for each shot. that is how we measure hits vs misses"; wire-verified in capture 2026-07-02 01:20 (orange-3 pursuit kill via 5 weapon=3 debits, orange-1 weapon=0 stream with zero debits)

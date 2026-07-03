@@ -656,3 +656,107 @@ Cross-checked the wiki structure against the `/wiki-init` scaffolding skill at `
 **Pages relocated outside wiki:** 2026-06-21-scan-refactor.md (handoff brief), vtable_trace.txt (V-table dump).
 
 No content pages were touched. The audit confirms the wiki was substantively spec-compliant from v0.1; v1.0 codifies the rules and tidies the layout.
+
+---
+
+## [2026-07-01] fix | Sniffer autosave never covered the canonical latest capture; `.env` TANKPIT_OUTPUT redirect
+
+Diagnosed after a human play-capture session (2026-07-01 18:59) was "lost" when the browser was closed before the timer: `runs/sniff/latest.capture_session.json` still held June 20 data while the session's log + events.jsonl were current.
+
+**Root cause, two layers:**
+
+1. `.env` carried the stale template default `TANKPIT_OUTPUT=capture_session.json`. The Makefile's `sniff` target explicitly removes `TANKPIT_OUTPUT` from the environment when no `OUTPUT=` override is given, but `main()` calls `load_dotenv()` which re-set it from `.env`. Every sniffer autosave therefore went to `capture_session.json` in the repo root, not to `runs/sniff/`.
+2. Even with a correct override, `_autosave_capture` only ever wrote the override path (+ a redundant `raw_capture.json` mirror beside it). The canonical `runs/sniff/latest.*` capture group was written exclusively by the end-of-run flush in `run_sniffer` — so any abnormal termination (browser closed mid-session -> `TargetClosedError`) left the canonical latest capture stale from a *previous* session, silently masquerading as current data.
+
+**Fix:**
+
+- `sniffer/core.py`: `WebSocketSniffer` now takes `autosave_paths: tuple[Path, ...]`; `run_sniffer` builds the deduped set {explicit output path, canonical `latest_capture_path`} and every captured message keeps both current. The redundant per-message `raw_capture.json` mirror is gone (the final flush still writes all raw/summary/archive mirrors).
+- `runtime_logging.configure_sniff_runtime_logging`: the session-start `_reset_artifact_files` now also truncates `latest.capture_session.json`, `latest.raw_capture.json`, `latest.session_summary.json` — an empty file honestly means "session started, no data yet" instead of a previous session's data.
+- `.env` / `.env.example`: `TANKPIT_OUTPUT` default removed; documented as an opt-in override only.
+- Also removed the `make play` target (byte-identical duplicate of `make sniff`); [[make-targets]] updated, including the stale `runs/sniffer/` -> `runs/sniff/` path.
+
+**Tests:** `test_core_sniffer.py` autosave tests rewritten for multi-destination autosave (override + latest, latest content asserted equal); `test_runtime_logging.py::test_configure_sniff_runtime_logging_resets_latest_files` extended to seed and assert truncation of the three stale capture files. `test_replay_pipeline.py::test_root_capture_session_replays_to_observed_terminal_state` had silently depended on the repo-root `capture_session.json` (untracked AND overwritten by every sniff run — it held the 2026-06-20 session only because no sniff had run since); the 2026-06-20 capture is now checked in as `tests/replay/fixtures/mixed_activity_sniff.capture_session.json` and the test renamed to `test_mixed_activity_sniff_capture_replays_to_observed_terminal_state`.
+
+**Sessions captured today (human play, account Artax):** archived as `sniff-20260701-185917.*` (6.4 min, fuel-starved walk-forage variant; log + events only — capture JSON was lost to this very bug) and `sniff-20260701-191133.*` (5 min, full kit; complete capture). Behavioral findings feed the combat-rework policy work.
+
+---
+
+## [2026-07-01] refactor | Terrain-scored fresh-viewport hop: pick the cleanest viewport, not the first passable one
+
+User policy from the recorded sessions + direct statement: "i usually just pick clean viewports that are mostly '.' walkable terrain." The old `make_resource_search_hop` took the FIRST of eight 16-tile directions whose single landing tile was passable, affordable, and unscanned — no signal about what the destination viewport was made of. Under the walk-only pickup contract a mostly-water viewport is worthless even when radar reveals containers there (no walk path), so first-match hopping paid ~96 fuel per gamble. The crashed `make run` earlier today (24 teleports, marooned at fuel=31) was largely this.
+
+**Code:** `bot/ai/resource_search.py`
+
+- `_pick_fresh_viewport_hop` now evaluates 16 candidates — the eight compass directions at one and two viewport-widths (16/32 tiles) — and returns the qualifier whose landing viewport has the highest **walkable fraction** from the static terrain map (`terrain.py` minimap GIF data covers all 256×256 tiles, so unvisited ground is scorable). Off-map tiles count as unwalkable (border is rock). Qualification gates unchanged: exact displacement after edge clamp, passable landing tile, affordable, destination viewport unscanned.
+- Tie-break is structural: candidates are iterated cheapest-first (16-cardinal 96 fuel, 16-diagonal ~135, 32-cardinal 192, 32-diagonal ~271 — monotone), and only a strictly better score replaces the incumbent, so equal-score ties keep the cheapest hop. No explicit cost comparison needed.
+- Without a terrain map every candidate scores 1.0 and selection degrades to the old cheapest-first behavior.
+- The fuel-dot question from the play-session analysis is closed: the user picks restock destinations by terrain cleanliness, not fuel dots. No MAP_DATA fuel-dot decode restore needed.
+
+**Tests:** `tests/bot/ai/test_resource_search.py` — 3 new behavior tests (`test_prefers_most_walkable_viewport`: qualifying-but-water-heavy east loses to clean west; `test_reaches_second_ring_when_first_ring_scanned`: 32-tile hop when all 16-tile viewports covered; `test_offmap_clipping_penalizes_edge_viewport`: border-clipped viewport scores 0.625 and loses to a full one). `test_returns_none_when_all_eight_directions_blocked` extended to both rings (16 covered viewports) and renamed. All prior ordering tests still pass because uniform terrain scores tie and the tie keeps the old cheapest-first choice.
+
+**Pages updated:** [[fuel-system]] cascade step 5 rewritten for the scored picker.
+
+---
+
+## [2026-07-01] fix | Radar reconcile wiped visible containers — "picked up 2 of 7"
+
+Live run 2026-07-01 20:20 (user watching): the bot teleported onto orange-3 amid ~7 visible equipment containers, killed it, picked up exactly 2, and hopped away. Same pattern at the next viewport (3 visible, picked 2). The user called it out in real time.
+
+**Diagnosis (events.jsonl entity_alignment samples):**
+
+- tick 5 (20:20:10, right after the landing 0x5A): registry holds 7 viewport-sourced containers in the new viewport, including a 1000+ volume fuel container.
+- tick 6 (20:20:12, right after the scan-on-landing extra radar): all 7 are gone; only the 2 radar-listed containers remain.
+
+**Root cause:** `reconcile_radar_viewport_resources` treated the radar response as the complete authoritative set for the scan envelope and deleted every registry entry the response didn't list. But **the radar response carries only the newly revealed HIDDEN entities** — already-visible containers/mines are on screen and are not re-sent. Every scan therefore erased the bot's knowledge of the visible layer. The offline capture decode confirms the wire sent a 19-entity ViewportUpdate at the landing and a 2-container radar response 2s later.
+
+**Fix:** the reconcile is scoped to `source == "radar"` entries (containers AND mines). Visible-layer entries are owned by the 0x5A viewport patches / 0x43 cache updates (which clear tiles on pickup) and are never removed by a radar response. Sweep logic extracted into `_without_stale_radar_entries` (shared for both registries).
+
+**Tests:** `test_world_state_radar_cache.py` — two new cases (`test_reconcile_spares_visible_containers`, `test_reconcile_spares_visible_mines_and_removes_radar_mines`); the existing radar-sourced staleness test passes unchanged. Replay pipeline pins re-anchored: mixed-activity capture 15→46 containers / 15→21 mines, fuel-probe capture 45→60 containers / 41→66 mines — the recovered entries are exactly the visible-layer ones the replayed scans used to wipe. `test_world_state_functions.py` mine-reconciliation tests re-seeded with `source="radar"` (they had encoded the old whole-envelope semantics via `make_mine_state`'s `"viewport"` default). The container equivalents needed no change because `make_container_state` defaults to `source="radar"`.
+
+**Test-infra hardening (found via a worker-order-dependent gate failure):** `tests/action_lab/conftest.py::restore_action_hooks` now also restores `action_hooks.wait_for_world_sync` / `wait_for_radar_sync` — several action_lab tests set them without restore, and under xdist the leaked fakes survive into whatever module the same worker runs next.
+
+**Pages updated:** [[radar-mechanics]] gains "The radar response lists ONLY newly revealed hidden entities" with the state-tracking implication.
+
+**Session note:** the same 29-tick run (ended early by browser close) was the first under the terrain-scored hop: 1 kill, 8/11 hits, no fuel spiral, kit full at end. With the reconcile fix the bot should now also hoover the loot it was forgetting.
+
+---
+
+## [2026-07-02] rework | Affordability-gated acquisition, stale-lock release, self-directed session exits
+
+User contract, verbatim intent: "i dont want it picking bad targets in the first place. if it has no targets then it can exit with the reason. same for low fuel or out of fuel exit." Diagnosed from run 2026-07-01 20:45-20:48 (user watching): the bot teleported 90 tiles (505 fuel) to the nearest map enemy, hit the fuel-low interrupt 8 hits into an unfinishable kill, and later resumed the stale lock from 92 tiles away — firing 11 server-rejected shots in a loop until the browser was closed.
+
+**Root cause chain (all four links needed):** (1) acquisition picked the nearest enemy with no notion of whether the fight was affordable end-to-end; (2) `engagement_fuel_budget=200` predated the wire-measured shot cost (~45 fuel + ~10/tick) and practice-bot durability (~8-10 hits per kill from the recorded human sessions); (3) the "restock-then-finish-the-kill" lock preservation had no scope — it survived a cross-map COLLECT excursion; (4) the ACQUIRE-path pursuit fired at the lock's tracked position without checking the server's in-viewport aim rule.
+
+**Code:**
+
+- `bot/session_exit.py` (new) — `SessionExitError(reason, detail)` with `SessionExitReason = Literal["no_viable_targets", "out_of_fuel"]`. `run_tick_loop` catches it and routes through the normal scorecard/summary/index shutdown with `exit_reason` set accordingly.
+- `bot/ai/threats.py::find_acquisition_target` — new keyword `engagement_reserve_fuel`; a candidate is viable only when `teleport_cost + reserve <= fuel`. Rejection reason `unaffordable` in the `acquisition_candidates` diagnostic. Gate logic extracted to `_acquisition_rejection_reason`.
+- `bot/ai/hunt_mode.py::_decide_hunt_acquire` — the off-viewport held-lock pursuit branch is DELETED from ACQUIRE: a lock whose target is off-viewport on resume is released (`clear_combat_target`) and acquisition runs fresh — teleporting back if the enemy is affordable (the recorded human resume behavior), else moving on. Mid-fight pursuit in ENGAGE / SCAN_ON_LANDING / REFRESH is unchanged (seconds-scale, target just left mid-exchange). New `_decide_hunt_acquire_fresh` raises `no_viable_targets` when the map snapshot is fresh (within `map_open_cooldown_ms`) and nothing passes the gates; a stale snapshot still dispatches `map_open`.
+- `bot/ai/collect_mode.py` — the marooned `ValueError` crash becomes `SessionExitError("out_of_fuel", ...)`.
+- `bot/ai/types.py` — `engagement_fuel_budget` default 200 → 450 (wire-calibrated kill cost). With the 1100 cap and 200 fuel-low reserve this caps engagement range at ~58 tiles — the recorded human maximum was 60.
+
+**Tests:** new coverage for the unaffordable rejection, the Manhattan-vs-euclid affordability edge (diagonal enemy farther by Manhattan but cheaper to reach wins), stale-lock release both ways (affordable → teleport back with lock re-formed; unaffordable → lock cleared + map_open), the fresh-map exit, and the tick-loop `SessionExitError` → index-row path. Re-anchored: mode-controller floor tests (650 boundary), `test_fallback_opens_map_even_when_recently_opened` → `test_fallback_exits_when_fresh_map_shows_no_viable_target`, mode-lock migration asserts released lock, scenario harness smoke places an enemy, replay marooning fixtures expect `SessionExitError`.
+
+**Pages updated:** [[bot-behavior-contract]] §1.2 (self-directed exits) and §3.2 (affordability gate, stale-lock release, no-viable-targets exit); [[fuel-system]] marooning section + cascade step 5 wording.
+
+**Deliberately NOT done (user rejected patch-stacking):** no shot-rejection counters, no pursuit time-bounds — the stand-off firing path that needed them no longer exists at the ACQUIRE level. If mid-fight pursuit ever produces rejected shots, that will surface as a distinct signature and get its own root-cause pass.
+
+---
+
+## [2026-07-02] rework | Hit/miss = per-shot ammo consumption; stationary-miss block enforced
+
+User contract, verbatim: "check the inventory delta for each shot. that is how we measure hits vs misses." Diagnosed from run 2026-07-02 01:20 (user watching): the mid-fight pursuit path looped 25+ `weapon=0` shots at orange-1's stale tile after the target teleported out, while earlier in the SAME run five pursuit homings (`weapon=3`, `victim_id=-1`) killed orange-3 — with the bot logging all five winning shots as misses.
+
+**Root cause — a circular oracle.** `mark_combat_hit` keyed the hit on tile-occupancy (`victim_id > 0`) and derived the local ammo decrement FROM that guess. The `check_and_clear_ammo_delta_hit` cross-check (added 2026-06-24 precisely for off-viewport pursuit) compared the pre-shot snapshot against `ws.inventory_state` — which is only ever decremented by the victim-id path. The ammo-delta signal was reading its own reflection: on every off-viewport hit (victim lookup can't see the tile), no decrement happened, so no delta, so "miss". Meanwhile the wire truth was in the `weapon` field all along: the server records the per-shot ammo spend there (it only spends on landing shots), and the page client's inventory display — the thing the user was reading — decrements from exactly that field. There is no per-shot 0x49 inventory frame; absolute syncs arrive later and reconcile (the `+5/-5` homing pair after the orange-3 kill).
+
+**Code:**
+
+- `sniffer/world_state_combat.py::mark_combat_hit` — hit and ammo decrement now key on `weapon_byte > 0` (consumption); `victim_id` demoted to kill-attribution metadata. `check_and_clear_ammo_delta_hit` retained as reconciliation against absolute 0x49 syncs.
+- `bot/ai/combat_strategy.py::_combat_shoot` — miss against a STATIONARY registry position now calls `block_combat_target_and_replan` (block TTL + lock release + next viable threat). This rule was already written in [[bot-behavior-contract]] §3.3 but the code only re-aimed — the direct enabler of the weapon=0 loop. Miss against a MOVED target still re-aims and keeps the lock. Safe to enforce now because consumption-classification means pursuit homings that land never reach the miss path (the earlier false-miss classification is what made blocking dangerous).
+- `bot/tick_loop.py::_get_combat_feedback` — docstring rewritten from the tile-occupancy narrative to the consumption ledger.
+
+**Validation against the capture:** orange-3's fight replays as 8 dual hits + 5 pursuit-homing hits + kill (previously 8 hits + 5 false misses + kill); orange-1's terminal phase becomes ONE weapon=0 miss → stationary → block → release → re-acquire, instead of an unbounded 2s loop.
+
+**Tests:** `test_hunt_feedback.py` — stationary-miss tests flipped to expect block+release (far and adjacent variants), new moved-miss re-aim test; `test_world_state_dispatch_container.py` / `test_tier2_lifecycle_signals.py` shot events corrected to wire-consistent weapon bytes (the old tests encoded wire-impossible combinations: weapon=3 at an empty tile, weapon=0 with a victim).
+
+**Pages updated:** [[weapon-selection]] gains "The weapon byte is the per-shot ammo ledger — and therefore the hit oracle" with the wire proof; [[bot-behavior-contract]] §3.3 rewritten (consumption oracle row, stationary-miss block row now enforced with test citations).

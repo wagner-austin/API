@@ -30,6 +30,12 @@ Radar does **NOT** reveal enemies. Enemy tanks are always visible to the bot whe
 
 This deletes a class of bot mistakes: HUNT mode must use map-open or viewport-edge walking to find enemies, never radar.
 
+## The radar response lists ONLY newly revealed hidden entities
+
+The wire response to a radar scan carries just the hidden containers/mines the scan uncovered -- **already-visible entities are not re-sent** (the client is already rendering them from the 0x5A viewport patch / 0x43 cache layer).[^12] Live run 2026-07-01 20:20:10: the teleport landing's 0x5A registered 7 visible containers; the scan-on-landing extra radar's response listed only the 2 hidden ones.
+
+Implication for state tracking: the radar response must never be treated as the complete container set for the viewport. The bot's radar reconcile (`reconcile_radar_viewport_resources`) is scoped to radar-sourced registry entries only; visible-layer entries are owned by 0x5A/0x43. Before the 2026-07-01 fix the whole-envelope reconcile deleted every visible container on each scan -- the bot would land amid 7 containers, radar, and instantly forget 5 of them (the "picked up only 2 of 7" bug the user observed live).
+
 ## Walking does NOT reveal containers
 
 **Walking is not a reveal action.** Stepping onto a tile that holds a hidden fuel or equipment container does NOT make the container appear -- the bot does not learn about a container by walking on it.[^10] Only radar reveals. This matters because the natural intuition ("explore the viewport on foot to discover what's there") is wrong: a tank can spend its entire fuel budget walking every viewport tile and never see a single container that wasn't already radar-revealed.

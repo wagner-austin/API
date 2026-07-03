@@ -26,8 +26,7 @@ confidence: high
 |--------|-------------|
 | `make bot` | Run the HFSM bot indefinitely (no timeout) |
 | `make run` | 5-minute timed session + scorecard (`TANKPIT_BOT_SESSION_SECONDS=300`) |
-| `make play` | Human session capture via sniffer (you play, it records) |
-| `make sniff` | Passive WebSocket capture to disk |
+| `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
 
 ## Live probes (need browser + accounts.json, touches live server)
 
@@ -54,7 +53,7 @@ confidence: high
 
 ## Output
 
-Bot runs save to `runs/bot/`, sniffer to `runs/sniffer/`. `latest.events.jsonl` and `latest.capture_session.json` are symlinks to the most recent run.[^2]
+Bot runs save to `runs/bot/`, sniffer to `runs/sniff/`. `latest.events.jsonl` and `latest.capture_session.json` are symlinks to the most recent run.[^2]
 
 [^1]: Makefile line 1 — `SHELL := powershell.exe`; Make handles PowerShell internally
 [^2]: runtime_artifacts.py — creates run directories and latest symlinks

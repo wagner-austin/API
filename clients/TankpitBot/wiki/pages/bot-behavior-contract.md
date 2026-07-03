@@ -33,8 +33,9 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 |---|---|
 | MUST | When `TANKPIT_BOT_SESSION_SECONDS` elapses, flush `runs/bot/latest.events.jsonl`, write `latest.summary.txt`, append to `runs/bot/_index.tsv`. |
 | MUST | Exit cleanly (return code 0) even mid-action. |
+| MUST | **Self-directed exits (2026-07-02):** decision owners end the session by raising `SessionExitError(reason, detail)`; `run_tick_loop` converts it to the same graceful shutdown as a tick-budget exit with `exit_reason` set to the request's reason. Current reasons: `no_viable_targets` (HUNT: fresh map, nothing affordable/engageable) and `out_of_fuel` (COLLECT: no lock, no pickup, no forage, no affordable hop — previously an uncaught `ValueError` crash). |
 | MUST NOT | Leave `latest.*` symlinks pointing at a prior run's data. |
-| Verified by | `tests/integration/test_session_shutdown.py` (TBD); `runs/bot/_index.tsv` row appended (Tier 3.3, handed off). |
+| Verified by | `tests/integration/test_session_shutdown.py` (TBD); `runs/bot/_index.tsv` row appended (Tier 3.3, handed off); `SessionExitError` handling in `tests/bot/test_tick_loop_coverage.py`. |
 
 ### 1.3 Session-end (interrupted: SIGINT / SIGTERM / crash)
 
@@ -96,24 +97,28 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 |---|---|
 | MUST | Use `analyze_threats` to score candidate enemies. Sort by distance, then finish-priority, then freshness. |
 | MUST | Filter out: self, allies, unsynced `(0,0)`, `liveness != "alive"` (catches both direct 0x41 deactivations and corpse-direction wire arrivals via `apply_tank_observation`), stale `timestamp_ms` older than `WIRE_PRESENCE_TTL_MS`. |
-| MUST | Open the map (`map_open` command) when no candidate is found and `map_open_cooldown_ms` has elapsed. |
+| MUST | **Affordability gate (2026-07-02):** a map-known candidate is viable only when `fuel >= teleport_cost(candidate) + engagement_fuel_budget + fuel_low_threshold`. The bot never picks a fight it cannot pay for end-to-end. With the 1100 fuel cap and a ~450 kill budget this caps engagement range at ~58 tiles — matching the recorded human maximum of 60. Rejection reason `unaffordable` appears in the `acquisition_candidates` diagnostic. (Live counterexample: run 2026-07-01 20:45 spent 505 fuel reaching the nearest enemy and hit the fuel-low interrupt 8 shots in.) |
+| MUST | **Stale-lock release (2026-07-02):** a lock reaching ACQUIRE with its target off-viewport (i.e. resumed after a mode interrupt) is RELEASED, and acquisition runs fresh. Resuming a fight means teleporting back to the target if affordable — never firing from stand-off range (the server rejects shot aims outside the viewport). |
+| MUST | Open the map (`map_open` command) when no candidate is found and the last snapshot is stale (older than `map_open_cooldown_ms`). |
+| MUST | **Exit on no viable targets (2026-07-02):** when the map snapshot is FRESH (within `map_open_cooldown_ms`) and no enemy passes the gates, raise `SessionExitError("no_viable_targets", ...)` — the session ends cleanly with that `exit_reason` instead of looping on map refreshes. |
 | MUST | After `map_open`, wait for the authoritative completion signal `map_data_processed` (set by `_dispatch_map_data` via `ws.mark_map_data_processed()`). |
 | MUST NOT | Re-issue `map_open` while a prior `map_open` is in flight and within `action_stall_timeout_ms`. |
 | MUST NOT | Fire `make_radar_command()` to "search for enemies". Radar does not reveal enemies (see [[radar-mechanics]]); enemy discovery is map-open + viewport-edge walking only. |
-| Verified by | `smoke[2,3]` (map_open clears, HUNT acquires); `tests/integration/test_hunt_acquires_wire_confirmed_enemy.py` (Tier 1, handed off). |
+| Verified by | `tests/bot/ai/test_threats.py::TestFindAcquisitionTarget::test_rejects_unaffordable_enemy`, `test_picks_affordable_enemy_over_nearer_unaffordable`; `tests/bot/ai/test_hunt_mode.py::test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable`, `test_hunt_acquire_releases_stale_lock_when_target_unaffordable`, `test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets`; `tests/bot/ai/test_enemy_search.py::test_fallback_exits_when_fresh_map_shows_no_viable_target`. |
 
 ### 3.3 Combat shoot gates (`_combat_shoot`)
 
 | Aspect | Contract |
 |---|---|
+| MUST | **Hit/miss = per-shot ammo consumption (2026-07-02).** The ShootEvent `weapon` field is the server's per-shot ammo ledger: `weapon > 0` = one dual/missile/homing debited = HIT (even with `victim_id=-1` on off-viewport pursuit impacts); `weapon = 0` = free single at empty ground = MISS. `victim_id` is kill-attribution metadata only, never the hit discriminator. (Wire proof: run 2026-07-02 01:21, five `weapon=3` `victim_id=-1` pursuit homings killed orange-3 while the old classifier logged five misses.) |
 | MUST | Gate 1: `is_wire_present(target["last_wire_seen_ms"], now)` — guard against firing at wire-stale ghosts. |
 | MUST | Gate 2: `is_position_fresh(target["last_position_update_ms"], now)` — guard against firing at a stale position. |
 | MUST | On gate failure, call `block_combat_target_and_replan` (does NOT fire, picks a different target after cooldown). |
-| MUST | On miss against a moved target, re-aim at the new position. |
-| MUST | On miss against a stationary target, mark the target as blocked. |
+| MUST | On miss against a moved target, re-aim at the new position and keep the lock. |
+| MUST | On miss against a stationary target, `block_combat_target_and_replan` — a consumption-miss at an unmoved registry position proves the tank is not there; repeating the shot cannot change the answer (run 2026-07-02 01:23: 25+ `weapon=0` shots looped at orange-1's stale tile before this was enforced — the rule existed in this contract but the code only re-aimed). |
 | MUST NOT | Fire if either gate fails. |
 | RESOLVED | Stationary practice-room bots pass these gates correctly under the 2-state liveness model. The earlier "ghost cache" concern (#75/#77/#80) was a false reading of the corpus — verified 2026-06-20 that tanks disappear from MapData immediately on kill; no server-side cache of dead tanks at kill tiles exists. |
-| Verified by | `tests/integration/test_combat_fires_when_gates_pass.py` (Tier 1, handed off); `tests/integration/test_combat_blocks_on_wire_stale_target.py` (Tier 1, handed off). |
+| Verified by | `tests/bot/ai/test_hunt_feedback.py::test_miss_on_stationary_far_target_blocks_and_replans`, `test_miss_on_adjacent_stationary_target_blocks`, `test_miss_on_moved_target_reaims_and_keeps_lock`; `tests/sniffer/test_world_state_dispatch_container.py::TestDispatchShootEvent`; `tests/integration/test_tier2_lifecycle_signals.py::TestCombatHitAdvancesDamageState`. |
 
 ### 3.4 COLLECT (unified fuel + equipment collection)
 
