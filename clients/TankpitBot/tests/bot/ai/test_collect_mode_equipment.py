@@ -8,39 +8,10 @@ from tankpit_bot.bot.ai.collect_mode import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
-
-# The tile-aware forager calls is_viewport_fully_covered on the
-# default 16x16 viewport centered on the tank. Covering every tile
-# in that viewport makes plan_forage_search return None so the test
-# can exercise the recovery fallback beneath it.
-_VIEWPORT_HALF_EXTENT = 8
-
-
-def _exhausted_viewport_tiles(self_x: int, self_y: int, now_ms: int) -> dict[str, int]:
-    """Return a ``local_scan_tiles`` dict covering the entire viewport.
-
-    When every tile in the current viewport carries a fresh scan mark
-    ``plan_forage_search`` returns ``None`` and the caller falls
-    through to the search-hop / edge-walk / map-intel recovery
-    fallback.
-
-    Args:
-        self_x: Tank X coordinate.
-        self_y: Tank Y coordinate.
-        now_ms: Timestamp to stamp each tile with.
-
-    Returns:
-        Coverage dict keyed by ``"x,y"`` covering every tile in the
-        16x16 viewport centered on the tank.
-    """
-    left = self_x - _VIEWPORT_HALF_EXTENT
-    top = self_y - _VIEWPORT_HALF_EXTENT
-    right = self_x + _VIEWPORT_HALF_EXTENT - 1
-    bottom = self_y + _VIEWPORT_HALF_EXTENT - 1
-    return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
 
 
 def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
@@ -49,9 +20,10 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     Regression guard for live run 20260610-000x: the owner used to raise
     here, killing the bot process mid-game. An unaffordable hop with no
     extra radar must degrade to the free built-in radar forage, never an
-    exception.
+    exception. The viewport has unscanned ground so the forager fires
+    the free radar instead of falling through to the unaffordable hop.
     """
-    world, self_state = make_world(fuel=800, scanned=True)
+    world, self_state = make_world(fuel=800, scanned=False)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -74,7 +46,7 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "forage_radar"
+    assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -84,9 +56,10 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     Every viewport tile is water, radar is exhausted, and at fuel=140
     neither the search hop nor any exploration teleport is affordable --
     the terminal action must be the free built-in radar forage so the
-    process keeps running.
+    process keeps running. Viewport not yet scanned so the forager
+    has work to do.
     """
-    world, self_state = make_world(fuel=140, scanned=True)
+    world, self_state = make_world(fuel=140, scanned=False)
     base_state = make_scanned_ai_state()
     ai_state = AIStateDict(
         **{
@@ -114,7 +87,7 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "forage_radar"
+    assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -145,7 +118,6 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
-            "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
         }
     )
     inventory = make_inventory(default_count=30)
@@ -154,7 +126,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
-    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
 
 
@@ -182,7 +154,6 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
-            "local_scan_tiles": _exhausted_viewport_tiles(100, 100, 100000),
         }
     )
     inventory = make_inventory(default_count=30)
@@ -196,7 +167,7 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
 
 

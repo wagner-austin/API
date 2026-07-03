@@ -8,8 +8,7 @@ from tankpit_bot.bot.ai.mode_controller import (
     should_enter_collect,
     should_exit_collect,
 )
-from tankpit_bot.bot.ai.scan_coverage import tile_key
-from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.state.scan_coverage import tile_key
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -47,7 +46,7 @@ def _ctx(
     fuel: int = 1200,
     self_x: int = 100,
     self_y: int = 100,
-    local_scan_tiles: dict[str, int] | None = None,
+    scanned_tiles: dict[str, int] | None = None,
     tanks: dict[str, TankStateDict] | None = None,
     terrain: InMemoryTerrainMap | None = None,
 ) -> DecideCtx:
@@ -60,7 +59,7 @@ def _ctx(
         fuel: Current fuel.
         self_x: Tank X coordinate.
         self_y: Tank Y coordinate.
-        local_scan_tiles: Seed tile-coverage map.
+        scanned_tiles: Seed world tile-coverage map.
         tanks: Visible tanks (enemies) keyed by id.
         terrain: Optional terrain map; when ``None`` no terrain rules apply.
 
@@ -70,17 +69,13 @@ def _ctx(
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel, scanned=False)
     if tanks is not None:
         world["tanks"].update(tanks)
+    if scanned_tiles is not None:
+        world["scanned_tiles"] = scanned_tiles
     inventory = make_inventory(default_count=30)
     inventory["dual_shots"]["count"] = dual
     inventory["homing_shots"]["count"] = homing
     inventory["extra_radars"]["count"] = radars
-    ai_state = AIStateDict(
-        **{
-            **make_scanned_ai_state(),
-            "local_scan_tiles": local_scan_tiles if local_scan_tiles is not None else {},
-        }
-    )
-    return DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+    return DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
 
 
 def _enemy(tank_id: int, x: int, y: int) -> dict[str, TankStateDict]:
@@ -158,7 +153,7 @@ class TestSelectForageTarget:
         for y in range(103, 107):
             for x in range(103, 107):
                 del coverage[f"{x},{y}"]
-        ctx = _ctx(radars=0, local_scan_tiles=coverage)
+        ctx = _ctx(radars=0, scanned_tiles=coverage)
 
         target = select_forage_target(ctx)
 
@@ -168,7 +163,7 @@ class TestSelectForageTarget:
 
     def test_returns_none_when_viewport_is_fully_covered(self) -> None:
         """Every viewport tile covered yields no walk target."""
-        ctx = _ctx(radars=0, local_scan_tiles=_full_viewport_coverage(100000))
+        ctx = _ctx(radars=0, scanned_tiles=_full_viewport_coverage(100000))
 
         assert select_forage_target(ctx) is None
 
@@ -193,29 +188,6 @@ class TestForageSearch:
         assert decision["command"]["cmd_type"] == "radar"
         assert decision["behavior"]["reason"] == "forage_radar"
         assert decision["behavior"]["mode"] == "COLLECT"
-        # Free 5x5 radar at (100,100) inside viewport (92..107)^2 reveals
-        # exactly 25 tiles (the interior 5x5 around the tank).
-        recorded = decision["updated_ai_state"]["local_scan_tiles"]
-        assert len(recorded) == 25
-        assert "100,100" in recorded
-
-    def test_extra_radar_records_every_viewport_tile(self) -> None:
-        """Extras > 0 reveals the entire viewport, all 256 tiles marked."""
-        ctx = _ctx(radars=5)
-
-        decision = plan_forage_search(
-            ctx,
-            ctx.ai_state,
-            score=925,
-            behavior_mode="COLLECT",
-            radar_affordable=True,
-        )
-
-        if decision is None:
-            raise AssertionError("expected a forage radar decision with extras")
-        assert decision["command"]["cmd_type"] == "radar"
-        recorded = decision["updated_ai_state"]["local_scan_tiles"]
-        assert len(recorded) == 16 * 16
 
     def test_dispatches_radar_with_fuel_mode_tag(self) -> None:
         """Behavior-mode label is stamped from the caller-supplied value."""
@@ -238,7 +210,7 @@ class TestForageSearch:
     def test_walks_to_unscanned_tile_when_radar_unaffordable(self) -> None:
         """Radar gated False but viewport not fully covered yields a walk."""
         coverage = {"100,100": 100000}
-        ctx = _ctx(radars=0, local_scan_tiles=coverage)
+        ctx = _ctx(radars=0, scanned_tiles=coverage)
 
         decision = plan_forage_search(
             ctx,
@@ -255,7 +227,7 @@ class TestForageSearch:
 
     def test_returns_none_when_viewport_fully_covered_with_no_radar(self) -> None:
         """No unscanned tiles AND radar unaffordable returns None for teleport-out."""
-        ctx = _ctx(radars=0, local_scan_tiles=_full_viewport_coverage(100000))
+        ctx = _ctx(radars=0, scanned_tiles=_full_viewport_coverage(100000))
 
         decision = plan_forage_search(
             ctx,
@@ -285,7 +257,7 @@ class TestForageSearch:
         ctx = _ctx(
             radars=0,
             fuel=10,
-            local_scan_tiles=coverage,
+            scanned_tiles=coverage,
             terrain=terrain,
         )
 

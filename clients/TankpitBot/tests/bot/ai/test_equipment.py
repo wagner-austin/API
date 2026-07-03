@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.equipment import is_area_scanned, is_tile_scanned
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_adjacent_container,
@@ -21,7 +20,6 @@ from tankpit_bot.state.types import (
     make_container_state,
     make_mine_state,
     make_self_state,
-    viewport_scan_key,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -36,14 +34,20 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
     Returns:
         Tuple of (empty WorldStateDict, SelfStateDict).
     """
+    vp_left = x - 9
+    vp_top = y - 9
     world = WorldStateDict(
         self_state=None,
         tanks={},
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=x - 9, top=y - 9, width=18, height=18),
-        scanned_viewports={viewport_scan_key(x - 9, y - 9): 100000},
+        viewport=ViewportStateDict(left=vp_left, top=vp_top, width=18, height=18),
+        scanned_tiles={
+            f"{tx},{ty}": 100000
+            for ty in range(vp_top, vp_top + 18)
+            for tx in range(vp_left, vp_left + 18)
+        },
         timestamp_ms=0,
     )
     state = make_self_state(
@@ -376,7 +380,7 @@ class TestFindNearestFuelExtras:
     def test_unscanned_viewport_does_not_change_raw_fuel_selection(self) -> None:
         """find_nearest_fuel stays a pure viewport selector without radar policy."""
         world, state = _world_and_self()
-        world["scanned_viewports"] = {}
+        world["scanned_tiles"] = {}
         expected = make_container_state(
             x=101,
             y=100,
@@ -682,7 +686,7 @@ class TestDescribeContainerSearch:
     def test_reports_actionable_visible_target_without_viewport_scan_flag(self) -> None:
         """Visible targets are diagnosed by reachability, not viewport-origin scan state."""
         world, state = _world_and_self()
-        world["scanned_viewports"] = {}
+        world["scanned_tiles"] = {}
         world["containers"]["101,100"] = make_container_state(
             x=101,
             y=100,
@@ -902,53 +906,6 @@ class TestFindBestFuel:
         )
         world["containers"]["105,100"] = fresh
         assert find_best_fuel(world, state, now_ms=100000) == fresh
-
-
-# =============================================================================
-# is_tile_scanned
-# =============================================================================
-
-
-class TestIsTileScanned:
-    """Tests for is_tile_scanned viewport coverage check."""
-
-    def test_is_tile_scanned_returns_true_for_fresh_scan_containing_tile(self) -> None:
-        """Returns True when the tile is inside a viewport scanned within TTL."""
-        world, _ = _world_and_self(x=100, y=100)
-        # Viewport at (91, 91) width=18 height=18, scanned at 100000.
-        # Tile (100, 100) is inside [91..109) x [91..109).
-        # now_ms=120000 => elapsed 20000 < 45000 TTL => fresh.
-        assert is_tile_scanned(world, 100, 100, now_ms=120000) is True
-
-    def test_is_tile_scanned_returns_false_for_stale_scan(self) -> None:
-        """Returns False when the scan is older than the 45 000 ms TTL."""
-        world, _ = _world_and_self(x=100, y=100)
-        # Scanned at 100000, now_ms=200000 => elapsed 100000 > 45000 TTL.
-        assert is_tile_scanned(world, 100, 100, now_ms=200000) is False
-
-    def test_is_tile_scanned_returns_false_for_tile_outside_viewport(self) -> None:
-        """Returns False when the tile lies outside every scanned viewport."""
-        world, _ = _world_and_self(x=100, y=100)
-        # Viewport covers [91..109) x [91..109). Tile (200, 200) is outside.
-        assert is_tile_scanned(world, 200, 200, now_ms=120000) is False
-
-    def test_is_tile_scanned_returns_false_for_empty_scanned_viewports(self) -> None:
-        """Returns False when no viewports have been scanned at all."""
-        world, _ = _world_and_self(x=100, y=100)
-        world["scanned_viewports"] = {}
-        assert is_tile_scanned(world, 100, 100, now_ms=120000) is False
-
-    def test_is_area_scanned_skips_expired_scan_entries(self) -> None:
-        """Stale entries past the coverage TTL do not count as scanned.
-
-        Guards the expired-entry continue branch in is_area_scanned --
-        previously only exercised through the deleted fuel-dot revival
-        test.
-        """
-        world, _ = _world_and_self(x=100, y=100)
-        world["scanned_viewports"] = {"100,100": 100000}
-        # Elapsed 46000 ms > 45000 ms TTL => entry expired.
-        assert is_area_scanned(world, 100, 100, now_ms=146000) is False
 
 
 def test_find_adjacent_container_skips_diagonal_with_blocked_cardinals() -> None:

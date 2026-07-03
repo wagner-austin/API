@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.movement import viewport_exploration_candidates
 from tankpit_bot.bot.ai.types import AIStateDict, make_default_ai_config
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -63,16 +66,16 @@ class TestDecideMapOpen:
 
         assert decision["behavior"]["reason"] != "find_enemies"
 
-    def test_fallback_opens_map_even_when_recently_opened(self) -> None:
-        """Enemy search dispatches map_open every tick that lacks a target.
+    def test_fallback_exits_when_fresh_map_shows_no_viable_target(self) -> None:
+        """A fresh map snapshot with nothing viable ends the session.
 
-        Pre-2026-06-22 HUNT walked to a viewport edge while the
-        ``map_open_cooldown_ms`` was active. That branch was removed
-        because (a) viewport shifting is OFF in this game configuration
-        so the walk reveals no new ground, and (b) the fallback
-        teleport variant burned fuel without aiming at a known enemy.
-        The in-flight-action machinery (not the cooldown) gates
-        duplicate dispatches while a previous map_open is pending.
+        Replaces the pre-2026-07-02 behavior of dispatching another
+        ``map_open`` every targetless tick: with the snapshot already
+        fresh, another refresh cannot change the answer, so looping on
+        it is exactly the churn the user rejected. The session exits
+        with ``no_viable_targets`` instead. A stale snapshot still
+        dispatches a refresh (see
+        ``test_hunt_search_dispatches_map_open_not_radar_during_acquire``).
         """
         world, self_state = make_world(fuel=800, scanned=False)
         ai_state = AIStateDict(
@@ -84,10 +87,8 @@ class TestDecideMapOpen:
         )
         inventory = make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
-
-        assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        with pytest.raises(SessionExitError, match="no_viable_targets"):
+            decide(world, self_state, ai_state, inventory, 100000, None)
 
 
 class TestDecideBlockedEdgeSearch:

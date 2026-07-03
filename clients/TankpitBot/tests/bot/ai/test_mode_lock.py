@@ -150,7 +150,13 @@ def test_invalid_mode_state_reselects_recover_equipment_when_reserves_are_broken
 
 
 def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> None:
-    """Invalid mode state with a combat lock is migrated into durable HUNT."""
+    """Invalid mode state with a combat lock is migrated into durable HUNT.
+
+    The stale lock's target is nowhere in the registry, so the HUNT
+    acquire path releases it and searches fresh (user contract
+    2026-07-02: an off-viewport lock on resume is released, never
+    pursued from stand-off range).
+    """
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(
         **{
@@ -169,7 +175,7 @@ def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> No
 
     assert decision["behavior"]["mode"] == "HUNT"
     assert decision["updated_ai_state"]["mode"] == "HUNT"
-    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
 def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
@@ -184,7 +190,7 @@ def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
     decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "forage_radar"
+    assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["updated_ai_state"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["mode_state"] == "SENSE"
     assert decision["updated_ai_state"]["mode_started_ms"] == 100000

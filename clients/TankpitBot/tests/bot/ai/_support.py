@@ -11,7 +11,6 @@ from tankpit_bot.state.types import (
     ViewportStateDict,
     WorldStateDict,
     make_container_state,
-    viewport_scan_key,
 )
 
 
@@ -28,10 +27,9 @@ def viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[
     """Return a coverage map marking every tile in the world's viewport.
 
     Useful for tests that need the forager to treat the current
-    viewport as fully scanned by the bot (e.g. when the test exercises
-    the search-hop / edge-walk / map-intel fallback path beneath the
-    forager). Mirrors what :func:`mark_scan_dispatched` writes when an
-    extra-radar reveal fills the viewport.
+    viewport as fully scanned (e.g. when the test exercises the
+    search-hop / edge-walk / map-intel fallback path beneath the
+    forager). Mirrors what an extra-radar reveal writes.
 
     Args:
         world: World state whose viewport bounds drive the coverage map.
@@ -46,25 +44,6 @@ def viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[
     right = left + viewport["width"] - 1
     bottom = top + viewport["height"] - 1
     return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
-
-
-def make_post_radar_ai_state(world: WorldStateDict, now_ms: int = 100000) -> AIStateDict:
-    """Create AI state that represents "the bot just radared this viewport".
-
-    The returned state has every viewport tile marked as covered, so
-    :func:`plan_forage_search` returns ``None`` and the caller falls
-    through to the search-hop / edge-walk / map-intel fallbacks.
-
-    Args:
-        world: World state whose viewport bounds drive the coverage map.
-        now_ms: Scan timestamp stamped onto every tile.
-
-    Returns:
-        AI state with ``local_scan_tiles`` filled for the current viewport.
-    """
-    return AIStateDict(
-        **{**make_scanned_ai_state(), "local_scan_tiles": viewport_covered_tiles(world, now_ms)}
-    )
 
 
 def make_world(
@@ -84,7 +63,7 @@ def make_world(
         fuel: Current fuel amount.
         containers: Optional visible containers.
         tanks: Optional visible tanks.
-        scanned: Whether the current viewport is marked as scanned.
+        scanned: Whether the current viewport is fully tile-covered.
 
     Returns:
         Tuple of world state and self state.
@@ -99,8 +78,14 @@ def make_world(
         leaderboard_position=5,
     )
     viewport = ViewportStateDict(left=self_x - 8, top=self_y - 8, width=16, height=16)
-    scanned_viewports = (
-        {viewport_scan_key(viewport["left"], viewport["top"]): 100000} if scanned else {}
+    left = viewport["left"]
+    top = viewport["top"]
+    right = left + viewport["width"] - 1
+    bottom = top + viewport["height"] - 1
+    scanned_tiles: dict[str, int] = (
+        {f"{x},{y}": 100000 for y in range(top, bottom + 1) for x in range(left, right + 1)}
+        if scanned
+        else {}
     )
     world = WorldStateDict(
         self_state=self_state,
@@ -109,7 +94,7 @@ def make_world(
         mines={},
         terrain={},
         viewport=viewport,
-        scanned_viewports=scanned_viewports,
+        scanned_tiles=scanned_tiles,
         timestamp_ms=0,
     )
     return world, self_state

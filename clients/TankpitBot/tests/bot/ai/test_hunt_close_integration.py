@@ -568,7 +568,7 @@ class TestDecideTeleportToFarTarget:
                 timestamp_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=50, tanks=tanks)
+        world, self_state = make_world(fuel=50, tanks=tanks, scanned=False)
         ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_map_open_ms": 99500})
         inventory = make_inventory()
 

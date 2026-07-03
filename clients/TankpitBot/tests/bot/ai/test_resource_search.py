@@ -13,6 +13,22 @@ from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_wo
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
+def _fully_cover_viewport_origins(
+    origins: list[tuple[int, int]],
+    *,
+    timestamp_ms: int = 100000,
+    width: int = 16,
+    height: int = 16,
+) -> dict[str, int]:
+    """Return a tile-coverage dict that fully covers every supplied 16x16 viewport."""
+    covered: dict[str, int] = {}
+    for left, top in origins:
+        for y in range(top, top + height):
+            for x in range(left, left + width):
+                covered[f"{x},{y}"] = timestamp_ms
+    return covered
+
+
 def _ctx(
     *,
     self_x: int = 100,
@@ -20,12 +36,12 @@ def _ctx(
     fuel: int = 800,
     terrain: InMemoryTerrainMap | None = None,
     ai_state: AIStateDict | None = None,
-    scanned_extra: dict[str, int] | None = None,
+    scanned_viewport_origins: list[tuple[int, int]] | None = None,
 ) -> DecideCtx:
     """Build a DecideCtx with a clean default world and optional overrides."""
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel)
-    if scanned_extra:
-        world["scanned_viewports"].update(scanned_extra)
+    if scanned_viewport_origins:
+        world["scanned_tiles"].update(_fully_cover_viewport_origins(scanned_viewport_origins))
     return DecideCtx(
         world,
         self_state,
@@ -56,7 +72,7 @@ class TestMakeResourceSearchHop:
     def test_skips_scanned_destination_takes_next_cardinal(self) -> None:
         """When east lands in a scanned viewport, west (second cardinal) wins."""
         decision = make_resource_search_hop(
-            _ctx(scanned_extra={"108,92": 100000}),
+            _ctx(scanned_viewport_origins=[(108, 92)]),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
@@ -124,14 +140,9 @@ class TestMakeResourceSearchHop:
 
     def test_falls_through_to_diagonal_when_all_cardinals_blocked(self) -> None:
         """All four cardinals scanned -> a diagonal is taken instead."""
-        cardinal_viewport_origins = {
-            "108,92": 100000,
-            "76,92": 100000,
-            "92,108": 100000,
-            "92,76": 100000,
-        }
+        cardinal_viewport_origins = [(108, 92), (76, 92), (92, 108), (92, 76)]
         decision = make_resource_search_hop(
-            _ctx(scanned_extra=cardinal_viewport_origins),
+            _ctx(scanned_viewport_origins=cardinal_viewport_origins),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
@@ -162,24 +173,23 @@ class TestMakeResourceSearchHop:
         # Cardinal hops change exactly one axis by 16; diagonals change both.
         assert (abs(target_x - 100) == 16) != (abs(target_y - 100) == 16)
 
-    def test_returns_none_when_all_eight_directions_blocked(self) -> None:
-        """Every cardinal and diagonal scanned -> None, caller raises."""
-        blocked = {
-            f"{x - 8},{y - 8}": 100000
-            for dx, dy in (
-                (1, 0),
-                (-1, 0),
-                (0, 1),
-                (0, -1),
-                (1, 1),
-                (1, -1),
-                (-1, 1),
-                (-1, -1),
-            )
-            for x, y in [(100 + dx * 16, 100 + dy * 16)]
-        }
+    def test_returns_none_when_both_rings_blocked(self) -> None:
+        """Every candidate in both rings scanned -> None, caller raises."""
+        directions = (
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        )
+        blocked = [
+            (100 + dx * step - 8, 100 + dy * step - 8) for step in (16, 32) for dx, dy in directions
+        ]
         decision = make_resource_search_hop(
-            _ctx(scanned_extra=blocked),
+            _ctx(scanned_viewport_origins=blocked),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
@@ -187,16 +197,95 @@ class TestMakeResourceSearchHop:
 
         assert decision is None
 
+    def test_reaches_second_ring_when_first_ring_scanned(self) -> None:
+        """All eight one-width candidates scanned -> a two-width hop is taken."""
+        directions = (
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        )
+        ring_one = [(100 + dx * 16 - 8, 100 + dy * 16 - 8) for dx, dy in directions]
+        decision = make_resource_search_hop(
+            _ctx(fuel=2000, scanned_viewport_origins=ring_one),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a second-ring hop when ring one is scanned")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 132
+        assert command["target_y"] == 100
+
+    def test_prefers_most_walkable_viewport(self) -> None:
+        """A mostly-water nearer viewport loses to an all-ground one.
+
+        The east landing viewport is water except the landing tile
+        itself (so east still qualifies via the landing-passability
+        gate), while every other viewport is clean ground. The picker
+        must skip past the qualifying-but-dirty east candidate and take
+        the clean west one -- the recorded human policy of restocking
+        in mostly-"." viewports.
+        """
+        east_viewport_water = {
+            (x, y): InMemoryTerrainMap.WATER
+            for y in range(92, 108)
+            for x in range(108, 124)
+            if (x, y) != (116, 100)
+        }
+        terrain = InMemoryTerrainMap(terrain_data=east_viewport_water)
+        decision = make_resource_search_hop(
+            _ctx(terrain=terrain),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a hop away from the water-heavy viewport")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 84
+        assert command["target_y"] == 100
+
+    def test_offmap_clipping_penalizes_edge_viewport(self) -> None:
+        """A viewport clipped by the field border scores below a full one.
+
+        At (100, 238) with east and west scanned, the south candidate's
+        viewport hangs 6 rows past the border (score 0.625 on all-ground
+        terrain) while north is fully in-map (score 1.0). North must win
+        even though south is evaluated first.
+        """
+        decision = make_resource_search_hop(
+            _ctx(
+                self_y=238,
+                terrain=InMemoryTerrainMap(),
+                scanned_viewport_origins=[(108, 230), (76, 230)],
+            ),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the fully in-map north hop")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 100
+        assert command["target_y"] == 222
+
     def test_returns_none_when_diagonal_unaffordable_and_cardinals_blocked(self) -> None:
         """Cardinals scanned + fuel < diagonal cost (135) -> None."""
-        cardinal_viewport_origins = {
-            "108,92": 100000,
-            "76,92": 100000,
-            "92,108": 100000,
-            "92,76": 100000,
-        }
+        cardinal_viewport_origins = [(108, 92), (76, 92), (92, 108), (92, 76)]
         decision = make_resource_search_hop(
-            _ctx(fuel=120, scanned_extra=cardinal_viewport_origins),
+            _ctx(fuel=120, scanned_viewport_origins=cardinal_viewport_origins),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",

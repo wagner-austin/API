@@ -18,7 +18,6 @@ from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
-    viewport_covered_tiles,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -103,7 +102,6 @@ class TestRecoverEquipmentPriority:
                 "combat_target_id": 50,
                 "combat_target_x": 103,
                 "combat_target_y": 103,
-                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False)
@@ -123,7 +121,6 @@ class TestRecoverEquipmentPriority:
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
-                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
 
@@ -337,7 +334,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
@@ -348,7 +345,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_critical_equipment_search_relocates_when_viewport_fully_swept(self) -> None:
@@ -364,7 +361,6 @@ class TestRecoverEquipmentSearch:
                 **make_scanned_ai_state(),
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
-                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
@@ -389,7 +385,6 @@ class TestRecoverEquipmentSearch:
                 **make_scanned_ai_state(),
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 94000,
-                "local_scan_tiles": viewport_covered_tiles(world),
             }
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
@@ -398,13 +393,16 @@ class TestRecoverEquipmentSearch:
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
-    def test_equipment_search_edge_walks_when_teleport_unaffordable(self) -> None:
-        """Unaffordable critical equipment search degrades to an edge walk.
+    def test_equipment_search_falls_back_to_forage_radar(self) -> None:
+        """Critical equipment search forages free radar before considering teleport hops.
 
         Regression guard for live run 20260610-000x: this path used to
-        raise and kill the bot process mid-game.
+        raise and kill the bot process mid-game. The unified COLLECT
+        cascade tries ``plan_forage_search`` BEFORE the teleport hop,
+        so an unscanned viewport with affordable radar always produces
+        a free-radar decision instead of raising.
         """
-        world, self_state = make_world(fuel=550)
+        world, self_state = make_world(fuel=550, scanned=False)
         config = AIConfigDict(
             **{
                 **make_default_ai_config(),
@@ -424,7 +422,7 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
@@ -479,16 +477,24 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
-    def test_low_fuel_cache_only_target_in_unscanned_viewport_collects(self) -> None:
-        """Visible critical fuel still collects directly in an unscanned viewport."""
+    def test_low_fuel_unscanned_viewport_scans_before_collecting(self) -> None:
+        """An unscanned viewport scans first even when a visible fuel target exists.
+
+        Mirrors HUNT's scan_on_landing: the COLLECT cascade fires one
+        radar on a fresh-landing viewport so the planner has the full
+        picture (0x5A entries plus radar reveals) before committing to
+        a pickup. Without this gate the bot would commit to the first
+        0x5A-visible container and miss any extra containers radar
+        would have surfaced.
+        """
         containers: dict[str, ContainerStateDict] = {
             "104,100": make_container(104, 100, 700, True),
         }
         world, self_state = make_world(fuel=150, containers=containers)
-        world["scanned_viewports"] = {}
+        world["scanned_tiles"] = {}
 
         decision = decide(
             world,
@@ -500,7 +506,8 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["command"]["cmd_type"] == "pickup_fuel"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
         """A newly entered unconfirmed viewport radars immediately."""
@@ -509,7 +516,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_fully_covered_viewport_walks_instead_of_repeating_radar(self) -> None:
@@ -520,20 +527,20 @@ class TestRecoverEquipmentSearch:
         which then teleports to a fresh sector. This is the
         regression guard that replaces the old server-side
         ``mark_scan_viewport_failed`` gate -- the new gate is the
-        bot-owned ``local_scan_tiles`` map written by
-        :func:`mark_scan_dispatched`.
+        per-tile ``world.scanned_tiles`` map populated by the
+        wire-side radar handler.
         """
         world, self_state = make_world(fuel=150, scanned=False)
         viewport_left = world["viewport"]["left"]
         viewport_top = world["viewport"]["top"]
         viewport_right = viewport_left + world["viewport"]["width"] - 1
         viewport_bottom = viewport_top + world["viewport"]["height"] - 1
-        covered = {
+        world["scanned_tiles"] = {
             f"{x},{y}": 100000
             for y in range(viewport_top, viewport_bottom + 1)
             for x in range(viewport_left, viewport_right + 1)
         }
-        ai_state = AIStateDict(**{**make_scanned_ai_state(), "local_scan_tiles": covered})
+        ai_state = make_scanned_ai_state()
 
         decision = decide(
             world,

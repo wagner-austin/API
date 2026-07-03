@@ -861,7 +861,7 @@ class TestFindCombatPickup:
             mines=world["mines"],
             terrain=world["terrain"],
             viewport=world["viewport"],
-            scanned_viewports=world["scanned_viewports"],
+            scanned_tiles=world["scanned_tiles"],
             timestamp_ms=world["timestamp_ms"],
         )
         ctx = DecideCtx(

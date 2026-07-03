@@ -10,10 +10,10 @@ from tankpit_bot.bot.ai.collect_mode import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import (
     make_inventory,
-    make_post_radar_ai_state,
     make_scanned_ai_state,
     make_world,
 )
@@ -261,7 +261,7 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
     decision = decide_collect_mode(ctx)
 
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "forage_radar"
+    assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -282,7 +282,7 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
 
     decision = decide_collect_mode(ctx)
 
-    assert decision["behavior"]["reason"] == "forage_radar"
+    assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -299,7 +299,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     world, self_state = make_world(fuel=30, scanned=True)
     ai_state = AIStateDict(
         **{
-            **make_post_radar_ai_state(world),
+            **make_scanned_ai_state(),
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
@@ -314,7 +314,7 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
     terrain = InMemoryTerrainMap(terrain_data=terrain_data)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         decide_collect_mode(ctx)
 
 
@@ -424,18 +424,21 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
     assert decision["behavior"]["reason"] == "fuel=57"
 
 
-def test_collect_mode_walks_to_unscanned_tile_when_radar_too_costly() -> None:
-    """Fuel recovery walks within the viewport when the radar fuel cost is unaffordable.
+def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> None:
+    """Fuel recovery walks instead of radaring when the next free radar would reveal nothing.
 
-    With fuel below the radar + operating-reserve floor the forager
-    cannot fire a radar, but it CAN walk -- moves are free, so the
-    bot walks toward the nearest unscanned tile so the next tick's
-    free radar (or a paid radar once refueled) reveals new ground.
-    The OLD edge-walk fallback fired only because the legacy gate
-    skipped the forager entirely; the tile-aware forager prefers
-    in-viewport sweeping over a directionless edge step.
+    Radar is always affordable (the wire never denies the action), but
+    a free radar only marks the 5x5 around the tank. When extras are
+    exhausted AND those 25 tiles are already covered, firing again
+    would mark zero new tiles -- the tank has to walk first so a
+    later free radar reaches new ground. Without this gate the bot
+    loops radaring from the same spot forever (post-unconditional-
+    radar regression caught in design 2026-06-26).
     """
     world, self_state = make_world(fuel=5, scanned=False)
+    # Pre-mark the 5x5 around the tank (self at default (100,100)) so
+    # the next free radar would reveal nothing more.
+    world["scanned_tiles"] = {f"{x},{y}": 100000 for y in range(98, 103) for x in range(98, 103)}
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -445,6 +448,7 @@ def test_collect_mode_walks_to_unscanned_tile_when_radar_too_costly() -> None:
         }
     )
     inventory = make_inventory()
+    inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
     decision = decide_collect_mode(ctx)

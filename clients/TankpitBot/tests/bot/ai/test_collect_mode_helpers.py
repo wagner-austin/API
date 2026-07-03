@@ -141,7 +141,7 @@ class TestRecoveryHelpers:
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=800, containers=containers)
         world["mines"] = {
-            "103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1),
+            "103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=0),
         }
         ctx = DecideCtx(
             world,
@@ -237,7 +237,7 @@ class TestRecoveryHelpers:
     def test_walk_or_teleport_picks_up_mined_tile_with_terrain(self) -> None:
         """Terrain routing still produces a legal command for mined pickup tiles."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
             world,
             self_state,
@@ -257,7 +257,7 @@ class TestRecoveryHelpers:
     def test_walk_or_teleport_picks_up_mined_tile_without_terrain(self) -> None:
         """Occupancy-only routing still allows pickup on mined tiles."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
             world,
             self_state,
@@ -615,7 +615,7 @@ class TestRecoveryHelpers:
     def test_walk_or_teleport_rejects_mined_move_without_terrain(self) -> None:
         """Mine occupancy blocks direct moves without terrain."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ctx = DecideCtx(
             world,
             self_state,

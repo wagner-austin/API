@@ -161,10 +161,18 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
 
 
 def test_should_enter_collect_uses_low_threshold() -> None:
-    """Fuel recovery entry uses the configured low threshold."""
+    """Fuel recovery entry uses the low threshold plus the engagement floor.
+
+    With no active combat lock, entry fires below
+    ``fuel_low_threshold + engagement_fuel_budget`` (200 + 450 = 650)
+    so the bot restocks before a fight it could not finish (user
+    contract 2026-07-02).
+    """
     assert should_enter_collect(_make_ctx(fuel=150)) is True
     assert should_enter_collect(_make_ctx(fuel=200)) is True
-    assert should_enter_collect(_make_ctx(fuel=500)) is False
+    assert should_enter_collect(_make_ctx(fuel=649)) is True
+    assert should_enter_collect(_make_ctx(fuel=650)) is False
+    assert should_enter_collect(_make_ctx(fuel=700)) is False
 
 
 def test_should_exit_collect_uses_full_threshold() -> None:
@@ -226,13 +234,13 @@ def test_exit_recover_equipment_requires_radar_resume() -> None:
 
 def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:
     """HUNT owns the tick only when no recovery mode has stronger entry rules."""
-    assert should_enter_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is True
+    assert should_enter_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is True
     assert should_enter_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is False
 
 
 def test_should_exit_hunt_when_recovery_takes_priority() -> None:
     """HUNT exits when recovery conditions become active."""
-    assert should_exit_hunt(_make_ctx(fuel=500, dual_count=30, radar_count=30)) is False
+    assert should_exit_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is False
     assert should_exit_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is True
 
 
@@ -278,6 +286,23 @@ def test_derive_hunt_mode_state_keeps_non_combat_teleport_in_acquire() -> None:
     decision = make_tick_decision(
         command=make_teleport_command(110, 100),
         behavior=make_behavior_score("HUNT", 0, 110, 100, "hunt_search_teleport"),
+        updated_ai_state=make_initial_ai_state(),
+        desired_equipment=[],
+    )
+
+    assert derive_hunt_mode_state(decision) == "ACQUIRE"
+
+
+def test_derive_hunt_mode_state_maps_unlocked_map_open_to_acquire() -> None:
+    """A map_open without a locked target and a non-search reason derives ACQUIRE.
+
+    Defensive: production map_opens during HUNT carry either the
+    ``find_enemies`` reason (acquire search) or a locked target
+    (REFRESH). A map_open with neither must still land in ACQUIRE.
+    """
+    decision = make_tick_decision(
+        command=make_map_open_command(),
+        behavior=make_behavior_score("HUNT", 800, 0, 0, "map_refresh"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )

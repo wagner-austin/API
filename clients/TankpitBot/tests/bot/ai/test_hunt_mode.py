@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
-    viewport_covered_tiles,
 )
 
 
@@ -127,7 +129,7 @@ def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
             "mode": "HUNT",
             "mode_state": "ACQUIRE",
             "mode_started_ms": 90000,
-            "last_map_open_ms": 99500,
+            "last_map_open_ms": 90000,
         }
     )
     inventory = make_inventory()
@@ -139,6 +141,31 @@ def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
     assert decision["command"]["cmd_type"] == "map_open"
     assert decision["behavior"]["reason"] == "find_enemies"
     assert decision["behavior"]["mode"] == "HUNT"
+
+
+def test_hunt_acquire_exits_when_fresh_map_has_no_viable_targets() -> None:
+    """A fresh map snapshot with no viable enemy ends the session.
+
+    User contract (2026-07-02): when the whole-map view is current and
+    no enemy passes the acquisition gates (alive, unblocked, reachable,
+    affordable), the bot must not loop on map refreshes -- it exits
+    with ``no_viable_targets`` so the run is analyzable.
+    """
+    world, self_state = make_world(fuel=800)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    with pytest.raises(SessionExitError, match="no_viable_targets"):
+        decide_hunt_mode(ctx)
 
 
 def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
@@ -156,7 +183,7 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
             "mode": "HUNT",
             "mode_state": "ACQUIRE",
             "mode_started_ms": 90000,
-            "last_map_open_ms": 99500,
+            "last_map_open_ms": 90000,
             "last_scan_ms": 90000,
         }
     )
@@ -175,7 +202,7 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
             "mode_started_ms": 90000,
         }
     )
-    next_ctx = DecideCtx(world, self_state, next_ai_state, inventory, 102000, None, "")
+    next_ctx = DecideCtx(world, self_state, next_ai_state, inventory, 106000, None, "")
 
     second_decision = decide_hunt_mode(next_ctx)
 
@@ -308,7 +335,6 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
             "mode_state": "ACQUIRE",
             "mode_started_ms": 90000,
             "last_map_open_ms": 99500,
-            "local_scan_tiles": viewport_covered_tiles(world),
         }
     )
     inventory = make_inventory()
@@ -410,14 +436,49 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
-def test_hunt_acquire_pursues_off_viewport_locked_target() -> None:
-    """ACQUIRE pursuit-fires when the held lock is off-viewport but still alive.
+def test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable() -> None:
+    """ACQUIRE releases an off-viewport lock and re-acquires by teleport.
 
-    Same staying-put pursuit pattern used by ENGAGE / CLOSE / REFRESH /
-    SCAN_ON_LANDING: when the lock isn't in the current threat list but
-    ``_locked_target_pursuit`` synthesises a pursuit threat (target in
-    the registry, alive, position fresh), the bot fires homing toward
-    the last wire position instead of re-acquiring.
+    User contract (2026-07-02): a lock that reaches ACQUIRE with its
+    target off-viewport is a stale engagement resumed after a mode
+    interrupt. The bot never fires from stand-off range on resume --
+    it releases the lock and re-acquires fresh. When the same enemy is
+    still the nearest affordable candidate, acquisition teleports back
+    to it (the recorded human behavior: purple-1 was resumed by
+    map-teleporting onto it, session 2026-07-01).
+    """
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=115, y=115)}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 115,
+            "combat_target_y": 115,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason"] == "teleport Runner"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
+def test_hunt_acquire_releases_stale_lock_when_target_unaffordable() -> None:
+    """ACQUIRE drops an off-viewport lock whose re-engagement is unaffordable.
+
+    The stale lock is released and the unaffordable enemy is rejected
+    by acquisition (teleport cost + kill budget + reserve exceeds
+    fuel), so the bot falls through to a map refresh with no lock --
+    instead of firing at a target it cannot legally hit (live run
+    2026-07-01 20:48: eleven server-rejected shots at a target 92
+    tiles away).
     """
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
@@ -437,9 +498,8 @@ def test_hunt_acquire_pursues_off_viewport_locked_target() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "shoot"
-    assert decision["behavior"]["reason"] == "shoot Runner"
-    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
@@ -457,7 +517,6 @@ def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
             "combat_target_id": 50,
             "combat_target_x": 190,
             "combat_target_y": 100,
-            "local_scan_tiles": viewport_covered_tiles(world),
         }
     )
     inventory = make_inventory()
@@ -533,7 +592,6 @@ def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
             "combat_target_id": 50,
             "combat_target_x": 190,
             "combat_target_y": 100,
-            "local_scan_tiles": viewport_covered_tiles(world),
         }
     )
     inventory = make_inventory()

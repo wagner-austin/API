@@ -9,6 +9,7 @@ from tankpit_bot.bot.ai.types import (
     make_initial_ai_state,
 )
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import reset_world_state, update_world_state_from_position
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, TankStateDict, WorldStateDict
@@ -32,11 +33,17 @@ def _make_world(
         fuel=fuel,
         leaderboard_position=0,
     )
-    scanned_viewports: dict[str, int] = {}
-    if scanned:
-        vp_left = self_x - 8
-        vp_top = self_y - 8
-        scanned_viewports[f"{vp_left},{vp_top}"] = 100000
+    vp_left = self_x - 8
+    vp_top = self_y - 8
+    scanned_tiles: dict[str, int] = (
+        {
+            f"{x},{y}": 100000
+            for y in range(vp_top, vp_top + 16)
+            for x in range(vp_left, vp_left + 16)
+        }
+        if scanned
+        else {}
+    )
     return (
         WorldStateDict(
             self_state=self_state,
@@ -44,8 +51,8 @@ def _make_world(
             containers=containers or {},
             mines={},
             terrain={},
-            viewport={"left": self_x - 8, "top": self_y - 8, "width": 16, "height": 16},
-            scanned_viewports=scanned_viewports,
+            viewport={"left": vp_left, "top": vp_top, "width": 16, "height": 16},
+            scanned_tiles=scanned_tiles,
             timestamp_ms=100000,
         ),
         self_state,
@@ -85,28 +92,6 @@ def _make_inventory(
 def _scanned_ai_state() -> AIStateDict:
     """Build a scanned AI state."""
     return make_initial_ai_state()
-
-
-def _viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[str, int]:
-    """Return a coverage map marking every tile in the world's viewport.
-
-    Mirrors what :func:`mark_scan_dispatched` writes after an extra
-    radar reveals a whole viewport. Tests use this to model "the bot
-    just radared this viewport" without having to drive the tick loop.
-
-    Args:
-        world: World state whose viewport bounds drive the coverage map.
-        now_ms: Timestamp to stamp every tile with.
-
-    Returns:
-        Coverage dict keyed by ``"x,y"`` with every viewport tile marked.
-    """
-    viewport = world["viewport"]
-    left = viewport["left"]
-    top = viewport["top"]
-    right = left + viewport["width"] - 1
-    bottom = top + viewport["height"] - 1
-    return {f"{x},{y}": now_ms for y in range(top, bottom + 1) for x in range(left, right + 1)}
 
 
 class TestLockedEquipmentTarget:
@@ -281,7 +266,7 @@ class TestRadarForEquipment:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -352,7 +337,6 @@ class TestEquipmentSearchHopFallback:
                 "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
-                "local_scan_tiles": _viewport_covered_tiles(world),
             }
         )
         # default_count=15: below low but above break; radar=0 so no scan
@@ -384,7 +368,6 @@ class TestEquipmentSearchHopFallback:
                 "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
-                "local_scan_tiles": _viewport_covered_tiles(world),
             }
         )
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
@@ -518,9 +501,7 @@ class TestFuelSearchFallbacks:
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
         """Fuel search hops to fresh sector when viewport tiles fully swept."""
         world, self_state = _make_world(fuel=150, scanned=True)
-        ai_state = AIStateDict(
-            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
-        )
+        ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
@@ -543,12 +524,10 @@ class TestFuelSearchFallbacks:
         # ``hunt_min_fuel`` reserve drop (2026-06-24) means stranding
         # now requires fuel < raw teleport cost.
         world, self_state = _make_world(fuel=30, scanned=True)
-        ai_state = AIStateDict(
-            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
-        )
+        ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+        with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
             decide(world, self_state, ai_state, inventory, 100000, None)
 
     def test_fuel_recovery_raises_when_all_paths_are_blocked(self) -> None:
@@ -571,10 +550,8 @@ class TestFuelSearchFallbacks:
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         # Fuel below the short-hop cost so no teleport is affordable.
         world, self_state = _make_world(fuel=30, scanned=True)
-        ai_state = AIStateDict(
-            **{**_scanned_ai_state(), "local_scan_tiles": _viewport_covered_tiles(world)}
-        )
+        ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+        with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
             decide(world, self_state, ai_state, inventory, 100000, terrain)

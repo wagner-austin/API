@@ -15,7 +15,6 @@ from tankpit_bot.state.types import (
     ViewportStateDict,
     make_mine_state,
     make_tank_state,
-    viewport_scan_key,
 )
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -152,6 +151,108 @@ class TestWalkOrTeleport:
 
         assert result is None
 
+    def test_approach_teleports_when_facing_edge_is_passable_but_unreachable(self) -> None:
+        """Passable edge tiles with no walk path still fall back to teleport.
+
+        A water wall one column inside the facing edge leaves every
+        edge candidate passable but walk-unreachable; the approach must
+        skip them all and teleport to the real target.
+        """
+        from tankpit_bot.bot.ai.context import local_actionable_bounds
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        _left, top, right, bottom = local_actionable_bounds(probe_ctx)
+        target_x, target_y = right + 10, 100
+        wall = {(right - 1, y): "W" for y in range(top, bottom + 1)}
+        terrain = InMemoryTerrainMap(wall)
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
+
+        if result is None:
+            raise AssertionError("expected direct teleport past the unreachable edge")
+        assert result["cmd_type"] == "teleport"
+        assert result["target_x"] == target_x
+        assert result["target_y"] == target_y
+
+    def test_approach_teleports_when_selected_edge_tile_is_enemy_occupied(self) -> None:
+        """An enemy parked on the chosen approach tile forces the teleport fallback.
+
+        The edge selector checks terrain and walk paths but not tank
+        occupancy; the recursive walk then refuses the enemy-occupied
+        tile, and the approach must fall through to teleporting at the
+        real target instead of returning nothing.
+        """
+        from tankpit_bot.bot.ai.context import local_actionable_bounds
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
+        target_x, target_y = right + 10, 100
+        world["tanks"] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=right,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        terrain = InMemoryTerrainMap()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = walk_or_teleport(ctx, target_x, target_y, pickup_kind=None)
+
+        if result is None:
+            raise AssertionError("expected teleport fallback past the occupied edge tile")
+        assert result["cmd_type"] == "teleport"
+        assert result["target_x"] == target_x
+        assert result["target_y"] == target_y
+
+    def test_approach_move_without_terrain_returns_none_when_clamp_is_occupied(self) -> None:
+        """Without terrain, a plain move's occupied clamp tile yields no command.
+
+        The pickup variant is covered above; the plain-move variant must
+        also return ``None`` because without a terrain map there is no
+        teleport-fallback landing computation.
+        """
+        from tankpit_bot.bot.ai.context import local_actionable_bounds
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        probe_ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+        _left, _top, right, _bottom = local_actionable_bounds(probe_ctx)
+        world["tanks"] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=right,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        result = walk_or_teleport(ctx, right + 10, 100, pickup_kind=None)
+
+        assert result is None
+
     def test_uses_final_move_target_when_viewport_path_exists(self) -> None:
         """In-viewport detours still issue the final move target."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
@@ -217,7 +318,7 @@ class TestWalkOrTeleport:
     def test_ignores_mine_on_old_waypoint_tile(self) -> None:
         """Mine occupancy off the final target does not block the move."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"103,99": make_mine_state(x=103, y=99, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"103,99": make_mine_state(x=103, y=99, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap({(102, 100): "#"})
@@ -285,7 +386,7 @@ class TestWalkOrTeleport:
     def test_direct_move_command_rejects_mined_target(self) -> None:
         """Direct move helper rejects final targets occupied by known mines."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
@@ -323,7 +424,7 @@ class TestWalkOrTeleport:
     def test_rejects_mined_move_without_terrain(self) -> None:
         """Without terrain, mine occupancy on the target blocks the move."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"107,100": make_mine_state(x=107, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
@@ -335,7 +436,7 @@ class TestWalkOrTeleport:
     def test_moves_to_final_target_when_mine_blocks_straight_line(self) -> None:
         """Known mines on the straight line still allow an in-viewport detour."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["mines"] = {"103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)}
+        world["mines"] = {"103,100": make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=0)}
         ai_state = make_scanned_ai_state()
         inventory = make_inventory(default_count=5)
         terrain = InMemoryTerrainMap()
@@ -391,12 +492,18 @@ class TestWalkOrTeleport:
         """Exploration prefers edges that expose fresh unscanned space."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
         current = world["viewport"]
-        world["scanned_viewports"] = {
-            viewport_scan_key(current["left"], current["top"]): 100000,
-            viewport_scan_key(92, 99): 100000,
-            viewport_scan_key(99, 92): 100000,
-            viewport_scan_key(99, 99): 100000,
-        }
+        scanned_viewport_origins = [
+            (current["left"], current["top"]),
+            (92, 99),
+            (99, 92),
+            (99, 99),
+        ]
+        covered: dict[str, int] = {}
+        for left, top in scanned_viewport_origins:
+            for y in range(top, top + current["height"]):
+                for x in range(left, left + current["width"]):
+                    covered[f"{x},{y}"] = 100000
+        world["scanned_tiles"] = covered
         ctx = DecideCtx(
             world,
             self_state,
@@ -415,7 +522,7 @@ class TestWalkOrTeleport:
         assert command["cmd_type"] == "move"
         next_left = max(0, min(240, candidate_x - 8))
         next_top = max(0, min(240, candidate_y - 8))
-        assert viewport_scan_key(next_left, next_top) not in world["scanned_viewports"]
+        assert (next_left, next_top) not in scanned_viewport_origins
 
     def test_surface_transition_clamps_move_target(self) -> None:
         """A ground-to-ferry transition clamps the move at the ferry tile."""

@@ -40,7 +40,7 @@ def _world_with_container(
         mines={},
         terrain={},
         viewport={"left": 0, "top": 0, "width": 16, "height": 16},
-        scanned_viewports={},
+        scanned_tiles={},
         timestamp_ms=0,
     )
 

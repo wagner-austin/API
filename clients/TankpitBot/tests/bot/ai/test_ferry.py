@@ -35,8 +35,6 @@ def _ferry_tile(x: int, y: int) -> dict[str, TerrainTileDict]:
             x=x,
             y=y,
             terrain_type=TERRAIN_FERRY,
-            cache_value=0,
-            overlay_value=0,
         )
     }
 
@@ -99,8 +97,6 @@ class TestRidingAndComposition:
             x=100,
             y=100,
             terrain_type=TERRAIN_GROUND,
-            cache_value=0,
-            overlay_value=0,
         )
         assert is_riding_ferry(world) is False
 

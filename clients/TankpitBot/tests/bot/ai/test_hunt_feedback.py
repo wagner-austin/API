@@ -221,15 +221,18 @@ class TestDecideKillCooldown:
                 decision["behavior"]["target_y"],
             ) != (105, 105)
 
-    def test_miss_keeps_firing_engaged_far_target(self) -> None:
-        """Miss feedback on an engaged distant target keeps firing, not chasing.
+    def test_miss_on_stationary_far_target_blocks_and_replans(self) -> None:
+        """A consumption-miss on a stationary distant target blocks it.
 
-        User contract (2026-06-26): once the bot has dispatched a shot
-        at a lock, mid-fight enemy movement is handled by staying put
-        and firing again. The server picks ``homing`` when not adjacent
-        and homing tracks, so a missed dual at distance is followed by
-        another shoot (not a teleport to re-close).
-        ``last_shot_target_id == combat_target_id`` proves engagement.
+        Consumption = hit (user contract 2026-07-02): pursuit homings
+        that land arrive as ``weapon>0`` hits and keep the engagement
+        alive through the hit path. A genuine miss (weapon=0, nothing
+        spent) at a registry position that has not moved proves the
+        target is NOT there -- a frozen registry entry or an
+        unwitnessed corpse. Repeating the shot cannot change the
+        answer (live run 2026-07-02 01:23: 25+ weapon=0 shots at
+        orange-1's stale tile), so the target is blocked and the lock
+        released.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -264,11 +267,20 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
-        assert decision["command"]["cmd_type"] == "shoot"
-        assert decision["updated_ai_state"]["combat_target_id"] == 50
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
-    def test_miss_reshoots_when_adjacent(self) -> None:
-        """Miss feedback re-aims at adjacent target instead of blocking."""
+    def test_miss_on_adjacent_stationary_target_blocks(self) -> None:
+        """A consumption-miss on an adjacent stationary target blocks it.
+
+        The original same-tile re-engage loop (run 20260611-103244:
+        12 shots at a frozen tile): an adjacent live target hits
+        255/255, so a weapon=0 empty-ground response against an
+        unmoved registry position is proof the tank is gone. Blocking
+        uses the kill-cooldown TTL, so a shielded tank is retried
+        later.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -305,7 +317,53 @@ class TestDecideKillCooldown:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
 
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+
+    def test_miss_on_moved_target_reaims_and_keeps_lock(self) -> None:
+        """A miss on a target that moved since the shot re-aims, not blocks.
+
+        The one ambiguous miss case: a live enemy may have stepped off
+        the tile as the shot resolved. The registry shows the new
+        position, so the bot re-aims there and keeps the lock.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=103,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "Enemy",
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+
         assert decision["command"]["cmd_type"] == "shoot"
+        assert decision["command"]["target_x"] == 103
+        assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
     def test_closing_keeps_firing_when_engaged_at_diagonal(self) -> None:

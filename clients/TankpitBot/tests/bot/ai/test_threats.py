@@ -17,7 +17,6 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     make_self_state,
     make_tank_state,
-    viewport_scan_key,
 )
 from tankpit_bot.state.types.constants import TankLiveness
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -83,7 +82,7 @@ def _world(tanks: dict[str, TankStateDict]) -> WorldStateDict:
         mines={},
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
-        scanned_viewports={viewport_scan_key(0, 0): 0},
+        scanned_tiles={},
         timestamp_ms=0,
     )
 
@@ -400,6 +399,7 @@ class TestFindAcquisitionTarget:
             terrain=None,
             now_ms=100000,
             map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
         )
 
         if result is None:
@@ -429,6 +429,7 @@ class TestFindAcquisitionTarget:
             terrain=None,
             now_ms=100000,
             map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
         )
 
         assert result is None
@@ -462,6 +463,7 @@ class TestFindAcquisitionTarget:
             terrain=terrain,
             now_ms=100000,
             map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
         )
 
         assert result is None
@@ -478,9 +480,66 @@ class TestFindAcquisitionTarget:
             terrain=None,
             now_ms=100000,
             map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
         )
 
         assert result is None
+
+    def test_rejects_unaffordable_enemy(self) -> None:
+        """An enemy whose approach teleport breaks the engagement reserve is skipped.
+
+        User contract (2026-07-02): the bot never picks a fight it
+        cannot pay for. Live run 2026-07-01 20:45: the nearest map
+        enemy cost 505 fuel to reach, leaving too little to finish the
+        kill -- acquisition must reject it, not commit to it. Enemy at
+        distance 100 costs 600 to reach; 600 + 650 reserve > 800 fuel.
+        """
+        tank = _tank("10", x=200, y=100, team=1)
+        tank["timestamp_ms"] = 100000
+        world = _world({"10": tank})
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
+        )
+
+        assert result is None
+
+    def test_picks_affordable_enemy_over_nearer_unaffordable(self) -> None:
+        """The nearest-by-Manhattan enemy loses to an affordable one.
+
+        Teleport cost scales with Euclidean distance while candidate
+        ordering is Manhattan, so a diagonal enemy can be farther by
+        Manhattan yet cheaper to reach: axial (125,100) is Manhattan 25
+        but costs 150; diagonal (114,114) is Manhattan 28 but costs
+        ~118. With reserve 660 and fuel 800 only the diagonal fits.
+        """
+        axial = _tank("10", x=125, y=100, team=1)
+        axial["timestamp_ms"] = 100000
+        diagonal = _tank("20", x=114, y=114, team=2)
+        diagonal["timestamp_ms"] = 100000
+        world = _world({"10": axial, "20": diagonal})
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=None,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=660,
+        )
+
+        if result is None:
+            raise AssertionError("expected the affordable diagonal enemy")
+        assert result["tank_id"] == 20
 
 
 class TestFindLockedTargetPursuit:

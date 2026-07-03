@@ -15,7 +15,6 @@ from tankpit_bot.state.types import (
     make_container_state,
     make_self_state,
     make_tank_state,
-    viewport_scan_key,
 )
 
 
@@ -28,7 +27,7 @@ def _empty_world() -> WorldStateDict:
         mines={},
         terrain={},
         viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
-        scanned_viewports={viewport_scan_key(0, 0): 0},
+        scanned_tiles={},
         timestamp_ms=0,
     )
 

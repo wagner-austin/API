@@ -326,6 +326,7 @@ class TestAIState:
             radar_break_threshold=config["radar_break_threshold"],
             radar_resume_threshold=config["radar_resume_threshold"],
             equip_search_hop_distance=config["equip_search_hop_distance"],
+            engagement_fuel_budget=config["engagement_fuel_budget"],
             patrol_waypoints=config["patrol_waypoints"],
         )
         state = make_initial_ai_state(custom)
