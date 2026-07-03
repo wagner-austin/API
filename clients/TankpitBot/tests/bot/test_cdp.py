@@ -453,7 +453,7 @@ class TestBotAIIntegration:
                         mines={},
                         terrain={},
                         viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
-                        scanned_viewports={},
+                        scanned_tiles={},
                         timestamp_ms=0,
                     )
                 return WorldStateDict(
@@ -463,7 +463,7 @@ class TestBotAIIntegration:
                     mines={},
                     terrain={},
                     viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
-                    scanned_viewports={},
+                    scanned_tiles={},
                     timestamp_ms=0,
                 )
 
@@ -2049,20 +2049,18 @@ class TestBotEquipmentManagement:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """Server-confirmed hit visible via ammo delta even when victim_id misses.
+        """A 0x49 sync revealing an ammo debit is a hit even without a 0x53 echo.
 
-        The pursuit case: a homing shot at an off-viewport target gets
-        ``victim_id=-1`` from the 0x53 tile-occupancy lookup (target
-        not in our local registry at the impact tile), but the
-        server's 0x49 inventory update debits the homing count. The
-        ammo decrement is the authoritative hit signal -- the
-        conservative "miss" the tile-empty path would have emitted
-        becomes "hit" instead.
+        Reconciliation case (the per-shot ``weapon`` byte is the
+        primary hit signal since 2026-07-02): if the 0x53 ShootEvent
+        echo is lost, the server's 0x49 absolute inventory sync still
+        reveals the debit against the pre-shot snapshot -- the shot
+        landed, and the feedback must say so instead of timing out
+        into a phantom miss.
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
-        from tankpit_bot.sniffer.world_state_combat import mark_combat_hit
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
 
         reset_world_state()
@@ -2073,9 +2071,8 @@ class TestBotEquipmentManagement:
         update_inventory_from_protocol(ws, [25, 25, 25, 25, 25], [False] * 5)
         # Bot dispatched a shoot just now: snapshot pre-shot inventory.
         ws.pending_shot_inventory_snapshot = ws.inventory_state
-        # 0x53 echo arrives with tile_empty (target off-viewport).
-        mark_combat_hit(ws, weapon_byte=3, victim_id=-1)
-        # 0x49 follow-up debits the homing -- authoritative hit.
+        # The 0x53 echo never arrives (dropped frame) -- but the 0x49
+        # absolute sync debits the homing: authoritative hit.
         update_inventory_from_protocol(ws, [25, 25, 25, 24, 25], [False] * 5)
 
         result = _get_combat_feedback(bot)

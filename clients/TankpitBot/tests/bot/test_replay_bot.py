@@ -86,7 +86,13 @@ def test_fuel_probe_replay_dispatches_at_least_one_command(
 def test_fuel_probe_replay_first_dispatched_command_is_radar(
     fuel_probe_session: ReplaySession,
 ) -> None:
-    """The first command the bot sends in COLLECT sense is a radar scan."""
+    """The first command the bot sends is the scan-on-landing radar.
+
+    COLLECT's scan-on-landing gate fires one radar on every fresh
+    teleport landing before any pickup -- mirrors HUNT's
+    scan_on_landing so the planner has the full picture (0x5A entries
+    plus radar reveals) before committing to a pickup order.
+    """
     if not fuel_probe_session.all_dispatched:
         pytest.fail("expected at least one dispatched command")
     _first_tick, first_command = fuel_probe_session.all_dispatched[0]

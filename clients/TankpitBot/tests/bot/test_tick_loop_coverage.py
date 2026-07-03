@@ -518,6 +518,14 @@ def _fail_tick_once_with_browser_closed(bot: Bot) -> None:
     raise TargetClosedError("Page.goto: target closed mid-tick")
 
 
+def _fail_tick_once_with_session_exit(bot: Bot) -> None:
+    """Drop-in ``_tick_once`` that simulates a decision-owner exit request."""
+    _ = bot
+    from tankpit_bot.bot.session_exit import SessionExitError
+
+    raise SessionExitError("no_viable_targets", "fresh map snapshot has no affordable enemy")
+
+
 class TestBrowserClosedExit:
     """Browser closure mid-run records ``browser_closed`` and exits cleanly."""
 
@@ -590,6 +598,41 @@ class TestBrowserClosedExit:
             raise AssertionError(f"expected 1 index row, got {len(data_lines)}")
         row = decode_row(data_lines[0])
         assert row["exit_reason"] == "browser_closed"
+
+    def test_session_exit_request_records_its_reason(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """A ``SessionExitError`` from a decision owner ends the run with its reason.
+
+        User contract (2026-07-02): when the bot cannot do its job
+        (no viable targets, out of fuel) it exits cleanly with an
+        analyzable ``exit_reason`` instead of crashing or looping.
+        """
+        from tankpit_bot.bot import tick_loop as tick_loop_module
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+        from tankpit_bot.diagnostics.runs_index import DEFAULT_INDEX_PATH, decode_row
+        from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+
+        configure_bot_runtime_logging("20260702-101500")
+        bot = Bot("https://test.tankpit.com/", headless=True)
+
+        saved_tick_once = tick_loop_module._tick_once
+        tick_loop_module._tick_once = _fail_tick_once_with_session_exit
+        run_tick_loop(
+            bot,
+            _FakePage(),
+            session_seconds=0,
+            stop_file_path=Path("C:/tmp/never_exists.sentinel"),
+        )
+        tick_loop_module._tick_once = saved_tick_once
+
+        text = fake_fs.get_written_files()[str(DEFAULT_INDEX_PATH)]
+        data_lines = [line for line in text.splitlines() if line and not line.startswith("stamp\t")]
+        if len(data_lines) != 1:
+            raise AssertionError(f"expected 1 index row, got {len(data_lines)}")
+        row = decode_row(data_lines[0])
+        assert row["exit_reason"] == "no_viable_targets"
 
 
 class TestClearCommandError:

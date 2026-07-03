@@ -1033,7 +1033,7 @@ class TestSecondaryCommandDispatch:
             mines=ws.world_state["mines"],
             terrain=ws.world_state["terrain"],
             viewport=ws.world_state["viewport"],
-            scanned_viewports=ws.world_state["scanned_viewports"],
+            scanned_tiles=ws.world_state["scanned_tiles"],
             timestamp_ms=1000,
         )
 
