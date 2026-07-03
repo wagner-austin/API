@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run analyze analyze-timing play queue-probe download-fields decode discover analyze-viewport smoke debug-run
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run
 
 help:
 	@Write-Host ""
@@ -209,11 +209,6 @@ analyze-timing:
 	@Write-Host ""
 	@Write-Host "==> analyze-timing (command-response latencies)" -ForegroundColor Cyan
 	poetry run python -m scripts.analyze_session_timing
-
-play: install
-	@Write-Host ""
-	@Write-Host "==> play (human session capture)" -ForegroundColor Cyan
-	poetry run tankpit-sniff
 
 queue-probe: install
 	@Write-Host ""
