@@ -65,7 +65,7 @@ def _world_with_viewport() -> WorldStateDict:
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=139, top=102, width=16, height=16),
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=40_000,
     )
 

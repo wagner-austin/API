@@ -85,7 +85,7 @@ def _world() -> WorldStateDict:
         mines=b["mines"],
         terrain=b["terrain"],
         viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
-        scanned_viewports=b["scanned_viewports"],
+        scanned_tiles=b["scanned_tiles"],
         timestamp_ms=2000,
     )
 

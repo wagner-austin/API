@@ -76,7 +76,7 @@ def _world() -> WorldStateDict:
         mines=b["mines"],
         terrain=b["terrain"],
         viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
-        scanned_viewports=b["scanned_viewports"],
+        scanned_tiles=b["scanned_tiles"],
         timestamp_ms=2000,
     )
 
@@ -472,6 +472,43 @@ def _fake_tp_missing_dispatch(
     )
 
 
+def _fake_tp_landed(
+    page: WaitPageProtocol,
+    probe: TeleportAttemptProbeProtocol,
+    target: TeleportTargetDict,
+    *,
+    cdp: CDPSessionProtocol | None,
+    attempt_label: str,
+    fuel_before: int,
+    world_timestamp_before: int,
+    send_acquisition_command: Callable[[], bool],
+    acquisition_command_name: str,
+    capture_before_map_open: bool,
+    wait_for_acquisition_sync: bool,
+    acquisition_timeout_ms: int,
+    teleport_timeout_ms: int,
+    wait_for_outcome: TeleportOutcomeWaiterProtocol,
+    dispatch_failure_error: type[Exception],
+    acquisition_dispatch_failure_message: str,
+    teleport_dispatch_failure_message: str,
+    unavailable_error: type[Exception],
+    unavailable_message: str,
+    unexpected_result_error: type[Exception],
+    unexpected_result_message: str,
+    reset_to_idle_before_start: bool = True,
+) -> TrackedTeleportAttempt:
+    return TrackedTeleportAttempt(
+        message_start_index=0,
+        teleport_cycle=_CYCLE,
+        acquisition_started_ms=1000,
+        acquisition_sync_timestamp_ms=1100,
+        page_snapshots=[],
+        capture_page_snapshot=_snap,
+        teleport_result=_TP_RESULT,
+        teleport_started_ms=1200,
+    )
+
+
 class TestEquipmentProbeAttemptCoverage:
     def setup_method(self) -> None:
         reset_world_state()
@@ -542,6 +579,101 @@ class TestEquipmentProbeAttemptCoverage:
         """Lines 366-376."""
         result = self._run(_fake_tp_sync_timeout)
         assert result["status"] == "no_equipment_visible"
+
+    def test_resolved_target_runs_pickup_attempt(self) -> None:
+        """A landed teleport + visible reachable target reaches the pickup phase."""
+        from tankpit_bot.action_lab import _test_hooks as action_hooks
+        from tankpit_bot.state import make_container_state
+
+        container = make_container_state(101, 100, False, 0, timestamp_ms=2000)
+        pickup_calls: list[ContainerStateDict] = []
+
+        def _find_container(p: EquipmentTargetPhaseProbeProtocol) -> ContainerStateDict | None:
+            _ = p
+            return container
+
+        def _recording_pickup(
+            *,
+            page: WaitPageProtocol,
+            target: TeleportTargetDict,
+            map_open_started_ms: int,
+            map_sync_timestamp_ms: int | None,
+            teleport_started_ms: int,
+            radar_started_ms: int,
+            radar_sync_timestamp_ms: int,
+            reposition_map_open_started_ms: int | None,
+            reposition_map_sync_timestamp_ms: int | None,
+            reposition_teleport_started_ms: int | None,
+            pickup_timeout_ms: int,
+            inventory_count_before: int,
+            teleport_result: TeleportAttemptResultDict,
+            equipment_target: ContainerStateDict,
+            message_start_index: int,
+            teleport_cycle_ids: list[int],
+            radar_cycle_id: int,
+        ) -> EquipmentProbeAttemptResultDict:
+            pickup_calls.append(equipment_target)
+            return _ATTEMPT
+
+        def _radar_sync(
+            page: WaitPageProtocol,
+            provider: BufferedWorldStateProviderProtocol,
+            started_ms: int,
+            timeout_ms: int,
+        ) -> int | None:
+            _ = (page, provider, started_ms, timeout_ms)
+            return 1400
+
+        action_hooks.wait_for_radar_sync = _radar_sync
+
+        result = run_single_equipment_target_attempt(
+            probe=_Probe(),
+            target=_TARGET,
+            map_sync_timeout_ms=30000,
+            teleport_timeout_ms=30000,
+            radar_timeout_ms=30000,
+            pickup_timeout_ms=10000,
+            settle_delay_ms=0,
+            teleport_strategy="sync_before_teleport",
+            cdp=None,
+            wait_for_teleport_outcome=_waiter,
+            run_tracked_teleport_attempt=_fake_tp_landed,
+            run_tracked_equipment_collection_phase=run_tracked_equipment_collection_phase,
+            build_map_sync_timeout_result=_build_map_sync_timeout,
+            build_teleport_timeout_result=_build_tp_timeout,
+            finalize_attempt_delay=_noop_finalize,
+            terrain_provider=lambda: None,
+            find_visible_target=_find_container,
+            requires_reposition=_no_repo,
+            find_landing_tile=_no_land,
+            get_phase_overlaps=lambda: [],
+            build_radar_timeout_result=_build_radar_timeout,
+            build_no_equipment_visible_result=_build_no_vis,
+            build_reposition_map_sync_timeout_result=_build_repo_map,
+            build_reposition_teleport_timeout_result=_build_repo_tp,
+            run_pickup_attempt=_recording_pickup,
+            make_reposition_target=lambda x, y: _TARGET,
+            teleport_strategy_requires_map_sync=_sync_policy,
+            dispatch_failure_error=RuntimeError,
+            unavailable_error=RuntimeError,
+            unexpected_result_error=RuntimeError,
+            unexpected_missing_target_error=RuntimeError,
+            no_landing_tile_error=RuntimeError,
+            missing_dispatch_error=RuntimeError,
+            acquisition_dispatch_failure_message="m",
+            teleport_dispatch_failure_message="t",
+            reposition_acquisition_dispatch_failure_message="rm",
+            reposition_teleport_dispatch_failure_message="rt",
+            unavailable_message="u",
+            impossible_map_sync_timeout_message="i",
+            reposition_impossible_result_message="ri",
+            reposition_missing_target_message="rmt",
+            no_landing_tile_message="nl",
+            missing_dispatch_message="missing dispatch",
+        )
+
+        assert result is _ATTEMPT
+        assert pickup_calls == [container]
 
     def test_missing_dispatch_raises(self) -> None:
         """Line 381."""

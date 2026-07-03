@@ -68,7 +68,7 @@ def _make_world() -> WorldStateDict:
         mines=base["mines"],
         terrain=base["terrain"],
         viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
-        scanned_viewports=base["scanned_viewports"],
+        scanned_tiles=base["scanned_tiles"],
         timestamp_ms=2000,
     )
 

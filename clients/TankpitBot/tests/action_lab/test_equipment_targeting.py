@@ -68,7 +68,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=x - 8, top=y - 8, width=16, height=16),
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -140,6 +140,22 @@ def test_visible_equipment_requires_reposition_raises_when_self_state_unavailabl
         visible_equipment_requires_reposition(probe, container)
 
 
+def test_visible_equipment_requires_reposition_checks_walk_reachability() -> None:
+    """A walk-reachable container needs no reposition; a water-locked one does."""
+    world = _make_world(1000, 100, 100, 700)
+    probe = _SimpleProbe(world)
+    container = make_container_state(102, 100, False, 100, timestamp_ms=1000)
+    equipment_targeting_module.get_terrain_map = lambda: _terrain(
+        {(100, 100), (101, 100), (102, 100)}
+    )
+
+    assert visible_equipment_requires_reposition(probe, container) is False
+
+    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (102, 100)})
+
+    assert visible_equipment_requires_reposition(probe, container) is True
+
+
 # ---------------------------------------------------------------------------
 # find_visible_equipment_landing_tile error guards
 # ---------------------------------------------------------------------------
@@ -166,3 +182,13 @@ def test_find_visible_equipment_landing_tile_raises_when_self_state_unavailable(
 
     with pytest.raises(EquipmentTargetingError, match="self state is unavailable"):
         find_visible_equipment_landing_tile(probe, container)
+
+
+def test_find_visible_equipment_landing_tile_returns_passable_goal() -> None:
+    """A passable container tile is returned as the teleport landing."""
+    world = _make_world(1000, 100, 100, 700)
+    probe = _SimpleProbe(world)
+    container = make_container_state(105, 105, False, 100, timestamp_ms=1000)
+    equipment_targeting_module.get_terrain_map = lambda: _terrain({(100, 100), (105, 105)})
+
+    assert find_visible_equipment_landing_tile(probe, container) == (105, 105)

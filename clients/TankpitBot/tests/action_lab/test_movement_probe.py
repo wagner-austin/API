@@ -104,7 +104,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=world["viewport"],
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 

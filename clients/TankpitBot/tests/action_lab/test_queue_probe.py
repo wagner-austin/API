@@ -83,7 +83,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         mines=empty["mines"],
         terrain=empty["terrain"],
         viewport=empty["viewport"],
-        scanned_viewports=empty["scanned_viewports"],
+        scanned_tiles=empty["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -97,7 +97,7 @@ def _make_world_no_self(timestamp_ms: int) -> WorldStateDict:
         mines=empty["mines"],
         terrain=empty["terrain"],
         viewport=empty["viewport"],
-        scanned_viewports=empty["scanned_viewports"],
+        scanned_tiles=empty["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 

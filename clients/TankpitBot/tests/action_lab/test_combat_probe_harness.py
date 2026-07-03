@@ -60,7 +60,7 @@ def _make_world(
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=x - 8, top=y - 8, width=16, height=16),
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 

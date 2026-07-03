@@ -105,11 +105,20 @@ def restore_action_hooks() -> Generator[None, None, None]:
     """Restore canonical action_lab hooks after each test.
 
     Tests that override ``action_hooks.drain_buffered_messages``,
-    ``action_hooks.get_current_time_ms``, ``action_hooks.check_and_clear_*``
-    don't have to remember to restore — this autouse fixture does it.
+    ``action_hooks.get_current_time_ms``, ``action_hooks.check_and_clear_*``,
+    or ``action_hooks.wait_for_*_sync`` don't have to remember to restore —
+    this autouse fixture does it. The sync-wait hooks matter for xdist:
+    a leaked ``wait_for_radar_sync`` fake survives into whatever test
+    module the same worker runs next.
     """
     from tankpit_bot.action_lab._test_hooks import (
         _default_check_and_clear_teleport_landed,
+    )
+    from tankpit_bot.action_lab.session import (
+        wait_for_radar_sync as _real_wait_radar,
+    )
+    from tankpit_bot.action_lab.session import (
+        wait_for_world_sync as _real_wait_world,
     )
     from tankpit_bot.bot.world_sync import drain_messages as _real_drain
     from tankpit_bot.browser import get_current_time_ms as _real_clock
@@ -123,6 +132,8 @@ def restore_action_hooks() -> Generator[None, None, None]:
     action_hooks.get_current_time_ms = _real_clock
     action_hooks.check_and_clear_radar_scan_complete = _real_clear_radar
     action_hooks.check_and_clear_teleport_landed = _default_check_and_clear_teleport_landed
+    action_hooks.wait_for_world_sync = _real_wait_world
+    action_hooks.wait_for_radar_sync = _real_wait_radar
 
 
 class Terrain:

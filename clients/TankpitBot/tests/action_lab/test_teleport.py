@@ -124,7 +124,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 
@@ -570,7 +570,7 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_after_landing(
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=world["viewport"],
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=1500,
     )
     provider = _SequencedProvider([world, missing_self])
@@ -634,7 +634,7 @@ def test_wait_for_teleport_outcome_raises_when_self_state_missing_on_timeout() -
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=world["viewport"],
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=1500,
     )
     provider = _SequencedProvider([world, missing_self, missing_self])
