@@ -1,0 +1,2293 @@
+{
+  "session_id": "8b25e17b-2841-4f6f-a79a-7590a07d4560",
+  "start_timestamp_ms": 1782007348885,
+  "end_timestamp_ms": 1782007731807,
+  "base_url": "https://tankpit.com/play",
+  "messages": [
+    {
+      "timestamp_ms": 1782007352939,
+      "direction": "sent",
+      "payload": "UAAlQVVUSCAhYmUgNjI5MTN8MWU1NDRmNGJhYmEwYzQxNzc1YTE2NmEwZjM1NzNjMDl8NDEyOTUxNzEyNSB5NWp1NHI1eDlqNXRvZ2lnODk2NA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at ab.e [as l] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:214:879)\n    at ab.Pa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:11:620)"
+    },
+    {
+      "timestamp_ms": 1782007353035,
+      "direction": "received",
+      "payload": "NgArNXxXb3JsZCAoRGVzZXJ0KXw1fDEsMSwxLDAsMSwwLDB8MnxufGZpZWxkMDUuZ2lmfDIwMjY=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007353036,
+      "direction": "received",
+      "payload": "MAArMXxQcmFjdGljZXwxfDAsMCwwLDAsMCwwLDB8MnxwfGZpZWxkMDEuZ2lmfDIwMjY=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007353038,
+      "direction": "sent",
+      "payload": "AgAqNQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at Ch.h [as s] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:215:499)\n    at ab.t [as m] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:218:260)\n    at ab.Va (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:12:306)"
+    },
+    {
+      "timestamp_ms": 1782007353104,
+      "direction": "received",
+      "payload": "IAA9NXxTZXAuIDI1LCAyMDEyfEFydGF4fDR8OXw5fDl8OQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007353120,
+      "direction": "sent",
+      "payload": "AgAqMQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "direct_send",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1782007353182,
+      "direction": "received",
+      "payload": "IAA9MXxKYW4uIDA4LCAyMDEzfEFydGF4fDF8OXw5fDl8OQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007353271,
+      "direction": "sent",
+      "payload": "YAArMXwyfDEyOHwxMjh8SHBaZh0xUxY4bwJiM2hOGX9sJ0BxEXV+aU9nUjMmPg18YG8sa2MBIzl8VFlDcwovHwB3NVdlKj59O1wTJWV8NipFKX4mSEYvABkvESMjayI2FS8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "bot_injected",
+      "sent_label": "direct_send",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at <anonymous>:24:16\n    at <anonymous>:29:7"
+    },
+    {
+      "timestamp_ms": 1782007353345,
+      "direction": "received",
+      "payload": "BAAkMXww",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007353439,
+      "direction": "received",
+      "payload": "EQAuAQY7E3QLfDlM+61IMXVbTw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358474,
+      "direction": "sent",
+      "payload": "AwAhIjs=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.ya (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:62:733)"
+    },
+    {
+      "timestamp_ms": 1782007358537,
+      "direction": "received",
+      "payload": "FAAuHhY7E3QLfDlMDisJtsB7RWhiMg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358537,
+      "direction": "received",
+      "payload": "RAAuescuKm6T/CdMXuwQQwG4POP8ykoBfTQWFSczJ0NVJDNTFC5DABNIRhcfGzVsFEtQei8jVzQJY1oSD/FlEfaeeuTfyw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358538,
+      "direction": "received",
+      "payload": "DgAuHQY7E6UJdDlNDmxOQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358538,
+      "direction": "received",
+      "payload": "DgAuHQUrFKQJeDpMDmWiQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358538,
+      "direction": "received",
+      "payload": "DgAuDgY7E24KfDkLBG0KQg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358539,
+      "direction": "received",
+      "payload": "EQAuAQTaF24LfDlMDm17JmUXBg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358539,
+      "direction": "received",
+      "payload": "EQAuAQTbF24LfDlMDm57JmUXBQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358539,
+      "direction": "received",
+      "payload": "EQAuAQTYF24LfDlMDm97JmUXBA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358540,
+      "direction": "received",
+      "payload": "EQAuAQTZF24LfDlMDmh7JmUXAw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358540,
+      "direction": "received",
+      "payload": "EQAuAQTWF24LfDlMDml7JmUXAg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358540,
+      "direction": "received",
+      "payload": "EQAuAQTXF24LfDlMDmp7JmUXAQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358541,
+      "direction": "received",
+      "payload": "EQAuAQTUF24LfDlMDmt7JmUXAA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358541,
+      "direction": "received",
+      "payload": "EQAuAQTVF24LfDlMDmR7JmUXDw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358541,
+      "direction": "received",
+      "payload": "EQAuAQTSF24LfDlMDmV7JmUXDg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358541,
+      "direction": "received",
+      "payload": "FAAuAQXTF24LfDlMDmZ5NnNKW3kuew==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358542,
+      "direction": "received",
+      "payload": "FAAuAQXQF24LfDlMDmd5NnNKW3kueA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358542,
+      "direction": "received",
+      "payload": "FAAuAQXRF24LfDlMDmB5NnNKW3kueQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358542,
+      "direction": "received",
+      "payload": "FAAuAQUuFG4LfDlMDmF5NnNKW3kufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358542,
+      "direction": "received",
+      "payload": "FAAuAQUvFG4LfDlMDmJ5NnNKW3kufw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358543,
+      "direction": "received",
+      "payload": "FAAuAQUsFG4LfDlMDmN5NnNKW3kufA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358543,
+      "direction": "received",
+      "payload": "FAAuAQUtFG4LfDlMDnx5NnNKW3kufQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358543,
+      "direction": "received",
+      "payload": "FAAuAQUqFG4LfDlMDn15NnNKW3kucg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358544,
+      "direction": "received",
+      "payload": "FAAuAQUrFG4LfDlMDn55NnNKW3kucw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358544,
+      "direction": "received",
+      "payload": "EgAuAQYoFG4LfDlMDn9rL3RfGi0=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358544,
+      "direction": "received",
+      "payload": "EgAuAQYpFG4LfDlMDnhrL3RfGi4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358545,
+      "direction": "received",
+      "payload": "EgAuAQYmFG4LfDlMDnlrL3RfGi8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358545,
+      "direction": "received",
+      "payload": "EgAuAQYnFG4LfDlMDnprL3RfGig=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358545,
+      "direction": "received",
+      "payload": "EgAuAQYkFG4LfDlMDntrL3RfGik=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358546,
+      "direction": "received",
+      "payload": "EgAuAQYlFG4LfDlMDnRrL3RfGio=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358546,
+      "direction": "received",
+      "payload": "EgAuAQYiFG4LfDlMDnVrL3RfGis=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358546,
+      "direction": "received",
+      "payload": "EgAuAQYjFG4LfDlMDnZrL3RfGiQ=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358546,
+      "direction": "received",
+      "payload": "EgAuAQYgFG4LfDlMDndrL3RfGiU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358547,
+      "direction": "received",
+      "payload": "FAAuAQchFG4LfDlMDnBmMWBUUHkuew==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358547,
+      "direction": "received",
+      "payload": "FAAuAQc+FG4LfDlMDnFmMWBUUHkueA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358547,
+      "direction": "received",
+      "payload": "FAAuAQc/FG4LfDlMDnJmMWBUUHkueQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358548,
+      "direction": "received",
+      "payload": "FAAuAQc8FG4LfDlMDnNmMWBUUHkufg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358548,
+      "direction": "received",
+      "payload": "FAAuAQc9FG4LfDlMDkxmMWBUUHkufw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358548,
+      "direction": "received",
+      "payload": "FAAuAQc6FG4LfDlMDk1mMWBUUHkufA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358549,
+      "direction": "received",
+      "payload": "FAAuAQc7FG4LfDlMDk5mMWBUUHkufQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358549,
+      "direction": "received",
+      "payload": "FAAuAQc4FG4LfDlMDk9mMWBUUHkucg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358549,
+      "direction": "received",
+      "payload": "FAAuAQc5FG4LfDlMDkhmMWBUUHkucw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358550,
+      "direction": "received",
+      "payload": "CAAuaQa3AvcTcQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358550,
+      "direction": "received",
+      "payload": "CAAuaQW3AvcTcQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358550,
+      "direction": "received",
+      "payload": "BwAuVAQvFm8K",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007358551,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007360423,
+      "direction": "sent",
+      "payload": "AwAhImI=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:142)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007362201,
+      "direction": "received",
+      "payload": "DgAuDgY7E24KfDkLBG3wQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007362202,
+      "direction": "received",
+      "payload": "CAAuaQS3AvcTcA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007362202,
+      "direction": "received",
+      "payload": "BAAubwQu",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007362203,
+      "direction": "received",
+      "payload": "BAAuZgQv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007365200,
+      "direction": "sent",
+      "payload": "BQAhJHTrGw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007366204,
+      "direction": "received",
+      "payload": "DgAuDgY7E24KfDkLBG3hQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007366205,
+      "direction": "received",
+      "payload": "HwAuZxEr3WwDfDlMSW0JQ3JJRG9wORxyDmd0YlBkUTQi",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007366205,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0hQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007366206,
+      "direction": "received",
+      "payload": "BgAuY8AjFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007366206,
+      "direction": "received",
+      "payload": "BgAuY8AjFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007366206,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007369474,
+      "direction": "sent",
+      "payload": "BAAhI14q",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:66:111)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007370206,
+      "direction": "received",
+      "payload": "MAAuescjF24LXCtMDkwcQ6e6H+P8yiABhpQDFeyTLUBahBFTFI9G/+zpWBQ3uzltHOs=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007370207,
+      "direction": "received",
+      "payload": "DgAuHQY7E6sGcDtNDmxOQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007370207,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0hQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007370208,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007370826,
+      "direction": "sent",
+      "payload": "AwAhImI=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:142)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007372209,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0XQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007372209,
+      "direction": "received",
+      "payload": "CAAuaQS3AvcTdw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007372210,
+      "direction": "received",
+      "payload": "EAAubwcu0Xr0g/VVDmzHXx4+",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007372210,
+      "direction": "received",
+      "payload": "BAAuZgQv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007374021,
+      "direction": "sent",
+      "payload": "BQAhJG7kBg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007374209,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0eQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007374209,
+      "direction": "received",
+      "payload": "FQAuZxEr02MHfTlMSW0JQ3JJRHlmLwo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007374210,
+      "direction": "received",
+      "payload": "CAAuRwUuE24LfA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007374210,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cTdw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007374210,
+      "direction": "received",
+      "payload": "BgAuY84+Fm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007375811,
+      "direction": "sent",
+      "payload": "BQAhJG7pAg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007376211,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0bQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007376212,
+      "direction": "received",
+      "payload": "EwAuZxEr334PfTlMSW0JQ3JJRG90",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007376212,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4KfA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007376213,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSdw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007376213,
+      "direction": "received",
+      "payload": "BgAuY8M6Fm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007377673,
+      "direction": "sent",
+      "payload": "BQAhJHTgAw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007378211,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0CQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007378212,
+      "direction": "received",
+      "payload": "FQAuZxEr3noCfTlMSW0JQ2RfUnlmLxw=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007378212,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007378212,
+      "direction": "received",
+      "payload": "BgAuY8o72G4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007378213,
+      "direction": "received",
+      "payload": "BgAuY8o72G4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007378213,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007380216,
+      "direction": "sent",
+      "payload": "BQAhJHTgCg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007382214,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1KRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007382214,
+      "direction": "received",
+      "payload": "FwAuZxEr2HsOfzlMSW0JQ2RJRG9wORxyCg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007382214,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007382215,
+      "direction": "received",
+      "payload": "BgAuY8oyAGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007382215,
+      "direction": "received",
+      "payload": "BgAuY8oyAGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007382215,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007384382,
+      "direction": "sent",
+      "payload": "BAAhI14q",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:66:111)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007386219,
+      "direction": "received",
+      "payload": "RAAuescyCGod/BlMrOwMQxC6GB3mylj+gpQXFhKTL0OwhDNQtY5HAyzoXBcfuSBss+t7ei8TRDQJU14S2/F9EVAOUxsgWw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007386219,
+      "direction": "received",
+      "payload": "DgAuHQY7E6AXdTpNDmxOQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007386219,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007386220,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007386627,
+      "direction": "sent",
+      "payload": "AwAhImI=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:142)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007388220,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1LRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388221,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSdg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388221,
+      "direction": "received",
+      "payload": "FAAubwAu3km/f/NSDmzDZf7F+z/8tQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388221,
+      "direction": "received",
+      "payload": "BAAuZgQv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388222,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388222,
+      "direction": "received",
+      "payload": "BgAuY8oyGmo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007388222,
+      "direction": "received",
+      "payload": "BgAuY8oyGmo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007392227,
+      "direction": "sent",
+      "payload": "BQAhJG7nMg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007394229,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1JRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007394230,
+      "direction": "received",
+      "payload": "GgAuZxEr2HICfzlMSW0JQ3JJRG9wORh2CmN0Zg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007394230,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4LeA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007394230,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cScg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007394230,
+      "direction": "received",
+      "payload": "BgAuY80KFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007396664,
+      "direction": "sent",
+      "payload": "BQAhJG7iNQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007398232,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG03Rw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007398233,
+      "direction": "received",
+      "payload": "EAAuZxEr3EoBfzlMSW0JQ29f",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007398233,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4Lfg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007398233,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSbA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007398234,
+      "direction": "received",
+      "payload": "BgAuY8gNFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007398990,
+      "direction": "sent",
+      "payload": "BQAhJG7kMA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007400231,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG0yRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007400232,
+      "direction": "received",
+      "payload": "EQAuZxEr3U0IfzlMSW0JQ3JJRA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007400232,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4Lfw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007400233,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSbw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007400233,
+      "direction": "received",
+      "payload": "BgAuY84IFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007403595,
+      "direction": "sent",
+      "payload": "AwAhImg=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:456)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007404238,
+      "direction": "received",
+      "payload": "YAMubKcsZ2QGezgmX0EDR1YxqB4MQn0FejRLXy0XFkQNLyAjSCsKBAfpSgEwKAdIHVJtRSwFZgxp8m8bEHcpA9waJj4jexE1wmVVbxpHGcwWIEBGfFUbVmxMRTApVKAIIjY1RBsrYyRCAiD9WhVYXy1FPiAKKTNFDiyAEWlyWA8aewl0pF8X0S8ff/ERd0KufF5PRFpaSSw+aVAsDVig1k4SBixCAXGGY6l9bT960202bURWRU8SJW8lVWlNbhdNIH9YDEJUJGdEF0Bjck1ZrCQPceocJ/IXisQ8CWjBPjcGLkkKRT8ES3oHJXg1CwAGJjTvL38XLQF2FRJ6XkI35hYItDRsQ0yiZx5aJGRz7KsjJV15SxYIrqKaHDiERsMAz3hEc0EdCN05EdXMZ4fsRI/DxXs2BNBy4qxw30SD4WcfQ39zVLZ6lKNQULQG9lN++BGZRXhEEMlriQW3BYqCB3CL57YJNMdpMkzZazHQYFEVWBsNVgkTDS6ZFFJXfTVCR/O1Mdl8sT+oEc/aVVUquFBpRr4qYTc8K9J2xjMFoQcEP+2UfHApCCUbPtE2UfGeao8Vk97j45lH/tvvA6k+9TfqEt4OfPOL13z9suesCBqxxu2nFPxDDfobBT/tmTLr9+dcHzMRRJATy2KzFe2Hg2YU9mbu6bkf9d53m24CHOSqiFPxzWoKmP4Xj8kIzEYGOfjfA+ZreY0a7MFhSsWZ/f6dU2rtYSqpKj9w7BVQ4kipHo6cscmQR5o4Sa8RcP70KCWDNLujEH81+MkNRstyazrbSrC/JKBmdIrAZ1+GZHtl/12FX479/PUJas8NMDVBJ9YI+rMVDgU2NG7yrRTebG24lAow/tEMHLLFePV8r1Fbzslh+/xC84AxY+Pffa5AQrJI00j1frAUg/VRXiDIyzoWHMgkbDU7vHwFHlZ6hrd+EiD4SBM/6N92MiH4PjZBAutrpX0zx+hNGiK7zQxSIQHR304DQQ+5ZEN/6esHOmvaH1pFLpRGCRoAuNV8FATO8QwbGYWCIyatsBJWHJ4wzA8f6lIHaBPVcJ0dFUPb4ggYxIYWAU4+qUtRP9bfCB4RP2YufQ8KnUp5B87PAgJNqIZLEQPYQhFhYQnCVlYOMvvVdS5wqmEkXfD/FAJrjl5dHSw=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007408421,
+      "direction": "sent",
+      "payload": "BQAhJHC/Ow==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.bb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:82:119)\n    at Rc.Uh (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:233:944)"
+    },
+    {
+      "timestamp_ms": 1782007410242,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG3UQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007410242,
+      "direction": "received",
+      "payload": "KAAueo0LHmoO/A9MDu4LQhO6NR4YynMCbZRDFr6TA0PZhGBT4Y5EAbno",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007410243,
+      "direction": "received",
+      "payload": "DgAuHQY7E/8mdDtNDmxOQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007410243,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG3UQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007410243,
+      "direction": "received",
+      "payload": "AgAudA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007410661,
+      "direction": "sent",
+      "payload": "AwAhImg=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:456)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007412244,
+      "direction": "received",
+      "payload": "YAMubKcsZ2QGezgmX0EDR1YxqB4MQn0FejRLXy0XFkQNLyAjSCsKBAfpSgEwKAdIHVJtRSwFZgxp8m8bEHcpA9waJj4jexE1wmVVbxpHGcwWIEBGfFUbVmxMRTApVKAIIjY1RBsrYyRCAiD9WhVYXy1FPiAKKTNFDiyAEWlyWA8aewl0pF8X0S8ff/ERd0KufF5PRFpaSSw+aVAsDVig1k4SBixCAXGGY6l9bT960202bURWRU8SJW8lVWlNbhdNIH9YDEJUJGdEF0Bjck1ZrCQPceocJ/IXisQ8CWjBPjcGLkkKRT8ES3oHJXg1CwAGJjTvL38XLQF2FRJ6XkI35hYItDRsQ0yiZx5aJGRz7KsjJV15SxYIrqKaHDiERsMAz3hEc0EdCN05EdXMZ4fsRI/DxXs2BNBy4qxw30SD4WcfQ39zVLZ6lKNQULQG9lN++BGZRXhEEMlriQW3BYqCB3CL57YJNMdpMkzZazHQYFEVWBsNVgkTDS6ZFFJXfTVCR/O1Mdl8sT+oEc/aVVUquFBpRr4qYTc8K9J2xjMFoQcEP+2UfHApCCUbPtE2UfGeao8Vk97j45lH/tvvA6k+9TfqEt4OfPOL13z9suesCBqxxu2nFPxDDfobBT/tmTLr9+dcHzMRRJATy2KzFe2Hg2YU9mbu6bkf9d53m24CHOSqiFPxzWoKmP4Xj8kIzEYGOfjfA+ZreY0a7MFhSsWZ/f6dU2rtYSqpKj9w7BVQ4kipHo6cscmQR5o4Sa8RcP70KCWDNLujEH81+MkNRstyazrbSrC/JKBmdIrAZ1+GZHtl/12FX479/PUJas8NMDVBJ9YI+rMVDgU2NG7yrRTebG24lAow/tEMHLLFePV8r1Fbzslh+/xC84AxY+Pffa5AQrJI00j1frAUg/VRXiDIyzoWHMgkbDU7vHwFHlZ6hrd+EiD4SBM/6N92MiH4PjZBAutrpX0zx+hNGiK7zQxSIQHR304DQQ+5ZEN/6esHOmvaH1pFLpRGCRoAuNV8FATO8QwbGYWCIyatsBJWHJ4wzA8f6lIHaBPVcJ0dFUPb4ggYxIYWAU4+qUtRP9bfCB4RP2YufQ8KnUp5B87PAgJNqIZLEQPYQhFhYQnCVlYOMvvVdS5wqmEkXfD/FAJr1FVdHSg=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007416002,
+      "direction": "sent",
+      "payload": "BQAhJHCAJA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.bb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:82:119)\n    at Rc.Uh (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:233:944)"
+    },
+    {
+      "timestamp_ms": 1782007416248,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0kQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007416248,
+      "direction": "received",
+      "payload": "XAAueqIECG+Q/BdMwewAQwG7NeP8ymz+gpQm6tiTLkcehDNQAI5nABPpXhUfuy9tvOtGe4CDRjYxw1LssPFyEJieURvRyx7g1PZINc2XL0hul0EALcQVW12IHW0/0A==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007416248,
+      "direction": "received",
+      "payload": "DgAuHQY7E8A5dDtNDmxOQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007416249,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0kQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007416249,
+      "direction": "received",
+      "payload": "AgAudA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007417870,
+      "direction": "sent",
+      "payload": "AwAhImI=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:142)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007418249,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0qQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007418250,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSbg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007418250,
+      "direction": "received",
+      "payload": "FAAubwAusFf0g5Ng8ZOnc0E+gi/8tQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007418250,
+      "direction": "received",
+      "payload": "BAAuZgQv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007438819,
+      "direction": "sent",
+      "payload": "BQAhJHSAIA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007440275,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0WQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007440275,
+      "direction": "received",
+      "payload": "EgAuZxEruFwDfTlMSW0JQ3JJRG8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007440275,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007440276,
+      "direction": "received",
+      "payload": "CgAuY6oYFm6lSUpM",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007440276,
+      "direction": "received",
+      "payload": "CgAuY6oYFm6lSUpM",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007440277,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007466685,
+      "direction": "sent",
+      "payload": "BwAhJkAOFcAk",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:119)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007468319,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1PRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468320,
+      "direction": "received",
+      "payload": "FAAuZxEruFgDfzlMSW0JQ29UWXJtJA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468320,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468320,
+      "direction": "received",
+      "payload": "BgAuY6oeLGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468321,
+      "direction": "received",
+      "payload": "BgAuY6oeLGo=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468321,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0lQg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468321,
+      "direction": "received",
+      "payload": "BAAuRCgv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007468322,
+      "direction": "received",
+      "payload": "BgAuY6oBNm0=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007491777,
+      "direction": "sent",
+      "payload": "BwAhJneAJ24L",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:83)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007492330,
+      "direction": "received",
+      "payload": "DgAuDgY7E28KfDkLBG0vQg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007492330,
+      "direction": "received",
+      "payload": "DAAucwY7E8A70gjiP2w=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007495750,
+      "direction": "sent",
+      "payload": "BwAhJkAIF8A6",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:119)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007496333,
+      "direction": "received",
+      "payload": "DgAuDgY7E24KfDkLBG1tQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007496334,
+      "direction": "received",
+      "payload": "BAAuRGAu",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007496334,
+      "direction": "received",
+      "payload": "BgAuY6of1G4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007525819,
+      "direction": "sent",
+      "payload": "AwAhIiU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.Fb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:71:190)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:50:309)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:65:33)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007531036,
+      "direction": "sent",
+      "payload": "BQAhJHSAOQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007532368,
+      "direction": "received",
+      "payload": "DgAuDgY7E24KfDkLBG1qQw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007532369,
+      "direction": "received",
+      "payload": "DwAuZxEruF4DfDlMSW0JQ28=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007532369,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007532370,
+      "direction": "received",
+      "payload": "CgAuY6oBFm6lTEhP",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007532370,
+      "direction": "received",
+      "payload": "CgAuY6oBFm6lTEhP",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007532370,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007561202,
+      "direction": "sent",
+      "payload": "AwAhIiU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.Fb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:71:190)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:50:309)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:65:33)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007579075,
+      "direction": "sent",
+      "payload": "BQAhJG6EOg==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007580420,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1PRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007580420,
+      "direction": "received",
+      "payload": "FAAuZxEruEELfzlMSW0JQ29UWWt0PQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007580421,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4LeA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007580421,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSag==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007580421,
+      "direction": "received",
+      "payload": "BgAuY64CFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007584492,
+      "direction": "sent",
+      "payload": "BQAhJG6GIA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007586425,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG0/Rw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007586426,
+      "direction": "received",
+      "payload": "HgAuZxErvUIGfzlMSW0JQ2RfRG9wORxyDmd0ZlBkUTQ=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007586426,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4Lfw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007586427,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSZQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007586427,
+      "direction": "received",
+      "payload": "BgAuY6wYFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007590805,
+      "direction": "sent",
+      "payload": "BQAhJHSaIw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007592430,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG0jRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007592431,
+      "direction": "received",
+      "payload": "GgAuZxErv1gHfzlMSW0JQ2RfUnlmLwpkGHpicA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007592431,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007620907,
+      "direction": "sent",
+      "payload": "AwAhIiU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.Fb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:71:190)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:50:309)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:65:33)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007630774,
+      "direction": "sent",
+      "payload": "BQAhJHSfIw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007632468,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG0uRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007632469,
+      "direction": "received",
+      "payload": "EQAuZxErolsPfzlMSW0JQ3ZNQA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007632469,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007632470,
+      "direction": "received",
+      "payload": "BgAuY7UbBWw=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007632470,
+      "direction": "received",
+      "payload": "BgAuY7UbBWw=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007632470,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007634798,
+      "direction": "sent",
+      "payload": "BQAhJHSdIw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007636472,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1DRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007636472,
+      "direction": "received",
+      "payload": "EAAuZxErp1sHfzlMSW0JQ2Rf",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007636472,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007637633,
+      "direction": "sent",
+      "payload": "AwAhIm8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:191)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007638473,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1JRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007638473,
+      "direction": "received",
+      "payload": "FgAuawY7E2a4SYt5vFi6d7UOgym3fN03",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007647791,
+      "direction": "sent",
+      "payload": "BQAhJG6fIA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007648482,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG03Rw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007648482,
+      "direction": "received",
+      "payload": "EAAuZxErpVsPfzlMSW0JQ3ZJ",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007648483,
+      "direction": "received",
+      "payload": "BQAucgUuEQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007676118,
+      "direction": "sent",
+      "payload": "BwAhJkC+F9w9",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:119)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007676509,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG2nQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007676510,
+      "direction": "received",
+      "payload": "BAAuRKos",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007676510,
+      "direction": "received",
+      "payload": "BgAuY7YYhm8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007678534,
+      "direction": "sent",
+      "payload": "BQAhJHScJQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:67:289)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007680516,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG2iQQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007680516,
+      "direction": "received",
+      "payload": "EQAuZxErpFgAfjlMSW0JQ29UWQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007680517,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007680517,
+      "direction": "received",
+      "payload": "BgAuY7cdSW4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007680517,
+      "direction": "received",
+      "payload": "BgAuY7cdSW4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007680517,
+      "direction": "received",
+      "payload": "AwAuHwU=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007704549,
+      "direction": "sent",
+      "payload": "BwAhJkACF984",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:119)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007706540,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0pQA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007706541,
+      "direction": "received",
+      "payload": "BAAuRCQt",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007706541,
+      "direction": "received",
+      "payload": "BgAuY7UdOm8=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007709179,
+      "direction": "sent",
+      "payload": "BQAhJG6fIA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007710545,
+      "direction": "received",
+      "payload": "DgAuDgY7E2wKfDkLBG0UQA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007710546,
+      "direction": "received",
+      "payload": "EQAuZxErpF0LfjlMSW0JQ3JJRA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007710546,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007710546,
+      "direction": "received",
+      "payload": "BgAuY7YYd24=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007710547,
+      "direction": "received",
+      "payload": "BgAuY7YYd24=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007710547,
+      "direction": "received",
+      "payload": "BQAucgUuEQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007718797,
+      "direction": "sent",
+      "payload": "BwAhJkDmFtw5",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:69:119)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007720558,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1ARw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720559,
+      "direction": "received",
+      "payload": "EQAuZxErpFgDfzlMSW0JQ29UWQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720559,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720559,
+      "direction": "received",
+      "payload": "BgAuY7cdSm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720560,
+      "direction": "received",
+      "payload": "BgAuY7cdSm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720560,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG2NQA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720560,
+      "direction": "received",
+      "payload": "BAAuRIAt",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007720560,
+      "direction": "received",
+      "payload": "BgAuY7Yc3m4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007721497,
+      "direction": "sent",
+      "payload": "AwAhImI=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:142)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007722557,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1zQA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722557,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSZA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722557,
+      "direction": "received",
+      "payload": "BAAubwQu",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722558,
+      "direction": "received",
+      "payload": "BAAuZgQv",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722558,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722558,
+      "direction": "received",
+      "payload": "CgAuY7cdFm65TmtM",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007722558,
+      "direction": "received",
+      "payload": "CgAuY7cdFm65TmtM",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007726990,
+      "direction": "sent",
+      "payload": "BQAhJG6fIA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at Xa (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:13:407)\n    at I (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:25:461)\n    at m.pb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:68:315)\n    at m.rb (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:47:80)"
+    },
+    {
+      "timestamp_ms": 1782007728563,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1ARw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728563,
+      "direction": "received",
+      "payload": "EQAuZxErpF0LfzlMSW0JQ3JJRA==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728564,
+      "direction": "received",
+      "payload": "DgAuDgY7E20KfDkLBG1FRw==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728564,
+      "direction": "received",
+      "payload": "BgAuY7YYSG4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728564,
+      "direction": "received",
+      "payload": "BgAuY7YYSG4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728564,
+      "direction": "received",
+      "payload": "CAAuRwUuFm4LfQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728564,
+      "direction": "received",
+      "payload": "CAAuaQS3D/cSZQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007728565,
+      "direction": "received",
+      "payload": "BgAuY7UYFm4=",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007730480,
+      "direction": "sent",
+      "payload": "AQAt",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at m.$a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:74:303)\n    at Rc.Vh (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:233:1031)"
+    },
+    {
+      "timestamp_ms": 1782007730548,
+      "direction": "received",
+      "payload": "AQAt",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    },
+    {
+      "timestamp_ms": 1782007730550,
+      "direction": "sent",
+      "payload": "AgAqMQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/",
+      "sent_origin": "page_client",
+      "sent_stack": "Error\n    at WebSocket.send (<anonymous>:141:33)\n    at $a (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:14:178)\n    at Ch.h [as s] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:215:499)\n    at ab.t [as m] (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:220:369)\n    at ab.Va (https://tankpit.com/game/tpclient-b45bd1ebc9c0c668.js:12:306)"
+    },
+    {
+      "timestamp_ms": 1782007730606,
+      "direction": "received",
+      "payload": "IAA9MXxKYW4uIDA4LCAyMDEzfEFydGF4fDF8OXw5fDl8OQ==",
+      "ws_url": "wss://dorothy.tankpit.com/ws/"
+    }
+  ],
+  "magic": "y5ju4r5x9j5togig8964",
+  "game_log": [
+    {
+      "timestamp_ms": 1782007358864,
+      "text": "********************************************",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007358866,
+      "text": "MAP",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007360435,
+      "text": "RADAR",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007362237,
+      "text": "FUEL: 166",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007365212,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007365216,
+      "text": "Teleport using the map.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007365220,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007366264,
+      "text": "SCOPE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007369485,
+      "text": "Extend view S",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007370245,
+      "text": "MINE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007370836,
+      "text": "198, 19",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007372253,
+      "text": "202, 21",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007374033,
+      "text": "201, 18",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007374268,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007375822,
+      "text": "5 dual shots gained",
+      "category": "equipment"
+    },
+    {
+      "timestamp_ms": 1782007376269,
+      "text": "FUEL: 783",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007377686,
+      "text": "1 homing shot gained",
+      "category": "equipment"
+    },
+    {
+      "timestamp_ms": 1782007377690,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007382273,
+      "text": "SCOPE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007384394,
+      "text": "Extend view S",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007386263,
+      "text": "RADAR",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007388301,
+      "text": "204, 34",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007394292,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007396676,
+      "text": "203, 37",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007398294,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007399003,
+      "text": "204, 37",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007400297,
+      "text": "FUEL: 167",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007403607,
+      "text": "203, 34",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007404252,
+      "text": "Zoom in",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007404257,
+      "text": "202, 33",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007408434,
+      "text": "Teleporting to [145,45]",
+      "category": "teleport"
+    },
+    {
+      "timestamp_ms": 1782007408438,
+      "text": "145, 45",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007410300,
+      "text": "MAP",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007412260,
+      "text": "Zoom in",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007412264,
+      "text": "Artax",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007412269,
+      "text": "private (71)",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007416015,
+      "text": "Teleporting to [174,50]",
+      "category": "teleport"
+    },
+    {
+      "timestamp_ms": 1782007416019,
+      "text": "174, 50",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007416305,
+      "text": "179, 48",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007416311,
+      "text": "179, 49",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007416317,
+      "text": "178, 50",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007417882,
+      "text": "171, 56",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007418292,
+      "text": "174, 49",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007438836,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007438842,
+      "text": "Use armor shield",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007438848,
+      "text": "when you really need it.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007438852,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007466700,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007468390,
+      "text": "LOCATION: 174,54",
+      "category": "location"
+    },
+    {
+      "timestamp_ms": 1782007491790,
+      "text": "Fuel deposited",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007491793,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007491797,
+      "text": "Teleport using the map.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007491803,
+      "text": "Waiting for FIRE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007492356,
+      "text": "You fire",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007492360,
+      "text": "174, 49",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007495766,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007496368,
+      "text": "Fuel deposited",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007496373,
+      "text": "Artax",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007496379,
+      "text": "private (71)",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007525833,
+      "text": "LOCATION: 174,48",
+      "category": "location"
+    },
+    {
+      "timestamp_ms": 1782007531051,
+      "text": "Artax",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007531056,
+      "text": "private (71)",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007532436,
+      "text": "FUEL: 1082",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007561214,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007561217,
+      "text": "Teleport using the map.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007561219,
+      "text": "LOCATION: 174,47",
+      "category": "location"
+    },
+    {
+      "timestamp_ms": 1782007580491,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007586497,
+      "text": "178, 53",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007590823,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007592475,
+      "text": "FUEL: 568",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007620930,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007620937,
+      "text": "Dual shot causes double",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007620940,
+      "text": "damage.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007620944,
+      "text": "178, 53",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007630793,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007632546,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007634816,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007637650,
+      "text": "MINE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007638496,
+      "text": "MAP",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007648531,
+      "text": "LOCATION: 179,53",
+      "category": "location"
+    },
+    {
+      "timestamp_ms": 1782007676137,
+      "text": "Inventory full",
+      "category": "equipment"
+    },
+    {
+      "timestamp_ms": 1782007676143,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007676150,
+      "text": "Plant mines to arrest pursuers.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007676156,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007676552,
+      "text": "Fuel deposited",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007676557,
+      "text": "179, 50",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007678552,
+      "text": "Waiting for MOVE",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007704566,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007706574,
+      "text": "Fuel deposited",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007706578,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007710618,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007718815,
+      "text": "Inventory full",
+      "category": "equipment"
+    },
+    {
+      "timestamp_ms": 1782007718819,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007720645,
+      "text": "Artax",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007720651,
+      "text": "private (71)",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007720656,
+      "text": "EQUIPMENT",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007720662,
+      "text": "Waiting for DEPOSIT FUEL",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007721514,
+      "text": "Fuel deposited",
+      "category": "action"
+    },
+    {
+      "timestamp_ms": 1782007721520,
+      "text": "177, 52",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007722627,
+      "text": "FUEL: 97",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007727007,
+      "text": "Tip (press N):",
+      "category": "tip"
+    },
+    {
+      "timestamp_ms": 1782007727013,
+      "text": "Blow up enemy mines.",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007727018,
+      "text": "178, 52",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007728645,
+      "text": "FUEL: 97",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007730498,
+      "text": "1 extra radar gained",
+      "category": "equipment"
+    },
+    {
+      "timestamp_ms": 1782007730503,
+      "text": "Artax",
+      "category": "other"
+    },
+    {
+      "timestamp_ms": 1782007730508,
+      "text": "private (71)",
+      "category": "other"
+    }
+  ],
+  "tank_names": {}
+}

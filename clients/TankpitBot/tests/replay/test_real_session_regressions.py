@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.replay.engine import replay_session
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
@@ -107,7 +108,7 @@ def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
     """
     session = load_capture_fixture("fuel_radar_loop.capture_session.json")
 
-    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         replay_session(session)
 
 
@@ -122,7 +123,7 @@ def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
     """
     session = load_capture_fixture("equipment_then_fuel_loop.capture_session.json")
 
-    with pytest.raises(ValueError, match="COLLECT owner produced no decision"):
+    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
         replay_session(session)
 
 
