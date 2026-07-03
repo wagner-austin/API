@@ -15,6 +15,7 @@ from tankpit_bot.action_lab.action_trace_types import (
 from tankpit_bot.bot.ai.equipment import (
     _CONTAINER_FRESHNESS_TTL_MS,
     _viewport_bounds,
+    hostile_mines,
 )
 from tankpit_bot.bot.ai.equipment_search import _describe_candidate_reason
 from tankpit_bot.runtime_logging import emit_diagnostic
@@ -174,7 +175,7 @@ def build_fuel_decision_basis(
                 terrain,
                 want_fuel=True,
                 minimum_volume=1,
-                blocked_mines=world["mines"],
+                blocked_mines=hostile_mines(world),
             )
         selected = fuel_target is not None and fuel_target["x"] == x and fuel_target["y"] == y
         candidates.append(

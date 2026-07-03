@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.equipment_search import find_nearest_equipment, find_teleport_landing_tile
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
 from tankpit_bot.sniffer.world_state import get_terrain_map
@@ -89,7 +90,7 @@ def visible_equipment_requires_reposition(
         self_state["y"],
         equipment_target["x"],
         equipment_target["y"],
-        world["mines"],
+        hostile_mines(world),
     )
 
 
@@ -122,7 +123,7 @@ def find_visible_equipment_landing_tile(
         self_state["y"],
         equipment_target["x"],
         equipment_target["y"],
-        world["mines"],
+        hostile_mines(world),
     )
 
 
