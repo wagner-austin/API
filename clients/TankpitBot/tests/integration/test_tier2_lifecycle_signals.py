@@ -370,7 +370,10 @@ class TestCombatHitAdvancesDamageState:
             ),
         )
 
-        # Our shot lands on Yuppler's tile (131, 124).
+        # Our shot lands on Yuppler's tile (131, 124). A landing shot
+        # debits ammo -- the server encodes the spend in the weapon
+        # byte (1 = dual), and consumption is the hit signal (user
+        # contract 2026-07-02).
         dispatch_world_state_update(
             ws,
             ShootEventDict(
@@ -383,7 +386,7 @@ class TestCombatHitAdvancesDamageState:
                 target_y=124,
                 aim_x=131,
                 aim_y=124,
-                weapon=0,
+                weapon=1,
             ),
         )
 
