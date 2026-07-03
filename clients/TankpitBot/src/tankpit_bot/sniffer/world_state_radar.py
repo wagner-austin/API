@@ -2,9 +2,17 @@
 
 Handles radar scan results, differential cache promotion, viewport scan
 confirmation, and stale resource reconciliation within the radar envelope.
+
+Container and mine state both live in their own registries
+(``world.containers`` / ``world.mines``), populated by every wire signal
+that carries them -- 0x5A viewport patches, 0x43 cache updates, 0x40
+overlay updates, 0x4B mine placements, and these radar handlers. There
+is no parallel store in ``world.terrain`` to reconcile against.
 """
 
 from __future__ import annotations
+
+from typing import TypeVar
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
@@ -16,10 +24,42 @@ from tankpit_bot.state import (
     WorldStateDict,
     add_mine_from_radar,
     coord_key,
-    make_terrain_tile,
-    mark_viewport_scanned,
+    record_scanned_tiles,
     update_container_from_radar,
 )
+from tankpit_bot.state.scan_coverage import (
+    free_radar_revealed_tiles,
+    viewport_tiles,
+)
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+
+def _radar_revealed_tiles(ws: WorldService) -> list[tuple[int, int]]:
+    """Return the exact tile set the current server radar revealed.
+
+    Extra radar reveals every tile in the viewport. Free radar reveals
+    the 5x5 block around the tank intersected with the viewport. When
+    the tank position is unknown (self_state not yet observed), the
+    server falls back to the extra-radar geometry -- mirror that.
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        Tiles the current radar revealed.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ws.world_state["viewport"])
+    self_state = ws.world_state["self_state"]
+    if ws.current_radar_uses_extra() or self_state is None:
+        return viewport_tiles(left, top, right, bottom)
+    return free_radar_revealed_tiles(
+        self_state["x"],
+        self_state["y"],
+        left,
+        top,
+        right,
+        bottom,
+    )
 
 
 def update_world_state_from_radar(
@@ -41,14 +81,9 @@ def update_world_state_from_radar(
     ws.clear_failed_move_targets()
     reconcile_radar_viewport_resources(ws, containers, mines)
     viewport = ws.world_state["viewport"]
+    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-        ws.world_state = mark_viewport_scanned(
-            ws.world_state,
-            viewport["left"],
-            viewport["top"],
-            ts,
-        )
 
     for c in containers:
         ws.world_state = update_container_from_radar(
@@ -69,52 +104,54 @@ def update_world_state_from_radar(
         )
 
 
-def containers_from_current_radar_cache(ws: WorldService) -> list[RadarContainerDict]:
-    """Synthesize authoritative radar containers from current terrain cache.
+def _radar_envelope_containers(ws: WorldService) -> list[RadarContainerDict]:
+    """Return the containers currently tracked inside the radar envelope.
+
+    Used by the differential-refresh path: when the server signals
+    "radar confirmed the cache is current", we replay the existing
+    ``world.containers`` entries within radar bounds back through
+    :func:`update_container_from_radar` to bump their refresh metadata.
 
     Args:
         ws: World service instance.
 
     Returns:
-        List of containers derived from terrain tile cache values within
+        Radar-shaped container records for every tracked container in
         the current radar envelope.
     """
     left, top, right, bottom = ws.radar_bounds()
-    containers: list[RadarContainerDict] = []
-    for tile in ws.world_state["terrain"].values():
-        x = tile["x"]
-        y = tile["y"]
+    result: list[RadarContainerDict] = []
+    for container in ws.world_state["containers"].values():
+        x = container["x"]
+        y = container["y"]
         if not (left <= x <= right and top <= y <= bottom):
             continue
-        cache_value = tile["cache_value"]
-        if cache_value == -1:
-            containers.append(RadarContainerDict(x=x, y=y, volume=-1))
-        elif cache_value > 0:
-            containers.append(RadarContainerDict(x=x, y=y, volume=cache_value))
-    return containers
+        volume = container["volume"] if container["is_fuel"] else -1
+        result.append(RadarContainerDict(x=x, y=y, volume=volume))
+    return result
 
 
 def update_world_state_from_radar_cache(ws: WorldService) -> None:
     """Promote a differential radar cache refresh to authoritative containers.
 
+    The wire signaled "radar saw containers but isn't sending the full
+    list -- the cache is current." With the single-store container
+    architecture, the per-tile mutators (0x5A / 0x43 / pickup) keep
+    ``world.containers`` continuously accurate, so this handler just
+    bumps refresh metadata on the in-envelope entries.
+
     Args:
         ws: World service instance.
     """
     ts = get_current_time_ms()
-    containers = containers_from_current_radar_cache(ws)
+    envelope = _radar_envelope_containers(ws)
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
-    reconcile_radar_viewport_resources(ws, containers, None)
     viewport = ws.world_state["viewport"]
+    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-        ws.world_state = mark_viewport_scanned(
-            ws.world_state,
-            viewport["left"],
-            viewport["top"],
-            ts,
-        )
-    for container in containers:
+    for container in envelope:
         ws.world_state = update_container_from_radar(
             ws.world_state,
             container["x"],
@@ -124,8 +161,8 @@ def update_world_state_from_radar_cache(ws: WorldService) -> None:
             refresh_kind="radar_cache_refresh",
         )
     emit_world(
-        "Radar cache refresh: promoted %d containers from combined tile update",
-        len(containers),
+        "Radar cache refresh: refreshed %d containers in current envelope",
+        len(envelope),
     )
 
 
@@ -138,32 +175,14 @@ def update_world_state_from_radar_known_resources(ws: WorldService) -> None:
         ws: World service instance.
     """
     ts = get_current_time_ms()
-    left, top, right, bottom = ws.radar_bounds()
-    containers_by_key: dict[str, RadarContainerDict] = {}
-
-    for container in ws.world_state["containers"].values():
-        x = container["x"]
-        y = container["y"]
-        if left <= x <= right and top <= y <= bottom:
-            containers_by_key[coord_key(x, y)] = RadarContainerDict(
-                x=x,
-                y=y,
-                volume=container["volume"],
-            )
-
-    radar_containers = list(containers_by_key.values())
+    envelope = _radar_envelope_containers(ws)
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
     viewport = ws.world_state["viewport"]
+    ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)
     if ws.current_radar_uses_extra():
         ws.clear_failed_scan_viewport(viewport["left"], viewport["top"])
-        ws.world_state = mark_viewport_scanned(
-            ws.world_state,
-            viewport["left"],
-            viewport["top"],
-            ts,
-        )
-    for rc in radar_containers:
+    for rc in envelope:
         ws.world_state = update_container_from_radar(
             ws.world_state,
             rc["x"],
@@ -174,40 +193,46 @@ def update_world_state_from_radar_known_resources(ws: WorldService) -> None:
         )
     emit_world(
         "Radar differential refresh: preserved %d known containers in viewport",
-        len(radar_containers),
+        len(envelope),
     )
 
 
-def clear_container_tile_cache(ws: WorldService, x: int, y: int) -> None:
-    """Clear cached resource data for a tile without changing terrain.
+_RadarEntityT = TypeVar("_RadarEntityT", ContainerStateDict, MineStateDict)
+
+
+def _without_stale_radar_entries(
+    entries: dict[str, _RadarEntityT],
+    bounds: tuple[int, int, int, int],
+    radar_keys: set[str],
+) -> dict[str, _RadarEntityT] | None:
+    """Return ``entries`` without stale radar-sourced ones, or ``None`` if unchanged.
+
+    An entry is stale when its latest confirmation came from a radar,
+    it sits inside the scan bounds, and the new radar response does not
+    list it. Entries confirmed by any other source (0x5A viewport
+    patches, 0x43 cache updates, mine placements) are never removed --
+    the radar response says nothing about visible entities.
 
     Args:
-        ws: World service instance.
-        x: Tile X coordinate.
-        y: Tile Y coordinate.
+        entries: Current registry keyed by ``"x,y"``.
+        bounds: ``(left, top, right, bottom)`` scan bounds, inclusive.
+        radar_keys: ``"x,y"`` keys the radar response listed.
+
+    Returns:
+        Pruned copy of the registry, or ``None`` when nothing is stale.
     """
-    key = coord_key(x, y)
-    existing = ws.world_state["terrain"].get(key)
-    if existing is None:
-        return
-    new_terrain = dict(ws.world_state["terrain"])
-    new_terrain[key] = make_terrain_tile(
-        x=x,
-        y=y,
-        terrain_type=existing["terrain_type"],
-        cache_value=0,
-        overlay_value=existing["overlay_value"],
-    )
-    ws.world_state = WorldStateDict(
-        self_state=ws.world_state["self_state"],
-        tanks=ws.world_state["tanks"],
-        containers=ws.world_state["containers"],
-        mines=ws.world_state["mines"],
-        terrain=new_terrain,
-        viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
-        timestamp_ms=ws.world_state["timestamp_ms"],
-    )
+    left, top, right, bottom = bounds
+    pruned: dict[str, _RadarEntityT] | None = None
+    for key, entry in entries.items():
+        if entry["source"] != "radar":
+            continue
+        x = entry["x"]
+        y = entry["y"]
+        if left <= x <= right and top <= y <= bottom and key not in radar_keys:
+            if pruned is None:
+                pruned = dict(entries)
+            del pruned[key]
+    return pruned
 
 
 def reconcile_radar_viewport_resources(
@@ -215,40 +240,40 @@ def reconcile_radar_viewport_resources(
     containers: list[RadarContainerDict],
     mines: list[RadarMineDict] | None,
 ) -> None:
-    """Make current viewport resources match an authoritative radar scan.
+    """Reconcile radar-sourced viewport resources against a fresh radar scan.
 
-    Any tracked container or mine inside the current viewport that is absent
-    from the radar response is stale and must be removed.
+    A radar response lists only the HIDDEN entities the scan revealed —
+    already-visible containers and mines are on screen and are NOT
+    re-sent (live run 2026-07-01 20:20:10: the landing 0x5A registered
+    7 visible containers, the scan-on-landing radar listed just 2
+    hidden ones, and the old whole-envelope reconcile deleted all 7
+    visible entries, including a 1000+ volume fuel container). Only
+    entries whose latest confirmation came from a PREVIOUS radar are
+    stale when a new radar omits them; the visible layer is owned by
+    the 0x5A viewport patches and 0x43 cache updates and must be left
+    alone.
 
     Args:
         ws: World service instance.
         containers: Containers returned by radar.
         mines: Mines returned by radar. ``None`` skips mine reconciliation.
     """
-    left, top, right, bottom = ws.radar_bounds()
+    bounds = ws.radar_bounds()
     radar_container_keys = {coord_key(item["x"], item["y"]) for item in containers}
-    radar_mine_keys = (
-        {coord_key(item["x"], item["y"]) for item in mines} if mines is not None else None
+
+    new_containers = _without_stale_radar_entries(
+        ws.world_state["containers"],
+        bounds,
+        radar_container_keys,
     )
-
-    new_containers: dict[str, ContainerStateDict] | None = None
-    for key, container in ws.world_state["containers"].items():
-        x = container["x"]
-        y = container["y"]
-        if left <= x <= right and top <= y <= bottom and key not in radar_container_keys:
-            if new_containers is None:
-                new_containers = dict(ws.world_state["containers"])
-            del new_containers[key]
-
     new_mines: dict[str, MineStateDict] | None = None
-    if radar_mine_keys is not None:
-        for key, mine in ws.world_state["mines"].items():
-            x = mine["x"]
-            y = mine["y"]
-            if left <= x <= right and top <= y <= bottom and key not in radar_mine_keys:
-                if new_mines is None:
-                    new_mines = dict(ws.world_state["mines"])
-                del new_mines[key]
+    if mines is not None:
+        radar_mine_keys = {coord_key(item["x"], item["y"]) for item in mines}
+        new_mines = _without_stale_radar_entries(
+            ws.world_state["mines"],
+            bounds,
+            radar_mine_keys,
+        )
 
     if new_containers is None and new_mines is None:
         return
@@ -260,7 +285,7 @@ def reconcile_radar_viewport_resources(
         mines=ws.world_state["mines"] if new_mines is None else new_mines,
         terrain=ws.world_state["terrain"],
         viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
+        scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
 
@@ -276,7 +301,7 @@ def handle_radar_ack(ws: WorldService, found: bool) -> None:
         update_world_state_from_radar_cache(ws)
     elif ws.consume_pending_radar_empty_delta():
         if found:
-            if containers_from_current_radar_cache(ws):
+            if _radar_envelope_containers(ws):
                 update_world_state_from_radar_cache(ws)
             else:
                 update_world_state_from_radar_known_resources(ws)
@@ -287,8 +312,6 @@ def handle_radar_ack(ws: WorldService, found: bool) -> None:
 
 
 __all__ = [
-    "clear_container_tile_cache",
-    "containers_from_current_radar_cache",
     "handle_radar_ack",
     "reconcile_radar_viewport_resources",
     "update_world_state_from_radar",

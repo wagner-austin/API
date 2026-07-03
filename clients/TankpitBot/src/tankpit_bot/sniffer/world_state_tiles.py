@@ -2,6 +2,14 @@
 
 Handles ``0x5A`` viewport entity patches, ``0x43`` cache updates, ``0x40``
 overlay updates, ``0x4A`` terrain updates, and waypoint resolution.
+
+Every wire message that carries a per-tile container layer
+(``cache_value``) or mine layer (``overlay_value``) fans those bytes out
+to ``world.containers`` and ``world.mines`` via
+:func:`tankpit_bot.state.container_mutations.apply_tile_cache_update`
+and :func:`apply_tile_overlay_update`. Terrain itself only stores
+``terrain_type``; the container and mine layers live in their own
+registries (single source of truth per entity class).
 """
 
 from __future__ import annotations
@@ -12,6 +20,8 @@ from tankpit_bot.sniffer.viewport import update_viewport_origin
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     WorldStateDict,
+    apply_tile_cache_update,
+    apply_tile_overlay_update,
     coord_key,
     make_terrain_tile,
     render_world_ascii,
@@ -45,7 +55,7 @@ def update_viewport_entities(
         mines=ws.world_state["mines"],
         terrain=ws.world_state["terrain"],
         viewport=make_visible_viewport_state(viewport_left, viewport_top),
-        scanned_viewports=ws.world_state["scanned_viewports"],
+        scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
 
@@ -59,7 +69,15 @@ def update_viewport_tiles(
     vp_left: int,
     vp_top: int,
 ) -> None:
-    """Apply ``0x5A`` tile patches to viewport terrain and visual cache only.
+    """Apply ``0x5A`` tile patches: terrain, container layer, and mine layer.
+
+    Each entity carries three layers. Terrain bits land on
+    ``world.terrain``; the container byte (``cache_value``) and mine
+    byte (``overlay_value``) are lifted into ``world.containers`` and
+    ``world.mines`` via the shared per-tile mutators -- the same code
+    path the 0x43 ``CacheUpdate`` and 0x40 ``OverlayUpdate`` messages
+    use, so a tile sourced from any of the three wire signals is
+    indistinguishable downstream.
 
     Args:
         ws: World service instance.
@@ -77,16 +95,11 @@ def update_viewport_tiles(
             ent["col"],
             ent["row"],
         )
-        cache_value = ent["cache_value"]
-        overlay_value = ent["overlay_value"]
-        terrain_type = ent["terrain_type"]
         key = coord_key(abs_x, abs_y)
         new_terrain[key] = make_terrain_tile(
             x=abs_x,
             y=abs_y,
-            terrain_type=terrain_type,
-            cache_value=cache_value,
-            overlay_value=overlay_value,
+            terrain_type=ent["terrain_type"],
         )
 
     ws.world_state = WorldStateDict(
@@ -96,77 +109,71 @@ def update_viewport_tiles(
         mines=ws.world_state["mines"],
         terrain=new_terrain,
         viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
+        scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=ts,
     )
 
+    for ent in entities:
+        abs_x, abs_y = viewport_patch_world_coords(
+            vp_left,
+            vp_top,
+            ent["col"],
+            ent["row"],
+        )
+        ws.world_state = apply_tile_cache_update(
+            ws.world_state,
+            abs_x,
+            abs_y,
+            ent["cache_value"],
+            ts,
+        )
+        ws.world_state = apply_tile_overlay_update(
+            ws.world_state,
+            abs_x,
+            abs_y,
+            ent["overlay_value"],
+            ts,
+        )
+
 
 def update_cache_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) -> None:
-    """Apply absolute cache-only tile updates to terrain/visual cache only.
+    """Apply absolute cache-only tile updates (``0x43 CacheUpdate``).
+
+    The container-layer byte is the only payload; terrain stays put.
 
     Args:
         ws: World service instance.
         updates: Absolute ``(x, y, cache_value)`` triples.
     """
-    new_terrain = dict(ws.world_state["terrain"])
     timestamp_ms = get_current_time_ms()
     for x, y, cache_value in updates:
-        key = coord_key(x, y)
-        existing = new_terrain.get(key)
-        terrain_type = existing["terrain_type"] if existing is not None else 0
-        overlay_value = existing["overlay_value"] if existing is not None else 255
-        new_terrain[key] = make_terrain_tile(
-            x=x,
-            y=y,
-            terrain_type=terrain_type,
-            cache_value=cache_value,
-            overlay_value=overlay_value,
+        ws.world_state = apply_tile_cache_update(
+            ws.world_state,
+            x,
+            y,
+            cache_value,
+            timestamp_ms,
         )
-
-    ws.world_state = WorldStateDict(
-        self_state=ws.world_state["self_state"],
-        tanks=ws.world_state["tanks"],
-        containers=ws.world_state["containers"],
-        mines=ws.world_state["mines"],
-        terrain=new_terrain,
-        viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
-        timestamp_ms=timestamp_ms,
-    )
 
 
 def update_overlay_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) -> None:
-    """Apply absolute overlay-only tile updates to world state.
+    """Apply absolute overlay-only tile updates (``0x40 OverlayUpdate``).
+
+    The mine-layer byte is the only payload; terrain stays put.
 
     Args:
         ws: World service instance.
         updates: Absolute ``(x, y, overlay_value)`` triples.
     """
-    new_terrain = dict(ws.world_state["terrain"])
     timestamp_ms = get_current_time_ms()
     for x, y, overlay_value in updates:
-        key = coord_key(x, y)
-        existing = new_terrain.get(key)
-        terrain_type = existing["terrain_type"] if existing is not None else 0
-        cache_value = existing["cache_value"] if existing is not None else 0
-        new_terrain[key] = make_terrain_tile(
-            x=x,
-            y=y,
-            terrain_type=terrain_type,
-            cache_value=cache_value,
-            overlay_value=overlay_value,
+        ws.world_state = apply_tile_overlay_update(
+            ws.world_state,
+            x,
+            y,
+            overlay_value,
+            timestamp_ms,
         )
-
-    ws.world_state = WorldStateDict(
-        self_state=ws.world_state["self_state"],
-        tanks=ws.world_state["tanks"],
-        containers=ws.world_state["containers"],
-        mines=ws.world_state["mines"],
-        terrain=new_terrain,
-        viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
-        timestamp_ms=timestamp_ms,
-    )
 
 
 def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) -> None:
@@ -181,15 +188,10 @@ def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
 
     for x, y, terrain_type in updates:
         key = coord_key(x, y)
-        existing = new_terrain.get(key)
-        cache_value = existing["cache_value"] if existing is not None else 0
-        overlay_value = existing["overlay_value"] if existing is not None else 255
         new_terrain[key] = make_terrain_tile(
             x=x,
             y=y,
             terrain_type=terrain_type,
-            cache_value=cache_value,
-            overlay_value=overlay_value,
         )
 
     ws.world_state = WorldStateDict(
@@ -199,7 +201,7 @@ def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
         mines=ws.world_state["mines"],
         terrain=new_terrain,
         viewport=ws.world_state["viewport"],
-        scanned_viewports=ws.world_state["scanned_viewports"],
+        scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )
 

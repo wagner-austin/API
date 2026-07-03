@@ -45,10 +45,9 @@ def update_world_state_from_container_pickup(
 
     The 0x43 wire format reports ``remaining_volume`` (fuel left in
     the container after this pickup). When emptied
-    (``remaining_volume == 0``) the tile is cleared from world state
-    and the radar tile cache; when fuel remains the container stays
-    in state with its volume updated so the planner can drain the
-    rest, and the radar tile cache is left intact.
+    (``remaining_volume == 0``) the tile is removed from
+    ``world.containers``; when fuel remains the container stays in
+    state with its volume updated so the planner can drain the rest.
 
     Args:
         ws: World service instance.
@@ -58,12 +57,9 @@ def update_world_state_from_container_pickup(
             pickup. Default ``0`` preserves the "emptied" semantic for
             callers without the wire field.
     """
-    from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
-
     ts = get_current_time_ms()
     ws.world_state = pickup_container(ws.world_state, x, y, ts, remaining_volume)
     if remaining_volume <= 0:
-        clear_container_tile_cache(ws, x, y)
         emit_world("Picked up container at (%d, %d)", x, y)
     else:
         emit_world(
@@ -78,23 +74,18 @@ def remove_container_at(ws: WorldService, x: int, y: int) -> None:
     """Remove a container from world state at the given position.
 
     Used when the bot detects a container is unreachable (stuck timeout).
-    Delegates the world-state edit to the central
-    :func:`state.remove_container` mutator, then clears the radar tile
-    cache so the planner cannot re-acquire the same tile.
 
     Args:
         ws: World service instance.
         x: Container X coordinate.
         y: Container Y coordinate.
     """
-    from tankpit_bot.sniffer.world_state_radar import clear_container_tile_cache
     from tankpit_bot.state import remove_container
 
     key = f"{x},{y}"
     if key not in ws.world_state["containers"]:
         return
     ws.world_state = remove_container(ws.world_state, x, y, ws.world_state["timestamp_ms"])
-    clear_container_tile_cache(ws, x, y)
     log.info("Removed unreachable container at (%d, %d)", x, y)
 
 

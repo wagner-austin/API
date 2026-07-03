@@ -92,7 +92,7 @@ class WebSocketSniffer(BrowserSession):
         headless: bool = False,
         live_decode: bool = False,
         prefer_account: bool = False,
-        output_path: str | None = None,
+        autosave_paths: tuple[Path, ...] = (),
     ) -> None:
         """Initialize the sniffer.
 
@@ -101,11 +101,13 @@ class WebSocketSniffer(BrowserSession):
             headless: Whether to run the browser in headless mode.
             live_decode: Whether to print decoded messages in real-time.
             prefer_account: Skip guest login and use account credentials directly.
-            output_path: Optional path for incremental capture autosaves.
+            autosave_paths: Destinations kept current with the capture
+                snapshot on every message, so an abnormal termination
+                (browser closed mid-session) never loses the capture.
         """
         super().__init__(target_url, headless=headless, prefer_account=prefer_account)
         self._live_decode = live_decode
-        self._output_path = Path(output_path) if output_path is not None else None
+        self._autosave_paths = autosave_paths
         self._game_log_entries: list[dict[str, str | int]] = []
         self._combat_tracker: CombatTracker | None = None
 
@@ -179,16 +181,14 @@ class WebSocketSniffer(BrowserSession):
 
     def _autosave_capture(self) -> None:
         """Persist the current capture snapshot if autosave is configured."""
-        if self._output_path is None:
+        if not self._autosave_paths:
             return
 
         session = self._build_capture_session()
         encoded = encode_capture_session(session)
         json_str = dump_json_str(encoded, compact=False, indent=2)
-        output_dir = self._output_path.parent
-        raw_path = output_dir / "raw_capture.json"
-        _test_hooks.write_text(raw_path, json_str)
-        _test_hooks.write_text(self._output_path, json_str)
+        for path in self._autosave_paths:
+            _test_hooks.write_text(path, json_str)
 
     def _on_magic_captured(self, magic: str) -> None:
         """Initialize trackers when magic key is captured.
@@ -372,12 +372,17 @@ def run_sniffer(
     Raises:
         PlaywrightNotInstalledError: If Playwright is not installed.
     """
+    autosave_paths = [Path(output_path)]
+    if runtime_artifacts is not None:
+        latest_capture = Path(runtime_artifacts["latest_capture_path"])
+        if latest_capture != autosave_paths[0]:
+            autosave_paths.append(latest_capture)
     sniffer = WebSocketSniffer(
         target_url,
         headless=headless,
         live_decode=live_decode,
         prefer_account=prefer_account,
-        output_path=output_path,
+        autosave_paths=tuple(autosave_paths),
     )
     session = sniffer.run(capture_duration_ms)
 

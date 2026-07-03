@@ -159,7 +159,7 @@ def update_world_state_from_move_response_full(
             mines=ws.world_state["mines"],
             terrain=ws.world_state["terrain"],
             viewport=ws.world_state["viewport"],
-            scanned_viewports=ws.world_state["scanned_viewports"],
+            scanned_tiles=ws.world_state["scanned_tiles"],
             timestamp_ms=ts,
         )
     elif self_state["tank_id"] == tank_id:

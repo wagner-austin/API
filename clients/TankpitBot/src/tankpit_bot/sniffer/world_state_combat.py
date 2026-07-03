@@ -17,48 +17,52 @@ log = get_logger(__name__)
 def mark_combat_hit(ws: WorldService, weapon_byte: int, victim_id: int) -> None:
     """Called when a 0x53 ShootEvent arrives where we are the attacker.
 
-    The legacy function name predates the 2026-06-19 decoder
-    unification, which deleted the container ``CombatHit`` decoder and
-    consolidated shot resolution on the protocol-path ``ShootEvent``
-    (0x53). The semantics are unchanged: the authoritative hit signal
-    is tile-occupancy. JS ``Gg.prototype.h`` switch case 18 prints
-    "You hit X" exactly when the shot's target tile contains a named
-    tank; we translate that to ``victim_id > 0``.
+    **The per-shot ammo consumption IS the hit signal** (user contract
+    2026-07-02). The server only spends dual / missile / homing ammo
+    on a shot that lands, and it encodes the spend in the ShootEvent
+    ``weapon`` field: ``weapon > 0`` means one consumable was debited
+    (hit), ``weapon == 0`` means a free single resolved against empty
+    ground (miss). This is the same per-shot inventory delta the page
+    client renders. Live proof, run 2026-07-02 01:21: five pursuit
+    homings each carried ``weapon=3`` and orange-3 died to the fifth,
+    while the wire's ``victim_id`` was ``-1`` on every one of them
+    (the tile-occupancy lookup cannot see an off-viewport target).
+    The pre-2026-07-02 classifier keyed the hit on ``victim_id > 0``
+    and derived the ammo decrement FROM it -- calling the winning
+    pursuit shots misses and leaving the ammo-delta signal circularly
+    dependent on the guess it existed to correct.
 
-    Server-side ammo: the server only decrements dual / missile /
-    homing counts on a confirmed hit (user-confirmed 2026-06-24 from
-    inventory deltas in run 2026-06-24 11:32). The local decrement
-    must mirror that rule -- otherwise the local shadow count drifts
-    below the authoritative server count between every miss and the
-    next 0x49/0x67/0x74 correction.
+    ``victim_id`` remains recorded for kill attribution and
+    intended-target diagnostics only.
 
     Args:
         ws: World service instance.
         weapon_byte: ShootEvent ``weapon`` field (0=single, 1=dual,
-            2=missile, 3=homing). Decrements that ammo type on a
-            confirmed hit only.
-        victim_id: Tank id present at the shot's target tile, or -1 if
-            the tile was empty (miss).
+            2=missile, 3=homing). Any value above 0 is a server-side
+            ammo debit and therefore a confirmed hit.
+        victim_id: Tank id present at the shot's target tile, or -1
+            when the tile is empty or the target is off-viewport.
     """
     ws.got_our_shot_response = True
     ws.last_shot_victim_id = victim_id
-    if victim_id > 0:
+    if weapon_byte > 0:
         ws.got_confirmed_hit = True
-        if weapon_byte > 0:
-            _decrement_ammo_for_weapon(ws, weapon_byte)
+        _decrement_ammo_for_weapon(ws, weapon_byte)
 
 
 def check_and_clear_combat_hit(ws: WorldService) -> bool:
-    """Check if our most recent shot hit a tank, then clear.
+    """Check if our most recent shot consumed ammo (= hit), then clear.
 
-    Hit = any tank existed at the wire-reported target tile of our shot.
-    Authoritative per the JS shoot handler (case 18: "You hit X").
+    Hit = the ShootEvent ``weapon`` field recorded an ammo debit
+    (weapon > 0). Consumption is the authoritative per-shot hit
+    ledger (user contract 2026-07-02); ``weapon=0`` singles are free
+    and resolve against empty ground.
 
     Args:
         ws: World service instance.
 
     Returns:
-        True if shot landed on an occupied tile, False if tile was empty.
+        True if the shot debited ammo, False if it was a free single.
     """
     result = ws.got_confirmed_hit
     ws.got_confirmed_hit = False
