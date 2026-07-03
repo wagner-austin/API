@@ -25,6 +25,7 @@ from tankpit_bot.bot import ai_strategy, executor, world_sync
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.overlay import OverlayStateDict, update_bot_overlay
@@ -102,6 +103,10 @@ def run_tick_loop(
         except TargetClosedError:
             log.info("Browser closed during tick, ending run gracefully")
             _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
+            return
+        except SessionExitError as exit_request:
+            log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
+            _emit_session_scorecard(bot, ticks_done, exit_reason=exit_request.reason)
             return
         ticks_done += 1
         if max_ticks > 0 and ticks_done >= max_ticks:
@@ -541,27 +546,30 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
 
 
 def _get_combat_feedback(bot: Bot) -> CombatFeedback:
-    """Get combat feedback from the wire tile-occupancy signal.
+    """Get combat feedback from the per-shot ammo consumption ledger.
 
-    The 0x53 ShootEvent decoder extracts ``target_x``, ``target_y``
-    from the wire and the dispatcher looks up which tank (if any) was
-    on that tile. That tile-occupancy result is the authoritative hit
-    signal per tpclient.js ``Gg.prototype.h`` (case 18 -> "You hit X"),
-    which the old weapon_byte heuristic could not reliably reproduce --
-    weapon=0 is indistinguishable from miss per the wiki.
+    **Consumption = hit** (user contract 2026-07-02): the server only
+    spends dual / missile / homing ammo on a shot that lands, and the
+    0x53 ShootEvent ``weapon`` field records the spend per shot --
+    the same per-shot inventory delta the page client renders.
+    ``weapon=0`` (free single, resolved against empty ground) spends
+    nothing and is a genuine miss. The earlier tile-occupancy signal
+    (``victim_id``) classified off-viewport pursuit hits as misses
+    because the impact tile is outside the local registry's view (run
+    2026-07-02 01:21: five ``weapon=3`` debits killed orange-3 while
+    ``victim_id`` was -1 on every shot).
 
     Outcomes:
-      - tile had any tank        -> "hit"
-      - target already in killed -> "hit" (kill confirmed)
-      - shot response, empty tile -> "miss"
-      - no response yet           -> ""  (keep waiting)
+      - ammo debited (weapon > 0)   -> "hit"
+      - target already in killed    -> "hit" (kill confirmed)
+      - 0x49 sync shows a debit the shot event missed -> "hit"
+      - shot response, no debit     -> "miss"
+      - no response yet             -> ""  (keep waiting)
 
-    Ammo count is decremented in ``mark_combat_hit`` (legacy function
-    name predating the 2026-06-19 decoder unification; the function
-    now consumes ShootEvent fields, not the deleted CombatHit
-    container). Combat feedback never rewrites inventory counts --
-    wire messages 0x49, 0x67, 0x74 are the sole authority for item
-    counts.
+    Ammo count is decremented in ``mark_combat_hit`` per the weapon
+    byte. Combat feedback never rewrites inventory counts -- wire
+    messages 0x49, 0x67, 0x74 remain the absolute authority the
+    shadow count reconciles against.
 
     Args:
         bot: Bot instance.
@@ -613,13 +621,12 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         _inc_hit()
         return "hit"
     if ammo_hit:
-        # Server only debits dual / missile / homing ammo on a confirmed
-        # hit, so the ammo delta is the authoritative ground-truth hit
-        # signal even when the wire's ``victim_id`` lookup misses
-        # (off-viewport target whose new position is not yet in our
-        # local registry). Promotes the conservative "miss" the wire
-        # tile-occupancy gate would have emitted into the actual hit
-        # the server recorded.
+        # Reconciliation channel: the per-shot ``weapon`` byte is the
+        # primary consumption signal (handled above via got_hit), but
+        # if the 0x53 echo is lost, the server's 0x49 absolute
+        # inventory sync still reveals the debit against the pre-shot
+        # snapshot. A debit is a landed shot regardless of which wire
+        # channel reported it.
         emit_diagnostic(
             diagnostic_kind="combat_feedback",
             result="hit",

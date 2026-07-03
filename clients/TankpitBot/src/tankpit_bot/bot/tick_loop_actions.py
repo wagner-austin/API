@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
@@ -342,7 +343,7 @@ def _clear_blocked_walk(
         self_state["y"],
         tx,
         ty,
-        world["mines"],
+        hostile_mines(world),
     ):
         return False
     emit_sync("movement to (%d,%d) is terrain-blocked, replanning", tx, ty)
@@ -378,7 +379,7 @@ def _clear_blocked_collection(
         self_state["y"],
         tx,
         ty,
-        world["mines"],
+        hostile_mines(world),
     ):
         return False
     emit_sync("collection target (%d,%d) is terrain-blocked, replanning", tx, ty)

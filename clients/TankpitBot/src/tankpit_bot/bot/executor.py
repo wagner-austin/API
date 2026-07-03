@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.diagnostics.game_log_feedback import (
@@ -335,23 +336,26 @@ def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
 
 
 def _is_valid_move_destination(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a move or teleport destination is not a known mine.
+    """Return True when a move or teleport destination is not a hostile mine.
+
+    Friendly (same-team) mines are passable per tankpit's damage rules;
+    only hostile mines block movement.
 
     Args:
         world: Current world-state snapshot.
         command: Command selected by the planner.
 
     Returns:
-        True when the destination tile is not a known mine.
+        True when the destination tile is not a hostile mine.
     """
     if command["cmd_type"] == "move" or command["cmd_type"] == "teleport":
         target_x = command["target_x"]
         target_y = command["target_y"]
     else:
         return True
-    if coord_key(target_x, target_y) in world["mines"]:
+    if coord_key(target_x, target_y) in hostile_mines(world):
         emit_ai(
-            "rejecting %s to (%d,%d): destination is a known mine",
+            "rejecting %s to (%d,%d): destination is a hostile mine",
             command["cmd_type"],
             target_x,
             target_y,
