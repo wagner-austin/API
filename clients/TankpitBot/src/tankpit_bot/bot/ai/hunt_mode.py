@@ -19,16 +19,18 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     target_position_is_fresh,
 )
-from tankpit_bot.bot.ai.equipment import is_current_viewport_scanned
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
     find_acquisition_target,
     find_locked_target_pursuit,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
 def search_for_enemies(
@@ -102,20 +104,21 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
 
 
 def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
-    """Resume a held lock or acquire a fresh combat target.
+    """Resume a viewport-confirmed lock or acquire a fresh combat target.
 
     Resume-or-acquire cascade:
 
-    1. **Resume held lock.** If ``combat_target_id != -1`` from a prior
-       engagement that survived a fuel/equipment recovery cycle, prefer
-       continuing that fight. If the locked target is in the current
-       threat list, engage or close on it. If the lock is set but the
-       target is off-viewport, fire homing toward the last wire
-       position via ``_locked_target_pursuit`` -- same staying-put
-       pursuit the in-fight substates use. This is what makes
-       "restock-then-finish-the-kill" work: fuel and equipment recovery
-       preserve ``combat_target_id`` rather than clearing it, and HUNT
-       resumes the same engagement instead of re-acquiring fresh.
+    1. **Resume held lock -- viewport-confirmed only.** If
+       ``combat_target_id != -1`` and the locked target is in the
+       current threat list, engage or close on it. If the lock is set
+       but the target is off-viewport, the engagement is stale (a mode
+       interrupt may have relocated the bot arbitrarily far); the lock
+       is RELEASED and acquisition runs fresh. If the same enemy is
+       still the best affordable candidate, acquisition teleports back
+       to it -- resuming a fight means going to the target, never
+       firing from stand-off range (user contract 2026-07-02; live
+       run 2026-07-01 20:48 fired at a target 92 tiles away and
+       looped on server rejections).
     2. **Strict (viewport-confirmed) threats.** ``analyze_threats``
        returns only enemies with recent ``last_viewport_observation_ms``;
        these are immediately fireable. If a viable one exists, pick it
@@ -124,12 +127,14 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
     3. **Loose (map-fresh) acquisition.** When no viewport-confirmed
        threat exists, look at every enemy whose ``timestamp_ms`` is
        within ``map_open_cooldown_ms`` (i.e. seen in a recent map
-       snapshot). Teleport at the nearest viable one. ``SCAN_ON_LANDING``
-       handles viewport confirmation before any shot, so map-only
-       intel never produces a phantom firing.
+       snapshot), gated on end-to-end affordability (teleport cost +
+       kill budget + fuel-low reserve). Teleport at the nearest
+       affordable one. ``SCAN_ON_LANDING`` handles viewport
+       confirmation before any shot.
 
-    Only when all stages produce nothing does the bot dispatch
-    another ``map_open``.
+    When the map snapshot is fresh and nothing is viable the session
+    exits with ``no_viable_targets``; a stale or absent snapshot
+    dispatches another ``map_open``.
     """
     threats = _visible_threats(ctx)
     locked = get_locked_target(ctx, threats)
@@ -138,15 +143,50 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         if has_cardinal_combat_shot(ctx.self_state, locked):
             return engage_target(ctx, locked)
         return close_target(ctx, locked)
-    pursuit = _locked_target_pursuit(ctx)
-    if pursuit is not None:
+    if ctx.ai_state["combat_target_id"] != -1:
+        # A lock that reaches ACQUIRE with its target off-viewport is a
+        # stale engagement resumed after a mode interrupt (COLLECT may
+        # have relocated the bot arbitrarily far). The user contract
+        # (2026-07-02): never fire from stand-off range on resume --
+        # release the lock and re-acquire fresh. If the same enemy is
+        # still the best affordable candidate, acquisition teleports
+        # back to it (live run 2026-07-01 20:48: the old resume path
+        # fired at a target 92 tiles away and looped on server
+        # rejections).
         emit_ai(
-            "resuming held lock on %s (id=%d) -- off viewport, firing toward last wire position",
-            pursuit["name"],
-            pursuit["tank_id"],
+            "releasing stale lock on id=%d - target off viewport after resume",
+            ctx.ai_state["combat_target_id"],
         )
-        return engage_target(ctx, pursuit)
+        return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
 
+    return _decide_hunt_acquire_fresh(ctx, threats, ctx.base)
+
+
+def _decide_hunt_acquire_fresh(
+    ctx: DecideCtx,
+    threats: list[EnemyThreatDict],
+    ai_state: AIStateDict,
+) -> TickDecisionDict:
+    """Acquire a new target from viewport threats or fresh map intel.
+
+    When the map snapshot is fresh (opened within the cooldown) and no
+    enemy passes the acquisition gates -- including affordability --
+    the session ends with ``no_viable_targets`` instead of looping on
+    map refreshes (user contract 2026-07-02).
+
+    Args:
+        ctx: Decision context.
+        threats: Viewport-confirmed threat list for this tick.
+        ai_state: Base AI state for the produced command (lock already
+            cleared when arriving from a stale-lock release).
+
+    Returns:
+        Teleport, map-open, or engage decision.
+
+    Raises:
+        SessionExitError: When fresh map intel shows no viable
+            target anywhere.
+    """
     target = select_new_combat_target(ctx, threats)
     if target is not None:
         emit_ai("new target %s (id=%d)", target["name"], target["tank_id"])
@@ -163,6 +203,9 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         ctx.terrain,
         ctx.timestamp_ms,
         ctx.config["map_open_cooldown_ms"],
+        engagement_reserve_fuel=(
+            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        ),
     )
     if map_target is not None:
         emit_ai(
@@ -174,9 +217,17 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         )
         return teleport_to_target(ctx, map_target)
 
+    map_age_ms = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
+    if ctx.ai_state["last_map_open_ms"] > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
+        raise SessionExitError(
+            "no_viable_targets",
+            f"fresh map snapshot ({map_age_ms}ms old) has no affordable enemy "
+            f"at ({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}",
+        )
+
     return search_for_enemies(
         ctx,
-        ai_state=ctx.base,
+        ai_state=ai_state,
         map_reason="find_enemies",
     )
 
@@ -301,10 +352,20 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
     if target is not None:
+        viewport_left, viewport_top, viewport_right, viewport_bottom = viewport_visible_bounds(
+            ctx.filtered["viewport"],
+        )
         if (
             has_cardinal_combat_shot(ctx.self_state, target)
             and can_use_radar(ctx)
-            and not is_current_viewport_scanned(ctx.filtered)
+            and not is_viewport_fully_covered(
+                ctx.filtered["scanned_tiles"],
+                viewport_left,
+                viewport_top,
+                viewport_right,
+                viewport_bottom,
+                ctx.timestamp_ms,
+            )
         ):
             emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
             return make_decision(

@@ -12,6 +12,7 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import (
     _viewport_bounds,
+    hostile_mines,
     is_container_pursuable,
 )
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
@@ -146,7 +147,7 @@ def find_nearest_fuel(
                 sy,
                 cx,
                 cy,
-                blocked_mines=world["mines"],
+                blocked_mines=hostile_mines(world),
             ):
                 continue
             best_dist = dist
@@ -220,7 +221,7 @@ def find_equipment_candidates(
             sy,
             cx,
             cy,
-            blocked_mines=world["mines"],
+            blocked_mines=hostile_mines(world),
         ):
             continue
         candidates.append((manhattan_distance(sx, sy, cx, cy), container))
@@ -273,7 +274,7 @@ def find_best_fuel(
             sy,
             cx,
             cy,
-            blocked_mines=world["mines"],
+            blocked_mines=hostile_mines(world),
         ):
             continue
         score = container["volume"] - dist
@@ -317,7 +318,7 @@ def find_adjacent_container(
             sy,
             container["x"],
             container["y"],
-            blocked_mines=world["mines"],
+            blocked_mines=hostile_mines(world),
         ):
             continue
         return container
@@ -393,7 +394,7 @@ def describe_container_search(
                 terrain,
                 want_fuel=want_fuel,
                 minimum_volume=minimum_volume,
-                blocked_mines=world["mines"],
+                blocked_mines=hostile_mines(world),
             )
         )
         if is_blocked:

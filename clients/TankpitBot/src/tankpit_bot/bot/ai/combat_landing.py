@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.bot.ai.types import EnemyThreatDict
 from tankpit_bot.state import SelfStateDict, WorldStateDict
@@ -107,7 +108,7 @@ def _is_dynamically_occupied(world: WorldStateDict, x: int, y: int) -> bool:
         return True
     if f"{x},{y}" in world["containers"]:
         return True
-    return f"{x},{y}" in world["mines"]
+    return f"{x},{y}" in hostile_mines(world)
 
 
 def _distance_key(self_x: int, self_y: int) -> Callable[[tuple[int, int]], int]:

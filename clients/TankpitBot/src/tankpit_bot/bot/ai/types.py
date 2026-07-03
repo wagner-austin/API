@@ -292,6 +292,24 @@ class AIConfigDict(TypedDict):
             6 * euclidean distance). Combat teleports use the
             target's actual coordinates via ``combat_landing_tile``
             and are NOT affected by this field.
+        engagement_fuel_budget: Estimated fuel a typical kill consumes
+            once adjacent (shot sequence + per-tick position cost; the
+            approach teleport is priced separately per candidate in
+            ``find_acquisition_target``). Starting a new engagement
+            requires ``fuel >= fuel_low_threshold +
+            engagement_fuel_budget``, and acquiring a map-known enemy
+            additionally requires the candidate's exact teleport cost
+            on top -- the bot never picks a fight it cannot pay for
+            (user contract 2026-07-02). Mid-engagement
+            (``combat_target_id != -1``) bypasses the mode-level gate
+            -- a kill in progress is finished even on a tight budget.
+            Recalibrated 2026-07-02 from wire data: shots cost ~45
+            fuel plus ~10/tick position drain (live runs 2026-07-01)
+            and practice-room kills take ~8-10 hits (recorded human
+            sessions), so a realistic kill costs ~450. The earlier
+            value (200) let the bot start fights it could not finish:
+            run 2026-07-01 20:45 burned 505 fuel on the approach and
+            hit the fuel-low interrupt 8 shots into the kill.
     """
 
     fuel_low_threshold: int
@@ -309,6 +327,7 @@ class AIConfigDict(TypedDict):
     radar_break_threshold: int
     radar_resume_threshold: int
     equip_search_hop_distance: int
+    engagement_fuel_budget: int
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -333,6 +352,7 @@ def make_default_ai_config() -> AIConfigDict:
         radar_break_threshold=5,
         radar_resume_threshold=20,
         equip_search_hop_distance=16,
+        engagement_fuel_budget=450,
     )
 
 
@@ -361,14 +381,6 @@ class AIStateDict(TypedDict):
             teleports and viewport recentering.
         resource_target_x: X coordinate of the locked resource target.
         resource_target_y: Y coordinate of the locked resource target.
-        local_scan_tiles: Tile-level scan coverage map keyed by ``"x,y"``
-            tile position, values are scan timestamps. Tracks every
-            individual tile the bot has scanned -- the radar (free or
-            extra) reveals only tiles inside the viewport, so each
-            scan marks the intersection of the radar footprint with
-            the viewport bounds. Reset to ``{}`` on each new session
-            (see :func:`make_initial_ai_state`); never persisted
-            across logins.
         attempted_equipment_targets: Equipment targets that have been
             teleport-approached. {``"x,y"``: timestamp_ms}. Prevents
             repeated orbits around the same container.
@@ -394,7 +406,6 @@ class AIStateDict(TypedDict):
     resource_target_kind: str
     resource_target_x: int
     resource_target_y: int
-    local_scan_tiles: dict[str, int]
     attempted_equipment_targets: dict[str, int]
 
 
@@ -430,7 +441,6 @@ def make_initial_ai_state(
         resource_target_kind="",
         resource_target_x=0,
         resource_target_y=0,
-        local_scan_tiles={},
         attempted_equipment_targets={},
     )
 

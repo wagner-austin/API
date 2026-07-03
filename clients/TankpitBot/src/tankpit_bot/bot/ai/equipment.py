@@ -1,9 +1,9 @@
-"""Container predicates and scan coverage for the AI system.
+"""Container predicates for the AI system.
 
-Pure functions that evaluate whether containers are pursuable, whether
-viewport areas have been scanned, and whether locked targets should be
-released. Search functions that find specific containers live in
-``equipment_search.py``.
+Pure functions that evaluate whether containers are pursuable and
+whether locked targets should be released. Search functions that find
+specific containers live in ``equipment_search.py``. Per-tile scan
+coverage lives in :mod:`tankpit_bot.state.scan_coverage`.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from platform_core.logging import get_logger
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.state.types import (
     ContainerStateDict,
+    MineStateDict,
     SelfStateDict,
     WorldStateDict,
 )
@@ -23,10 +24,6 @@ log = get_logger(__name__)
 _CONTAINER_FRESHNESS_TTL_MS = 30000
 
 _LOCK_RELEASE_MIN_GAP = 10
-
-_SCAN_COVERAGE_OVERLAP_TILES = 4
-
-_SCAN_COVERAGE_TTL_MS = 45000
 
 
 def is_lock_release_warranted(
@@ -85,68 +82,6 @@ def is_container_pursuable(
     return not (now_ms > 0 and _is_stale(container, now_ms))
 
 
-def is_area_scanned(world: WorldStateDict, left: int, top: int, now_ms: int) -> bool:
-    """Return True when a viewport origin has fresh overlapping scan coverage.
-
-    Args:
-        world: Current world state with scan coverage records.
-        left: Queried viewport left X coordinate.
-        top: Queried viewport top Y coordinate.
-        now_ms: Current timestamp for coverage freshness.
-
-    Returns:
-        True when a fresh, mostly-overlapping scan covers the origin.
-    """
-    for key, scanned_ms in world["scanned_viewports"].items():
-        if now_ms - scanned_ms > _SCAN_COVERAGE_TTL_MS:
-            continue
-        key_left_text, _, key_top_text = key.partition(",")
-        if (
-            abs(int(key_left_text) - left) <= _SCAN_COVERAGE_OVERLAP_TILES
-            and abs(int(key_top_text) - top) <= _SCAN_COVERAGE_OVERLAP_TILES
-        ):
-            return True
-    return False
-
-
-def is_tile_scanned(world: WorldStateDict, x: int, y: int, now_ms: int) -> bool:
-    """Return True when a world tile sits inside fresh scan coverage.
-
-    Args:
-        world: Current world state with scan coverage records.
-        x: World tile X coordinate.
-        y: World tile Y coordinate.
-        now_ms: Current timestamp for coverage freshness.
-
-    Returns:
-        True when a fresh scan's viewport contained the tile.
-    """
-    width = world["viewport"]["width"]
-    height = world["viewport"]["height"]
-    for key, scanned_ms in world["scanned_viewports"].items():
-        if now_ms - scanned_ms > _SCAN_COVERAGE_TTL_MS:
-            continue
-        key_left_text, _, key_top_text = key.partition(",")
-        scan_left = int(key_left_text)
-        scan_top = int(key_top_text)
-        if scan_left <= x < scan_left + width and scan_top <= y < scan_top + height:
-            return True
-    return False
-
-
-def is_current_viewport_scanned(world: WorldStateDict) -> bool:
-    """Return True when the current viewport has authoritative local coverage.
-
-    Args:
-        world: Current world state.
-
-    Returns:
-        True if the current viewport area is covered by a fresh radar scan.
-    """
-    viewport = world["viewport"]
-    return is_area_scanned(world, viewport["left"], viewport["top"], world["timestamp_ms"])
-
-
 def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
     """Return inclusive observable viewport bounds from world state."""
     return viewport_visible_bounds(world["viewport"])
@@ -166,11 +101,34 @@ def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
     return age > _CONTAINER_FRESHNESS_TTL_MS
 
 
+def hostile_mines(world: WorldStateDict) -> dict[str, MineStateDict]:
+    """Return tracked mines that would damage the bot if detonated.
+
+    Tankpit mines do not damage tanks on the placer's team -- friendly
+    mines are passable. Every blocking / pathing check should query
+    this filtered view instead of ``world["mines"]`` directly so the
+    bot doesn't treat its own team's defensive layout as obstacles.
+
+    If ``self_state`` is not yet known, every mine is treated as
+    hostile (defensive default).
+
+    Args:
+        world: Current world state.
+
+    Returns:
+        Mines indexed by ``"x,y"`` key whose team is different from the
+        bot's team, or every tracked mine when ``self_state`` is None.
+    """
+    self_state = world["self_state"]
+    if self_state is None:
+        return world["mines"]
+    self_team = self_state["team"]
+    return {key: mine for key, mine in world["mines"].items() if mine["team"] != self_team}
+
+
 __all__ = [
     "_viewport_bounds",
-    "is_area_scanned",
+    "hostile_mines",
     "is_container_pursuable",
-    "is_current_viewport_scanned",
     "is_lock_release_warranted",
-    "is_tile_scanned",
 ]

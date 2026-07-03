@@ -34,17 +34,17 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     clear_resource_target,
     make_decision,
-    mark_scan_dispatched,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
-from tankpit_bot.bot.ai.scan_coverage import (
-    is_viewport_fully_covered,
-    select_best_free_radar_position,
-)
 from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_radar_command
 from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.state.scan_coverage import (
+    free_radar_new_coverage,
+    is_viewport_fully_covered,
+    select_best_free_radar_position,
+)
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
@@ -67,7 +67,7 @@ def select_forage_target(ctx: DecideCtx) -> tuple[int, int] | None:
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     return select_best_free_radar_position(
-        ctx.ai_state["local_scan_tiles"],
+        ctx.world["scanned_tiles"],
         ctx.self_state["x"],
         ctx.self_state["y"],
         left,
@@ -95,10 +95,10 @@ def plan_forage_search(
     Three branches in order:
 
     1. If any tile in the current viewport is unscanned AND
-       ``radar_affordable`` is True → dispatch the radar. The server
-       resolves extra (full viewport) or free (5x5 intersected with
-       viewport) based on inventory; :func:`mark_scan_dispatched`
-       records exactly the revealed set.
+       ``radar_affordable`` is True → dispatch the radar. The wire
+       handler records the revealed tile set into
+       ``world.scanned_tiles`` when the server radar response
+       arrives next tick.
     2. Else if an unscanned tile is reachable → walk toward it so the
        next tick's free radar (or a paid radar once affordable again)
        reveals it.
@@ -123,14 +123,42 @@ def plan_forage_search(
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     viewport_fully_covered = is_viewport_fully_covered(
-        ai_state["local_scan_tiles"],
+        ctx.world["scanned_tiles"],
         left,
         top,
         right,
         bottom,
         ctx.timestamp_ms,
     )
-    if not viewport_fully_covered and radar_affordable:
+    # Extras reveal the whole viewport; free radar only reveals the 5x5
+    # around the tank. When no extras are stocked AND the tank is inside
+    # the viewport, firing a free radar from a spot whose 5x5 footprint
+    # is already fully covered would mark zero new tiles -- the tank
+    # must walk first so a later free radar reaches new ground. Without
+    # this gate the forager loops firing the same free radar from the
+    # same position whenever ``can_use_radar`` is permissive (radar is
+    # fuel-free). The gate intentionally only applies inside the
+    # viewport: if the tank is somehow outside it (test setup, pre-
+    # synced wire state), there's no walk that helps, so let radar
+    # fire and rely on the next wire viewport update to converge state.
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    has_extras = ctx.inventory["extra_radars"]["count"] > 0
+    tank_in_viewport = left <= sx <= right and top <= sy <= bottom
+    if has_extras or not tank_in_viewport:
+        radar_productive = True
+    else:
+        next_radar_gain = free_radar_new_coverage(
+            ctx.world["scanned_tiles"],
+            sx,
+            sy,
+            left,
+            top,
+            right,
+            bottom,
+            ctx.timestamp_ms,
+        )
+        radar_productive = next_radar_gain > 0
+    if not viewport_fully_covered and radar_affordable and radar_productive:
         emit_ai(
             "forage radar (mode=%s, extras=%d, viewport=(%d,%d)-(%d,%d))",
             behavior_mode,
@@ -147,7 +175,7 @@ def plan_forage_search(
             0,
             0,
             "forage_radar",
-            mark_scan_dispatched(ctx, clear_resource_target(ai_state)),
+            clear_resource_target(ai_state),
             ctx.equip,
         )
 

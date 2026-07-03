@@ -29,11 +29,14 @@ from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
 from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import BotCommand
+from tankpit_bot.bot.types import BotCommand, make_radar_command
 from tankpit_bot.diagnostics.game_log_feedback import is_fuel_at_learned_capacity
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.state.scan_coverage import is_tile_covered
 from tankpit_bot.state.types import ContainerStateDict
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 _COLLECT_SCORE = 925
 
@@ -134,11 +137,18 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
     Cascade:
 
     1. Continue a held equipment or fuel lock from a previous tick.
-    2. Pick up the best equipment in the current viewport.
-    3. Pick up the best fuel in the current viewport (skipped at cap).
-    4. Forage: radar when the viewport has unscanned tiles, or walk
+    2. Scan-on-landing: fire one radar when the current viewport has
+       zero scan coverage. Mirrors HUNT's scan_on_landing so the
+       planner has a full picture (0x5A patch entries plus any tiles
+       radar reveals) before committing to a pickup order. Without
+       this gate, the cascade picks up whatever 0x5A enumerated first
+       and only later discovers (via the forage step below) extra
+       containers radar would have shown up front.
+    3. Pick up the best equipment in the current viewport.
+    4. Pick up the best fuel in the current viewport (skipped at cap).
+    5. Forage: radar when the viewport has unscanned tiles, or walk
        toward an unscanned tile so the next free radar covers it.
-    5. Hop: teleport to a fresh viewport when nothing actionable
+    6. Hop: teleport to a fresh viewport when nothing actionable
        remains here.
 
     Args:
@@ -148,13 +158,19 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
         Mode-owned collection decision.
 
     Raises:
-        ValueError: When every cascade branch declines -- the bot is
-            marooned and cannot produce a legal collection action.
+        SessionExitError: When every cascade branch declines -- the bot
+            is marooned and cannot produce a legal collection action,
+            so the session ends with ``out_of_fuel`` (user contract
+            2026-07-02).
     """
     base_state = ctx.base
     locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
     if locked_decision is not None:
         return locked_decision
+
+    landing_scan = _scan_on_landing_decision(ctx, base_state)
+    if landing_scan is not None:
+        return landing_scan
 
     equip_decision = _select_and_pickup_equipment(ctx, base_state)
     if equip_decision is not None:
@@ -201,10 +217,64 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
     if search is not None:
         return search
 
-    raise ValueError(
+    raise SessionExitError(
+        "out_of_fuel",
         f"COLLECT owner produced no decision at "
         f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
-        f"forager exhausted, no affordable search hop."
+        f"forager exhausted, no affordable search hop.",
+    )
+
+
+def _scan_on_landing_decision(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Return a radar decision when the current viewport hasn't been scanned.
+
+    The COLLECT-mode equivalent of HUNT's ``scan_on_landing``: fired
+    once per fresh teleport landing in COLLECT mode, before any
+    pickup logic runs. The gate is "the current viewport has zero
+    tiles in ``scanned_tiles``" -- once a radar fires (extras mark
+    the full viewport, free marks 25 around the tank), at least one
+    tile carries a live mark, this returns ``None`` on subsequent
+    ticks, and the normal pickup -> forage -> hop cascade takes
+    over. Pairs with the 0x5A container lift: 0x5A enumerates only
+    the tiles the server's viewport patch touches; the landing radar
+    fills in the rest so the planner picks an optimal pickup order
+    on the next tick rather than committing to the first 0x5A entry.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        ``forage_radar``-shaped decision, or ``None`` when the
+        viewport already has any scan coverage.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    scanned_tiles = ctx.world["scanned_tiles"]
+    now_ms = ctx.timestamp_ms
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            if is_tile_covered(scanned_tiles, x, y, now_ms):
+                return None
+    emit_ai(
+        "scan-on-landing (mode=COLLECT, extras=%d, viewport=(%d,%d)-(%d,%d))",
+        ctx.inventory["extra_radars"]["count"],
+        left,
+        top,
+        right,
+        bottom,
+    )
+    return make_decision(
+        make_radar_command(),
+        "COLLECT",
+        _COLLECT_SCORE,
+        0,
+        0,
+        "scan_on_landing",
+        clear_resource_target(base_state),
+        ctx.equip,
     )
 
 

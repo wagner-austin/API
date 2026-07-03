@@ -343,7 +343,7 @@ def filter_killed_tanks(world: WorldStateDict, killed: dict[str, int]) -> WorldS
         mines=world["mines"],
         terrain=world["terrain"],
         viewport=world["viewport"],
-        scanned_viewports=world["scanned_viewports"],
+        scanned_tiles=world["scanned_tiles"],
         timestamp_ms=world["timestamp_ms"],
     )
 
@@ -405,17 +405,23 @@ def target_position_is_fresh(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
 
 
 def can_use_radar(ctx: DecideCtx) -> bool:
-    """Return True when the bot can afford a radar scan this tick.
+    """Return True -- radar is always available regardless of fuel.
 
-    Regular radar is always available; extra radar only widens the scan area.
+    Radar dispatch can never kill the bot: the server accepts the
+    command even at zero fuel (user-confirmed 2026-06-26). The
+    wire-reported 10-fuel deduction after a radar is just a debit, not
+    a precondition. Keeping radar available at fuel=0 is what lets a
+    stranded bot still see what's around it instead of looping silently.
 
     Args:
-        ctx: Decision context.
+        ctx: Decision context (unused; kept for signature compatibility
+            with the rest of the ``can_*`` predicate family).
 
     Returns:
-        True if the fixed radar fuel cost can be paid.
+        Always True.
     """
-    return ctx.fuel >= 10
+    del ctx
+    return True
 
 
 def teleport_fuel_cost_to(ctx: DecideCtx, target_x: int, target_y: int) -> int:
@@ -484,61 +490,6 @@ def require_command(
     return command
 
 
-def mark_scan_dispatched(ctx: DecideCtx, ai_state: AIStateDict) -> AIStateDict:
-    """Return AI state with the dispatched scan's tile coverage recorded.
-
-    The radar command resolves server-side using whichever radar the
-    bot has available: when ``extra_radars > 0`` the server consumes
-    one extra and reveals the whole viewport; otherwise the free
-    built-in 5x5 fires. Either way the radar only reveals tiles
-    inside the viewport bounds. Coverage tracking marks exactly the
-    set of revealed tiles:
-
-    * Extra radar: every tile in the viewport.
-    * Free radar: ``(tank-x ± 2, tank-y ± 2)`` intersected with the
-      viewport.
-
-    Args:
-        ctx: Decision context (provides tank position, timestamp, and
-            inventory).
-        ai_state: AI state to update.
-
-    Returns:
-        New AIStateDict with the revealed tiles recorded in
-        ``local_scan_tiles`` and ``last_scan_ms`` advanced.
-    """
-    from tankpit_bot.bot.ai.scan_coverage import (
-        free_radar_revealed_tiles,
-        record_tile_scan,
-        viewport_tiles,
-    )
-    from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
-
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    if ctx.inventory["extra_radars"]["count"] > 0:
-        revealed = viewport_tiles(left, top, right, bottom)
-    else:
-        revealed = free_radar_revealed_tiles(
-            ctx.self_state["x"],
-            ctx.self_state["y"],
-            left,
-            top,
-            right,
-            bottom,
-        )
-    return AIStateDict(
-        **{
-            **ai_state,
-            "last_scan_ms": ctx.timestamp_ms,
-            "local_scan_tiles": record_tile_scan(
-                ai_state["local_scan_tiles"],
-                revealed,
-                ctx.timestamp_ms,
-            ),
-        },
-    )
-
-
 __all__ = [
     "DecideCtx",
     "can_afford_teleport",
@@ -550,7 +501,6 @@ __all__ = [
     "local_actionable_bounds",
     "locked_resource_target",
     "make_decision",
-    "mark_scan_dispatched",
     "normalize_resource_target",
     "require_command",
     "set_resource_target",

@@ -327,6 +327,58 @@ def find_locked_target_pursuit(
     )
 
 
+def _acquisition_rejection_reason(
+    tank: TankStateDict,
+    self_state: SelfStateDict,
+    blocked: dict[str, int],
+    killed: dict[str, int],
+    terrain: TerrainMapProtocol | None,
+    now_ms: int,
+    map_open_cooldown_ms: int,
+    engagement_reserve_fuel: int,
+) -> str | None:
+    """Return why an enemy fails the acquisition gates, or ``None`` if viable.
+
+    Args:
+        tank: Enemy tank under consideration.
+        self_state: Player's own state.
+        blocked: Tank IDs temporarily un-engageable.
+        killed: Tank IDs on kill cooldown.
+        terrain: Terrain map for passable-adjacent check.
+        now_ms: Current tick timestamp.
+        map_open_cooldown_ms: Freshness window for map-known positions.
+        engagement_reserve_fuel: Fuel that must remain after the
+            approach teleport.
+
+    Returns:
+        Rejection reason string, or ``None`` when the enemy is viable.
+    """
+    from tankpit_bot.bot.ai.combat_strategy import has_passable_adjacent
+    from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
+
+    if tank["liveness"] != "alive":
+        return "not_alive"
+    if tank["x"] == 0 and tank["y"] == 0:
+        return "unsynced_position"
+    if str(tank["tank_id"]) in killed:
+        return "killed_cooldown"
+    if str(tank["tank_id"]) in blocked:
+        return "blocked"
+    if now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
+        return "stale_map_data"
+    if not has_passable_adjacent(tank["x"], tank["y"], terrain):
+        return "no_passable_adjacent"
+    teleport_cost = compute_teleport_fuel_cost(
+        self_state["x"],
+        self_state["y"],
+        tank["x"],
+        tank["y"],
+    )
+    if teleport_cost + engagement_reserve_fuel > self_state["fuel"]:
+        return "unaffordable"
+    return None
+
+
 def find_acquisition_target(
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -335,8 +387,10 @@ def find_acquisition_target(
     terrain: TerrainMapProtocol | None,
     now_ms: int,
     map_open_cooldown_ms: int,
+    *,
+    engagement_reserve_fuel: int,
 ) -> EnemyThreatDict | None:
-    """Pick the nearest map-fresh enemy worth teleporting at.
+    """Pick the nearest map-fresh enemy the bot can afford to fight.
 
     This is the **acquisition** gate, deliberately looser than the
     **firing** gate in :func:`analyze_threats`. Firing requires
@@ -349,9 +403,15 @@ def find_acquisition_target(
 
     Filters: enemy team, alive, position not (0,0), not on
     ``killed`` or ``blocked`` lists, has a passable adjacent tile
-    for a combat landing, and ``timestamp_ms`` within
-    ``map_open_cooldown_ms``. Returns the closest survivor by
-    Manhattan distance.
+    for a combat landing, ``timestamp_ms`` within
+    ``map_open_cooldown_ms``, and **affordable end-to-end**: current
+    fuel must cover the approach teleport plus
+    ``engagement_reserve_fuel`` (a realistic kill cost plus the
+    fuel-low reserve). The user contract (2026-07-02) is that the bot
+    never picks a fight it cannot pay for -- live run 2026-07-01
+    20:45 spent 505 fuel reaching the nearest enemy and hit the
+    fuel-low interrupt eight shots into a fight it could not finish.
+    Returns the closest survivor by Manhattan distance.
 
     Args:
         world: Filtered world state (killed tanks already removed).
@@ -361,14 +421,16 @@ def find_acquisition_target(
         terrain: Terrain map for passable-adjacent check.
         now_ms: Current tick timestamp.
         map_open_cooldown_ms: Freshness window for map-known positions.
+        engagement_reserve_fuel: Fuel that must remain after the
+            approach teleport (kill budget + fuel-low reserve).
 
     Returns:
-        Nearest acquisition target as :class:`EnemyThreatDict`, or
-        ``None`` when no map-fresh enemy is viable.
+        Nearest affordable acquisition target as
+        :class:`EnemyThreatDict`, or ``None`` when no map-fresh enemy
+        is viable.
     """
     from platform_core.json_utils import JSONObject, dump_json_str
 
-    from tankpit_bot.bot.ai.combat_strategy import has_passable_adjacent
     from tankpit_bot.runtime_logging import emit_diagnostic
 
     self_x = self_state["x"]
@@ -381,19 +443,16 @@ def find_acquisition_target(
         if not _is_enemy(tank, self_team):
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
-        rejected_reason: str | None = None
-        if tank["liveness"] != "alive":
-            rejected_reason = "not_alive"
-        elif tank["x"] == 0 and tank["y"] == 0:
-            rejected_reason = "unsynced_position"
-        elif str(tank["tank_id"]) in killed:
-            rejected_reason = "killed_cooldown"
-        elif str(tank["tank_id"]) in blocked:
-            rejected_reason = "blocked"
-        elif now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
-            rejected_reason = "stale_map_data"
-        elif not has_passable_adjacent(tank["x"], tank["y"], terrain):
-            rejected_reason = "no_passable_adjacent"
+        rejected_reason = _acquisition_rejection_reason(
+            tank,
+            self_state,
+            blocked,
+            killed,
+            terrain,
+            now_ms,
+            map_open_cooldown_ms,
+            engagement_reserve_fuel,
+        )
         candidate_log.append(
             {
                 "tank_id": tank["tank_id"],

@@ -133,6 +133,12 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
     Entry triggers across fuel and equipment:
 
     * **Fuel low** -- at or below the fuel-low threshold.
+    * **Insufficient engagement budget** -- no active combat target AND
+      fuel cannot cover ``fuel_low_threshold + engagement_fuel_budget``.
+      Refusing the engagement up front beats committing to a kill the
+      bot will drop mid-fight (live run 2026-06-26 19:55: spawned at
+      400 fuel, engaged adjacent enemy, dropped LOW_FUEL at 152, lost
+      both the kill and the survival hop).
     * **Weapon emergency** -- any weapon reserve below its break
       threshold, or extra radars at or below the radar break threshold.
       Interrupts even an active combat target.
@@ -149,6 +155,10 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
     """
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         return True
+    if ctx.ai_state["combat_target_id"] == -1:
+        engagement_floor = ctx.config["fuel_low_threshold"] + ctx.config["engagement_fuel_budget"]
+        if ctx.fuel < engagement_floor:
+            return True
     if (
         ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
         or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
@@ -257,7 +267,7 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     """
     reason = decision["behavior"]["reason"]
     command_type = decision["command"]["cmd_type"]
-    if reason in ("forage_radar", "forage_sweep"):
+    if reason in ("forage_radar", "forage_sweep", "scan_on_landing"):
         return "SENSE"
     if reason == "search_collect_local":
         return "SEARCH"

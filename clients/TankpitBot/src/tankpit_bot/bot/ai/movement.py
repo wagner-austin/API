@@ -13,7 +13,7 @@ from tankpit_bot.bot.ai.context import (
     local_actionable_bounds,
     teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.equipment import is_area_scanned
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
 from tankpit_bot.bot.ai.reachability import (
@@ -29,6 +29,7 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_state import is_move_target_failed, is_scan_viewport_failed
+from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.types import MineStateDict, viewport_scan_key
 
 
@@ -258,7 +259,7 @@ def _select_walkable_approach_tile(
             sy,
             cx,
             cy,
-            ctx.world["mines"],
+            hostile_mines(ctx.world),
         ):
             continue
         return (cx, cy)
@@ -292,7 +293,14 @@ def _exploration_priority(
     next_key = viewport_scan_key(next_left, next_top)
     is_current = next_key == current_key
     is_failed = is_scan_viewport_failed(next_left, next_top, ctx.timestamp_ms)
-    is_scanned = is_area_scanned(ctx.world, next_left, next_top, ctx.timestamp_ms)
+    is_scanned = is_viewport_fully_covered(
+        ctx.world["scanned_tiles"],
+        next_left,
+        next_top,
+        next_left + current_viewport["width"] - 1,
+        next_top + current_viewport["height"] - 1,
+        ctx.timestamp_ms,
+    )
     reveal_distance = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
     return (is_current, is_failed, is_scanned, -reveal_distance)
 
@@ -344,7 +352,7 @@ def _is_occupied_by_mine(ctx: DecideCtx, x: int, y: int) -> bool:
     Returns:
         True if the tile is occupied by a known mine.
     """
-    return f"{x},{y}" in ctx.world["mines"]
+    return f"{x},{y}" in hostile_mines(ctx.world)
 
 
 def _walk_or_teleport_with_terrain(
@@ -380,7 +388,7 @@ def _walk_or_teleport_with_terrain(
             sy,
             tx,
             ty,
-            ctx.world["mines"],
+            hostile_mines(ctx.world),
         ):
             return None
         emit_ai("dispatching %s pickup at (%d,%d)", pickup_kind, tx, ty)
@@ -394,10 +402,10 @@ def _walk_or_teleport_with_terrain(
         sy,
         tx,
         ty,
-        ctx.world["mines"],
+        hostile_mines(ctx.world),
     ):
         return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
-    return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, ctx.world["mines"])
+    return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, hostile_mines(ctx.world))
 
 
 def _surface_clamped_move(
@@ -440,7 +448,7 @@ def _surface_clamped_move(
         sy,
         tx,
         ty,
-        ctx.world["mines"],
+        hostile_mines(ctx.world),
     )
     if (clamp_x, clamp_y) != (tx, ty):
         emit_ai(
@@ -527,7 +535,7 @@ def _approach_command(
         ctx.self_state["y"],
         tx,
         ty,
-        ctx.world["mines"],
+        hostile_mines(ctx.world),
     )
 
 

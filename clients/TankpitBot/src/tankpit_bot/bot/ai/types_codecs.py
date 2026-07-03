@@ -227,6 +227,7 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "radar_break_threshold": config["radar_break_threshold"],
         "radar_resume_threshold": config["radar_resume_threshold"],
         "equip_search_hop_distance": config["equip_search_hop_distance"],
+        "engagement_fuel_budget": config["engagement_fuel_budget"],
     }
 
 
@@ -286,6 +287,7 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         radar_break_threshold=require_int(data, "radar_break_threshold"),
         radar_resume_threshold=require_int(data, "radar_resume_threshold"),
         equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
+        engagement_fuel_budget=require_int(data, "engagement_fuel_budget"),
     )
 
 
@@ -325,7 +327,6 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "resource_target_kind": state["resource_target_kind"],
         "resource_target_x": state["resource_target_x"],
         "resource_target_y": state["resource_target_y"],
-        "local_scan_tiles": dict(state["local_scan_tiles"]),
         "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
     }
 
@@ -416,7 +417,6 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         resource_target_kind=require_str(data, "resource_target_kind"),
         resource_target_x=require_int(data, "resource_target_x"),
         resource_target_y=require_int(data, "resource_target_y"),
-        local_scan_tiles=_require_str_int_mapping(data, "local_scan_tiles"),
         attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
         if "attempted_equipment_targets" in data
         else {},

@@ -557,13 +557,28 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             dist=dist,
             target_moved=not target_stationary,
         )
+        if target_stationary:
+            # A consumption-miss (weapon=0: the server spent nothing and
+            # resolved the shot against empty ground) at a registry
+            # position that has not moved means the target is NOT there
+            # -- a frozen registry entry after the target left, or a
+            # corpse from an unwitnessed kill. Repeating the shot cannot
+            # change the answer (live run 2026-07-02 01:23: 25+
+            # weapon=0 shots at orange-1's stale tile in a 2s loop).
+            # Contract 3.3: miss on a stationary target blocks it.
+            emit_ai(
+                "miss on stationary %s at (%d,%d) - blocking target",
+                target["name"],
+                target["x"],
+                target["y"],
+            )
+            return block_combat_target_and_replan(ctx, target)
         emit_ai(
-            "miss on %s at (%d,%d) dist=%d moved=%s - re-aiming",
+            "miss on %s at (%d,%d) dist=%d moved=True - re-aiming",
             target["name"],
             target["x"],
             target["y"],
             dist,
-            not target_stationary,
         )
 
     emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
