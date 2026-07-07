@@ -1,0 +1,10 @@
+# Libs
+
+Shared libraries in `libs/` — the reusable core that services and clients build on. Search here BEFORE adding a cross-cutting helper. Two families:
+
+- **platform_*** — infrastructure primitives: `platform_core` (config, logging, HTTP, FastAPI utils, OAuth 2.0 + PKCE), `platform_workers` (RQ + Redis), `platform_ml` (ML artifact storage, device auto-detection), `platform_discord`, `platform_music`, `platform_email` (Outlook Graph + Gmail), `platform_calendar` (Google Calendar), `platform_codebase`, `platform_devpost`, `platform_kaggle`, `platform_stt` (Whisper), `platform_langid` (Meta MMS-LID), `platform_translate` (Anthropic + OpenAI backends).
+- **domain libs** — narrower vertical stacks: `covenant_domain` / `covenant_ml` / `covenant_nn` / `covenant_persistence` (loan-covenant modeling), `cleargbm` + `cleargbm_rs` (interpretable gradient boosting, numpy + Rust), `procart` (procedural art / neon HDR).
+- **instrument_io** — scientific instrument format readers (mass spec, mzML, Excel, PDF).
+- **monorepo_guards** — the code-quality rule engine (20+ static analysis checks, Python + Rust).
+
+<!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
