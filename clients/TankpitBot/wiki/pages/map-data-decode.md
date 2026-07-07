@@ -11,6 +11,8 @@ confidence: high
 
 The 0x14 MAP_DATA blob's first section (historically misnamed "terrain deltas") is the map's **yellow fuel-pixel layer** — a skip-RLE fuel-container atlas.[^1]
 
+**Decode status:** the dot coordinates are materialised by `decode_map_data` (`MapDataDict.fuel_dots`) and stored on `WorldService.map_fuel_dots`, overwritten on every map open. Restored 2026-07-03 for dot-hop restocking and dot-relay travel; between 2026-06-22 and then the decoder skipped the RLE region for length validation only.
+
 ## Decode algorithm
 
 Lifted from client JS `Ig.h` in `tpclient-b45bd1ebc9c0c668.js`:[^1]

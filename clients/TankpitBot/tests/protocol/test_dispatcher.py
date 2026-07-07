@@ -12,7 +12,6 @@ from tankpit_bot.protocol import (
     MSG_ACTION_DONE,
     MSG_ACTIVE_FORCES,
     MSG_BUILD_PICKUP,
-    MSG_CACHE_OVERLAY_UPDATE,
     MSG_CACHE_UPDATE,
     MSG_CHAT,
     MSG_DEACTIVATE,
@@ -29,6 +28,7 @@ from tankpit_bot.protocol import (
     MSG_OVERLAY_UPDATE,
     MSG_PROMOTION,
     MSG_RADAR_RESULT,
+    MSG_RADAR_SCAN,
     MSG_SHOOT,
     MSG_STATISTICS,
     MSG_SUPERVISOR,
@@ -131,13 +131,14 @@ class TestDecodeMessage:
         result = decode_message(MSG_ENEMY_DETECT, enemy_data)
         assert result["msg_type"] == 0x48
 
-        # Combined tile update
+        # Radar scan result (0x4F -- single wire personality per JS ch)
         tile_data = bytes([1, 0, 10, 20, 0x34, 0x12, 30, 40, 7])
-        result = decode_message(MSG_CACHE_OVERLAY_UPDATE, tile_data)
+        result = decode_message(MSG_RADAR_SCAN, tile_data)
         assert result == {
             "msg_type": 0x4F,
-            "cache_updates": [(10, 20, 0x1234)],
-            "overlay_updates": [(30, 40, 7)],
+            "containers": [{"x": 10, "y": 20, "volume": 0x1234}],
+            "mines": [{"x": 30, "y": 40, "team": 3}],
+            "mine_clears": [],
         }
 
     def test_dispatches_tank_messages(self) -> None:

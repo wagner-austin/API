@@ -53,13 +53,29 @@ from tankpit_bot.sniffer.world_state import (
 from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_ammo_delta_hit,
     check_and_clear_combat_hit,
+    check_and_clear_command_error,
     check_and_clear_last_shot_victim_id,
     check_and_clear_our_shot_response,
     drain_killed_tank_ids,
     peek_combat_hit,
+    peek_command_error,
     peek_our_shot_response,
 )
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
+
+# 0x52 Supervisor codes a shoot dispatch can draw. Any of these while a
+# shot is pending is the server's authoritative refusal of THAT shot --
+# no 0x53 ShootEvent and no ammo delta will ever arrive for it (live
+# run 2026-07-03 20:34: five code-0 rejections at an off-viewport aim
+# produced zero wire feedback and each burned the full 4 s feedback
+# window before an identical redispatch).
+_SHOT_REJECTING_COMMAND_ERRORS = frozenset(
+    {
+        0,  # "You can't do this" -- aim outside the viewport
+        3,  # "Friendly fire!"
+        8,  # "Insufficient fuel"
+    }
+)
 
 log = get_logger(__name__)
 
@@ -153,6 +169,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
     kills = ai["session_kill_count"]
     hits = ai["session_hit_count"]
     misses = ai["session_miss_count"]
+    rejected = ai["session_reject_count"]
     dual = inv["dual_shots"]["count"]
     homing = inv["homing_shots"]["count"]
     radar = inv["extra_radars"]["count"]
@@ -165,6 +182,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         kills=kills,
         hits=hits,
         misses=misses,
+        rejected=rejected,
         fuel_remaining=fuel,
         dual_shots_remaining=dual,
         homing_shots_remaining=homing,
@@ -174,7 +192,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         ai_mode_state=mode_state,
         exit_reason=exit_reason,
     )
-    shots = hits + misses
+    shots = hits + misses + rejected
     hit_rate = f"{hits * 100 // shots}%" if shots > 0 else "n/a"
     summary = (
         f"TANKPIT SESSION SUMMARY\n"
@@ -182,7 +200,7 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         f"Ticks:    {ticks}\n"
         f"Exit:     {exit_reason}\n"
         f"Kills:    {kills}\n"
-        f"Shots:    {shots} ({hits} hits, {misses} misses)\n"
+        f"Shots:    {shots} ({hits} hits, {misses} misses, {rejected} rejected)\n"
         f"Hit rate: {hit_rate}\n"
         f"Blocked:  {blocked}\n"
         f"{'=' * 40}\n"
@@ -332,7 +350,7 @@ def _tick_once(bot: Bot) -> None:
     log_entries = bot._poll_game_log()
     log_world = bot.get_world_state()
     register_kills_from_game_log(log_entries, log_world)
-    register_world_feedback_from_game_log(log_entries, log_world)
+    register_world_feedback_from_game_log(log_entries)
 
     # 2. Read state
     world = bot.get_world_state()
@@ -385,6 +403,7 @@ def _tick_once(bot: Bot) -> None:
         now,
         terrain,
         combat_feedback,
+        get_world_service().map_fuel_dots,
     )
 
     maybe_emit_self_alignment_sample(self_state, snapshot)
@@ -532,6 +551,11 @@ def _has_pending_shot_feedback(bot: Bot, timestamp_ms: int) -> bool:
         return False
     if peek_our_shot_response(get_world_service()):
         return False
+    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
+        # The server refused the shot outright -- no ShootEvent or
+        # ammo delta will ever arrive, so waiting out the feedback
+        # window is pure dead time. The classifier consumes the error.
+        return False
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
         return False
     elapsed_ms = timestamp_ms - bot._ai_state["last_shoot_ms"]
@@ -564,6 +588,8 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
       - target already in killed    -> "hit" (kill confirmed)
       - 0x49 sync shows a debit the shot event missed -> "hit"
       - shot response, no debit     -> "miss"
+      - 0x52 shot-rejecting error   -> "rejected" (server refused the
+        dispatch; neither hit nor miss -- no ammo moved)
       - no response yet             -> ""  (keep waiting)
 
     Ammo count is decremented in ``mark_combat_hit`` per the weapon
@@ -650,6 +676,23 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         )
         _inc_miss()
         return "miss"
+    if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
+        error_code = check_and_clear_command_error(get_world_service())
+        emit_diagnostic(
+            diagnostic_kind="combat_feedback",
+            result="rejected",
+            reason="command_error",
+            error_code=error_code,
+            target_name=target_name,
+            target_id=target_id,
+        )
+        bot._ai_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "session_reject_count": bot._ai_state["session_reject_count"] + 1,
+            }
+        )
+        return "rejected"
     return ""
 
 

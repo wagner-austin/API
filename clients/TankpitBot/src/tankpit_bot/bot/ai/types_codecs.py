@@ -226,7 +226,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "dual_resume_threshold": config["dual_resume_threshold"],
         "radar_break_threshold": config["radar_break_threshold"],
         "radar_resume_threshold": config["radar_resume_threshold"],
-        "equip_search_hop_distance": config["equip_search_hop_distance"],
         "engagement_fuel_budget": config["engagement_fuel_budget"],
     }
 
@@ -286,7 +285,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         dual_resume_threshold=require_int(data, "dual_resume_threshold"),
         radar_break_threshold=require_int(data, "radar_break_threshold"),
         radar_resume_threshold=require_int(data, "radar_resume_threshold"),
-        equip_search_hop_distance=require_int(data, "equip_search_hop_distance"),
         engagement_fuel_budget=require_int(data, "engagement_fuel_budget"),
     )
 
@@ -321,6 +319,7 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "session_kill_count": state["session_kill_count"],
         "session_hit_count": state["session_hit_count"],
         "session_miss_count": state["session_miss_count"],
+        "session_reject_count": state["session_reject_count"],
         "blocked_combat_targets": dict(state["blocked_combat_targets"]),
         "last_shot_target_id": state["last_shot_target_id"],
         "last_shot_target_name": state["last_shot_target_name"],
@@ -328,6 +327,7 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "resource_target_x": state["resource_target_x"],
         "resource_target_y": state["resource_target_y"],
         "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
+        "last_landing_scan_viewport": state["last_landing_scan_viewport"],
     }
 
 
@@ -411,6 +411,9 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         session_miss_count=require_int(data, "session_miss_count")
         if "session_miss_count" in data
         else 0,
+        session_reject_count=require_int(data, "session_reject_count")
+        if "session_reject_count" in data
+        else 0,
         blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),
@@ -420,6 +423,9 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
         if "attempted_equipment_targets" in data
         else {},
+        last_landing_scan_viewport=require_str(data, "last_landing_scan_viewport")
+        if "last_landing_scan_viewport" in data
+        else "",
     )
 
 

@@ -736,6 +736,69 @@ class TestClearCommandError:
         container = ws.world_state["containers"]["150,150"]
         assert container["failed_pickups"] == 1
 
+    def test_command_error_tank_full_marks_failed_pickup(self, fake_env: FakeEnv) -> None:
+        """A 0x52 ``Tank full`` (code 5) is handled as a normal collect rejection.
+
+        The old branch that kept the container and fed a learned-capacity
+        watermark was retired 2026-07-06 when fuel capacity became
+        rank-derived (see :mod:`tankpit_bot.state.rank_formulas`). Fuel
+        selection and fuel-lock continuation both gate on
+        ``fuel >= fuel_capacity(rank)`` before dispatching, so a wire
+        code-5 here means the pickup was dispatched anyway (rank-up race
+        between decision and dispatch, or a protocol quirk). Marking the
+        container as a failed pickup is the correct response: the planner
+        drops it from the candidate set until a radar refresh, and the
+        pickup loop can never recur.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+        from tankpit_bot.state.types import (
+            SelfStateDict,
+            WorldStateDict,
+            make_container_state,
+        )
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        ws.world_state = WorldStateDict(
+            **{
+                **ws.world_state,
+                "self_state": SelfStateDict(
+                    tank_id=1,
+                    x=100,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    fuel=1000,
+                    leaderboard_position=0,
+                ),
+                "containers": {
+                    "150,150": make_container_state(
+                        x=150,
+                        y=150,
+                        is_fuel=True,
+                        volume=400,
+                        timestamp_ms=get_current_time_ms(),
+                        failed_pickups=0,
+                    )
+                },
+            }
+        )
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("collect", target_x=150, target_y=150)
+
+        ws.last_command_error = 5  # "Tank full"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert bot.get_state() == "IDLE"
+        assert ws.last_command_error == -1
+        container = ws.world_state["containers"]["150,150"]
+        assert container["failed_pickups"] == 1
+
     def test_command_error_clears_teleport_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't go there!`` aborts a pending teleport in < 1 s."""
         from tankpit_bot.bot.base import Bot
@@ -754,8 +817,17 @@ class TestClearCommandError:
         assert result is False
         assert bot.get_state() == "IDLE"
 
-    def test_command_error_clears_scan_action(self, fake_env: FakeEnv) -> None:
-        """A 0x52 ``Insufficient fuel`` aborts a pending radar scan in < 1 s."""
+    def test_scan_wait_drops_orphan_error_and_stays_pending(self, fake_env: FakeEnv) -> None:
+        """A 0x52 code arriving during a scan wait is an orphan and is dropped.
+
+        Radar dispatch (``CMD_RADAR`` 0x66, client ``Mb``) is not
+        server-side rejectable: the server accepts every scan and
+        replies with a ``0x4F`` result. Any 0x52 that lands during the
+        scan wait belongs to a PRIOR action (typically one that already
+        completed via a different wire signal like
+        ``container_consumed``). The wait discards the orphan code and
+        stays pending so the scan can complete normally.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_scan_action
         from tankpit_bot.sniffer.world_state import get_world_service
@@ -769,29 +841,123 @@ class TestClearCommandError:
         get_world_service().last_command_error = 8  # "Insufficient fuel"
         result = _wait_for_scan_action(bot, action)
 
-        assert result is False
-        assert bot.get_state() == "IDLE"
+        assert result is True
+        assert bot.get_state() == "SCANNING"
+        assert get_world_service().last_command_error == -1
 
-    def test_command_error_clears_map_open_action(self, fake_env: FakeEnv) -> None:
-        """A 0x52 ``You can't do this`` aborts a pending map_open in < 1 s."""
+    def test_map_open_wait_drops_orphan_error_and_stays_pending(self, fake_env: FakeEnv) -> None:
+        """A 0x52 code arriving during a map_open wait is an orphan and is dropped.
+
+        Regression guard for live run 2026-07-06 20:20:59: a late-
+        arriving ``code=4`` from a collect that already completed via
+        ``container_consumed`` was misattributed to the following
+        ``map_open``. HUNT could not acquire, session exited
+        ``no_viable_targets`` at fuel 531 with a fully-stocked tank.
+        Map_open dispatch (``CMD_MAP_OPEN`` 0x6C, client ``Nb``) is
+        server-side unconditional, so no 0x52 code is ever a legitimate
+        map_open rejection.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
         from tankpit_bot.sniffer.world_state import get_world_service
 
         update_world_state_from_position(100, 100)
         bot = Bot("https://test.tankpit.com/", headless=True)
-        # Map-open dispatch fires from IDLE; IDLE -> IDLE is a valid
-        # transition so the rejection path replans without leaving the
-        # ready state.
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
         action = self._make_pending_action("map_open")
 
-        get_world_service().last_command_error = 0  # "You can't do this"
+        get_world_service().last_command_error = 4  # "Empty container"
         result = _wait_for_map_open_action(bot, action)
 
-        assert result is False
+        assert result is True
         assert bot.get_state() == "IDLE"
+        assert get_world_service().last_command_error == -1
+
+    def test_teleport_wait_drops_orphan_empty_container(self, fake_env: FakeEnv) -> None:
+        """A code=4 during a teleport wait is an orphan; teleport stays pending.
+
+        Teleport (``CMD_MAP_TELEPORT`` 0x74) can draw codes 0/1/8; an
+        ``Empty container`` (4) can only originate from a pickup and so
+        must belong to a prior collect.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "TELEPORTING"
+        action = self._make_pending_action("teleport", target_x=200, target_y=200)
+
+        get_world_service().last_command_error = 4  # "Empty container"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is True
+        assert bot.get_state() == "TELEPORTING"
+        assert get_world_service().last_command_error == -1
+
+    def test_move_wait_drops_orphan_tank_full(self, fake_env: FakeEnv) -> None:
+        """A code=5 (tank full) during a move wait is orphaned.
+
+        Move (``CMD_MOVE`` 0x70) can draw codes 0/1/8; ``Tank full`` (5)
+        can only originate from a fuel pickup.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("move", target_x=150, target_y=150)
+
+        get_world_service().last_command_error = 5  # "Tank full"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is True
+        assert bot.get_state() == "MOVING"
+        assert get_world_service().last_command_error == -1
+
+    def test_orphan_command_error_emits_diagnostic(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """The orphan-drop path emits an ``orphan_command_error`` diagnostic.
+
+        Observability guard: without the diagnostic, a wire race that
+        drops an orphan code is invisible in the events stream. This
+        test drives the map_open orphan path and asserts a single
+        diagnostic with the action_kind and error_code fields.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_map_open_action
+        from tankpit_bot.diagnostics.event_stream import load_event_records
+        from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+        from tankpit_bot.sniffer.world_state import get_world_service
+
+        artifacts = configure_bot_runtime_logging("20260706-202100")
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "IDLE"
+        action = self._make_pending_action("map_open")
+
+        get_world_service().last_command_error = 4  # "Empty container"
+        _wait_for_map_open_action(bot, action)
+
+        records = [
+            record
+            for record in load_event_records(Path(artifacts["latest_events_path"]))
+            if record["fields"].get("diagnostic_kind") == "orphan_command_error"
+        ]
+        assert len(records) == 1
+        assert records[0]["fields"] == {
+            "diagnostic_kind": "orphan_command_error",
+            "action_kind": "map_open",
+            "error_code": 4,
+        }
 
     def test_no_command_error_lets_wait_continue(self, fake_env: FakeEnv) -> None:
         """No 0x52 error pending -> normal wait machinery runs."""
@@ -810,3 +976,41 @@ class TestClearCommandError:
         # The action is still in-flight (not rejected, not stalled, not
         # blocked) so wait returns True to continue waiting.
         assert result is True
+
+    def test_scan_wait_with_no_error_stays_pending(self, fake_env: FakeEnv) -> None:
+        """The scan drain path is a no-op when no 0x52 code is pending."""
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_scan_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "SCANNING"
+        action = self._make_pending_action("scan")
+
+        assert get_world_service().last_command_error == -1
+        result = _wait_for_scan_action(bot, action)
+
+        assert result is True
+        assert bot.get_state() == "SCANNING"
+
+    def test_scan_and_map_open_whitelists_are_empty(self) -> None:
+        """Whitelist invariant: scan and map_open are never rejected by any 0x52 code.
+
+        Radar (``CMD_RADAR`` 0x66) and map_open (``CMD_MAP_OPEN`` 0x6C)
+        are server-side unconditional. If a future change adds a code
+        to either whitelist,
+        :func:`~tankpit_bot.bot.tick_loop_actions._wait_for_scan_action`
+        and :func:`~tankpit_bot.bot.tick_loop_actions._wait_for_map_open_action`
+        must be updated to check the applicable-rejection outcome and
+        transition the action -- currently they only call
+        :func:`~tankpit_bot.bot.tick_loop_actions._drain_orphan_command_error`
+        which never transitions.
+        """
+        from tankpit_bot.bot.tick_loop_actions import _COMMAND_ERROR_APPLICABILITY
+
+        assert _COMMAND_ERROR_APPLICABILITY["scan"] == frozenset()
+        assert _COMMAND_ERROR_APPLICABILITY["map_open"] == frozenset()
+        assert _COMMAND_ERROR_APPLICABILITY["none"] == frozenset()
+        assert _COMMAND_ERROR_APPLICABILITY["shoot"] == frozenset()

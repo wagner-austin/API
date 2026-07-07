@@ -126,6 +126,7 @@ class TestSnifferCoverageBranches:
                 RadarContainerDict(x=11, y=21, volume=-1),
             ],
             mines=[RadarMineDict(x=30, y=40, team=0)],
+            mine_clears=[],
         )
         result = format_container_simple(msg)
         assert "2 containers" in str(result)
@@ -321,6 +322,7 @@ class TestSnifferCoverageBranches:
             msg_type=0x4F,
             containers=[RadarContainerDict(x=10, y=20, volume=100)],
             mines=[RadarMineDict(x=30, y=40, team=0)],
+            mine_clears=[],
         )
         world_state_dispatch.dispatch_world_state_update(get_world_service(), msg)
 

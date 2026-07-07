@@ -102,7 +102,7 @@ class MineDetonationDict(TypedDict):
 # Container DeactivationDeath (7-byte 0x43) was deleted 2026-06-20 after
 # empirical proof of zero production fires: 7-byte 0x2E bodies all route
 # to 0x49 Inventory / 0x67 EquipmentGain / 0x4A TerrainUpdate / 0x4F
-# CombinedTileUpdate via the tunneled protocol dispatch.
+# RadarScanResult via the tunneled protocol dispatch.
 
 
 class MinePlacementDict(TypedDict):

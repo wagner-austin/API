@@ -504,6 +504,86 @@ def find_acquisition_target(
     return winner
 
 
+def find_relay_travel_target(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    blocked: dict[str, int],
+    killed: dict[str, int],
+    terrain: TerrainMapProtocol | None,
+    now_ms: int,
+    map_open_cooldown_ms: int,
+    *,
+    engagement_reserve_fuel: int,
+) -> EnemyThreatDict | None:
+    """Pick the nearest map-fresh enemy that fails ONLY the affordability gate.
+
+    The dot-relay travel planner needs a destination worth travelling
+    toward: an enemy that would be a perfectly viable acquisition if
+    the bot had the fuel for the end-to-end fight. Every other gate
+    (alive, synced, not blocked/killed, map-fresh, passable-adjacent)
+    must pass -- travelling toward a corpse or a blocked target wastes
+    the relay.
+
+    Args:
+        world: Filtered world state (killed tanks already removed).
+        self_state: Player's own state.
+        blocked: Tank IDs temporarily un-engageable.
+        killed: Tank IDs on kill cooldown.
+        terrain: Terrain map for passable-adjacent check.
+        now_ms: Current tick timestamp.
+        map_open_cooldown_ms: Freshness window for map-known positions.
+        engagement_reserve_fuel: Fuel that must remain after the
+            approach teleport (kill budget + fuel-low reserve).
+
+    Returns:
+        Nearest unaffordable-but-otherwise-viable enemy, or ``None``
+        when no enemy is worth relaying toward.
+    """
+    self_x = self_state["x"]
+    self_y = self_state["y"]
+    self_team = self_state["team"]
+
+    candidates: list[EnemyThreatDict] = []
+    for tank in world["tanks"].values():
+        if not _is_enemy(tank, self_team):
+            continue
+        rejected_reason = _acquisition_rejection_reason(
+            tank,
+            self_state,
+            blocked,
+            killed,
+            terrain,
+            now_ms,
+            map_open_cooldown_ms,
+            engagement_reserve_fuel,
+        )
+        if rejected_reason != "unaffordable":
+            continue
+        candidates.append(
+            make_enemy_threat(
+                tank_id=tank["tank_id"],
+                x=tank["x"],
+                y=tank["y"],
+                distance=manhattan_distance(self_x, self_y, tank["x"], tank["y"]),
+                damage_state=tank["damage_state"],
+                rank=tank["rank"],
+                team=tank["team"],
+                name=tank["name"],
+                is_bot=tank["is_bot"],
+                timestamp_ms=tank["timestamp_ms"],
+                last_wire_seen_ms=tank["last_wire_seen_ms"],
+                last_position_update_ms=tank["last_position_update_ms"],
+                last_aim_x=tank["last_aim_x"],
+                last_aim_y=tank["last_aim_y"],
+                last_aim_weapon=tank["last_aim_weapon"],
+                last_aim_ms=tank["last_aim_ms"],
+            )
+        )
+
+    candidates.sort(key=_threat_sort_key)
+    return candidates[0] if candidates else None
+
+
 __all__ = [
     "POSITION_FRESHNESS_TTL_MS",
     "VIEWPORT_PRESENCE_TTL_MS",
@@ -512,6 +592,7 @@ __all__ = [
     "find_acquisition_target",
     "find_closest_threat",
     "find_locked_target_pursuit",
+    "find_relay_travel_target",
     "manhattan_distance",
     "threats_in_range",
 ]

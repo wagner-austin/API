@@ -36,6 +36,7 @@ class TestDispatchRadar:
             msg_type=0x4F,
             containers=[RadarContainerDict(x=100, y=100, volume=50)],
             mines=[RadarMineDict(x=110, y=110, team=0)],
+            mine_clears=[],
         )
 
         dispatch_world_state_update(get_world_service(), msg)
@@ -57,6 +58,7 @@ class TestDispatchRadar:
             msg_type=0x4F,
             containers=[RadarContainerDict(x=128, y=128, volume=50)],
             mines=[],
+            mine_clears=[],
         )
 
         dispatch_world_state_update(get_world_service(), msg)
@@ -93,7 +95,7 @@ class TestDispatchRadarEmptyDelta:
         from tankpit_bot.protocol.types import RadarScanResultDict
 
         update_world_state_from_position(100, 100)
-        msg = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[])
+        msg = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[], mine_clears=[])
 
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -106,7 +108,7 @@ class TestDispatchRadarEmptyDelta:
 
         update_world_state_from_position(100, 100)
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        msg = RadarScanResultDict(msg_type=0x4F, containers=containers, mines=[])
+        msg = RadarScanResultDict(msg_type=0x4F, containers=containers, mines=[], mine_clears=[])
 
         dispatch_world_state_update(get_world_service(), msg)
 

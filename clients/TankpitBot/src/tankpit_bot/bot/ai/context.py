@@ -43,6 +43,7 @@ class DecideCtx:
         "fuel",
         "inventory",
         "killed",
+        "map_fuel_dots",
         "mode",
         "mode_started_ms",
         "mode_state",
@@ -61,6 +62,7 @@ class DecideCtx:
         timestamp_ms: int,
         terrain: TerrainMapProtocol | None,
         combat_feedback: CombatFeedback,
+        map_fuel_dots: tuple[tuple[int, int], ...] = (),
     ) -> None:
         self.world = world
         self.self_state = self_state
@@ -69,6 +71,9 @@ class DecideCtx:
         self.timestamp_ms = timestamp_ms
         self.terrain = terrain
         self.combat_feedback = combat_feedback
+        # 0x4C fuel-dot atlas (session-constant like ``terrain``):
+        # empty until the first map open of the session.
+        self.map_fuel_dots = map_fuel_dots
 
         self.config: AIConfigDict = ai_state["config"]
         self.mode = ai_state["mode"]
@@ -97,7 +102,7 @@ class DecideCtx:
                 "last_shot_target_name": "",
             },
         )
-        self.base = normalize_resource_target(self.base, self.filtered, timestamp_ms)
+        self.base = normalize_resource_target(self.base, self.filtered)
 
 
 # =============================================================================
@@ -197,20 +202,16 @@ def set_resource_target(
 def normalize_resource_target(
     ai_state: AIStateDict,
     world: WorldStateDict,
-    now_ms: int,
 ) -> AIStateDict:
     """Drop locked resource targets that are no longer pursuable.
 
     Applies the SAME pursuability predicate as candidate selection
-    (kind match, failed pickups, freshness TTL). The lock previously
-    skipped the freshness check, so the bot kept walking to containers
-    whose belief had expired -- live run 20260610 crossed the map to a
-    long-drained container because of exactly this divergence.
+    (kind match, failed pickups). A drained or failed container clears
+    the lock so the cascade re-derives from live registry truth.
 
     Args:
         ai_state: Current AI state with resource target fields.
         world: Current world state with container positions.
-        now_ms: Current timestamp for freshness filtering.
 
     Returns:
         AI state with a no-longer-pursuable target cleared, or unchanged.
@@ -225,7 +226,7 @@ def normalize_resource_target(
     target = world["containers"].get(f"{tx},{ty}")
     if target is None:
         return clear_resource_target(ai_state)
-    if not is_container_pursuable(target, want_fuel=kind == "fuel", now_ms=now_ms):
+    if not is_container_pursuable(target, want_fuel=kind == "fuel"):
         return clear_resource_target(ai_state)
     return ai_state
 

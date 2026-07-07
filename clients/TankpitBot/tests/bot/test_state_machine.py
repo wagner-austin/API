@@ -279,9 +279,7 @@ class TestBotStateUpdates:
         from tankpit_bot.protocol import RadarContainerDict
 
         update_world_state_from_radar(
-            get_world_service(),
-            [RadarContainerDict(x=100, y=100, volume=50)],
-            [],
+            get_world_service(), [RadarContainerDict(x=100, y=100, volume=50)], [], []
         )
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
@@ -306,7 +304,7 @@ class TestBotStateUpdates:
         _sm_update_fuel(get_world_service(), 1400)
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "SCANNING", "scan", 0, 0)
-        update_world_state_from_radar(get_world_service(), [], [])
+        update_world_state_from_radar(get_world_service(), [], [], [])
         bot._update_state_from_world()
         assert bot.get_state() == "IDLE"
         assert bot._state_data["in_flight_action"]["kind"] == "none"
@@ -381,7 +379,7 @@ class TestBotStateUpdates:
             RadarContainerDict(x=205, y=82, volume=-1),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines, [])
         bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 205, 82)
         update_world_state_from_container_pickup(get_world_service(), 205, 82)
         bot._update_state_from_world()
@@ -481,9 +479,7 @@ class TestBotStateUpdates:
         update_world_state_from_position(50, 50)
         _sm_update_fuel(get_world_service(), 100)
         update_world_state_from_radar(
-            get_world_service(),
-            [RadarContainerDict(x=55, y=55, volume=500)],
-            [],
+            get_world_service(), [RadarContainerDict(x=55, y=55, volume=500)], [], []
         )
         bot._update_state_from_world()
         bot._state_data = _set_bot_action(bot._state_data, "COLLECTING", "collect", 55, 55)

@@ -556,6 +556,7 @@ class TestDispatchMapData:
             tanks=[
                 MapTankEntry(x=100, y=120, tank_id=7, rank=2, damage=1, team=0),
             ],
+            fuel_dots=[],
         )
         dispatch_world_state_update(ws, snapshot)
 
@@ -585,7 +586,7 @@ class TestDispatchMapData:
 
         dispatch_world_state_update(
             ws,
-            MapDataDict(msg_type=0x4C, tanks=[]),
+            MapDataDict(msg_type=0x4C, tanks=[], fuel_dots=[]),
         )
 
         assert ws.check_and_clear_map_data_processed() is True

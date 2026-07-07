@@ -19,15 +19,21 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     target_position_is_fresh,
 )
+from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
     find_acquisition_target,
     find_locked_target_pursuit,
+    find_relay_travel_target,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import make_map_open_command, make_radar_command
+from tankpit_bot.bot.types import (
+    make_map_open_command,
+    make_radar_command,
+    make_teleport_command,
+)
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
@@ -171,8 +177,12 @@ def _decide_hunt_acquire_fresh(
 
     When the map snapshot is fresh (opened within the cooldown) and no
     enemy passes the acquisition gates -- including affordability --
-    the session ends with ``no_viable_targets`` instead of looping on
-    map refreshes (user contract 2026-07-02).
+    the bot first tries a **dot relay**: hop to the fuel dot that best
+    closes distance to the nearest otherwise-viable enemy, refuelling
+    on landing (user contract 2026-07-03). Only when there is no enemy
+    worth relaying toward, or no dot makes affordable progress, does
+    the session end with ``no_viable_targets`` (user contract
+    2026-07-02).
 
     Args:
         ctx: Decision context.
@@ -219,16 +229,136 @@ def _decide_hunt_acquire_fresh(
 
     map_age_ms = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
     if ctx.ai_state["last_map_open_ms"] > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
+        relay = _relay_toward_unaffordable_enemy(ctx, ai_state)
+        if relay is not None:
+            return relay
         raise SessionExitError(
             "no_viable_targets",
             f"fresh map snapshot ({map_age_ms}ms old) has no affordable enemy "
-            f"at ({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}",
+            f"and no relay dot at ({ctx.self_state['x']},{ctx.self_state['y']}) "
+            f"fuel={ctx.fuel}",
         )
 
     return search_for_enemies(
         ctx,
         ai_state=ai_state,
         map_reason="find_enemies",
+    )
+
+
+def _pick_relay_dot(
+    ctx: DecideCtx,
+    travel: EnemyThreatDict,
+) -> tuple[int, int] | None:
+    """Return the fuel dot that best closes distance to ``travel``.
+
+    A dot qualifies when it is strictly closer to the enemy than the
+    bot's current tile (euclidean -- teleport cost geometry), the
+    landing tile is passable, and the hop leaves ``fuel_low_threshold``
+    behind so a dry dot cannot strand the bot below the COLLECT entry
+    reserve. Among qualifiers the one nearest the enemy wins (maximum
+    progress per hop); ties keep the cheaper hop. Strict progress
+    makes the relay monotone -- it terminates at the enemy or runs out
+    of qualifying dots.
+
+    Args:
+        ctx: Decision context.
+        travel: Enemy the relay is travelling toward.
+
+    Returns:
+        ``(x, y)`` of the best relay dot, or ``None`` when no dot
+        makes affordable progress.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    ex, ey = travel["x"], travel["y"]
+    self_to_enemy_sq = (ex - sx) ** 2 + (ey - sy) ** 2
+    best: tuple[int, int] | None = None
+    best_remaining_sq = self_to_enemy_sq
+    best_cost = 0
+    for dot_x, dot_y in ctx.map_fuel_dots:
+        remaining_sq = (ex - dot_x) ** 2 + (ey - dot_y) ** 2
+        if remaining_sq >= self_to_enemy_sq:
+            continue
+        if ctx.terrain is not None and not ctx.terrain.is_passable(dot_x, dot_y):
+            continue
+        cost = compute_teleport_fuel_cost(sx, sy, dot_x, dot_y)
+        if cost + ctx.config["fuel_low_threshold"] > ctx.fuel:
+            continue
+        if (
+            best is None
+            or remaining_sq < best_remaining_sq
+            or (remaining_sq == best_remaining_sq and cost < best_cost)
+        ):
+            best = (dot_x, dot_y)
+            best_remaining_sq = remaining_sq
+            best_cost = cost
+    return best
+
+
+def _relay_toward_unaffordable_enemy(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Hop toward the nearest out-of-range enemy via a fuel dot.
+
+    User contract (2026-07-03): when no enemy is affordable end-to-end,
+    do what a human does -- yellow-dot teleport while en route to the
+    opponent, refuelling on each landing (teleporting onto a container
+    tile auto-picks it up), instead of exiting the session. The relay
+    fires only when a map-fresh enemy exists that fails ONLY the
+    affordability gate; a map with no enemies at all still exits with
+    ``no_viable_targets``.
+
+    Each hop strictly reduces the distance to the enemy, so the relay
+    terminates: either acquisition succeeds on a later tick (fuel
+    recovered, distance shortened) or no qualifying dot remains and
+    the session exits.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+
+    Returns:
+        Relay teleport decision, or ``None`` when there is no enemy
+        worth relaying toward or no dot makes affordable progress.
+    """
+    travel = find_relay_travel_target(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.blocked_targets,
+        ctx.killed,
+        ctx.terrain,
+        ctx.timestamp_ms,
+        ctx.config["map_open_cooldown_ms"],
+        engagement_reserve_fuel=(
+            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        ),
+    )
+    if travel is None:
+        return None
+    dot = _pick_relay_dot(ctx, travel)
+    if dot is None:
+        return None
+    dot_x, dot_y = dot
+    emit_ai(
+        "dot-relay toward %s (id=%d) at (%d,%d): hop to dot (%d,%d) (fuel=%d)",
+        travel["name"],
+        travel["tank_id"],
+        travel["x"],
+        travel["y"],
+        dot_x,
+        dot_y,
+        ctx.fuel,
+    )
+    return make_decision(
+        make_teleport_command(dot_x, dot_y),
+        "HUNT",
+        800,
+        dot_x,
+        dot_y,
+        "dot_relay",
+        ai_state,
+        ctx.equip,
     )
 
 
@@ -379,6 +509,10 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
                     **{
                         **ctx.base,
                         "last_scan_ms": ctx.timestamp_ms,
+                        # Record the per-viewport landing-scan latch so
+                        # a later COLLECT entry in the same viewport
+                        # does not fire a second landing radar.
+                        "last_landing_scan_viewport": f"{viewport_left},{viewport_top}",
                     }
                 ),
                 ctx.equip,
@@ -415,6 +549,7 @@ def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:
         ctx.timestamp_ms,
         ctx.terrain,
         ctx.combat_feedback,
+        ctx.map_fuel_dots,
     )
     return _decide_hunt_acquire(cleared_ctx)
 

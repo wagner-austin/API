@@ -81,8 +81,7 @@ class FuelDecisionCandidateDict(TypedDict):
     source: Literal["viewport", "radar", "world_state"]
     refresh_kind: ContainerRefreshKind
     refresh_timestamp_ms: int
-    stale_age_ms: int
-    stale_ttl_ms: int
+    age_ms: int
 
 
 class FuelDecisionBasisDict(TypedDict):
@@ -159,8 +158,7 @@ def encode_fuel_decision_candidate(candidate: FuelDecisionCandidateDict) -> JSON
         "source": candidate["source"],
         "refresh_kind": encode_container_refresh_kind(candidate["refresh_kind"]),
         "refresh_timestamp_ms": candidate["refresh_timestamp_ms"],
-        "stale_age_ms": candidate["stale_age_ms"],
-        "stale_ttl_ms": candidate["stale_ttl_ms"],
+        "age_ms": candidate["age_ms"],
     }
 
 
@@ -177,8 +175,7 @@ def decode_fuel_decision_candidate(data: JSONObject) -> FuelDecisionCandidateDic
         source=_decode_entity_source(data, "source"),
         refresh_kind=decode_container_refresh_kind(data, "refresh_kind"),
         refresh_timestamp_ms=require_int(data, "refresh_timestamp_ms"),
-        stale_age_ms=require_int(data, "stale_age_ms"),
-        stale_ttl_ms=require_int(data, "stale_ttl_ms"),
+        age_ms=require_int(data, "age_ms"),
     )
 
 

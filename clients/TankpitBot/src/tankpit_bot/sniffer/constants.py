@@ -41,7 +41,7 @@ MSG_TYPE_NAMES: dict[int, str] = {
     0x4C: "MapData",
     0x4D: "PlayerList",
     0x4E: "Decoration",
-    0x4F: "CombinedTileUpdate",
+    0x4F: "RadarScanResult",
     0x52: "Supervisor",
     0x53: "Shooting",
     0x54: "ActionDone",
@@ -81,7 +81,7 @@ MSG_MIN_LENGTHS: dict[int, int] = {
     ord("t"): 5,  # EquipmentToggle
     ord("F"): 2,  # RadarResult
     ord("H"): 6,  # EnemyDetection
-    ord("O"): 2,  # CombinedTileUpdate
+    ord("O"): 2,  # RadarScanResult (JS ch: LE u16 count + tile writes)
     ord("("): 10,  # TankEntry
     ord(")"): 5,  # TankExit (Vf: team, tank_id, was_silent, was_eliminated)
     ord("+"): 2,  # Promotion (Rf binary form: new_rank, was_promoted)
@@ -145,7 +145,7 @@ DECODED_SIGS: dict[int, tuple[str, str]] = {
     0x4C: ("map_data", "FULL"),
     0x4D: ("player_list", "IDENTIFIED"),
     0x4E: ("decoration", "FULL"),
-    0x4F: ("combined_tile_update", "FULL"),
+    0x4F: ("radar_scan_result", "FULL"),
     0x52: ("supervisor", "PARTIAL"),
     0x53: ("tank_move", "FULL"),
     0x54: ("tank_shoot", "FULL"),

@@ -374,7 +374,7 @@ class TestRecoveryHelpers:
         decision = decide(
             world,
             self_state,
-            make_scanned_ai_state(),
+            make_scanned_ai_state(landing_scan_viewport="56,56"),
             inventory,
             100000,
             InMemoryTerrainMap(),

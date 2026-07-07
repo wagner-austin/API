@@ -14,11 +14,15 @@ registries (single source of truth per entity class).
 
 from __future__ import annotations
 
+from typing import TypeVar
+
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.viewport import update_viewport_origin
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
+    ContainerStateDict,
+    MineStateDict,
     WorldStateDict,
     apply_tile_cache_update,
     apply_tile_overlay_update,
@@ -29,7 +33,10 @@ from tankpit_bot.state import (
 from tankpit_bot.state.viewport_geometry import (
     make_visible_viewport_state,
     viewport_patch_world_coords,
+    viewport_radar_bounds,
 )
+
+_TileEntityT = TypeVar("_TileEntityT", ContainerStateDict, MineStateDict)
 
 
 def update_viewport_entities(
@@ -39,6 +46,18 @@ def update_viewport_entities(
     entities: list[dict[str, int]],
 ) -> None:
     """Apply a visible viewport update using explicit viewport origin from 0x5A.
+
+    Reset-then-apply (mirrors JS ``Vg.prototype.h``, which wipes the
+    tile grid via ``rg()`` and rebuilds it from the patch alone): the
+    0x5A skip-walk covers the whole 18x18 patch grid, so a tile it
+    does NOT enumerate is the server's statement that nothing is
+    there. Viewport/cache-sourced container and mine entries on
+    silent tiles are removed — the historical behaviour kept them,
+    so a container remembered from a previous visit survived
+    re-entry even after someone consumed it. Radar-sourced entries
+    are spared: the visible patch says nothing about hidden-layer
+    entities, and those are owned by the radar omission-prune in
+    ``reconcile_radar_viewport_resources``.
 
     Args:
         ws: World service instance.
@@ -59,8 +78,90 @@ def update_viewport_entities(
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
 
+    _sweep_silent_viewport_tiles(ws, entities, viewport_left, viewport_top)
     update_viewport_tiles(ws, entities, viewport_left, viewport_top)
     ws.clear_failed_scan_viewport(viewport_left, viewport_top)
+
+
+def _without_silent_visible_entries(
+    entries: dict[str, _TileEntityT],
+    bounds: tuple[int, int, int, int],
+    enumerated_keys: set[str],
+) -> dict[str, _TileEntityT] | None:
+    """Return ``entries`` without silent visible-layer ones, or ``None`` if unchanged.
+
+    An entry is stale when its latest confirmation came from the
+    visible layer (any source but ``"radar"``), it sits inside the
+    0x5A patch bounds, and the patch did not enumerate its tile.
+
+    Args:
+        entries: Current registry keyed by ``"x,y"``.
+        bounds: Inclusive ``(left, top, right, bottom)`` patch bounds.
+        enumerated_keys: ``"x,y"`` keys the 0x5A patch enumerated.
+
+    Returns:
+        Pruned copy of the registry, or ``None`` when nothing is stale.
+    """
+    left, top, right, bottom = bounds
+    pruned: dict[str, _TileEntityT] | None = None
+    for key, entry in entries.items():
+        if entry["source"] == "radar":
+            continue
+        x = entry["x"]
+        y = entry["y"]
+        if left <= x <= right and top <= y <= bottom and key not in enumerated_keys:
+            if pruned is None:
+                pruned = dict(entries)
+            del pruned[key]
+    return pruned
+
+
+def _sweep_silent_viewport_tiles(
+    ws: WorldService,
+    entities: list[dict[str, int]],
+    vp_left: int,
+    vp_top: int,
+) -> None:
+    """Drop visible-layer entries the incoming 0x5A patch is silent about.
+
+    Args:
+        ws: World service instance.
+        entities: Viewport entity list from the 0x5A patch.
+        vp_left: Viewport left offset.
+        vp_top: Viewport top offset.
+    """
+    enumerated_keys = {
+        coord_key(*viewport_patch_world_coords(vp_left, vp_top, ent["col"], ent["row"]))
+        for ent in entities
+    }
+    bounds = viewport_radar_bounds(ws.world_state["viewport"])
+    new_containers = _without_silent_visible_entries(
+        ws.world_state["containers"],
+        bounds,
+        enumerated_keys,
+    )
+    new_mines = _without_silent_visible_entries(
+        ws.world_state["mines"],
+        bounds,
+        enumerated_keys,
+    )
+    if new_containers is None and new_mines is None:
+        return
+    if new_containers is not None:
+        emit_world(
+            "Viewport patch sweep: dropped %d stale visible container(s)",
+            len(ws.world_state["containers"]) - len(new_containers),
+        )
+    ws.world_state = WorldStateDict(
+        self_state=ws.world_state["self_state"],
+        tanks=ws.world_state["tanks"],
+        containers=ws.world_state["containers"] if new_containers is None else new_containers,
+        mines=ws.world_state["mines"] if new_mines is None else new_mines,
+        terrain=ws.world_state["terrain"],
+        viewport=ws.world_state["viewport"],
+        scanned_tiles=ws.world_state["scanned_tiles"],
+        timestamp_ms=ws.world_state["timestamp_ms"],
+    )
 
 
 def update_viewport_tiles(

@@ -123,7 +123,6 @@ class WorldService:
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False
-        self.pending_radar_cache_refresh_ms: int = 0
         self.pending_radar_empty_delta_ms: int = 0
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
@@ -162,6 +161,12 @@ class WorldService:
         # monitor reads this to detect long server silences without
         # racing the WebSocket layer.
         self.last_ping_response_ms: int = 0
+        # 0x4C MapData fuel-dot atlas -- the map's yellow-pixel fuel
+        # positions. Server-cached per session (byte-identical across
+        # map opens), so each MapData dispatch simply overwrites it.
+        # Empty until the first map open. Consumed by the dot-hop
+        # restock picker and the dot-relay travel planner.
+        self.map_fuel_dots: tuple[tuple[int, int], ...] = ()
 
     # -----------------------------------------------------------------
     # World state accessors
@@ -232,19 +237,6 @@ class WorldService:
     # -----------------------------------------------------------------
     # Radar cache refresh tracking
     # -----------------------------------------------------------------
-
-    def mark_pending_radar_cache_refresh(self) -> None:
-        """Record that a recent combined-tile update may belong to a radar scan."""
-        self.pending_radar_cache_refresh_ms = get_current_time_ms()
-
-    def consume_pending_radar_cache_refresh(self) -> bool:
-        """Return True if a recent combined-tile update should count as radar."""
-        if self.pending_radar_cache_refresh_ms <= 0:
-            return False
-        now = get_current_time_ms()
-        recent = now - self.pending_radar_cache_refresh_ms <= _RADAR_CACHE_REFRESH_WINDOW_MS
-        self.pending_radar_cache_refresh_ms = 0
-        return recent
 
     def mark_pending_radar_empty_delta(self) -> None:
         """Record that a zero-delta tunneled radar result was observed."""
@@ -416,7 +408,7 @@ class WorldService:
             return viewport_radar_bounds(self.world_state["viewport"])
         if self.pending_radar_uses_extra:
             return viewport_radar_bounds(self.world_state["viewport"])
-        return regular_radar_bounds(self_state["x"], self_state["y"])
+        return regular_radar_bounds(self_state["x"], self_state["y"], self_state["rank"])
 
     # -----------------------------------------------------------------
     # Private helpers

@@ -48,7 +48,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 | 0x4C | `L` | Ig | MapData: all tank positions + fuel dots | FULL | — |
 | 0x4D | `M` | Qg | Chat: sender, type, position | FULL | — |
 | 0x4E | `N` | Sf | Decoration: tank_id, slot, level | FULL | — |
-| 0x4F | `O` | ch | CombinedTileUpdate / RadarScanResult (structural disambiguation) | FULL | — |
+| 0x4F | `O` | ch | RadarScanResult — a batch of per-tile cache + overlay writes (delta sync: reveals, volume corrections, removals via cache=0, mine clears via overlay>=8). **Single personality as of 2026-07-03**: the parallel "CombinedTileUpdate" decode was deleted after a 199-session corpus scan showed 0 top-level fires (all 1817 bodies arrive tunneled in 0x2E); count header fixed to LE u16 per JS `ch.h`. | FULL | — |
 | 0x52 | `R` | xg | CommandResult: reset_action, close_map, error_code | FULL | — |
 | 0x53 | `S` | Gg | ShootEvent: team, shooter, source pos, target pos, weapon | FULL | — |
 | 0x54 | `T` | Kg | ActionDone: bare completion ping | FULL | — |

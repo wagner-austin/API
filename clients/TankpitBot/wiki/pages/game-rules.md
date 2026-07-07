@@ -57,7 +57,7 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 | Colonel | 40,000 | deactivate a captain or higher |
 | General | 50,000 | deactivate a colonel or higher |
 
-**Higher rank tanks hold more fuel, equipment, and have a larger radar.** This means the built-in radar radius may scale with rank — not just the 5x5 we measured at our rank. See [[radar-mechanics]].[^2]
+**Higher rank tanks hold more fuel, equipment, and have a larger radar.** All three scalings are now quantified: fuel capacity = 1000 + 100·rank ([[game-economy]]), equipment = 20 + 5·rank (below), built-in radar radius = 2 + floor(rank/3) ([[radar-mechanics]]).[^2]
 
 **Demotion:** if deactivated by an enemy, you lose one rank.
 
@@ -67,4 +67,4 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 - This is the death spiral: 0 fuel = instant deactivation, not just immobility
 
 [^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
-[^2]: "Higher rank tanks... have a larger radar" — official text; may mean built-in radar radius scales; our 5x5 measurement was at a specific rank; needs verification at higher ranks
+[^2]: "Higher rank tanks... have a larger radar" — official text; resolved 2026-07-06 with exact formulas via client mining (tpclient.js Gc gauge draw) + user measurements at ranks 1/3/4/6/7 — see [[game-economy]] and [[radar-mechanics]]

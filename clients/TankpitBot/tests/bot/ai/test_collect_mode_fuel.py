@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.ai.collect_mode import (
+    _continue_or_release_fuel_lock,
+    _select_and_pickup_fuel,
     decide_collect_mode,
     select_fuel_target,
 )
@@ -51,6 +53,8 @@ def test_collect_mode_continues_locked_fuel_target() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "fuel=700"
     assert decision["command"]["cmd_type"] == "pickup_fuel"
@@ -97,6 +101,8 @@ def test_collect_mode_preserves_combat_lock_across_recovery() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] == "pickup_fuel"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
     assert decision["updated_ai_state"]["combat_target_x"] == 120
@@ -144,6 +150,8 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["behavior"]["target_x"] == 101
@@ -194,6 +202,8 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "fuel=900"
     assert decision["behavior"]["target_x"] == 107
     assert decision["behavior"]["target_y"] == 107
@@ -239,6 +249,8 @@ def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "fuel=700"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
@@ -249,7 +261,7 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
     world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
-            **make_scanned_ai_state(),
+            **make_scanned_ai_state(landing_scan_viewport=""),
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
@@ -260,6 +272,8 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
@@ -270,7 +284,7 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
     world, self_state = make_world(fuel=150, scanned=False)
     ai_state = AIStateDict(
         **{
-            **make_scanned_ai_state(),
+            **make_scanned_ai_state(landing_scan_viewport=""),
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
@@ -282,6 +296,8 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
@@ -303,6 +319,9 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
+            # Recent map open: the dot atlas is empty and a re-open
+            # inside the cooldown teaches nothing, so the hop declines.
+            "last_map_open_ms": 96000,
         }
     )
     inventory = make_inventory()
@@ -420,6 +439,8 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] == "pickup_fuel"
     assert decision["behavior"]["reason"] == "fuel=57"
 
@@ -453,6 +474,8 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] == "move"
     assert decision["behavior"]["reason"] == "forage_sweep"
     assert decision["behavior"]["mode"] == "COLLECT"
@@ -486,6 +509,8 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["command"]["target_x"] == 102
@@ -520,6 +545,8 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["behavior"]["target_x"] == 103
 
@@ -569,4 +596,107 @@ def test_locked_fuel_clears_when_water_locked() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["updated_ai_state"]["resource_target_kind"] == ""
+
+
+def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
+    """``_select_and_pickup_fuel`` refuses to dispatch at capacity.
+
+    Sergeant (rank 3) has fuel capacity 1300 per
+    :func:`tankpit_bot.state.rank_formulas.fuel_capacity`. A full tank
+    at exactly 1300 must skip fuel selection so the cascade falls
+    through instead of dispatching a wasted ``pickup_fuel`` that the
+    server rejects with ``0x52`` code-5.
+    """
+    from tankpit_bot.state.types import SelfStateDict
+
+    base_world, base_self = make_world(
+        fuel=1300,
+        scanned=True,
+        containers={
+            "105,105": make_container_state(
+                x=105,
+                y=105,
+                is_fuel=True,
+                volume=900,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    self_state = SelfStateDict(**{**base_self, "rank": 3})
+    world = base_world
+    world["self_state"] = self_state
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = _select_and_pickup_fuel(ctx, ctx.base)
+
+    assert decision is None
+
+
+def test_locked_fuel_released_at_rank_derived_capacity() -> None:
+    """A held fuel lock is dropped when the tank hits ``fuel_capacity(rank)``.
+
+    Regression guard for the live-run 2026-07-06 tank-full pickup loop:
+    the lock-continuation path had no capacity gate, so a held fuel
+    lock kept re-dispatching ``pickup_fuel`` at capacity, each dispatch
+    draws wire ``0x52`` code-5 ``Tank full``, and the lock survives to
+    next tick. With rank-derived capacity, the lock is released and
+    ``resource_target_kind`` cleared before the cascade can produce a
+    fresh pickup command.
+    """
+    from tankpit_bot.state.types import SelfStateDict
+
+    base_world, base_self = make_world(
+        fuel=1600,
+        scanned=True,
+        containers={
+            "105,105": make_container_state(
+                x=105,
+                y=105,
+                is_fuel=True,
+                volume=900,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    self_state = SelfStateDict(**{**base_self, "rank": 6})
+    world = base_world
+    world["self_state"] = self_state
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "APPROACH",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 105,
+            "resource_target_y": 105,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    locked_target = world["containers"]["105,105"]
+
+    decision, updated_state = _continue_or_release_fuel_lock(
+        ctx,
+        ctx.base,
+        locked_target,
+    )
+
+    assert decision is None
+    assert updated_state["resource_target_kind"] == ""
+    assert updated_state["resource_target_x"] == 0
+    assert updated_state["resource_target_y"] == 0

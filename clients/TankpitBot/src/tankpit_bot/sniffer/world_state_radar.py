@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import TypeVar
 
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.protocol import RadarContainerDict, RadarMineDict
+from tankpit_bot.protocol import RadarContainerDict, RadarMineClearDict, RadarMineDict
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
@@ -25,6 +25,7 @@ from tankpit_bot.state import (
     add_mine_from_radar,
     coord_key,
     record_scanned_tiles,
+    remove_mine,
     update_container_from_radar,
 )
 from tankpit_bot.state.scan_coverage import (
@@ -38,9 +39,11 @@ def _radar_revealed_tiles(ws: WorldService) -> list[tuple[int, int]]:
     """Return the exact tile set the current server radar revealed.
 
     Extra radar reveals every tile in the viewport. Free radar reveals
-    the 5x5 block around the tank intersected with the viewport. When
-    the tank position is unknown (self_state not yet observed), the
-    server falls back to the extra-radar geometry -- mirror that.
+    a ``(2r+1)x(2r+1)`` block around the tank, where
+    ``r = free_radar_radius(rank)``, intersected with the viewport
+    (see :func:`tankpit_bot.state.rank_formulas.free_radar_radius`).
+    When the tank position is unknown (self_state not yet observed),
+    the server falls back to the extra-radar geometry -- mirror that.
 
     Args:
         ws: World service instance.
@@ -59,6 +62,7 @@ def _radar_revealed_tiles(ws: WorldService) -> list[tuple[int, int]]:
         top,
         right,
         bottom,
+        self_state["rank"],
     )
 
 
@@ -66,16 +70,22 @@ def update_world_state_from_radar(
     ws: WorldService,
     containers: list[RadarContainerDict],
     mines: list[RadarMineDict],
+    mine_clears: list[RadarMineClearDict],
 ) -> None:
     """Update world state with radar scan results.
+
+    The 0x4F body is a delta sync of the scanned area (JS handler
+    ``ch`` applies every entry as a per-tile write): container entries
+    with ``volume == 0`` are authoritative removals, and mine-clear
+    entries (overlay >= 8) drop any tracked mine at the tile.
 
     Args:
         ws: World service instance.
         containers: List of containers from radar.
         mines: List of mines from radar.
+        mine_clears: Tiles the server declared mine-free.
     """
     ts = get_current_time_ms()
-    ws.pending_radar_cache_refresh_ms = 0
     ws.pending_radar_empty_delta_ms = 0
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
@@ -102,6 +112,8 @@ def update_world_state_from_radar(
             m["team"],
             ts,
         )
+    for mc in mine_clears:
+        ws.world_state = remove_mine(ws.world_state, mc["x"], mc["y"], ts)
 
 
 def _radar_envelope_containers(ws: WorldService) -> list[RadarContainerDict]:
@@ -297,16 +309,14 @@ def handle_radar_ack(ws: WorldService, found: bool) -> None:
         ws: World service instance.
         found: Whether the RadarAck reports resources exist.
     """
-    if ws.consume_pending_radar_cache_refresh():
-        update_world_state_from_radar_cache(ws)
-    elif ws.consume_pending_radar_empty_delta():
+    if ws.consume_pending_radar_empty_delta():
         if found:
             if _radar_envelope_containers(ws):
                 update_world_state_from_radar_cache(ws)
             else:
                 update_world_state_from_radar_known_resources(ws)
         else:
-            update_world_state_from_radar(ws, [], [])
+            update_world_state_from_radar(ws, [], [], [])
     else:
         ws.mark_radar_scan_complete()
 

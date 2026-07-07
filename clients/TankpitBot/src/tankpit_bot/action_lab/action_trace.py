@@ -12,11 +12,7 @@ from tankpit_bot.action_lab.action_trace_types import (
     FuelDecisionBasisDict,
     FuelDecisionCandidateDict,
 )
-from tankpit_bot.bot.ai.equipment import (
-    _CONTAINER_FRESHNESS_TTL_MS,
-    _viewport_bounds,
-    hostile_mines,
-)
+from tankpit_bot.bot.ai.equipment import _viewport_bounds, hostile_mines
 from tankpit_bot.bot.ai.equipment_search import _describe_candidate_reason
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import ContainerStateDict, WorldStateDict
@@ -162,21 +158,17 @@ def build_fuel_decision_basis(
         y = container["y"]
         if not (left <= x <= right and top <= y <= bottom):
             continue
-        stale_age_ms = now_ms - container["timestamp_ms"]
-        if stale_age_ms > _CONTAINER_FRESHNESS_TTL_MS:
-            reason = "stale"
-            actionable = False
-        else:
-            reason, actionable, _, _, _ = _describe_candidate_reason(
-                world,
-                container,
-                self_x,
-                self_y,
-                terrain,
-                want_fuel=True,
-                minimum_volume=1,
-                blocked_mines=hostile_mines(world),
-            )
+        age_ms = now_ms - container["timestamp_ms"]
+        reason, actionable, _, _, _ = _describe_candidate_reason(
+            world,
+            container,
+            self_x,
+            self_y,
+            terrain,
+            want_fuel=True,
+            minimum_volume=1,
+            blocked_mines=hostile_mines(world),
+        )
         selected = fuel_target is not None and fuel_target["x"] == x and fuel_target["y"] == y
         candidates.append(
             FuelDecisionCandidateDict(
@@ -190,8 +182,7 @@ def build_fuel_decision_basis(
                 source=container["source"],
                 refresh_kind=container["refresh_kind"],
                 refresh_timestamp_ms=container["timestamp_ms"],
-                stale_age_ms=stale_age_ms,
-                stale_ttl_ms=_CONTAINER_FRESHNESS_TTL_MS,
+                age_ms=age_ms,
             )
         )
     candidates.sort(key=_fuel_candidate_sort_key)
@@ -270,7 +261,7 @@ def format_fuel_decision_candidates(
             f" actionable={candidate['actionable']}"
             f" selected={candidate['selected']}"
             f" refresh={candidate['refresh_kind']}@{candidate['refresh_timestamp_ms']}"
-            f" age={candidate['stale_age_ms']}/{candidate['stale_ttl_ms']}"
+            f" age={candidate['age_ms']}"
         )
     if len(basis["candidates"]) > limit:
         formatted_candidates.append(f"...+{len(basis['candidates']) - limit} more")

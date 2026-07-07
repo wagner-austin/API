@@ -18,14 +18,15 @@ from tankpit_bot.protocol.decoders.movement import (
 from tankpit_bot.protocol.decoders.radar import (
     decode_enemy_detection,
     decode_radar_container,
-    decode_radar_mine,
     decode_radar_result,
     decode_radar_scan_result,
     encode_radar_container,
     encode_radar_mine,
+    encode_radar_mine_clear,
     encode_radar_scan_result,
     require_radar_container,
     require_radar_mine,
+    require_radar_mine_clear,
     require_radar_scan_result,
 )
 from tankpit_bot.protocol.decoders.resources import (
@@ -73,7 +74,6 @@ from tankpit_bot.protocol.decoders.text import (
 )
 from tankpit_bot.protocol.decoders.world import (
     decode_cache_update,
-    decode_combined_tile_update,
     decode_overlay_update,
     decode_supervisor,
     decode_supervisor_text,
@@ -209,7 +209,6 @@ __all__ = [
     "decode_build_pickup",
     "decode_cache_update",
     "decode_chat_message",
-    "decode_combined_tile_update",
     "decode_connection_lost",
     "decode_deactivation",
     "decode_decoration",
@@ -228,7 +227,6 @@ __all__ = [
     "decode_ping_response",
     "decode_promotion",
     "decode_radar_container",
-    "decode_radar_mine",
     "decode_radar_result",
     "decode_radar_scan_result",
     "decode_shoot_event",
@@ -249,9 +247,11 @@ __all__ = [
     "decode_world_info",
     "encode_radar_container",
     "encode_radar_mine",
+    "encode_radar_mine_clear",
     "encode_radar_scan_result",
     "require_radar_container",
     "require_radar_mine",
+    "require_radar_mine_clear",
     "require_radar_scan_result",
     "supervisor_error_code",
     "supervisor_is_cant_go",

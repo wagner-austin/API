@@ -463,3 +463,51 @@ class TestDecideKillCooldown:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert "50" not in decision["updated_ai_state"]["killed_tank_ids"]
+
+    def test_rejected_shot_blocks_target_and_replans(self) -> None:
+        """A server-rejected shot blocks the target instead of redispatching.
+
+        The 0x52 rejection ("You can't do this") means the server
+        refused the dispatch outright -- no ShootEvent, no ammo delta.
+        With the viewport-clamped aim every dispatch is legal, so a
+        residual rejection means the server refuses this engagement
+        geometry for a reason the bot cannot see; repeating the
+        identical shot cannot change the answer (live run 2026-07-03
+        20:34: five identical redispatches at 4 s of dead wait each).
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=110,
+                y=110,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 110,
+                "combat_target_y": 110,
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "Enemy",
+            }
+        )
+        inventory = make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "rejected")
+
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]

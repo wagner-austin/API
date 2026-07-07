@@ -2,10 +2,10 @@
 title: Game Economy (Fuel, Damage, Costs)
 tags: [game, combat, fuel, economy]
 related: [[shoot-event-format]], [[mine-mechanics]], [[deactivation-format]], [[bot-behavior-contract]], [[fuel-system]]
-sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20]
-fact_checked: 2026-06-20
+sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20, tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06]
+fact_checked: 2026-07-06
 confidence: high
-verified: 2026-06-20 (every value matched user-narrated actions to wire bytes)
+verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
 ---
 
 # Game Economy
@@ -14,11 +14,23 @@ Empirically measured fuel costs, damage values, and capacity limits — derived 
 
 ## Tank capacity
 
-| Quantity | Value | Verified |
-|---|---|---|
-| **Max fuel cap** | **1100** | 7+ instances of fuel hitting exactly 1100 after a pickup, never above |
+**Fuel capacity = 1000 + 100 × rank** (2026-07-06). Not sent on the wire — the client derives it from rank in the fuel-gauge draw (`Gc` in tpclient.js: fill width `7·fuel/100` px against a capacity region of `7·(10+rank)` px, equal iff `fuel = 100·(10+rank)`). Rank IS on the wire (`self_state["rank"]`), so the bot can compute capacity at tick 1 with no probe pickup.
 
-The cap is enforced by the server on pickup — if the picker's tank can only hold `N` more fuel before hitting 1100, only `N` is transferred from the container and the rest remains. This is why `container_pickup.remaining_volume` is often non-zero.
+| Rank | Capacity | Verified |
+|---|---|---|
+| recruit (0) | 1000 | formula only |
+| **private (1)** | **1100** | wire 0x52 code-5 tank-full at exactly 1100 (2026-07-06 run); 7+ pickup caps at 1100 (2026-06-20); max deposit 1000 = 1100−100 |
+| corporal (2) | 1200 | formula only |
+| **sergeant (3)** | **1300** | max deposit 1200 = 1300−100 (user, 2026-07-06) |
+| lieutenant (4) | 1400 | formula only |
+| captain (5) | 1500 | formula only |
+| **major (6)** | **1600** | max deposit 1500 = 1600−100 (user, 2026-07-06) |
+| **colonel (7)** | **1700** | max deposit 1598 = 1700−100−~2 walk (user, 2026-07-06) |
+| general (8) | 1800 | formula only |
+
+The cap is enforced by the server on pickup — if the picker's tank can only hold `N` more fuel before hitting capacity, only `N` is transferred from the container and the rest remains. This is why `container_pickup.remaining_volume` is often non-zero.
+
+The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specific: all 2026-06-20 measurements were taken on a private. A 2026-06-11 learned-watermark of 2010 exceeds even a general's 1800 and was a polluted scrape read (the same run tank-full'd at 1100), not evidence against the formula.
 
 ## Cost per player action
 
@@ -67,9 +79,13 @@ Every row matches `remaining = declared − taken` exactly.
 
 ## Fuel deposit (your own tank donating fuel)
 
-- Triggered by a deposit command. Server places a fuel container on a tile **adjacent to the depositing tank's position** (verified: Yuppler at (131, 124) deposited → container at (132, 124)).
+- Triggered by a deposit command: client code `'D'` (0x44), 6 bytes — x, y, **u16 LE amount** (tpclient.js `Wb` class, 2026-07-06). The amount accumulates during the mouse long-press ("DEPOSIT FUEL: N" HUD label) and is clamped client-side to current fuel.
+- Client-gated by the fuel>100 check (`ce()`): a tank at ≤100 fuel cannot initiate a deposit.
+- **Deposit floor = 100, server-enforced**: a max deposit always leaves exactly 100 fuel in the tank. Verified at four ranks 2026-07-06 — private 1000 (=1100−100), sergeant 1200 (=1300−100), major 1500 (=1600−100), colonel 1598 (=1700−100−~2 walked).
+- Server places the fuel container on a tile **adjacent to the depositing tank's position** (verified: Yuppler at (131, 124) deposited → container at (132, 124)).
 - The wire path: depositing player gets a 0x64 FuelDeposit; observers see the container via the next 0x4F RadarScan / viewport refresh.
 - Containers are **invisible by default** to non-owning players. They appear via radar reveal.
+- Bot use case: a tank at capacity can bank surplus fuel next to a defended position and reclaim it later.
 
 ## What's still open
 

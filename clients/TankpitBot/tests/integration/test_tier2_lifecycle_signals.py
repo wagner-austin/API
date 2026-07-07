@@ -18,7 +18,6 @@ Wire-byte and position values mirror the practice-vs-real
 from __future__ import annotations
 
 from tankpit_bot.protocol import (
-    CombinedTileUpdateDict,
     MovementResponseDict,
     ShootEventDict,
     TankInfoDict,
@@ -135,7 +134,7 @@ class TestTeleportLandedClearsAction:
 
 
 class TestRadarScanReturnsToIdle:
-    """0x4F CombinedTileUpdate / RadarScanResult flips the radar-complete flag."""
+    """0x4F RadarScanResult flips the radar-complete flag."""
 
     def setup_method(self) -> None:
         """Reset world state before each test."""
@@ -145,28 +144,47 @@ class TestRadarScanReturnsToIdle:
         """Reset world state after each test."""
         reset_world_state()
 
-    def test_combined_tile_update_marks_radar_cache_refresh(self) -> None:
-        """A 0x4F dispatch marks pending radar cache refresh so the bot replans.
+    def test_radar_scan_dispatch_marks_complete_and_applies_tile_writes(self) -> None:
+        """A 0x4F dispatch marks scan-complete and applies per-tile writes.
 
-        ``mark_pending_radar_cache_refresh`` is the one-shot signal the
-        bot polls to know its in-flight radar action has resolved.
-        Asserts the dispatch path actually marks it.
+        The 0x4F body is a delta sync (JS handler ``ch``): container
+        entries upsert, and mine-clear entries (overlay >= 8) drop any
+        tracked mine at the tile instead of adding a phantom team-255
+        mine (the pre-2026-07-03 misread).
         """
+        from tankpit_bot.protocol import (
+            RadarMineClearDict,
+            RadarMineDict,
+            RadarScanResultDict,
+        )
+        from tankpit_bot.sniffer.world_state import update_world_state_from_position
+
         ws = get_world_service()
-        assert ws.consume_pending_radar_cache_refresh() is False
+        update_world_state_from_position(45, 55)
+        # Seed a tracked mine that the scan will clear.
+        dispatch_world_state_update(
+            ws,
+            RadarScanResultDict(
+                msg_type=0x4F,
+                containers=[],
+                mines=[RadarMineDict(x=41, y=51, team=1)],
+                mine_clears=[],
+            ),
+        )
+        assert check_and_clear_radar_scan_complete() is True
+        assert "41,51" in ws.world_state["mines"]
 
         dispatch_world_state_update(
             ws,
-            CombinedTileUpdateDict(
+            RadarScanResultDict(
                 msg_type=0x4F,
-                cache_updates=[(40, 50, 600)],
-                overlay_updates=[(40, 50, 12)],
+                containers=[],
+                mines=[],
+                mine_clears=[RadarMineClearDict(x=41, y=51)],
             ),
         )
-
-        assert ws.consume_pending_radar_cache_refresh() is True
-        # One-shot consumer.
-        assert ws.consume_pending_radar_cache_refresh() is False
+        assert check_and_clear_radar_scan_complete() is True
+        assert "41,51" not in ws.world_state["mines"]
 
     def test_radar_response_with_containers_marks_scan_complete(self) -> None:
         """A radar response with containers marks the radar-scan-complete flag.
@@ -182,7 +200,7 @@ class TestRadarScanReturnsToIdle:
             RadarContainerDict(x=132, y=125, volume=600),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(ws, containers, mines)
+        update_world_state_from_radar(ws, containers, mines, [])
         assert check_and_clear_radar_scan_complete() is True
         assert check_and_clear_radar_scan_complete() is False
 

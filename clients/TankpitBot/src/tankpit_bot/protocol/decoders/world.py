@@ -13,7 +13,6 @@ from tankpit_bot.protocol.constants import (
 from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
     CacheUpdateDict,
-    CombinedTileUpdateDict,
     OverlayUpdateDict,
     SupervisorDict,
     SupervisorTextDict,
@@ -100,50 +99,6 @@ def decode_overlay_update(data: bytes) -> OverlayUpdateDict:
     for offset in range(0, len(data), 3):
         updates.append((data[offset], data[offset + 1], data[offset + 2]))
     return OverlayUpdateDict(msg_type=0x40, updates=updates)
-
-
-def decode_combined_tile_update(data: bytes) -> CombinedTileUpdateDict:
-    """Decode combined cache+overlay tile patch from XOR-decoded data.
-
-    Args:
-        data: XOR-decoded message body (without 0x4F prefix).
-
-    Returns:
-        Decoded combined cache and overlay updates.
-
-    Raises:
-        DecodeError: If payload length is invalid.
-    """
-    require_min_length(data, 2, "CombinedTileUpdate")
-    cache_count = x16(data[0], data[1])
-    cache_data_len = cache_count * 4
-    cache_data_start = 2
-    cache_data_end = cache_data_start + cache_data_len
-    if cache_data_end > len(data):
-        raise DecodeError("CombinedTileUpdate: cache section exceeds payload length")
-    remaining_overlay_len = len(data) - cache_data_end
-    if remaining_overlay_len % 3 != 0:
-        raise DecodeError("CombinedTileUpdate: overlay section must be 3-byte entries")
-
-    cache_updates: list[tuple[int, int, int]] = []
-    for offset in range(cache_data_start, cache_data_end, 4):
-        cache_updates.append(
-            (
-                data[offset],
-                data[offset + 1],
-                _decode_cache_value(data[offset + 2], data[offset + 3]),
-            )
-        )
-
-    overlay_updates: list[tuple[int, int, int]] = []
-    for offset in range(cache_data_end, len(data), 3):
-        overlay_updates.append((data[offset], data[offset + 1], data[offset + 2]))
-
-    return CombinedTileUpdateDict(
-        msg_type=0x4F,
-        cache_updates=cache_updates,
-        overlay_updates=overlay_updates,
-    )
 
 
 def decode_terrain_update(data: bytes) -> TerrainUpdateDict:
@@ -350,7 +305,6 @@ def supervisor_is_insufficient_fuel(supervisor: SupervisorDict) -> bool:
 
 __all__ = [
     "decode_cache_update",
-    "decode_combined_tile_update",
     "decode_overlay_update",
     "decode_supervisor",
     "decode_supervisor_text",

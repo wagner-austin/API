@@ -15,7 +15,6 @@ from tankpit_bot.protocol import (
     decode_build_pickup,
     decode_cache_update,
     decode_chat_message,
-    decode_combined_tile_update,
     decode_decoration,
     decode_overlay_update,
     decode_promotion,
@@ -73,33 +72,6 @@ class TestDecodeOverlayUpdate:
         """Raises DecodeError on invalid entry length."""
         with pytest.raises(DecodeError):
             decode_overlay_update(bytes([1, 2]))
-
-
-class TestDecodeCombinedTileUpdate:
-    """Tests for decode_combined_tile_update function."""
-
-    def test_decodes_combined_tile_updates(self) -> None:
-        """Decodes cache and overlay sections."""
-        data = bytes([1, 0, 10, 20, 0x04, 0x03, 30, 40, 7])
-        result = decode_combined_tile_update(data)
-        assert result["msg_type"] == 0x4F
-        assert result["cache_updates"] == [(10, 20, 0x0304)]
-        assert result["overlay_updates"] == [(30, 40, 7)]
-
-    def test_raises_on_short_header(self) -> None:
-        """Raises DecodeError on missing cache count header."""
-        with pytest.raises(DecodeError):
-            decode_combined_tile_update(bytes([1]))
-
-    def test_raises_on_truncated_cache_section(self) -> None:
-        """Raises DecodeError when cache section exceeds payload length."""
-        with pytest.raises(DecodeError):
-            decode_combined_tile_update(bytes([1, 0, 10, 20]))
-
-    def test_raises_on_invalid_overlay_length(self) -> None:
-        """Raises DecodeError when overlay section is not triplet-aligned."""
-        with pytest.raises(DecodeError):
-            decode_combined_tile_update(bytes([0, 0, 10]))
 
 
 class TestDecodeChatMessage:

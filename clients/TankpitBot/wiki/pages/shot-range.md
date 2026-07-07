@@ -3,7 +3,7 @@ title: Shot Range
 tags: [combat, shooting, geometry]
 related: [[shoot-event-format]], [[tank-registry]], [[combat-chase-bug]]
 sources: [see footnotes]
-fact_checked: 2026-06-16
+fact_checked: 2026-07-03
 confidence: high
 ---
 
@@ -30,6 +30,10 @@ Distance-15 "hits" in the raw data were homing shots (which track the target). E
 
 The bot requires **Manhattan distance exactly 1** (same row or column, 1 tile apart) before firing. This is the only proven reliable geometry for a guaranteed hit.[^1]
 
+## Aim legality: the shoot command must target a tile inside the viewport
+
+The server rejects any `shoot` whose aim tile is outside the visible viewport with 0x52 code 0 ("You can't do this") — no ShootEvent, no ammo delta, just the refusal.[^4] The user's game knowledge sharpens the rule: when the fleeing enemy is close enough that shifting the viewport (scope) would bring them into view, the game refuses a lobbed homing at their raw coordinates — you are expected to shift and take a legal shot.[^5] The bot's answer (2026-07-03) is the viewport-clamped aim: dispatch at the registry coordinate clamped onto the visible bounds, carrying the target's `tank_id`; the server picks homing and the seeker tracks regardless (aim is a hint, wire-proven: the same run's `weapon=3` hit was aimed at the target's vacated tile).
+
 ## Homing shots
 
 Homing shots track the target regardless of distance. They bypass normal range rules. See [[weapon-log-markers]] for detection.[^1]
@@ -37,3 +41,5 @@ Homing shots track the target regardless of distance. They bypass normal range r
 [^1]: 350 shots analyzed from run 20260611 — Manhattan 1 = 255/255, 4+ = ~0%, distance-15 were homing
 [^2]: current code uses SHOT_RANGE_TILES=2 but has_cardinal_combat_shot gates shooting on distance==1; distance-2 data insufficient
 [^3]: user (Austin), 2026-04-20 — "must be within 18x18 viewport to hit"
+[^4]: live run 2026-07-03 20:34 — five `shoot(143,237,id=530)` dispatches with viewport (129,217)-(144,232) each drew 0x52 error_code=0; game log showed five "You can't do this" lines; zero 0x53 echoes, zero ammo deltas.
+[^5]: user (Austin), 2026-07-03 — "the enemy was close enough that if we shifted the viewport down we could have seen them which makes the game prevent subsequent homing shots"

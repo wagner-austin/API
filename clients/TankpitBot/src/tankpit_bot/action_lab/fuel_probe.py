@@ -122,7 +122,6 @@ def _find_visible_fuel_target(
         world,
         self_state,
         terrain,
-        now_ms=world["timestamp_ms"],
         minimum_volume=1,
     )
 

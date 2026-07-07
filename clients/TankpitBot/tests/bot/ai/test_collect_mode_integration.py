@@ -106,7 +106,15 @@ class TestRecoverEquipmentPriority:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((116, 100),),
+        )
 
         assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
@@ -124,7 +132,15 @@ class TestRecoverEquipmentPriority:
             }
         )
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((116, 100),),
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["command"]["cmd_type"] == "teleport"
@@ -218,6 +234,7 @@ class TestRecoverEquipmentPriority:
             "128,126": make_container(128, 126, 0, False),
         }
         world, self_state = make_world(self_x=129, self_y=125, fuel=800, containers=containers)
+        ai_state = make_scanned_ai_state(landing_scan_viewport="121,117")
         inventory = make_inventory(default_count=3)
         terrain = InMemoryTerrainMap(
             terrain_data={
@@ -227,7 +244,7 @@ class TestRecoverEquipmentPriority:
             }
         )
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
+        decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         assert decision["command"]["cmd_type"] == "pickup_equipment"
         assert decision["command"]["target_x"] == 128
@@ -269,7 +286,14 @@ class TestRecoverEquipmentPriority:
         inventory = make_inventory(default_count=5)
         terrain = InMemoryTerrainMap(terrain_data={(128, 126): "W"})
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(landing_scan_viewport="121,118"),
+            inventory,
+            100000,
+            terrain,
+        )
 
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
@@ -332,7 +356,14 @@ class TestRecoverEquipmentSearch:
         world, self_state = make_world(fuel=800, scanned=False)
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
-        decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            make_scanned_ai_state(landing_scan_viewport=""),
+            inventory,
+            100000,
+            None,
+        )
 
         assert decision["behavior"]["reason"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
@@ -340,7 +371,12 @@ class TestRecoverEquipmentSearch:
     def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
         """A new unscanned viewport bypasses the global radar cooldown."""
         world, self_state = make_world(fuel=800, scanned=False)
-        ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(landing_scan_viewport=""),
+                "last_scan_ms": 99999,
+            }
+        )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
@@ -365,7 +401,15 @@ class TestRecoverEquipmentSearch:
         )
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((116, 100),),
+        )
 
         assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
@@ -406,12 +450,11 @@ class TestRecoverEquipmentSearch:
         config = AIConfigDict(
             **{
                 **make_default_ai_config(),
-                "equip_search_hop_distance": 90,
             }
         )
         ai_state = AIStateDict(
             **{
-                **make_scanned_ai_state(),
+                **make_scanned_ai_state(landing_scan_viewport=""),
                 "config": config,
                 "last_scan_ms": 99500,
                 "last_map_open_ms": 99500,
@@ -438,7 +481,15 @@ class TestRecoverEquipmentSearch:
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=0)
         inventory["extra_radars"]["count"] = 1
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((116, 100),),
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
@@ -470,7 +521,7 @@ class TestRecoverEquipmentSearch:
         decision = decide(
             world,
             self_state,
-            make_scanned_ai_state(),
+            make_scanned_ai_state(landing_scan_viewport=""),
             make_inventory(),
             100000,
             None,
@@ -499,7 +550,7 @@ class TestRecoverEquipmentSearch:
         decision = decide(
             world,
             self_state,
-            make_scanned_ai_state(),
+            make_scanned_ai_state(landing_scan_viewport=""),
             make_inventory(),
             100000,
             None,
@@ -512,7 +563,12 @@ class TestRecoverEquipmentSearch:
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
         """A newly entered unconfirmed viewport radars immediately."""
         world, self_state = make_world(fuel=150, scanned=False)
-        ai_state = AIStateDict(**{**make_scanned_ai_state(), "last_scan_ms": 99999})
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(landing_scan_viewport=""),
+                "last_scan_ms": 99999,
+            }
+        )
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
@@ -549,6 +605,7 @@ class TestRecoverEquipmentSearch:
             make_inventory(),
             100000,
             None,
+            map_fuel_dots=((116, 100),),
         )
 
         assert decision["behavior"]["reason"] == "search_collect_local"
@@ -645,7 +702,15 @@ class TestRecoverEquipmentSearch:
         inventory = make_inventory(dual_count=0, dual_enabled=False, default_count=30)
         inventory["extra_radars"]["count"] = 30
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((116, 100),),
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
 

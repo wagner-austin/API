@@ -181,7 +181,7 @@ def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> No
 def test_unset_mode_enters_recover_equipment_after_equipment_decision() -> None:
     """A legacy equipment recovery decision seeds durable recovery ownership."""
     world, self_state = make_world(fuel=800, scanned=False)
-    ai_state = make_scanned_ai_state()
+    ai_state = make_scanned_ai_state(landing_scan_viewport="")
     inventory = make_inventory(default_count=30)
     inventory["dual_shots"]["count"] = 5
     inventory["homing_shots"]["count"] = 5
@@ -264,6 +264,7 @@ def test_collect_mode_owns_tick_below_full_threshold() -> None:
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
+            "last_landing_scan_viewport": "92,92",
         }
     )
     inventory = make_inventory()
@@ -319,6 +320,7 @@ def test_collect_mode_owns_tick_below_resume_threshold() -> None:
             "mode_state": "APPROACH",
             "mode_started_ms": 90000,
             "last_scan_ms": 1,
+            "last_landing_scan_viewport": "92,92",
         }
     )
     inventory = make_inventory(default_count=30)

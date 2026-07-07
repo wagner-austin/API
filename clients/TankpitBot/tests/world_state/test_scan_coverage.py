@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from tankpit_bot.state.rank_formulas import free_radar_radius
 from tankpit_bot.state.scan_coverage import (
     FORAGE_COVERAGE_TTL_MS,
-    FREE_RADAR_RADIUS,
     free_radar_revealed_tiles,
     is_tile_covered,
     is_viewport_fully_covered,
@@ -133,31 +133,50 @@ class TestViewportTiles:
 
 
 class TestFreeRadarRevealedTiles:
-    """Tests for the free-radar reveal footprint."""
+    """Tests for the rank-scaled free-radar reveal footprint."""
 
-    def test_interior_tank_reveals_full_5x5_block(self) -> None:
-        """Well inside the viewport the free radar reveals 25 tiles."""
-        revealed = free_radar_revealed_tiles(100, 100, 92, 92, 107, 107)
+    def test_corporal_interior_reveals_full_5x5_block(self) -> None:
+        """Rank 2 (corporal) built-in radar reveals a 5x5 = 25 tile block."""
+        revealed = free_radar_revealed_tiles(100, 100, 92, 92, 107, 107, 2)
 
         assert len(revealed) == 25
         assert (100, 100) in revealed
         assert (98, 98) in revealed
         assert (102, 102) in revealed
 
-    def test_corner_tank_reveals_clipped_block(self) -> None:
-        """At the top-left corner the reveal is clipped to the viewport."""
-        revealed = free_radar_revealed_tiles(92, 92, 92, 92, 107, 107)
+    def test_sergeant_interior_reveals_full_7x7_block(self) -> None:
+        """Rank 3 (sergeant) built-in radar reveals a 7x7 = 49 tile block."""
+        revealed = free_radar_revealed_tiles(100, 100, 92, 92, 107, 107, 3)
+
+        assert len(revealed) == 49
+        assert (97, 97) in revealed
+        assert (103, 103) in revealed
+        # A rank-2 radar would only reach 98..102; sergeant's is one wider.
+        assert (100, 97) in revealed
+        assert (100, 103) in revealed
+
+    def test_major_interior_reveals_full_9x9_block(self) -> None:
+        """Rank 6 (major) built-in radar reveals a 9x9 = 81 tile block."""
+        revealed = free_radar_revealed_tiles(100, 100, 92, 92, 107, 107, 6)
+
+        assert len(revealed) == 81
+        assert (96, 96) in revealed
+        assert (104, 104) in revealed
+
+    def test_corporal_corner_tank_reveals_clipped_block(self) -> None:
+        """Rank 2 at the top-left corner is clipped: 3x3 = 9 tiles."""
+        revealed = free_radar_revealed_tiles(92, 92, 92, 92, 107, 107, 2)
 
         for x, y in revealed:
             assert 92 <= x <= 107
             assert 92 <= y <= 107
         assert (92, 92) in revealed
-        # Tank+2 = 94; from (92..94)x(92..94) that is 3x3 = 9 tiles.
-        assert len(revealed) == (FREE_RADAR_RADIUS + 1) ** 2
+        radius = free_radar_radius(2)
+        assert len(revealed) == (radius + 1) ** 2
 
     def test_tank_off_viewport_returns_empty(self) -> None:
-        """A tank position whose 5x5 misses the viewport reveals nothing."""
-        assert free_radar_revealed_tiles(50, 50, 92, 92, 107, 107) == []
+        """A tank whose radar box misses the viewport reveals nothing."""
+        assert free_radar_revealed_tiles(50, 50, 92, 92, 107, 107, 2) == []
 
 
 class TestIsViewportFullyCovered:
@@ -191,11 +210,11 @@ class TestSelectBestFreeRadarPosition:
         """Fully covered viewport yields no walk target."""
         coverage = {tile_key(x, y): 100000 for y in range(92, 108) for x in range(92, 108)}
 
-        result = select_best_free_radar_position(coverage, 100, 100, 92, 92, 107, 107, 100000)
+        result = select_best_free_radar_position(coverage, 100, 100, 92, 92, 107, 107, 100000, 2)
 
         assert result is None
 
-    def test_picks_position_whose_5x5_reveals_the_most_uncovered_tiles(self) -> None:
+    def test_picks_position_whose_footprint_reveals_the_most_uncovered_tiles(self) -> None:
         """Selection maximises next-radar coverage, not nearest-unscanned distance.
 
         Coverage layout: every tile in the viewport scanned EXCEPT a
@@ -213,7 +232,7 @@ class TestSelectBestFreeRadarPosition:
                 del coverage[tile_key(x, y)]
 
         # Tank sits at the top-left corner of the viewport, far from the unscanned cluster.
-        result = select_best_free_radar_position(coverage, 92, 92, 92, 92, 107, 107, 100000)
+        result = select_best_free_radar_position(coverage, 92, 92, 92, 92, 107, 107, 100000, 2)
 
         # The centre of the 4x4 cluster is (101, 101) or (102, 102). A 5x5 footprint
         # at either covers all 16 uncovered tiles; the picker should land inside the
@@ -223,6 +242,30 @@ class TestSelectBestFreeRadarPosition:
         rx, ry = result
         assert 100 <= rx <= 103
         assert 100 <= ry <= 103
+
+    def test_higher_rank_footprint_widens_the_reach(self) -> None:
+        """A rank 6 (9x9) tank reaches an uncovered tile a rank 2 (5x5) can't.
+
+        Single uncovered tile at (99, 99). Tank at (95, 95). Rank 2's
+        5x5 from any tank position can reach at most 2 tiles away,
+        yielding a best destination of (97, 97). Rank 6's 9x9 reaches
+        4 tiles away, so it can stay at the tank's tile candidates
+        closer to itself -- verify that the higher-rank result comes
+        strictly nearer to (95, 95) than the lower-rank one.
+        """
+        coverage: dict[str, int] = {
+            tile_key(x, y): 100000 for y in range(92, 108) for x in range(92, 108)
+        }
+        del coverage[tile_key(99, 99)]
+
+        low_result = select_best_free_radar_position(coverage, 95, 95, 92, 92, 107, 107, 100000, 2)
+        high_result = select_best_free_radar_position(coverage, 95, 95, 92, 92, 107, 107, 100000, 6)
+
+        if low_result is None or high_result is None:
+            raise AssertionError("expected destinations at both ranks")
+        low_dist = abs(low_result[0] - 95) + abs(low_result[1] - 95)
+        high_dist = abs(high_result[0] - 95) + abs(high_result[1] - 95)
+        assert high_dist < low_dist
 
     def test_skips_expired_marks(self) -> None:
         """A tile whose mark expired is again counted as uncovered."""
@@ -239,6 +282,7 @@ class TestSelectBestFreeRadarPosition:
             107,
             107,
             100000,
+            2,
         )
 
         # The one uncovered tile is (105, 100); the optimal destination is any

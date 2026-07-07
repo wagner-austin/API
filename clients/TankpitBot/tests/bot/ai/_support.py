@@ -14,13 +14,31 @@ from tankpit_bot.state.types import (
 )
 
 
-def make_scanned_ai_state() -> AIStateDict:
+def make_scanned_ai_state(
+    *,
+    landing_scan_viewport: str = "92,92",
+) -> AIStateDict:
     """Create AI state that does not force an opening radar action.
 
+    Args:
+        landing_scan_viewport: ``"left,top"`` origin recorded in the
+            one-radar-per-landing latch. Defaults to the (92,92)
+            viewport that :func:`make_world` builds around the default
+            (100,100) position, so COLLECT's unconditional
+            scan-on-landing reads as already satisfied and tests
+            exercise the downstream cascade steps.
+
     Returns:
-        AI state with a non-zero last scan timestamp.
+        AI state with a non-zero last scan timestamp and the landing
+        latch recorded.
     """
-    return AIStateDict(**{**make_initial_ai_state(), "last_scan_ms": 1})
+    return AIStateDict(
+        **{
+            **make_initial_ai_state(),
+            "last_scan_ms": 1,
+            "last_landing_scan_viewport": landing_scan_viewport,
+        }
+    )
 
 
 def viewport_covered_tiles(world: WorldStateDict, now_ms: int = 100000) -> dict[str, int]:

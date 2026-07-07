@@ -1,4 +1,4 @@
-"""Tests for the fresh-viewport hop planner."""
+"""Tests for the fuel-dot hop planner."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ def _ctx(
     terrain: InMemoryTerrainMap | None = None,
     ai_state: AIStateDict | None = None,
     scanned_viewport_origins: list[tuple[int, int]] | None = None,
+    map_fuel_dots: tuple[tuple[int, int], ...] = (),
 ) -> DecideCtx:
     """Build a DecideCtx with a clean default world and optional overrides."""
     world, self_state = make_world(self_x=self_x, self_y=self_y, fuel=fuel)
@@ -50,224 +51,51 @@ def _ctx(
         100000,
         terrain,
         "",
+        map_fuel_dots,
     )
 
 
 class TestMakeResourceSearchHop:
-    """Behavior tests for the single-method fresh-viewport hop planner."""
+    """Behavior tests for the nearest-clean-viewport fuel-dot hop planner."""
 
-    def test_picks_east_cardinal_first(self) -> None:
-        """From open ground, east (the first cardinal) is taken."""
+    def test_hops_to_nearest_dot(self) -> None:
+        """The nearest atlas dot wins when several qualify."""
         decision = make_resource_search_hop(
-            _ctx(), mode="COLLECT", score=900, reason="search_collect_local"
+            _ctx(map_fuel_dots=((150, 100), (130, 100), (100, 160))),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
         )
 
         if decision is None:
-            raise AssertionError("expected a cardinal hop decision from open ground")
+            raise AssertionError("expected a dot hop from open ground")
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 116
+        assert command["target_x"] == 130
         assert command["target_y"] == 100
 
-    def test_skips_scanned_destination_takes_next_cardinal(self) -> None:
-        """When east lands in a scanned viewport, west (second cardinal) wins."""
+    def test_skips_own_tile_dot(self) -> None:
+        """A dot on the bot's own tile is not a hop destination."""
         decision = make_resource_search_hop(
-            _ctx(scanned_viewport_origins=[(108, 92)]),
+            _ctx(map_fuel_dots=((100, 100), (130, 100))),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
         )
 
         if decision is None:
-            raise AssertionError("expected west cardinal when east landing is scanned")
+            raise AssertionError("expected the next dot when the nearest is the own tile")
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 84
+        assert command["target_x"] == 130
         assert command["target_y"] == 100
 
-    def test_skips_impassable_cardinal(self) -> None:
-        """Cardinal whose landing tile is water is skipped."""
-        terrain = InMemoryTerrainMap(terrain_data={(116, 100): "W"})
-        decision = make_resource_search_hop(
-            _ctx(terrain=terrain),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected a non-east cardinal when east is impassable")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        assert command["target_x"] != 116
-
-    def test_skips_clamped_edge_cardinal(self) -> None:
-        """Near the map edge, the clamped direction is skipped, west wins.
-
-        At (250,250) east and south clamp to displacement < 16; only
-        west and north qualify. West (the first viable cardinal in the
-        iteration order) wins.
-        """
-        decision = make_resource_search_hop(
-            _ctx(self_x=250, self_y=250),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected west cardinal when east and south clamp")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 234
-        assert command["target_y"] == 250
-
-    def test_skips_unaffordable_destination(self) -> None:
-        """Fuel below cardinal cost (96) returns None.
-
-        At fuel=80 every cardinal is unaffordable (cardinal cost = 96)
-        AND every diagonal is unaffordable (diagonal cost = 135). No
-        hop is taken.
-        """
-        decision = make_resource_search_hop(
-            _ctx(fuel=80),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        assert decision is None
-
-    def test_falls_through_to_diagonal_when_all_cardinals_blocked(self) -> None:
-        """All four cardinals scanned -> a diagonal is taken instead."""
-        cardinal_viewport_origins = [(108, 92), (76, 92), (92, 108), (92, 76)]
-        decision = make_resource_search_hop(
-            _ctx(scanned_viewport_origins=cardinal_viewport_origins),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected a diagonal hop when cardinals are blocked")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        assert abs(command["target_x"] - 100) == 16
-        assert abs(command["target_y"] - 100) == 16
-
-    def test_cardinal_preferred_over_diagonal_when_both_fresh(self) -> None:
-        """A fresh cardinal beats a fresh diagonal; cheaper hop wins."""
-        decision = make_resource_search_hop(
-            _ctx(),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected a hop from open ground")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        target_x = command["target_x"]
-        target_y = command["target_y"]
-        # Cardinal hops change exactly one axis by 16; diagonals change both.
-        assert (abs(target_x - 100) == 16) != (abs(target_y - 100) == 16)
-
-    def test_returns_none_when_both_rings_blocked(self) -> None:
-        """Every candidate in both rings scanned -> None, caller raises."""
-        directions = (
-            (1, 0),
-            (-1, 0),
-            (0, 1),
-            (0, -1),
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1),
-        )
-        blocked = [
-            (100 + dx * step - 8, 100 + dy * step - 8) for step in (16, 32) for dx, dy in directions
-        ]
-        decision = make_resource_search_hop(
-            _ctx(scanned_viewport_origins=blocked),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        assert decision is None
-
-    def test_reaches_second_ring_when_first_ring_scanned(self) -> None:
-        """All eight one-width candidates scanned -> a two-width hop is taken."""
-        directions = (
-            (1, 0),
-            (-1, 0),
-            (0, 1),
-            (0, -1),
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1),
-        )
-        ring_one = [(100 + dx * 16 - 8, 100 + dy * 16 - 8) for dx, dy in directions]
-        decision = make_resource_search_hop(
-            _ctx(fuel=2000, scanned_viewport_origins=ring_one),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected a second-ring hop when ring one is scanned")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 132
-        assert command["target_y"] == 100
-
-    def test_prefers_most_walkable_viewport(self) -> None:
-        """A mostly-water nearer viewport loses to an all-ground one.
-
-        The east landing viewport is water except the landing tile
-        itself (so east still qualifies via the landing-passability
-        gate), while every other viewport is clean ground. The picker
-        must skip past the qualifying-but-dirty east candidate and take
-        the clean west one -- the recorded human policy of restocking
-        in mostly-"." viewports.
-        """
-        east_viewport_water = {
-            (x, y): InMemoryTerrainMap.WATER
-            for y in range(92, 108)
-            for x in range(108, 124)
-            if (x, y) != (116, 100)
-        }
-        terrain = InMemoryTerrainMap(terrain_data=east_viewport_water)
-        decision = make_resource_search_hop(
-            _ctx(terrain=terrain),
-            mode="COLLECT",
-            score=900,
-            reason="search_collect_local",
-        )
-
-        if decision is None:
-            raise AssertionError("expected a hop away from the water-heavy viewport")
-        command = decision["command"]
-        assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 84
-        assert command["target_y"] == 100
-
-    def test_offmap_clipping_penalizes_edge_viewport(self) -> None:
-        """A viewport clipped by the field border scores below a full one.
-
-        At (100, 238) with east and west scanned, the south candidate's
-        viewport hangs 6 rows past the border (score 0.625 on all-ground
-        terrain) while north is fully in-map (score 1.0). North must win
-        even though south is evaluated first.
-        """
+    def test_skips_dot_in_scanned_viewport(self) -> None:
+        """A dot whose landing viewport is fully covered is skipped."""
         decision = make_resource_search_hop(
             _ctx(
-                self_y=238,
-                terrain=InMemoryTerrainMap(),
-                scanned_viewport_origins=[(108, 230), (76, 230)],
+                map_fuel_dots=((130, 100), (160, 100)),
+                scanned_viewport_origins=[(122, 92)],
             ),
             mode="COLLECT",
             score=900,
@@ -275,23 +103,155 @@ class TestMakeResourceSearchHop:
         )
 
         if decision is None:
-            raise AssertionError("expected the fully in-map north hop")
+            raise AssertionError("expected the fresh dot when the nearest is scanned")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 160
+        assert command["target_y"] == 100
+
+    def test_skips_impassable_dot(self) -> None:
+        """A dot whose landing tile is water is skipped."""
+        terrain = InMemoryTerrainMap(terrain_data={(130, 100): "W"})
+        decision = make_resource_search_hop(
+            _ctx(terrain=terrain, map_fuel_dots=((130, 100), (160, 100))),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the passable dot when the nearest is water")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 160
+        assert command["target_y"] == 100
+
+    def test_skips_dirty_viewport_dot(self) -> None:
+        """A dot in a water-flecked viewport loses to a 100% clean one.
+
+        One water tile inside the nearer dot's landing viewport drops
+        its walkable fraction below 1.0 -- the user contract is "hop to
+        nearest yellow dot with a 100% clean viewport", so the farther
+        clean dot wins.
+        """
+        terrain = InMemoryTerrainMap(terrain_data={(125, 95): "W"})
+        decision = make_resource_search_hop(
+            _ctx(terrain=terrain, map_fuel_dots=((130, 100), (100, 160))),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the clean-viewport dot")
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
         assert command["target_x"] == 100
-        assert command["target_y"] == 222
+        assert command["target_y"] == 160
 
-    def test_returns_none_when_diagonal_unaffordable_and_cardinals_blocked(self) -> None:
-        """Cardinals scanned + fuel < diagonal cost (135) -> None."""
-        cardinal_viewport_origins = [(108, 92), (76, 92), (92, 108), (92, 76)]
+    def test_offmap_clipped_viewport_dot_skipped(self) -> None:
+        """A dot whose viewport hangs past the field border is skipped.
+
+        Off-map tiles count as unwalkable, so a border-adjacent dot can
+        never reach the 100% clean bar when a terrain map is loaded.
+        """
         decision = make_resource_search_hop(
-            _ctx(fuel=120, scanned_viewport_origins=cardinal_viewport_origins),
+            _ctx(
+                terrain=InMemoryTerrainMap(),
+                map_fuel_dots=((100, 130), (100, 252)),
+                self_y=200,
+            ),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the in-map dot")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 100
+        assert command["target_y"] == 130
+
+    def test_skips_unaffordable_dot(self) -> None:
+        """Fuel below every dot's teleport cost returns None."""
+        decision = make_resource_search_hop(
+            _ctx(fuel=80, map_fuel_dots=((130, 100), (160, 100))),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
         )
 
         assert decision is None
+
+    def test_returns_none_when_every_dot_scanned(self) -> None:
+        """Every dot's landing viewport covered -> None, caller raises."""
+        decision = make_resource_search_hop(
+            _ctx(
+                map_fuel_dots=((130, 100),),
+                scanned_viewport_origins=[(122, 92)],
+            ),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        assert decision is None
+
+    def test_opens_map_when_atlas_empty(self) -> None:
+        """With no dots and no recent map open, the hop opens the map.
+
+        The atlas arrives with the 0x4C MapData response, so the first
+        hop of a session loads it via ``map_open``.
+        """
+        decision = make_resource_search_hop(
+            _ctx(map_fuel_dots=()),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a map_open to load the dot atlas")
+        assert decision["command"]["cmd_type"] == "map_open"
+        assert decision["behavior"]["reason"] == "map_for_dots"
+        assert decision["updated_ai_state"]["last_map_open_ms"] == 100000
+
+    def test_returns_none_when_atlas_empty_after_recent_map_open(self) -> None:
+        """A dotless atlas right after a map open cannot loop on map_open."""
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 98000,
+            }
+        )
+        decision = make_resource_search_hop(
+            _ctx(map_fuel_dots=(), ai_state=ai_state),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        assert decision is None
+
+    def test_opens_map_again_after_cooldown_with_empty_atlas(self) -> None:
+        """A stale map open (past the cooldown) re-opens for the atlas."""
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 90000,
+            }
+        )
+        decision = make_resource_search_hop(
+            _ctx(map_fuel_dots=(), ai_state=ai_state),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected a fresh map_open after the cooldown")
+        assert decision["command"]["cmd_type"] == "map_open"
 
     def test_clears_resource_target_on_success(self) -> None:
         """A successful hop clears any previously locked resource target."""
@@ -304,7 +264,7 @@ class TestMakeResourceSearchHop:
             }
         )
         decision = make_resource_search_hop(
-            _ctx(),
+            _ctx(map_fuel_dots=((130, 100),)),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
@@ -318,9 +278,9 @@ class TestMakeResourceSearchHop:
         assert decision["updated_ai_state"]["resource_target_y"] == 0
 
     def test_no_terrain_treats_every_tile_as_passable(self) -> None:
-        """Without a terrain map, the passability gate is skipped."""
+        """Without a terrain map, passability and cleanliness degrade to 1.0."""
         decision = make_resource_search_hop(
-            _ctx(terrain=None),
+            _ctx(terrain=None, map_fuel_dots=((130, 100),)),
             mode="COLLECT",
             score=900,
             reason="search_collect_local",
@@ -330,11 +290,15 @@ class TestMakeResourceSearchHop:
             raise AssertionError("expected a hop when terrain is absent")
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 130
 
     def test_uses_ctx_base_state_when_ai_state_not_provided(self) -> None:
         """Omitting ``ai_state`` uses the context's base state for clearing."""
         decision = make_resource_search_hop(
-            _ctx(), mode="COLLECT", score=900, reason="search_collect_local"
+            _ctx(map_fuel_dots=((130, 100),)),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
         )
 
         if decision is None:

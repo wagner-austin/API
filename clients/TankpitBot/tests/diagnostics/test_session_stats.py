@@ -67,7 +67,6 @@ def _emit_first_run_activity() -> None:
     record_pickup_dispatch(13, 172)
     register_world_feedback_from_game_log(
         [GameLogEntry(text="Empty container", category="other")],
-        make_empty_world_state(),
     )
 
 

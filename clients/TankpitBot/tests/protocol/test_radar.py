@@ -11,6 +11,7 @@ from platform_core.json_utils import JSONObject
 from tankpit_bot.protocol import (
     DecodeError,
     RadarContainerDict,
+    RadarMineClearDict,
     RadarMineDict,
     RadarScanResultDict,
     decode_enemy_detection,
@@ -19,6 +20,7 @@ from tankpit_bot.protocol import (
     encode_radar_scan_result,
     require_radar_container,
     require_radar_mine,
+    require_radar_mine_clear,
     require_radar_scan_result,
 )
 
@@ -110,6 +112,47 @@ class TestDecodeRadarScanResult:
         assert result["mines"][1] == {"x": 20, "y": 20, "team": 1}  # purple
         assert result["mines"][2] == {"x": 30, "y": 30, "team": 2}  # blue
         assert result["mines"][3] == {"x": 40, "y": 40, "team": 3}  # orange
+        assert result["mine_clears"] == []
+
+    def test_decodes_container_removal_entry(self) -> None:
+        """A cache entry with value 0 decodes as a volume-0 removal.
+
+        Corpus scan 2026-07-03 (199 sessions): 247 of 2093 cache
+        entries carried value 0 -- the server's "tile now empty"
+        statement, applied downstream as authoritative removal.
+        """
+        data = bytes([1, 0, 12, 34, 0, 0])
+        result = decode_radar_scan_result(data)
+        assert result["containers"] == [{"x": 12, "y": 34, "volume": 0}]
+
+    def test_decodes_overlay_clear_as_mine_clear(self) -> None:
+        """Overlay values >= 8 decode as mine clears, not phantom mines.
+
+        JS ch writes the overlay byte into tile.m raw and 255 is the
+        canonical no-mine sentinel (dh detonation handler); the old
+        decoder misread a 255 entry as a mine with team=255.
+        """
+        data = bytes([0, 0, 50, 60, 255, 70, 80, 8])
+        result = decode_radar_scan_result(data)
+        assert result["mines"] == []
+        assert result["mine_clears"] == [{"x": 50, "y": 60}, {"x": 70, "y": 80}]
+
+    def test_decodes_mine_variant_team_from_low_bits(self) -> None:
+        """Overlay values 4-7 decode as mines with team = value & 3."""
+        data = bytes([0, 0, 15, 25, 5])
+        result = decode_radar_scan_result(data)
+        assert result["mines"] == [{"x": 15, "y": 25, "team": 1}]
+        assert result["mine_clears"] == []
+
+    def test_decodes_count_high_byte(self) -> None:
+        """The container count is a LE u16, not count-byte plus flags.
+
+        JS ch.h reads ``X(a[0], a[1])``; the old decoder treated byte 1
+        as an always-zero flags byte.
+        """
+        data = bytes([1, 0, 12, 34, 100, 0])
+        result = decode_radar_scan_result(data)
+        assert result["containers"] == [{"x": 12, "y": 34, "volume": 100}]
 
     def test_raises_on_truncated_container(self) -> None:
         """Raises DecodeError on truncated container data."""
@@ -142,6 +185,9 @@ class TestDecodeRadarScanResult:
                 RadarMineDict(x=46, y=203, team=0),  # red
                 RadarMineDict(x=47, y=203, team=0),  # red
             ],
+            mine_clears=[
+                RadarMineClearDict(x=48, y=204),
+            ],
         )
         encoded = encode_radar_scan_result(original)
         decoded = decode_radar_scan_result(encoded)
@@ -156,10 +202,11 @@ class TestDecodeRadarScanResult:
         assert decoded["mines"][0] == {"x": 45, "y": 203, "team": 0}
         assert decoded["mines"][1] == {"x": 46, "y": 203, "team": 0}
         assert decoded["mines"][2] == {"x": 47, "y": 203, "team": 0}
+        assert decoded["mine_clears"] == [{"x": 48, "y": 204}]
 
     def test_encode_empty_result(self) -> None:
         """Encodes empty radar result."""
-        result = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[])
+        result = RadarScanResultDict(msg_type=0x4F, containers=[], mines=[], mine_clears=[])
         encoded = encode_radar_scan_result(result)
         assert encoded == bytes([0, 0])
 
@@ -273,6 +320,41 @@ class TestRequireRadarMine:
             require_radar_mine(mine)
 
 
+class TestRequireRadarMineClear:
+    """Tests for require_radar_mine_clear validation."""
+
+    def test_validates_valid_clear(self) -> None:
+        """Validates valid mine-clear entry."""
+        clear: JSONObject = {"x": 48, "y": 204}
+        result = require_radar_mine_clear(clear)
+        assert result["x"] == 48
+        assert result["y"] == 204
+
+    def test_raises_on_missing_x(self) -> None:
+        """Raises ValueError when x is missing."""
+        clear: JSONObject = {"y": 0}
+        with pytest.raises(ValueError, match="x must be int"):
+            require_radar_mine_clear(clear)
+
+    def test_raises_on_missing_y(self) -> None:
+        """Raises ValueError when y is missing."""
+        clear: JSONObject = {"x": 0}
+        with pytest.raises(ValueError, match="y must be int"):
+            require_radar_mine_clear(clear)
+
+    def test_raises_on_x_out_of_range(self) -> None:
+        """Raises ValueError for x out of range."""
+        clear: JSONObject = {"x": 256, "y": 0}
+        with pytest.raises(ValueError, match="x out of range"):
+            require_radar_mine_clear(clear)
+
+    def test_raises_on_y_out_of_range(self) -> None:
+        """Raises ValueError for y out of range."""
+        clear: JSONObject = {"x": 0, "y": 256}
+        with pytest.raises(ValueError, match="y out of range"):
+            require_radar_mine_clear(clear)
+
+
 class TestRequireRadarScanResult:
     """Tests for require_radar_scan_result validation."""
 
@@ -282,11 +364,13 @@ class TestRequireRadarScanResult:
             "msg_type": 0x4F,
             "containers": [{"x": 10, "y": 20, "volume": 100}],
             "mines": [{"x": 45, "y": 203, "team": 0}],
+            "mine_clears": [{"x": 48, "y": 204}],
         }
         validated = require_radar_scan_result(result)
         assert validated["msg_type"] == 0x4F
         assert len(validated["containers"]) == 1
         assert len(validated["mines"]) == 1
+        assert len(validated["mine_clears"]) == 1
 
     def test_raises_on_invalid_container(self) -> None:
         """Raises ValueError for invalid container in result."""
@@ -294,6 +378,7 @@ class TestRequireRadarScanResult:
             "msg_type": 0x4F,
             "containers": [{"x": 256, "y": 0, "volume": 0}],
             "mines": [],
+            "mine_clears": [],
         }
         with pytest.raises(ValueError, match="container"):
             require_radar_scan_result(result)
@@ -304,38 +389,97 @@ class TestRequireRadarScanResult:
             "msg_type": 0x4F,
             "containers": [],
             "mines": [{"x": 0, "y": 0, "team": 5}],
+            "mine_clears": [],
         }
         with pytest.raises(ValueError, match="mine"):
             require_radar_scan_result(result)
 
+    def test_raises_on_invalid_mine_clear(self) -> None:
+        """Raises ValueError for invalid mine-clear in result."""
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": [],
+            "mine_clears": [{"x": 256, "y": 0}],
+        }
+        with pytest.raises(ValueError, match=r"mine_clear\[0\]"):
+            require_radar_scan_result(result)
+
     def test_raises_on_wrong_msg_type(self) -> None:
         """Raises ValueError for wrong msg_type."""
-        result: JSONObject = {"msg_type": 0x00, "containers": [], "mines": []}
+        result: JSONObject = {
+            "msg_type": 0x00,
+            "containers": [],
+            "mines": [],
+            "mine_clears": [],
+        }
         with pytest.raises(ValueError, match="msg_type must be 0x4F"):
             require_radar_scan_result(result)
 
     def test_raises_on_containers_not_list(self) -> None:
         """Raises ValueError when containers is not a list."""
-        result: JSONObject = {"msg_type": 0x4F, "containers": None, "mines": []}
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": None,
+            "mines": [],
+            "mine_clears": [],
+        }
         with pytest.raises(ValueError, match="containers must be list"):
             require_radar_scan_result(result)
 
     def test_raises_on_mines_not_list(self) -> None:
         """Raises ValueError when mines is not a list."""
-        result: JSONObject = {"msg_type": 0x4F, "containers": [], "mines": "not a list"}
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": "not a list",
+            "mine_clears": [],
+        }
         with pytest.raises(ValueError, match="mines must be list"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_mine_clears_not_list(self) -> None:
+        """Raises ValueError when mine_clears is not a list."""
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": [],
+            "mine_clears": "not a list",
+        }
+        with pytest.raises(ValueError, match="mine_clears must be list"):
             require_radar_scan_result(result)
 
     def test_raises_on_container_not_dict(self) -> None:
         """Raises ValueError when container item is not a dict."""
-        result: JSONObject = {"msg_type": 0x4F, "containers": ["not a dict"], "mines": []}
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": ["not a dict"],
+            "mines": [],
+            "mine_clears": [],
+        }
         with pytest.raises(ValueError, match=r"container\[0\] must be dict"):
             require_radar_scan_result(result)
 
     def test_raises_on_mine_not_dict(self) -> None:
         """Raises ValueError when mine item is not a dict."""
-        result: JSONObject = {"msg_type": 0x4F, "containers": [], "mines": [123]}
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": [123],
+            "mine_clears": [],
+        }
         with pytest.raises(ValueError, match=r"mine\[0\] must be dict"):
+            require_radar_scan_result(result)
+
+    def test_raises_on_mine_clear_not_dict(self) -> None:
+        """Raises ValueError when mine-clear item is not a dict."""
+        result: JSONObject = {
+            "msg_type": 0x4F,
+            "containers": [],
+            "mines": [],
+            "mine_clears": [123],
+        }
+        with pytest.raises(ValueError, match=r"mine_clear\[0\] must be dict"):
             require_radar_scan_result(result)
 
 
@@ -349,15 +493,3 @@ class TestDecodeRadarContainerNotEnoughBytes:
         data = bytes([0x00, 0x00, 0x00])  # Only 3 bytes, need 4
         with pytest.raises(DecodeError, match="not enough bytes"):
             decode_radar_container(data, 0)
-
-
-class TestDecodeRadarMineNotEnoughBytes:
-    """Tests for decode_radar_mine error handling."""
-
-    def test_raises_on_not_enough_bytes(self) -> None:
-        """Raises DecodeError when not enough bytes."""
-        from tankpit_bot.protocol import DecodeError, decode_radar_mine
-
-        data = bytes([0x00, 0x00])  # Only 2 bytes, need 3
-        with pytest.raises(DecodeError, match="not enough bytes"):
-            decode_radar_mine(data, 0)

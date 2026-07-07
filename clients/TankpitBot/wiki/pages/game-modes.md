@@ -1,11 +1,11 @@
 ---
 title: Game Modes
 tags: [js-client, game-mechanics, modes]
-related: [[connection-protocol]], [[client-constants]]
-sources: [tpclient.js lines 207 (Jf class), line 217 (mode parsing), lines 265-266 (tournament guide)]
-fact_checked: 2026-06-19
+related: [[connection-protocol]], [[client-constants]], [[game-rules]], [[tournament-strategy]]
+sources: [tpclient.js lines 207 (Jf class), line 217 (mode parsing), lines 265-266 (tournament guide); docs/sources/sigmas-tankpit-guide-v3.4.pdf for the tournament capacity ladder]
+fact_checked: 2026-07-06
 confidence: high
-verified: 2026-06-19 (mode values traced from JS lobby handler)
+verified: 2026-06-19 (mode encoding/values traced from JS lobby handler); tournament capacity ladder guide-sourced, not verified against a tournament capture
 ---
 
 # Game Modes
@@ -79,6 +79,26 @@ From the How To Play guide (xi class, line 265):
 4. **Awards**: Top 3 get Bronze, Silver, Golden Cup decorations
 5. **Free kills banned**: Intentionally allowing yourself to be deactivated is prohibited
 
+### Tournament capacity ladder
+
+Regular mode grows capacity by **+5 per rank** from a Recruit floor of 20 (see [[game-rules]]). Tournament mode grows capacity by **+8 per rank** from a Recruit floor of 60. Full progression:[^t1]
+
+| Rank | Regular | Tournament |
+|---|---:|---:|
+| Recruit | 20 | 60 |
+| Private | 25 | 68 |
+| Corporal | 30 | 76 |
+| Sergeant | 35 | 84 |
+| Lieutenant | 40 | 92 |
+| Captain | 45 | 100 |
+| Major | 50 | 108 |
+| Colonel | 55 | 116 |
+| General | 60 | 124 |
+
+**Points required for promotion and kill requirements are the same as the main map's** — only the carry cap changes.[^t1]
+
+### Elimination flag
+
 The elimination flag is transmitted in the TankExit (V.`)`) message:
 ```
 a[4] = was_eliminated    — 1=eliminated from tournament
@@ -139,3 +159,5 @@ l.aa = parseInt(u[7], 10);  // red count (note: Hi = max_rank parsed but not dis
 ```
 
 This populates the lobby stats panel showing active forces per team.
+
+[^t1]: Sigma's TankPit Tournament Guide v3.4, 16-Jan-2015 (`docs/sources/sigmas-tankpit-guide-v3.4.pdf`), §"Initial equipment fill" — full per-rank capacity table and the "points/kill requirements unchanged from main map" claim. Tournament mode is not exercised by this project; ladder is documented for preservation, not verified against tournament captures.

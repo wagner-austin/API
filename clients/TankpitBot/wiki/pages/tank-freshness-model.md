@@ -145,11 +145,23 @@ lock because `0x58` fired in the next tick).
 Rationale: `0x58` carries no information that the freshness gates above
 can't already derive. A tank that has truly left the world stops
 broadcasting `0x2E TankStatusSync`; `timestamp_ms` ages out naturally.
-A tank that simply teleported keeps broadcasting `0x2E` (which refreshes
-`timestamp_ms` and `last_wire_seen_ms` but NOT position) -- pursuit fires
-homing at the cached coords, server picks homing weapon, homing tracks.
+A tank that simply teleported keeps broadcasting -- pursuit fires
+homing toward it, server picks homing weapon, homing tracks.
 The only authoritative death signal is `0x41`, and the lifecycle is now
 gated entirely by `liveness`.
+
+**Correction (2026-07-03):** the original rationale claimed off-viewport
+tanks stop producing position-bearing messages, so the registry would
+hold the last on-viewport coordinate and pursuit aims would stay legal
+by construction. That is false: `0x3D MovementResponse` broadcasts
+position for **every tank on the map** every ~2 s, so a pursued
+target's registry coordinates track its true off-viewport tile. Live
+run 2026-07-03 20:34: the registry followed orange-4 to (143,237), 5
+rows below the viewport, and five pursuit shots at that aim drew 0x52
+code-0 rejections. Aim legality is now enforced at the dispatch
+boundary instead (`_clamp_aim_into_viewport` in `combat_strategy.py`
+-- see [[shot-range]] and [[bot-behavior-contract]] 3.3); the registry
+keeps the truth.
 
 ## Tests that lock the contract
 

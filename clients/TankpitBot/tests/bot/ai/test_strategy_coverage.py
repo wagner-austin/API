@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import (
-    AIConfigDict,
     AIStateDict,
-    make_default_ai_config,
     make_initial_ai_state,
 )
 from tankpit_bot.bot.ai_strategy import decide
@@ -90,8 +88,19 @@ def _make_inventory(
 
 
 def _scanned_ai_state() -> AIStateDict:
-    """Build a scanned AI state."""
-    return make_initial_ai_state()
+    """Build a scanned AI state.
+
+    ``last_landing_scan_viewport`` matches the (92,92) viewport every
+    ``_make_world`` builds around position (100,100), so COLLECT's
+    unconditional scan-on-landing latch reads as already satisfied and
+    tests exercise the downstream cascade steps.
+    """
+    return AIStateDict(
+        **{
+            **make_initial_ai_state(),
+            "last_landing_scan_viewport": "92,92",
+        }
+    )
 
 
 class TestLockedEquipmentTarget:
@@ -257,6 +266,7 @@ class TestRadarForEquipment:
                 "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
+                "last_landing_scan_viewport": "",
             }
         )
         # default_count=15: below low (20) but above break (12) → _try_collect_equipment
@@ -328,8 +338,8 @@ class TestEquipmentSearchHopFallback:
         """Reset world state."""
         reset_world_state()
 
-    def test_equipment_search_hop_when_viewport_scanned_no_radar(self) -> None:
-        """Equipment search hops to fresh sector when viewport scanned and no radar."""
+    def test_equipment_search_hops_to_nearest_dot_when_viewport_scanned(self) -> None:
+        """Equipment search dot-hops to fresh ground when viewport scanned and no radar."""
         world, self_state = _make_world(fuel=800, scanned=True)
         ai_state = AIStateDict(
             **{
@@ -344,27 +354,37 @@ class TestEquipmentSearchHopFallback:
         # doesn't matter for this test since viewport is already scanned
         inventory = _make_inventory(default_count=15, radar_count=13)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((150, 100),),
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 150
+        assert decision["command"]["target_y"] == 100
 
-    def test_equipment_search_walks_edge_when_teleport_unaffordable(self) -> None:
-        """Durable equipment recovery edge-walks when the search hop is unaffordable.
+    def test_equipment_search_exits_when_no_dot_affordable_at_low_fuel(self) -> None:
+        """The COLLECT owner exits ``out_of_fuel`` when marooned at low fuel.
 
-        Regression guard for live run 20260610-000x: the owner used to
-        raise here, killing the bot process mid-game.
+        The only atlas dot is 150 tiles away (teleport cost 900 vs
+        fuel 150), fuel is at or below ``fuel_low_threshold`` (200),
+        and lock / pickup / sense / hop all decline, so the session
+        ends instead of gambling on a blind hop (user contract
+        2026-07-02/03).
         """
-        # fuel=550: above critical (500) so fuel recovery doesn't fire first
-        world, self_state = _make_world(fuel=550, scanned=True)
-        base_config = make_default_ai_config()
-        # hop_distance=90: floor(6 * 90)=540, so 550 < 540+100 reserve.
-        config = AIConfigDict(**{**base_config, "equip_search_hop_distance": 90})
+        import pytest
+
+        world, self_state = _make_world(fuel=150, scanned=True)
         ai_state = AIStateDict(
             **{
                 **_scanned_ai_state(),
-                "config": config,
                 "mode": "COLLECT",
                 "mode_state": "SEARCH",
                 "mode_started_ms": 90000,
@@ -373,11 +393,48 @@ class TestEquipmentSearchHopFallback:
         # default_count=15, radar_count=13: above break, viewport scanned → search hop path
         inventory = _make_inventory(default_count=15, radar_count=13)
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        with pytest.raises(SessionExitError) as exc_info:
+            decide(
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                100000,
+                None,
+                map_fuel_dots=((250, 100),),
+            )
+        assert exc_info.value.reason == "out_of_fuel"
 
-        assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "search_collect_local"
-        assert decision["command"]["cmd_type"] == "teleport"
+    def test_exhausted_collect_yields_to_hunt_at_healthy_fuel(self) -> None:
+        """An exhausted COLLECT cascade hands the tick to HUNT when fuel is healthy.
+
+        Same marooned setup but fuel 550 > ``fuel_low_threshold``
+        (200): the tank is stocked, so instead of a bogus
+        ``out_of_fuel`` exit (live run 2026-07-06 exited at fuel 1100
+        this way) the tick falls through to the hunt owner.
+        """
+        world, self_state = _make_world(fuel=550, scanned=True)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
+        inventory = _make_inventory(default_count=15, radar_count=13)
+
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((250, 100),),
+        )
+
+        assert decision["behavior"]["mode"] == "HUNT"
 
 
 class TestCriticalEquipmentLockedTarget:
@@ -504,10 +561,19 @@ class TestFuelSearchFallbacks:
         ai_state = _scanned_ai_state()
         inventory = _make_inventory()
 
-        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((120, 100),),
+        )
 
         assert decision["behavior"]["mode"] == "COLLECT"
         assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["command"]["cmd_type"] == "teleport"
 
     def test_fuel_raises_when_no_hop_affordable_and_no_atlas_dot(self) -> None:
         """Fuel recovery raises when no productive action remains.
@@ -524,7 +590,9 @@ class TestFuelSearchFallbacks:
         # ``hunt_min_fuel`` reserve drop (2026-06-24) means stranding
         # now requires fuel < raw teleport cost.
         world, self_state = _make_world(fuel=30, scanned=True)
-        ai_state = _scanned_ai_state()
+        # Recent map open: the dot atlas is empty and a re-open inside
+        # the cooldown teaches nothing, so the hop declines.
+        ai_state = AIStateDict(**{**_scanned_ai_state(), "last_map_open_ms": 96000})
         inventory = _make_inventory()
 
         with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
@@ -550,7 +618,9 @@ class TestFuelSearchFallbacks:
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
         # Fuel below the short-hop cost so no teleport is affordable.
         world, self_state = _make_world(fuel=30, scanned=True)
-        ai_state = _scanned_ai_state()
+        # Recent map open: the dot atlas is empty and a re-open inside
+        # the cooldown teaches nothing, so the hop declines.
+        ai_state = AIStateDict(**{**_scanned_ai_state(), "last_map_open_ms": 96000})
         inventory = _make_inventory()
 
         with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):

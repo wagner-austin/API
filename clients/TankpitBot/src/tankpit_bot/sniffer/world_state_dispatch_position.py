@@ -124,15 +124,6 @@ def _dispatch_tile_patch_update(ws: WorldService, decoded: protocol.BinaryMessag
             update_cache_tiles(ws, updates)
             return True
         case {
-            "msg_type": 0x4F,
-            "cache_updates": list(cache_updates),
-            "overlay_updates": list(overlay_updates),
-        }:
-            update_cache_tiles(ws, cache_updates)
-            update_overlay_tiles(ws, overlay_updates)
-            ws.mark_pending_radar_cache_refresh()
-            return True
-        case {
             "msg_type": 0x5A,
             "viewport_left": int(viewport_left),
             "viewport_top": int(viewport_top),

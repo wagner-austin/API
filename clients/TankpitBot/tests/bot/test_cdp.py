@@ -1083,7 +1083,7 @@ class TestBotEquipmentManagement:
         update_inventory_from_protocol(get_world_service(), [5, 5, 5, 5, 5], [False] * 5)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=205, y=80, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
         get_world_service().terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1213,8 +1213,18 @@ class TestBotEquipmentManagement:
             timestamp_ms: int,
             terrain: TerrainMapProtocol | None,
             combat_feedback: CombatFeedback = "",
+            map_fuel_dots: tuple[tuple[int, int], ...] = (),
         ) -> TickDecisionDict:
-            _ = (world, self_state, ai_state, inventory, timestamp_ms, terrain, combat_feedback)
+            _ = (
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                timestamp_ms,
+                terrain,
+                combat_feedback,
+                map_fuel_dots,
+            )
             return decision
 
         original_decide = ai_strategy_mod.decide
@@ -1457,7 +1467,7 @@ class TestBotEquipmentManagement:
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
         get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1491,7 +1501,7 @@ class TestBotEquipmentManagement:
         _update_fuel_total(get_world_service(), 580)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=12, y=10, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
         get_world_service().terrain_map = InMemoryTerrainMap()
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1522,7 +1532,7 @@ class TestBotEquipmentManagement:
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
         get_world_service().terrain_map = InMemoryTerrainMap({(11, y): "#" for y in range(256)})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -1577,7 +1587,7 @@ class TestBotEquipmentManagement:
         _update_fuel_total(get_world_service(), 800)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=72, y=63, volume=-1)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         bot._magic = "test_magic"
@@ -1841,7 +1851,7 @@ class TestBotEquipmentManagement:
         _update_fuel_total(get_world_service(), 400)
         containers: list[RadarContainerDict] = [RadarContainerDict(x=15, y=10, volume=700)]
         mines: list[RadarMineDict] = []
-        _update_radar(get_world_service(), containers, mines)
+        _update_radar(get_world_service(), containers, mines, [])
         get_world_service().terrain_map = InMemoryTerrainMap({(15, 10): "#"})
 
         bot = Bot("https://test.tankpit.com/", headless=True)
@@ -2044,6 +2054,88 @@ class TestBotEquipmentManagement:
         bot = Bot("https://test.tankpit.com/", headless=True)
         result = _get_combat_feedback(bot)
         assert result == ""
+
+    def test_get_combat_feedback_rejected_on_command_error(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A shot-rejecting 0x52 code during a pending shot yields 'rejected'.
+
+        A rejected dispatch produces no ShootEvent and no ammo delta
+        (live run 2026-07-03 20:34: five code-0 rejections were
+        invisible to the classifier and each burned the 4 s feedback
+        window). The error is consumed, the reject counter advances,
+        and the outcome is neither a hit nor a miss.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import _get_combat_feedback
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 50
+        bot._ai_state["last_shot_target_name"] = "Enemy"
+        get_world_service().last_command_error = 0
+
+        result = _get_combat_feedback(bot)
+
+        assert result == "rejected"
+        assert bot._ai_state["session_reject_count"] == 1
+        assert bot._ai_state["session_hit_count"] == 0
+        assert bot._ai_state["session_miss_count"] == 0
+        # The error was consumed so nothing else double-handles it.
+        assert get_world_service().last_command_error == -1
+
+    def test_get_combat_feedback_ignores_non_shot_command_error(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A non-shot 0x52 code (e.g. 7 'Inventory full') is left pending.
+
+        Codes outside the shot-rejecting set belong to other action
+        machinery (pickup rejections route through
+        ``_clear_command_error``); the feedback classifier must not
+        consume them.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import _get_combat_feedback
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 50
+        bot._ai_state["last_shot_target_name"] = "Enemy"
+        get_world_service().last_command_error = 7
+
+        result = _get_combat_feedback(bot)
+
+        assert result == ""
+        assert bot._ai_state["session_reject_count"] == 0
+        assert get_world_service().last_command_error == 7
+
+    def test_has_pending_shot_feedback_ends_wait_on_command_error(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A shot-rejecting 0x52 code ends the feedback wait immediately.
+
+        Without this the bot idles the full ``shot_feedback_timeout_ms``
+        (4 s) on a shot the server already refused.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import _has_pending_shot_feedback
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 50
+        bot._ai_state["last_shot_target_name"] = "Enemy"
+        bot._ai_state["last_shoot_ms"] = 100000
+
+        assert _has_pending_shot_feedback(bot, 100500) is True
+
+        get_world_service().last_command_error = 0
+        assert _has_pending_shot_feedback(bot, 100500) is False
 
     def test_get_combat_feedback_hit_via_ammo_delta(
         self,

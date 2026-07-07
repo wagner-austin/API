@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from tankpit_bot.state.rank_formulas import free_radar_radius
 from tankpit_bot.state.types import ViewportStateDict
 
 VISIBLE_VIEWPORT_WIDTH = 16
 VISIBLE_VIEWPORT_HEIGHT = 16
-REGULAR_RADAR_RADIUS = 2
 RADAR_ENVELOPE_MARGIN = 1
 VIEWPORT_PATCH_WIDTH = VISIBLE_VIEWPORT_WIDTH + (RADAR_ENVELOPE_MARGIN * 2)
 VIEWPORT_PATCH_HEIGHT = VISIBLE_VIEWPORT_HEIGHT + (RADAR_ENVELOPE_MARGIN * 2)
@@ -66,24 +66,33 @@ def viewport_radar_bounds(viewport: ViewportStateDict) -> tuple[int, int, int, i
     )
 
 
-def regular_radar_bounds(center_x: int, center_y: int) -> tuple[int, int, int, int]:
-    """Return inclusive bounds for the built-in 5x5 radar scan.
+def regular_radar_bounds(
+    center_x: int,
+    center_y: int,
+    rank: int,
+) -> tuple[int, int, int, int]:
+    """Return inclusive bounds for the built-in radar scan.
 
-    The built-in radar reveals a 2-tile radius around the tank; only an
-    extra radar sweeps the whole viewport.
+    The built-in radar radius is rank-scaled: chebyshev
+    ``2 + rank // 3`` (5x5 / 7x7 / 9x9 at rank bands 0-2 / 3-5 / 6-8).
+    Only the extra radar sweeps the whole viewport regardless of rank.
+    See :func:`tankpit_bot.state.rank_formulas.free_radar_radius` for
+    the mining chain.
 
     Args:
         center_x: Controlled tank X coordinate.
         center_y: Controlled tank Y coordinate.
+        rank: Controlled tank rank (``self_state["rank"]``, 0..8).
 
     Returns:
         Inclusive ``(left, top, right, bottom)`` local radar bounds.
     """
+    radius = free_radar_radius(rank)
     return (
-        center_x - REGULAR_RADAR_RADIUS,
-        center_y - REGULAR_RADAR_RADIUS,
-        center_x + REGULAR_RADAR_RADIUS,
-        center_y + REGULAR_RADAR_RADIUS,
+        center_x - radius,
+        center_y - radius,
+        center_x + radius,
+        center_y + radius,
     )
 
 
@@ -116,7 +125,6 @@ def viewport_patch_world_coords(
 
 __all__ = [
     "RADAR_ENVELOPE_MARGIN",
-    "REGULAR_RADAR_RADIUS",
     "VIEWPORT_PATCH_HEIGHT",
     "VIEWPORT_PATCH_WIDTH",
     "VISIBLE_VIEWPORT_HEIGHT",

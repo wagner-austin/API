@@ -26,6 +26,7 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import InventoryState
+from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import SelfStateDict, WorldStateDict
 
 
@@ -37,6 +38,7 @@ def decide(
     timestamp_ms: int,
     terrain: TerrainMapProtocol | None,
     combat_feedback: CombatFeedback = "",
+    map_fuel_dots: tuple[tuple[int, int], ...] = (),
 ) -> TickDecisionDict:
     """Run one AI decision cycle under durable owner routing.
 
@@ -48,6 +50,8 @@ def decide(
         timestamp_ms: Current game timestamp in milliseconds.
         terrain: Optional terrain map for reachability and landing checks.
         combat_feedback: Protocol-level hit or miss feedback for the last shot.
+        map_fuel_dots: 0x4C fuel-dot atlas positions (empty before the
+            first map open of the session).
 
     Returns:
         Tick decision produced by the selected durable owner.
@@ -61,16 +65,21 @@ def decide(
         timestamp_ms,
         compose_decision_terrain(world, terrain),
         combat_feedback,
+        map_fuel_dots,
     )
     mode = _select_owner_mode(ctx)
     if mode == "COLLECT":
-        decision = decide_collect_mode(ctx)
-        return apply_mode_to_decision(
-            decision,
-            "COLLECT",
-            derive_collect_mode_state(decision),
-            timestamp_ms,
-        )
+        collect_decision = decide_collect_mode(ctx)
+        if collect_decision is not None:
+            return apply_mode_to_decision(
+                collect_decision,
+                "COLLECT",
+                derive_collect_mode_state(collect_decision),
+                timestamp_ms,
+            )
+        # Collection exhausted with healthy fuel: the tank is stocked,
+        # so this tick belongs to the hunt owner (fall through).
+        emit_ai("collect owner yielded, handing tick to hunt owner")
     decision = decide_hunt_mode(ctx)
     return apply_mode_to_decision(
         decision,

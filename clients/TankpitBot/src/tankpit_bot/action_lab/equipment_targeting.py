@@ -55,7 +55,6 @@ def find_visible_equipment_target(
         world,
         self_state,
         terrain,
-        now_ms=world["timestamp_ms"],
     )
 
 

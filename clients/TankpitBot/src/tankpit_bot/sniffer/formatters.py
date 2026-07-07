@@ -211,14 +211,13 @@ def format_radar_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x46:
         return f"type={d['detection_type']} found={d['found']}"
     match d:
-        case {"msg_type": 0x4F, "containers": list(containers), "mines": list(mines)}:
-            return f"containers={len(containers)} mines={len(mines)}"
         case {
             "msg_type": 0x4F,
-            "cache_updates": list(cache_updates),
-            "overlay_updates": list(overlay_updates),
+            "containers": list(containers),
+            "mines": list(mines),
+            "mine_clears": list(mine_clears),
         }:
-            return f"cache_updates={len(cache_updates)} overlay_updates={len(overlay_updates)}"
+            return f"containers={len(containers)} mines={len(mines)} clears={len(mine_clears)}"
     if d["msg_type"] == 0x5A:
         return f"viewport=({d['viewport_left']},{d['viewport_top']}) entities={len(d['entities'])}"
     return ""

@@ -37,6 +37,45 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
+
+
+def _clamp_aim_into_viewport(ctx: DecideCtx, aim_x: int, aim_y: int) -> tuple[int, int]:
+    """Clamp a shoot aim onto the visible viewport.
+
+    The server rejects any ``shoot`` whose aim tile is outside the
+    16x16 visible viewport with 0x52 code 0 ("You can't do this") —
+    live run 2026-07-03 20:34 drew five such rejections aiming at a
+    pursuit target 5 rows below the viewport. The aim is only a hint:
+    the wire-proven snipe pattern fires at an in-viewport ground tile
+    with the target's ``tank_id`` and the server picks ``homing``,
+    whose seeker tracks the real target (same run: ``weapon=3`` hit
+    from an aim at the target's vacated tile). Off-viewport registry
+    coordinates leak into pursuit aims because 0x3D MovementResponse
+    broadcasts every map tank's position ~every 2 s — clamping the
+    dispatched aim keeps every shot legal without touching the
+    registry truth.
+
+    The clamp only applies when the recorded viewport contains the
+    bot's own tank — the tank is always inside its actual viewport, so
+    a record that excludes it is stale or not yet established (the
+    origin arrives with the landing 0x5A) and clamping against it
+    would aim at garbage.
+
+    Args:
+        ctx: Decision context.
+        aim_x: Desired aim X (may be outside the viewport).
+        aim_y: Desired aim Y (may be outside the viewport).
+
+    Returns:
+        The aim clamped into the visible viewport bounds, or unchanged
+        when the viewport record does not contain the bot.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    self_x, self_y = ctx.self_state["x"], ctx.self_state["y"]
+    if not (left <= self_x <= right and top <= self_y <= bottom):
+        return (aim_x, aim_y)
+    return (max(left, min(right, aim_x)), max(top, min(bottom, aim_y)))
 
 
 def is_already_engaged(ctx: DecideCtx) -> bool:
@@ -277,7 +316,7 @@ def block_combat_target_and_replan(
 # =============================================================================
 
 
-def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
+def _refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Delegate the tick to the fuel planner when hunting is fuel-starved.
 
     Threats sort nearest-first and teleport cost is monotone in
@@ -291,11 +330,18 @@ def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
     target is cleared so reacquisition re-derives from fresh intel
     once an engagement is affordable.
 
+    When the collect cascade itself declines (fuel healthy but nothing
+    collectible in reach), the fuel situation is not going to improve
+    this tick, so the unaffordable target is blocked and replanned
+    instead of exiting the session.
+
     Args:
         ctx: Decision context.
+        target: The unaffordable combat target being deferred.
 
     Returns:
-        Fuel recovery decision with combat target cleared.
+        Fuel recovery decision with combat target cleared, or a
+        blocked-target replanning decision when collection declines.
     """
     # Lazy import: collect_mode imports clear_combat_target from
     # this module at import time.
@@ -309,8 +355,17 @@ def _refuel_for_hunt(ctx: DecideCtx) -> TickDecisionDict:
         ctx.timestamp_ms,
         ctx.terrain,
         ctx.combat_feedback,
+        ctx.map_fuel_dots,
     )
-    return decide_collect_mode(cleared_ctx)
+    decision = decide_collect_mode(cleared_ctx)
+    if decision is None:
+        emit_ai(
+            "refuel-for-hunt found nothing collectible at fuel %d, blocking %s",
+            ctx.fuel,
+            target["name"],
+        )
+        return block_combat_target_and_replan(ctx, target)
+    return decision
 
 
 def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
@@ -378,7 +433,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             teleport_fuel_cost_to(ctx, landing_x, landing_y),
             ctx.config["fuel_low_threshold"],
         )
-        return _refuel_for_hunt(ctx)
+        return _refuel_for_hunt(ctx, target)
     emit_ai(
         "teleport near %s to (%d,%d) (target at %d,%d)",
         target["name"],
@@ -500,7 +555,6 @@ def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
             self_state,
             ctx.terrain,
             want_fuel=want_fuel,
-            now_ms=ctx.timestamp_ms,
         )
         if container is not None:
             x, y = container["x"], container["y"]
@@ -540,6 +594,22 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     off the tile as the shot resolved -- so a mover is re-aimed at its
     fresh registry position instead of being abandoned.
     """
+    if ctx.combat_feedback == "rejected":
+        # The server refused the previous dispatch outright (0x52
+        # code 0/3/8) -- no ShootEvent, no ammo delta. With the aim
+        # clamp below every dispatch is viewport-legal, so a residual
+        # rejection means the server refuses this engagement geometry
+        # for a reason the bot cannot see; repeating the identical
+        # shot cannot change the answer (live run 2026-07-03 20:34:
+        # five identical redispatches, 4 s of dead wait each).
+        emit_ai(
+            "server rejected shot at %s (%d,%d) - blocking target",
+            target["name"],
+            target["x"],
+            target["y"],
+        )
+        return block_combat_target_and_replan(ctx, target)
+
     if ctx.combat_feedback == "miss":
         last_shot_at = (ctx.ai_state["combat_target_x"], ctx.ai_state["combat_target_y"])
         target_stationary = (target["x"], target["y"]) == last_shot_at
@@ -581,17 +651,28 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             dist,
         )
 
-    emit_ai("shoot %s at (%d,%d)", target["name"], target["x"], target["y"])
+    aim_x, aim_y = _clamp_aim_into_viewport(ctx, target["x"], target["y"])
+    if (aim_x, aim_y) != (target["x"], target["y"]):
+        emit_ai(
+            "pursuit aim (%d,%d) is outside the viewport - clamped to (%d,%d); "
+            "server homing tracks %s from the legal tile",
+            target["x"],
+            target["y"],
+            aim_x,
+            aim_y,
+            target["name"],
+        )
+    emit_ai("shoot %s at (%d,%d)", target["name"], aim_x, aim_y)
     engaging_state = _set_combat_target(ctx.base, target)
     secondary = _find_combat_pickup(ctx)
     if secondary is not None:
         emit_ai("mid-combat pickup %s", secondary["cmd_type"])
     return make_decision(
-        make_shoot_command(target["x"], target["y"], target["tank_id"]),
+        make_shoot_command(aim_x, aim_y, target["tank_id"]),
         "HUNT",
         800,
-        target["x"],
-        target["y"],
+        aim_x,
+        aim_y,
         f"shoot {target['name']}",
         AIStateDict(
             **{

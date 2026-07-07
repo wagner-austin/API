@@ -75,6 +75,7 @@ def select_forage_target(ctx: DecideCtx) -> tuple[int, int] | None:
         right,
         bottom,
         ctx.timestamp_ms,
+        ctx.self_state["rank"],
     )
 
 
@@ -130,17 +131,19 @@ def plan_forage_search(
         bottom,
         ctx.timestamp_ms,
     )
-    # Extras reveal the whole viewport; free radar only reveals the 5x5
-    # around the tank. When no extras are stocked AND the tank is inside
-    # the viewport, firing a free radar from a spot whose 5x5 footprint
-    # is already fully covered would mark zero new tiles -- the tank
-    # must walk first so a later free radar reaches new ground. Without
-    # this gate the forager loops firing the same free radar from the
-    # same position whenever ``can_use_radar`` is permissive (radar is
-    # fuel-free). The gate intentionally only applies inside the
-    # viewport: if the tank is somehow outside it (test setup, pre-
-    # synced wire state), there's no walk that helps, so let radar
-    # fire and rely on the next wire viewport update to converge state.
+    # Extras reveal the whole viewport; free radar only reveals a
+    # ``(2r+1)x(2r+1)`` footprint around the tank
+    # (``r = free_radar_radius(rank)``). When no extras are stocked
+    # AND the tank is inside the viewport, firing a free radar from a
+    # spot whose footprint is already fully covered would mark zero
+    # new tiles -- the tank must walk first so a later free radar
+    # reaches new ground. Without this gate the forager loops firing
+    # the same free radar from the same position whenever
+    # ``can_use_radar`` is permissive (radar is fuel-free). The gate
+    # intentionally only applies inside the viewport: if the tank is
+    # somehow outside it (test setup, pre-synced wire state), there's
+    # no walk that helps, so let radar fire and rely on the next wire
+    # viewport update to converge state.
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     has_extras = ctx.inventory["extra_radars"]["count"] > 0
     tank_in_viewport = left <= sx <= right and top <= sy <= bottom
@@ -156,6 +159,7 @@ def plan_forage_search(
             right,
             bottom,
             ctx.timestamp_ms,
+            ctx.self_state["rank"],
         )
         radar_productive = next_radar_gain > 0
     if not viewport_fully_covered and radar_affordable and radar_productive:

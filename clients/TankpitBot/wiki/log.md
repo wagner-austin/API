@@ -760,3 +760,123 @@ User contract, verbatim: "check the inventory delta for each shot. that is how w
 **Tests:** `test_hunt_feedback.py` — stationary-miss tests flipped to expect block+release (far and adjacent variants), new moved-miss re-aim test; `test_world_state_dispatch_container.py` / `test_tier2_lifecycle_signals.py` shot events corrected to wire-consistent weapon bytes (the old tests encoded wire-impossible combinations: weapon=3 at an empty tile, weapon=0 with a victim).
 
 **Pages updated:** [[weapon-selection]] gains "The weapon byte is the per-shot ammo ledger — and therefore the hit oracle" with the wire proof; [[bot-behavior-contract]] §3.3 rewritten (consumption oracle row, stationary-miss block row now enforced with test citations).
+
+---
+
+## [2026-07-03] audit + rework | 0x4F has one personality; the radar response is a delta sync, not an append
+
+User challenge ("visually I see some containers come into view and some removed from view... where is the data that removes the stale containers?") prompted a corpus scan of all 199 capture sessions (1817 0x4F bodies) plus a read of the JS `ch` handler (`tpclient.pretty.js:4791-4815`). Findings, in evidence order:
+
+1. **The server DOES send removals.** 247 of 2093 cache entries carried value 0 — the "tile now empty" write. The 2026-07-01 claim that the radar response "lists ONLY newly revealed hidden entities" was too strong; the correct model is a **delta sync**: new reveals + volume corrections + explicit removals, with *unchanged* visible entities omitted. `update_container_from_radar`'s volume-0 branch had been applying those removals correctly all along.
+2. **The client has no container list.** JS `ch` applies every 0x4F entry as a raw per-tile write (`tile.cache = value`, `tile.m = overlay`); rendering and the mouse-hover fuel value read the same slot. Our "RadarScanResult vs CombinedTileUpdate" split was an invented dual personality: **0 of 1817 bodies arrived top-level**, so the CombinedTileUpdate decode path had never fired in production.
+3. **The mine tail was a loaded misread.** We decoded the 3-byte tail as `(x, y, team)`; per JS it is `(x, y, overlay)` where >= 8 (255 canonical, the `dh` detonation sentinel) means *clear the mine*. Corpus showed only values 0/1/3, so it had not bitten — yet.
+4. **Byte 1 was the count's high byte** (JS reads `X(a[0], a[1])`), not an "always-zero flags byte".
+
+**Code:** single 0x4F personality — `CombinedTileUpdateDict` + `decode_combined_tile_update` + its dispatch arm + `mark_pending_radar_cache_refresh`/`consume_pending_radar_cache_refresh` (only settable from the dead arm) deleted; top-level 0x4F routes to `decode_radar_scan_result`; `MSG_CACHE_OVERLAY_UPDATE` renamed `MSG_RADAR_SCAN`. Decoder: count = LE u16; tail entries split into mines (`team = value & 3` for 0-7) and `mine_clears` (>= 8), applied via `remove_mine`. `RadarScanResultDict` gains `mine_clears`; `update_world_state_from_radar` applies them.
+
+**Pages updated:** [[radar-mechanics]] (delta-sync section replaces "only newly revealed"), [[decode-coverage]] 0x4F row, [[bot-behavior-contract]] new §2.4.
+
+---
+
+## [2026-07-03] rework | Landing truthfulness: 0x5A reset-then-apply + unconditional scan-on-landing
+
+User contract: "the visible containers may be stale... I usually always use radar right on landing from teleport."
+
+**0x5A reset-then-apply.** The landing viewport patch's skip-walk covers the whole 18x18 grid, so a tile it does not enumerate is the server saying "nothing here" — but our dispatch only applied the enumerated half, so container/mine entries remembered from a previous visit survived re-entry after being consumed (a ghost pickup target). `update_viewport_entities` now sweeps visible-layer (non-radar-sourced) entries on silent tiles inside the patch bounds before applying the patch — the same reset-then-apply the JS client does with its full grid wipe (`rg()` in `Vg.prototype.h`). Radar-sourced entries stay owned by the radar omission-prune.
+
+**Unconditional scan-on-landing in COLLECT.** The committed zero-coverage gate skipped the landing radar whenever the 18-wide visible viewport overlapped 2 tiles of old coverage after a 16-tile hop, and skipped it entirely on revisited ground — exactly where knowledge is most stale. Replaced with a per-viewport-entry latch (`AIStateDict.last_landing_scan_viewport`; the viewport changes only on teleport, so origin-differs = just landed). HUNT's combat-landing scan records the same latch so a later COLLECT entry in the same viewport does not double-fire. Landing sequence now matches the human policy exactly: teleport → 0x5A gives the truthful visible layer → radar reveals the hidden layer → one complete pickup sweep.
+
+**Pages updated:** [[bot-behavior-contract]] §2.4 + §3.4.
+
+---
+
+## [2026-07-03] rework | Fuel-dot atlas restored: dot-hop restocking + dot-relay travel
+
+User contract, verbatim intent: "instead of our blind viewport hopping we could switch that to yellow dot hopping. so hop to nearest yellow dot with a 100% clean viewport" and "if it was me playing id use yellow dot teleporting while en route to the opponent."
+
+**Atlas restore (partial revert of the 2026-06-22 strip).** `decode_map_data` materialises the skip-RLE dot coordinates again (`MapDataDict.fuel_dots`, mirrors JS `Ig.h` exactly); `_dispatch_map_data` stores them on `WorldService.map_fuel_dots` (server-cached per session, overwritten every map open); the atlas threads into `DecideCtx.map_fuel_dots` via a new `decide()` parameter, like `terrain`.
+
+**COLLECT dot hop.** `make_resource_search_hop` replaced the blind 16-candidate compass ring with: nearest atlas dot whose landing tile is passable, teleport affordable, landing viewport unscanned, and landing viewport 100% walkable on the static terrain map. Landing auto-pickup makes each hop partially self-funding (dots are ~40% fresh, wire-verified high-volume). With an empty atlas the hop dispatches `map_open` (dots arrive with the 0x4C response), guarded by `map_open_cooldown_ms`. No dot qualifies → the existing `out_of_fuel` exit. `equip_search_hop_distance` config field deleted with the compass ring.
+
+**HUNT dot relay.** When a fresh map has an enemy that fails ONLY the affordability gate (`find_relay_travel_target` — every other gate must pass; travelling toward a corpse wastes the relay), `_relay_toward_unaffordable_enemy` teleports to the dot that best closes distance to it: strictly closer than the current tile (monotone → terminates), passable, and leaving `fuel_low_threshold` behind so a dry dot cannot strand the bot below the COLLECT reserve. Ties keep the cheaper hop. `no_viable_targets` now fires only when no enemy is worth relaying toward or no dot makes affordable progress — the hard ~58-tile engagement ceiling becomes a soft one funded by dots en route.
+
+**Gate:** `make check` green — guard + ruff + mypy + 4059 tests at 100.00% statement+branch coverage. (One transient 4-test replay flake was observed once under a particular xdist ordering and did not reproduce across 7 subsequent full runs; noted for watch.)
+
+**Pages updated:** [[fuel-system]] (cascade step 5 + atlas restore), [[map-data-decode]] (decode status), [[bot-behavior-contract]] §2.3 / §3.2 / §3.4.
+
+---
+
+## [2026-07-03] fix | Pursuit rejection loop: viewport-clamped aim + rejected-shot feedback; frozen-clock test leak
+
+Live `make run` 2026-07-03 20:34 (user watching): the new dot relay and landing sequence worked end-to-end (relay hop to dot (138,234) refuelled 451 -> 1100 via landing auto-pickup, teleport onto orange-4, landing radar, dual hit, tracked homing hit) — then the pursuit dispatched `shoot(143,237)` five times, each drawing 0x52 code 0 ("You can't do this"), each invisible to combat feedback, each burning the full 4 s shot-feedback window before an identical redispatch.
+
+**Diagnosis (user-directed: "inspect the you cant do that and determine why we are missing the failed firing"):**
+
+1. **The rejection channel was unread during combat.** `has_in_flight_action` routes only move/collect/teleport/scan/map_open to the `_clear_command_error` hook; a `shoot` action falls through. The shot wait (`_has_pending_shot_feedback` / `_get_combat_feedback`) polls only success channels — hit, 0x53 echo, killed set, ammo delta. A rejected dispatch produces none of those (the user called it: "there would not have been an inventory delta for those restricted shots"), so the 0x52 sat unconsumed, the window timed out to "" (not even a miss — scorecard read 8 shots / 2 hits / 0 misses), and the unchanged lock re-fired the identical shot.
+2. **The aim was illegal because a 2026-06-26 assumption is false.** "Off-viewport tanks stop broadcasting position, so the registry stays at the last on-viewport coord" — in fact 0x3D MovementResponse broadcasts every map tank's position ~every 2 s, so the pursuit aim tracked orange-4's true tile (143,237), five rows below the viewport. New game-mechanic fact from the user: the server refuses homing at an enemy close enough that a viewport shift would reveal them — the aim must be a viewport-legal tile.
+
+**Fix:**
+
+- `_clamp_aim_into_viewport` (`combat_strategy.py`): every shoot dispatch aims at the registry coordinate clamped onto the visible viewport bounds, carrying the target's `tank_id` — exactly the wire-proven snipe shape (the same run's `weapon=3` kill shot aimed at the target's vacated in-viewport tile). Applies only when the viewport record contains the bot; registry truth untouched (`combat_target_x/y` keep the real position for the stationary-miss comparison).
+- Rejected-shot feedback: `CombatFeedback` gains `"rejected"`; shot-rejecting 0x52 codes (0/3/8) during a pending shot end the wait immediately (`peek_command_error`), classify as rejected (consumed via `check_and_clear_command_error`), count in the scorecard (`session_reject_count`, summary line now `N hits, M misses, R rejected`), and block-and-replan the target. Non-shot codes (7 etc.) are left for the in-flight-action machinery.
+
+**Root-caused the 4-test replay flake while at it** (first seen 2026-07-03 morning, "did not reproduce"): every test in `tests/scenarios/` constructs `BotScenario()` bare — the harness installs a frozen scenario clock on `_test_hooks.get_current_time_ms` at construction and none ever `close()` — and the global `_restore_hooks` autouse fixture restored every hook EXCEPT the clock. Any xdist worker that ran the scenarios module then stamped all world-state observations with frozen ~100000 ms values; the replay module's capture-epoch decide clocks then read every enemy as `stale_map_data`, acquisition emptied, and the (2026-07-02) no-viable-targets exit raised. Reproduced deterministically with `pytest tests/scenarios tests/replay/test_real_session_regressions.py -n 0`; fixed by adding `get_current_time_ms` to the global per-test hook restore. The scenarios harness landed 2026-07-02, which is why the flake was new.
+
+**Gate:** `make check` green — 4064 tests, 100.00% statement+branch coverage; the scenarios+replay reproduction is now green.
+
+**Pages updated:** [[bot-behavior-contract]] 3.3 (clamped-aim + rejected-feedback rows), [[shot-range]] (aim-legality section + scope-shift refusal mechanic), [[tank-freshness-model]] + [[combat-chase-bug]] (correction of the falsified "registry stays at last on-viewport coord" rationale, follow-up fix section).
+
+## [2026-07-06] ingest | Sigma's TankPit Tournament Guide v3.4 (16-Jan-2015)
+
+**Motivation:** Tankpit's community is small and its era-2014-2015 knowledge lives in a handful of PDFs on fragile hosts. Sigma's v3.4 guide was found via DocDroid (Scribd paywalls after page 4). Preserved in-repo so citations survive link rot; the wiki may end up as the most organized surviving Tankpit reference.
+
+**Source archived:** `docs/sources/sigmas-tankpit-guide-v3.4.pdf` (505 KB, 12 pages). Outside `wiki/` because SCHEMA v1.0 forbids extra top-level dirs under `wiki/`; `docs/sources/` follows the "operational docs live in `docs/`" convention.
+
+**Pages written:** [[tournament-strategy]] — new page under [[combat]] hub preserving the strategic content of Sigma's guide (initial fill, fill-fighting, kill types, PPH mechanics, equipment management, endgame shield-fighting, scenario templates). Confidence medium, marked as 2015 human tournament meta not verified against wire captures. Cross-links to [[game-modes]], [[enemy-bot-behavior]], [[gameplay-loop]], [[equipment-refill-strategy]], [[game-economy]].
+
+**Pages updated:**
+- [[enemy-bot-behavior]] — added four guide-sourced facts: (1) bot shots-to-teleport-off table (7 recruit / 8 private / 9 corporal), (2) last-shade + N heuristic mapped to our decoded `damage_state 0-3`, (3) bots return SINGLES not duals in combat (rewrites cost-of-engagement asymmetry), (4) same-color bots respond to chat commands ("use the radar", "move out of the way"). All marked guide-sourced, awaiting wire verification against the next multi-tank capture.
+- [[game-modes]] — extended the Tournament Mode Differences section with the full tournament capacity ladder (Recruit 60 → General 124, +8 per rank) alongside the regular ladder (20 → 60, +5 per rank) for comparison. Confirmed unchanged: promotion point requirements and kill requirements are the same as main map's; only carry cap changes.
+
+**Structural updates:** combat hub page count 9 → 10; index total 50 → 51.
+
+**Deliberately skipped:** ethics, prep (Ethernet, restroom), Type 1/2/3 human-social targeting, PPH partner selection, cup thresholds, video review, anonymous tanks, Kirby's 2-ER-per-minute rule. Preserved in [[tournament-strategy]] but not extracted as separate wiki facts — the bot doesn't play tournaments and none of this drives code.
+
+**Verification debt:** the shots-to-teleport counts, the shade heuristic, the singles-return claim, and the chat-command mechanic are all 2015 human observations, not wire-verified in this project. Next multi-tank capture with bot targets: count `You hit N/N` events against `damage_state` transitions and inspect incoming weapon bytes.
+
+## [2026-07-06] update | Rank formulas cracked: fuel capacity, radar radius, deposit mechanics (client mining + 4-rank user measurements)
+
+**Motivation:** the 2026-07-06 live run looped forever re-picking a fuel container at a full tank (code-5 "Tank full" every 2 s). Root-causing "how should the bot know it's full?" led to mining tpclient.js for the capacity source, then user measurements on his own tanks at 4 ranks to verify.
+
+**New game facts (all wire/client/user verified):**
+
+1. **Fuel capacity = 1000 + 100·rank.** Never on the wire; the client derives it in the fuel-gauge draw (`Gc`: fill `7·fuel/100` px vs capacity region `7·(10+rank)` px). Verified at private (wire tank-full at exactly 1100 + max deposit 1000), sergeant (deposit 1200), major (deposit 1500), colonel (deposit 1598 = 1700−100−~2 walked). The 2026-06-11 learned-watermark of 2010 was a polluted scrape read (same run tank-full'd at 1100), not counter-evidence.
+2. **Deposit floor = 100, server-enforced**: max deposit always leaves exactly 100 fuel. Deposit wire command decoded: `'D'` (0x44), 6 bytes, x/y/u16-LE amount, client-gated fuel>100.
+3. **Built-in radar radius = 2 + floor(rank/3)** (5x5 / 7x7 / 9x9 at rank bands 0-2 / 3-5 / 6-8). User measured lieutenant=3, colonel=4, then sergeant=3 and major=4 chosen specifically to discriminate the two candidate step formulas — steps fall at sergeant and major. Resolves the guide's "higher ranks have a larger radar" open question. Extra radar stays full-viewport at all ranks.
+4. **Client fuel>100 gate (`ce()`)**: blocks targeted shots, mine drop, nearest-enemy, deposit, obstacle pickup — locally, with a client-generated "Insufficient fuel" line. Untargeted shots, radar, map open, move, teleport are NOT client-gated.
+5. **Homing = tank-on-aimed-tile**: the client sends `target_id` iff a tank occupies the aimed tile (`new Lb(x, y, tank ? tank.id : 0)`). Friendly-fire and own-tile aims abort client-side and never reach the wire — a wire 0x52 code-3 can only be a race.
+6. **Radar sets a client cooldown counter** (`ca = 50`) on dispatch; units unconfirmed.
+7. **Obstacle carrying / bridge building** exists (`'b'` command, fuel>100 + tile flag gates) — unused by the bot, now documented.
+
+**Pages updated:** [[game-economy]] (capacity formula table, deposit mechanics + floor, frontmatter re-verified), [[radar-mechanics]] (rank-scaled radius table replacing the fixed 5x5 claim, footnote 14, downstream 5x5 phrasing generalized), [[client-constants]] (Gc/Cc/ce functions, shoot/deposit/radar dispatch facts, obstacle mechanics).
+
+**Code implications (pending, for the combat-rework fix-up):** replace the `learn_fuel_capacity` empirical watermark with rank-derived capacity (kills the tank-full pickup loop at the root — fuel selection AND lock continuation gate off known capacity from tick 1); make `REGULAR_RADAR_RADIUS = 2` (`state/viewport_geometry.py`) rank-derived; fuel-lock release must consider capacity so a code-5 never strands a held lock.
+
+## [2026-07-06] fix | Action-kind-scoped 0x52 error routing (live 20:20:59 session-exit smoking gun)
+
+**Motivation:** the 2026-07-06 `make run` session exited `no_viable_targets` at fuel 531 with a fully-stocked tank (25 duals / 16 homings / 24 extras). Root cause: at 20:20:59 a `collect fuel at (189,77)` completed via `container_consumed`, but the wire's late-arriving `0x52 code=4` "Empty container" (~2 s late) landed while the next tick's HUNT `map_open` was in flight. The old universal `_ACTION_BLOCKING_COMMAND_ERRORS = {0,1,4,5,7,8}` frozenset treated it as a map_open rejection, HUNT could not acquire, and the fresh-map cascade raised `no_viable_targets`. This was a chronic wire/log race: any 0x52 that landed a tick after its owning action had already resolved via a different signal could poison the next unrelated action.
+
+**Fix:** replaced the global set with a per-`ActionKind` whitelist `_COMMAND_ERROR_APPLICABILITY` (`bot/tick_loop_actions.py`) derived from tpclient.js dispatch semantics:
+
+- `move`: {0 "can't do this", 1 "can't go there", 8 "insufficient fuel"}
+- `teleport`: {0, 1, 8}
+- `collect`: {0, 1, 4 "empty container", 5 "tank full", 7 "inventory full", 8}
+- `scan`, `map_open`, `shoot`, `none`: `frozenset()` — server never rejects these dispatches, so any 0x52 landing during their waits is orphan by definition
+
+Codes outside the current action's whitelist are consumed as **orphan** and emitted as an `orphan_command_error` diagnostic instead of triggering a spurious rejection. Movement paths use `_clear_command_error` (returns True on applicable rejection, transitions bot to IDLE, marks failed target); scan/map_open use `_drain_orphan_command_error` (drain-only, no state transition). Both share `_emit_orphan_command_error` for the diagnostic emission so drift can't creep in.
+
+**Tests added:** `TestClearCommandError` in `tests/bot/test_tick_loop_coverage.py` gained `test_scan_wait_drops_orphan_error_and_stays_pending`, `test_map_open_wait_drops_orphan_error_and_stays_pending` (live-run regression guard), `test_teleport_wait_drops_orphan_empty_container`, `test_move_wait_drops_orphan_tank_full`, `test_orphan_command_error_emits_diagnostic`, `test_scan_wait_with_no_error_stays_pending`, `test_scan_and_map_open_whitelists_are_empty` (invariant guard against future whitelist drift). Two pre-existing tests that asserted the old buggy behavior (`test_command_error_clears_scan_action`, `test_command_error_clears_map_open_action`) were replaced by the new orphan-drop variants.
+
+**Wiki update:** [[bot-behavior-contract]] §3.4 grew a `MUST` row for action-kind-scoped 0x52 with the smoking-gun scenario logged verbatim, and its verifier list now cites the new tests.
+
+**Gate:** `make check` green — 4088 tests, 100.00% statement + branch coverage.

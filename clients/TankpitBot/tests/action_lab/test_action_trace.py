@@ -157,9 +157,14 @@ def test_action_cycle_tracker_reset_restarts_cycle_numbers() -> None:
 
 
 def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -> None:
-    """Fuel decision basis includes freshness causality and formatting metadata."""
+    """Fuel decision basis includes refresh causality and formatting metadata.
+
+    Container age is reported for diagnostics but never filters: the
+    30 s freshness TTL was removed 2026-07-06, so the 35 s old
+    candidate stays actionable.
+    """
     world = _world_with_viewport()
-    fresh = make_container_state(
+    selected = make_container_state(
         140,
         109,
         True,
@@ -169,7 +174,7 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
         timestamp_ms=39_000,
         failed_pickups=1,
     )
-    stale = make_container_state(
+    old = make_container_state(
         141,
         102,
         True,
@@ -179,8 +184,8 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
         timestamp_ms=5_000,
         failed_pickups=0,
     )
-    world["containers"]["140,109"] = fresh
-    world["containers"]["141,102"] = stale
+    world["containers"]["140,109"] = selected
+    world["containers"]["141,102"] = old
 
     basis = build_fuel_decision_basis(
         world,
@@ -188,7 +193,7 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
         self_y=110,
         radar_cycle_id=4,
         terrain=_FlatTerrain(),
-        fuel_target=fresh,
+        fuel_target=selected,
     )
 
     assert basis["radar_cycle_id"] == 4
@@ -196,16 +201,20 @@ def test_build_fuel_decision_basis_and_formatters_capture_freshness_metadata() -
     assert basis["selected_target_y"] == 109
     assert len(basis["candidates"]) == 2
     assert basis["candidates"][0]["x"] == 141
-    assert basis["candidates"][0]["reason"] == "stale"
+    assert basis["candidates"][0]["reason"] == "actionable"
+    assert basis["candidates"][0]["actionable"] is True
+    assert basis["candidates"][0]["age_ms"] == 35_000
     assert basis["candidates"][0]["refresh_kind"] == "radar_cache_refresh"
     assert basis["candidates"][1]["selected"] is True
+    assert basis["candidates"][1]["reason"] == "failed_pickup"
 
     formatted_basis = format_fuel_decision_basis(basis)
     formatted_candidates = format_fuel_decision_candidates(basis)
 
     assert "world_ts=40000 radar_cycle=4" in formatted_basis
     assert "refresh=radar_response@39000" in formatted_candidates
-    assert "age=1000/3000" in formatted_candidates
+    assert "age=1000" in formatted_candidates
+    assert "age=35000" in formatted_candidates
 
 
 def test_format_fuel_decision_basis_handles_no_candidates() -> None:

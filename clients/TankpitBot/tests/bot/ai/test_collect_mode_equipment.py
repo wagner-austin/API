@@ -24,13 +24,12 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     the free radar instead of falling through to the unaffordable hop.
     """
     world, self_state = make_world(fuel=800, scanned=False)
-    base_state = make_scanned_ai_state()
+    base_state = make_scanned_ai_state(landing_scan_viewport="")
     ai_state = AIStateDict(
         **{
             **base_state,
             "config": {
                 **base_state["config"],
-                "equip_search_hop_distance": 150,
             },
             "mode": "COLLECT",
             "mode_state": "SEARCH",
@@ -45,6 +44,8 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
@@ -60,13 +61,12 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     has work to do.
     """
     world, self_state = make_world(fuel=140, scanned=False)
-    base_state = make_scanned_ai_state()
+    base_state = make_scanned_ai_state(landing_scan_viewport="")
     ai_state = AIStateDict(
         **{
             **base_state,
             "config": {
                 **base_state["config"],
-                "equip_search_hop_distance": 150,
             },
             "mode": "COLLECT",
             "mode_state": "SEARCH",
@@ -86,6 +86,8 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
@@ -113,11 +115,13 @@ def test_collect_mode_raises_when_genuinely_boxed_in() -> None:
             **base_state,
             "config": {
                 **base_state["config"],
-                "equip_search_hop_distance": 150,
             },
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
+            # Recent map open: the dot atlas is empty and a re-open
+            # inside the cooldown teaches nothing, so the hop declines.
+            "last_map_open_ms": 96000,
         }
     )
     inventory = make_inventory(default_count=30)
@@ -149,11 +153,13 @@ def test_collect_mode_raises_when_fully_boxed_in() -> None:
             **base_state,
             "config": {
                 **base_state["config"],
-                "equip_search_hop_distance": 150,
             },
             "mode": "COLLECT",
             "mode_state": "SEARCH",
             "mode_started_ms": 90000,
+            # Recent map open: the dot atlas is empty and a re-open
+            # inside the cooldown teaches nothing, so the hop declines.
+            "last_map_open_ms": 96000,
         }
     )
     inventory = make_inventory(default_count=30)
@@ -216,6 +222,8 @@ def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["behavior"]["target_x"] == 106
@@ -262,28 +270,28 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["behavior"]["reason"] == "fuel=900"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
 
-def test_collect_mode_skips_opportunistic_fuel_at_learned_capacity() -> None:
-    """When fuel is at the learned cap, the in-viewport fuel pickup is skipped.
+def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
+    """When fuel is at ``fuel_capacity(rank)``, the fuel pickup is skipped.
 
-    Picking up at capacity wastes the action ("Tank full" in the
-    game log), so the opportunistic-viewport-fuel branch must defer.
-    The bot falls through to the no-equipment search-hop path.
+    Picking up at capacity wastes the action (wire ``0x52`` code-5
+    ``Tank full``), so the opportunistic-viewport-fuel branch must
+    defer. Capacity here is rank-derived
+    (:func:`tankpit_bot.state.rank_formulas.fuel_capacity`), not a
+    learned watermark: at corporal (``rank=2``) capacity is 1200 and
+    the tank is at exactly 1200, so ``_select_and_pickup_fuel``
+    returns ``None`` and the cascade falls through to the no-equipment
+    search-hop path.
     """
-    from tankpit_bot.browser.dom_scraper import GameLogEntry
-    from tankpit_bot.diagnostics.game_log_feedback import (
-        register_world_feedback_from_game_log,
-        reset_game_log_feedback,
-    )
-
-    reset_game_log_feedback()
     world, self_state = make_world(
-        fuel=1100,
+        fuel=1200,
         scanned=True,
         containers={
             "105,105": make_container_state(
@@ -295,11 +303,6 @@ def test_collect_mode_skips_opportunistic_fuel_at_learned_capacity() -> None:
                 failed_pickups=0,
             ),
         },
-    )
-    capacity_world, _ = make_world(fuel=1100, scanned=True)
-    register_world_feedback_from_game_log(
-        [GameLogEntry(text="Tank full", category="fuel")],
-        capacity_world,
     )
     ai_state = AIStateDict(
         **{
@@ -314,7 +317,8 @@ def test_collect_mode_skips_opportunistic_fuel_at_learned_capacity() -> None:
 
     decision = decide_collect_mode(ctx)
 
-    reset_game_log_feedback()
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
 
 
@@ -359,6 +363,8 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
     decision = decide_collect_mode(ctx)
 
     reset_world_state()
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
 
 
@@ -406,6 +412,8 @@ def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["target_x"] == 106
     assert decision["behavior"]["target_y"] == 106
     assert decision["updated_ai_state"]["resource_target_x"] == 106
@@ -451,6 +459,8 @@ def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason"] == "equipment_locked"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
@@ -598,6 +608,8 @@ def test_rock_walled_equipment_is_skipped_for_forage() -> None:
 
     decision = decide_collect_mode(ctx)
 
+    if decision is None:
+        raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] != "pickup_equipment"
 
 

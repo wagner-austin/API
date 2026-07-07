@@ -142,7 +142,7 @@ class TestDispatchOther:
             RadarContainerDict(x=80, y=90, volume=500),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines, [])
         assert "80,90" in get_world_service().world_state["containers"]
 
         msg = ContainerPickupDict(
@@ -180,7 +180,7 @@ class TestDispatchOther:
             RadarContainerDict(x=80, y=90, volume=500),
         ]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines, [])
         assert "80,90" in get_world_service().world_state["containers"]
         initial_self_state = get_world_service().world_state["self_state"]
         if initial_self_state is None:

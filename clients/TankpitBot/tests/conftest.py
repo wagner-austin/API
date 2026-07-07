@@ -118,8 +118,18 @@ def _noop_install_signal_handlers(on_interrupt: Callable[[], None]) -> None:
 
 @pytest.fixture(autouse=True)
 def _restore_hooks() -> Generator[None, None, None]:
-    """Reset all shared test hooks to canonical defaults for each test."""
+    """Reset all shared test hooks to canonical defaults for each test.
+
+    ``get_current_time_ms`` is in the list because a leaked frozen
+    clock is the nastiest cross-test poison: the scenarios harness
+    installs a scenario clock at construction, and any path that skips
+    ``close()`` used to freeze time for every later test on the same
+    xdist worker. Frozen dispatch stamps + capture-epoch decide clocks
+    made every replay enemy read as ``stale_map_data`` (the 4-test
+    replay flake diagnosed 2026-07-03).
+    """
     _test_hooks.get_env = _test_hooks._default_get_env
+    _test_hooks.get_current_time_ms = _test_hooks._real_get_current_time_ms
     _test_hooks.write_text = _test_hooks._real_write_text
     _test_hooks.read_text = _test_hooks._real_read_text
     _test_hooks.append_text = _test_hooks._real_append_text
@@ -144,6 +154,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
     _test_hooks.get_env = _test_hooks._default_get_env
+    _test_hooks.get_current_time_ms = _test_hooks._real_get_current_time_ms
     _test_hooks.write_text = _test_hooks._real_write_text
     _test_hooks.read_text = _test_hooks._real_read_text
     _test_hooks.append_text = _test_hooks._real_append_text

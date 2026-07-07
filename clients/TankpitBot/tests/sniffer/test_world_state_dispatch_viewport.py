@@ -389,7 +389,7 @@ class TestViewportContainerExtraction:
         self_state["fuel"] = 400
 
         update_world_state_from_radar(
-            get_world_service(), [RadarContainerDict(x=55, y=33, volume=900)], []
+            get_world_service(), [RadarContainerDict(x=55, y=33, volume=900)], [], []
         )
 
         assert "55,33" in get_world_service().world_state["containers"]
@@ -538,3 +538,129 @@ class TestViewportInvalidationEdgeCases:
         # Far-away tank position preserved — not in viewport bounds
         assert get_world_service().world_state["tanks"]["961"]["x"] == 200
         assert get_world_service().world_state["tanks"]["961"]["y"] == 200
+
+
+class TestViewportPatchSweep:
+    """Reset-then-apply: the 0x5A patch's silence removes stale visible entries."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_landing_patch_sweeps_silent_visible_entries(self) -> None:
+        """Visible-layer entries the patch is silent about are removed.
+
+        Mirrors the JS client's reset-then-apply (``Vg.prototype.h``
+        wipes the tile grid before rebuilding from the patch). A
+        container remembered from a previous visit that the landing
+        0x5A does not enumerate is the server saying the tile is
+        empty; keeping it produced ghost pickup targets. Radar-sourced
+        entries are spared (owned by the radar omission-prune), and
+        entries outside the patch bounds are untouched.
+        """
+        from tankpit_bot.protocol import (
+            CacheUpdateDict,
+            OverlayUpdateDict,
+            RadarContainerDict,
+            RadarScanResultDict,
+            ViewportUpdateDict,
+        )
+        from tankpit_bot.protocol.types import ViewportEntityDict
+
+        ws = get_world_service()
+        # Two visible-layer containers + a mine inside the future viewport.
+        dispatch_world_state_update(
+            ws, CacheUpdateDict(msg_type=0x43, updates=[(50, 50, 600), (53, 50, 250)])
+        )
+        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(51, 50, 1)]))
+        # Visible container at the tile the patch WILL enumerate: kept.
+        dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(48, 48, 100)]))
+        # Radar-sourced container inside the future viewport: spared.
+        dispatch_world_state_update(
+            ws,
+            RadarScanResultDict(
+                msg_type=0x4F,
+                containers=[RadarContainerDict(x=52, y=50, volume=300)],
+                mines=[],
+                mine_clears=[],
+            ),
+        )
+        # Visible-layer container far outside the future viewport: untouched.
+        dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(200, 200, 400)]))
+        assert "50,50" in ws.world_state["containers"]
+        assert "51,50" in ws.world_state["mines"]
+
+        # Landing patch for the (46,46) viewport enumerates ONE tile --
+        # a fresh container at (48,48) -- and is silent about the rest.
+        enumerated = ViewportEntityDict(
+            col=3,
+            row=3,
+            cache_value=700,
+            overlay_value=255,
+            terrain_type=0,
+        )
+        dispatch_world_state_update(
+            ws,
+            ViewportUpdateDict(
+                msg_type=0x5A,
+                viewport_left=46,
+                viewport_top=46,
+                entities=[enumerated],
+            ),
+        )
+
+        containers = ws.world_state["containers"]
+        mines = ws.world_state["mines"]
+        # Silent visible-layer entries inside the patch: swept.
+        assert "50,50" not in containers
+        assert "53,50" not in containers
+        assert "51,50" not in mines
+        # Enumerated tile: present with the patch's value.
+        assert containers["48,48"]["volume"] == 700
+        # Radar-sourced entry: spared.
+        assert containers["52,50"]["source"] == "radar"
+        # Outside the patch bounds: untouched.
+        assert containers["200,200"]["volume"] == 400
+
+    def test_landing_patch_with_nothing_stale_leaves_registries_alone(self) -> None:
+        """A patch over ground with no stale entries changes nothing."""
+        from tankpit_bot.protocol import CacheUpdateDict, ViewportUpdateDict
+
+        ws = get_world_service()
+        dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(200, 200, 400)]))
+
+        dispatch_world_state_update(
+            ws,
+            ViewportUpdateDict(
+                msg_type=0x5A,
+                viewport_left=46,
+                viewport_top=46,
+                entities=[],
+            ),
+        )
+
+        assert ws.world_state["containers"]["200,200"]["volume"] == 400
+
+    def test_landing_patch_sweeps_stale_mine_without_stale_containers(self) -> None:
+        """A sweep that only removes a mine still rewrites the registry."""
+        from tankpit_bot.protocol import OverlayUpdateDict, ViewportUpdateDict
+
+        ws = get_world_service()
+        dispatch_world_state_update(ws, OverlayUpdateDict(msg_type=0x40, updates=[(51, 50, 1)]))
+        assert "51,50" in ws.world_state["mines"]
+
+        dispatch_world_state_update(
+            ws,
+            ViewportUpdateDict(
+                msg_type=0x5A,
+                viewport_left=46,
+                viewport_top=46,
+                entities=[],
+            ),
+        )
+
+        assert "51,50" not in ws.world_state["mines"]

@@ -21,8 +21,6 @@ from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 log = get_logger(__name__)
 
-_CONTAINER_FRESHNESS_TTL_MS = 30000
-
 _LOCK_RELEASE_MIN_GAP = 10
 
 
@@ -58,47 +56,38 @@ def is_container_pursuable(
     container: ContainerStateDict,
     *,
     want_fuel: bool,
-    now_ms: int,
 ) -> bool:
     """Return True when a tracked container is worth pursuing at all.
 
     This is the SINGLE definition of pursuability: candidate selection,
     opportunistic pickups, and lock continuation must all apply it.
 
+    The historical 30 s freshness TTL was removed 2026-07-06. Every
+    pursuability consumer is viewport-scoped, and an in-viewport
+    container is wire-truthful under the truth layer: the landing 0x5A
+    sweep removes silent visible entries, the landing radar's
+    omission-prune covers radar-sourced ones, and live 0x43 cache
+    updates track consumption while the bot watches. The TTL therefore
+    only ever expired REAL loot -- live run 2026-07-06 18:20:55 dropped
+    an equipment container revealed 31 s earlier and cascaded into a
+    bogus ``out_of_fuel`` session exit at fuel 1100.
+
     Args:
         container: Tracked container to check.
         want_fuel: True to require fuel, False to require equipment.
-        now_ms: Current timestamp for freshness filtering. ``0`` disables
-            the TTL.
 
     Returns:
-        True when the container matches the kind, has no failed pickup,
-        and is within the freshness TTL.
+        True when the container matches the kind and has no failed
+        pickup.
     """
     if container["is_fuel"] != want_fuel:
         return False
-    if container["failed_pickups"] > 0:
-        return False
-    return not (now_ms > 0 and _is_stale(container, now_ms))
+    return container["failed_pickups"] == 0
 
 
 def _viewport_bounds(world: WorldStateDict) -> tuple[int, int, int, int]:
     """Return inclusive observable viewport bounds from world state."""
     return viewport_visible_bounds(world["viewport"])
-
-
-def _is_stale(container: ContainerStateDict, now_ms: int) -> bool:
-    """Return True when a container's timestamp is older than the freshness TTL.
-
-    Args:
-        container: Container to check.
-        now_ms: Current timestamp.
-
-    Returns:
-        True when the container's last-seen time exceeds the TTL.
-    """
-    age = now_ms - container["timestamp_ms"]
-    return age > _CONTAINER_FRESHNESS_TTL_MS
 
 
 def hostile_mines(world: WorldStateDict) -> dict[str, MineStateDict]:

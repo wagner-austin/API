@@ -102,7 +102,7 @@ class TestUpdateWorldStateFromRadarCache:
         )
         get_world_service().record_radar_command(use_extra_radar=True)
 
-        update_world_state_from_radar(svc, [RadarContainerDict(x=98, y=98, volume=500)], [])
+        update_world_state_from_radar(svc, [RadarContainerDict(x=98, y=98, volume=500)], [], [])
 
         result = get_world_state()
         assert len(result["scanned_tiles"]) == 16 * 16
@@ -123,7 +123,7 @@ class TestUpdateWorldStateFromRadarCache:
         )
         get_world_service().record_radar_command(use_extra_radar=False)
 
-        update_world_state_from_radar(svc, [RadarContainerDict(x=100, y=100, volume=500)], [])
+        update_world_state_from_radar(svc, [RadarContainerDict(x=100, y=100, volume=500)], [], [])
 
         result = get_world_state()
         # Tank at (100, 100) reveals the 5x5 around the tank, all inside the viewport.
@@ -152,7 +152,7 @@ class TestUpdateWorldStateFromRadarKnownResources:
             **{**svc.world_state, "viewport": make_visible_viewport_state(92, 92)},
         )
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(svc, containers, [])
+        update_world_state_from_radar(svc, containers, [], [])
 
         update_world_state_from_radar_known_resources(svc)
 
@@ -204,40 +204,10 @@ class TestHandleRadarAck:
         """Reset state after each test."""
         reset_world_state()
 
-    def test_cache_refresh_path(self) -> None:
-        """RadarAck after a cache refresh re-confirms in-envelope containers."""
-        from tankpit_bot.state.viewport_geometry import make_visible_viewport_state
-
-        svc = get_world_service()
-        key = coord_key(96, 96)
-        svc.world_state = WorldStateDict(
-            **{
-                **svc.world_state,
-                "viewport": make_visible_viewport_state(92, 92),
-                "containers": {
-                    key: make_container_state(
-                        x=96,
-                        y=96,
-                        is_fuel=True,
-                        volume=300,
-                        source="viewport",
-                        refresh_kind="viewport_patch",
-                        timestamp_ms=50000,
-                    ),
-                },
-            },
-        )
-        svc.mark_pending_radar_cache_refresh()
-
-        _handle_radar_ack(svc, found=True)
-
-        assert check_and_clear_radar_scan_complete() is True
-        assert get_world_state()["containers"][key]["refresh_kind"] == "radar_cache_refresh"
-
     def test_empty_delta_found_true_preserves(self) -> None:
         """RadarAck(found=True) after empty delta preserves known resources."""
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(get_world_service(), containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [], [])
         get_world_service().mark_pending_radar_empty_delta()
 
         _handle_radar_ack(get_world_service(), found=True)
@@ -293,7 +263,7 @@ class TestHandleRadarAck:
     def test_empty_delta_found_false_clears(self) -> None:
         """RadarAck(found=False) after empty delta clears viewport."""
         containers = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(get_world_service(), containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [], [])
         get_world_service().mark_pending_radar_empty_delta()
 
         _handle_radar_ack(get_world_service(), found=False)
@@ -329,7 +299,7 @@ class TestReconcileRadarViewportResources:
             **{**svc.world_state, "viewport": make_visible_viewport_state(92, 92)},
         )
         stale = [RadarContainerDict(x=98, y=98, volume=500)]
-        update_world_state_from_radar(svc, stale, [])
+        update_world_state_from_radar(svc, stale, [], [])
         assert coord_key(98, 98) in get_world_state()["containers"]
 
         # New radar shows different container, stale one should be reconciled

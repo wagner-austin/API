@@ -19,10 +19,10 @@ from tankpit_bot.bot.ai.reachability import (
     is_move_reachable_in_viewport,
 )
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.states import InFlightActionDict, make_no_action, transition_to
+from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_no_action, transition_to
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
-from tankpit_bot.runtime_logging import emit_sync, emit_wire_complete
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_sync, emit_wire_complete
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -43,16 +43,58 @@ _COMMAND_ERROR_EMPTY_CONTAINER = 4  # "Empty container"
 _COMMAND_ERROR_TANK_FULL = 5  # "Tank full"
 _COMMAND_ERROR_INVENTORY_FULL = 7  # "Inventory full"
 _COMMAND_ERROR_INSUFFICIENT_FUEL = 8  # "Insufficient fuel"
-_ACTION_BLOCKING_COMMAND_ERRORS = frozenset(
-    {
-        _COMMAND_ERROR_CANT_DO_THIS,
-        _COMMAND_ERROR_CANT_GO_THERE,
-        _COMMAND_ERROR_EMPTY_CONTAINER,
-        _COMMAND_ERROR_TANK_FULL,
-        _COMMAND_ERROR_INVENTORY_FULL,
-        _COMMAND_ERROR_INSUFFICIENT_FUEL,
-    }
-)
+
+
+# Per-``ActionKind`` whitelist of the 0x52 codes that action can legitimately
+# draw. A 0x52 whose code is NOT in the current action's whitelist belongs
+# to a prior action (typically one that already completed via a different
+# wire signal like ``container_consumed`` or ``teleport_landed``) and would
+# poison the in-flight action if attributed to it.
+#
+# Live-run 2026-07-06 20:20:59 was the smoking gun: a ``collect fuel at
+# (189,77)`` completed via ``container_consumed``, but the wire's
+# late-arriving code=4 ("Empty container") landed while the next tick's
+# ``map_open`` was in flight. Under the previous universal blocking set,
+# ``map_open`` was declared rejected, HUNT could not acquire, and the
+# session exited ``no_viable_targets`` at fuel 531 with a fully-stocked
+# tank. Radar and map_open both dispatch commands the server never
+# rejects, so their whitelist is empty and any code arriving during their
+# wait is treated as an orphan.
+#
+# Sourced from ``tpclient.js`` server-side dispatch (see
+# ``wiki/pages/client-constants.md``) and the empirical set the bot has
+# observed across captures. Codes ``2/3/6/9/10`` are informational or
+# universally non-blocking and appear in no whitelist.
+_COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
+    "move": frozenset(
+        {
+            _COMMAND_ERROR_CANT_DO_THIS,
+            _COMMAND_ERROR_CANT_GO_THERE,
+            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+        }
+    ),
+    "teleport": frozenset(
+        {
+            _COMMAND_ERROR_CANT_DO_THIS,
+            _COMMAND_ERROR_CANT_GO_THERE,
+            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+        }
+    ),
+    "collect": frozenset(
+        {
+            _COMMAND_ERROR_CANT_DO_THIS,
+            _COMMAND_ERROR_CANT_GO_THERE,
+            _COMMAND_ERROR_EMPTY_CONTAINER,
+            _COMMAND_ERROR_TANK_FULL,
+            _COMMAND_ERROR_INVENTORY_FULL,
+            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+        }
+    ),
+    "scan": frozenset(),
+    "map_open": frozenset(),
+    "shoot": frozenset(),  # shot rejections use their own path in tick_loop
+    "none": frozenset(),
+}
 
 log = get_logger(__name__)
 
@@ -107,9 +149,16 @@ def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
 
 
 def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
-    """Return True while a radar scan is still pending."""
-    if _clear_command_error(bot, action):
-        return False
+    """Return True while a radar scan is still pending.
+
+    Radar dispatch (``CMD_RADAR`` 0x66, client ``Mb``) is not
+    server-side rejectable -- the server accepts every scan and
+    replies with a ``0x4F`` result. Any 0x52 landing here must
+    belong to a prior action; the drain call consumes and diagnoses
+    it so it can't poison the NEXT action, but never transitions
+    the scan out of pending.
+    """
+    _drain_orphan_command_error(action)
     if _clear_stalled_action(bot, action):
         return False
     emit_sync("waiting for radar results")
@@ -117,9 +166,16 @@ def _wait_for_scan_action(bot: Bot, action: InFlightActionDict) -> bool:
 
 
 def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
-    """Return True while a map-open action is waiting on fresh server sync."""
-    if _clear_command_error(bot, action):
-        return False
+    """Return True while a map-open action is waiting on fresh server sync.
+
+    Map-open dispatch (``CMD_MAP_OPEN`` 0x6C, client ``Nb``) is not
+    server-side rejectable. The same drain rule as :func:`_wait_for_
+    scan_action` applies. Live run 2026-07-06 20:20:59 was the
+    smoking gun: a late-arriving ``code=4`` from a completed collect
+    was misattributed as a map_open rejection under the old
+    universal blocking set.
+    """
+    _drain_orphan_command_error(action)
     if _clear_stalled_action(bot, action):
         return False
     if _clear_completed_map_open(bot, action):
@@ -128,8 +184,49 @@ def _wait_for_map_open_action(bot: Bot, action: InFlightActionDict) -> bool:
     return True
 
 
+def _emit_orphan_command_error(kind: ActionKind, error_code: int) -> None:
+    """Emit the sync log line + diagnostic for a dropped orphan 0x52 code.
+
+    Shared by :func:`_drain_orphan_command_error` (scan/map_open wait
+    paths, whose whitelists are empty) and :func:`_clear_command_error`
+    (movement paths whose whitelists may still miss the incoming code).
+    """
+    emit_sync(
+        "%s wait discarded orphan error_code=%d (not applicable to this kind)",
+        kind,
+        error_code,
+    )
+    emit_diagnostic(
+        diagnostic_kind="orphan_command_error",
+        action_kind=kind,
+        error_code=error_code,
+    )
+
+
+def _drain_orphan_command_error(action: InFlightActionDict) -> None:
+    """Drain a pending 0x52 code during a scan or map_open wait.
+
+    Radar and map_open dispatch are not server-side rejectable, so
+    :data:`_COMMAND_ERROR_APPLICABILITY` lists an empty whitelist for
+    both. Any 0x52 arriving here therefore belongs to a prior action
+    that already completed via a different wire signal
+    (``container_consumed``, ``teleport_landed``, ...) but whose reject
+    landed a beat later. Consuming it here prevents the code surviving
+    into the NEXT action's wait -- which is exactly how live run
+    2026-07-06 20:20:59 misattributed a stale code=4 to a map_open,
+    ended HUNT acquisition, and exited the session at fuel 531.
+
+    Args:
+        action: The in-flight scan or map_open action.
+    """
+    error_code = check_and_clear_command_error(get_world_service())
+    if error_code == -1:
+        return
+    _emit_orphan_command_error(action["kind"], error_code)
+
+
 def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
-    """Clear an in-flight action when the server emitted a 0x52 rejection.
+    """Clear an in-flight movement action when the server emitted a 0x52 rejection.
 
     The Supervisor message carries an authoritative reject ("You can't
     do this", "You can't go there!", "Empty container", "Tank full",
@@ -143,18 +240,29 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     rejects at full inventory; code 7 joined the blocking set on
     2026-06-21 (see [[bot-behavior-contract]] §3.4).
 
+    Error codes are scoped to the ``ActionKind`` they can legitimately
+    reject: see :data:`_COMMAND_ERROR_APPLICABILITY`. A code that is
+    not in the current kind's whitelist belongs to a prior action and
+    is dropped as an orphan (same diagnostic path as
+    :func:`_drain_orphan_command_error`) rather than being spuriously
+    attributed to the in-flight action.
+
     Args:
         bot: Bot instance.
-        action: The in-flight action record.
+        action: The in-flight movement action record.
 
     Returns:
-        True if a blocking command error was consumed and the action
-        was cleared.
+        True if an applicable command error was consumed and the
+        action was cleared. False when there was no error, or when an
+        orphan code was consumed but the action stays pending.
     """
     error_code = check_and_clear_command_error(get_world_service())
-    if error_code not in _ACTION_BLOCKING_COMMAND_ERRORS:
+    if error_code == -1:
         return False
-    kind = action["kind"]
+    kind: ActionKind = action["kind"]
+    if error_code not in _COMMAND_ERROR_APPLICABILITY[kind]:
+        _emit_orphan_command_error(kind, error_code)
+        return False
     tx, ty = action["target_x"], action["target_y"]
     started_ms = action["started_ms"]
     elapsed_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
@@ -174,6 +282,16 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         error_code=error_code,
     )
     if kind == "collect":
+        # Every collect rejection -- empty container, tank-full, inventory-full,
+        # illegal geometry -- marks the target as a failed pickup so the
+        # planner drops it from the candidate set. A tank-full rejection here
+        # should never fire in normal flow: fuel selection and fuel-lock
+        # continuation both gate on the rank-derived capacity from
+        # :func:`tankpit_bot.state.rank_formulas.fuel_capacity`, so a
+        # pickup_fuel at capacity is unreachable. If it does fire (rank-up
+        # race, protocol quirk), the failed-pickup mark is the right response
+        # and the container drops out of contention until the next radar
+        # refresh.
         increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):

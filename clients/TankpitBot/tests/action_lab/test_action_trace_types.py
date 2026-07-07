@@ -58,8 +58,7 @@ def _sample_candidate(
         source=resolved_source,
         refresh_kind="radar_cache_refresh",
         refresh_timestamp_ms=4200,
-        stale_age_ms=9500,
-        stale_ttl_ms=3000,
+        age_ms=9500,
     )
 
 

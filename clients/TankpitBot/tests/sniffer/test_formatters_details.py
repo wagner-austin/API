@@ -347,28 +347,21 @@ class TestFormatFunctions:
 
     def test_format_radar_details_radar_result(self) -> None:
         """Test format_radar_details for radar result (0x4F)."""
-        from tankpit_bot.protocol import RadarContainerDict, RadarScanResultDict
+        from tankpit_bot.protocol import (
+            RadarContainerDict,
+            RadarMineClearDict,
+            RadarScanResultDict,
+        )
 
         container = RadarContainerDict(x=10, y=20, volume=100)
         msg = RadarScanResultDict(
             msg_type=0x4F,
             containers=[container],
             mines=[],
+            mine_clears=[RadarMineClearDict(x=11, y=21)],
         )
         result = format_radar_details(msg)
-        assert "containers=1" in result or "entities=1" in result
-
-    def test_format_radar_details_combined_tile_update(self) -> None:
-        """Test format_radar_details for top-level combined tile update (0x4F)."""
-        from tankpit_bot.protocol import CombinedTileUpdateDict
-
-        msg = CombinedTileUpdateDict(
-            msg_type=0x4F,
-            cache_updates=[(10, 20, 300)],
-            overlay_updates=[(11, 21, 7), (12, 22, 255)],
-        )
-        result = format_radar_details(msg)
-        assert result == "cache_updates=1 overlay_updates=2"
+        assert result == "containers=1 mines=0 clears=1"
 
     def test_format_radar_details_viewport_update(self) -> None:
         """Test format_radar_details for viewport update (0x5A)."""
@@ -493,6 +486,7 @@ class TestFormatFunctions:
         msg = MapDataDict(
             msg_type=0x4C,
             tanks=[MapTankEntry(x=1, y=2, tank_id=5, rank=0, damage=0, team=0)],
+            fuel_dots=[],
         )
         result = format_misc_details(msg)
         assert "tanks=1" in result

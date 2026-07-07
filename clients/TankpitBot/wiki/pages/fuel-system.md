@@ -3,7 +3,7 @@ title: Fuel System
 tags: [fuel, containers, map-data]
 related: [[teleport-mechanics]], [[radar-mechanics]], [[map-data-decode]]
 sources: [see footnotes]
-fact_checked: 2026-06-23
+fact_checked: 2026-07-03
 confidence: high
 ---
 
@@ -81,26 +81,28 @@ collapsed 2026-06-24). The owner runs a single cascade per tick (see
    free radar covers a 5×5 around the tank, clipped to viewport
    bounds). When radar is unaffordable, walk toward an unscanned
    tile so the next free radar covers fresh ground.
-5. **Hop** — teleport to the cleanest fresh viewport nearby.
-   Candidates are the eight compass neighbors at one and two
-   viewport-widths (16 candidates). A candidate qualifies when its
-   landing tile is passable, the teleport is fuel-affordable, and the
-   destination viewport is unscanned. Qualifiers are ranked by the
-   **walkable fraction** of the landing viewport from the static
-   terrain map (mostly-"." viewports, matching the recorded human
-   restock policy — see [[gameplay-loop]]); ties keep the cheapest
-   hop because candidates are iterated cheapest-first (16 cardinal,
-   16 diagonal, 32 cardinal, 32 diagonal). When no candidate
-   qualifies the owner ends the session with exit reason
-   ``out_of_fuel`` (``SessionExitError``, 2026-07-02; previously an
-   uncaught ``ValueError`` crash) rather than idle silently.
-   (Hop picker rewritten 2026-07-01; previously
-   first-qualifying-direction with no destination-quality signal.)
+5. **Hop** — teleport to the **nearest fuel dot with a 100% clean
+   viewport** (user contract 2026-07-03: "hop to nearest yellow dot
+   with a 100% clean viewport"). Candidates come from the 0x4C
+   MapData fuel-dot atlas; a dot qualifies when its landing tile is
+   passable, the teleport is fuel-affordable, the landing viewport is
+   unscanned, and the landing viewport is fully walkable ground on
+   the static terrain map. Qualifiers are taken nearest-first, and
+   the landing auto-pickup makes each hop partially self-funding.
+   With an empty atlas (no map open yet this session) the hop
+   dispatches ``map_open`` first, guarded by ``map_open_cooldown_ms``
+   so a dotless map cannot loop. When no dot qualifies the owner ends
+   the session with exit reason ``out_of_fuel`` (``SessionExitError``,
+   2026-07-02; previously an uncaught ``ValueError`` crash) rather
+   than idle silently. (Dot hop replaced the blind 16-candidate
+   compass-ring hop 2026-07-03; that in turn replaced the
+   first-qualifying-direction hop 2026-07-01.)
 
-There is no fuel-dot atlas: the bot does not consult a map-wide
-fuel-container list. The MAP_DATA blob still carries the RLE fuel-dot
-section, but the protocol decoder skips past those bytes (the
-sniffer/state layer does not surface them).[^3]
+The fuel-dot atlas was restored 2026-07-03 (stripped 2026-06-22):
+`decode_map_data` materialises the skip-RLE dot coordinates and
+`WorldService.map_fuel_dots` holds the session-cached copy. Dots are
+~40% fresh and every wire-verified dot held high-volume fuel — see
+[[map-data-decode]].[^3]
 
 ## Marooning hazard
 
@@ -120,7 +122,7 @@ all decline the COLLECT owner ends the session with exit reason
 
 [^1]: AIConfigDict in bot/ai/types.py — thresholds lowered from 500→300 in Phase 3d (2026-06-14)
 [^2]: user (Austin), 2026-06-11 — "only collect fuel containers with volume >= 500"
-[^3]: Phase A/B/C of the fuel-dot strip (2026-06-22): planner, state, protocol decoder all stopped surfacing dot coordinates. RLE byte count is still parsed for length validation so the decoder advances cleanly into the MAP_DATA tank-entries section.
+[^3]: Fuel-dot history: stripped 2026-06-22 (planner, state, protocol decoder all stopped surfacing dot coordinates), restored 2026-07-03 per user contract ("switch blind viewport hopping to yellow-dot hopping"; "use yellow dot teleporting while en route to the opponent"). Dot freshness ~40% and dot-held volumes >= 762 wire-verified 2026-06-11 (fuel dot probe, 6/6 dots held fuel).
 [^4]: Run 131003 2026-06-12 — marooned at 87 fuel on one-tile island (actually a ferry; see [[ferry-mechanics]]). Reserve-bypass escape removed 2026-06-22.
 [^5]: AIConfigDict 2026-06-22 — `fuel_critical_threshold` field removed; the COLLECT entry predicate (`should_enter_collect`) and the in-cascade fuel-pickup branch now consume `fuel_low_threshold` directly. The unused `try_collect_critical_fuel` / `try_collect_fuel` non-owner helpers and the `_plan_fuel_recovery` wrapper were deleted at the same time. The fuel-mode and equipment-mode owners themselves were then merged into one `decide_collect_mode` 2026-06-24.
 [^6]: Live observation 2026-06-23 00:35:57 in `runs/bot/latest.log`: worldstate logged `Fuel: 195 -> 633 (+438)` from the 0x44 FuelGain, then the next AI decision read `ctx.fuel = 1071` (633 + 438). The 438 ghost was the container's volume being added a second time by `pickup_container`'s local fuel-delta branch on top of the wire's already-correct absolute fuel. Removed in `state/container_mutations.pickup_container` 2026-06-23; the function now only mutates the container registry.

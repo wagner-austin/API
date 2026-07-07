@@ -32,9 +32,8 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand, make_radar_command
-from tankpit_bot.diagnostics.game_log_feedback import is_fuel_at_learned_capacity
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.scan_coverage import is_tile_covered
+from tankpit_bot.state.rank_formulas import fuel_capacity
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -89,7 +88,6 @@ def select_equipment_target(
             ctx.filtered,
             ctx.self_state,
             ctx.terrain,
-            now_ms=ctx.timestamp_ms,
         )
         if not is_container_blacklisted(container["x"], container["y"])
     ]
@@ -119,7 +117,6 @@ def select_fuel_target(
         ctx.filtered,
         ctx.self_state,
         ctx.terrain,
-        now_ms=ctx.timestamp_ms,
         minimum_volume=1,
     )
     if container is None:
@@ -131,7 +128,7 @@ def select_fuel_target(
     return (container, command)
 
 
-def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
+def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     """Run the durable ``COLLECT`` owner for this tick.
 
     Cascade:
@@ -148,19 +145,28 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
     4. Pick up the best fuel in the current viewport (skipped at cap).
     5. Forage: radar when the viewport has unscanned tiles, or walk
        toward an unscanned tile so the next free radar covers it.
-    6. Hop: teleport to a fresh viewport when nothing actionable
-       remains here.
+    6. Hop: teleport to the nearest fuel dot whose landing viewport
+       is unscanned and 100% walkable when nothing actionable remains
+       here (landing auto-pickup makes the hop partially
+       self-funding). With an empty dot atlas the hop opens the map
+       first.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        Mode-owned collection decision.
+        Mode-owned collection decision, or ``None`` when every cascade
+        branch declines but fuel is above ``fuel_low_threshold`` -- the
+        tank is stocked, so collection is DONE and the caller should
+        hand the tick to the hunt owner. Live run 2026-07-06 hit this
+        state at fuel 1100 (every dot-hop landing filtered out) and
+        wrongly exited ``out_of_fuel`` instead of going hunting.
 
     Raises:
-        SessionExitError: When every cascade branch declines -- the bot
-            is marooned and cannot produce a legal collection action,
-            so the session ends with ``out_of_fuel`` (user contract
+        SessionExitError: When every cascade branch declines AND fuel is
+            at or below ``fuel_low_threshold`` -- the bot is marooned
+            and cannot produce a legal collection action, so the
+            session ends with ``out_of_fuel`` (user contract
             2026-07-02).
     """
     base_state = ctx.base
@@ -217,6 +223,15 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict:
     if search is not None:
         return search
 
+    if ctx.fuel > ctx.config["fuel_low_threshold"]:
+        emit_ai(
+            "collect exhausted at (%d,%d) with healthy fuel %d, yielding to hunt",
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            ctx.fuel,
+        )
+        return None
+
     raise SessionExitError(
         "out_of_fuel",
         f"COLLECT owner produced no decision at "
@@ -229,35 +244,32 @@ def _scan_on_landing_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
-    """Return a radar decision when the current viewport hasn't been scanned.
+    """Return a radar decision when this viewport has no landing scan yet.
 
     The COLLECT-mode equivalent of HUNT's ``scan_on_landing``: fired
-    once per fresh teleport landing in COLLECT mode, before any
-    pickup logic runs. The gate is "the current viewport has zero
-    tiles in ``scanned_tiles``" -- once a radar fires (extras mark
-    the full viewport, free marks 25 around the tank), at least one
-    tile carries a live mark, this returns ``None`` on subsequent
-    ticks, and the normal pickup -> forage -> hop cascade takes
-    over. Pairs with the 0x5A container lift: 0x5A enumerates only
-    the tiles the server's viewport patch touches; the landing radar
-    fills in the rest so the planner picks an optimal pickup order
-    on the next tick rather than committing to the first 0x5A entry.
+    once per viewport entry, before any pickup logic runs. The gate is
+    the ``last_landing_scan_viewport`` latch -- the viewport origin
+    changes only on teleport, so "origin differs from the latch" means
+    the bot landed here without radaring yet. User policy (2026-07-03):
+    always radar right on landing, unconditionally — the 0x5A patch is
+    truthful for the visible layer but says nothing about hidden
+    containers, and re-entering previously scanned ground is exactly
+    when coverage marks are most stale. (The previous zero-coverage
+    gate skipped the scan whenever the 18-wide visible viewport
+    overlapped 2 tiles of old coverage after a 16-tile hop.)
 
     Args:
         ctx: Decision context.
         base_state: Base AI state to rewrite for the produced command.
 
     Returns:
-        ``forage_radar``-shaped decision, or ``None`` when the
-        viewport already has any scan coverage.
+        ``scan_on_landing`` decision, or ``None`` when this viewport
+        already had its landing radar.
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    scanned_tiles = ctx.world["scanned_tiles"]
-    now_ms = ctx.timestamp_ms
-    for y in range(top, bottom + 1):
-        for x in range(left, right + 1):
-            if is_tile_covered(scanned_tiles, x, y, now_ms):
-                return None
+    origin_key = f"{left},{top}"
+    if base_state["last_landing_scan_viewport"] == origin_key:
+        return None
     emit_ai(
         "scan-on-landing (mode=COLLECT, extras=%d, viewport=(%d,%d)-(%d,%d))",
         ctx.inventory["extra_radars"]["count"],
@@ -273,7 +285,12 @@ def _scan_on_landing_decision(
         0,
         0,
         "scan_on_landing",
-        clear_resource_target(base_state),
+        AIStateDict(
+            **{
+                **clear_resource_target(base_state),
+                "last_landing_scan_viewport": origin_key,
+            }
+        ),
         ctx.equip,
     )
 
@@ -335,6 +352,22 @@ def _continue_or_release_fuel_lock(
     base_state: AIStateDict,
     locked_target: ContainerStateDict,
 ) -> tuple[TickDecisionDict | None, AIStateDict]:
+    if ctx.fuel >= fuel_capacity(ctx.self_state["rank"]):
+        # Live run 2026-07-06 pickup loop: a held fuel lock kept
+        # re-dispatching pickup_fuel at capacity because the lock path
+        # had no capacity gate, only the selection path did. Every
+        # dispatch drew wire 0x52 code-5 "Tank full" and the lock
+        # survived to next tick. Capacity is now rank-derived
+        # (:func:`tankpit_bot.state.rank_formulas.fuel_capacity`), so
+        # this gate closes the loop at the root regardless of how the
+        # lock was established.
+        emit_ai(
+            "releasing fuel lock at (%d,%d): tank at capacity %d",
+            locked_target["x"],
+            locked_target["y"],
+            ctx.fuel,
+        )
+        return None, clear_resource_target(base_state)
     if _superior_fuel_candidate(ctx, locked_target) is not None:
         emit_ai(
             "releasing fuel lock at (%d,%d): markedly closer fuel is visible",
@@ -395,7 +428,7 @@ def _select_and_pickup_fuel(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
-    if is_fuel_at_learned_capacity(ctx.fuel):
+    if ctx.fuel >= fuel_capacity(ctx.self_state["rank"]):
         return None
     selection = select_fuel_target(ctx)
     if selection is None:
@@ -430,7 +463,6 @@ def _superior_equipment_candidate(
         ctx.filtered,
         ctx.self_state,
         ctx.terrain,
-        now_ms=ctx.timestamp_ms,
     )
     if candidate is None:
         return None
@@ -455,7 +487,6 @@ def _superior_fuel_candidate(
         ctx.filtered,
         ctx.self_state,
         ctx.terrain,
-        now_ms=ctx.timestamp_ms,
         minimum_volume=1,
     )
     if candidate is None:

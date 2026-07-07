@@ -283,15 +283,6 @@ class AIConfigDict(TypedDict):
             leaving restock and returning to the hunt. Radars find
             enemies and equipment, so a healthy buffer is rebuilt
             first; below it the bot restocks instead of fighting.
-        equip_search_hop_distance: Teleport hop distance for resource
-            search (equipment AND fuel). Set to one viewport width
-            (16) so each hop lands in an adjacent, previously-
-            unscanned viewport with no gap between scans. Larger
-            strides leave unscanned strips between hops and burn
-            disproportionately more fuel (teleport cost scales as
-            6 * euclidean distance). Combat teleports use the
-            target's actual coordinates via ``combat_landing_tile``
-            and are NOT affected by this field.
         engagement_fuel_budget: Estimated fuel a typical kill consumes
             once adjacent (shot sequence + per-tick position cost; the
             approach teleport is priced separately per candidate in
@@ -326,7 +317,6 @@ class AIConfigDict(TypedDict):
     dual_resume_threshold: int
     radar_break_threshold: int
     radar_resume_threshold: int
-    equip_search_hop_distance: int
     engagement_fuel_budget: int
 
 
@@ -351,7 +341,6 @@ def make_default_ai_config() -> AIConfigDict:
         dual_resume_threshold=25,
         radar_break_threshold=5,
         radar_resume_threshold=20,
-        equip_search_hop_distance=16,
         engagement_fuel_budget=450,
     )
 
@@ -384,6 +373,14 @@ class AIStateDict(TypedDict):
         attempted_equipment_targets: Equipment targets that have been
             teleport-approached. {``"x,y"``: timestamp_ms}. Prevents
             repeated orbits around the same container.
+        last_landing_scan_viewport: ``"left,top"`` origin of the last
+            viewport a landing radar was dispatched in ("" before the
+            first). The viewport changes only on teleport, so this is
+            a one-radar-per-landing latch: HUNT's and COLLECT's
+            scan-on-landing both record it, and COLLECT fires its
+            landing radar only when the current origin differs
+            (user policy 2026-07-03: always radar right on landing,
+            before any pickup).
     """
 
     config: AIConfigDict
@@ -400,6 +397,7 @@ class AIStateDict(TypedDict):
     session_kill_count: int
     session_hit_count: int
     session_miss_count: int
+    session_reject_count: int
     blocked_combat_targets: dict[str, int]
     last_shot_target_id: int
     last_shot_target_name: str
@@ -407,6 +405,7 @@ class AIStateDict(TypedDict):
     resource_target_x: int
     resource_target_y: int
     attempted_equipment_targets: dict[str, int]
+    last_landing_scan_viewport: str
 
 
 def make_initial_ai_state(
@@ -435,6 +434,7 @@ def make_initial_ai_state(
         session_kill_count=0,
         session_hit_count=0,
         session_miss_count=0,
+        session_reject_count=0,
         blocked_combat_targets={},
         last_shot_target_id=-1,
         last_shot_target_name="",
@@ -442,6 +442,7 @@ def make_initial_ai_state(
         resource_target_x=0,
         resource_target_y=0,
         attempted_equipment_targets={},
+        last_landing_scan_viewport="",
     )
 
 

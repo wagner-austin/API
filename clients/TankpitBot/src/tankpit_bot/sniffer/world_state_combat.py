@@ -257,6 +257,23 @@ def check_and_clear_teleport_landed(ws: WorldService) -> bool:
     return result
 
 
+def peek_command_error(ws: WorldService) -> int:
+    """Return the pending command error code without consuming it.
+
+    Used by the shot-feedback wait to end the wait immediately when a
+    0x52 rejection arrives for the in-flight shot -- the actual
+    consumption happens in the feedback classifier so nothing races
+    the in-flight-action machinery.
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        Pending error code (0-10), or -1 if no error pending.
+    """
+    return ws.last_command_error
+
+
 def check_and_clear_command_error(ws: WorldService) -> int:
     """Return and clear the last command error code from a Supervisor message.
 
@@ -293,5 +310,6 @@ __all__ = [
     "mark_tank_killed",
     "mark_teleport_landed",
     "peek_combat_hit",
+    "peek_command_error",
     "peek_our_shot_response",
 ]

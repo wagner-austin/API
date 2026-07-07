@@ -575,8 +575,14 @@ def test_format_visible_fuel_entries_returns_none_when_no_visible_fuel_is_tracke
     assert summary == "none"
 
 
-def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None:
-    """Visible-fuel diagnostics mark stale entries and truncate long summaries."""
+def test_format_visible_fuel_entries_marks_selected_and_truncates() -> None:
+    """Visible-fuel diagnostics stamp the selected target and truncate at 8 entries.
+
+    The 30 s stale TTL was removed 2026-07-06 -- every viewport
+    container is pursuable regardless of age -- so this test now
+    covers the ``selected=True`` stamp and the 8-entry truncation
+    behavior of ``_format_visible_fuel_entries``.
+    """
     probe = _ProbeHarness(ReplayClock(1000))
     probe._world_state = _make_world(40001, 100, 100, 700)
     world = probe.get_world_state()
@@ -584,7 +590,7 @@ def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None
     selected_target = make_container_state(101, 100, True, 300, timestamp_ms=0)
     world["containers"][coord_key(101, 100)] = selected_target
     passable_tiles.add((101, 100))
-    stale_positions = [
+    extra_positions = [
         (102, 100),
         (103, 100),
         (104, 100),
@@ -594,7 +600,7 @@ def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None
         (101, 101),
         (102, 101),
     ]
-    for x, y in stale_positions:
+    for x, y in extra_positions:
         world["containers"][coord_key(x, y)] = make_container_state(
             x,
             y,
@@ -607,7 +613,7 @@ def test_format_visible_fuel_entries_marks_stale_entries_and_truncates() -> None
 
     summary = _format_visible_fuel_entries(probe, fuel_target=selected_target)
 
-    assert "reason=stale actionable=False selected=True" in summary
+    assert "reason=actionable actionable=True selected=True" in summary
     assert "...+1 more" in summary
 
 

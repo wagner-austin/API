@@ -111,8 +111,6 @@ def find_nearest_fuel(
     world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
-    *,
-    now_ms: int = 0,
 ) -> ContainerStateDict | None:
     """Find the nearest walk-reachable fuel container.
 
@@ -120,7 +118,6 @@ def find_nearest_fuel(
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
         Nearest walk-reachable fuel ContainerStateDict, or None if none visible.
@@ -134,7 +131,6 @@ def find_nearest_fuel(
             container,
             world,
             want_fuel=True,
-            now_ms=now_ms,
         ):
             continue
         cx, cy = container["x"], container["y"]
@@ -160,8 +156,6 @@ def find_nearest_equipment(
     world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
-    *,
-    now_ms: int = 0,
 ) -> ContainerStateDict | None:
     """Find the nearest walk-reachable equipment container.
 
@@ -169,7 +163,6 @@ def find_nearest_equipment(
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
         Nearest walk-reachable equipment ContainerStateDict, or None if none visible.
@@ -178,7 +171,6 @@ def find_nearest_equipment(
         world,
         self_state,
         terrain,
-        now_ms=now_ms,
     )
     if not candidates:
         return None
@@ -189,8 +181,6 @@ def find_equipment_candidates(
     world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
-    *,
-    now_ms: int = 0,
 ) -> list[ContainerStateDict]:
     """Return visible walk-reachable equipment candidates ordered nearest-first.
 
@@ -198,7 +188,6 @@ def find_equipment_candidates(
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        now_ms: Current timestamp for freshness filtering. 0 disables.
 
     Returns:
         List of visible walk-reachable equipment containers ordered by Manhattan distance.
@@ -210,7 +199,6 @@ def find_equipment_candidates(
             container,
             world,
             want_fuel=False,
-            now_ms=now_ms,
         ):
             continue
         cx, cy = container["x"], container["y"]
@@ -234,7 +222,6 @@ def find_best_fuel(
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None = None,
     *,
-    now_ms: int = 0,
     minimum_volume: int = 100,
 ) -> ContainerStateDict | None:
     """Find the best walk-reachable fuel container, prioritizing volume over distance.
@@ -245,7 +232,6 @@ def find_best_fuel(
         world: Current world state with container positions.
         self_state: Player's own state for position.
         terrain: Optional terrain map for reachability checks.
-        now_ms: Current timestamp for freshness filtering. 0 disables.
         minimum_volume: Minimum fuel volume that counts as actionable.
 
     Returns:
@@ -260,7 +246,6 @@ def find_best_fuel(
             container,
             world,
             want_fuel=True,
-            now_ms=now_ms,
         ):
             continue
         if container["volume"] < minimum_volume:
@@ -291,23 +276,21 @@ def find_adjacent_container(
     terrain: TerrainMapProtocol | None,
     *,
     want_fuel: bool,
-    now_ms: int,
 ) -> ContainerStateDict | None:
-    """Return a fresh, walk-reachable container of the requested kind within one tile.
+    """Return a walk-reachable container of the requested kind within one tile.
 
     Args:
         world: Current world state with container positions.
         self_state: Player's own state for adjacency.
         terrain: Terrain map for reachability; ``None`` skips the check.
         want_fuel: True to look for fuel, False for equipment.
-        now_ms: Current timestamp for freshness filtering.
 
     Returns:
-        An adjacent fresh walk-reachable container, or ``None``.
+        An adjacent walk-reachable container, or ``None``.
     """
     sx, sy = self_state["x"], self_state["y"]
     for container in world["containers"].values():
-        if not is_container_pursuable(container, want_fuel=want_fuel, now_ms=now_ms):
+        if not is_container_pursuable(container, want_fuel=want_fuel):
             continue
         if abs(container["x"] - sx) > 1 or abs(container["y"] - sy) > 1:
             continue
@@ -425,10 +408,9 @@ def _is_visible_candidate(
     world: WorldStateDict,
     *,
     want_fuel: bool,
-    now_ms: int,
 ) -> bool:
-    """Return True when a container passes type, freshness, and viewport checks."""
-    if not is_container_pursuable(container, want_fuel=want_fuel, now_ms=now_ms):
+    """Return True when a container passes type, pursuability, and viewport checks."""
+    if not is_container_pursuable(container, want_fuel=want_fuel):
         return False
     cx, cy = container["x"], container["y"]
     left, top, right, bottom = _viewport_bounds(world)

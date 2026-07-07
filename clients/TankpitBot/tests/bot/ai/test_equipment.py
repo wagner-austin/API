@@ -344,38 +344,31 @@ class TestFindNearestFuelExtras:
 
         assert find_nearest_fuel(world, state) == expected
 
-    def test_skips_stale_containers(self) -> None:
-        """find_nearest_fuel skips containers older than freshness TTL."""
-        world, state = _world_and_self()
-        world["containers"]["101,100"] = make_container_state(
-            x=101,
-            y=100,
-            is_fuel=True,
-            volume=500,
-            timestamp_ms=10000,
-        )
-        fresh = make_container_state(
-            x=103,
-            y=100,
-            is_fuel=True,
-            volume=300,
-            timestamp_ms=90000,
-        )
-        world["containers"]["103,100"] = fresh
-        assert find_nearest_fuel(world, state, now_ms=100000) == fresh
+    def test_age_does_not_filter_containers(self) -> None:
+        """find_nearest_fuel ignores container age.
 
-    def test_freshness_disabled_when_now_ms_zero(self) -> None:
-        """find_nearest_fuel skips freshness check when now_ms=0."""
+        The 30 s freshness TTL was removed 2026-07-06: in-viewport
+        containers are wire-truthful under the truth layer, so the
+        nearer container wins regardless of timestamp.
+        """
         world, state = _world_and_self()
         old = make_container_state(
             x=101,
             y=100,
             is_fuel=True,
             volume=500,
-            timestamp_ms=0,
+            timestamp_ms=10000,
         )
         world["containers"]["101,100"] = old
-        assert find_nearest_fuel(world, state, now_ms=0) == old
+        world["containers"]["103,100"] = make_container_state(
+            x=103,
+            y=100,
+            is_fuel=True,
+            volume=300,
+            timestamp_ms=90000,
+        )
+        world["timestamp_ms"] = 100000
+        assert find_nearest_fuel(world, state) == old
 
     def test_unscanned_viewport_does_not_change_raw_fuel_selection(self) -> None:
         """find_nearest_fuel stays a pure viewport selector without radar policy."""
@@ -482,25 +475,26 @@ class TestFindNearestEquipment:
         world["containers"]["105,100"] = farther
         assert find_nearest_equipment(world, state) == farther
 
-    def test_skips_stale_equipment(self) -> None:
-        """find_nearest_equipment skips containers older than freshness TTL."""
+    def test_age_does_not_filter_equipment(self) -> None:
+        """find_nearest_equipment ignores container age (TTL removed 2026-07-06)."""
         world, state = _world_and_self()
-        world["containers"]["101,100"] = make_container_state(
+        old = make_container_state(
             x=101,
             y=100,
             is_fuel=False,
             volume=0,
             timestamp_ms=10000,
         )
-        fresh = make_container_state(
+        world["containers"]["101,100"] = old
+        world["containers"]["103,100"] = make_container_state(
             x=103,
             y=100,
             is_fuel=False,
             volume=0,
             timestamp_ms=90000,
         )
-        world["containers"]["103,100"] = fresh
-        assert find_nearest_equipment(world, state, now_ms=100000) == fresh
+        world["timestamp_ms"] = 100000
+        assert find_nearest_equipment(world, state) == old
 
 
 class TestDescribeContainerSearch:
@@ -887,25 +881,26 @@ class TestFindBestFuel:
         world["containers"]["105,100"] = farther
         assert find_best_fuel(world, state) == farther
 
-    def test_skips_stale_fuel(self) -> None:
-        """find_best_fuel skips containers older than freshness TTL."""
+    def test_age_does_not_filter_best_fuel(self) -> None:
+        """find_best_fuel ignores container age (TTL removed 2026-07-06)."""
         world, state = _world_and_self()
-        world["containers"]["101,100"] = make_container_state(
+        old = make_container_state(
             x=101,
             y=100,
             is_fuel=True,
             volume=900,
             timestamp_ms=10000,
         )
-        fresh = make_container_state(
+        world["containers"]["101,100"] = old
+        world["containers"]["105,100"] = make_container_state(
             x=105,
             y=100,
             is_fuel=True,
             volume=500,
             timestamp_ms=90000,
         )
-        world["containers"]["105,100"] = fresh
-        assert find_best_fuel(world, state, now_ms=100000) == fresh
+        world["timestamp_ms"] = 100000
+        assert find_best_fuel(world, state) == old
 
 
 def test_find_adjacent_container_skips_diagonal_with_blocked_cardinals() -> None:
@@ -936,6 +931,4 @@ def test_find_adjacent_container_skips_diagonal_with_blocked_cardinals() -> None
         },
     )
 
-    assert (
-        find_adjacent_container(world, self_state, terrain, want_fuel=True, now_ms=100000) is None
-    )
+    assert find_adjacent_container(world, self_state, terrain, want_fuel=True) is None

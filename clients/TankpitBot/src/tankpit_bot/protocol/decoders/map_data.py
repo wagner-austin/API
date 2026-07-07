@@ -5,12 +5,12 @@ opens the strategic map. JS handler is ``Ig`` (V.L). The body packs
 two sections: a run-length list of fuel-dot positions followed by a
 flat array of tank slots.
 
-The fuel-dot RLE section is *parsed for length only* (the byte count
-is read from the LE u16 header and the cursor advances past those
-bytes). The decoder no longer materialises the dot coordinates -- the
-bot stopped consulting the fuel-dot atlas 2026-06-22, so the RLE
-payload is dead data; we only need to skip past it to reach the tank
-entries that follow.
+The fuel-dot RLE section is the map's yellow-pixel fuel atlas
+(server-cached per session, byte-identical across map opens; ~40% of
+dots still hold fuel when visited, and every verified dot held
+high-volume fuel -- see wiki [[map-data-decode]]). Restored 2026-07-03
+for dot-hop restocking and dot-relay travel; it was decoded for
+length only between 2026-06-22 and then.
 
 Trace-verified from ``tpclient.js`` Ig.h. Layout details live on
 :class:`tankpit_bot.protocol.types.MapDataDict`.
@@ -23,6 +23,36 @@ from tankpit_bot.protocol.types import MapDataDict, MapTankEntry
 
 # Each tank slot is 5 bytes: x, y, tank_id (LE u16), packed byte.
 _TANK_ENTRY_BYTES = 5
+
+
+def _decode_fuel_dots(body: bytes, rle_count: int) -> list[tuple[int, int]]:
+    """Decode the skip-RLE fuel-dot section.
+
+    Mirrors JS ``Ig.h`` exactly: a 2-D cursor starts at ``(1, 1)``;
+    each byte advances x by its value, wrapping to ``y += 1,
+    x %= 256`` whenever x exceeds 255. A byte of 255 is a pure skip
+    (cursor advance, no dot); every other byte emits the cursor
+    position as a fuel dot.
+
+    Args:
+        body: Full XOR-decoded MapData body.
+        rle_count: RLE byte count from the LE u16 header.
+
+    Returns:
+        Fuel-dot ``(x, y)`` positions in stream order.
+    """
+    dots: list[tuple[int, int]] = []
+    x = 1
+    y = 1
+    for offset in range(2, 2 + rle_count):
+        step = body[offset]
+        x += step
+        if x > 255:
+            y += 1
+            x %= 256
+        if step != 255:
+            dots.append((x, y))
+    return dots
 
 
 def _decode_tank_entries(body: bytes, start: int) -> list[MapTankEntry]:
@@ -72,14 +102,12 @@ def _decode_tank_entries(body: bytes, start: int) -> list[MapTankEntry]:
 
 
 def decode_map_data(data: bytes) -> MapDataDict:
-    """Decode the 0x4C 'L' MapData blob into the visible tank list.
+    """Decode the 0x4C 'L' MapData blob into fuel dots and the tank list.
 
     See :class:`MapDataDict` for layout. The header is two bytes (LE
     u16) carrying the run-length region's byte count; bytes
-    ``2..2+count`` hold the RLE fuel-dot payload and are skipped --
-    the bot no longer maintains the fuel-dot atlas, so the RLE bytes
-    are validated for length only. Everything past the RLE region is
-    a packed list of 5-byte tank slots.
+    ``2..2+count`` hold the skip-RLE fuel-dot atlas. Everything past
+    the RLE region is a packed list of 5-byte tank slots.
 
     Args:
         data: XOR-decoded message body (without the 0x4C prefix).
@@ -95,9 +123,11 @@ def decode_map_data(data: bytes) -> MapDataDict:
     require_min_length(data, 2, "MapData")
     rle_count = x16(data[0], data[1])
     require_min_length(data, 2 + rle_count, "MapData.rle_section")
+    fuel_dots = _decode_fuel_dots(data, rle_count)
     tanks = _decode_tank_entries(data, 2 + rle_count)
     return MapDataDict(
         msg_type=0x4C,
+        fuel_dots=fuel_dots,
         tanks=tanks,
     )
 

@@ -280,20 +280,46 @@ class RadarMineDict(TypedDict):
     team: int
 
 
-class RadarScanResultDict(TypedDict):
-    """Radar scan result (tunneled 0x2E -> 0x4F).
+class RadarMineClearDict(TypedDict):
+    """Mine-clear entry in radar scan result.
 
-    Contains containers (fuel/equipment) and mines discovered by radar.
+    An overlay entry whose value is >= 8 (255 in the JS dh detonation
+    handler) — the server's statement that the tile has NO mine. The
+    JS ch handler writes the value into ``tile.m`` raw; 255 is the
+    canonical no-mine sentinel it uses everywhere else.
+
+    Attributes:
+        x: X coordinate (0-255).
+        y: Y coordinate (0-255).
+    """
+
+    x: int
+    y: int
+
+
+class RadarScanResultDict(TypedDict):
+    """Radar scan result (0x4F, JS handler ``ch`` / V.O).
+
+    The 0x4F body is a batch of per-tile writes — a delta sync of the
+    scanned area, not an append-only reveal list. Cache entries set a
+    tile's container layer (0 = tile now empty, N = fuel volume,
+    65535 -> -1 = equipment); overlay entries set the mine layer
+    (0-7 = mine with ``team = value & 3``, >= 8 = no mine). Corpus
+    scan 2026-07-03 (199 sessions, 1817 bodies): 247 of 2093 cache
+    entries were removals (value 0); every body arrived tunneled
+    inside 0x2E.
 
     Attributes:
         msg_type: Message type (0x4F).
-        containers: List of container entries.
-        mines: List of mine entries.
+        containers: Container entries (volume 0 = authoritative removal).
+        mines: Mine entries (overlay value 0-7).
+        mine_clears: Tiles the server declared mine-free (overlay >= 8).
     """
 
     msg_type: Literal[0x4F]
     containers: list[RadarContainerDict]
     mines: list[RadarMineDict]
+    mine_clears: list[RadarMineClearDict]
 
 
 # =============================================================================
@@ -385,19 +411,18 @@ class MapDataDict(TypedDict):
     Trace-verified from tpclient.js Ig.h (V.L). The body has two
     sections:
 
-      1. Fuel-dot run-length list. Total RLE byte count is
-         ``X(a[0], a[1])`` (LE u16) and the cells live in
-         ``a[2 : 2+count]``. The bot stopped consulting the fuel-dot
-         atlas 2026-06-22, so the decoder skips past this region for
-         length validation only -- the coordinates are not surfaced
-         on this TypedDict. The wire format of the RLE region is
-         retained in code-comment form for the day someone wants to
-         resurrect it: a 2-D cursor ``(d, e)`` starts at ``(1, 1)``;
-         each byte ``h`` advances ``d`` by ``h``, wrapping to
-         ``e += 1, d %= 256`` whenever ``d`` exceeds 255. Cells
-         valued 255 are pure continuation -- they advance the cursor
-         but emit no dot. Every other cell emits the cursor as a
-         ``(x, y)`` fuel-dot position.
+      1. Fuel-dot run-length list -- the map's yellow-pixel fuel
+         atlas. Total RLE byte count is ``X(a[0], a[1])`` (LE u16)
+         and the cells live in ``a[2 : 2+count]``. A 2-D cursor
+         ``(d, e)`` starts at ``(1, 1)``; each byte ``h`` advances
+         ``d`` by ``h``, wrapping to ``e += 1, d %= 256`` whenever
+         ``d`` exceeds 255. Cells valued 255 are pure continuation --
+         they advance the cursor but emit no dot. Every other cell
+         emits the cursor as a ``(x, y)`` fuel-dot position. The
+         atlas is server-cached per session (byte-identical across
+         map opens); ~40% of dots still hold fuel when visited, and
+         every verified dot held high-volume fuel. Restored
+         2026-07-03 (decoded for length only 2026-06-22 to then).
 
       2. Tank entries -- 5 bytes each, packed to the end of the body.
          See :class:`MapTankEntry` for the per-entry layout.
@@ -409,6 +434,7 @@ class MapDataDict(TypedDict):
     """
 
     msg_type: Literal[0x4C]
+    fuel_dots: list[tuple[int, int]]
     tanks: list[MapTankEntry]
 
 
@@ -572,14 +598,6 @@ class OverlayUpdateDict(TypedDict):
 
     msg_type: Literal[0x40]
     updates: list[tuple[int, int, int]]
-
-
-class CombinedTileUpdateDict(TypedDict):
-    """Combined cache+overlay tile patch (0x4F 'O' message)."""
-
-    msg_type: Literal[0x4F]
-    cache_updates: list[tuple[int, int, int]]
-    overlay_updates: list[tuple[int, int, int]]
 
 
 class ViewportEntityDict(TypedDict):
@@ -791,7 +809,6 @@ __all__ = [
     "BuildPickupDict",
     "CacheUpdateDict",
     "ChatMessageDict",
-    "CombinedTileUpdateDict",
     "ConnectionLostDict",
     "DeactivationDict",
     "DecodedMessage",
@@ -811,6 +828,7 @@ __all__ = [
     "PingResponseDict",
     "PromotionDict",
     "RadarContainerDict",
+    "RadarMineClearDict",
     "RadarMineDict",
     "RadarResultDict",
     "RadarScanResultDict",
@@ -858,7 +876,6 @@ BinaryMessage = (
     | SyncDict
     | CacheUpdateDict
     | OverlayUpdateDict
-    | CombinedTileUpdateDict
     | TankEntryDict
     | TankExitDict
     | TankRemoveDict

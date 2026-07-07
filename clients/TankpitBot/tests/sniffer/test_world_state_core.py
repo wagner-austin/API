@@ -116,7 +116,7 @@ class TestWorldStateCore:
         mines: list[RadarMineDict] = []
 
         svc = get_world_service()
-        update_world_state_from_radar(svc, containers, mines)
+        update_world_state_from_radar(svc, containers, mines, [])
 
         assert "50,60" in svc.world_state["containers"]
         assert svc.world_state["containers"]["50,60"]["is_fuel"] is True
@@ -134,7 +134,7 @@ class TestWorldStateCore:
         ]
 
         svc = get_world_service()
-        update_world_state_from_radar(svc, containers, mines)
+        update_world_state_from_radar(svc, containers, mines, [])
 
         assert "70,80" in svc.world_state["mines"]
         assert svc.world_state["mines"]["70,80"]["team"] == 1
@@ -611,5 +611,5 @@ class TestFailedMoveTargets:
         )
 
         mark_move_target_failed(73, 158, 90000)
-        update_world_state_from_radar(get_world_service(), [], [])
+        update_world_state_from_radar(get_world_service(), [], [], [])
         assert is_move_target_failed(73, 158, 100000) is False

@@ -222,15 +222,16 @@ def decode_tank_status(data: bytes) -> TankStatusDict:
 
 
 def _is_radar_scan_structure(inner: bytes) -> bool:
-    """Validate inner 0x4F payload as a radar scan result.
+    """Validate inner 0x4F payload length arithmetic.
 
-    0x4F is shared by RadarScanResult (containers + mines) and
-    CombinedTileUpdate (cache+overlay patches). Without this structural
-    check the radar decoder would consume tile updates.
+    Mirrors JS ``ch.h``: a LE u16 cache-entry count, ``count`` 4-byte
+    cache entries, then a 3-byte-aligned overlay tail. Bodies that fail
+    the arithmetic fall through to the container path as
+    ``unknown_container`` instead of raising mid-dispatch.
     """
     if len(inner) < 2:
         return False
-    container_count = inner[0]
+    container_count = inner[0] | (inner[1] << 8)
     expected_container_bytes = container_count * 4
     if 2 + expected_container_bytes > len(inner):
         return False

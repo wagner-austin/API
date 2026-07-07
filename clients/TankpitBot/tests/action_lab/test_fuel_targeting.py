@@ -34,7 +34,6 @@ class _FindBestFuelProtocol(Protocol):
         self_state: SelfStateDict,
         terrain: TerrainMapProtocol,
         *,
-        now_ms: int,
         minimum_volume: int,
     ) -> ContainerStateDict | None: ...
 
@@ -111,13 +110,11 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
         self_state: SelfStateDict,
         terrain: TerrainMapProtocol,
         *,
-        now_ms: int,
         minimum_volume: int,
     ) -> ContainerStateDict | None:
         captured["world"] = world
         captured["self_state"] = self_state
         captured["terrain"] = terrain
-        captured["now_ms"] = now_ms
         captured["minimum_volume"] = minimum_volume
         return expected
 
@@ -128,7 +125,6 @@ def test_find_visible_fuel_target_uses_current_probe_state() -> None:
     assert result == expected
     assert captured["world"] == probe.get_world_state()
     assert captured["self_state"] == probe.get_self_state()
-    assert captured["now_ms"] == 1500
     assert captured["minimum_volume"] == 1
 
 

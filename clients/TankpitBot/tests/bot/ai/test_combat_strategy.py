@@ -13,7 +13,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
     teleport_to_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, WorldStateDict, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -457,6 +457,65 @@ class TestCombatTeleportGuards:
         assert result["behavior"]["mode"] == "COLLECT"
         assert result["updated_ai_state"]["combat_target_id"] == -1
         assert result["updated_ai_state"]["blocked_combat_targets"] == {}
+
+    def test_teleport_to_target_blocks_when_collect_declines(self) -> None:
+        """An unaffordable target with a fully-exhausted collect cascade
+        blocks and replans instead of exiting the session.
+
+        Live run 2026-07-06 exited ``out_of_fuel`` at fuel 1100 with a
+        stocked tank because the collect cascade could not produce a
+        legal action either. With the ``None`` yield from collect,
+        ``_refuel_for_hunt`` now falls through to
+        :func:`block_combat_target_and_replan` so the tick advances
+        instead of raising.
+
+        Setup: enemy 90 tiles east (teleport unaffordable at fuel 550
+        against the ``fuel_low_threshold`` reserve of 200), viewport
+        fully scanned (forage declines), no visible containers (both
+        pickup branches decline), and an empty dot atlas with a recent
+        map open (``last_map_open_ms=96000`` -> 4000 ms age, inside the
+        default 5000 ms cooldown) so the dot-hop path also declines.
+        Fuel 550 > 200, so collect returns ``None`` rather than raising
+        ``out_of_fuel``.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=190,
+                y=100,
+                team=2,
+                rank=1,
+                name="FarEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=550, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 96000,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=190, y=100, name="FarEnemy"))
+
+        assert result["behavior"]["mode"] == "HUNT"
+        assert result["behavior"]["reason"] == "find_enemies"
+        assert result["updated_ai_state"]["combat_target_id"] == -1
+        assert "50" in result["updated_ai_state"]["blocked_combat_targets"]
+        assert result["updated_ai_state"]["blocked_combat_targets"]["50"] == 100000
 
     def test_teleport_to_target_returns_teleport_for_affordable_close(self) -> None:
         """Combat teleport emits a teleport decision when the landing is affordable."""

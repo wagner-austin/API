@@ -189,6 +189,7 @@ def _process_tick_batch(
         inventory,
         timestamp_ms,
         terrain,
+        map_fuel_dots=get_world_service().map_fuel_dots,
     )
 
     updated_ai_state = decision["updated_ai_state"]

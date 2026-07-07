@@ -53,6 +53,52 @@ rank 7→8: 50,000
 // Tournament exception: Recruits hold 60 each in tournaments (line 265)
 ```
 
+## Fuel (mined 2026-07-06)
+
+```javascript
+// Fuel gauge draw (Gc function): capacity is rank-derived, never on the wire.
+// fill width = 7*fuel/100 px; capacity region = 7*(10+rank) px
+// => FUEL CAPACITY = 100*(10+rank) = 1000 + 100*rank
+// Verified vs user deposits at ranks 1/3/6/7 -- see game-economy.
+
+// Fuel setter (Cc function): display sanity clamp only
+function Cc(a,b){if(0>b||1E4<b)b=0;a.j=b;a.P=!0}
+
+// Fuel gate (ce function): actions blocked at fuel <= 100 with local
+// "Insufficient fuel" log line (never reaches the wire):
+function ce(a){return 100>=a.v.j?(F(a.j,"Insufficient fuel\n",H),Q(a),!1):!0}
+// Gated actions: targeted shot (aim tile holds a tank), mine drop 'k',
+// nearest-enemy 'h', fuel deposit 'D', obstacle pickup.
+// NOT gated: untargeted shot, radar 'f', map open 'l', move, teleport.
+```
+
+## Action dispatch facts (mined 2026-07-06)
+
+```javascript
+// Shoot (Lb, code 's', 6 bytes): x, y, u16 LE target_id.
+// target_id = id of the tank on the aimed tile, else 0 -- clicking a
+// tank's tile IS the homing shot; there is no separate homing mode.
+// Client-side pre-checks (never reach the wire): aim at own tile ->
+// silent abort; aim at teammate -> local "Friendly fire!" line.
+// A wire 0x52 code-3 therefore only occurs on races (tank moved onto
+// the tile after dispatch).
+
+// Fuel deposit (Wb, code 'D' = 0x44, 6 bytes): x, y, u16 LE amount.
+// Amount accumulates during long-press, clamps to current fuel.
+// Server enforces the 100-fuel floor (max deposit = capacity - 100).
+
+// Radar (Mb, code 'f'): no client fuel gate; sets a client-side
+// cooldown counter (this.ca = 50) on dispatch. Units unconfirmed.
+
+// Long-press action resolver (be function): tile cache > 0 -> "GET FUEL",
+// cache < 0 -> "GET EQUIPMENT", empty tile + accumulated amount ->
+// "DEPOSIT FUEL: N". Confirms the tile-cache sign convention.
+
+// Obstacle carrying exists (unused by bot): "PICK UP OBSTACLE" needs
+// fuel > 100 and tile flag bit 2; "DROP OBSTACLE" / "BUILD BRIDGE"
+// (obstacle onto water, overlay bits 32===(i&112)) via Tb, code 'b'.
+```
+
 ## Error Strings
 
 ```javascript

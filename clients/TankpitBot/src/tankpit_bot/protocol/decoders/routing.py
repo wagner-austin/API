@@ -7,7 +7,6 @@ from tankpit_bot.protocol.constants import (
     MSG_ACTIVE_FORCES,
     MSG_ACTIVE_PLAYERS,
     MSG_BUILD_PICKUP,
-    MSG_CACHE_OVERLAY_UPDATE,
     MSG_CACHE_UPDATE,
     MSG_CHAT,
     MSG_DEACTIVATE,
@@ -26,6 +25,7 @@ from tankpit_bot.protocol.constants import (
     MSG_PING,
     MSG_PROMOTION,
     MSG_RADAR_RESULT,
+    MSG_RADAR_SCAN,
     MSG_SHOOT,
     MSG_STATISTICS,
     MSG_SUPERVISOR,
@@ -53,6 +53,7 @@ from tankpit_bot.protocol.decoders.movement import (
 from tankpit_bot.protocol.decoders.radar import (
     decode_enemy_detection,
     decode_radar_result,
+    decode_radar_scan_result,
 )
 from tankpit_bot.protocol.decoders.resources import (
     decode_equipment_gain,
@@ -84,7 +85,6 @@ from tankpit_bot.protocol.decoders.tank import (
 )
 from tankpit_bot.protocol.decoders.world import (
     decode_cache_update,
-    decode_combined_tile_update,
     decode_overlay_update,
     decode_supervisor,
     decode_supervisor_text,
@@ -125,6 +125,13 @@ def _decode_radar_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_radar_result(data)
     if msg_type == MSG_ENEMY_DETECT:
         return decode_enemy_detection(data)
+    if msg_type == MSG_RADAR_SCAN:
+        # 0x4F has a single wire personality (JS handler ch / V.O): a
+        # batch of per-tile cache + overlay writes, used by the server
+        # as the radar response. Corpus 2026-07-03 (199 sessions): all
+        # 1817 bodies arrived tunneled inside 0x2E; this top-level
+        # route keeps decode_message total over every message byte.
+        return decode_radar_scan_result(data)
     return None
 
 
@@ -166,8 +173,6 @@ def _decode_world_message(msg_type: int, data: bytes) -> BinaryMessage | None:
         return decode_cache_update(data)
     if msg_type == MSG_OVERLAY_UPDATE:
         return decode_overlay_update(data)
-    if msg_type == MSG_CACHE_OVERLAY_UPDATE:
-        return decode_combined_tile_update(data)
     if msg_type == MSG_SYNC:
         return decode_sync(data)
     if msg_type == MSG_MAP_DATA:

@@ -259,7 +259,7 @@ class TestContainerPickup:
         # Add a container via radar
         containers: list[RadarContainerDict] = [RadarContainerDict(x=50, y=60, volume=100)]
         mines: list[RadarMineDict] = []
-        update_world_state_from_radar(get_world_service(), containers, mines)
+        update_world_state_from_radar(get_world_service(), containers, mines, [])
 
         state = get_world_service().world_state
         assert "50,60" in state["containers"]
@@ -293,7 +293,7 @@ class TestRadarViewportReconciliation:
         ws.world_state["viewport"]["left"] = 100
         ws.world_state["viewport"]["top"] = 200
 
-        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [], [])
 
         assert ws.world_state["scanned_tiles"]["100,200"] > 0
 
@@ -312,7 +312,7 @@ class TestRadarViewportReconciliation:
 
         assert is_scan_viewport_failed(100, 200, 1001) is True
 
-        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=101, y=201, volume=500)], [], [])
 
         assert is_scan_viewport_failed(100, 200, 1001) is False
 
@@ -337,7 +337,7 @@ class TestRadarViewportReconciliation:
             volume=600,
         )
 
-        update_world_state_from_radar(ws, [RadarContainerDict(x=102, y=202, volume=700)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=102, y=202, volume=700)], [], [])
 
         assert "101,201" not in ws.world_state["containers"]
         assert "102,202" in ws.world_state["containers"]
@@ -363,7 +363,7 @@ class TestRadarViewportReconciliation:
             volume=600,
         )
 
-        update_world_state_from_radar(ws, [], [])
+        update_world_state_from_radar(ws, [], [], [])
 
         assert "101,201" not in ws.world_state["containers"]
         assert "102,202" not in ws.world_state["containers"]
@@ -399,7 +399,7 @@ class TestRadarViewportReconciliation:
             source="radar",
         )
 
-        update_world_state_from_radar(ws, [], [RadarMineDict(x=102, y=202, team=1)])
+        update_world_state_from_radar(ws, [], [RadarMineDict(x=102, y=202, team=1)], [])
 
         assert "101,201" not in ws.world_state["mines"]
         assert "102,202" in ws.world_state["mines"]
@@ -429,7 +429,7 @@ class TestRadarViewportReconciliation:
             source="radar",
         )
 
-        update_world_state_from_radar(ws, [], [])
+        update_world_state_from_radar(ws, [], [], [])
 
         assert "101,201" not in ws.world_state["mines"]
         assert "102,202" not in ws.world_state["mines"]
@@ -460,6 +460,7 @@ class TestRadarViewportReconciliation:
             ws,
             [RadarContainerDict(x=101, y=201, volume=500)],
             [RadarMineDict(x=102, y=202, team=2)],
+            [],
         )
 
         assert "101,201" in ws.world_state["containers"]

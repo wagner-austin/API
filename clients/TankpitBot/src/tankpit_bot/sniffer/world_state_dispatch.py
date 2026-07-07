@@ -223,7 +223,11 @@ def _record_enemy_aim(
     )
 
 
-def _dispatch_map_data(ws: WorldService, tanks: list[protocol.MapTankEntry]) -> None:
+def _dispatch_map_data(
+    ws: WorldService,
+    tanks: list[protocol.MapTankEntry],
+    fuel_dots: list[tuple[int, int]],
+) -> None:
     """Apply a 0x4C MapData snapshot to world state.
 
     Every tank slot is lifted into world state via the observation
@@ -249,6 +253,9 @@ def _dispatch_map_data(ws: WorldService, tanks: list[protocol.MapTankEntry]) -> 
         ws: World service instance.
         tanks: Decoded :class:`protocol.MapTankEntry` slots, one per
             tank visible on the map.
+        fuel_dots: Decoded skip-RLE fuel-dot atlas positions. The
+            atlas is server-cached per session, so this simply
+            overwrites the stored copy on every map open.
     """
     from tankpit_bot.state.types import make_tank_observation
 
@@ -268,10 +275,12 @@ def _dispatch_map_data(ws: WorldService, tanks: list[protocol.MapTankEntry]) -> 
         from tankpit_bot.state.mutations import apply_tank_observation
 
         ws.world_state = apply_tank_observation(ws.world_state, obs)
+    ws.map_fuel_dots = tuple(fuel_dots)
     ws.mark_map_data_processed()
     emit_diagnostic(
         diagnostic_kind="map_data_snapshot",
         tank_count=len(tanks),
+        fuel_dot_count=len(fuel_dots),
     )
 
 
@@ -932,15 +941,20 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
                 error_code=error_code,
             )
             return
-        case {"msg_type": 0x4F, "containers": list(containers), "mines": list(mines)}:
-            if not containers and not mines:
+        case {
+            "msg_type": 0x4F,
+            "containers": list(containers),
+            "mines": list(mines),
+            "mine_clears": list(mine_clears),
+        }:
+            if not containers and not mines and not mine_clears:
                 ws.mark_pending_radar_empty_delta()
             else:
-                update_world_state_from_radar(ws, containers, mines)
+                update_world_state_from_radar(ws, containers, mines, mine_clears)
                 render_ascii_if_available(ws, "Radar")
             return
-        case {"msg_type": 0x4C, "tanks": list(map_tanks)}:
-            _dispatch_map_data(ws, map_tanks)
+        case {"msg_type": 0x4C, "fuel_dots": list(fuel_dots), "tanks": list(map_tanks)}:
+            _dispatch_map_data(ws, map_tanks, fuel_dots)
             return
 
 

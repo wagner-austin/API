@@ -11,3 +11,4 @@ Fighting strategy, weapon behavior, enemy AI patterns, and diagnosed combat bugs
 [Equipment Refill Strategy](../pages/equipment-refill-strategy.md) -- low-radar grid walk, extra radar conservation, container randomness
 [Mine Mechanics](../pages/mine-mechanics.md) -- 3x3 placement filter, mine-on-mine destruction, cascade chain detonation, real-combat wire evidence 2026-06-20
 [Game Economy](../pages/game-economy.md) -- empirical fuel costs (walk 1/tile, single shot 6, radar 10), damage taken (single 45, dual 90, mine 45), max fuel cap 1100, container_pickup remaining_volume semantic (2026-06-20)
+[Tournament Strategy (Sigma v3.4)](../pages/tournament-strategy.md) -- preserved 2015 human tournament meta: initial fill, fill-fighting, kill types, PPH, equipment management, endgame shield-fighting

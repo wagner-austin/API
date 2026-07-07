@@ -72,7 +72,7 @@ class TestBotWithWorldState:
             RadarContainerDict(x=10, y=20, volume=100),
             RadarContainerDict(x=30, y=40, volume=200),
         ]
-        update_world_state_from_radar(get_world_service(), containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [], [])
         bot = Bot("https://test.tankpit.com/", headless=True)
         fuel_containers = bot.get_fuel_containers()
         assert len(fuel_containers) == 2
@@ -93,7 +93,7 @@ class TestBotWithWorldState:
             RadarContainerDict(x=60, y=60, volume=200),  # Distance: 20
             RadarContainerDict(x=100, y=100, volume=300),  # Distance: 100
         ]
-        update_world_state_from_radar(get_world_service(), containers, [])
+        update_world_state_from_radar(get_world_service(), containers, [], [])
         bot = Bot("https://test.tankpit.com/", headless=True)
         nearest = bot.get_nearest_fuel_container()
         # Type guard: fail test if None

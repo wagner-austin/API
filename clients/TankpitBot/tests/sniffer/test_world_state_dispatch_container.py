@@ -94,7 +94,7 @@ class TestDispatchTilePatchUpdates:
             raise AssertionError("self_state should not be None")
         self_state["fuel"] = 250
 
-        update_world_state_from_radar(ws, [RadarContainerDict(x=33, y=44, volume=600)], [])
+        update_world_state_from_radar(ws, [RadarContainerDict(x=33, y=44, volume=600)], [], [])
         assert "33,44" in ws.world_state["containers"]
 
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 0)]))
@@ -105,18 +105,24 @@ class TestDispatchTilePatchUpdates:
             raise AssertionError("self_state should not be None")
         assert self_state["fuel"] == 250
 
-    def test_dispatch_combined_tile_update_applies_cache_and_overlay_sections(self) -> None:
-        """Top-level 0x4F applies both cache and overlay sections to their registries."""
-        from tankpit_bot.protocol import CombinedTileUpdateDict, TerrainUpdateDict
+    def test_dispatch_radar_scan_result_applies_container_and_mine_sections(self) -> None:
+        """A 0x4F radar scan result lands both entry kinds in their registries."""
+        from tankpit_bot.protocol import (
+            RadarContainerDict,
+            RadarMineDict,
+            RadarScanResultDict,
+            TerrainUpdateDict,
+        )
 
         ws = get_world_service()
         dispatch_world_state_update(ws, TerrainUpdateDict(msg_type=0x4A, updates=[(90, 91, 4)]))
         dispatch_world_state_update(
             ws,
-            CombinedTileUpdateDict(
+            RadarScanResultDict(
                 msg_type=0x4F,
-                cache_updates=[(90, 91, -1)],
-                overlay_updates=[(90, 91, 3)],
+                containers=[RadarContainerDict(x=90, y=91, volume=-1)],
+                mines=[RadarMineDict(x=90, y=91, team=3)],
+                mine_clears=[],
             ),
         )
 
@@ -124,10 +130,10 @@ class TestDispatchTilePatchUpdates:
         assert tile["terrain_type"] == 4
         container = ws.world_state["containers"]["90,91"]
         assert container["is_fuel"] is False
-        assert container["source"] == "viewport"
+        assert container["source"] == "radar"
         mine = ws.world_state["mines"]["90,91"]
         assert mine["team"] == 3
-        assert mine["source"] == "viewport"
+        assert mine["source"] == "radar"
 
 
 class TestDispatchShootEvent:
@@ -462,11 +468,7 @@ class TestIncrementContainerFailedPickups:
         from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
 
         ws = get_world_service()
-        update_world_state_from_radar(
-            ws,
-            [RadarContainerDict(x=50, y=60, volume=100)],
-            [],
-        )
+        update_world_state_from_radar(ws, [RadarContainerDict(x=50, y=60, volume=100)], [], [])
         assert ws.world_state["containers"]["50,60"]["failed_pickups"] == 0
         increment_container_failed_pickups(ws, 50, 60)
         assert ws.world_state["containers"]["50,60"]["failed_pickups"] == 1
@@ -498,11 +500,7 @@ class TestRemoveContainerAt:
         from tankpit_bot.sniffer.world_state_containers import remove_container_at
 
         ws = get_world_service()
-        update_world_state_from_radar(
-            ws,
-            [RadarContainerDict(x=50, y=60, volume=100)],
-            [],
-        )
+        update_world_state_from_radar(ws, [RadarContainerDict(x=50, y=60, volume=100)], [], [])
         assert "50,60" in ws.world_state["containers"]
         remove_container_at(ws, 50, 60)
         assert "50,60" not in ws.world_state["containers"]

@@ -211,7 +211,7 @@ class TestAIConfig:
         assert len(config["patrol_waypoints"]) == 4
         assert config["dual_break_threshold"] == 4
         assert config["dual_resume_threshold"] == 25
-        assert config["equip_search_hop_distance"] == 16
+        assert config["engagement_fuel_budget"] == 450
 
     def test_encode_decode_roundtrip(self) -> None:
         """Encode then decode produces identical AIConfigDict."""
@@ -234,7 +234,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
             "dual_resume_threshold": 25,
-            "equip_search_hop_distance": 15,
             "patrol_waypoints": "not_a_list",
         }
         with pytest.raises(ValueError, match="must be a list"):
@@ -254,7 +253,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
             "dual_resume_threshold": 25,
-            "equip_search_hop_distance": 15,
             "patrol_waypoints": [[1, 2, 3]],
         }
         with pytest.raises(ValueError, match="must be"):
@@ -274,7 +272,6 @@ class TestAIConfig:
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
             "dual_resume_threshold": 25,
-            "equip_search_hop_distance": 15,
             "patrol_waypoints": [["a", "b"]],
         }
         with pytest.raises(ValueError, match="must be int"):
@@ -325,7 +322,6 @@ class TestAIState:
             dual_resume_threshold=config["dual_resume_threshold"],
             radar_break_threshold=config["radar_break_threshold"],
             radar_resume_threshold=config["radar_resume_threshold"],
-            equip_search_hop_distance=config["equip_search_hop_distance"],
             engagement_fuel_budget=config["engagement_fuel_budget"],
             patrol_waypoints=config["patrol_waypoints"],
         )
