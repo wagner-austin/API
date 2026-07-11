@@ -84,11 +84,24 @@ def _chrome_stream_display_args() -> list[str]:
     x, y, w, h = values
     if w <= 0 or h <= 0:
         return []
-    _ = w
-    _ = h
+    # KEY: use --window-size, NOT --start-maximized.
+    #
+    # Playwright issue microsoft/playwright#14314 (confirmed against
+    # tankpit-sniff 2026-07-10): when both --window-position and
+    # --start-maximized are passed, Chromium opens at the position
+    # but skips the maximize entirely — the window comes up at the
+    # default 800x600. Selenium doesn't have this bug; Playwright's
+    # Chromium wrapping does. --window-size=W,H sized to the display
+    # rect sidesteps the bug: the window is the same visual result
+    # as maximized (fills the display) without hitting the
+    # position+maximized interaction.
+    #
+    # ``no_viewport=True`` on ``new_context()`` (below) prevents
+    # Playwright's default 1280x720 viewport from clamping the
+    # content down inside the correctly-sized window.
     return [
         f"--window-position={x},{y}",
-        "--start-maximized",
+        f"--window-size={w},{h}",
     ]
 
 
