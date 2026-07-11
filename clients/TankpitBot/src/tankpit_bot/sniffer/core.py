@@ -6,6 +6,7 @@ WebSocket traffic from TankPit using Playwright and CDP.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, dump_json_str
@@ -49,6 +50,44 @@ from tankpit_bot.types import (
 )
 
 log = get_logger(__name__)
+
+
+def _chrome_stream_display_args() -> list[str]:
+    """Build Chromium args positioning the browser on the streamed virtual display.
+
+    Reads SUNSHINE_STREAM_DISPLAY_X/Y/W/H env vars set by Vibeshine's
+    ``run_command`` handler when a WebRTC session forks a launcher-button
+    command (see ``vibeshine/src/webrtc_stream.cpp::launch_run_command_on_user_desktop``).
+    When set, they carry the virtual monitor's position and size in the
+    Windows virtual-desktop coordinate space; passing them as
+    ``--window-position`` + ``--window-size`` puts Chrome on the phone-
+    streamed display instead of the primary monitor.
+
+    Returns an empty list when any var is missing or unparseable — Chrome
+    falls back to its last-used or default position.
+    """
+    keys = (
+        "SUNSHINE_STREAM_DISPLAY_X",
+        "SUNSHINE_STREAM_DISPLAY_Y",
+        "SUNSHINE_STREAM_DISPLAY_W",
+        "SUNSHINE_STREAM_DISPLAY_H",
+    )
+    values: list[int] = []
+    for k in keys:
+        raw = os.environ.get(k)
+        if raw is None:
+            return []
+        try:
+            values.append(int(raw))
+        except ValueError:
+            return []
+    x, y, w, h = values
+    if w <= 0 or h <= 0:
+        return []
+    return [
+        f"--window-position={x},{y}",
+        f"--window-size={w},{h}",
+    ]
 
 
 def _log_js_fuel_findings(result: JSONObject) -> None:
@@ -296,8 +335,12 @@ class WebSocketSniffer(BrowserSession):
         self._ws_urls = {}
         self._magic = None
 
+        launch_args = _chrome_stream_display_args()
         with _test_hooks.sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=self._headless)
+            browser = playwright.chromium.launch(
+                headless=self._headless,
+                args=launch_args,
+            )
             context = browser.new_context()
             page = context.new_page()
             cdp = context.new_cdp_session(page)

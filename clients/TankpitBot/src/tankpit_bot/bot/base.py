@@ -38,6 +38,7 @@ from tankpit_bot.diagnostics.account_stats import (
     parse_account_stats,
 )
 from tankpit_bot.runtime_logging import emit_state
+from tankpit_bot.sniffer.core import _chrome_stream_display_args
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -338,8 +339,12 @@ class Bot(DispatchMixin):
         self._ai_state = make_initial_ai_state()
         self._cdp_message_buffer = []
 
+        launch_args = _chrome_stream_display_args()
         with _test_hooks.sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=self._headless)
+            browser = playwright.chromium.launch(
+                headless=self._headless,
+                args=launch_args,
+            )
             context = browser.new_context()
             page = context.new_page()
             cdp = context.new_cdp_session(page)
