@@ -41,6 +41,7 @@ from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.core import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
+    _maximize_via_cdp,
 )
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
@@ -355,6 +356,8 @@ class Bot(DispatchMixin):
             )
             page = context.new_page()
             cdp = context.new_cdp_session(page)
+            if _chrome_stream_no_viewport():
+                _maximize_via_cdp(cdp)
 
             self._cdp = cdp
             self._page = page

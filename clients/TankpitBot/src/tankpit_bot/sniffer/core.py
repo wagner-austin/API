@@ -105,6 +105,43 @@ def _chrome_stream_display_args() -> list[str]:
     ]
 
 
+def _maximize_via_cdp(cdp: object) -> None:
+    """Flip the current window to the OS-level maximized state via CDP.
+
+    ``--window-position=X,Y --window-size=W,H`` (see
+    ``_chrome_stream_display_args``) puts Chromium on the streamed
+    display at the correct dimensions, but the WINDOW STATE is
+    still "normal" (a floating window that happens to be display-
+    sized), not "maximized" (the OS-recognised maximised state).
+    User report 2026-07-10: "it was large didnt use the official
+    maximize function".
+
+    ``Browser.setWindowBounds`` with ``bounds.windowState =
+    "maximized"`` is Chrome DevTools Protocol's supported way to
+    trigger the actual maximise. --start-maximized would do the
+    same but conflicts with --window-position (Playwright issue
+    microsoft/playwright#14314). CDP after launch sidesteps that
+    conflict.
+
+    Failures are logged and swallowed — a Playwright/Chromium
+    version that renames or reshapes the CDP surface shouldn't
+    take the sniff down. The window stays large + on the target
+    display, just not in the OS-maximised state.
+    """
+    try:
+        window = cdp.send("Browser.getWindowForTarget")  # type: ignore[attr-defined]
+        window_id = window.get("windowId") if isinstance(window, dict) else None
+        if window_id is None:
+            log.warning("Chromium maximize skipped: no windowId from Browser.getWindowForTarget")
+            return
+        cdp.send(  # type: ignore[attr-defined]
+            "Browser.setWindowBounds",
+            {"windowId": window_id, "bounds": {"windowState": "maximized"}},
+        )
+    except Exception as exc:  # noqa: BLE001 — CDP surface is external, catch broadly
+        log.warning("Chromium maximize via CDP failed: %s", exc)
+
+
 def _chrome_stream_no_viewport() -> bool:
     """True when the launch is targeting the streamed virtual display.
 
@@ -380,6 +417,8 @@ class WebSocketSniffer(BrowserSession):
             )
             page = context.new_page()
             cdp = context.new_cdp_session(page)
+            if _chrome_stream_no_viewport():
+                _maximize_via_cdp(cdp)
 
             # Reset session state for new session
             reset_cdp_time_offset()
