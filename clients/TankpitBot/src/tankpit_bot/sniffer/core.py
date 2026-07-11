@@ -84,9 +84,18 @@ def _chrome_stream_display_args() -> list[str]:
     x, y, w, h = values
     if w <= 0 or h <= 0:
         return []
+    # --window-position pins Chromium to the streamed virtual display;
+    # --start-maximized fills that display's work area (2026-07-10:
+    # --window-size opened at the right position but the OUTER
+    # window dimensions include Chromium's chrome — title bar + tab
+    # strip — so the content area came up smaller than the display).
+    # Keep w/h in the return path for debug logging / future callers
+    # that specifically want a non-maximized sized window.
+    _ = w
+    _ = h
     return [
         f"--window-position={x},{y}",
-        f"--window-size={w},{h}",
+        "--start-maximized",
     ]
 
 
