@@ -59,9 +59,9 @@ def _chrome_stream_display_args() -> list[str]:
     ``run_command`` handler when a WebRTC session forks a launcher-button
     command (see ``vibeshine/src/webrtc_stream.cpp::launch_run_command_on_user_desktop``).
     When set, they carry the virtual monitor's position and size in the
-    Windows virtual-desktop coordinate space; passing them as
-    ``--window-position`` + ``--window-size`` puts Chrome on the phone-
-    streamed display instead of the primary monitor.
+    Windows virtual-desktop coordinate space; ``--window-position``
+    pins the browser onto that display and ``--start-maximized`` fills
+    the display's work area.
 
     Returns an empty list when any var is missing or unparseable — Chrome
     falls back to its last-used or default position.
@@ -84,19 +84,29 @@ def _chrome_stream_display_args() -> list[str]:
     x, y, w, h = values
     if w <= 0 or h <= 0:
         return []
-    # --window-position pins Chromium to the streamed virtual display;
-    # --start-maximized fills that display's work area (2026-07-10:
-    # --window-size opened at the right position but the OUTER
-    # window dimensions include Chromium's chrome — title bar + tab
-    # strip — so the content area came up smaller than the display).
-    # Keep w/h in the return path for debug logging / future callers
-    # that specifically want a non-maximized sized window.
     _ = w
     _ = h
     return [
         f"--window-position={x},{y}",
         "--start-maximized",
     ]
+
+
+def _chrome_stream_no_viewport() -> bool:
+    """True when the launch is targeting the streamed virtual display.
+
+    Playwright's ``browser.new_context()`` defaults to a fixed
+    1280x720 viewport that OVERRIDES Chromium's ``--start-maximized``
+    (2026-07-10 user report: browser opened at the right position
+    but the content clamped to 1280x720). Passing
+    ``no_viewport=True`` on the context disables that clamp and lets
+    the natural (maximized) window size drive the viewport.
+
+    Gated on the same SUNSHINE_STREAM_DISPLAY_* env vars as the
+    Chromium args so a local ``make sniff`` (no env vars) keeps the
+    stable 1280x720 test viewport it always had.
+    """
+    return bool(_chrome_stream_display_args())
 
 
 def _log_js_fuel_findings(result: JSONObject) -> None:
@@ -350,7 +360,11 @@ class WebSocketSniffer(BrowserSession):
                 headless=self._headless,
                 args=launch_args,
             )
-            context = browser.new_context()
+            context = (
+                browser.new_context(no_viewport=True)
+                if _chrome_stream_no_viewport()
+                else browser.new_context()
+            )
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 

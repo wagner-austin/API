@@ -38,7 +38,10 @@ from tankpit_bot.diagnostics.account_stats import (
     parse_account_stats,
 )
 from tankpit_bot.runtime_logging import emit_state
-from tankpit_bot.sniffer.core import _chrome_stream_display_args
+from tankpit_bot.sniffer.core import (
+    _chrome_stream_display_args,
+    _chrome_stream_no_viewport,
+)
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage
@@ -345,7 +348,11 @@ class Bot(DispatchMixin):
                 headless=self._headless,
                 args=launch_args,
             )
-            context = browser.new_context()
+            context = (
+                browser.new_context(no_viewport=True)
+                if _chrome_stream_no_viewport()
+                else browser.new_context()
+            )
             page = context.new_page()
             cdp = context.new_cdp_session(page)
 
