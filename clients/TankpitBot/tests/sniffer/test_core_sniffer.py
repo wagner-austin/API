@@ -92,6 +92,37 @@ def test_websocket_sniffer_magic_none_when_not_available(fake_fs: FakeFileSystem
     assert session["magic"] is None
 
 
+def test_websocket_sniffer_run_maximises_via_cdp_on_streamed_display(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """The streamed-display path issues Browser.setWindowBounds via CDP.
+
+    When Vibeshine's launcher sets ``SUNSHINE_STREAM_DISPLAY_*``, the
+    sniffer must (a) skip the default viewport clamp on new_context and
+    (b) post-launch flip the window to the OS-maximised state via CDP.
+    Exercised through the ``FakeEnv`` + fake sync-playwright pair.
+    """
+    from tests.conftest import FakeEnv
+
+    _test_hooks.sync_playwright = fake_sync_playwright
+    _test_hooks.get_env = FakeEnv(
+        {
+            "SUNSHINE_STREAM_DISPLAY_X": "0",
+            "SUNSHINE_STREAM_DISPLAY_Y": "0",
+            "SUNSHINE_STREAM_DISPLAY_W": "1920",
+            "SUNSHINE_STREAM_DISPLAY_H": "1080",
+        }
+    )
+
+    sniffer = WebSocketSniffer("https://tankpit.com")
+    session = sniffer.run(1000)
+
+    # The fake accepts the run and the sniff still captures messages;
+    # if _maximize_via_cdp did not receive a ``windowId`` from the fake
+    # CDP session the run would raise JSONTypeError instead of returning.
+    assert session["base_url"] == "https://tankpit.com"
+
+
 # =============================================================================
 # Error Class Tests
 # =============================================================================

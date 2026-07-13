@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_mode import (
+    _hop_toward_equipment,
     decide_collect_mode,
     select_equipment_target,
 )
@@ -243,6 +244,10 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     ignored it and hopped away. This test pins that the bot now
     walks to the in-viewport fuel before bailing.
     """
+    # Fuel + volume chosen so the projected pickup fits under cap:
+    # corporal cap is 1200, fuel 800, walk 10 tiles, volume 300 -->
+    # 800 + 10 + min(300, 400) = 1110 <= 1200. Overflow-refusal is
+    # covered by ``_would_overfill`` tests in test_collect_mode_fuel.py.
     world, self_state = make_world(
         fuel=800,
         scanned=True,
@@ -251,7 +256,7 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
                 x=105,
                 y=105,
                 is_fuel=True,
-                volume=900,
+                volume=300,
                 timestamp_ms=100000,
                 failed_pickups=0,
             ),
@@ -273,7 +278,7 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "fuel=900"
+    assert decision["behavior"]["reason"] == "fuel=300"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
@@ -681,3 +686,143 @@ def test_select_skips_previously_blacklisted_container() -> None:
 
     result = select_equipment_target(ctx)
     assert result is None
+
+
+def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() -> None:
+    """The equipment hop step picks the nearest external equipment container.
+
+    Two equipment containers sit outside the current viewport
+    (default 92-107 around bot at 100,100): one at (130,100) with
+    teleport cost 180, one at (150,100) with teleport cost 300. Bot
+    at fuel 1200 (corporal cap) and under-armed inventory forces the
+    hop step to fire; both teleports leave the 650 engagement
+    reserve behind so both are affordable candidates. The step ranks
+    by teleport cost and picks (130,100) -- exercising the
+    ``best_container is not None AND cost >= best_cost`` branch when
+    the (150,100) candidate is considered and rejected as more
+    expensive.
+    """
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "150,100": make_container_state(
+            x=150,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain = InMemoryTerrainMap()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = _hop_toward_equipment(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected equipment-hop decision")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 130
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason"] == "equipment_hop"
+
+
+def test_hop_toward_equipment_skips_in_viewport_containers() -> None:
+    """The equipment hop step ignores containers inside the current viewport.
+
+    Step 3 of the cascade (``_select_and_pickup_equipment``) already
+    handles viewport-local equipment. The hop step reaches for
+    tracked equipment elsewhere on the map; when every tracked
+    container sits inside the current viewport bounds, the hop
+    declines and the cascade falls through to the search-hop path.
+    """
+    containers = {
+        "105,105": make_container_state(
+            x=105,
+            y=105,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain = InMemoryTerrainMap()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = _hop_toward_equipment(ctx, ctx.base)
+
+    assert decision is None
+
+
+def test_hop_toward_equipment_skips_when_teleport_unaffordable() -> None:
+    """The equipment hop step declines when every teleport leaves under-reserve.
+
+    Engagement reserve is ``engagement_fuel_budget(450) +
+    fuel_low_threshold(200) = 650``. A teleport from (100,100) to
+    (200,100) costs 600; at fuel 1000 the post-teleport residual is
+    400, which is below the 650 reserve. The step considers the
+    candidate, rejects the affordability check, and returns None.
+    """
+    containers = {
+        "200,100": make_container_state(
+            x=200,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1000, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain = InMemoryTerrainMap()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = _hop_toward_equipment(ctx, ctx.base)
+
+    assert decision is None
+
+
+def test_hop_toward_equipment_skips_when_landing_tile_impassable() -> None:
+    """The equipment hop step skips containers with no legal landing tile.
+
+    Container at (150,100) with the container tile and all four
+    cardinal neighbors marked water: ``find_teleport_landing_tile``
+    returns None for this container, the loop continues to the next
+    candidate (of which there are none), and the step returns None.
+    """
+    containers = {
+        "150,100": make_container_state(
+            x=150,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain_data: dict[tuple[int, int], str] = {
+        (150, 100): "W",
+        (149, 100): "W",
+        (151, 100): "W",
+        (150, 99): "W",
+        (150, 101): "W",
+    }
+    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = _hop_toward_equipment(ctx, ctx.base)
+
+    assert decision is None

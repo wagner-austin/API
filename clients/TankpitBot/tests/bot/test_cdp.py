@@ -1148,11 +1148,9 @@ class TestBotEquipmentManagement:
             update_world_state_from_position,
         )
         from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
-        from tankpit_bot.state import apply_tank_observation
         from tankpit_bot.state.types import (
             SelfStateDict,
             WorldStateDict,
-            make_tank_observation,
         )
         from tests.fakes import FakeCDPSession
 
@@ -1162,23 +1160,12 @@ class TestBotEquipmentManagement:
         update_inventory_from_protocol(
             get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
         )
-        # The tracked tank sits at a different tile than the shoot command
-        # targets, so the executor's structural re-check rejects the shoot
-        # (the target drifted between decision and dispatch).
-        get_world_service().world_state = apply_tank_observation(
-            get_world_service().world_state,
-            make_tank_observation(
-                tank_id=10,
-                timestamp_ms=1000,
-                is_wire_sourced=True,
-                storage_source="viewport",
-                position=(105, 100),
-                team=2,
-                rank=1,
-                name="enemy",
-                is_bot=False,
-            ),
-        )
+        # The target_id is not in the tank registry, so the executor's
+        # tank-existence race guard rejects the shoot (the tank vanished
+        # from the registry between planner-decide and dispatch). This is
+        # the only remaining executor-side shoot rejection path -- aim/tank
+        # position drift is intentional under the viewport-clamped-aim
+        # mechanic and no longer rejected.
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp = FakeCDPSession()

@@ -736,19 +736,22 @@ class TestClearCommandError:
         container = ws.world_state["containers"]["150,150"]
         assert container["failed_pickups"] == 1
 
-    def test_command_error_tank_full_marks_failed_pickup(self, fake_env: FakeEnv) -> None:
-        """A 0x52 ``Tank full`` (code 5) is handled as a normal collect rejection.
+    def test_command_error_tank_full_does_not_mark_failed_pickup(self, fake_env: FakeEnv) -> None:
+        """A 0x52 ``Tank full`` (code 5) clears the action WITHOUT blacklisting.
 
-        The old branch that kept the container and fed a learned-capacity
-        watermark was retired 2026-07-06 when fuel capacity became
-        rank-derived (see :mod:`tankpit_bot.state.rank_formulas`). Fuel
-        selection and fuel-lock continuation both gate on
-        ``fuel >= fuel_capacity(rank)`` before dispatching, so a wire
-        code-5 here means the pickup was dispatched anyway (rank-up race
-        between decision and dispatch, or a protocol quirk). Marking the
-        container as a failed pickup is the correct response: the planner
-        drops it from the candidate set until a radar refresh, and the
-        pickup loop can never recur.
+        Bug 0.3 (2026-07-06): a code=5 rejection means the container
+        was not empty -- the server refused the transfer because the
+        tank could not accept it. Under Bug 0.2's ``_would_overfill``
+        pre-dispatch gate the overflow scenario cannot occur in the
+        normal flow, so a surviving code=5 is a race between
+        planner-time and dispatch-time fuel state. Blacklisting a
+        still-full container is wrong -- next tick with headroom will
+        successfully consume it. The in-flight action is still
+        cleared (the planner replans this tick) but ``failed_pickups``
+        stays at 0 so the container remains a candidate. Pre-fix
+        behavior: the 22:37 fuel-loop's four consecutive
+        partial-transfer + code=5 events blacklisted four still-full
+        fuel containers.
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
@@ -797,7 +800,7 @@ class TestClearCommandError:
         assert bot.get_state() == "IDLE"
         assert ws.last_command_error == -1
         container = ws.world_state["containers"]["150,150"]
-        assert container["failed_pickups"] == 1
+        assert container["failed_pickups"] == 0
 
     def test_command_error_clears_teleport_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't go there!`` aborts a pending teleport in < 1 s."""

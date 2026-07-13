@@ -406,12 +406,15 @@ class TestEquipmentSearchHopFallback:
         assert exc_info.value.reason == "out_of_fuel"
 
     def test_exhausted_collect_yields_to_hunt_at_healthy_fuel(self) -> None:
-        """An exhausted COLLECT cascade hands the tick to HUNT when fuel is healthy.
+        """An exhausted COLLECT cascade hands the tick to HUNT when combat-ready.
 
         Same marooned setup but fuel 550 > ``fuel_low_threshold``
-        (200): the tank is stocked, so instead of a bogus
-        ``out_of_fuel`` exit (live run 2026-07-06 exited at fuel 1100
-        this way) the tick falls through to the hunt owner.
+        (200) AND inventory at combat-ready (Bug 0.4: recruit needs
+        duals/homings at ``inventory_capacity(0) = 20`` and radars at
+        least ``combat_radar_min(0) = 15``): the tank is stocked, so
+        instead of a bogus ``out_of_fuel`` exit (live run 2026-07-06
+        exited at fuel 1100 this way) the tick falls through to the
+        hunt owner.
         """
         world, self_state = _make_world(fuel=550, scanned=True)
         ai_state = AIStateDict(
@@ -422,7 +425,7 @@ class TestEquipmentSearchHopFallback:
                 "mode_started_ms": 90000,
             }
         )
-        inventory = _make_inventory(default_count=15, radar_count=13)
+        inventory = _make_inventory(default_count=20, radar_count=15)
 
         decision = decide(
             world,
@@ -435,6 +438,41 @@ class TestEquipmentSearchHopFallback:
         )
 
         assert decision["behavior"]["mode"] == "HUNT"
+
+    def test_exhausted_collect_under_armed_raises_no_productive_collect(self) -> None:
+        """An exhausted COLLECT cascade with under-armed inventory ends the session.
+
+        User contract (Bug 0.4 / Bug 0.7, 2026-07-06): the yield-to-hunt
+        gesture requires combat-ready inventory. When fuel is healthy
+        but duals/homings/radars sit below their rank-derived caps AND
+        no tracked equipment container is affordably teleport-reachable
+        (``world.containers`` empty here), COLLECT refuses to hand the
+        tick to HUNT and the session exits with
+        ``no_productive_collect`` instead of engaging under-armed.
+        """
+        world, self_state = _make_world(fuel=550, scanned=True)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+            }
+        )
+        import pytest
+
+        inventory = _make_inventory(default_count=15, radar_count=13)
+
+        with pytest.raises(SessionExitError, match="no_productive_collect"):
+            decide(
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                100000,
+                None,
+                map_fuel_dots=((250, 100),),
+            )
 
 
 class TestCriticalEquipmentLockedTarget:
@@ -625,3 +663,141 @@ class TestFuelSearchFallbacks:
 
         with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
             decide(world, self_state, ai_state, inventory, 100000, terrain)
+
+
+class TestCardinalShotOverride:
+    """Tests for the KillPriorityContract mode-selector override.
+
+    The 2026-07-06 22:37 live run teleported the bot adjacent to
+    orange-8 at (46,159) five separate times; each landing COLLECT
+    dispatched a fuel pickup instead of firing the free cardinal
+    dual. The mode selector's first check is now "is there a live
+    wire-fresh enemy at Manhattan distance 1?" -- yes overrides the
+    durable mode into HUNT regardless of inventory reserves or
+    COLLECT candidates.
+    """
+
+    def setup_method(self) -> None:
+        """Reset world state."""
+        reset_world_state()
+        update_world_state_from_position(100, 100)
+
+    def teardown_method(self) -> None:
+        """Reset world state."""
+        reset_world_state()
+
+    def _make_cardinal_enemy(self) -> dict[str, TankStateDict]:
+        """Return a viewport-fresh live enemy at (101,100), Manhattan 1 from (100,100)."""
+        from tankpit_bot.state.types import make_tank_state
+
+        return {
+            "50": make_tank_state(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="CardinalEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+
+    def _make_distant_enemy(self) -> dict[str, TankStateDict]:
+        """Return a viewport-fresh live enemy at (104,100), Manhattan 4 from (100,100)."""
+        from tankpit_bot.state.types import make_tank_state
+
+        return {
+            "50": make_tank_state(
+                tank_id=50,
+                x=104,
+                y=100,
+                team=2,
+                rank=1,
+                name="DistantEnemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+
+    def test_has_any_cardinal_combat_shot_true_with_cardinal_enemy(self) -> None:
+        """The check returns True when a viewport-fresh enemy is Manhattan 1 away."""
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
+
+        world, self_state = _make_world(fuel=800, tanks=self._make_cardinal_enemy())
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        assert _has_any_cardinal_combat_shot(ctx) is True
+
+    def test_has_any_cardinal_combat_shot_false_with_distant_enemy(self) -> None:
+        """The check returns False when the only enemy is beyond Manhattan 1."""
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
+
+        world, self_state = _make_world(fuel=800, tanks=self._make_distant_enemy())
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        assert _has_any_cardinal_combat_shot(ctx) is False
+
+    def test_has_any_cardinal_combat_shot_false_with_no_enemies(self) -> None:
+        """The check returns False when the world holds no live enemy tanks."""
+        from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
+
+        world, self_state = _make_world(fuel=800)
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+        assert _has_any_cardinal_combat_shot(ctx) is False
+
+    def test_cardinal_enemy_overrides_collect_lock_into_hunt(self) -> None:
+        """A cardinal enemy diverts a COLLECT-locked tick into a HUNT tick.
+
+        Bot durably in COLLECT with a fuel target lock on (105,105).
+        Under the pre-fix mode selector the lock keeps ownership and
+        COLLECT dispatches a fuel pickup even with an enemy at
+        (101,100). Post-fix the mode selector's cardinal-shot check
+        fires first and HUNT wins the tick. HUNT's own cascade may
+        teleport-then-shoot in the next tick (the fresh-acquire path
+        does not fire on cardinal targets yet -- follow-up work),
+        so this test only guarantees the mode-selector reversal:
+        HUNT owns the tick, and the command is not the fuel pickup
+        the pre-fix mode selector would have dispatched.
+        """
+        containers = {"105,105": _c(105, 105, 400, True)}
+        world, self_state = _make_world(
+            fuel=800, containers=containers, tanks=self._make_cardinal_enemy()
+        )
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+                "resource_target_kind": "fuel",
+                "resource_target_x": 105,
+                "resource_target_y": 105,
+            },
+        )
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "HUNT"
+        assert decision["command"]["cmd_type"] != "pickup_fuel"

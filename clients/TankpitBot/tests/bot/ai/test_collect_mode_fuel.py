@@ -7,6 +7,7 @@ import pytest
 from tankpit_bot.bot.ai.collect_mode import (
     _continue_or_release_fuel_lock,
     _select_and_pickup_fuel,
+    _would_overfill,
     decide_collect_mode,
     select_fuel_target,
 )
@@ -700,3 +701,109 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
     assert updated_state["resource_target_kind"] == ""
     assert updated_state["resource_target_x"] == 0
     assert updated_state["resource_target_y"] == 0
+
+
+def test_would_overfill_true_when_projected_pickup_exceeds_cap() -> None:
+    """``_would_overfill`` returns True for the 2026-07-06 22:37 loop shape.
+
+    Private (rank 1, cap 1100) at fuel 1054 planning a 1-tile walk to a
+    386-volume container: projected end-state is
+    ``1054 + 1 + min(386, 46) = 1101``, which exceeds cap. Predicate
+    fires and the planner refuses the dispatch. This is the exact
+    per-tick geometry that produced four consecutive overflow pickups
+    and blacklisted four fuel containers in the live run.
+    """
+    from tankpit_bot.state.types import SelfStateDict
+
+    base_world, base_self = make_world(fuel=1054)
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    container = make_container_state(
+        x=101,
+        y=100,
+        is_fuel=True,
+        volume=386,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+
+    assert _would_overfill(ctx, container) is True
+
+
+def test_would_overfill_false_when_room_covers_walk_and_transfer() -> None:
+    """``_would_overfill`` returns False when the pickup fits below cap.
+
+    Private (rank 1, cap 1100) at fuel 500 planning a 2-tile walk to a
+    100-volume container: projected end-state is
+    ``500 + 2 + min(100, 600) = 602 <= 1100``. The predicate declines
+    and the planner proceeds to dispatch the pickup normally.
+    """
+    from tankpit_bot.state.types import SelfStateDict
+
+    base_world, base_self = make_world(fuel=500)
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    container = make_container_state(
+        x=102,
+        y=100,
+        is_fuel=True,
+        volume=100,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+
+    assert _would_overfill(ctx, container) is False
+
+
+def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> None:
+    """``_select_and_pickup_fuel`` returns None on projected overflow.
+
+    Wire the 2026-07-06 22:37 scenario end-to-end: private at fuel
+    1054 with a single visible 386-volume fuel container 1 tile east.
+    The at-cap gate on line 431 passes (fuel below cap), the fuel
+    target is selected successfully, but ``_would_overfill`` fires
+    and the planner returns None instead of dispatching a pickup
+    that the server would clamp-transfer and reject with code 5.
+    The container is left untouched -- not blacklisted -- so a later
+    tick with more headroom can still consume it.
+    """
+    from tankpit_bot.state.types import SelfStateDict
+
+    base_world, base_self = make_world(
+        fuel=1054,
+        scanned=True,
+        containers={
+            "101,100": make_container_state(
+                x=101,
+                y=100,
+                is_fuel=True,
+                volume=386,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = _select_and_pickup_fuel(ctx, ctx.base)
+
+    assert decision is None
+    assert world["containers"]["101,100"]["failed_pickups"] == 0

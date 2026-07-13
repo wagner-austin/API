@@ -316,6 +316,39 @@ def block_combat_target_and_replan(
 # =============================================================================
 
 
+def _has_damaging_weapon_available(ctx: DecideCtx) -> bool:
+    """Return True when at least one damaging weapon slot can fire this tick.
+
+    A "damaging" slot is a dual or homing that is both enabled and
+    stocked. Radars, missiles, and shields don't damage tanks; single
+    (weapon=0) is what the server picks as the fallback when neither
+    dual nor homing is available. The predicate distinguishes the two
+    causes of a ``weapon=0`` miss:
+
+    * ``afterimage_confirmed`` -- dual OR homing was available and the
+      server still picked single, so the target is not at the aim tile.
+    * ``ammo_exhaustion_miss`` -- neither dual nor homing was
+      available, so the server routed to single by default. The miss
+      says nothing about the target's presence.
+
+    Used by the stationary-miss classifier in :func:`_combat_shoot`
+    (Bug 0.6): only the ``afterimage_confirmed`` case warrants
+    blacklisting the target.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when ``dual_shots`` or ``homing_shots`` has both
+        ``enabled=True`` and ``count > 0``.
+    """
+    duals = ctx.inventory["dual_shots"]
+    homings = ctx.inventory["homing_shots"]
+    return (duals["enabled"] and duals["count"] > 0) or (
+        homings["enabled"] and homings["count"] > 0
+    )
+
+
 def _refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Delegate the tick to the fuel planner when hunting is fuel-starved.
 
@@ -630,19 +663,39 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         if target_stationary:
             # A consumption-miss (weapon=0: the server spent nothing and
             # resolved the shot against empty ground) at a registry
-            # position that has not moved means the target is NOT there
-            # -- a frozen registry entry after the target left, or a
-            # corpse from an unwitnessed kill. Repeating the shot cannot
-            # change the answer (live run 2026-07-02 01:23: 25+
-            # weapon=0 shots at orange-1's stale tile in a 2s loop).
-            # Contract 3.3: miss on a stationary target blocks it.
+            # position that has not moved usually means the target is
+            # NOT there -- a frozen registry entry after the target
+            # left, or a corpse from an unwitnessed kill. Repeating
+            # the shot cannot change the answer (live run 2026-07-02
+            # 01:23: 25+ weapon=0 shots at orange-1's stale tile in a
+            # 2s loop). Contract 3.3: miss on a stationary target
+            # blocks it.
+            #
+            # Bug 0.6 (2026-07-06 22:39/22:40): the same weapon=0 +
+            # stationary miss ALSO fires when the bot has no damaging
+            # weapon left (duals + homings both exhausted or disabled),
+            # because the server routes to single as the only remaining
+            # option. That is an ``ammo_exhaustion_miss``, not an
+            # ``afterimage_confirmed`` miss -- the target is live, the
+            # bot just cannot damage it right now. Blacklisting a live
+            # target in that case is wrong; the right response is to
+            # disengage and refill.
+            if _has_damaging_weapon_available(ctx):
+                emit_ai(
+                    "miss on stationary %s at (%d,%d) - blocking target",
+                    target["name"],
+                    target["x"],
+                    target["y"],
+                )
+                return block_combat_target_and_replan(ctx, target)
             emit_ai(
-                "miss on stationary %s at (%d,%d) - blocking target",
+                "miss on stationary %s at (%d,%d) but no damaging weapon available - "
+                "disengaging to refill (ammo exhaustion, not afterimage)",
                 target["name"],
                 target["x"],
                 target["y"],
             )
-            return block_combat_target_and_replan(ctx, target)
+            return _refuel_for_hunt(ctx, target)
         emit_ai(
             "miss on %s at (%d,%d) dist=%d moved=True - re-aiming",
             target["name"],

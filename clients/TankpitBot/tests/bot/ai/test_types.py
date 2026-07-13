@@ -302,6 +302,9 @@ class TestAIState:
         assert state["last_shoot_ms"] == 0
         assert state["combat_target_id"] == -1
         assert state["config"]["fuel_low_threshold"] == 200
+        assert state["manual_mode"] is None
+        assert state["live_radars_used"] == 0
+        assert state["live_teleports"] == 0
 
     def test_make_initial_ai_state_custom_config(self) -> None:
         """Initial state accepts custom config."""
@@ -453,3 +456,99 @@ class TestAIState:
         encoded = encode_ai_state(state)
         decoded = decode_ai_state(encoded)
         assert decoded == state
+
+    def test_encode_decode_roundtrip_with_manual_mode_hunt(self) -> None:
+        """Encode/decode preserves ``manual_mode = HUNT``."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        state = AIStateDict(**{**original, "manual_mode": "HUNT"})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["manual_mode"] == "HUNT"
+        assert decoded == state
+
+    def test_encode_decode_roundtrip_with_manual_mode_collect(self) -> None:
+        """Encode/decode preserves ``manual_mode = COLLECT``."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        state = AIStateDict(**{**original, "manual_mode": "COLLECT"})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["manual_mode"] == "COLLECT"
+
+    def test_encode_decode_roundtrip_with_manual_mode_unset(self) -> None:
+        """Encode/decode preserves ``manual_mode = UNSET`` (idle-pin)."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        state = AIStateDict(**{**original, "manual_mode": "UNSET"})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["manual_mode"] == "UNSET"
+
+    def test_encode_decode_roundtrip_with_live_counters(self) -> None:
+        """Encode/decode preserves ``live_radars_used`` / ``live_teleports``."""
+        from tankpit_bot.bot.ai.types import AIStateDict
+
+        original = make_initial_ai_state()
+        state = AIStateDict(**{**original, "live_radars_used": 17, "live_teleports": 42})
+        encoded = encode_ai_state(state)
+        decoded = decode_ai_state(encoded)
+        assert decoded["live_radars_used"] == 17
+        assert decoded["live_teleports"] == 42
+
+    def test_decode_missing_manual_mode_raises(self) -> None:
+        """Missing ``manual_mode`` raises — no back-compat default."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["manual_mode"]
+        with pytest.raises(KeyError, match="manual_mode"):
+            decode_ai_state(encoded)
+
+    def test_decode_null_manual_mode_becomes_none(self) -> None:
+        """A serialised null decodes as None (auto-arbitration)."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        encoded["manual_mode"] = None
+        decoded = decode_ai_state(encoded)
+        assert decoded["manual_mode"] is None
+
+    def test_decode_invalid_manual_mode_raises(self) -> None:
+        """An unknown ``manual_mode`` string surfaces as ValueError."""
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        encoded["manual_mode"] = "PATROL"
+        with pytest.raises(ValueError, match="manual_mode must be one of"):
+            decode_ai_state(encoded)
+
+    def test_decode_non_string_manual_mode_raises(self) -> None:
+        """A non-string, non-null ``manual_mode`` surfaces as JSONTypeError."""
+        from platform_core.json_utils import JSONTypeError
+
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        encoded["manual_mode"] = 7
+        with pytest.raises(JSONTypeError):
+            decode_ai_state(encoded)
+
+    def test_decode_missing_live_radars_used_raises(self) -> None:
+        """Missing ``live_radars_used`` raises — no back-compat default."""
+        from platform_core.json_utils import JSONTypeError
+
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["live_radars_used"]
+        with pytest.raises(JSONTypeError):
+            decode_ai_state(encoded)
+
+    def test_decode_missing_live_teleports_raises(self) -> None:
+        """Missing ``live_teleports`` raises — no back-compat default."""
+        from platform_core.json_utils import JSONTypeError
+
+        original = make_initial_ai_state()
+        encoded = encode_ai_state(original)
+        del encoded["live_teleports"]
+        with pytest.raises(JSONTypeError):
+            decode_ai_state(encoded)

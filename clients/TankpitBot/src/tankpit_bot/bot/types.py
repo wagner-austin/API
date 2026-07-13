@@ -211,6 +211,32 @@ def make_teleport_command(target_x: int, target_y: int) -> TeleportCommandDict:
     return TeleportCommandDict(cmd_type="teleport", target_x=target_x, target_y=target_y)
 
 
+class HoldCommandDict(TypedDict):
+    """No-op command: the tick executes but dispatches nothing.
+
+    Produced by the durable owner arbitrator when the SPA pins
+    ``manual_mode = "UNSET"``. The executor recognises ``cmd_type ==
+    "hold"`` and returns without touching the wire. The tick still runs
+    to completion so ai_state persists, status publishes, and the
+    scorecard sees the beat — the tank simply holds its position.
+
+    Attributes:
+        cmd_type: Command type identifier.
+    """
+
+    cmd_type: Literal["hold"]
+
+
+def make_hold_command() -> HoldCommandDict:
+    """Create the no-op hold command.
+
+    Returns:
+        :class:`HoldCommandDict` — a stateless command used for manual
+        idle ticks.
+    """
+    return HoldCommandDict(cmd_type="hold")
+
+
 # Union of all bot command types
 BotCommand = (
     MoveCommandDict
@@ -220,11 +246,13 @@ BotCommand = (
     | PickupEquipmentCommandDict
     | MapOpenCommandDict
     | TeleportCommandDict
+    | HoldCommandDict
 )
 
 
 __all__ = [
     "BotCommand",
+    "HoldCommandDict",
     "MapOpenCommandDict",
     "MoveCommandDict",
     "PickupEquipmentCommandDict",
@@ -232,6 +260,7 @@ __all__ = [
     "RadarCommandDict",
     "ShootCommandDict",
     "TeleportCommandDict",
+    "make_hold_command",
     "make_map_open_command",
     "make_move_command",
     "make_pickup_equipment_command",

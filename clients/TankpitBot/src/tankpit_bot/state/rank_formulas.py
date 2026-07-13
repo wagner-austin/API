@@ -57,7 +57,49 @@ def free_radar_radius(rank: int) -> int:
     return 2 + rank // 3
 
 
+def inventory_capacity(rank: int) -> int:
+    """Return the per-slot inventory capacity at the given rank.
+
+    The tankpit.com official rules table (recruit 20, +5 per rank) is
+    the source. Each of ``dual_shots``, ``missile_shots``,
+    ``homing_shots``, ``extra_radars``, and ``armor_shields`` shares
+    the same rank-derived cap; the server refuses further pickup with
+    ``0x52`` code-7 when a slot would exceed the cap.
+
+    Args:
+        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
+
+    Returns:
+        Per-slot cap ``20 + 5 * rank``: 20 at recruit, 25 at private,
+        30 at corporal, 35 at sergeant, 40 at lieutenant, 45 at
+        captain, 50 at major, 55 at colonel, 60 at general.
+    """
+    return 20 + 5 * rank
+
+
+def combat_radar_min(rank: int) -> int:
+    """Return the minimum extra-radar count for HUNT-entry readiness.
+
+    User contract (2026-07-06): weapons must be at cap for HUNT entry,
+    but extra radars are permitted up to 5 below cap because scan
+    coverage during the fight consumes them faster than the between-
+    kill restock can top them up. The floor is
+    ``inventory_capacity(rank) - 5``.
+
+    Args:
+        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
+
+    Returns:
+        Minimum extra-radar count below which HUNT entry is refused:
+        15 at recruit, 20 at private, 25 at corporal, ..., 55 at
+        general.
+    """
+    return inventory_capacity(rank) - 5
+
+
 __all__ = [
+    "combat_radar_min",
     "free_radar_radius",
     "fuel_capacity",
+    "inventory_capacity",
 ]

@@ -72,6 +72,10 @@ def _decode_bot_command(data: JSONObject) -> BotCommand:
         from tankpit_bot.bot.types import MapOpenCommandDict
 
         return MapOpenCommandDict(cmd_type="map_open")
+    if cmd_type == "hold":
+        from tankpit_bot.bot.types import HoldCommandDict
+
+        return HoldCommandDict(cmd_type="hold")
     target_x = require_int(data, "target_x")
     target_y = require_int(data, "target_y")
     if cmd_type == "move":
@@ -120,6 +124,8 @@ def _encode_bot_command(command: BotCommand) -> JSONObject:
         return {"cmd_type": "radar"}
     if command["cmd_type"] == "map_open":
         return {"cmd_type": "map_open"}
+    if command["cmd_type"] == "hold":
+        return {"cmd_type": "hold"}
     result: JSONObject = {
         "cmd_type": command["cmd_type"],
         "target_x": command["target_x"],

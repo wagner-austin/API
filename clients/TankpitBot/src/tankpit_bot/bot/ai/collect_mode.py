@@ -19,19 +19,23 @@ from tankpit_bot.bot.ai.context import (
 from tankpit_bot.bot.ai.equipment import is_lock_release_warranted
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
+    find_all_tracked_equipment,
     find_best_fuel,
     find_equipment_candidates,
     find_nearest_equipment,
+    find_teleport_landing_tile,
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
+from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
+from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import BotCommand, make_radar_command
+from tankpit_bot.bot.types import BotCommand, make_radar_command, make_teleport_command
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.rank_formulas import fuel_capacity
 from tankpit_bot.state.types import ContainerStateDict
@@ -213,6 +217,10 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if forage_decision is not None:
         return forage_decision
 
+    equipment_hop = _hop_toward_equipment(ctx, base_state)
+    if equipment_hop is not None:
+        return equipment_hop
+
     search = make_resource_search_hop(
         ctx,
         mode="COLLECT",
@@ -224,13 +232,23 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         return search
 
     if ctx.fuel > ctx.config["fuel_low_threshold"]:
-        emit_ai(
-            "collect exhausted at (%d,%d) with healthy fuel %d, yielding to hunt",
-            ctx.self_state["x"],
-            ctx.self_state["y"],
-            ctx.fuel,
+        if hunt_entry_permitted(ctx):
+            emit_ai(
+                "collect exhausted at (%d,%d) fuel=%d combat-ready, yielding to hunt",
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+                ctx.fuel,
+            )
+            return None
+        raise SessionExitError(
+            "no_productive_collect",
+            f"COLLECT owner produced no decision at "
+            f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel} "
+            f"dual={ctx.inventory['dual_shots']['count']} "
+            f"homing={ctx.inventory['homing_shots']['count']} "
+            f"radar={ctx.inventory['extra_radars']['count']}: "
+            f"inventory below combat-ready and no reachable equipment.",
         )
-        return None
 
     raise SessionExitError(
         "out_of_fuel",
@@ -424,6 +442,153 @@ def _select_and_pickup_equipment(
     )
 
 
+def _hop_toward_equipment(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Teleport toward tracked equipment outside the current viewport.
+
+    ``find_nearest_equipment`` filters to walkable-from-here candidates
+    inside the current viewport; step 3 of the cascade
+    (``_select_and_pickup_equipment``) handles those. Everything else
+    ``world.containers`` has ever accumulated -- equipment revealed by
+    prior radar or 0x5A patches in other viewports -- is invisible to
+    the viewport-scoped picks and was silently ignored until Bug 0.7.
+
+    User contract (2026-07-06): while inventory is below combat-ready
+    the bot must be actively topping up. This cascade step reaches
+    into the whole-map equipment atlas and teleports to the nearest
+    container whose landing tile is legal and whose teleport cost
+    leaves ``engagement_reserve`` behind. The predicate matches the
+    yield-to-hunt gate (Bug 0.4): if HUNT is permitted, no hop is
+    needed.
+
+    Stale-belief caveat: a container tracked from a scan minutes ago
+    may have been picked up by another player and no wire signal
+    confirms distant consumption. The pragmatic Phase 0 hop accepts
+    that risk and pays the wasted-teleport cost if the container is
+    gone. Wasted hops still refresh the viewport and reveal fresher
+    intel on the way to combat-ready.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        Teleport decision to the closest reachable + affordable
+        out-of-viewport equipment container, or ``None`` when
+        inventory is combat-ready, terrain is unknown, no tracked
+        equipment sits outside the viewport, no candidate has a
+        legal landing tile, or every affordable teleport would
+        leave the engagement reserve.
+    """
+    if hunt_entry_permitted(ctx):
+        return None
+    if ctx.terrain is None:
+        return None
+    candidates = find_all_tracked_equipment(ctx.world)
+    if not candidates:
+        return None
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    external = [
+        container
+        for container in candidates
+        if not (left <= container["x"] <= right and top <= container["y"] <= bottom)
+    ]
+    if not external:
+        return None
+    landing_reserve = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    best_cost = -1
+    best_landing_x = 0
+    best_landing_y = 0
+    best_container: ContainerStateDict | None = None
+    for container in external:
+        landing = find_teleport_landing_tile(
+            ctx.terrain,
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            container["x"],
+            container["y"],
+        )
+        if landing is None:
+            continue
+        landing_x, landing_y = landing
+        cost = compute_teleport_fuel_cost(
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            landing_x,
+            landing_y,
+        )
+        if ctx.fuel - cost < landing_reserve:
+            continue
+        if best_container is None or cost < best_cost:
+            best_cost = cost
+            best_landing_x = landing_x
+            best_landing_y = landing_y
+            best_container = container
+    if best_container is None:
+        return None
+    emit_ai(
+        "equipment hop to (%d,%d) landing (%d,%d) cost=%d (dual=%d homing=%d radar=%d)",
+        best_container["x"],
+        best_container["y"],
+        best_landing_x,
+        best_landing_y,
+        best_cost,
+        ctx.inventory["dual_shots"]["count"],
+        ctx.inventory["homing_shots"]["count"],
+        ctx.inventory["extra_radars"]["count"],
+    )
+    return make_decision(
+        make_teleport_command(best_landing_x, best_landing_y),
+        "COLLECT",
+        _COLLECT_SCORE,
+        best_landing_x,
+        best_landing_y,
+        "equipment_hop",
+        clear_resource_target(base_state),
+        ctx.equip,
+    )
+
+
+def _would_overfill(
+    ctx: DecideCtx,
+    container: ContainerStateDict,
+) -> bool:
+    """Return True when picking up ``container`` would exceed fuel cap.
+
+    A pickup that transfers less than the container's full volume
+    (because the tank is near cap) draws server ``code=5`` and marks
+    the container ``failed_pickup``; the 2026-07-06 22:37 run spent
+    26 s dispatching four consecutive overflow pickups at fuel
+    1040/1054/1062/1054 (headroom 46/60/46) before every nearby fuel
+    container was blacklisted. Refuse the dispatch instead of paying
+    the walk cost and blacklisting the container.
+
+    Formula matches the handoff spec: the projected end-state of the
+    walk plus the server's clamped transfer (``min(volume, headroom)``)
+    exceeds cap. When ``walk_cost > 0`` any container whose volume
+    meets or exceeds current headroom will trigger a refusal, since
+    the transfer would fill to cap and still leave fuel in the
+    container -- exactly the wasteful-pickup class the server rejects.
+
+    Args:
+        ctx: Decision context.
+        container: The candidate fuel container.
+
+    Returns:
+        True when the projected pickup would exceed
+        :func:`fuel_capacity` for the current rank.
+    """
+    cap = fuel_capacity(ctx.self_state["rank"])
+    walk_cost = abs(container["x"] - ctx.self_state["x"]) + abs(
+        container["y"] - ctx.self_state["y"]
+    )
+    headroom = cap - ctx.fuel
+    projected = ctx.fuel + walk_cost + min(container["volume"], headroom)
+    return projected > cap
+
+
 def _select_and_pickup_fuel(
     ctx: DecideCtx,
     base_state: AIStateDict,
@@ -436,6 +601,20 @@ def _select_and_pickup_fuel(
     container, command = selection
     target_x = container["x"]
     target_y = container["y"]
+    if _would_overfill(ctx, container):
+        cap = fuel_capacity(ctx.self_state["rank"])
+        walk_cost = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
+        emit_ai(
+            "skip fuel at (%d,%d) vol=%d: would overfill (fuel=%d cap=%d walk=%d headroom=%d)",
+            target_x,
+            target_y,
+            container["volume"],
+            ctx.fuel,
+            cap,
+            walk_cost,
+            cap - ctx.fuel,
+        )
+        return None
     emit_ai(
         "collect fuel at (%d,%d) vol=%d (fuel=%d)",
         target_x,

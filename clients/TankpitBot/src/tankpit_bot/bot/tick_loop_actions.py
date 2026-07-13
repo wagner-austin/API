@@ -282,18 +282,37 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         error_code=error_code,
     )
     if kind == "collect":
-        # Every collect rejection -- empty container, tank-full, inventory-full,
-        # illegal geometry -- marks the target as a failed pickup so the
-        # planner drops it from the candidate set. A tank-full rejection here
-        # should never fire in normal flow: fuel selection and fuel-lock
-        # continuation both gate on the rank-derived capacity from
-        # :func:`tankpit_bot.state.rank_formulas.fuel_capacity`, so a
-        # pickup_fuel at capacity is unreachable. If it does fire (rank-up
-        # race, protocol quirk), the failed-pickup mark is the right response
-        # and the container drops out of contention until the next radar
-        # refresh.
-        increment_container_failed_pickups(get_world_service(), tx, ty)
-        emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
+        # Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
+        # "blacklist this container forever" are not the same event.
+        #
+        # * ``code=5`` ("Tank full"): the container was not empty, the
+        #   server refused because our tank could not accept the
+        #   transfer. Bug 0.2's ``_would_overfill`` pre-dispatch gate
+        #   prevents this in the normal flow, so a surviving code=5 is
+        #   a race between planner-time and dispatch-time fuel state.
+        #   Blacklisting a still-full container is wrong -- the next
+        #   tick with headroom can consume it.
+        # * ``code=4`` ("Empty container"): the container is drained.
+        #   Blacklist.
+        # * ``code=7`` ("Inventory full"): equipment slot at cap.
+        #   Blacklist for this session (the slot won't clear).
+        # * ``code=0`` ("You can't do this"): illegal geometry.
+        #   Blacklist per position.
+        #
+        # Pre-fix (through 2026-07-06): all four codes incremented
+        # failed_pickups, so the 22:37 fuel-loop's four consecutive
+        # partial-transfer + code=5 events blacklisted four still-full
+        # fuel containers.
+        if error_code == _COMMAND_ERROR_TANK_FULL:
+            emit_sync(
+                "container at (%d,%d) rejected code=5 (tank full) -- "
+                "not blacklisting, container is not empty",
+                tx,
+                ty,
+            )
+        else:
+            increment_container_failed_pickups(get_world_service(), tx, ty)
+            emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):
         mark_move_target_failed(tx, ty, get_current_time_ms())
         emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)

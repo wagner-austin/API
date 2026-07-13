@@ -13,6 +13,7 @@ from tankpit_bot.bot.ai.types import (
 )
 from tankpit_bot.bot.tick_loop_types import make_tick_decision
 from tankpit_bot.bot.types import (
+    make_hold_command,
     make_map_open_command,
     make_move_command,
     make_radar_command,
@@ -175,6 +176,11 @@ class TestExtractCommandTarget:
     def test_map_open_command(self) -> None:
         """Returns (0, 0) for map_open command."""
         cmd = make_map_open_command()
+        assert _extract_command_target(cmd) == (0, 0)
+
+    def test_hold_command(self) -> None:
+        """Returns (0, 0) for the SPA-idle hold command."""
+        cmd = make_hold_command()
         assert _extract_command_target(cmd) == (0, 0)
 
     def test_teleport_command(self) -> None:

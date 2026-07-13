@@ -16,6 +16,8 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.bot.ai.modes import (
+    AI_MODES,
+    AIMode,
     is_valid_ai_mode_state,
     require_ai_mode,
     require_ai_mode_state,
@@ -157,10 +159,10 @@ def decode_enemy_threat(data: JSONObject) -> EnemyThreatDict:
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
-        last_aim_x=require_int(data, "last_aim_x") if "last_aim_x" in data else -1,
-        last_aim_y=require_int(data, "last_aim_y") if "last_aim_y" in data else -1,
-        last_aim_weapon=(require_int(data, "last_aim_weapon") if "last_aim_weapon" in data else -1),
-        last_aim_ms=require_int(data, "last_aim_ms") if "last_aim_ms" in data else 0,
+        last_aim_x=require_int(data, "last_aim_x"),
+        last_aim_y=require_int(data, "last_aim_y"),
+        last_aim_weapon=require_int(data, "last_aim_weapon"),
+        last_aim_ms=require_int(data, "last_aim_ms"),
     )
 
 
@@ -304,6 +306,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         JSON-serializable dict representation.
     """
     killed: JSONValue = dict(state["killed_tank_ids"])
+    manual_mode = state["manual_mode"]
+    manual_value: JSONValue = manual_mode if manual_mode is not None else None
     return {
         "config": encode_ai_config(state["config"]),
         "mode": state["mode"],
@@ -328,7 +332,39 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "resource_target_y": state["resource_target_y"],
         "attempted_equipment_targets": dict(state["attempted_equipment_targets"]),
         "last_landing_scan_viewport": state["last_landing_scan_viewport"],
+        "manual_mode": manual_value,
+        "live_radars_used": state["live_radars_used"],
+        "live_teleports": state["live_teleports"],
     }
+
+
+def _decode_manual_mode(data: JSONObject) -> AIMode | None:
+    """Decode the required ``manual_mode`` field from an encoded AI state.
+
+    Args:
+        data: JSON object being decoded into :class:`AIStateDict`.
+
+    Returns:
+        ``None`` when the encoded value is explicit JSON ``null``
+        (auto-arbitration). Otherwise the validated :data:`AIMode`.
+
+    Raises:
+        KeyError: If the field is absent — every valid AIStateDict
+            carries ``manual_mode`` since 2026-07-11.
+        ValueError: If the value is a string outside :data:`AI_MODES`.
+        JSONTypeError: If the value is present but neither ``None`` nor
+            a string.
+    """
+    if "manual_mode" not in data:
+        raise KeyError("manual_mode")
+    raw = data["manual_mode"]
+    if raw is None:
+        return None
+    validated = require_str(data, "manual_mode")
+    for mode in AI_MODES:
+        if validated == mode:
+            return mode
+    raise ValueError(f"manual_mode must be one of {AI_MODES} or null, got {validated!r}")
 
 
 def _decode_killed_tank_ids(data: JSONObject) -> dict[str, int]:
@@ -402,30 +438,21 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         combat_target_x=require_int(data, "combat_target_x"),
         combat_target_y=require_int(data, "combat_target_y"),
         killed_tank_ids=_decode_killed_tank_ids(data),
-        session_kill_count=require_int(data, "session_kill_count")
-        if "session_kill_count" in data
-        else 0,
-        session_hit_count=require_int(data, "session_hit_count")
-        if "session_hit_count" in data
-        else 0,
-        session_miss_count=require_int(data, "session_miss_count")
-        if "session_miss_count" in data
-        else 0,
-        session_reject_count=require_int(data, "session_reject_count")
-        if "session_reject_count" in data
-        else 0,
+        session_kill_count=require_int(data, "session_kill_count"),
+        session_hit_count=require_int(data, "session_hit_count"),
+        session_miss_count=require_int(data, "session_miss_count"),
+        session_reject_count=require_int(data, "session_reject_count"),
         blocked_combat_targets=_require_str_int_mapping(data, "blocked_combat_targets"),
         last_shot_target_id=require_int(data, "last_shot_target_id"),
         last_shot_target_name=require_str(data, "last_shot_target_name"),
         resource_target_kind=require_str(data, "resource_target_kind"),
         resource_target_x=require_int(data, "resource_target_x"),
         resource_target_y=require_int(data, "resource_target_y"),
-        attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets")
-        if "attempted_equipment_targets" in data
-        else {},
-        last_landing_scan_viewport=require_str(data, "last_landing_scan_viewport")
-        if "last_landing_scan_viewport" in data
-        else "",
+        attempted_equipment_targets=_require_str_int_mapping(data, "attempted_equipment_targets"),
+        last_landing_scan_viewport=require_str(data, "last_landing_scan_viewport"),
+        manual_mode=_decode_manual_mode(data),
+        live_radars_used=require_int(data, "live_radars_used"),
+        live_teleports=require_int(data, "live_teleports"),
     )
 
 

@@ -381,6 +381,25 @@ class AIStateDict(TypedDict):
             landing radar only when the current origin differs
             (user policy 2026-07-03: always radar right on landing,
             before any pickup).
+        manual_mode: When not ``None``, the durable mode the SPA has
+            pinned the arbitrator to. ``"UNSET"`` means the bot is
+            connected but idle (no ticks dispatched, hold position).
+            ``"HUNT"`` / ``"COLLECT"`` force those modes. ``None``
+            restores the built-in auto-arbitration and mirrors the
+            historical (pre-service) behaviour of :func:`make bot`.
+            Drained from :mod:`tankpit_bot.service.mode_bridge` at the
+            top of every tick.
+        live_radars_used: Radar-scan commands dispatched by the executor
+            this session. Incremented at the radar dispatch call-site
+            in :mod:`tankpit_bot.bot.executor`. Distinct from the
+            end-of-session ``scans_extra`` / ``scans_builtin`` totals
+            in :class:`ScorecardAccumulatorDict`, which are rolled up
+            from the wire event stream — this counter is the live
+            executor-side view the SPA renders in real time.
+        live_teleports: Teleport commands dispatched by the executor
+            this session. Same rationale as :attr:`live_radars_used` —
+            live executor-side counter, not the wire-derived scorecard
+            aggregate.
     """
 
     config: AIConfigDict
@@ -406,6 +425,9 @@ class AIStateDict(TypedDict):
     resource_target_y: int
     attempted_equipment_targets: dict[str, int]
     last_landing_scan_viewport: str
+    manual_mode: AIMode | None
+    live_radars_used: int
+    live_teleports: int
 
 
 def make_initial_ai_state(
@@ -443,6 +465,9 @@ def make_initial_ai_state(
         resource_target_y=0,
         attempted_equipment_targets={},
         last_landing_scan_viewport="",
+        manual_mode=None,
+        live_radars_used=0,
+        live_teleports=0,
     )
 
 

@@ -33,11 +33,18 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
     wait_for_game_ready,
 )
+from tankpit_bot.browser.session_storage import (
+    STORAGE_STATE_PATH,
+    load_storage_state,
+    save_storage_state,
+)
 from tankpit_bot.diagnostics.account_stats import (
     emit_account_stats_sample,
     parse_account_stats,
 )
 from tankpit_bot.runtime_logging import emit_state
+from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
+from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.sniffer.core import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
@@ -98,6 +105,8 @@ class Bot(DispatchMixin):
         prefer_account: bool = False,
         cdp_service: CDPService | None = None,
         command_service: CommandService | None = None,
+        mode_bridge: ModeBridgeProtocol | None = None,
+        status_bus: StatusBusProtocol | None = None,
     ) -> None:
         """Initialize the bot.
 
@@ -107,6 +116,19 @@ class Bot(DispatchMixin):
             prefer_account: Skip guest login and use account credentials.
             cdp_service: Injected CDPService. Created internally if None.
             command_service: Injected CommandService. Created internally if None.
+            mode_bridge: Cross-thread channel the SPA writes mode
+                overrides into. When ``None``, a fresh :class:`ModeBridge`
+                is created — a standalone ``make bot`` session gets an
+                inert bridge that no HTTP handler ever writes to, so
+                ``drain`` returns ``None`` every tick and
+                auto-arbitration runs unchanged. The service main
+                (Phase A8) injects the shared instance the aiohttp
+                thread owns.
+            status_bus: Fan-out the tick loop publishes
+                :class:`SessionStatusDict` frames into. When ``None``,
+                a fresh :class:`StatusBus` is created — a standalone
+                session gets a bus with zero subscribers, so publish
+                is a no-op.
         """
         super().__init__(
             target_url,
@@ -119,6 +141,14 @@ class Bot(DispatchMixin):
         self._game_log_scraper: GameLogScraper | None = None
         self._shot_screenshot_seq: int = 0
         self._ai_state: AIStateDict = make_initial_ai_state()
+        default_mode_bridge: ModeBridgeProtocol = ModeBridge()
+        default_status_bus: StatusBusProtocol = StatusBus()
+        self._mode_bridge: ModeBridgeProtocol = (
+            mode_bridge if mode_bridge is not None else default_mode_bridge
+        )
+        self._status_bus: StatusBusProtocol = (
+            status_bus if status_bus is not None else default_status_bus
+        )
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x
@@ -344,15 +374,16 @@ class Bot(DispatchMixin):
         self._cdp_message_buffer = []
 
         launch_args = _chrome_stream_display_args()
+        storage_state_path = load_storage_state(STORAGE_STATE_PATH)
         with _test_hooks.sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=self._headless,
                 args=launch_args,
             )
             context = (
-                browser.new_context(no_viewport=True)
+                browser.new_context(no_viewport=True, storage_state=storage_state_path)
                 if _chrome_stream_no_viewport()
-                else browser.new_context()
+                else browser.new_context(storage_state=storage_state_path)
             )
             page = context.new_page()
             cdp = context.new_cdp_session(page)
@@ -378,6 +409,13 @@ class Bot(DispatchMixin):
             )
 
             wait_for_game_ready(page, self._messages)
+
+            # Persist the freshly-issued auth cookies + localStorage
+            # before the game loop can crash. Next launch of the bot
+            # skips the tankpit login flow entirely and rejoins in
+            # seconds instead of the ~5-10 s cold navigate + credential
+            # sequence.
+            save_storage_state(context, STORAGE_STATE_PATH)
 
             self._cdp_service.log_websocket_urls()
             self._static_key = gather_intel(page, cdp)

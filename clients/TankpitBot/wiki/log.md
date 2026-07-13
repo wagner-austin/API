@@ -880,3 +880,133 @@ Codes outside the current action's whitelist are consumed as **orphan** and emit
 **Wiki update:** [[bot-behavior-contract]] §3.4 grew a `MUST` row for action-kind-scoped 0x52 with the smoking-gun scenario logged verbatim, and its verifier list now cites the new tests.
 
 **Gate:** `make check` green — 4088 tests, 100.00% statement + branch coverage.
+
+## [2026-07-06] design | Self-observing bot architecture (multi-phase; handoff written; NO code landed)
+
+**Motivation:** the same 2026-07-06 `make run` that verified the earlier fixes surfaced a NEW class of bug at 20:47:31 — a 26-second silent deadlock. The executor's `_is_valid_shoot` position-match clause was self-rejecting every clamped homing shot (aim ≠ tank position under the 2026-07-03 clamp mechanic is intentional; the position clause treated it as a stale-target race). The discard fired only `emit_ai("rejecting shoot at ...")` — a bare log line that read identically to a legitimate server rejection. No structured event correlated the discard to the planner's decision. Nothing tripped an alarm. 26 s of silent failure.
+
+**The class:** decisions and outcomes live in disjoint observability channels. Three parallel diagnostic fabrics — `wire_complete` for scan/move/teleport/collect/map_open, `teleport_attempt` for teleports, `combat_feedback` for shots — with no shared contract, and one whole class of failure (client-side executor discards) that no channel covered at all. Every future bug of this class hides the same way.
+
+**The design conversation:** user asked "what else is the bot blind to?" We enumerated fifteen items: (1) standardized WHAT, (2) standardized WHY, (3) predictions + accuracy, (4) alternatives considered, (5) confidence, (6) provenance for facts, (7) per-entity memory, (8) cross-session persistence, (9) causal chain, (10) anomaly detection, (11) mode transitions as first-class events, (12) time budgets, (13) self-model, (14) comparative baselines, (15) feature-flag experiments. The 20:47:31 deadlock hit at least four of them (1, 3, 10, 12) simultaneously.
+
+**The philosophy correction:** user pushed back on "repeated-failure detection" as still soft. The right posture is **fail hard on state entry** — contracts on state transitions, raise on violation. No retry counters, no anomaly thresholds. Item (10) "anomaly detection" is REJECTED and replaced by contracts throughout.
+
+**The architecture:** four layers — Facts (world model with provenance + confidence), Decision Engine (per-tick planners), Ledger (per-attempt decisions + outcomes + causal chain), Memory (cross-tick + cross-session). Cross-cutting `contracts/` framework with `ContractError` + `@enforce_contract` + a guard rule that scans for public mutations skipping enforcement.
+
+**Phase roadmap (all documented in the handoff, NONE landed):**
+
+| Phase | Deliverable | LoC | Sessions |
+|---|---|---|---|
+| 0 | Immediate deadlock fix: delete executor position-check | 200 | 1 |
+| 1 | `contracts/` + `facts/` foundation | 800 | 2-3 |
+| 2 | `ledger/` core (Outcomes, Decisions, Ring, Causal, ModeTransitions) | 2500 | 4-6 |
+| 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
+| 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
+| 5 | Aggregation (self-model + baselines + experiments) | 1500 | 2-3 |
+
+Total ~9000 LoC production + ~13500 LoC tests. 14-21 sessions of focused work.
+
+**In-session artifact NOT landed:** the prior AI (this session) wrote a monolithic 1000-line `src/tankpit_bot/bot/action_outcome.py` before the split-per-kind design emerged. Deleted before handoff to leave a clean tree. Next AI builds `ledger/outcome/` split into six per-kind files from scratch per the handoff spec.
+
+**Pages written:** [[self-observing-architecture]] — new page under [[architecture]] hub. Vision, four layers, fifteen items, phase overview. Detailed phase specs live in `docs/handoffs/self-observing-bot-architecture.md`.
+
+**Structural updates:** architecture hub 4 → 5 pages; index total 51 → 52.
+
+**Handoff artifact:** `docs/handoffs/self-observing-bot-architecture.md`. Comprehensive: ban list, principle, four-layer architecture, module layout, per-phase specs with data types + contracts + tests + verification gates, ordering constraints, ban list repeated.
+
+**Gate:** `make check` green — no code changes landed this session, so 4088 tests + 100% coverage baseline preserved.
+
+## [2026-07-06] fix | Container freshness TTL removed — belief decay was destroying wire truth
+
+**Motivation:** the 30 s `_CONTAINER_FRESHNESS_TTL_MS` in `bot/ai/equipment.py` expired REAL loot twice in live runs. (1) Run 2026-07-02 01:46: after a 23 s fight plus an equipment sweep in the kill viewport, every fuel container aged past 30 s; `find_best_fuel` saw nothing while `describe_container_search` — which never applied the TTL — logged `actionable=9`, and the bot hopped away at fuel 565/1100 instead of restocking where it stood. (2) Run 2026-07-06 18:19 (index row `20260706-181928`): an equipment container revealed 31 s earlier was dropped mid-cascade and the session died with a bogus `out_of_fuel` exit at fuel 1100.
+
+**Fix:** deleted `_CONTAINER_FRESHNESS_TTL_MS` and `_is_stale`; `is_container_pursuable` no longer takes `now_ms` and checks only container kind + `failed_pickups == 0`. Rationale (recorded in the docstring): every pursuability consumer is viewport-scoped, and an in-viewport container is wire-truthful under the truth layer — the landing 0x5A reset-then-apply sweep removes silently-vanished visible entries ([[viewport-frame]], 2026-07-03 landing-truthfulness rework), the landing radar's omission-prune covers radar-sourced entries ([[radar-mechanics]]), and live 0x43 cache updates track consumption while the bot watches. A wall-clock decay on top of that only ever deleted truth. Rode in the 2026-07-06 21:34 commit alongside the 0x4F collapse.
+
+**Side effect — the lying diagnostic is structurally fixed:** the TTL was the single criterion `describe_container_search` did not apply, so its `actionable=N` count could contradict the pickers. With the TTL gone, the summary and `find_best_fuel` / `find_equipment_candidates` filter on identical criteria (kind, viewport bounds, failed-pickup, volume, walk-reachability); the `actionable=9`-then-hop contradiction from 2026-07-02 can no longer occur.
+
+**Live validation:** run 2026-07-06 20:44:51 replays the original failure scenario correctly — kill of tank 510 followed immediately by two same-viewport fuel pickups (537 → 945 → 1100 cap) before yielding to hunt; and the 22:38:22 post-kill "no actionable" verdict showed `blocked_walk` on all nearby fuel — a true reason, log and behavior in agreement.
+
+**Tests:** the collect-mode suites were extended in the same commit (`test_collect_mode_fuel.py` +134 lines, `test_collect_mode_equipment.py`, `test_collect_mode_integration.py`, `test_equipment.py` reworked for the `now_ms`-free signature).
+
+**Pages already consistent:** [[self-observing-architecture]] refers to "the retired freshness TTL"; no page asserts a live container TTL.
+
+## [2026-07-12] add | Bot Service Architecture — SPA-driven long-running service (Phase A)
+
+**Motivation:** the SPA on the phone (fiesta) previously spawned a fresh `make bot` per session (~15 s cold-start including Python imports + Chromium launch + tankpit login). Phase A ships a long-running Python service that keeps Chromium warm across sessions and exposes five HTTP routes so the SPA can Start/Stop/Mode a running bot in ~200 ms.
+
+**Landed:** `tankpit-bot-service` binary + `service/*` package (10 modules): `types` + `types_codecs` (Wire vocabulary and encode/decode), `mode_bridge` + `status_bus` (threadsafe cross-thread channels), `session_runner` (single-session coordinator), `http_server` (aiohttp app with 5 routes), `service_main` (`_async_main` + `main`), `_test_hooks` (DI hooks in `Services/: _test_hooks.py` style).
+
+**Wire surface added to `bot.ai.types.AIStateDict`:** `manual_mode: AIMode | None`, `live_radars_used: int`, `live_teleports: int`. The tick loop drains the mode bridge into `manual_mode` at the top of every tick; the executor increments the counters at radar/teleport dispatch call-sites via `apply_dispatch_counters` in `mode_controller.py`. The tick loop publishes a `SessionStatusDict` frame to the status bus after every tick.
+
+**Bot construction change:** `Bot.__init__` grew `mode_bridge: ModeBridgeProtocol | None = None` and `status_bus: StatusBusProtocol | None = None` kwargs. Defaults construct fresh inert instances so `make bot` (standalone) still works — a bridge no HTTP handler ever writes to always drains `None`, and a bus with zero subscribers publishes into the void.
+
+**New command:** `HoldCommandDict{ cmd_type: "hold" }` for manual `UNSET` — a no-op tick the executor recognises and skips dispatch on. `resolve_owner_from_manual` in `mode_controller.py` short-circuits `ai_strategy.decide` when `manual_mode` is set: `UNSET` → hold decision; `HUNT` / `COLLECT` → force that owner; `None` → auto-arbitrate.
+
+**Storage state persistence:** `browser/session_storage.py` (`STORAGE_STATE_PATH = Path("runs/state/tankpit.storage.json")`, `load_storage_state`, `save_storage_state`, `StorageStateCacheError`). `Bot.run` loads it before `new_context` (passes to Playwright as `storage_state=path` if present), and saves it after `wait_for_game_ready` — so cold-start login runs once per Chromium install; subsequent sessions skip the tankpit login flow entirely.
+
+**Baseline drift fixed alongside:** commit `d2e89ddd` (2026-07-10 fiesta streaming maximise-window workaround) had left `sniffer/core.py` with a `type: ignore`, an `os.environ.get`, an `except Exception: # noqa: BLE001`, and a `cdp: object` annotation — all guard violations. The Phase A pass fixed those (proper `CDPSessionProtocol` typing, `_test_hooks.get_env`, `require_int(window, "windowId")` failure surfaces loudly), extended `BrowserProtocol` / `BrowserTypeLaunchProtocol` to match the real Playwright signatures (`args` + `no_viewport` + `storage_state`), and updated the six fake Playwright families in tests/fakes/{base,bot,probe}.py + tests/action_lab/_replay_browser.py. Baseline `make check` was red before this pass; it is now green.
+
+**Structural updates:** architecture hub 5 → 6 pages; index total 52 → 53. New page: [[bot-service-architecture]].
+
+**Gate:** `make check` green — 4278 tests pass, 100% branch coverage on 18,341 statements + 5,190 branches, mypy strict clean across src + tests + scripts, guard clean, ruff clean. `asyncio_mode = "auto"` added to `[tool.pytest.ini_options]` so async tests type-check clean without the `@pytest.mark.asyncio` decorator (which leaks `Any` under strict mypy).
+
+## [2026-07-12] refactor | Bot-launch config extracted to bot/config.py (Phase A9)
+
+**Motivation:** the tankpit target URL and guest-vs-account preference env-var resolvers were duplicated between `bot/entry.py` (one-shot `tankpit-bot`) and `service/service_main.py` (long-running service). Two copies of the same env-parsing logic is a silent divergence risk — a semantics change to one would let the two commands quietly disagree about production defaults.
+
+**Landed:** new `bot/config.py` with `DEFAULT_TARGET_URL`, `resolve_target_url()`, `resolve_prefer_account()`. Both `entry.py` and `service_main.py` import from there. `entry.py` also switched its `.env` loading to route through `service_hooks.load_dotenv` so both entrypoints stub the same way in tests. `service_main.py` deleted its private `_resolve_target_url` / `_resolve_prefer_account`.
+
+**Tests:** new `tests/bot/test_config.py` (10 tests: defaults + env override + empty-string-as-unset for URL, missing/true/1/yes/case-insensitive/other for prefer_account). Deleted the duplicated `TestResolveTargetURL` / `TestResolvePreferAccount` blocks in `tests/service/test_service_main.py`.
+
+**Gate:** `make check` green — 4279 tests pass, 100% branch coverage on 18,345 statements + 5,190 branches. First-shot pass, no follow-up fixes needed.
+
+## [2026-07-12] add | fiesta bot-controls panel + SSE subscriber (Phase B)
+
+**Motivation:** Phase A stood up the bot service (`tankpit-bot-service`) but nothing on the SPA consumed it. Phase B ships the browser UI: a `<section class="bot-panel">` widget the phone renders on the tankpit profile, driving the bot via `/api/tankbot/*` and painting a live stats readout from the SSE `/status` stream.
+
+**Landed (fiesta, `MCPs/fiesta/src/tankbot/`):**
+- `types.ts` — TypeScript mirror of `service/types.py`. Strict literal-union types (`WireMode`, `AIMode`, `AIModeState`), immutable `readonly` interfaces (`ModeCommand`, `LiveStats`, `SessionStatus`), and full `decodeSessionStatus` / `decodeLiveStats` validators. Every SSE frame hits `decodeSessionStatus` at the seam — a mismatched literal throws instead of rendering a blank panel.
+- `TankbotHttpClient.ts` — constructor-DI HTTP client (same shape as `WebrtcHttpClient`). `postStart` / `postStop` / `postMode` throw on non-2xx; `subscribeStatus(onStatus, onError)` returns a dispose function.
+- `BotController.ts` — reactive state layer publishing one immutable `BotUIState` per change. `runIntent` uses `.then/.catch` chaining (matches the fiesta `no-try-catch-in-core` convention). Non-Error rejections rethrow instead of coercing to a soft state message.
+- `BotControlsView.ts` — DOM widget subscribing to controller state. Start / Stop pair swaps on `running`, mode buttons highlight the current `manualMode`, per-intent pending grey greys only the pressed button, SSE-error banner reveals a Reconnect button.
+- `_test_hooks.ts` — reuses the same `FetchFn` + `EventSourceFactory` protocols as the WebRTC client so production wires through the shared `productionFetch` + `productionEventSourceFactory` in `production-hooks.ts`.
+
+**Boot wiring (`boot/bot-controls.ts`, excluded from coverage like every other `boot/**`):** `main.ts` calls `wireBotControls(autoLaunchProfile)`; no-op on any profile ≠ `"tankpit"`; throws if `#bot-panel-host` is missing on the tankpit profile (drift, not a silent degradation). CSS shipped alongside — `.bot-panel` / `.bot-panel-host` / `.bot-panel__btn` rules in `style.css`; `?v=` bump to `64` so phones refresh the stylesheet.
+
+**Gate:** `make check` green in `MCPs/fiesta` — 749 tests pass, 100% coverage on statements + branches + functions + lines (1,434 statements, 692 branches, 284 functions), `mcp-guard` clean, ESLint clean, `tsc --noEmit` strict clean, no `any` / no `as` / no `@ts-*` / no test mocks / no weak assertions.
+
+**Structural updates:** [[bot-service-architecture]] page extended with a "Phase B — SPA bot-controls panel" section documenting the tankbot package + boot wiring + host CSS. Remaining phase: Phase C ships nginx `/api/tankbot/*` routing, the fiesta docker rebuild, and the `shell:startup` `.cmd` for the bot service on austinpc.
+
+## [2026-07-12] ship | Phase C — nginx route + docker rebuild + startup shortcut
+
+**Motivation:** Phases A + B stood up the service and the browser widget. Phase C is the plumbing that connects them end-to-end: nginx routes `/api/tankbot/*` from the phone through the fiesta container to the bot service on austinpc, the fiesta docker image is rebuilt so the config reaches production, and a `shell:startup` `.cmd` respawns the service on login so the operator does not manually launch it every reboot.
+
+**Landed (fiesta, `MCPs/fiesta/nginx.conf`):** new `location /api/tankbot/` block, placed before the `/api/` (Vibeshine) block so nginx's longest-prefix-match rule routes correctly. Uses the same Tailscale-IP literal (`100.77.206.124`) `proxy_pass` shape as `/api/webrtc/` — `host.docker.internal` remains unreachable under WSL2 mirrored networking (see the same nginx.conf's history comments for the 2026-07-01/02 investigation). SSE knobs (`proxy_buffering off`, `proxy_read_timeout 24h`) mirror the /api/webrtc/ ICE-stream settings so the `/status` frame stream flows without buffering.
+
+**Bot service (tankpitbot, `service/service_main.py`):** `_DEFAULT_HOST` flipped from `"127.0.0.1"` to `"0.0.0.0"` so the aiohttp site is reachable from the fiesta container via the host's Tailscale IPv4. Trust boundary is the machine's LAN + the operator's Tailnet — the same boundary Vibeshine already accepts on 47990. Test updated to match (`tests/service/test_service_main.py`).
+
+**Launcher (tankpitbot, `Makefile` `service:` target):** a `make service` target that respawns `poetry run tankpit-bot-service` on crash with a 5-second cooldown via a PowerShell `while ($true)` loop. Chose this over an initial `shell:startup` `.cmd` after weighing the trade-off — the service is just an aiohttp listener until the phone POSTs `/start`, so always-on has no benefit. `make service` sits next to `make bot` / `make sniff` in the same Makefile, foreground-terminal-friendly for debugging, zero setup. The initial `.cmd` was written and then removed (`scripts/tankpit-bot-service.cmd` deleted).
+
+**Fiesta docker rebuild:** `make up-fiesta` at the `MCPs/` top-level (which runs `docker compose up -d --no-deps --build fiesta`). The `mcp-fiesta` container recreated with the new nginx config. `nginx -t` inside the container confirmed the config parsed clean; `/api/tankbot/*` requests reach the proxy path (they time out until the bot service starts, then flip to 200).
+
+**Gate:** tankpitbot `make check` green — 4279 tests pass, 100% branch coverage (unchanged from A9). Fiesta `make check` remains green from Phase B — no fiesta-side code touched in Phase C, only nginx.conf.
+
+**How to bring it up end-to-end:** (1) `cd C:\Users\Test\PROJECTS\api\clients\tankpitbot; make service` — the terminal starts the aiohttp server on `0.0.0.0:47100` and stays foreground; (2) accept the Windows Firewall prompt for port 47100 (private networks) on first launch; (3) load `https://tankpit.austinwagner.org` on the phone. The bot-controls panel paints immediately and starts receiving SSE status frames within one tick. Ctrl+C in the terminal exits the respawn loop cleanly.
+
+## [2026-07-12] fix | Idempotent bot-service launch + phone SERVER button
+
+**Motivation:** the Phase C `make service` design had a race: `poetry run tankpit-bot-service` blind-launches, so a double-tap of a future SERVER button (or a second `make service`) would spawn a competing Python process, both fighting to bind port 47100 — one loses with ``OSError``, the outer respawn loop retries every 5 s forever, and the operator ends up with a stuck terminal that never recovers on its own. User's ask: "cant we fix the race issue properly? we have unlimited time, tokens and context."
+
+**Landed (idempotency, three layers):**
+
+1. **Service self-probe** — new `service_hooks.probe_existing_instance` DI hook. Probe implementation lives in its own module: `service/probe.py` (URL constant + `probe_health_url(url) -> bool` core + `default_probe_existing_instance()` wrapper). `service/_test_hooks.py` binds `probe_existing_instance` to `default_probe_existing_instance` and defines the Protocol; the utility stays out of the DI-plumbing file so each concern lives in one home ("lift don't fork"). Real probe uses stdlib `http.client.HTTPConnection` (not `urllib.request.urlopen` — `urlopen`'s context manager returns `Any` under strict mypy) to GET `http://127.0.0.1:47100/health` with a 1-second timeout; returns True only when the peer answers `200` with the exact body `"ok"` (the marker we own — a foreign HTTP server on the port cannot pass). `main()` calls this before `serve()`; on True, it logs "already responding" and exits 0 idempotently. Non-Error exceptions (URL parse errors) still raise — the probe only swallows the expected connectivity failures (`OSError`, `HTTPException`).
+
+2. **Makefile respawn discipline** — the `service:` recipe's `while ($true)` loop now distinguishes graceful exits (exit 0 → break) from crashes (nonzero → retry), and caps consecutive crashes at 3 before giving up. A double-invocation hits the probe short-circuit, the wrapper exits 0, the loop breaks, nothing spins.
+
+3. **Phone `SERVER` button** — `profiles/tankpit.json` gained a `menu-button` labelled `SERVER` beside `SNIFF`. Its `runCommand` spawns a persistent cmd window on the PC (`cmd /c start cmd /k "... && make service"`) — combined with layer 1, tapping it is safe under any state. Service down → new instance boots. Service up → new instance immediately exits with "already responding"; the phone-triggered cmd window stays open so the user sees the log line and closes it manually.
+
+**Tests:** dedicated `tests/service/test_probe.py` (mirrors the `service/probe.py` extraction — clean separation, no duplicate coverage). Contains `TestProbeHealthURL` (6 scenarios: `200 ok` → True; `200` wrong-body → False; non-200 status → False; connection refused → False; empty-path URL falls back to `/`; missing-host URL → ValueError) plus `TestDefaultProbeExistingInstance` (delegates-to-parameterized equivalence). `test_service_main.py`'s `TestMain` gained `test_short_circuits_when_probe_reports_existing_instance` — the load-bearing guard for double-tap safety. Sync `http.client` probe runs under `asyncio.to_thread` in the async aiohttp-server tests so the sync call does not deadlock the event loop the test server needs to accept the incoming TCP connection.
+
+**Gate:** tankpitbot `make check` green — 4287 tests pass, 100% coverage on 18,378 statements + 5,196 branches. Guard rules `except-without-log-or-raise` and `weak-assertion-isinstance` were both fired during the initial pass and fixed properly (`log.debug` on the probe's swallowed exception; equivalence check between wrapper and parameterized core instead of an `isinstance` check on the runtime-dependent bool).
+
+**Wiki:** [[bot-service-architecture]] Phase-C section extended with the idempotency + SERVER-button design + a new "What Phase C does NOT do" bullet clarifying that Stop-Server stays on the PC (Ctrl+C or close-window), not on the phone.

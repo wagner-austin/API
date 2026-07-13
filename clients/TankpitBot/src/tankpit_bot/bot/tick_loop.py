@@ -46,6 +46,13 @@ from tankpit_bot.runtime_logging import (
     get_bot_runtime_artifacts,
     set_runtime_context,
 )
+from tankpit_bot.service.types import (
+    SessionStatusDict,
+    make_live_stats,
+    make_session_status,
+    manual_to_wire_mode,
+    wire_mode_to_manual,
+)
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -114,6 +121,7 @@ def run_tick_loop(
     ticks_done = 0
     while True:
         _publish_tick_context(bot, ticks_done + 1)
+        _apply_pending_mode_override(bot)
         try:
             _tick_once(bot)
         except TargetClosedError:
@@ -124,6 +132,7 @@ def run_tick_loop(
             log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
             _emit_session_scorecard(bot, ticks_done, exit_reason=exit_request.reason)
             return
+        _publish_session_status(bot)
         ticks_done += 1
         if max_ticks > 0 and ticks_done >= max_ticks:
             log.info(
@@ -332,6 +341,60 @@ def _publish_tick_context(bot: Bot, tick_n: int) -> None:
         bot_state=f"{ai['mode']}/{ai['mode_state']}",
         in_flight_action_kind=action["kind"],
     )
+
+
+def _apply_pending_mode_override(bot: Bot) -> None:
+    """Drain the SPA mode bridge and stamp the override onto ``bot._ai_state``.
+
+    Runs at the top of every tick iteration in :func:`run_tick_loop`.
+    A drained :data:`WireMode` is translated through
+    :func:`wire_mode_to_manual` and written to
+    ``bot._ai_state["manual_mode"]`` so the tick's :func:`decide`
+    respects the pin. When the bridge is empty (no SPA input since the
+    last tick), ``bot._ai_state["manual_mode"]`` is left untouched —
+    manual overrides are sticky across ticks by design.
+
+    Args:
+        bot: Bot instance whose ``_mode_bridge`` and ``_ai_state`` are
+            mutated in place.
+    """
+    pending = bot._mode_bridge.drain()
+    if pending is None:
+        return
+    manual = wire_mode_to_manual(pending)
+    bot._ai_state = AIStateDict(**{**bot._ai_state, "manual_mode": manual})
+
+
+def _publish_session_status(bot: Bot) -> None:
+    """Build a :class:`SessionStatusDict` from ``bot._ai_state`` and publish it.
+
+    Runs at the bottom of every completed tick iteration in
+    :func:`run_tick_loop`. The published frame reflects the AI state
+    the tick just finalised — durable mode ownership, live counters,
+    the SPA-selected pin. Consumers (SSE subscribers) receive it
+    through the shared :class:`StatusBusProtocol`.
+
+    Args:
+        bot: Bot instance whose ``_status_bus`` receives the frame.
+    """
+    ai = bot._ai_state
+    stats = make_live_stats(
+        kills=ai["session_kill_count"],
+        hits=ai["session_hit_count"],
+        misses=ai["session_miss_count"],
+        radars_used=ai["live_radars_used"],
+        teleports=ai["live_teleports"],
+    )
+    status: SessionStatusDict = make_session_status(
+        running=True,
+        manual_mode=manual_to_wire_mode(ai["manual_mode"]),
+        active_mode=ai["mode"],
+        active_mode_state=ai["mode_state"],
+        session_started_ms=bot._start_timestamp_ms,
+        tick_timestamp_ms=get_current_time_ms(),
+        stats=stats,
+    )
+    bot._status_bus.publish(status)
 
 
 def _tick_once(bot: Bot) -> None:

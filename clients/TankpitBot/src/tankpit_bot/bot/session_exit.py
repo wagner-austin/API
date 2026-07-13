@@ -2,7 +2,7 @@
 
 The user contract (2026-07-02): when the bot cannot do its job, it must
 not degenerate into loops -- it ends the session with an explicit,
-analyzable reason. Two conditions are terminal:
+analyzable reason. Three conditions are terminal:
 
 * ``no_viable_targets`` -- a fresh map snapshot was inspected and no
   enemy passed the acquisition gates (affordability included). Raised
@@ -10,6 +10,13 @@ analyzable reason. Two conditions are terminal:
 * ``out_of_fuel`` -- the COLLECT owner has no lock, no pickup, no
   forage action, and cannot afford any search hop. Raised by the
   COLLECT owner (previously a bare ``ValueError`` crash).
+* ``no_productive_collect`` -- the COLLECT cascade produced no action
+  while inventory is below combat-ready (Bug 0.4/0.7, 2026-07-06):
+  fuel is healthy but duals, homings, or radars are below cap and no
+  tracked equipment container is affordably teleport-reachable. Under
+  the pre-fix code the cascade would yield to HUNT under-armed and
+  the bot would engage a fight it could not finish; ending the
+  session cleanly is preferable to that loop.
 
 ``run_tick_loop`` converts the request into the same graceful shutdown
 path as a tick-budget exit: scorecard emitted, summary written, index
@@ -20,7 +27,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-SessionExitReason = Literal["no_viable_targets", "out_of_fuel"]
+SessionExitReason = Literal["no_viable_targets", "out_of_fuel", "no_productive_collect"]
 
 
 class SessionExitError(Exception):

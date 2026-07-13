@@ -24,6 +24,7 @@ from tankpit_bot.bot.executor import (
 )
 from tankpit_bot.bot.tick_loop_types import make_tick_decision
 from tankpit_bot.bot.types import (
+    make_hold_command,
     make_map_open_command,
     make_move_command,
     make_pickup_equipment_command,
@@ -331,6 +332,20 @@ class TestDispatchCommand:
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
+    def test_dispatch_hold_sends_nothing(self, fake_env: FakeEnv) -> None:
+        """Hold command returns True and does not touch the wire.
+
+        The SPA-driven idle tick must not dispatch any CDP command;
+        the fake CDP session confirms no ``Runtime.evaluate`` reached
+        it while ``dispatch_command`` still reports success (the
+        desired effect — do nothing — was achieved).
+        """
+        bot, fake_cdp = _make_bot(fake_env)
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+        result = dispatch_command(bot, make_hold_command(), _make_snapshot())
+        assert result is True
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+
     def test_dispatch_map_open_sends_wire_only_when_already_visible(
         self, fake_env: FakeEnv
     ) -> None:
@@ -422,8 +437,18 @@ class TestExecutorValidationHelpers:
             raise AssertionError("expected tracked container at (104,100)")
         assert container["volume"] == 500
 
-    def test_valid_shoot_rejects_moved_target(self) -> None:
-        """Shoot validation rejects targets whose tracked coordinates drifted."""
+    def test_valid_shoot_accepts_clamped_aim_drift(self) -> None:
+        """Aim tile is a viewport-legal hint; target_id is the truth channel.
+
+        Under ``_clamp_aim_into_viewport`` the aim tile is deliberately
+        different from the target tank's current position: the server
+        picks homing from ``target_id`` (off-adjacent aim + valid target
+        id) and the seeker tracks the true target wherever it is. The
+        executor accepts the drift; rejecting it silently blocked every
+        clamped homing shot in the 2026-07-06 20:47:31 live-run deadlock
+        (26 s of client-side self-rejections). Only the tank-existence
+        race is guarded.
+        """
         world = _make_world()
         world["tanks"]["10"] = make_tank_state(
             tank_id=10,
@@ -441,7 +466,7 @@ class TestExecutorValidationHelpers:
 
         result = _is_valid_shoot(world, make_shoot_command(105, 103, 10))
 
-        assert result is False
+        assert result is True
 
     def test_valid_shoot_rejects_missing_target(self) -> None:
         """Shoot validation rejects unknown target ids."""

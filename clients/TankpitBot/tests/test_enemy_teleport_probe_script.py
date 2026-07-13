@@ -77,8 +77,9 @@ class _FakeBrowserType:
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
-        _ = (headless, slow_mo, timeout)
+        _ = (headless, slow_mo, timeout, args)
         raise AssertionError("playwright factory should not be invoked in this script test")
 
 

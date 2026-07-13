@@ -32,7 +32,7 @@ import types
 from collections.abc import Callable
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, JSONValue
 from tests.action_lab._replay_core import (
     FrameBatchSource,
     ReplayClock,
@@ -149,6 +149,18 @@ class RecordedBrowserContext:
             )
         return self._cdp
 
+    def storage_state(self) -> JSONObject:
+        """Return an empty Playwright storage-state snapshot.
+
+        The recorded harness never touches real cookies; returning the
+        canonical empty shape lets :func:`save_storage_state` write a
+        valid file through the fake filesystem in tests that drive the
+        bot's storage flow.
+        """
+        empty_cookies: list[JSONValue] = []
+        empty_origins: list[JSONValue] = []
+        return {"cookies": empty_cookies, "origins": empty_origins}
+
     def close(self, *, reason: str | None = None) -> None:
         """Record a context-close request without raising.
 
@@ -171,8 +183,14 @@ class RecordedBrowser:
         self._context = context
         self.close_calls: int = 0
 
-    def new_context(self) -> BrowserContextProtocol:
+    def new_context(
+        self,
+        *,
+        no_viewport: bool | None = None,
+        storage_state: str | None = None,
+    ) -> BrowserContextProtocol:
         """Return the harness browser context."""
+        _ = (no_viewport, storage_state)
         return self._context
 
     def close(self, *, reason: str | None = None) -> None:
@@ -203,6 +221,7 @@ class RecordedBrowserType:
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Record the launch request and return the harness browser.
 
@@ -210,11 +229,13 @@ class RecordedBrowserType:
             headless: Recorded for assertion purposes.
             slow_mo: Ignored (production uses defaults).
             timeout: Ignored (production uses defaults).
+            args: Recorded but ignored — the harness never spawns a real
+                browser process.
 
         Returns:
             The harness browser.
         """
-        _ = (slow_mo, timeout)
+        _ = (slow_mo, timeout, args)
         self.launches.append(headless)
         return self._browser
 

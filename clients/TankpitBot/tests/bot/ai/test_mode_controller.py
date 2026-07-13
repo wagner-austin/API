@@ -6,11 +6,14 @@ import pytest
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.mode_controller import (
+    apply_dispatch_counters,
     apply_mode_to_decision,
     clear_ai_mode,
     clear_mode_on_decision,
     derive_collect_mode_state,
     derive_hunt_mode_state,
+    make_hold_decision,
+    resolve_owner_from_manual,
     set_ai_mode,
     should_enter_collect,
     should_enter_hunt,
@@ -18,12 +21,14 @@ from tankpit_bot.bot.ai.mode_controller import (
     should_exit_hunt,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score, make_initial_ai_state
-from tankpit_bot.bot.tick_loop_types import make_tick_decision
+from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import (
+    BotCommand,
     make_map_open_command,
     make_move_command,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
+    make_radar_command,
     make_shoot_command,
     make_teleport_command,
 )
@@ -465,3 +470,200 @@ def test_derive_collect_mode_state_maps_sense_search_pickup_and_approach() -> No
     assert derive_collect_mode_state(search) == "SEARCH"
     assert derive_collect_mode_state(pickup) == "PICKUP"
     assert derive_collect_mode_state(approach) == "APPROACH"
+
+
+# =============================================================================
+# resolve_owner_from_manual
+# =============================================================================
+
+
+def test_resolve_owner_from_manual_returns_none_when_unset() -> None:
+    """``manual_mode = None`` yields ``None`` (auto-arbitration)."""
+    state = make_initial_ai_state()
+    assert state["manual_mode"] is None
+    assert resolve_owner_from_manual(state) is None
+
+
+def test_resolve_owner_from_manual_pins_unset() -> None:
+    """``manual_mode = "UNSET"`` short-circuits with the same literal."""
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "UNSET"})
+    assert resolve_owner_from_manual(state) == "UNSET"
+
+
+def test_resolve_owner_from_manual_pins_hunt() -> None:
+    """``manual_mode = "HUNT"`` short-circuits with the same literal."""
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "HUNT"})
+    assert resolve_owner_from_manual(state) == "HUNT"
+
+
+def test_resolve_owner_from_manual_pins_collect() -> None:
+    """``manual_mode = "COLLECT"`` short-circuits with the same literal."""
+    state = AIStateDict(**{**make_initial_ai_state(), "manual_mode": "COLLECT"})
+    assert resolve_owner_from_manual(state) == "COLLECT"
+
+
+# =============================================================================
+# make_hold_decision
+# =============================================================================
+
+
+def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
+    """Hold decision emits ``cmd_type = "hold"`` and clears durable ownership."""
+    state = AIStateDict(
+        **{
+            **make_initial_ai_state(),
+            "manual_mode": "UNSET",
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 12000,
+        }
+    )
+
+    decision = make_hold_decision(state, timestamp_ms=15000)
+
+    assert decision["command"]["cmd_type"] == "hold"
+    assert decision["updated_ai_state"]["mode"] == "UNSET"
+    assert decision["updated_ai_state"]["mode_state"] == ""
+    # A transition from HUNT into UNSET refreshes the started timestamp.
+    assert decision["updated_ai_state"]["mode_started_ms"] == 15000
+    assert decision["updated_ai_state"]["manual_mode"] == "UNSET"
+    assert decision["behavior"]["reason"] == "manual_hold"
+    assert decision["desired_equipment"] == []
+    assert decision["secondary_command"] is None
+
+
+def test_make_hold_decision_preserves_started_ms_when_already_unset() -> None:
+    """A UNSET → UNSET transition keeps the earlier ``mode_started_ms``."""
+    state = AIStateDict(
+        **{
+            **make_initial_ai_state(),
+            "manual_mode": "UNSET",
+            "mode": "UNSET",
+            "mode_state": "",
+            "mode_started_ms": 8000,
+        }
+    )
+
+    decision = make_hold_decision(state, timestamp_ms=15000)
+
+    assert decision["updated_ai_state"]["mode_started_ms"] == 8000
+
+
+# =============================================================================
+# apply_dispatch_counters
+# =============================================================================
+
+
+def _make_decision(
+    command: BotCommand,
+    ai_state: AIStateDict | None = None,
+    *,
+    secondary_command: BotCommand | None = None,
+) -> TickDecisionDict:
+    """Build a minimal :class:`TickDecisionDict` for counter tests.
+
+    Args:
+        command: Primary command for the decision.
+        ai_state: Optional AI state override; defaults to
+            :func:`make_initial_ai_state`.
+        secondary_command: Optional secondary command.
+
+    Returns:
+        A :class:`TickDecisionDict` suitable for exercising
+        :func:`apply_dispatch_counters`.
+    """
+    state = ai_state if ai_state is not None else make_initial_ai_state()
+    return make_tick_decision(
+        command=command,
+        behavior=make_behavior_score("HUNT", 100, 0, 0, "test"),
+        updated_ai_state=state,
+        desired_equipment=[],
+        secondary_command=secondary_command,
+    )
+
+
+def test_apply_dispatch_counters_increments_radars_used_on_radar() -> None:
+    """A radar primary advances ``live_radars_used`` by 1."""
+    decision = _make_decision(make_radar_command())
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["updated_ai_state"]["live_radars_used"] == 1
+    assert updated["updated_ai_state"]["live_teleports"] == 0
+
+
+def test_apply_dispatch_counters_increments_teleports_on_teleport() -> None:
+    """A teleport primary advances ``live_teleports`` by 1."""
+    decision = _make_decision(make_teleport_command(50, 60))
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["updated_ai_state"]["live_teleports"] == 1
+    assert updated["updated_ai_state"]["live_radars_used"] == 0
+
+
+def test_apply_dispatch_counters_leaves_counters_untouched_on_other_commands() -> None:
+    """A shoot / move / pickup / map_open primary leaves counters alone."""
+    for command in (
+        make_shoot_command(1, 2, 3),
+        make_move_command(10, 20),
+        make_pickup_fuel_command(30, 40),
+        make_pickup_equipment_command(50, 60),
+        make_map_open_command(),
+    ):
+        decision = _make_decision(command)
+        updated = apply_dispatch_counters(decision)
+        assert updated["updated_ai_state"]["live_radars_used"] == 0, command["cmd_type"]
+        assert updated["updated_ai_state"]["live_teleports"] == 0, command["cmd_type"]
+
+
+def test_apply_dispatch_counters_increments_secondary_radar() -> None:
+    """A radar as ``secondary_command`` also contributes to the counter."""
+    decision = _make_decision(
+        make_shoot_command(1, 2, 3),
+        secondary_command=make_radar_command(),
+    )
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["updated_ai_state"]["live_radars_used"] == 1
+    assert updated["updated_ai_state"]["live_teleports"] == 0
+
+
+def test_apply_dispatch_counters_increments_secondary_teleport() -> None:
+    """A teleport as ``secondary_command`` also contributes to the counter."""
+    decision = _make_decision(
+        make_shoot_command(1, 2, 3),
+        secondary_command=make_teleport_command(70, 80),
+    )
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["updated_ai_state"]["live_teleports"] == 1
+    assert updated["updated_ai_state"]["live_radars_used"] == 0
+
+
+def test_apply_dispatch_counters_accumulates_from_prior_state() -> None:
+    """Counter increments stack on the existing state values."""
+    state = AIStateDict(**{**make_initial_ai_state(), "live_radars_used": 3, "live_teleports": 7})
+    decision = _make_decision(make_radar_command(), state)
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["updated_ai_state"]["live_radars_used"] == 4
+    assert updated["updated_ai_state"]["live_teleports"] == 7
+
+
+def test_apply_dispatch_counters_preserves_untouched_fields() -> None:
+    """Applying counters does not clobber unrelated decision fields."""
+    decision = _make_decision(
+        make_teleport_command(100, 100),
+        secondary_command=make_radar_command(),
+    )
+
+    updated = apply_dispatch_counters(decision)
+
+    assert updated["command"] == decision["command"]
+    assert updated["behavior"] == decision["behavior"]
+    assert updated["desired_equipment"] == decision["desired_equipment"]
+    assert updated["secondary_command"] == decision["secondary_command"]

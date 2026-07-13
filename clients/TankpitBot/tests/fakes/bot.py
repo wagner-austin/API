@@ -125,44 +125,62 @@ class FakeCDPSessionBot:
         """Send CDP command.
 
         Returns a valid CDP response with ``{"result": {"value": ...}}``,
-        matching the real Chrome DevTools Protocol contract.
+        matching the real Chrome DevTools Protocol contract. The
+        ``Browser.getWindowForTarget`` / ``Browser.setWindowBounds``
+        pair used by ``_maximize_via_cdp`` returns a stable
+        ``windowId`` so the streamed-display bootstrap path can be
+        exercised through this fake.
         """
         self._sent_methods.append(method)
+        if method == "Browser.getWindowForTarget":
+            return {"windowId": 1}
         if method == "Runtime.evaluate" and params is not None:
-            expression = str(params.get("expression", ""))
-            if "window.__rawMsgs" in expression:
-                return {
-                    "result": {
-                        "value": _build_captured_raw_messages(
-                            self._selected_room,
-                            self._entered_room,
-                        )
-                    }
-                }
-            if "tankpit.magic" in expression:
-                return {"result": {"value": _FAKE_MAGIC}}
-            if "hasInventoryAnchor" in expression:
-                return {
-                    "result": {
-                        "value": (
-                            '{"bodyLength": 0, "hasInventoryAnchor": false, "hasChatAnchor": false}'
-                        )
-                    }
-                }
-            if "script[src]" in expression and "tpclient" in expression:
-                return {"result": {"value": _FAKE_TPCLIENT_URL}}
-            if "fetch(" in expression and "tpclient-test.js" in expression:
-                return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
-            body = _decode_injected_websocket_body(expression)
-            if body is not None:
-                if body.startswith(b"*"):
-                    self._selected_room = body[1:].decode("utf-8")
-                    return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
-                if body.startswith(b"+"):
-                    self._entered_room = _extract_enter_room_id(body)
-                    return {"result": {"value": f"SENT_{len(body) + 2}_BYTES via {self._ws_url}"}}
-                return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
+            return self._runtime_evaluate_result(str(params.get("expression", "")))
         return {"result": {"value": ""}}
+
+    def _runtime_evaluate_result(self, expression: str) -> JSONObject:
+        """Dispatch a ``Runtime.evaluate`` fake response by expression content.
+
+        Args:
+            expression: The JS source the caller asked Chromium to
+                evaluate.
+
+        Returns:
+            The fake CDP response the sniffer / bot should observe.
+        """
+        if "window.__rawMsgs" in expression:
+            return {
+                "result": {
+                    "value": _build_captured_raw_messages(
+                        self._selected_room,
+                        self._entered_room,
+                    )
+                }
+            }
+        if "tankpit.magic" in expression:
+            return {"result": {"value": _FAKE_MAGIC}}
+        if "hasInventoryAnchor" in expression:
+            return {
+                "result": {
+                    "value": (
+                        '{"bodyLength": 0, "hasInventoryAnchor": false, "hasChatAnchor": false}'
+                    )
+                }
+            }
+        if "script[src]" in expression and "tpclient" in expression:
+            return {"result": {"value": _FAKE_TPCLIENT_URL}}
+        if "fetch(" in expression and "tpclient-test.js" in expression:
+            return {"result": {"value": f'window.fakeTpclientKey="{_FAKE_STATIC_KEY}";'}}
+        body = _decode_injected_websocket_body(expression)
+        if body is None:
+            return {"result": {"value": ""}}
+        if body.startswith(b"*"):
+            self._selected_room = body[1:].decode("utf-8")
+            return {"result": {"value": f"SENT_4_BYTES via {self._ws_url}"}}
+        if body.startswith(b"+"):
+            self._entered_room = _extract_enter_room_id(body)
+            return {"result": {"value": f"SENT_{len(body) + 2}_BYTES via {self._ws_url}"}}
+        return {"result": {"value": f"SENT_5_BYTES via {self._ws_url}"}}
 
     def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
         """Register event handler."""
@@ -321,6 +339,12 @@ class FakeBrowserContextBot:
             self._page._cdp_session = self._cdp_session
         return self._cdp_session
 
+    def storage_state(self) -> JSONObject:
+        """Return an empty Playwright storage-state snapshot for the bot fake."""
+        empty_cookies: list[JSONValue] = []
+        empty_origins: list[JSONValue] = []
+        return {"cookies": empty_cookies, "origins": empty_origins}
+
     def close(self, *, reason: str | None = None) -> None:
         """Close context."""
         _ = reason
@@ -337,8 +361,14 @@ class FakeBrowserBot:
         """
         self._interrupt_after = interrupt_after
 
-    def new_context(self) -> BrowserContextProtocol:
+    def new_context(
+        self,
+        *,
+        no_viewport: bool | None = None,
+        storage_state: str | None = None,
+    ) -> BrowserContextProtocol:
         """Create new context."""
+        _ = (no_viewport, storage_state)
         return FakeBrowserContextBot(interrupt_after=self._interrupt_after)
 
     def close(self, *, reason: str | None = None) -> None:
@@ -363,9 +393,10 @@ class FakeBrowserTypeBot:
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Launch browser."""
-        _ = (headless, slow_mo, timeout)
+        _ = (headless, slow_mo, timeout, args)
         return FakeBrowserBot(interrupt_after=self._interrupt_after)
 
 

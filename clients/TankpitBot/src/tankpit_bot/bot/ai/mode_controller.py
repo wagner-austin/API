@@ -7,8 +7,10 @@ from tankpit_bot.bot.ai.context import (
     combat_reserve_restored,
 )
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
-from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
+from tankpit_bot.bot.types import BotCommand, make_hold_command
+from tankpit_bot.state.rank_formulas import combat_radar_min, inventory_capacity
 
 
 def clear_ai_mode(ai_state: AIStateDict) -> AIStateDict:
@@ -104,6 +106,125 @@ def apply_mode_to_decision(
         behavior=decision["behavior"],
         updated_ai_state=set_ai_mode(decision["updated_ai_state"], mode, mode_state, timestamp_ms),
         desired_equipment=decision["desired_equipment"],
+    )
+
+
+def resolve_owner_from_manual(ai_state: AIStateDict) -> AIMode | None:
+    """Return the durable owner pinned by the SPA, or ``None`` for auto.
+
+    The bot service surface writes :attr:`AIStateDict.manual_mode` when
+    the phone user picks a mode. Auto-arbitration only runs when the
+    field is ``None``; otherwise the pinned mode wins.
+
+    Args:
+        ai_state: Current AI state (already normalised by the caller).
+
+    Returns:
+        The pinned :data:`AIMode` when the SPA has selected one;
+        ``None`` when auto-arbitration should run.
+    """
+    return ai_state["manual_mode"]
+
+
+def _bump_dispatch_counter(state: AIStateDict, command: BotCommand) -> AIStateDict:
+    """Return state with the live dispatch counter for ``command`` advanced.
+
+    Args:
+        state: AI state to update.
+        command: Command being dispatched this tick.
+
+    Returns:
+        AI state whose ``live_radars_used`` or ``live_teleports`` is
+        incremented when ``command`` targets that path. Other command
+        types return ``state`` unchanged — those commands do not feed
+        the SPA stats panel.
+    """
+    if command["cmd_type"] == "radar":
+        return AIStateDict(**{**state, "live_radars_used": state["live_radars_used"] + 1})
+    if command["cmd_type"] == "teleport":
+        return AIStateDict(**{**state, "live_teleports": state["live_teleports"] + 1})
+    return state
+
+
+def apply_dispatch_counters(decision: TickDecisionDict) -> TickDecisionDict:
+    """Advance live dispatch counters for the commands in ``decision``.
+
+    Called by :func:`tankpit_bot.bot.ai_strategy.decide` on every
+    non-hold path just before the arbitrator returns. Each command in
+    the decision that maps to a tracked counter — radar or teleport —
+    contributes one increment; other command types leave the counter
+    untouched. Both the primary and (if present) secondary commands
+    contribute, because the executor dispatches both under the tick's
+    success gate.
+
+    The tick loop persists ``decision["updated_ai_state"]`` only after
+    :func:`tankpit_bot.bot.executor.execute` returns True, so a
+    validation-side rejection never leaks a counter increment into
+    the SPA stats panel — the wire and the panel stay aligned.
+
+    Args:
+        decision: Planner decision about to leave the arbitrator.
+
+    Returns:
+        Decision whose ``updated_ai_state`` reflects the dispatch
+        counters the executor will produce for the primary + secondary
+        commands.
+    """
+    state = _bump_dispatch_counter(decision["updated_ai_state"], decision["command"])
+    secondary = decision["secondary_command"]
+    if secondary is not None:
+        state = _bump_dispatch_counter(state, secondary)
+    return make_tick_decision(
+        command=decision["command"],
+        behavior=decision["behavior"],
+        updated_ai_state=state,
+        desired_equipment=decision["desired_equipment"],
+        secondary_command=secondary,
+    )
+
+
+def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecisionDict:
+    """Return a no-op decision for a manually-pinned idle tick.
+
+    Produced when :func:`resolve_owner_from_manual` resolves to
+    ``"UNSET"`` — the bot is connected, healthy, and should hold
+    position instead of arbitrating hunt vs. collect. Downstream:
+
+    * :func:`tankpit_bot.bot.executor.dispatch_command` sees
+      ``cmd_type == "hold"`` and returns immediately without touching
+      the wire.
+    * The durable mode ownership is cleared to ``UNSET`` / empty
+      substate; the durable ``mode_started_ms`` is refreshed whenever
+      the previous owner was something other than ``UNSET`` so the
+      bot-service status stream can report accurate idle duration.
+
+    Args:
+        ai_state: Current AI state.
+        timestamp_ms: Current tick timestamp in milliseconds.
+
+    Returns:
+        Tick decision that dispatches nothing and stamps ``UNSET``
+        ownership onto the returned AI state.
+    """
+    started_ms = timestamp_ms if ai_state["mode"] != "UNSET" else ai_state["mode_started_ms"]
+    return make_tick_decision(
+        command=make_hold_command(),
+        behavior=make_behavior_score(
+            mode="HUNT",
+            score=0,
+            target_x=0,
+            target_y=0,
+            reason="manual_hold",
+        ),
+        updated_ai_state=AIStateDict(
+            **{
+                **ai_state,
+                "mode": "UNSET",
+                "mode_state": "",
+                "mode_started_ms": started_ms,
+            }
+        ),
+        desired_equipment=[],
     )
 
 
@@ -213,6 +334,42 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     return combat_reserve_restored(ctx)
 
 
+def hunt_entry_permitted(ctx: DecideCtx) -> bool:
+    """Return True when the bot's inventory permits entering HUNT.
+
+    User contract (2026-07-06, Bug 0.4): the bot must never enter a
+    combat engagement below full duals + full homings + at-least
+    ``combat_radar_min`` extra radars. The 22:37 live run hit HUNT
+    with duals 12/25 + homings 3/25, engaged orange-8 under-armed,
+    exhausted its ammo mid-fight, hit the stationary-miss classifier
+    (Bug 0.6), and blocked a live target. Enforce the readiness gate
+    at every yield-to-hunt gesture: COLLECT never releases the tick
+    unless the bot could take the fight to completion.
+
+    The gate is inventory-only. Fuel readiness lives in
+    :func:`combat_reserve_restored` and the fuel-cascade already
+    guards it. The cardinal-shot override in
+    :mod:`tankpit_bot.bot.ai_strategy` (Bug 0.5) intentionally
+    bypasses this predicate for a free adjacent kill; even a single
+    dual advances the kill and is worth taking under-armed.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when duals and homings are at ``inventory_capacity(rank)``
+        and extra radars are at least ``combat_radar_min(rank)``.
+    """
+    rank = ctx.self_state["rank"]
+    cap = inventory_capacity(rank)
+    radar_floor = combat_radar_min(rank)
+    return (
+        ctx.inventory["dual_shots"]["count"] >= cap
+        and ctx.inventory["homing_shots"]["count"] >= cap
+        and ctx.inventory["extra_radars"]["count"] >= radar_floor
+    )
+
+
 def should_exit_hunt(ctx: DecideCtx) -> bool:
     """Return True when HUNT should release control.
 
@@ -277,11 +434,15 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
 
 
 __all__ = [
+    "apply_dispatch_counters",
     "apply_mode_to_decision",
     "clear_ai_mode",
     "clear_mode_on_decision",
     "derive_collect_mode_state",
     "derive_hunt_mode_state",
+    "hunt_entry_permitted",
+    "make_hold_decision",
+    "resolve_owner_from_manual",
     "set_ai_mode",
     "should_enter_collect",
     "should_enter_hunt",

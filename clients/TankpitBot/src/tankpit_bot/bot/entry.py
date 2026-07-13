@@ -46,13 +46,13 @@ def resolve_session_seconds(argv: list[str], env_value: str | None) -> int:
 
 def main() -> None:
     """Entry point for tankpit-bot command."""
-    from dotenv import load_dotenv
-
     from tankpit_bot.bot.base import Bot
+    from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
     from tankpit_bot.bot.tick_loop import request_interrupt, reset_interrupt_flag
+    from tankpit_bot.service import _test_hooks as service_hooks
     from tankpit_bot.sniffer.decoders import set_protocol_frame_logging
 
-    load_dotenv()
+    service_hooks.load_dotenv()
     session_seconds = resolve_session_seconds(
         _test_hooks.get_argv()[1:],
         _test_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"),
@@ -83,15 +83,11 @@ def main() -> None:
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
 
-    target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/"
-    prefer_account_str = _test_hooks.get_env("TANKPIT_PREFER_ACCOUNT")
-    prefer_account = prefer_account_str is not None and prefer_account_str.lower() in (
-        "true",
-        "1",
-        "yes",
+    bot = Bot(
+        resolve_target_url(),
+        headless=False,
+        prefer_account=resolve_prefer_account(),
     )
-
-    bot = Bot(target_url, headless=False, prefer_account=prefer_account)
     bot.run(session_seconds=session_seconds, stop_file_path=stop_file_path)
 
 

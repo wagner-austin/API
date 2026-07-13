@@ -494,6 +494,12 @@ class FakeBrowserContextProbe:
         _ = page
         return self._cdp_session
 
+    def storage_state(self) -> JSONObject:
+        """Return an empty Playwright storage-state snapshot for the probe fake."""
+        empty_cookies: list[JSONValue] = []
+        empty_origins: list[JSONValue] = []
+        return {"cookies": empty_cookies, "origins": empty_origins}
+
     def close(self, *, reason: str | None = None) -> None:
         """Close context."""
         _ = reason
@@ -532,8 +538,14 @@ class FakeBrowserProbe:
         self._viewport_result = viewport_result
         self._emit_during_stabilization = emit_during_stabilization
 
-    def new_context(self) -> BrowserContextProtocol:
+    def new_context(
+        self,
+        *,
+        no_viewport: bool | None = None,
+        storage_state: str | None = None,
+    ) -> BrowserContextProtocol:
         """Create new context."""
+        _ = (no_viewport, storage_state)
         ctx = FakeBrowserContextProbe(
             emit_messages=self._emit_messages,
             before_playing=self._before_playing,
@@ -588,9 +600,10 @@ class FakeBrowserTypeProbe:
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Launch browser."""
-        _ = (headless, slow_mo, timeout)
+        _ = (headless, slow_mo, timeout, args)
         browser = FakeBrowserProbe(
             emit_messages=self._emit_messages,
             before_playing=self._before_playing,

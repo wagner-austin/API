@@ -135,6 +135,11 @@ def dispatch_command(
         command was dispatched, or because the desired client state was
         already in place.
     """
+    if command["cmd_type"] == "hold":
+        # SPA-pinned idle tick — no wire traffic. Returning True keeps
+        # the tick loop's success accounting honest (the desired
+        # effect, "do nothing", was achieved).
+        return True
     if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
         return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":
@@ -240,25 +245,34 @@ def _tracked_container(
 
 
 def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a shoot command still targets the tracked tank.
+    """Return True when a shoot command still has a tracked target tank.
 
     Combat presence -- whether the target is a live tank rather than a
     map-only afterimage -- is decided once, upstream, by the HUNT owner's
     viewport-presence acquisition gate in :func:`analyze_threats`. The
-    executor's remaining job is the structural re-check that the target
-    still exists at the commanded tile after any same-tick world-state
-    update: a target that vanished or drifted is rejected. ``source`` no
-    longer gates the shot -- the old ``source``/viewport proxy admitted
-    afterimages that sat inside the viewport and is superseded by the
-    viewport-presence acquisition gate.
+    executor's remaining job is a race guard against the tank vanishing
+    from the registry between planner-decide and dispatch: without a
+    tracked tank there is no ``target_id`` for the server to route to
+    and the shot would crash the wire.
+
+    ``target_id`` is the truth channel. The server picks homing from the
+    id and the seeker tracks the true target wherever it is.
+    ``target_x``/``target_y`` are a viewport-legal aim hint used by the
+    server to route to homing; under
+    :func:`~tankpit_bot.bot.ai.combat_strategy._clamp_aim_into_viewport`
+    the aim tile is deliberately clamped inside the viewport and drift
+    between the aim and the tank's current position is intentional. The
+    executor does not reject on that drift -- rejecting it silently
+    blocked every clamped homing shot in the 2026-07-06 20:47:31
+    live-run deadlock, where 26 s of client-side self-rejections
+    accumulated before the loop broke.
 
     Args:
         world: Current world-state snapshot.
         command: Command selected by the planner.
 
     Returns:
-        True when the target tank still exists and still matches the
-        commanded coordinates.
+        True when the target tank still exists in the tank registry.
     """
     if command["cmd_type"] != "shoot":
         return True
@@ -269,16 +283,6 @@ def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
             command["target_x"],
             command["target_y"],
             command["target_id"],
-        )
-        return False
-    if tank["x"] != command["target_x"] or tank["y"] != command["target_y"]:
-        emit_ai(
-            "rejecting shoot at (%d,%d): target id=%d moved to (%d,%d)",
-            command["target_x"],
-            command["target_y"],
-            command["target_id"],
-            tank["x"],
-            tank["y"],
         )
         return False
     return True

@@ -22,12 +22,14 @@ httpx = "^0.28"
 rich = "^14.0"
 python-dotenv = "^1.0.0"
 pillow = "^11.0"
+aiohttp = "^3.10"
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 platform-core = { path = "../../libs/platform_core", develop = true }
 
 [tool.poetry.scripts]
 tankpit-sniff = "tankpit_bot.sniffer.core:main"
 tankpit-bot = "tankpit_bot.bot.entry:main"
+tankpit-bot-service = "tankpit_bot.service.service_main:main"
 tankpit-teleport-probe = "scripts.teleport_probe:main"
 tankpit-enemy-teleport-probe = "scripts.enemy_teleport_probe:main"
 tankpit-fuel-probe = "scripts.fuel_probe:main"
@@ -107,7 +109,10 @@ branch = true
 # Playwright's sync API drives the browser on a greenlet; without this,
 # coverage loses the tracer across its context switches and under-counts
 # in-process code that runs after a CDP call (e.g. screenshot decode).
-concurrency = ["greenlet"]
+# ``thread`` is added so the bot-service ``StatusBus`` /
+# ``ModeBridge`` primitives — which cross the aiohttp thread and the
+# tick-loop thread by design — get their arcs traced too.
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 precision = 2
@@ -118,3 +123,8 @@ fail_under = 100
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-v -n auto --dist loadscope --basetemp .pytest_tmp"
+# ``asyncio_mode = "auto"`` treats every ``async def`` test as if it
+# carried ``@pytest.mark.asyncio``. Without it the marker decorator
+# leaks ``Any`` through mypy's strict rules; with it we type-check
+# clean async tests without a decorator surface.
+asyncio_mode = "auto"

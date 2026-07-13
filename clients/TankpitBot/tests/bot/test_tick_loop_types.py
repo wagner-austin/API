@@ -12,6 +12,7 @@ from tankpit_bot.bot.tick_loop_types import (
     make_tick_decision,
 )
 from tankpit_bot.bot.types import (
+    make_hold_command,
     make_map_open_command,
     make_move_command,
     make_pickup_equipment_command,
@@ -199,3 +200,15 @@ class TestDecodeValidation:
         full["command"] = {"cmd_type": "UNKNOWN", "target_x": 0, "target_y": 0}
         with pytest.raises(ValueError, match="Unknown cmd_type"):
             decode_tick_decision(full)
+
+    def test_encode_decode_hold_command_roundtrip(self) -> None:
+        """Hold decisions round-trip through encode/decode."""
+        cmd = make_hold_command()
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
+        ai_state = make_initial_ai_state()
+        original = make_tick_decision(cmd, behavior, ai_state, [])
+        encoded = encode_tick_decision(original)
+        assert encoded["command"] == {"cmd_type": "hold"}
+        decoded = decode_tick_decision(encoded)
+        assert decoded["command"]["cmd_type"] == "hold"
+        assert decoded == original

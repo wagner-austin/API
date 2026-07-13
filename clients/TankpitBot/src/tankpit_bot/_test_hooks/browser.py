@@ -12,6 +12,8 @@ from __future__ import annotations
 import types
 from typing import Protocol
 
+from platform_core.json_utils import JSONObject
+
 from tankpit_bot._test_hooks.cdp import CDPSessionProtocol, PageProtocol
 
 
@@ -40,6 +42,20 @@ class BrowserContextProtocol(Protocol):
         """
         ...
 
+    def storage_state(self) -> JSONObject:
+        """Snapshot the context's cookies + localStorage as a JSON object.
+
+        The bot's session-storage layer dumps this snapshot to disk
+        after ``wait_for_game_ready`` so the next launch can restore
+        auth without repeating the login flow.
+
+        Returns:
+            A dict shaped like ``{"cookies": [...], "origins": [...]}``
+            per Playwright's storage-state format. The bot serialises
+            it via ``platform_core.json_utils.dump_json_str``.
+        """
+        ...
+
     def close(self, *, reason: str | None = None) -> None:
         """Close the browser context.
 
@@ -55,8 +71,27 @@ class BrowserProtocol(Protocol):
     Matches playwright.sync_api.Browser interface for methods we use.
     """
 
-    def new_context(self) -> BrowserContextProtocol:
+    def new_context(
+        self,
+        *,
+        no_viewport: bool | None = None,
+        storage_state: str | None = None,
+    ) -> BrowserContextProtocol:
         """Create a new browser context.
+
+        Args:
+            no_viewport: When ``True``, Playwright will not clamp the
+                page to its default 1280x720 viewport. Used by the
+                streamed-display path so the browser fills the
+                display-sized window (see
+                ``_chrome_stream_no_viewport``); other callers omit it
+                and get Playwright's stable default viewport for tests.
+            storage_state: Optional filesystem path Playwright will
+                seed the context's cookies + localStorage from. The bot
+                passes the path returned by
+                :func:`tankpit_bot.browser.session_storage.load_storage_state`
+                so subsequent launches skip the tankpit login flow.
+                ``None`` starts fresh.
 
         Returns:
             New browser context instance.
@@ -81,6 +116,7 @@ class BrowserTypeLaunchProtocol(Protocol):
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Launch a browser instance.
 
@@ -88,6 +124,9 @@ class BrowserTypeLaunchProtocol(Protocol):
             headless: Whether to run browser in headless mode. Defaults to True.
             slow_mo: Slows down operations by the specified milliseconds.
             timeout: Maximum time to wait for browser to start in milliseconds.
+            args: Extra command-line flags forwarded to Chromium. The
+                sniffer + bot use this to pin the browser to the streamed
+                display (see ``_chrome_stream_display_args``).
 
         Returns:
             Browser instance.
@@ -104,6 +143,7 @@ class BrowserTypeProtocol(Protocol):
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Launch a browser instance.
 
@@ -111,6 +151,9 @@ class BrowserTypeProtocol(Protocol):
             headless: Whether to run browser in headless mode. Defaults to True.
             slow_mo: Slows down operations by the specified milliseconds.
             timeout: Maximum time to wait for browser to start in milliseconds.
+            args: Extra command-line flags forwarded to Chromium. The
+                sniffer + bot use this to pin the browser to the streamed
+                display (see ``_chrome_stream_display_args``).
 
         Returns:
             Browser instance.

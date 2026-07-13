@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.ai_strategy import decide
+from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import reset_world_state
-from tankpit_bot.state.types import TankStateDict, make_tank_state
+from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -511,3 +512,82 @@ class TestDecideKillCooldown:
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+
+    def test_miss_on_stationary_target_without_damaging_weapon_disengages(self) -> None:
+        """Ammo-exhausted miss on a stationary live target disengages, not blocks.
+
+        Live run 2026-07-06 22:39/22:40 (Bug 0.6): the bot entered
+        combat under Bug 0.5's cardinal-shot override with duals=0 +
+        homings=0, fired ``weapon=0`` (server-picked single, forced
+        because no damaging weapon was available), missed, and the
+        stationary-miss classifier wrongfully blacklisted a live
+        target. The classifier now checks the ammo state at
+        classification time: without at least one damaging weapon
+        (dual or homing) enabled and stocked, the ``weapon=0`` miss
+        is an ``ammo_exhaustion_miss`` -- do NOT blacklist the
+        target. Instead release the combat lock and disengage to
+        COLLECT (the fuel container at (100,101) provides the
+        cascade with a legal recovery action).
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=101,
+                y=100,
+                team=2,
+                rank=1,
+                name="Enemy",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        containers = {
+            "100,101": make_container_state(
+                x=100,
+                y=101,
+                is_fuel=True,
+                volume=100,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks, containers=containers)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "Enemy",
+            }
+        )
+        # Ammo exhausted: dual + homing both at 0. The mode selector's
+        # cardinal-shot override (Bug 0.5) still routes this tick to
+        # HUNT because the enemy at (101,100) is Manhattan 1 from the
+        # bot; without the Bug 0.6 fix the miss classifier would
+        # blacklist the target.
+        exhausted_slot = InventoryItem(count=0, enabled=True)
+        stocked_slot = InventoryItem(count=30, enabled=True)
+        inventory = InventoryState(
+            armor_shields=stocked_slot,
+            dual_shots=exhausted_slot,
+            missile_shots=stocked_slot,
+            homing_shots=exhausted_slot,
+            extra_radars=stocked_slot,
+        )
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+
+        assert decision["command"]["cmd_type"] != "shoot"
+        assert decision["updated_ai_state"]["combat_target_id"] == -1
+        assert "50" not in decision["updated_ai_state"]["blocked_combat_targets"]

@@ -482,9 +482,46 @@ def _equipment_candidate_distance(item: tuple[int, ContainerStateDict]) -> int:
     return item[0]
 
 
+def find_all_tracked_equipment(world: WorldStateDict) -> list[ContainerStateDict]:
+    """Return every tracked equipment container across the whole map.
+
+    ``find_nearest_equipment`` filters to the current viewport bounds
+    -- what the bot can walk to right now -- but ``world.containers``
+    accumulates every equipment container revealed by radar or 0x5A
+    patch since the session began. When the current viewport is dry
+    the bot still needs a target to hop to, and Bug 0.7 introduces
+    the equipment-hop cascade step consuming this atlas. The filter
+    is minimal:
+
+    * ``is_fuel = False`` -- fuel dots have their own hop path in
+      :func:`~tankpit_bot.bot.ai.resource_search.make_resource_search_hop`.
+    * ``failed_pickups == 0`` -- containers the server has already
+      refused (empty, geometry, inventory-full) stay refused; the
+      hop path does not retry them.
+
+    Stale beliefs are accepted: a container revealed 5 minutes ago
+    may have been picked up by another player and no wire signal
+    confirms distant consumption. The pragmatic Phase 0 hop pays the
+    wasted-teleport cost when the container is gone.
+
+    Args:
+        world: Current world state.
+
+    Returns:
+        Every equipment container in ``world["containers"]`` that has
+        not been blacklisted by prior failed pickups.
+    """
+    return [
+        container
+        for container in world["containers"].values()
+        if not container["is_fuel"] and container["failed_pickups"] == 0
+    ]
+
+
 __all__ = [
     "describe_container_search",
     "find_adjacent_container",
+    "find_all_tracked_equipment",
     "find_best_fuel",
     "find_equipment_candidates",
     "find_nearest_deposit",

@@ -106,6 +106,34 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
+    def test_run_maximises_via_cdp_on_streamed_display(self, fake_env: FakeEnv) -> None:
+        """Bot.run() flips the window to maximised via CDP on the streamed display.
+
+        When Vibeshine's launcher sets ``SUNSHINE_STREAM_DISPLAY_*``,
+        ``_chrome_stream_no_viewport`` becomes ``True`` and the
+        post-launch maximise branch in :meth:`Bot.run` fires. The fake
+        CDP session returns a well-formed ``windowId`` so the run
+        completes without raising.
+        """
+        from tankpit_bot import _test_hooks
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes import fake_sync_playwright_bot
+
+        original = _test_hooks.sync_playwright
+        fake_env.set("SUNSHINE_STREAM_DISPLAY_X", "0")
+        fake_env.set("SUNSHINE_STREAM_DISPLAY_Y", "0")
+        fake_env.set("SUNSHINE_STREAM_DISPLAY_W", "1920")
+        fake_env.set("SUNSHINE_STREAM_DISPLAY_H", "1080")
+        _test_hooks.sync_playwright = fake_sync_playwright_bot
+
+        try:
+            bot = Bot("https://test.tankpit.com/", headless=True)
+            bot.run(session_seconds=0, stop_file_path=_STOP)
+            assert bot._cdp is None
+            assert bot._page is None
+        finally:
+            _test_hooks.sync_playwright = original
+
     def test_run_saves_capture_session(
         self,
         fake_env: FakeEnv,

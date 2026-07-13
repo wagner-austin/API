@@ -442,9 +442,15 @@ class FakeCDPSession:
         """Send CDP command.
 
         Returns a valid CDP response with ``{"result": {"value": ...}}``,
-        matching the real Chrome DevTools Protocol contract.
+        matching the real Chrome DevTools Protocol contract. The
+        ``Browser.getWindowForTarget`` / ``Browser.setWindowBounds``
+        pair used by ``_maximize_via_cdp`` returns a stable
+        ``windowId`` so the streamed-display bootstrap path can be
+        exercised through this fake.
         """
         self._sent_methods.append(method)
+        if method == "Browser.getWindowForTarget":
+            return {"windowId": 1}
         if method != "Runtime.evaluate" or params is None:
             return {"result": {"value": ""}}
         expression = str(params.get("expression", ""))
@@ -564,6 +570,8 @@ class FakeCDPSessionRateLimited:
     def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
         """Send CDP command, returning rate limit error on 3rd Runtime.evaluate."""
         self._sent_methods.append(method)
+        if method == "Browser.getWindowForTarget":
+            return {"windowId": 1}
         if method != "Runtime.evaluate":
             result: JSONObject = {}
             return result
@@ -959,6 +967,18 @@ class FakeBrowserContext:
         _ = page
         return self._cdp_session
 
+    def storage_state(self) -> JSONObject:
+        """Return an empty Playwright storage-state snapshot.
+
+        The fake browser has no real cookies or origins to serialise;
+        returning the canonical empty shape lets
+        :func:`save_storage_state` write a valid file through the fake
+        filesystem without touching real Playwright.
+        """
+        empty_cookies: list[JSONValue] = []
+        empty_origins: list[JSONValue] = []
+        return {"cookies": empty_cookies, "origins": empty_origins}
+
     def close(self, *, reason: str | None = None) -> None:
         """Close context."""
         _ = reason
@@ -994,8 +1014,14 @@ class FakeBrowser:
         self._script_urls = script_urls
         self._magic = magic
 
-    def new_context(self) -> BrowserContextProtocol:
+    def new_context(
+        self,
+        *,
+        no_viewport: bool | None = None,
+        storage_state: str | None = None,
+    ) -> BrowserContextProtocol:
         """Create new context."""
+        _ = (no_viewport, storage_state)
         ctx = FakeBrowserContext(
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,
@@ -1046,9 +1072,10 @@ class FakeBrowserType:
         headless: bool | None = None,
         slow_mo: float | None = None,
         timeout: float | None = None,
+        args: list[str] | None = None,
     ) -> BrowserProtocol:
         """Launch browser."""
-        _ = (headless, slow_mo, timeout)
+        _ = (headless, slow_mo, timeout, args)
         browser = FakeBrowser(
             emit_messages=self._emit_messages,
             rate_limited=self._rate_limited,

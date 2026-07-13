@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run
 
 help:
 	@Write-Host ""
@@ -34,6 +34,7 @@ help:
 	@Write-Host "  make track                       enemy tracking probe (wire vs JS truth)"
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
+	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
 	@Write-Host "  make analyze                     issue report + cross-session stats"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
 	@Write-Host ""
@@ -189,6 +190,25 @@ bot: install
 	@Write-Host ""
 	@Write-Host "==> bot (live HFSM)" -ForegroundColor Cyan
 	poetry run tankpit-bot
+
+# Long-running HTTP + SSE server the fiesta SPA drives via /api/tankbot/*.
+# Listens on 0.0.0.0:47100; the phone's Start Bot button POSTs /start
+# which kicks off a live tankpit session (headed Chromium in this
+# console's user session — needs a real display).
+#
+# Respawn discipline:
+#   * exit 0 = graceful (Ctrl+C caught in main OR the idempotency
+#     probe short-circuited because another instance is already
+#     serving). Break the loop; nothing to retry.
+#   * nonzero = actual crash. Retry after a 5 s cooldown, but cap
+#     at 3 consecutive crashes so a hard failure (port permanently
+#     bound by a foreign process, dependency import error) fails
+#     fast instead of spinning forever.
+service: install
+	@Write-Host ""
+	@Write-Host "==> service (long-running SPA-driven HTTP + SSE server)" -ForegroundColor Cyan
+	@Write-Host "  Listens on 0.0.0.0:47100; Ctrl+C to stop." -ForegroundColor DarkGray
+	$$crashCount = 0; while ($$true) { Write-Host ""; Write-Host "[service] Starting at $$(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Cyan; poetry run tankpit-bot-service; if ($$LASTEXITCODE -eq 0) { Write-Host "[service] Exited cleanly; done." -ForegroundColor Green; break }; $$crashCount = $$crashCount + 1; if ($$crashCount -ge 3) { Write-Host "[service] 3 consecutive crashes; giving up." -ForegroundColor Red; exit 1 }; Write-Host "[service] Crashed (exit=$$LASTEXITCODE); restarting in 5s ($$crashCount/3)" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
 
 run: install
 	@Write-Host ""
