@@ -1,7 +1,7 @@
 """Tests for :mod:`tankpit_bot.service.probe`.
 
 The probe is exercised against a fixture-owned aiohttp test server
-bound to a random free port — never the production 47100 — so the
+bound to a random free port — never the production 27100 — so the
 tests stay stable regardless of whether a real service happens to be
 running on the developer's machine.
 """

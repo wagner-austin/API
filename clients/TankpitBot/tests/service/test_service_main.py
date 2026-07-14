@@ -27,6 +27,7 @@ from tankpit_bot.service._test_hooks import (
     _real_load_dotenv,
     _real_serve,
 )
+from tankpit_bot.service.constants import SERVICE_HOST, SERVICE_PORT
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.service_main import (
     _async_main,
@@ -282,8 +283,8 @@ class TestAsyncMain:
 
         async def fake_build_site(app: web.Application, host: str, port: int) -> SiteRunnerProtocol:
             received_apps.append(app)
-            assert host == "0.0.0.0"
-            assert port == 47100
+            assert host == SERVICE_HOST
+            assert port == SERVICE_PORT
             return fake_site
 
         service_hooks.build_site = fake_build_site

@@ -23,6 +23,7 @@ from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol
+from tankpit_bot.service.constants import SERVICE_HOST, SERVICE_PORT
 from tankpit_bot.service.http_server import make_app
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import SessionRunner
@@ -31,16 +32,6 @@ from tankpit_bot.service.types import idle_session_status
 
 log = get_logger(__name__)
 
-# Bind on every interface so the fiesta docker container's nginx
-# can proxy ``/api/tankbot/*`` to the host — the container reaches
-# the host via the host's Tailscale IPv4 (100.77.206.124), not
-# loopback, because docker networking on Windows/WSL2 cannot
-# forward-to-loopback reliably (see MCPs/fiesta/nginx.conf for the
-# 2026-07-01/02 history that led to the Tailscale-IP proxy_pass).
-# Trust boundary: the machine's LAN + the operator's Tailnet — the
-# same boundary Vibeshine already accepts on 47990.
-_DEFAULT_HOST = "0.0.0.0"
-_DEFAULT_PORT = 47100
 _DEFAULT_STOP_FILE = Path("runs/state/STOP")
 
 
@@ -70,7 +61,7 @@ async def run_service_forever(
         await site.cleanup()
 
 
-async def _async_main(host: str = _DEFAULT_HOST, port: int = _DEFAULT_PORT) -> None:
+async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> None:
     """Wire the primitives, publish an initial idle frame, and serve forever.
 
     Site construction goes through :data:`service_hooks.build_site` so
@@ -122,8 +113,8 @@ def main() -> None:
     if service_hooks.probe_existing_instance():
         log.info(
             "tankpit-bot-service already responding on %s:%d; exiting idempotently.",
-            _DEFAULT_HOST,
-            _DEFAULT_PORT,
+            SERVICE_HOST,
+            SERVICE_PORT,
         )
         return
     try:

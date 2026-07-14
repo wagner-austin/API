@@ -1,6 +1,6 @@
 # Bot Service Architecture
 
-The bot service (`tankpit-bot-service`) is the long-running Python process that lets the phone SPA drive live tankpit sessions over HTTP. It hosts an aiohttp server on `127.0.0.1:47100`; the fiesta docker container's nginx proxies `/api/tankbot/*` to it. Landed 2026-07-12 as Phase A of the SPA-driven bot design.
+The bot service (`tankpit-bot-service`) is the long-running Python process that lets the phone SPA drive live tankpit sessions over HTTP. It hosts an aiohttp server on `127.0.0.1:27100`; the fiesta docker container's nginx proxies `/api/tankbot/*` to it. Landed 2026-07-12 as Phase A of the SPA-driven bot design.
 
 ## The three shared primitives
 
@@ -121,7 +121,7 @@ The always-on argument (make headed Chromium ready) is a nothing-burger: the ser
 
 **Deployment:** `make up-fiesta` from `MCPs/` (which runs `docker compose up -d --no-deps --build fiesta`) is the only step needed to ship an nginx.conf change. The bot service side is `make service` in the tankpitbot repo — no install step at all.
 
-**Idempotency (probe-before-bind)** — a second launch is a no-op, not a crash-loop. The `main()` entry-point calls `service_hooks.probe_existing_instance()` before `serve()`. The default implementation sends an HTTP `GET /health` on `127.0.0.1:47100`; a `200 ok` response is the marker we own end-to-end (any other body means a foreign server on the port, not us) — so we exit 0 with an "already responding" log line. The Makefile's respawn loop treats exit 0 as "graceful, break" and only retries on nonzero, with a 3-consecutive-crash cap. Net effect: double-tap of the phone SERVER button spawns a new terminal, probes the existing service, prints "already responding" and stays open (the user closes it manually) — no port fight, no lockup.
+**Idempotency (probe-before-bind)** — a second launch is a no-op, not a crash-loop. The `main()` entry-point calls `service_hooks.probe_existing_instance()` before `serve()`. The default implementation sends an HTTP `GET /health` on `127.0.0.1:27100`; a `200 ok` response is the marker we own end-to-end (any other body means a foreign server on the port, not us) — so we exit 0 with an "already responding" log line. The Makefile's respawn loop treats exit 0 as "graceful, break" and only retries on nonzero, with a 3-consecutive-crash cap. Net effect: double-tap of the phone SERVER button spawns a new terminal, probes the existing service, prints "already responding" and stays open (the user closes it manually) — no port fight, no lockup.
 
 **Phone-driven `SERVER` button** — `profiles/tankpit.json` gained a `menu-button` labeled `SERVER` beside `SNIFF`. Its `runCommand` (`cmd /c start cmd /k "cd ... && make service"`) spawns a new persistent cmd window on the PC running `make service`. Combined with the idempotency check, tapping the button is now safe under any state: service down → new instance boots; service up → new instance exits immediately with the "already running" log.
 
@@ -129,6 +129,6 @@ The always-on argument (make headed Chromium ready) is a nothing-burger: the ser
 
 - No always-on auto-start. The operator runs `make service` (or taps the phone SERVER button) when they want the bot available. If they never do, `/api/tankbot/*` times out from the phone — the failure mode is loud, not subtle.
 - No "Stop Server" button. To stop the server itself (not the game session), the operator Ctrl+Cs the `make service` terminal or closes the window. Killing the SERVER from the phone would require a taskkill-by-title hack that is fragile; the trade-off is deliberate.
-- No Windows Firewall automation. The first launch of the service will prompt for port 47100; the operator accepts for private networks.
+- No Windows Firewall automation. The first launch of the service will prompt for port 27100; the operator accepts for private networks.
 
 See also: [Coding Standards](coding-standards.md) (the strictness rules Phases A / B / C were written under), [Inheritance Chain](inheritance-chain.md) (how Bot slots into the runner).

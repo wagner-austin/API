@@ -192,7 +192,7 @@ bot: install
 	poetry run tankpit-bot
 
 # Long-running HTTP + SSE server the fiesta SPA drives via /api/tankbot/*.
-# Listens on 0.0.0.0:47100; the phone's Start Bot button POSTs /start
+# Listens on 0.0.0.0:27100; the phone's Start Bot button POSTs /start
 # which kicks off a live tankpit session (headed Chromium in this
 # console's user session — needs a real display).
 #
@@ -207,7 +207,7 @@ bot: install
 service: install
 	@Write-Host ""
 	@Write-Host "==> service (long-running SPA-driven HTTP + SSE server)" -ForegroundColor Cyan
-	@Write-Host "  Listens on 0.0.0.0:47100; Ctrl+C to stop." -ForegroundColor DarkGray
+	@Write-Host "  Listens on 0.0.0.0:27100; Ctrl+C to stop." -ForegroundColor DarkGray
 	$$crashCount = 0; while ($$true) { Write-Host ""; Write-Host "[service] Starting at $$(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Cyan; poetry run tankpit-bot-service; if ($$LASTEXITCODE -eq 0) { Write-Host "[service] Exited cleanly; done." -ForegroundColor Green; break }; $$crashCount = $$crashCount + 1; if ($$crashCount -ge 3) { Write-Host "[service] 3 consecutive crashes; giving up." -ForegroundColor Red; exit 1 }; Write-Host "[service] Crashed (exit=$$LASTEXITCODE); restarting in 5s ($$crashCount/3)" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
 
 run: install

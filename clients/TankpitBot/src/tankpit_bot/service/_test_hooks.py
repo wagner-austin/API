@@ -76,7 +76,7 @@ class ProbeExistingInstanceProtocol(Protocol):
         """Return True when a tankpit-bot-service instance already responds.
 
         Returns:
-            True when ``GET http://127.0.0.1:47100/health`` returns
+            True when ``GET http://127.0.0.1:27100/health`` returns
             ``200 ok``; False when the port is idle OR another
             (non-us) process holds the port and does not answer
             ``/health`` with the expected body.
@@ -190,6 +190,13 @@ async def _real_build_site(
 ) -> SiteRunnerProtocol:
     """Production site factory — wires aiohttp's split AppRunner + TCPSite.
 
+    ``reuse_address=True`` is passed to :class:`web.TCPSite` so a
+    restart within Windows' ~120 s ``TIME_WAIT`` window succeeds
+    instead of failing with ``WinError 10048`` (EADDRINUSE). Every
+    Ctrl+C exit + immediate ``make service`` restart pattern hits
+    this if the flag is missing; the flag maps to the underlying
+    ``SO_REUSEADDR`` socket option, which is the standard fix.
+
     Args:
         app: Routed :class:`web.Application` to serve.
         host: Loopback host to bind to.
@@ -201,7 +208,10 @@ async def _real_build_site(
     """
     aiohttp_runner = web.AppRunner(app)
     await aiohttp_runner.setup()
-    return _AiohttpSite(aiohttp_runner, web.TCPSite(aiohttp_runner, host, port))
+    return _AiohttpSite(
+        aiohttp_runner,
+        web.TCPSite(aiohttp_runner, host, port, reuse_address=True),
+    )
 
 
 def _real_load_dotenv() -> None:

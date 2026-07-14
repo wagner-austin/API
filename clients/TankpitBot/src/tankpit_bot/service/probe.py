@@ -20,17 +20,14 @@ from urllib.parse import urlparse
 
 from platform_core.logging import get_logger
 
+from tankpit_bot.service.constants import HEALTH_URL
+
 log = get_logger(__name__)
 
 
-HEALTH_URL = "http://127.0.0.1:47100/health"
-"""Fixed loopback + port + path the probe targets in production.
-
-The literal is public + module-scoped on purpose — tests read it via
-import to assert :func:`default_probe_existing_instance` delegates to
-the same URL, without hard-coding a duplicate constant in the test
-file.
-"""
+# ``HEALTH_URL`` re-exported for callers that only import from
+# :mod:`tankpit_bot.service.probe`. Every value lives in
+# :mod:`tankpit_bot.service.constants` — single source of truth.
 
 
 def probe_health_url(url: str) -> bool:
