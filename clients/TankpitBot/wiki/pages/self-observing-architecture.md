@@ -1,0 +1,192 @@
+---
+title: Self-Observing Bot Architecture
+tags: [architecture, decisions, observability, contracts, ledger, memory]
+related: [[bot-behavior-contract]], [[coding-standards]], [[combat-chase-bug]]
+sources: [docs/handoffs/self-observing-bot-architecture.md; live incident 2026-07-06 20:47:31]
+fact_checked: 2026-07-06
+confidence: high
+---
+
+# Self-Observing Bot Architecture
+
+The tank_pit bot has been organically built one action at a time. Each action grew its own diagnostic channel: `wire_complete` for scan/move/teleport/collect/map_open, `teleport_attempt` for teleports, `combat_feedback` for shots. Three parallel diagnostic fabrics with no shared contract, and one class of failure — client-side executor discards — that no channel covered at all. The 2026-07-06 20:47:31 live deadlock exposed the gap: 26 seconds of silent self-rejection because a bare `emit_ai("rejecting shoot at ...")` log line looked identical to a legitimate server rejection and no structured event correlated the discard to the planner's decision.
+
+The corrected architecture treats the bot as a self-observing decision system with four layers, one cross-cutting contracts framework, and one philosophical principle: **fail hard on state entry, not soft on state observation.**
+
+## Foundational principle
+
+**The bot cannot enter a wrong state.** State transitions have contracts. Contract violations raise on the transition, not after N observations of the consequences.
+
+- No repeated-failure detection. No "wait until N tries then complain."
+- No anomaly thresholds over consequences. Anomalies are just late notifications of contract violations that should have raised earlier.
+- Races vs bugs are structurally distinguished: if the planner had the evidence and used it correctly, a same-tick external change is a race → replan gracefully. If the planner should have checked but didn't → contract violation, raise.
+
+The 20:47:31 deadlock under this architecture: at tick 1, the executor sees the tank position is not in the registry, raises `ShootTargetNotTrackedError`, session exits with a specific error naming the planner-generated command. The human fixes the planner. No retry counter. No anomaly detector. No 26-second wait.
+
+## What the bot is missing today — the fifteen
+
+Each item has the same shape: **missing** state / what it looks like **present** / what we have **today**.
+
+### 1. Standardized WHAT (action outcomes) — ⚠️ partial
+
+- **Missing:** silent discards, no correlation dispatch↔outcome, three parallel diagnostic channels.
+- **Present:** unified `action_outcome` event per attempt (all six action kinds).
+- **Today:** partial via `combat_feedback` / `wire_complete` / `teleport_attempt`.
+
+### 2. Standardized WHY (decision reasoning) — ❌
+
+- **Missing:** free-text `reason` strings, unstructured, dropped after log.
+- **Present:** `reason_kind` (Literal) + `reason_context` (TypedDict) per Decision.
+- **Today:** `emit_ai("reason=…")` strings only.
+
+### 3. Predictions and their accuracy — ❌
+
+- **Missing:** bot commits to actions without stating what it EXPECTS to happen. Can't tell when its world model is wrong.
+- **Present:** before each decision, structured `PredictionDict` of expected outcome + specifics. After outcome, `matched_prediction: bool` computed. `prediction_accuracy_by_reason_kind` derived across runs.
+- **Example:** when the bot teleports to purple-4 at (172,107), it doesn't predict "purple-4 will be at (172,107) when I land." So it can't learn that targets with recent teleport activity don't stay put.
+- **Today:** no expected-hit-rate per weapon, per range, per target rank.
+
+### 4. Alternatives considered — ❌
+
+- **Missing:** planner picks target A, we never record that B and C were also candidates and why they lost.
+- **Present:** `alternatives: list[RankedAlternativeDict]` on every Decision. Post-hoc: "was my ranking right? was the second choice better historically?"
+- **Example:** HUNT picks red-8 as top threat, orange-4 was #2 at score 780, red-5 was #3 at 650. If red-8 always escapes and orange-4 always dies, the ranking is miscalibrated — but today we can't discover this because we didn't record the ranking.
+- **Today:** acquisition scores aren't structured in a queryable form.
+
+### 5. Confidence / uncertainty — ❌
+
+- **Missing:** decisions are binary commitments. No "70% sure the container has 400 fuel" or "45% sure this target will hold still."
+- **Present:** `Confidence[0,1]` field on every Fact and Decision; low-confidence triggers verification actions (extra radar, scan-on-landing).
+- **Example:** the bot treats a container discovered 30 s ago the same as one discovered 3 s ago. Different confidences, same commitment.
+- **Today:** the retired freshness TTL was a crude single-threshold proxy for this.
+
+### 6. Provenance for facts — ⚠️ containers only
+
+- **Missing:** when the bot believes "container at (150,150) has vol=400," it doesn't record whether that belief came from 0x5A viewport patch, 0x43 cache update, 0x4F radar reveal, or a game-log inference — so it can't reason about trust; every belief is treated as equally reliable.
+- **Present:** every world-state field carries `source: FactSource + observed_ms + provenance_chain`. Planner can weight beliefs by source reliability.
+- **Today:** `ContainerStateDict.source` and `refresh_kind` capture this for containers only. Not extended to tanks, mines, terrain, or self-tank state.
+- **Example:** after the 30 s freshness TTL fix, the bot trusts any in-viewport container. But a container revealed by a stale radar cache and one confirmed by the current 0x5A sweep have different provenance — different trust.
+
+### 7. Per-entity memory — ❌
+
+- **Missing:** every enemy is treated identically. If Yuppler tends to marathon and Kirby tends to stand and fight, the bot doesn't record that pattern.
+- **Present:** `per_entity_memory: dict[EntityId, EntityMemoryDict]` — tracked across ticks (and eventually across sessions).
+- **Example:** Sigma's guide is entirely built on this — Type 1/2/3 target categorization from per-player observation.
+- **Today:** `killed_tank_ids` and `blocked_combat_targets` are ad-hoc partial memory. Not general.
+
+### 8. Cross-session persistence — ❌
+
+- **Missing:** every session starts blank. No memory of yesterday's game, no map-specific hot spots, no learned enemy behaviors.
+- **Present:** a session artifact (JSONL + SQLite index) that accumulates per-map and per-entity beliefs, re-loaded at bot start.
+- **Example:** field01 (Practice room) is played every session. We could know its fuel-dot decay rate, hot combat zones, typical enemy density.
+- **Today:** `docs/handoffs/` accumulates human-authored handoffs; nothing machine-consumable.
+
+### 9. Causal chain — ❌
+
+- **Missing:** "I teleported → landed adjacent → fired dual → hit → homed off → target teleported" is a chain implied by the log, not queryable data.
+- **Present:** every event carries `caused_by: list[EventId]`. Chains form a DAG; queries traverse.
+- **Example:** to answer "when I get a kill, what typical sequence led there?" you eyeball the log. Should be a query.
+- **Today:** only implicit ordering.
+
+### 10. Anomaly detection — REJECTED
+
+- The whole category is a symptom of missing contracts. All would-be anomalies are contract violations that should raise at state entry, not after accumulating observations.
+- The one exception: `PredictionModelDriftError` fires when the planner's stated prediction accuracy falls below its own committed threshold — that IS a contract on the planner ("your model is broken"), not anomaly detection over consequences.
+
+### 11. Mode transitions — ⚠️ partial
+
+- **Missing:** mode changes (COLLECT ↔ HUNT) happen via cascade fall-through, not first-class events. Why did we transition? Was it the right time?
+- **Present:** `mode_transition` diagnostic on every mode change with `from_mode`, `to_mode`, `reason_kind`, world snapshot.
+- **Today:** emitted in `emit_ai` free text.
+
+### 12. Time budgets — ❌
+
+- **Missing:** no "I've been engaged with purple-4 for 30 s; should I disengage?" Time-aware self-control is minimal.
+- **Present:** per-decision time budgets that expire and force re-evaluation. `TimeBudgetExpiredError` raises at expiry.
+- **Example:** the 20:47:31 deadlock consumed 26 s on one target. A "30-second engagement budget" would have forced disengage.
+
+### 13. Self-model — ❌
+
+- **Missing:** the bot has no model of its own performance. Doesn't know that at range 3 it hits 90% of the time but at range 6 only 40%. Doesn't know its dot-relay landed-exact rate vs combat-landing rate.
+- **Present:** aggregated `SelfModelDict` derived from the ledger, exposed on `DecideCtx`.
+- **Example:** bot commits to homing pursuit not knowing its historical off-viewport hit rate is 20%. Would rather teleport-close.
+- **Today:** `session_hit_count` / `session_miss_count` are the only self-observations, and they're not per-context.
+
+### 14. Comparative baselines — ❌
+
+- **Missing:** no session-to-session comparison. This session vs last session, this hour vs baseline, this map vs typical.
+- **Present:** `runs_index.tsv` aggregation feeding a "compare-to-baseline" scorecard line.
+- **Today:** `runs_index.tsv` exists but isn't consumed for comparison during play.
+
+### 15. Feature-flag experiments — ❌
+
+- **Missing:** no way to A/B test a hypothesis. "Would blocking targets after 2 rejections be better?" — only way to answer is deploy and see.
+- **Present:** config-flag machinery so a fraction of sessions run variant A vs variant B, with paired outcome comparison.
+- **Today:** config values are static.
+
+## The four-layer architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 4: MEMORY (long-lived, cross-tick, cross-session)       │
+│  Per-entity behavior models, per-map facts, session index,     │
+│  self-model, feature-flag store                                │
+└────────────────────────────────────────────────────────────────┘
+                            ▲    │
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 3: LEDGER (per-attempt, in-session)                     │
+│  Decisions, Outcomes, ring buffer, causal chain,               │
+│  mode transitions                                               │
+└────────────────────────────────────────────────────────────────┘
+                            ▲    │
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 2: DECISION ENGINE (per-tick)                           │
+│  Planners consume Facts + Memory + Ledger + SelfModel          │
+│  Emit Decisions with evidence, predictions, alternatives,      │
+│  confidence, time budgets                                       │
+└────────────────────────────────────────────────────────────────┘
+                            ▲    │
+┌────────────────────────────────────────────────────────────────┐
+│ Layer 1: FACTS (world model with metadata)                    │
+│  Every fact: value + source + observed_ms + confidence +       │
+│              provenance_chain                                   │
+└────────────────────────────────────────────────────────────────┘
+                            ▲
+                     WIRE + LOGS
+```
+
+**Cross-cutting: `contracts/`** — `ContractError` base + `@enforce_contract` decorator + guard rule scanning for public mutations that skip enforcement.
+
+## Phase roadmap
+
+The full architecture is a multi-phase multi-session commitment. Each phase leaves the tree green and shippable.
+
+| Phase | Deliverable | LoC | Sessions |
+|---|---|---|---|
+| 0 | Immediate deadlock fix: delete executor position-check | 200 | 1 |
+| 1 | `contracts/` + `facts/` foundation | 800 | 2-3 |
+| 2 | `ledger/` core (Outcomes, Decisions, Ring, Causal, ModeTransitions) | 2500 | 4-6 |
+| 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
+| 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
+| 5 | Aggregation (self-model + baselines + experiments) | 1500 | 2-3 |
+
+Total: ~9000 LoC production + ~13500 LoC tests + wiki. 14-21 sessions of focused work.
+
+Detailed phase specs live in `docs/handoffs/self-observing-bot-architecture.md`.
+
+## Why we're building this
+
+The 20:47:31 deadlock is one instance of a class. The class is "decisions and outcomes live in disjoint observability channels." Every future bug of that class hides the same way. Fixing the specific bug closes one instance; installing the architecture closes the class.
+
+The 15 items above are not features — they are the shape of what "a bot that can learn from itself" requires. Each item names a specific blind spot the bot has today. The 20:47:31 deadlock hit at least four of them (1, 3, 10, 12) simultaneously. Any single item, present, would have surfaced the bug within seconds instead of hiding it for 26 seconds.
+
+## Related pages
+
+- [[bot-behavior-contract]] — the current contract for AI behavior (updated in each phase)
+- [[coding-standards]] — style guide, ban list, testing patterns
+- [[combat-chase-bug]] — the closest prior architectural bug, closed by decoupling planner from executor
+- [[game-economy]] — wire-verified action costs; the substrate the ledger records above
+
+## Provenance
+
+Design conversation: 2026-07-06 session, driven by user's observation "we were missing standardized WHY, and WHAT — what else are we missing?" Full architectural spec in `docs/handoffs/self-observing-bot-architecture.md`.
