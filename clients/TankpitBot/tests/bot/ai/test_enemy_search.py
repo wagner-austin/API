@@ -31,7 +31,7 @@ class TestDecideMapOpen:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
 
     def test_no_map_open_when_enemy_visible(self) -> None:
         """decide() skips generic map-open fallback when a live enemy is visible.
@@ -64,7 +64,7 @@ class TestDecideMapOpen:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] != "find_enemies"
+        assert decision["behavior"]["reason_kind"] != "find_enemies"
 
     def test_fallback_exits_when_fresh_map_shows_no_viable_target(self) -> None:
         """A fresh map snapshot with nothing viable ends the session.

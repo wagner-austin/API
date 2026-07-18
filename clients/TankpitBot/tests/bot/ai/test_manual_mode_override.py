@@ -83,5 +83,5 @@ def test_manual_unset_produces_hold_decision() -> None:
     assert decision["command"]["cmd_type"] == "hold"
     assert decision["updated_ai_state"]["mode"] == "UNSET"
     assert decision["updated_ai_state"]["mode_state"] == ""
-    assert decision["behavior"]["reason"] == "manual_hold"
+    assert decision["behavior"]["reason_kind"] == "manual_hold"
     assert decision["desired_equipment"] == []

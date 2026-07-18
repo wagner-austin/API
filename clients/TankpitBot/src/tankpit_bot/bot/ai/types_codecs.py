@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from platform_core.json_utils import (
     JSONObject,
+    JSONTypeError,
     JSONValue,
     require_bool,
+    require_dict,
     require_int,
     require_str,
 )
@@ -24,12 +26,14 @@ from tankpit_bot.bot.ai.modes import (
 )
 from tankpit_bot.bot.ai.types import (
     BEHAVIOR_MODES,
+    REASON_KINDS,
     AIConfigDict,
     AIStateDict,
     BehaviorMode,
     BehaviorScoreDict,
     EnemyThreatDict,
     PathStepDict,
+    ReasonKind,
 )
 
 
@@ -58,6 +62,48 @@ def _require_behavior_mode(data: JSONObject, key: str) -> BehaviorMode:
 # =========================================================================
 
 
+def _require_reason_kind(data: JSONObject, key: str) -> ReasonKind:
+    """Validate and extract a reason kind from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated reason kind.
+
+    Raises:
+        JSONTypeError: If the value is not a supported reason kind.
+    """
+    raw = require_str(data, key)
+    for kind in REASON_KINDS:
+        if raw == kind:
+            return kind
+    raise JSONTypeError(f"{key} must be one of {REASON_KINDS}, got {raw!r}")
+
+
+def _require_reason_context(data: JSONObject, key: str) -> dict[str, str | int]:
+    """Validate and extract a reason context map from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated scalar context map.
+
+    Raises:
+        JSONTypeError: If the value is not a str/int-valued object.
+    """
+    raw = require_dict(data, key)
+    context: dict[str, str | int] = {}
+    for field, value in raw.items():
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise JSONTypeError(f"{key}[{field!r}] must be str or int")
+        context[field] = value
+    return context
+
+
 def encode_behavior_score(score: BehaviorScoreDict) -> JSONObject:
     """Encode BehaviorScoreDict to JSON-serializable dict.
 
@@ -73,7 +119,8 @@ def encode_behavior_score(score: BehaviorScoreDict) -> JSONObject:
         "target_x": score["target_x"],
         "target_y": score["target_y"],
         "target_id": score["target_id"],
-        "reason": score["reason"],
+        "reason_kind": score["reason_kind"],
+        "reason_context": dict(score["reason_context"]),
     }
 
 
@@ -96,7 +143,8 @@ def decode_behavior_score(data: JSONObject) -> BehaviorScoreDict:
         target_x=require_int(data, "target_x"),
         target_y=require_int(data, "target_y"),
         target_id=require_int(data, "target_id"),
-        reason=require_str(data, "reason"),
+        reason_kind=_require_reason_kind(data, "reason_kind"),
+        reason_context=_require_reason_context(data, "reason_context"),
     )
 
 

@@ -4,12 +4,13 @@ This module is pure: it takes a path to a JSONL events stream (the
 artifact :mod:`tankpit_bot.runtime_logging` writes during ``make bot``
 or ``make <name>-probe`` runs), parses every event through the real
 :func:`tankpit_bot.runtime_logging.decode_runtime_event_record`
-decoder, classifies the relevant DIAGNOSTIC / WIRE / WIRE_COMPLETE
+decoder, classifies the relevant DIAGNOSTIC / WIRE
 events into structured records, and returns the aggregate report.
 
 Categorization rules:
 
-* ``teleport_attempt`` DIAGNOSTIC events become
+* ``teleport_attempt`` DIAGNOSTIC events (action-lab probes; the
+  live bot records teleports as ``action_outcome`` events) become
   :class:`TeleportAttemptRecordDict` rows. Success vs failure is
   decided by the ``status`` field -- the only status strings considered
   successful are ``landed_exact`` and ``landed_inexact``.
@@ -20,8 +21,8 @@ Categorization rules:
 * ``session_room_joined`` DIAGNOSTIC events populate the report's
   ``session_room`` field; if more than one is present the LAST one
   wins so reconfigured sessions are reflected.
-* ``WIRE_COMPLETE`` channel events become
-  :class:`WireCompleteRecordDict` rows.
+* ``action_outcome`` DIAGNOSTIC events (the ledger's unified
+  per-attempt fabric) become :class:`ActionOutcomeRowDict` rows.
 * ``WIRE`` channel events whose message starts with ``map_open`` count
   toward the ``map_open_dispatches`` total.
 * ``STATE`` transitions, ``shoot(`` WIRE dispatches, and
@@ -38,12 +39,12 @@ from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.issue_report_types import (
+    ActionOutcomeRowDict,
     FuelTargetSelectionRecordDict,
     IssueReportDict,
     MapOpenSkippedRecordDict,
     SessionRoomRecordDict,
     TeleportAttemptRecordDict,
-    WireCompleteRecordDict,
 )
 from tankpit_bot.diagnostics.session_scorecard import (
     ScorecardAccumulatorDict,
@@ -170,20 +171,23 @@ def _classify_session_room(record: RuntimeEventRecordDict) -> SessionRoomRecordD
     )
 
 
-def _classify_wire_complete(record: RuntimeEventRecordDict) -> WireCompleteRecordDict:
-    """Build a typed WIRE_COMPLETE row.
+def _classify_action_outcome(record: RuntimeEventRecordDict) -> ActionOutcomeRowDict:
+    """Build a typed action-outcome row from a DIAGNOSTIC event.
 
     Args:
-        record: Decoded event record on the ``WIRE_COMPLETE`` channel.
+        record: Decoded event record whose ``diagnostic_kind`` is
+            ``action_outcome``.
 
     Returns:
-        Strict-typed wire complete row.
+        Strict-typed action outcome row.
     """
     fields = record["fields"]
-    return WireCompleteRecordDict(
+    return ActionOutcomeRowDict(
         action_kind=require_str_field(fields, "action_kind"),
+        outcome=require_str_field(fields, "outcome"),
+        event_id=require_int_field(fields, "event_id"),
+        attempt_id=require_int_field(fields, "attempt_id"),
         duration_ms=require_int_field(fields, "duration_ms"),
-        signal=require_str_field(fields, "signal"),
         timestamp=record["timestamp"],
     )
 
@@ -207,7 +211,7 @@ class _ReportAccumulatorDict(TypedDict):
         map_open_skipped: ``map_open_skipped_already_open`` events
             observed so far.
         fuel_target_selections: Fuel target selections observed so far.
-        wire_completes: WIRE_COMPLETE events observed so far.
+        action_outcomes: ``action_outcome`` events observed so far.
         session_room: Last ``session_room_joined`` event seen, or None.
         mode: Latest non-empty mode string observed.
         map_open_dispatches: Count of ``WIRE`` events whose message
@@ -220,7 +224,7 @@ class _ReportAccumulatorDict(TypedDict):
     teleport_attempts: list[TeleportAttemptRecordDict]
     map_open_skipped: list[MapOpenSkippedRecordDict]
     fuel_target_selections: list[FuelTargetSelectionRecordDict]
-    wire_completes: list[WireCompleteRecordDict]
+    action_outcomes: list[ActionOutcomeRowDict]
     session_room: SessionRoomRecordDict | None
     mode: str
     map_open_dispatches: int
@@ -234,7 +238,7 @@ def _new_accumulator() -> _ReportAccumulatorDict:
         teleport_attempts=[],
         map_open_skipped=[],
         fuel_target_selections=[],
-        wire_completes=[],
+        action_outcomes=[],
         session_room=None,
         mode="unconfigured",
         map_open_dispatches=0,
@@ -260,7 +264,9 @@ def _classify_diagnostic_record(
     kind = record["fields"].get("diagnostic_kind")
     if not isinstance(kind, str):
         return
-    if kind == "teleport_attempt":
+    if kind == "action_outcome":
+        accumulator["action_outcomes"].append(_classify_action_outcome(record))
+    elif kind == "teleport_attempt":
         accumulator["teleport_attempts"].append(_classify_teleport_attempt(record))
     elif kind == "map_open_skipped_already_open":
         accumulator["map_open_skipped"].append(_classify_map_open_skipped(record))
@@ -287,9 +293,7 @@ def _route_record(
     if record["mode"]:
         accumulator["mode"] = record["mode"]
     channel = record["channel"]
-    if channel == "WIRE_COMPLETE":
-        accumulator["wire_completes"].append(_classify_wire_complete(record))
-    elif channel == "WIRE":
+    if channel == "WIRE":
         if record["message"].startswith("map_open"):
             accumulator["map_open_dispatches"] += 1
     elif channel == "DIAGNOSTIC":
@@ -331,10 +335,21 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
 
     teleport_attempts = accumulator["teleport_attempts"]
     fuel_target_selections = accumulator["fuel_target_selections"]
-    wire_completes = accumulator["wire_completes"]
-    teleport_success = sum(1 for a in teleport_attempts if a["status"] in _LANDED_STATUSES)
+    action_outcomes = accumulator["action_outcomes"]
+    teleport_outcomes = [o for o in action_outcomes if o["action_kind"] == "teleport"]
+    teleport_success = sum(1 for a in teleport_attempts if a["status"] in _LANDED_STATUSES) + sum(
+        1 for o in teleport_outcomes if o["outcome"] in _LANDED_STATUSES
+    )
+    # ``superseded`` is a re-plan (the decision was replaced before the
+    # wire resolved it), not a failed landing -- excluded from failures.
+    teleport_superseded = sum(1 for o in teleport_outcomes if o["outcome"] == "superseded")
+    teleport_total = len(teleport_attempts) + len(teleport_outcomes) - teleport_superseded
     fuel_selected = sum(1 for s in fuel_target_selections if s["target_present"])
-    map_open_completions = sum(1 for w in wire_completes if w["action_kind"] == "map_open")
+    map_open_completions = sum(
+        1
+        for o in action_outcomes
+        if o["action_kind"] == "map_open" and o["outcome"] == "map_data_processed"
+    )
 
     return IssueReportDict(
         source_path=str(source_path),
@@ -344,9 +359,9 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
         teleport_attempts=teleport_attempts,
         map_open_skipped=accumulator["map_open_skipped"],
         fuel_target_selections=fuel_target_selections,
-        wire_completes=wire_completes,
+        action_outcomes=action_outcomes,
         teleport_success_count=teleport_success,
-        teleport_failure_count=len(teleport_attempts) - teleport_success,
+        teleport_failure_count=teleport_total - teleport_success,
         fuel_selected_count=fuel_selected,
         fuel_rejected_count=len(fuel_target_selections) - fuel_selected,
         map_open_dispatches=accumulator["map_open_dispatches"],

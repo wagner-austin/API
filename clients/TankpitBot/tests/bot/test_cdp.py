@@ -1188,7 +1188,7 @@ class TestBotEquipmentManagement:
         )
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 10),
-            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot enemy", target_id=10),
+            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot_target", target_id=10),
             updated_ai_state=rejected_state,
             desired_equipment=[],
         )

@@ -33,10 +33,12 @@ def _render_header(report: IssueReportDict) -> list[str]:
 
 def _render_teleport_section(report: IssueReportDict) -> list[str]:
     """Return the teleport-attempt section lines."""
+    superseded = report["scorecard"]["action_outcome_counts"].get("teleport:superseded", 0)
     lines = [
-        f"=== TELEPORTS ({len(report['teleport_attempts'])} attempts; "
-        f"success={report['teleport_success_count']} "
-        f"failure={report['teleport_failure_count']}) ==="
+        f"=== TELEPORTS (success={report['teleport_success_count']} "
+        f"failure={report['teleport_failure_count']} "
+        f"superseded={superseded}; "
+        f"lab_attempt_rows={len(report['teleport_attempts'])}) ==="
     ]
     for attempt in report["teleport_attempts"]:
         marker = "[OK]" if attempt["status"] in _LANDED_STATUSES else "[FAIL]"
@@ -85,17 +87,17 @@ def _render_fuel_section(report: IssueReportDict) -> list[str]:
     return lines
 
 
-def _render_wire_complete_section(report: IssueReportDict) -> list[str]:
-    """Return the WIRE_COMPLETE section lines."""
-    lines = ["=== WIRE_COMPLETE EVENTS ==="]
-    if not report["wire_completes"]:
+def _render_action_outcome_section(report: IssueReportDict) -> list[str]:
+    """Return the ACTION OUTCOMES section lines."""
+    lines = ["=== ACTION OUTCOMES ==="]
+    if not report["action_outcomes"]:
         lines.append("  (none)")
     else:
-        for wc in report["wire_completes"]:
+        for row in report["action_outcomes"]:
             lines.append(
-                f"  action_kind={wc['action_kind']} "
-                f"signal={wc['signal']} "
-                f"duration_ms={wc['duration_ms']}"
+                f"  {row['action_kind']}#{row['attempt_id']} "
+                f"outcome={row['outcome']} "
+                f"duration_ms={row['duration_ms']}"
             )
     lines.append("")
     return lines
@@ -118,6 +120,11 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
         f"ghosts_blocked={scorecard['combat_ghosts_blocked']} "
         f"stale_pos_blocked={scorecard['combat_stale_positions_blocked']} "
         f"damage_changes={scorecard['tank_damage_changes']}",
+        "  outcomes: "
+        + (
+            " ".join(f"{key}={count}" for key, count in scorecard["action_outcome_counts"].items())
+            or "(none)"
+        ),
         f"  fuel: {fuel_text}",
     ]
     if not scorecard["state_budget"]:
@@ -164,7 +171,7 @@ def _collect_top_level_issues(report: IssueReportDict) -> list[str]:
 
     The ``map_open`` dispatch/completion mismatch check is intentionally
     gated to ``mode == "bot"``: only the live HFSM runtime emits
-    ``WIRE_COMPLETE`` events on map_open completion via
+    ``action_outcome`` events on map_open completion via
     :func:`tankpit_bot.bot.tick_loop._clear_completed_map_open`. The
     action_lab probe paths have their own per-attempt phase machinery
     (``run_tracked_acquisition_phase`` / ``run_tracked_teleport_command``)
@@ -233,7 +240,7 @@ def render_issue_report(report: IssueReportDict) -> str:
         + _render_teleport_section(report)
         + _render_map_open_section(report)
         + _render_fuel_section(report)
-        + _render_wire_complete_section(report)
+        + _render_action_outcome_section(report)
         + _render_summary_section(report)
     )
 

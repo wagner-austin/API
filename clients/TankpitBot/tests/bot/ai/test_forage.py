@@ -186,7 +186,7 @@ class TestForageSearch:
         if decision is None:
             raise AssertionError("expected a forage radar decision")
         assert decision["command"]["cmd_type"] == "radar"
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason_kind"] == "forage_radar"
         assert decision["behavior"]["mode"] == "COLLECT"
 
     def test_dispatches_radar_with_fuel_mode_tag(self) -> None:
@@ -204,7 +204,7 @@ class TestForageSearch:
         if decision is None:
             raise AssertionError("expected a forage radar decision")
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "forage_radar"
+        assert decision["behavior"]["reason_kind"] == "forage_radar"
         assert decision["behavior"]["score"] == 900
 
     def test_walks_to_unscanned_tile_when_radar_unaffordable(self) -> None:
@@ -223,7 +223,7 @@ class TestForageSearch:
         if decision is None:
             raise AssertionError("expected a forage walk decision")
         assert decision["command"]["cmd_type"] == "move"
-        assert decision["behavior"]["reason"] == "forage_sweep"
+        assert decision["behavior"]["reason_kind"] == "forage_sweep"
 
     def test_returns_none_when_viewport_fully_covered_with_no_radar(self) -> None:
         """No unscanned tiles AND radar unaffordable returns None for teleport-out."""

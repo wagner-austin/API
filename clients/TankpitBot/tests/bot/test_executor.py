@@ -267,7 +267,7 @@ class TestExecutorHelpers:
         world = _make_world()
         decision = make_tick_decision(
             command=make_move_command(100, 100),
-            behavior=make_behavior_score("COLLECT", 900, 100, 100, "noop"),
+            behavior=make_behavior_score("COLLECT", 900, 100, 100, "manual_hold"),
             updated_ai_state=AIStateDict(**{**make_initial_ai_state(), "resource_target_kind": ""}),
             desired_equipment=[],
         )
@@ -382,7 +382,7 @@ class TestDispatchCommand:
         fake_env: FakeEnv,
     ) -> None:
         """A failed teleport send leaves no pending attempt to mislabel later."""
-        from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
+        from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
 
         world = _make_world()
         result = dispatch_command(
@@ -392,7 +392,10 @@ class TestDispatchCommand:
         )
 
         assert result is False
-        assert emit_teleport_attempt_outcome(status="landed_exact", messages=[]) is False
+        landed = emit_teleport_landed(
+            duration_ms=0, target_x=200, target_y=200, landed_x=200, landed_y=200, messages=[]
+        )
+        assert landed["detail"]["sent_window"] == "(none)"
 
     def test_dispatch_teleport_skips_open_map_when_map_already_visible(
         self,
@@ -615,7 +618,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy", target_id=10),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target", target_id=10),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -634,7 +637,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy", target_id=10),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target", target_id=10),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -645,7 +648,7 @@ class TestExecutorValidationHelpers:
         """Combat target lookup returns None when no combat target is locked."""
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy"),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -674,7 +677,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -703,7 +706,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "equipment_low"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "equipment_restock"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -736,7 +739,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy", target_id=10),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target", target_id=10),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -755,7 +758,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy", target_id=10),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target", target_id=10),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -766,7 +769,7 @@ class TestExecutorValidationHelpers:
         """HUNT teleports without a locked combat target are allowed through unchanged."""
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
-            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport enemy"),
+            behavior=make_behavior_score("HUNT", 800, 105, 100, "teleport_target"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -785,7 +788,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -814,7 +817,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -843,7 +846,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -875,7 +878,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_teleport_command(103, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -896,7 +899,7 @@ class TestExecutorValidationHelpers:
         )
         decision = make_tick_decision(
             command=make_pickup_fuel_command(104, 100),
-            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 104, 100, "fuel_collect"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )
@@ -912,7 +915,7 @@ class TestExecute:
         bot, fake_cdp = _make_bot(fake_env)
         # Set all slots to enabled so execute needs to disable 1, 2, 4
         update_inventory_from_toggle(get_world_service(), [True, True, True, True, True])
-        behavior = make_behavior_score("HUNT", 50, 100, 200, "patrol_waypoint")
+        behavior = make_behavior_score("HUNT", 50, 100, 200, "search_collect_local")
         decision = make_tick_decision(
             command=make_move_command(100, 200),
             behavior=behavior,
@@ -922,6 +925,46 @@ class TestExecute:
         execute(bot, decision, _make_snapshot())
         # Equipment toggles (disable 1, 2, 4) + move command
         assert len(fake_cdp._sent_methods) == 4
+
+    def test_execute_hold_records_no_decision(self, fake_env: FakeEnv) -> None:
+        """A hold decision produces no ledger decision record."""
+        from tankpit_bot.ledger.decision import latest_decision_event_id
+
+        bot, _fake_cdp = _make_bot(fake_env)
+        decision = make_tick_decision(
+            command=make_hold_command(),
+            behavior=make_behavior_score("HUNT", 0, 0, 0, "manual_hold"),
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[],
+        )
+        assert execute(bot, decision, _make_snapshot()) is True
+        assert latest_decision_event_id() == 0
+
+    def test_execute_records_decision_for_dispatchable_command(self, fake_env: FakeEnv) -> None:
+        """A dispatchable decision is recorded before validation."""
+        from tankpit_bot.ledger.decision import decision_record, latest_decision_event_id
+
+        bot, _fake_cdp = _make_bot(fake_env)
+        decision = make_tick_decision(
+            command=make_move_command(100, 200),
+            behavior=make_behavior_score("COLLECT", 500, 100, 200, "search_collect_local"),
+            updated_ai_state=make_initial_ai_state(),
+            desired_equipment=[],
+        )
+        execute(bot, decision, _make_snapshot())
+        recorded_id = latest_decision_event_id()
+        assert decision_record(recorded_id) == {
+            "event_id": recorded_id,
+            "action_kind": "move",
+            "cmd_type": "move",
+            "mode": "COLLECT",
+            "score": 500,
+            "reason_kind": "search_collect_local",
+            "reason_context": {},
+            "target_x": 100,
+            "target_y": 200,
+            "target_id": 0,
+        }
 
     def test_execute_dispatches_structurally_valid_shoot(self, fake_env: FakeEnv) -> None:
         """Execute dispatches a shoot at a tracked, in-position target.
@@ -933,7 +976,7 @@ class TestExecute:
         """
         bot, fake_cdp = _make_bot(fake_env)
         _store_tank(10, x=105, y=103, source="world_state")
-        behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot enemy", target_id=10)
+        behavior = make_behavior_score("HUNT", 800, 105, 103, "shoot_target", target_id=10)
         decision = make_tick_decision(
             command=make_shoot_command(105, 103, 10),
             behavior=behavior,
@@ -948,7 +991,7 @@ class TestExecute:
     def test_execute_rejects_missing_pickup_target(self, fake_env: FakeEnv) -> None:
         """Execute drops pickup commands when the container no longer exists."""
         bot, fake_cdp = _make_bot(fake_env)
-        behavior = make_behavior_score("COLLECT", 900, 80, 90, "fuel=500")
+        behavior = make_behavior_score("COLLECT", 900, 80, 90, "fuel_collect")
         decision = make_tick_decision(
             command=make_pickup_fuel_command(80, 90),
             behavior=behavior,
@@ -977,7 +1020,7 @@ class TestExecute:
                 "combat_target_y": 100,
             }
         )
-        behavior = make_behavior_score("HUNT", 800, 105, 100, "teleport enemy", target_id=10)
+        behavior = make_behavior_score("HUNT", 800, 105, 100, "teleport_target", target_id=10)
         decision = make_tick_decision(
             command=make_teleport_command(105, 100),
             behavior=behavior,
@@ -1062,7 +1105,7 @@ class TestSecondaryCommandDispatch:
             timestamp_ms=1000,
         )
 
-        behavior = make_behavior_score("HUNT", 900, 101, 100, "engage_shoot")
+        behavior = make_behavior_score("HUNT", 900, 101, 100, "shoot_target")
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 50),
             behavior=behavior,
@@ -1080,7 +1123,7 @@ class TestSecondaryCommandDispatch:
         update_world_state_from_fuel_total(get_world_service(), 800)
 
         bot = Bot("https://test.tankpit.com/", headless=True)
-        behavior = make_behavior_score("HUNT", 900, 101, 100, "engage_shoot")
+        behavior = make_behavior_score("HUNT", 900, 101, 100, "shoot_target")
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 999),
             behavior=behavior,
@@ -1105,7 +1148,7 @@ class TestTickDecisionCodecs:
 
         decision = make_tick_decision(
             command=make_shoot_command(50, 60, 99),
-            behavior=make_behavior_score("HUNT", 900, 50, 60, "engage"),
+            behavior=make_behavior_score("HUNT", 900, 50, 60, "shoot_target"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[1, 2],
             secondary_command=make_pickup_fuel_command(49, 60),
@@ -1126,7 +1169,7 @@ class TestTickDecisionCodecs:
 
         decision = make_tick_decision(
             command=make_radar_command(),
-            behavior=make_behavior_score("HUNT", 500, 0, 0, "scan"),
+            behavior=make_behavior_score("HUNT", 500, 0, 0, "scan_on_landing"),
             updated_ai_state=make_initial_ai_state(),
             desired_equipment=[],
         )

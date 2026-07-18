@@ -58,7 +58,7 @@ class TestDecideCombatFeedback:
         decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "hit")
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
         assert decision["updated_ai_state"]["last_shot_target_id"] == -1
 
     def test_miss_with_no_target_in_world_opens_map(self) -> None:
@@ -77,7 +77,7 @@ class TestDecideCombatFeedback:
         decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "miss")
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
 
     def test_hit_feedback_continues_normally(self) -> None:
         """Hit feedback preserves normal combat routing when the target remains visible.
@@ -118,8 +118,8 @@ class TestDecideCombatFeedback:
 
         decision = decide(world, self_state, ai_state_with_shot, inventory, 100000, None, "hit")
 
-        assert decision["behavior"]["reason"] != "kill_confirmed"
-        assert decision["behavior"]["reason"] != "miss_relocate"
+        assert decision["behavior"]["reason_kind"] != "confirm_kill"
+        assert decision["behavior"]["reason_kind"] != "find_enemies"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_no_feedback_when_no_shot_pending(self) -> None:
@@ -131,7 +131,7 @@ class TestDecideCombatFeedback:
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
 
 
 class TestDecideShotTracking:
@@ -412,7 +412,7 @@ class TestDecideKillCooldown:
         decision = decide(world, self_state, ai_state, inventory, 100000, None, "")
 
         assert decision["command"]["cmd_type"] == "shoot"
-        assert decision["behavior"]["reason"] == "shoot Enemy"
+        assert decision["behavior"]["reason_kind"] == "shoot_target"
 
     def test_closing_shoots_when_cardinally_adjacent(self) -> None:
         """Closing combat engages once the landed position is cardinally usable."""

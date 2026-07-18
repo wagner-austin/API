@@ -32,8 +32,61 @@ BEHAVIOR_MODES: tuple[BehaviorMode, ...] = (
 
 
 # =============================================================================
-# BehaviorScoreDict
+# ReasonKind + BehaviorScoreDict
 # =============================================================================
+
+ReasonKind = Literal[
+    # shared
+    "scan_on_landing",
+    # COLLECT
+    "equipment_locked",
+    "fuel_locked",
+    "equipment_restock",
+    "equipment_hop",
+    "fuel_collect",
+    "forage_radar",
+    "forage_sweep",
+    "search_collect_local",
+    "map_for_dots",
+    # HUNT
+    "find_target",
+    "find_enemies",
+    "teleport_target",
+    "shoot_target",
+    "dot_relay",
+    "confirm_kill",
+    # controller
+    "manual_hold",
+]
+"""Typed decision-reason vocabulary (Phase 2).
+
+Replaces the free-text ``reason`` string. Several of these are
+load-bearing control flow: ``derive_hunt_mode_state`` /
+``derive_collect_mode_state`` branch on them to derive the AI mode
+substate, so the vocabulary is closed on purpose -- adding a planner
+path means adding its reason here, not inventing a string.
+"""
+
+REASON_KINDS: tuple[ReasonKind, ...] = (
+    "scan_on_landing",
+    "equipment_locked",
+    "fuel_locked",
+    "equipment_restock",
+    "equipment_hop",
+    "fuel_collect",
+    "forage_radar",
+    "forage_sweep",
+    "search_collect_local",
+    "map_for_dots",
+    "find_target",
+    "find_enemies",
+    "teleport_target",
+    "shoot_target",
+    "dot_relay",
+    "confirm_kill",
+    "manual_hold",
+)
+"""All valid reason kinds, for validation messages."""
 
 
 class BehaviorScoreDict(TypedDict):
@@ -45,7 +98,10 @@ class BehaviorScoreDict(TypedDict):
         target_x: Target X coordinate for this behavior.
         target_y: Target Y coordinate for this behavior.
         target_id: Tank ID of the combat target (0 if no specific target).
-        reason: Human-readable reason for debugging.
+        reason_kind: Typed decision reason (see :data:`ReasonKind`).
+        reason_context: Reason-specific scalar payload -- e.g.
+            ``target_name`` for the ``*_target`` kinds, ``volume`` for
+            the fuel kinds. Empty when the kind needs no parameters.
     """
 
     mode: BehaviorMode
@@ -53,7 +109,8 @@ class BehaviorScoreDict(TypedDict):
     target_x: int
     target_y: int
     target_id: int
-    reason: str
+    reason_kind: ReasonKind
+    reason_context: dict[str, str | int]
 
 
 def make_behavior_score(
@@ -61,8 +118,9 @@ def make_behavior_score(
     score: int,
     target_x: int,
     target_y: int,
-    reason: str,
+    reason_kind: ReasonKind,
     target_id: int = 0,
+    reason_context: dict[str, str | int] | None = None,
 ) -> BehaviorScoreDict:
     """Create a BehaviorScoreDict.
 
@@ -71,8 +129,9 @@ def make_behavior_score(
         score: Priority score (0-1000).
         target_x: Target X coordinate.
         target_y: Target Y coordinate.
-        reason: Human-readable reason.
+        reason_kind: Typed decision reason.
         target_id: Tank ID of combat target (0 if no specific target).
+        reason_context: Reason-specific scalar payload.
 
     Returns:
         BehaviorScoreDict with the provided values.
@@ -83,8 +142,29 @@ def make_behavior_score(
         target_x=target_x,
         target_y=target_y,
         target_id=target_id,
-        reason=reason,
+        reason_kind=reason_kind,
+        reason_context={} if reason_context is None else reason_context,
     )
+
+
+def render_reason(behavior: BehaviorScoreDict) -> str:
+    """Render a behavior's reason as a compact human-readable label.
+
+    The single formatting path for log lines, the HUD overlay, and
+    replay narration: ``kind`` alone when the context is empty,
+    ``kind(k=v, ...)`` otherwise.
+
+    Args:
+        behavior: Behavior score carrying the typed reason.
+
+    Returns:
+        Compact reason label.
+    """
+    context = behavior["reason_context"]
+    if not context:
+        return behavior["reason_kind"]
+    rendered = ", ".join(f"{key}={value}" for key, value in sorted(context.items()))
+    return f"{behavior['reason_kind']}({rendered})"
 
 
 # =============================================================================

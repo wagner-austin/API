@@ -19,7 +19,6 @@ from tankpit_bot.runtime_logging import (
     emit_state,
     emit_sync,
     emit_wire,
-    emit_wire_complete,
     emit_world,
     encode_runtime_event_record,
     get_bot_runtime_artifacts,
@@ -220,44 +219,29 @@ def test_runtime_logging_reconfigures_without_duplicate_artifact_handlers(
     assert files[first["archive_log_path"]].count("AI: first") == 1
 
 
-def test_emit_wire_complete_writes_structured_fields_to_jsonl(
+def test_action_outcome_emission_writes_structured_fields_to_jsonl(
     fake_fs: FakeFileSystem,
 ) -> None:
-    """``emit_wire_complete`` spreads action_kind/duration_ms/signal into JSONL."""
+    """Ledger outcome emitters spread their payload into the JSONL stream."""
     from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
+    from tankpit_bot.ledger.outcome.map_open import emit_map_open_data_processed
 
     artifacts = configure_bot_runtime_logging("20260331-230405")
 
-    emit_wire_complete(
-        action_kind="map_open",
-        duration_ms=850,
-        signal="map_data_processed",
-        target_x=131,
-        target_y=110,
-    )
+    emit_map_open_data_processed(duration_ms=850)
 
     files = fake_fs.get_written_files()
-    latest_log = files[artifacts["latest_log_path"]]
     event_line = files[artifacts["latest_events_path"]].strip()
 
-    assert "WIRE_COMPLETE: map_open completed in 850ms via map_data_processed" in latest_log
-
     decoded_raw = narrow_json_to_dict(load_json_str(event_line))
-    assert decoded_raw["channel"] == "WIRE_COMPLETE"
+    assert decoded_raw["channel"] == "DIAGNOSTIC"
+    assert decoded_raw["diagnostic_kind"] == "action_outcome"
     assert decoded_raw["action_kind"] == "map_open"
+    assert decoded_raw["outcome"] == "map_data_processed"
     assert decoded_raw["duration_ms"] == 850
-    assert decoded_raw["signal"] == "map_data_processed"
-    assert decoded_raw["target_x"] == 131
-    assert decoded_raw["target_y"] == 110
-
-    decoded = decode_runtime_event_record(decoded_raw)
-    assert decoded["fields"] == {
-        "action_kind": "map_open",
-        "duration_ms": 850,
-        "signal": "map_data_processed",
-        "target_x": 131,
-        "target_y": 110,
-    }
+    assert decoded_raw["attempt_id"] == 1
+    assert decoded_raw["event_id"] == 1
 
 
 def test_encode_runtime_event_record_rejects_reserved_key_in_fields() -> None:
@@ -659,13 +643,14 @@ class TestRuntimeContext:
         assert "bot_state" not in decoded
         assert "in_flight_action_kind" not in decoded
 
-    def test_context_is_attached_to_wire_complete_events(self, fake_fs: FakeFileSystem) -> None:
-        """``emit_wire_complete`` also picks up the context.
+    def test_context_is_attached_to_action_outcome_events(self, fake_fs: FakeFileSystem) -> None:
+        """Ledger outcome events also pick up the runtime context.
 
         This is the highest-value attachment: the post-mortem JSONL
         query "which tick fired the stall_timeout?" works because every
-        WIRE_COMPLETE event carries ``tick_n``.
+        ``action_outcome`` event carries ``tick_n``.
         """
+        from tankpit_bot.ledger.outcome.shoot import emit_shoot_miss
         from tankpit_bot.runtime_logging import set_runtime_context
 
         artifacts = configure_bot_runtime_logging("20260620-150138")
@@ -674,15 +659,12 @@ class TestRuntimeContext:
             bot_state="HUNT/engaging",
             in_flight_action_kind="shoot",
         )
-        emit_wire_complete(
-            action_kind="shoot",
-            duration_ms=80,
-            signal="our_shot_response",
-        )
+        emit_shoot_miss(duration_ms=80, target_id=530, target_name="orange-3")
 
         event_line = fake_fs.get_written_files()[artifacts["latest_events_path"]].strip()
         decoded = narrow_json_to_dict(load_json_str(event_line))
-        assert decoded["channel"] == "WIRE_COMPLETE"
+        assert decoded["channel"] == "DIAGNOSTIC"
+        assert decoded["diagnostic_kind"] == "action_outcome"
         assert decoded["tick_n"] == 42
         assert decoded["bot_state"] == "HUNT/engaging"
         assert decoded["in_flight_action_kind"] == "shoot"

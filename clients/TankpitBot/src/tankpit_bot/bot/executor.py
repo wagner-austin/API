@@ -9,13 +9,29 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.equipment import hostile_mines
+from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.diagnostics.game_log_feedback import (
     record_move_dispatch,
     record_pickup_dispatch,
 )
-from tankpit_bot.diagnostics.teleport_attempts import record_teleport_dispatch
+from tankpit_bot.ledger.decision import record_decision
+from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
+from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
+from tankpit_bot.ledger.outcome.collect import (
+    emit_collect_discarded_kind_mismatch,
+    emit_collect_discarded_no_container,
+)
+from tankpit_bot.ledger.outcome.move import emit_move_discarded_hostile_mine
+from tankpit_bot.ledger.outcome.shoot import emit_shoot_discarded_target_not_tracked
+from tankpit_bot.ledger.outcome.teleport import (
+    emit_teleport_discarded_combat_target_stale,
+    emit_teleport_discarded_hostile_mine,
+    emit_teleport_discarded_resource_target_invalid,
+    emit_teleport_discarded_resource_target_stale,
+    record_teleport_dispatch,
+)
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict, coord_key
@@ -23,6 +39,18 @@ from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict,
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
 _COMBAT_SLOTS: list[int] = [1, 2, 4]
+
+# Wire command type -> ledger action kind. ``hold`` dispatches nothing
+# and is deliberately absent -- it produces no attempt to correlate.
+_LEDGER_KIND_BY_CMD_TYPE: dict[str, LedgerActionKind] = {
+    "move": "move",
+    "teleport": "teleport",
+    "pickup_fuel": "collect",
+    "pickup_equipment": "collect",
+    "radar": "scan",
+    "map_open": "map_open",
+    "shoot": "shoot",
+}
 _EQUIPMENT_LABELS: dict[int, str] = {
     1: "armor",
     2: "dual",
@@ -184,6 +212,9 @@ def dispatch_command(
             teleport_target_x=command["target_x"],
             teleport_target_y=command["target_y"],
         )
+        # This tick's product is the map open, not the teleport: the
+        # recorded teleport decision resolves via the map_open outcome.
+        transfer_pending_decision("teleport", "map_open")
         return bot.open_map()
     emit_diagnostic(
         diagnostic_kind="map_open_skipped_already_open",
@@ -278,11 +309,10 @@ def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
         return True
     tank = _tracked_tank(world, command["target_id"])
     if tank is None:
-        emit_ai(
-            "rejecting shoot at (%d,%d): target id=%d not tracked",
-            command["target_x"],
-            command["target_y"],
-            command["target_id"],
+        emit_shoot_discarded_target_not_tracked(
+            target_x=command["target_x"],
+            target_y=command["target_y"],
+            target_id=command["target_id"],
         )
         return False
     return True
@@ -303,17 +333,13 @@ def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
         target_y = command["target_y"]
         container = _tracked_container(world, target_x, target_y)
         if container is None:
-            emit_ai(
-                "rejecting pickup_fuel at (%d,%d): container no longer exists",
-                target_x,
-                target_y,
+            emit_collect_discarded_no_container(
+                target_x=target_x, target_y=target_y, pickup_kind="fuel"
             )
             return False
         if not container["is_fuel"]:
-            emit_ai(
-                "rejecting pickup_fuel at (%d,%d): tracked container is equipment",
-                target_x,
-                target_y,
+            emit_collect_discarded_kind_mismatch(
+                target_x=target_x, target_y=target_y, pickup_kind="fuel"
             )
             return False
         return True
@@ -322,17 +348,13 @@ def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
         target_y = command["target_y"]
         container = _tracked_container(world, target_x, target_y)
         if container is None:
-            emit_ai(
-                "rejecting pickup_equipment at (%d,%d): container no longer exists",
-                target_x,
-                target_y,
+            emit_collect_discarded_no_container(
+                target_x=target_x, target_y=target_y, pickup_kind="equipment"
             )
             return False
         if container["is_fuel"]:
-            emit_ai(
-                "rejecting pickup_equipment at (%d,%d): tracked container is fuel",
-                target_x,
-                target_y,
+            emit_collect_discarded_kind_mismatch(
+                target_x=target_x, target_y=target_y, pickup_kind="equipment"
             )
             return False
         return True
@@ -358,12 +380,10 @@ def _is_valid_move_destination(world: WorldStateDict, command: BotCommand) -> bo
     else:
         return True
     if coord_key(target_x, target_y) in hostile_mines(world):
-        emit_ai(
-            "rejecting %s to (%d,%d): destination is a hostile mine",
-            command["cmd_type"],
-            target_x,
-            target_y,
-        )
+        if command["cmd_type"] == "move":
+            emit_move_discarded_hostile_mine(target_x=target_x, target_y=target_y)
+        else:
+            emit_teleport_discarded_hostile_mine(target_x=target_x, target_y=target_y)
         return False
     return True
 
@@ -450,10 +470,10 @@ def _is_valid_teleport(world: WorldStateDict, decision: TickDecisionDict) -> boo
         if decision["updated_ai_state"]["combat_target_id"] == -1:
             return True
         if combat_target is None:
-            emit_ai(
-                "rejecting teleport to (%d,%d): combat target is stale",
-                command["target_x"],
-                command["target_y"],
+            emit_teleport_discarded_combat_target_stale(
+                target_x=command["target_x"],
+                target_y=command["target_y"],
+                target_id=decision["updated_ai_state"]["combat_target_id"],
             )
             return False
         return True
@@ -461,18 +481,17 @@ def _is_valid_teleport(world: WorldStateDict, decision: TickDecisionDict) -> boo
     if decision["updated_ai_state"]["resource_target_kind"] == "":
         return True
     if resource_target is None:
-        emit_ai(
-            "rejecting teleport to (%d,%d): resource target is stale",
-            command["target_x"],
-            command["target_y"],
+        emit_teleport_discarded_resource_target_stale(
+            target_x=command["target_x"],
+            target_y=command["target_y"],
+            resource_kind=decision["updated_ai_state"]["resource_target_kind"],
         )
         return False
     if resource_target["source"] not in ("viewport", "radar"):
-        emit_ai(
-            "rejecting teleport to (%d,%d): resource target source=%s is invalid",
-            command["target_x"],
-            command["target_y"],
-            resource_target["source"],
+        emit_teleport_discarded_resource_target_invalid(
+            target_x=command["target_x"],
+            target_y=command["target_y"],
+            source=resource_target["source"],
         )
         return False
     return True
@@ -527,16 +546,29 @@ def execute(
         behavior["target_y"],
         command["cmd_type"],
         _format_desired_equipment(decision["desired_equipment"]),
-        behavior["reason"],
+        render_reason(behavior),
         behavior_mode=behavior["mode"],
         behavior_score=behavior["score"],
         combat_target_x=behavior["target_x"],
         combat_target_y=behavior["target_y"],
         combat_target_id=behavior["target_id"],
         command_type=command["cmd_type"],
-        behavior_reason=behavior["reason"],
+        behavior_reason=render_reason(behavior),
     )
 
+    ledger_kind = _LEDGER_KIND_BY_CMD_TYPE.get(command["cmd_type"])
+    if ledger_kind is not None:
+        record_decision(
+            action_kind=ledger_kind,
+            cmd_type=command["cmd_type"],
+            mode=behavior["mode"],
+            score=behavior["score"],
+            reason_kind=behavior["reason_kind"],
+            reason_context=behavior["reason_context"],
+            target_x=behavior["target_x"],
+            target_y=behavior["target_y"],
+            target_id=behavior["target_id"],
+        )
     if not _is_dispatchable(bot, decision):
         return False
     primary_sent = dispatch_command(bot, command, snapshot)

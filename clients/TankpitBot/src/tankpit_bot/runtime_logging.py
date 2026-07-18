@@ -637,49 +637,6 @@ def emit_diagnostic(
     )
 
 
-def emit_wire_complete(
-    *,
-    action_kind: str,
-    duration_ms: int,
-    signal: str,
-    **extra: str | int | float | bool,
-) -> None:
-    """Emit a structured completion event for a dispatched bot action.
-
-    Symmetric to :func:`emit_wire`: where ``WIRE`` records the moment the
-    bot dispatched a command, ``WIRE_COMPLETE`` records the moment the
-    HFSM observed the authoritative completion signal for that command.
-    The resulting JSONL line carries ``action_kind`` / ``duration_ms`` /
-    ``signal`` at the top level so consumers can run queries like
-    ``jq 'select(.channel=="WIRE_COMPLETE" and .action_kind=="map_open")
-    | .duration_ms'`` directly against ``runs/bot/latest.events.jsonl``.
-
-    Args:
-        action_kind: Kind of action that completed (e.g. ``map_open``,
-            ``move``, ``teleport``, ``collect``, ``scan``).
-        duration_ms: Wall-clock milliseconds between dispatch and the
-            observed completion. Negative values mean the gate fired
-            with no recorded ``started_ms`` and are passed through
-            verbatim so reviewers can spot the case.
-        signal: Name of the authoritative completion signal -- e.g.
-            ``map_data_processed``, ``teleport_landed``,
-            ``radar_scan_complete``, ``position_reached``,
-            ``container_consumed_or_reached``, ``stall_timeout``.
-        **extra: Additional structured fields to attach (e.g. target
-            coordinates). Field names must not collide with the reserved
-            top-level event keys -- collision raises at encode time.
-    """
-    message = f"{action_kind} completed in {duration_ms}ms via {signal}"
-    _emit_runtime_event(
-        "WIRE_COMPLETE",
-        message,
-        action_kind=action_kind,
-        duration_ms=duration_ms,
-        signal=signal,
-        **extra,
-    )
-
-
 def _reset_artifact_files(*paths: Path) -> None:
     """Clear artifact files at process startup.
 
@@ -823,7 +780,6 @@ __all__ = [
     "emit_state",
     "emit_sync",
     "emit_wire",
-    "emit_wire_complete",
     "emit_world",
     "encode_runtime_event_record",
     "get_bot_runtime_artifacts",

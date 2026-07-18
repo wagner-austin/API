@@ -57,7 +57,8 @@ def test_collect_mode_continues_locked_fuel_target() -> None:
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "fuel=700"
+    assert decision["behavior"]["reason_kind"] in ("fuel_locked", "fuel_collect")
+    assert decision["behavior"]["reason_context"]["volume"] == 700
     assert decision["command"]["cmd_type"] == "pickup_fuel"
 
 
@@ -153,7 +154,7 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "equipment_restock"
+    assert decision["behavior"]["reason_kind"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["behavior"]["target_x"] == 101
     assert decision["behavior"]["target_y"] == 100
@@ -205,7 +206,8 @@ def test_collect_mode_releases_lock_for_markedly_closer_fuel() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "fuel=900"
+    assert decision["behavior"]["reason_kind"] in ("fuel_locked", "fuel_collect")
+    assert decision["behavior"]["reason_context"]["volume"] == 900
     assert decision["behavior"]["target_x"] == 107
     assert decision["behavior"]["target_y"] == 107
     assert decision["updated_ai_state"]["resource_target_x"] == 107
@@ -252,7 +254,8 @@ def test_collect_mode_keeps_lock_against_marginally_closer_fuel() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "fuel=700"
+    assert decision["behavior"]["reason_kind"] in ("fuel_locked", "fuel_collect")
+    assert decision["behavior"]["reason_context"]["volume"] == 700
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
@@ -276,7 +279,7 @@ def test_collect_mode_uses_radar_when_viewport_needs_authoritative_scan() -> Non
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "scan_on_landing"
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -299,7 +302,7 @@ def test_collect_mode_uses_regular_radar_when_extra_charges_are_empty() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "scan_on_landing"
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -443,7 +446,8 @@ def test_selects_low_volume_fuel_when_critically_low() -> None:
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] == "pickup_fuel"
-    assert decision["behavior"]["reason"] == "fuel=57"
+    assert decision["behavior"]["reason_kind"] in ("fuel_locked", "fuel_collect")
+    assert decision["behavior"]["reason_context"]["volume"] == 57
 
 
 def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> None:
@@ -478,7 +482,7 @@ def test_collect_mode_walks_when_no_extras_and_local_5x5_already_covered() -> No
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["command"]["cmd_type"] == "move"
-    assert decision["behavior"]["reason"] == "forage_sweep"
+    assert decision["behavior"]["reason_kind"] == "forage_sweep"
     assert decision["behavior"]["mode"] == "COLLECT"
 
 
@@ -512,7 +516,7 @@ def test_collect_takes_visible_equipment_before_search_hop() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "equipment_restock"
+    assert decision["behavior"]["reason_kind"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["command"]["target_x"] == 102
     assert decision["command"]["target_y"] == 100
@@ -548,7 +552,7 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "equipment_restock"
+    assert decision["behavior"]["reason_kind"] == "equipment_restock"
     assert decision["behavior"]["target_x"] == 103
 
 

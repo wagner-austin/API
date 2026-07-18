@@ -107,7 +107,7 @@ def test_hunt_acquire_searches_for_enemies_when_no_target_exists() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find_enemies"
+    assert decision["behavior"]["reason_kind"] == "find_enemies"
 
 
 def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
@@ -139,7 +139,7 @@ def test_hunt_search_dispatches_map_open_not_radar_during_acquire() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find_enemies"
+    assert decision["behavior"]["reason_kind"] == "find_enemies"
     assert decision["behavior"]["mode"] == "HUNT"
 
 
@@ -206,7 +206,7 @@ def test_hunt_search_does_not_enter_confirm_kill_without_target() -> None:
 
     second_decision = decide_hunt_mode(next_ctx)
 
-    assert second_decision["behavior"]["reason"] != "confirm_kill"
+    assert second_decision["behavior"]["reason_kind"] != "confirm_kill"
 
 
 def test_hunt_acquire_uses_fresh_target_position_to_close_on_target() -> None:
@@ -230,7 +230,7 @@ def test_hunt_acquire_uses_fresh_target_position_to_close_on_target() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -257,7 +257,7 @@ def test_hunt_acquire_targets_enemy_between_break_and_resume_thresholds() -> Non
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -284,7 +284,7 @@ def test_hunt_refresh_engages_visible_adjacent_locked_target() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
-    assert decision["behavior"]["reason"] == "shoot Enemy"
+    assert decision["behavior"]["reason_kind"] == "shoot_target"
     assert decision["updated_ai_state"]["last_shot_target_id"] == 50
 
 
@@ -311,7 +311,7 @@ def test_hunt_refresh_returns_close_decision_for_visible_nonadjacent_target() ->
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
 
 
 def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> None:
@@ -367,7 +367,7 @@ def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find_enemies"
+    assert decision["behavior"]["reason_kind"] == "find_enemies"
 
 
 def test_hunt_acquire_resumes_visible_locked_target() -> None:
@@ -400,7 +400,7 @@ def test_hunt_acquire_resumes_visible_locked_target() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
-    assert decision["behavior"]["reason"] == "shoot Enemy"
+    assert decision["behavior"]["reason_kind"] == "shoot_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -432,7 +432,7 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -466,7 +466,7 @@ def test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable() -
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Runner"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -548,7 +548,7 @@ def test_hunt_close_enters_confirm_kill_when_locked_target_disappears() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "confirm_kill"
+    assert decision["behavior"]["reason_kind"] == "confirm_kill"
 
 
 def test_hunt_close_returns_close_decision_for_visible_target() -> None:
@@ -574,7 +574,7 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Enemy"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
 
 
 def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
@@ -623,7 +623,7 @@ def test_hunt_engage_enters_confirm_kill_when_locked_target_disappears() -> None
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "confirm_kill"
+    assert decision["behavior"]["reason_kind"] == "confirm_kill"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
@@ -650,7 +650,7 @@ def test_hunt_engage_shoots_visible_locked_target() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
-    assert decision["behavior"]["reason"] == "shoot Enemy"
+    assert decision["behavior"]["reason_kind"] == "shoot_target"
 
 
 def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
@@ -674,7 +674,7 @@ def test_hunt_engage_confirms_killed_target_with_explicit_reason() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "confirm_kill"
+    assert decision["behavior"]["reason_kind"] == "confirm_kill"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
@@ -695,7 +695,7 @@ def test_hunt_engage_without_locked_target_id_still_confirms_and_searches() -> N
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "confirm_kill"
+    assert decision["behavior"]["reason_kind"] == "confirm_kill"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 
 
@@ -724,7 +724,7 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["behavior"]["reason"] == "teleport Respawned"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
@@ -748,7 +748,7 @@ def test_scan_on_landing_reacquires_when_target_gone() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["behavior"]["reason"] == "find_enemies"
+    assert decision["behavior"]["reason_kind"] == "find_enemies"
 
 
 def test_scan_on_landing_engages_when_target_present() -> None:
@@ -827,7 +827,7 @@ def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "shoot"
-    assert decision["behavior"]["reason"] == "shoot Runner"
+    assert decision["behavior"]["reason_kind"] == "shoot_target"
 
 
 def test_hunt_close_fires_homing_when_locked_target_left_viewport() -> None:
@@ -1067,7 +1067,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     assert decision["command"]["cmd_type"] == "teleport"
     assert decision["command"]["target_x"] == 150
     assert decision["command"]["target_y"] == 100
-    assert decision["behavior"]["reason"] == "dot_relay"
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
     assert decision["behavior"]["mode"] == "HUNT"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
 

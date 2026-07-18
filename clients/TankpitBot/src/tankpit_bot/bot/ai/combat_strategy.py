@@ -288,7 +288,7 @@ def block_combat_target_and_replan(
             800,
             0,
             0,
-            f"find {next_target['name']}",
+            "find_target",
             AIStateDict(
                 **{
                     **_set_combat_target(base_with_block, next_target),
@@ -296,6 +296,7 @@ def block_combat_target_and_replan(
                 }
             ),
             ctx.equip,
+            reason_context={"target_name": next_target["name"]},
         )
 
     emit_ai("blocked %s, no viable threats remaining", target["name"])
@@ -410,7 +411,7 @@ def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         800,
         0,
         0,
-        f"find {target['name']}",
+        "find_target",
         AIStateDict(
             **{
                 **_set_combat_target(ctx.base, target),
@@ -418,6 +419,7 @@ def _combat_open_map(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             }
         ),
         ctx.equip,
+        reason_context={"target_name": target["name"]},
     )
 
 
@@ -481,9 +483,10 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         800,
         landing_x,
         landing_y,
-        f"teleport {target['name']}",
+        "teleport_target",
         _set_combat_target(ctx.base, target),
         ctx.equip,
+        reason_context={"target_name": target["name"]},
     )
 
 
@@ -726,7 +729,7 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
         800,
         aim_x,
         aim_y,
-        f"shoot {target['name']}",
+        "shoot_target",
         AIStateDict(
             **{
                 **engaging_state,
@@ -736,6 +739,7 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             }
         ),
         ctx.equip,
+        reason_context={"target_name": target["name"]},
         secondary_command=secondary,
     )
 

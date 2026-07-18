@@ -51,19 +51,56 @@ class TestBehaviorScore:
 
     def test_make_behavior_score(self) -> None:
         """Factory creates correct BehaviorScoreDict."""
-        score = make_behavior_score("HUNT", 800, 100, 150, "enemy nearby")
+        score = make_behavior_score("HUNT", 800, 100, 150, "find_target")
         assert score["mode"] == "HUNT"
         assert score["score"] == 800
         assert score["target_x"] == 100
         assert score["target_y"] == 150
-        assert score["reason"] == "enemy nearby"
+        assert score["reason_kind"] == "find_target"
+        assert score["reason_context"] == {}
 
     def test_encode_decode_roundtrip(self) -> None:
         """Encode then decode produces identical BehaviorScoreDict."""
-        original = make_behavior_score("COLLECT", 600, 50, 75, "low fuel")
+        original = make_behavior_score("COLLECT", 600, 50, 75, "fuel_collect")
         encoded = encode_behavior_score(original)
         decoded = decode_behavior_score(encoded)
         assert decoded == original
+
+    def test_roundtrip_with_reason_context(self) -> None:
+        """A reason context map survives encode/decode."""
+        original = make_behavior_score(
+            "HUNT", 800, 100, 150, "shoot_target", reason_context={"target_name": "orange-3"}
+        )
+        decoded = decode_behavior_score(encode_behavior_score(original))
+        assert decoded == original
+
+    def test_decode_invalid_reason_kind_raises(self) -> None:
+        """Decode rejects an unknown reason kind."""
+        data: JSONObject = {
+            "mode": "HUNT",
+            "score": 100,
+            "target_x": 0,
+            "target_y": 0,
+            "target_id": 0,
+            "reason_kind": "vibes",
+            "reason_context": {},
+        }
+        with pytest.raises(JSONTypeError, match="reason_kind must be one of"):
+            decode_behavior_score(data)
+
+    def test_decode_invalid_reason_context_value_raises(self) -> None:
+        """Decode rejects non-scalar reason context values."""
+        data: JSONObject = {
+            "mode": "HUNT",
+            "score": 100,
+            "target_x": 0,
+            "target_y": 0,
+            "target_id": 0,
+            "reason_kind": "manual_hold",
+            "reason_context": {"flag": True},
+        }
+        with pytest.raises(JSONTypeError, match="must be str or int"):
+            decode_behavior_score(data)
 
     def test_decode_invalid_mode_raises(self) -> None:
         """Decode rejects invalid BehaviorMode."""

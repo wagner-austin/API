@@ -229,10 +229,38 @@ class TestAppendIndexRowEndToEnd:
             HEADER_LINE,
             decode_row,
         )
+        from tankpit_bot.ledger.decision import record_decision
+        from tankpit_bot.ledger.outcome.map_open import emit_map_open_data_processed
         from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 
         configure_bot_runtime_logging("20260620-150138")
         bot = Bot("https://test.tankpit.com/", headless=True)
+
+        # One resolved decision (outcome-counts line) plus one still
+        # pending at shutdown (unresolved-decisions line).
+        record_decision(
+            action_kind="map_open",
+            cmd_type="map_open",
+            mode="HUNT",
+            score=800,
+            reason_kind="find_enemies",
+            reason_context={},
+            target_x=0,
+            target_y=0,
+            target_id=0,
+        )
+        emit_map_open_data_processed(duration_ms=500)
+        record_decision(
+            action_kind="scan",
+            cmd_type="radar",
+            mode="HUNT",
+            score=700,
+            reason_kind="scan_on_landing",
+            reason_context={},
+            target_x=1,
+            target_y=2,
+            target_id=0,
+        )
 
         _emit_session_scorecard(bot, ticks=30, exit_reason="completed")
 

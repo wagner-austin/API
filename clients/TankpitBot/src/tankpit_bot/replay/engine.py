@@ -19,7 +19,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot import ai_strategy
 from tankpit_bot.bot.ai.threats import analyze_threats
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
@@ -268,7 +268,7 @@ def _build_trace(
         fuel=self_state["fuel"],
         behavior_mode=behavior["mode"],
         behavior_score=behavior["score"],
-        behavior_reason=behavior["reason"],
+        behavior_reason=render_reason(behavior),
         ai_mode=ai_state["mode"],
         ai_mode_state=ai_state["mode_state"],
         command_type=command["cmd_type"],

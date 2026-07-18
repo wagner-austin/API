@@ -48,7 +48,7 @@ def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "scan_on_landing"
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -90,7 +90,7 @@ def test_collect_mode_forages_radar_when_fully_boxed_in() -> None:
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "scan_on_landing"
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
     assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -225,7 +225,7 @@ def test_collect_mode_picks_equipment_before_adjacent_fuel() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "equipment_restock"
+    assert decision["behavior"]["reason_kind"] == "equipment_restock"
     assert decision["command"]["cmd_type"] == "pickup_equipment"
     assert decision["behavior"]["target_x"] == 106
     assert decision["behavior"]["target_y"] == 106
@@ -278,7 +278,8 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     if decision is None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["behavior"]["reason"] == "fuel=300"
+    assert decision["behavior"]["reason_kind"] in ("fuel_locked", "fuel_collect")
+    assert decision["behavior"]["reason_context"]["volume"] == 300
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
@@ -324,7 +325,7 @@ def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
+    assert decision["behavior"]["reason_kind"] != "fuel_collect"
 
 
 def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
@@ -370,7 +371,7 @@ def test_collect_mode_falls_through_when_fuel_walk_unreachable() -> None:
     reset_world_state()
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] != "opportunistic_fuel_viewport"
+    assert decision["behavior"]["reason_kind"] != "fuel_collect"
 
 
 def test_collect_mode_releases_lock_for_markedly_closer_equipment() -> None:
@@ -466,7 +467,7 @@ def test_collect_mode_keeps_lock_against_marginally_closer_equipment() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["behavior"]["reason"] == "equipment_locked"
+    assert decision["behavior"]["reason_kind"] == "equipment_locked"
     assert decision["behavior"]["target_x"] == 105
     assert decision["behavior"]["target_y"] == 105
 
@@ -732,7 +733,7 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     assert decision["command"]["cmd_type"] == "teleport"
     assert decision["command"]["target_x"] == 130
     assert decision["command"]["target_y"] == 100
-    assert decision["behavior"]["reason"] == "equipment_hop"
+    assert decision["behavior"]["reason_kind"] == "equipment_hop"
 
 
 def test_hop_toward_equipment_skips_in_viewport_containers() -> None:

@@ -212,18 +212,33 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     lives in -- no duplicated per-file fixtures, no missed resets.
     """
     from tankpit_bot.bot.ai.collect_mode import reset_container_blacklist
-    from tankpit_bot.diagnostics.teleport_attempts import reset_teleport_attempt_tracking
+    from tankpit_bot.ledger.decision import reset_decision_records
+    from tankpit_bot.ledger.events import reset_event_ids
+    from tankpit_bot.ledger.mode_transition import reset_mode_transitions
+    from tankpit_bot.ledger.outcome._emit import reset_action_outcome_tracking
+    from tankpit_bot.ledger.outcome.teleport import reset_teleport_dispatch_tracking
+    from tankpit_bot.ledger.ring import reset_outcome_rings
     from tankpit_bot.sniffer.world_state import reset_world_state
     from tankpit_bot.sniffer.xor import reset_xor_state
 
     reset_world_state()
     reset_xor_state()
-    reset_teleport_attempt_tracking()
+    reset_event_ids()
+    reset_action_outcome_tracking()
+    reset_outcome_rings()
+    reset_teleport_dispatch_tracking()
+    reset_decision_records()
+    reset_mode_transitions()
     reset_container_blacklist()
     yield
     reset_world_state()
     reset_xor_state()
-    reset_teleport_attempt_tracking()
+    reset_event_ids()
+    reset_action_outcome_tracking()
+    reset_outcome_rings()
+    reset_teleport_dispatch_tracking()
+    reset_decision_records()
+    reset_mode_transitions()
     reset_container_blacklist()
 
 

@@ -26,6 +26,7 @@ from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
     require_bool_field,
     require_int_field,
+    require_str_field,
 )
 
 # An equipment container teleport-approached this many times never
@@ -86,6 +87,10 @@ class ScorecardAccumulatorDict(TypedDict):
             ``uses_extra``.
         equipment_approaches: Every ``equipment_approach`` event, in
             stream order.
+        action_outcome_counts: Per ``"kind:outcome"`` tallies from the
+            unified ``action_outcome`` fabric -- the ledger-grade view
+            of every attempt resolution (hits, stalls, rejections,
+            executor discards, superseded re-dispatches).
         first_timestamp: Timestamp of the first record, or ``""``.
         last_timestamp: Timestamp of the last record, or ``""``.
     """
@@ -105,6 +110,7 @@ class ScorecardAccumulatorDict(TypedDict):
     scans_extra: int
     scans_builtin: int
     equipment_approaches: list[TargetedTeleportRecordDict]
+    action_outcome_counts: dict[str, int]
     first_timestamp: str
     last_timestamp: str
     # Career totals from the wire's 0x56 broadcast (latest seen this
@@ -146,6 +152,7 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         scans_extra=0,
         scans_builtin=0,
         equipment_approaches=[],
+        action_outcome_counts={},
         first_timestamp="",
         last_timestamp="",
         career_destroyed_last=-1,
@@ -277,6 +284,13 @@ def _route_scorecard_diagnostic(
             accumulator["scans_extra"] += 1
         else:
             accumulator["scans_builtin"] += 1
+    elif kind == "action_outcome":
+        counter_key = (
+            f"{require_str_field(record['fields'], 'action_kind')}:"
+            f"{require_str_field(record['fields'], 'outcome')}"
+        )
+        counts = accumulator["action_outcome_counts"]
+        counts[counter_key] = counts.get(counter_key, 0) + 1
     else:
         _route_metrics_diagnostic(kind, record, accumulator)
 
@@ -447,6 +461,7 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         equipment_approaches=approaches,
         equipment_approach_distinct_targets=len(approach_counts),
         equipment_approach_max_repeats=(max(approach_counts.values()) if approach_counts else 0),
+        action_outcome_counts=dict(sorted(accumulator["action_outcome_counts"].items())),
         career_destroyed_last=accumulator["career_destroyed_last"],
         career_deactivated_last=accumulator["career_deactivated_last"],
         career_score_last=accumulator["career_score_last"],

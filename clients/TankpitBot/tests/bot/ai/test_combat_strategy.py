@@ -512,7 +512,7 @@ class TestCombatTeleportGuards:
         result = teleport_to_target(ctx, _enemy_threat(x=190, y=100, name="FarEnemy"))
 
         assert result["behavior"]["mode"] == "HUNT"
-        assert result["behavior"]["reason"] == "find_enemies"
+        assert result["behavior"]["reason_kind"] == "find_enemies"
         assert result["updated_ai_state"]["combat_target_id"] == -1
         assert "50" in result["updated_ai_state"]["blocked_combat_targets"]
         assert result["updated_ai_state"]["blocked_combat_targets"]["50"] == 100000
@@ -549,7 +549,7 @@ class TestCombatTeleportGuards:
         if result is None:
             raise AssertionError("expected teleport decision")
         assert result["command"]["cmd_type"] == "teleport"
-        assert result["behavior"]["reason"] == "teleport CloseEnemy"
+        assert result["behavior"]["reason_kind"] == "teleport_target"
 
 
 class TestKillShotWireGate:
@@ -628,7 +628,7 @@ class TestKillShotWireGate:
         decision = engage_target(ctx, target)
 
         assert decision["command"]["cmd_type"] == "shoot"
-        assert decision["behavior"]["reason"] == "shoot Adjacent"
+        assert decision["behavior"]["reason_kind"] == "shoot_target"
 
     def test_wire_stale_adjacent_target_is_still_shot(self) -> None:
         """A wire-silent target is still engaged.
@@ -718,7 +718,7 @@ class TestMissOnMovedTarget:
         assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 102
         assert decision["command"]["target_y"] == 100
-        assert decision["behavior"]["reason"] == "shoot Mover"
+        assert decision["behavior"]["reason_kind"] == "shoot_target"
         assert "50" not in decision["updated_ai_state"]["blocked_combat_targets"]
 
 

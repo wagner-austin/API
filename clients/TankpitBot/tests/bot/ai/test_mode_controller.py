@@ -153,7 +153,7 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
     """Decision rewriting can attach durable mode ownership."""
     decision = make_tick_decision(
         command=make_move_command(110, 100),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport enemy"),
+        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport_target"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -253,7 +253,7 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
     """HUNT substates are derived from concrete combat commands."""
     closing = make_tick_decision(
         command=make_teleport_command(110, 100),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport enemy"),
+        behavior=make_behavior_score("HUNT", 800, 110, 100, "teleport_target"),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -264,7 +264,7 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
     )
     engaging = make_tick_decision(
         command=make_shoot_command(110, 100, 42),
-        behavior=make_behavior_score("HUNT", 800, 110, 100, "shoot enemy"),
+        behavior=make_behavior_score("HUNT", 800, 110, 100, "shoot_target"),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -276,6 +276,17 @@ def test_derive_hunt_mode_state_uses_command_shape_for_close_and_engage() -> Non
 
     assert derive_hunt_mode_state(closing) == "CLOSE"
     assert derive_hunt_mode_state(engaging) == "ENGAGE"
+
+
+def test_derive_hunt_mode_state_map_open_without_lock_acquires() -> None:
+    """A non-find_enemies map open with no locked target derives ACQUIRE."""
+    acquiring = make_tick_decision(
+        command=make_map_open_command(),
+        behavior=make_behavior_score("HUNT", 800, 0, 0, "dot_relay"),
+        updated_ai_state=make_initial_ai_state(),
+        desired_equipment=[],
+    )
+    assert derive_hunt_mode_state(acquiring) == "ACQUIRE"
 
 
 def test_derive_hunt_mode_state_keeps_non_combat_teleport_in_acquire() -> None:
@@ -290,7 +301,7 @@ def test_derive_hunt_mode_state_keeps_non_combat_teleport_in_acquire() -> None:
     """
     decision = make_tick_decision(
         command=make_teleport_command(110, 100),
-        behavior=make_behavior_score("HUNT", 0, 110, 100, "hunt_search_teleport"),
+        behavior=make_behavior_score("HUNT", 0, 110, 100, "search_collect_local"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -307,7 +318,7 @@ def test_derive_hunt_mode_state_maps_unlocked_map_open_to_acquire() -> None:
     """
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "map_refresh"),
+        behavior=make_behavior_score("HUNT", 800, 0, 0, "find_enemies"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -319,7 +330,7 @@ def test_derive_hunt_mode_state_maps_locked_walk_to_close() -> None:
     """A combat walk toward a locked target is a CLOSE transition."""
     decision = make_tick_decision(
         command=make_move_command(103, 100),
-        behavior=make_behavior_score("HUNT", 800, 103, 100, "walk to Enemy"),
+        behavior=make_behavior_score("HUNT", 800, 103, 100, "find_target"),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -341,7 +352,7 @@ def test_derive_hunt_mode_state_uses_acquire_for_delegated_fuel_pickup() -> None
     """
     decision = make_tick_decision(
         command=make_pickup_fuel_command(110, 100),
-        behavior=make_behavior_score("COLLECT", 900, 110, 100, "fuel=500"),
+        behavior=make_behavior_score("COLLECT", 900, 110, 100, "fuel_collect"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -353,7 +364,7 @@ def test_derive_hunt_mode_state_uses_refresh_for_map_refresh() -> None:
     """Map refresh with a locked target maps to REFRESH."""
     decision = make_tick_decision(
         command=make_map_open_command(),
-        behavior=make_behavior_score("HUNT", 800, 0, 0, "find target"),
+        behavior=make_behavior_score("HUNT", 800, 0, 0, "find_target"),
         updated_ai_state=AIStateDict(
             **{
                 **make_initial_ai_state(),
@@ -417,7 +428,7 @@ def test_derive_collect_mode_state_maps_sense_search_and_pickup() -> None:
     )
     pickup = make_tick_decision(
         command=make_pickup_equipment_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 925, 102, 101, "equipment_critical"),
+        behavior=make_behavior_score("COLLECT", 925, 102, 101, "equipment_restock"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -455,13 +466,13 @@ def test_derive_collect_mode_state_maps_sense_search_pickup_and_approach() -> No
     )
     pickup = make_tick_decision(
         command=make_pickup_fuel_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel=700"),
+        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel_locked"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
     approach = make_tick_decision(
         command=make_move_command(102, 101),
-        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel=700"),
+        behavior=make_behavior_score("COLLECT", 900, 102, 101, "fuel_locked"),
         updated_ai_state=make_initial_ai_state(),
         desired_equipment=[],
     )
@@ -527,7 +538,7 @@ def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
     # A transition from HUNT into UNSET refreshes the started timestamp.
     assert decision["updated_ai_state"]["mode_started_ms"] == 15000
     assert decision["updated_ai_state"]["manual_mode"] == "UNSET"
-    assert decision["behavior"]["reason"] == "manual_hold"
+    assert decision["behavior"]["reason_kind"] == "manual_hold"
     assert decision["desired_equipment"] == []
     assert decision["secondary_command"] is None
 
@@ -575,7 +586,7 @@ def _make_decision(
     state = ai_state if ai_state is not None else make_initial_ai_state()
     return make_tick_decision(
         command=command,
-        behavior=make_behavior_score("HUNT", 100, 0, 0, "test"),
+        behavior=make_behavior_score("HUNT", 100, 0, 0, "manual_hold"),
         updated_ai_state=state,
         desired_equipment=[],
         secondary_command=secondary_command,

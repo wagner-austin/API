@@ -406,12 +406,12 @@ class TestCountStallTimeouts:
         """A missing events file counts as zero stalls."""
         assert count_stall_timeouts(Path("runs/bot/missing.jsonl")) == 0
 
-    def test_counts_only_wire_complete_stall_timeout(self) -> None:
-        """Filter is strict on both ``channel`` and ``signal``."""
+    def test_counts_only_action_outcome_stall_timeout(self) -> None:
+        """Filter is strict on both ``diagnostic_kind`` and ``outcome``."""
         from platform_core.json_utils import dump_json_str
 
-        # Two qualifying records, one near-miss (wrong channel), one
-        # near-miss (wrong signal), and a blank line.
+        # Two qualifying records, one near-miss (wrong kind), one
+        # near-miss (wrong outcome), and a blank line.
         lines = [
             dump_json_str(
                 {
@@ -419,11 +419,12 @@ class TestCountStallTimeouts:
                     "level": "INFO",
                     "logger": "tankpit_bot.runtime.events",
                     "mode": "bot",
-                    "channel": "WIRE_COMPLETE",
-                    "message": "move completed in 10000ms via stall_timeout",
+                    "channel": "DIAGNOSTIC",
+                    "message": "move stalled",
+                    "diagnostic_kind": "action_outcome",
                     "action_kind": "move",
                     "duration_ms": 10000,
-                    "signal": "stall_timeout",
+                    "outcome": "stall_timeout",
                 }
             ),
             dump_json_str(
@@ -432,9 +433,9 @@ class TestCountStallTimeouts:
                     "level": "INFO",
                     "logger": "tankpit_bot.runtime.events",
                     "mode": "bot",
-                    "channel": "AI",  # wrong channel
+                    "channel": "AI",  # wrong kind (no diagnostic_kind)
                     "message": "stall_timeout",
-                    "signal": "stall_timeout",
+                    "outcome": "stall_timeout",
                 }
             ),
             dump_json_str(
@@ -443,11 +444,12 @@ class TestCountStallTimeouts:
                     "level": "INFO",
                     "logger": "tankpit_bot.runtime.events",
                     "mode": "bot",
-                    "channel": "WIRE_COMPLETE",  # right channel
-                    "message": "map_open completed in 250ms via map_data_processed",
+                    "channel": "DIAGNOSTIC",
+                    "message": "map_open resolved",
+                    "diagnostic_kind": "action_outcome",
                     "action_kind": "map_open",
                     "duration_ms": 250,
-                    "signal": "map_data_processed",  # wrong signal
+                    "outcome": "map_data_processed",  # wrong outcome
                 }
             ),
             "",  # blank line should be skipped
@@ -457,11 +459,12 @@ class TestCountStallTimeouts:
                     "level": "INFO",
                     "logger": "tankpit_bot.runtime.events",
                     "mode": "bot",
-                    "channel": "WIRE_COMPLETE",
-                    "message": "teleport completed in 10000ms via stall_timeout",
+                    "channel": "DIAGNOSTIC",
+                    "message": "teleport stalled",
+                    "diagnostic_kind": "action_outcome",
                     "action_kind": "teleport",
                     "duration_ms": 10000,
-                    "signal": "stall_timeout",
+                    "outcome": "stall_timeout",
                 }
             ),
         ]

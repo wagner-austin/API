@@ -24,8 +24,14 @@ from tankpit_bot.bot.states import (
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.session_base import SessionBase
-from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
-from tankpit_bot.runtime_logging import emit_diagnostic, emit_state, emit_wire_complete
+from tankpit_bot.ledger.outcome.collect import (
+    emit_collect_container_consumed,
+    emit_collect_position_reached,
+)
+from tankpit_bot.ledger.outcome.move import emit_move_position_reached
+from tankpit_bot.ledger.outcome.scan import emit_scan_radar_complete
+from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_state
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_service,
@@ -178,7 +184,11 @@ class CompletionsMixin(SessionBase):
             return False
         if not check_and_clear_radar_scan_complete():
             return False
-        self._emit_completion(action_kind="scan", signal="radar_scan_complete", action=action)
+        emit_scan_radar_complete(
+            duration_ms=self._action_duration_ms(action),
+            target_x=action["target_x"],
+            target_y=action["target_y"],
+        )
         self._transition("IDLE", in_flight_action=make_no_action())
         return True
 
@@ -196,10 +206,10 @@ class CompletionsMixin(SessionBase):
         action = self._state_data["in_flight_action"]
         tx, ty = action["target_x"], action["target_y"]
         if self_state["x"] == tx and self_state["y"] == ty:
-            self._emit_completion(
-                action_kind="move",
-                signal="position_reached",
-                action=action,
+            emit_move_position_reached(
+                duration_ms=self._action_duration_ms(action),
+                target_x=tx,
+                target_y=ty,
                 landed_x=self_state["x"],
                 landed_y=self_state["y"],
             )
@@ -238,16 +248,12 @@ class CompletionsMixin(SessionBase):
                         landed_y=self_state["y"],
                         dist=dist,
                     )
-            self._emit_completion(
-                action_kind="teleport",
-                signal="teleport_landed",
-                action=action,
+            emit_teleport_landed(
+                duration_ms=self._action_duration_ms(action),
+                target_x=tx,
+                target_y=ty,
                 landed_x=self_state["x"],
                 landed_y=self_state["y"],
-            )
-            landed_exactly = self_state["x"] == tx and self_state["y"] == ty
-            emit_teleport_attempt_outcome(
-                status="landed_exact" if landed_exactly else "landed_inexact",
                 messages=self._messages,
             )
             self._transition("IDLE", in_flight_action=make_no_action())
@@ -275,46 +281,38 @@ class CompletionsMixin(SessionBase):
         target_key = f"{tx},{ty}"
         position_reached = self_state["x"] == tx and self_state["y"] == ty
         if position_reached or target_key not in world["containers"]:
-            signal = "position_reached" if position_reached else "container_consumed"
-            self._emit_completion(
-                action_kind="collect",
-                signal=signal,
-                action=action,
-                landed_x=self_state["x"],
-                landed_y=self_state["y"],
-            )
+            if position_reached:
+                emit_collect_position_reached(
+                    duration_ms=self._action_duration_ms(action),
+                    target_x=tx,
+                    target_y=ty,
+                    landed_x=self_state["x"],
+                    landed_y=self_state["y"],
+                )
+            else:
+                emit_collect_container_consumed(
+                    duration_ms=self._action_duration_ms(action),
+                    target_x=tx,
+                    target_y=ty,
+                    landed_x=self_state["x"],
+                    landed_y=self_state["y"],
+                )
             self._transition("IDLE", in_flight_action=make_no_action())
             return True
         return False
 
-    def _emit_completion(
-        self,
-        *,
-        action_kind: str,
-        signal: str,
-        action: InFlightActionDict,
-        **extra: str | int | float | bool,
-    ) -> None:
-        """Emit a structured WIRE_COMPLETE event for an authoritative completion.
+    def _action_duration_ms(self, action: InFlightActionDict) -> int:
+        """Return dispatch-to-now wall-clock ms for an in-flight action.
 
         Args:
-            action_kind: Kind of action that completed.
-            signal: Name of the authoritative completion signal.
-            action: The in-flight action being cleared.
-            **extra: Additional structured fields (e.g. landed coordinates).
+            action: The in-flight action being resolved.
+
+        Returns:
+            Elapsed ms since dispatch, or ``-1`` when the gate fired
+            with no recorded dispatch time.
         """
         started_ms = action["started_ms"]
-        duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
-        target_x = action["target_x"]
-        target_y = action["target_y"]
-        emit_wire_complete(
-            action_kind=action_kind,
-            duration_ms=duration_ms,
-            signal=signal,
-            target_x=target_x,
-            target_y=target_y,
-            **extra,
-        )
+        return get_current_time_ms() - started_ms if started_ms > 0 else -1
 
     def _update_state_from_world(self) -> None:
         """Update state machine based on current world state.

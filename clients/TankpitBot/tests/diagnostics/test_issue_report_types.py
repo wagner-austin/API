@@ -12,6 +12,7 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.diagnostics.issue_report_codecs import (
+    decode_action_outcome_row,
     decode_fuel_target_selection_record,
     decode_issue_report,
     decode_map_open_skipped_record,
@@ -19,7 +20,7 @@ from tankpit_bot.diagnostics.issue_report_codecs import (
     decode_state_budget_record,
     decode_targeted_teleport_record,
     decode_teleport_attempt_record,
-    decode_wire_complete_record,
+    encode_action_outcome_row,
     encode_fuel_target_selection_record,
     encode_issue_report,
     encode_map_open_skipped_record,
@@ -27,9 +28,9 @@ from tankpit_bot.diagnostics.issue_report_codecs import (
     encode_state_budget_record,
     encode_targeted_teleport_record,
     encode_teleport_attempt_record,
-    encode_wire_complete_record,
 )
 from tankpit_bot.diagnostics.issue_report_types import (
+    ActionOutcomeRowDict,
     FuelTargetSelectionRecordDict,
     IssueReportDict,
     MapOpenSkippedRecordDict,
@@ -37,7 +38,6 @@ from tankpit_bot.diagnostics.issue_report_types import (
     StateBudgetRecordDict,
     TargetedTeleportRecordDict,
     TeleportAttemptRecordDict,
-    WireCompleteRecordDict,
 )
 
 
@@ -111,16 +111,40 @@ def test_fuel_target_selection_record_rejects_non_bool_target_present() -> None:
         decode_fuel_target_selection_record(raw)
 
 
-def test_wire_complete_record_round_trip() -> None:
-    """``WireCompleteRecordDict`` round-trips through JSON encoding."""
-    record = WireCompleteRecordDict(
+def test_decode_scorecard_rejects_non_int_outcome_count() -> None:
+    """The outcome-counts codec rejects non-int values."""
+    from tankpit_bot.diagnostics.issue_report_codecs import (
+        decode_session_scorecard,
+        encode_session_scorecard,
+    )
+    from tankpit_bot.diagnostics.session_scorecard import (
+        build_session_scorecard,
+        new_scorecard_accumulator,
+    )
+
+    scorecard = build_session_scorecard(new_scorecard_accumulator())
+    encoded = encode_session_scorecard(scorecard)
+    assert decode_session_scorecard(encoded) == scorecard
+    encoded["action_outcome_counts"] = {"shoot:hit": 4, "move:stall_timeout": 1}
+    populated = decode_session_scorecard(encoded)
+    assert populated["action_outcome_counts"] == {"shoot:hit": 4, "move:stall_timeout": 1}
+    encoded["action_outcome_counts"] = {"move:stall_timeout": "many"}
+    with pytest.raises(JSONTypeError, match="must be int"):
+        decode_session_scorecard(encoded)
+
+
+def test_action_outcome_row_round_trip() -> None:
+    """``ActionOutcomeRowDict`` round-trips through JSON encoding."""
+    record = ActionOutcomeRowDict(
         action_kind="map_open",
+        outcome="map_data_processed",
+        event_id=7,
+        attempt_id=3,
         duration_ms=850,
-        signal="map_data_processed",
         timestamp="2026-06-07T22:12:33",
     )
 
-    decoded = decode_wire_complete_record(_round_trip(encode_wire_complete_record(record)))
+    decoded = decode_action_outcome_row(_round_trip(encode_action_outcome_row(record)))
 
     assert decoded == record
 
@@ -181,11 +205,13 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
                 timestamp="2026-06-07T22:12:32",
             )
         ],
-        wire_completes=[
-            WireCompleteRecordDict(
+        action_outcomes=[
+            ActionOutcomeRowDict(
                 action_kind="map_open",
+                outcome="map_data_processed",
+                event_id=7,
+                attempt_id=3,
                 duration_ms=850,
-                signal="map_data_processed",
                 timestamp="2026-06-07T22:12:33",
             )
         ],
@@ -217,6 +243,7 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
+            action_outcome_counts={},
             career_destroyed_last=-1,
             career_deactivated_last=-1,
             career_score_last=-1,
@@ -248,7 +275,7 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
         teleport_attempts=[],
         map_open_skipped=[],
         fuel_target_selections=[],
-        wire_completes=[],
+        action_outcomes=[],
         teleport_success_count=0,
         teleport_failure_count=0,
         fuel_selected_count=0,
@@ -277,6 +304,7 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
+            action_outcome_counts={},
             career_destroyed_last=-1,
             career_deactivated_last=-1,
             career_score_last=-1,
@@ -302,7 +330,7 @@ def test_decode_issue_report_rejects_non_object_session_room() -> None:
         "teleport_attempts": [],
         "map_open_skipped": [],
         "fuel_target_selections": [],
-        "wire_completes": [],
+        "action_outcomes": [],
         "teleport_success_count": 0,
         "teleport_failure_count": 0,
         "fuel_selected_count": 0,
@@ -331,7 +359,7 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
         "teleport_attempts": [],
         "map_open_skipped": [],
         "fuel_target_selections": [],
-        "wire_completes": [],
+        "action_outcomes": [],
         "teleport_success_count": 0,
         "teleport_failure_count": 0,
         "fuel_selected_count": 0,
@@ -361,6 +389,7 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
                 equipment_approaches=[],
                 equipment_approach_distinct_targets=0,
                 equipment_approach_max_repeats=0,
+                action_outcome_counts={},
                 career_destroyed_last=-1,
                 career_deactivated_last=-1,
                 career_score_last=-1,

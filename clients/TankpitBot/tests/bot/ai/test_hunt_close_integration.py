@@ -399,7 +399,7 @@ class TestDecideTeleportToFarTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "confirm_kill"
+        assert decision["behavior"]["reason_kind"] == "confirm_kill"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
 
     def test_stale_killed_target_is_not_reacquired_from_old_sighting(self) -> None:

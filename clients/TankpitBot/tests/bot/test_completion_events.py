@@ -1,4 +1,4 @@
-"""Integration tests for ``WIRE_COMPLETE`` events on every completion gate.
+"""Integration tests for ``action_outcome`` events on every completion gate.
 
 Each test drives a real :class:`tankpit_bot.bot.base.Bot` (or
 :func:`tankpit_bot.bot.tick_loop._has_in_flight_action`) through a
@@ -13,7 +13,7 @@ The full pipeline tested by each case is:
 
     bot completion site
       -> emit_wire_complete(...)
-        -> _emit_runtime_event("WIRE_COMPLETE", ..., **fields)
+        -> emit_diagnostic(diagnostic_kind="action_outcome", ..., **fields)
           -> stdlib logging with RuntimeLogExtraDict on the LogRecord
             -> _HookEventArtifactHandler.emit(record)
               -> dump_json_str(encode_runtime_event_record(...))
@@ -65,23 +65,24 @@ from tankpit_bot.state.types import make_tank_state
 from tests.conftest import FakeEnv, FakeFileSystem
 
 
-def _decode_wire_complete_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
-    """Return every ``WIRE_COMPLETE`` event decoded from a JSONL artifact.
+def _decode_action_outcome_lines(jsonl: str) -> list[RuntimeEventRecordDict]:
+    """Return every ``action_outcome`` event decoded from a JSONL artifact.
 
     Args:
         jsonl: Raw newline-delimited JSONL artifact body.
 
     Returns:
-        Decoded :class:`RuntimeEventRecordDict` instances whose ``channel``
-        is ``WIRE_COMPLETE``. Other channels (``STATE``, ``WIRE``, etc.) are
-        filtered out so completion-site assertions are not coupled to
-        unrelated emissions on the same path.
+        Decoded :class:`RuntimeEventRecordDict` instances whose
+        ``diagnostic_kind`` is ``action_outcome``. Other records
+        (``STATE``, ``WIRE``, unrelated diagnostics) are filtered out
+        so completion-site assertions are not coupled to unrelated
+        emissions on the same path.
     """
     records: list[RuntimeEventRecordDict] = []
     for line in jsonl.strip().splitlines():
         raw: JSONObject = narrow_json_to_dict(load_json_str(line))
         record = decode_runtime_event_record(raw)
-        if record["channel"] == "WIRE_COMPLETE":
+        if record["fields"].get("diagnostic_kind") == "action_outcome":
             records.append(record)
     return records
 
@@ -123,8 +124,8 @@ def _make_bot_with_in_flight(
     return bot
 
 
-class TestWireCompleteEventsOnAuthoritativeCompletion:
-    """Each authoritative completion gate emits a ``WIRE_COMPLETE`` event."""
+class TestActionOutcomeEventsOnAuthoritativeCompletion:
+    """Each authoritative completion gate emits an ``action_outcome`` event."""
 
     def test_map_open_completion_emits_event_with_map_data_processed_signal(
         self,
@@ -149,13 +150,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         cleared = has_in_flight_action(bot) is False
         assert cleared
 
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "map_open"
-        assert require_str_field(fields, "signal") == "map_data_processed"
+        assert require_str_field(fields, "outcome") == "map_data_processed"
         # The live clock advances between the recorded started_ms and the
         # completion call, so the decoded duration_ms is strictly positive.
         assert require_int_field(fields, "duration_ms") >= 0
@@ -190,13 +191,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         completed = bot._maybe_complete_walk(landed_state)
 
         assert completed is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "move"
-        assert require_str_field(fields, "signal") == "position_reached"
+        assert require_str_field(fields, "outcome") == "position_reached"
         assert require_int_field(fields, "target_x") == 120
         assert require_int_field(fields, "target_y") == 130
         assert require_int_field(fields, "landed_x") == 120
@@ -233,13 +234,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         completed = bot._maybe_complete_teleport(landed_state)
 
         assert completed is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "teleport"
-        assert require_str_field(fields, "signal") == "teleport_landed"
+        assert require_str_field(fields, "outcome") == "landed_exact"
         assert require_int_field(fields, "target_x") == 200
         assert require_int_field(fields, "target_y") == 210
         assert require_int_field(fields, "landed_x") == 200
@@ -321,13 +322,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         completed = bot._maybe_complete_collection(bot.get_world_state(), landed_state)
 
         assert completed is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "collect"
-        assert require_str_field(fields, "signal") == "position_reached"
+        assert require_str_field(fields, "outcome") == "position_reached"
         assert require_int_field(fields, "target_x") == 80
         assert require_int_field(fields, "target_y") == 90
 
@@ -361,13 +362,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         completed = bot._maybe_complete_collection(bot.get_world_state(), non_target_self)
 
         assert completed is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "collect"
-        assert require_str_field(fields, "signal") == "container_consumed"
+        assert require_str_field(fields, "outcome") == "container_consumed"
         assert require_int_field(fields, "target_x") == 80
         assert require_int_field(fields, "target_y") == 90
         assert require_int_field(fields, "landed_x") == 70
@@ -396,13 +397,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         completed = bot._maybe_complete_scan(bot.get_world_state())
 
         assert completed is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "scan"
-        assert require_str_field(fields, "signal") == "radar_scan_complete"
+        assert require_str_field(fields, "outcome") == "radar_complete"
 
     def test_stalled_action_emits_event_with_stall_timeout_signal(
         self,
@@ -425,13 +426,13 @@ class TestWireCompleteEventsOnAuthoritativeCompletion:
         cleared = _clear_stalled_action(bot, bot._state_data["in_flight_action"])
 
         assert cleared is True
-        events = _decode_wire_complete_lines(
+        events = _decode_action_outcome_lines(
             fake_fs.get_written_files()[artifacts["latest_events_path"]]
         )
         assert len(events) == 1
         fields = events[0]["fields"]
         assert require_str_field(fields, "action_kind") == "move"
-        assert require_str_field(fields, "signal") == "stall_timeout"
+        assert require_str_field(fields, "outcome") == "stall_timeout"
         assert require_int_field(fields, "target_x") == 180
         assert require_int_field(fields, "target_y") == 200
         # timeout_ms carries the configured action stall timeout the gate
@@ -474,8 +475,8 @@ def test_artifact_jsonl_lines_round_trip_through_real_decoder(
         "latest and archive event streams must hold identical content"
     )
 
-    latest_events = _decode_wire_complete_lines(files[artifacts["latest_events_path"]])
-    archive_events = _decode_wire_complete_lines(files[artifacts["archive_events_path"]])
+    latest_events = _decode_action_outcome_lines(files[artifacts["latest_events_path"]])
+    archive_events = _decode_action_outcome_lines(files[artifacts["archive_events_path"]])
     assert latest_events == archive_events
     assert len(latest_events) == 1
-    assert require_str_field(latest_events[0]["fields"], "signal") == "radar_scan_complete"
+    assert require_str_field(latest_events[0]["fields"], "outcome") == "radar_complete"

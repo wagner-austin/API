@@ -10,7 +10,7 @@ The index is one line per session, tab-separated. Columns (in order):
   2. ``duration_s`` -- session wall-clock seconds (integer).
   3. ``exit_reason`` -- ``completed`` / ``interrupted`` / ``stop_file``.
   4. ``ticks`` -- total ticks executed.
-  5. ``stalls`` -- WIRE_COMPLETE events with ``signal=stall_timeout``.
+  5. ``stalls`` -- ``action_outcome`` events with ``outcome=stall_timeout``.
   6. ``shots_fired`` -- hits + misses (from the AI scorecard).
   7. ``kills`` -- ``session_kill_count`` from the AI scorecard.
   8. ``kills_per_min`` -- ``kills / max(1, duration_s) * 60`` rounded to
@@ -67,7 +67,7 @@ class BotRunIndexRowDict(TypedDict):
             exhausted), ``interrupted`` (SIGINT/SIGTERM), or
             ``stop_file`` (graceful sentinel file consumed).
         ticks: Total ticks executed before exit.
-        stalls: Count of ``stall_timeout`` WIRE_COMPLETE events.
+        stalls: Count of ``stall_timeout`` action-outcome events.
         shots_fired: Hits + misses from the AI scorecard.
         kills: ``session_kill_count`` from the AI scorecard.
         kills_per_min: ``kills / max(1, duration_s) * 60`` rounded to
@@ -283,10 +283,11 @@ def load_index_rows(index_path: Path = DEFAULT_INDEX_PATH) -> list[BotRunIndexRo
 
 
 def count_stall_timeouts(events_path: Path) -> int:
-    """Count ``stall_timeout`` WIRE_COMPLETE events in a JSONL file.
+    """Count ``stall_timeout`` action-outcome events in a JSONL file.
 
-    Walks the file once, parses each line as JSON, and counts records
-    with ``channel == "WIRE_COMPLETE"`` and ``signal == "stall_timeout"``.
+    Walks the file once, parses each line as JSON, and counts
+    DIAGNOSTIC records with ``diagnostic_kind == "action_outcome"``
+    and ``outcome == "stall_timeout"``.
 
     Args:
         events_path: Path to a runtime events JSONL file.
@@ -317,9 +318,9 @@ def count_stall_timeouts(events_path: Path) -> int:
         if not line.strip():
             continue
         parsed = _narrow(_load_json_str(line))
-        if _optional_str(parsed, "channel") != "WIRE_COMPLETE":
+        if _optional_str(parsed, "diagnostic_kind") != "action_outcome":
             continue
-        if _optional_str(parsed, "signal") == "stall_timeout":
+        if _optional_str(parsed, "outcome") == "stall_timeout":
             count += 1
     return count
 

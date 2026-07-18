@@ -31,11 +31,12 @@ from tankpit_bot.bot.ai.context import (
     can_afford_teleport,
     clear_resource_target,
     make_decision,
+    teleport_fuel_cost_to,
 )
-from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode
+from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode, ReasonKind
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
-from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.types import coord_key
 
@@ -75,35 +76,64 @@ def _viewport_walkable_fraction(
 
 
 def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
-    """Return the nearest fuel dot whose landing viewport is 100% clean.
+    """Return the best-value fuel dot to hop to, or None when none qualify.
 
-    A dot qualifies when (a) it is not the bot's own tile, (b) its
-    landing tile is passable, (c) the teleport is fuel-affordable,
-    (d) the landing viewport has no fresh scan coverage, and (e) the
-    landing viewport is fully walkable ground. Candidates are tried
-    nearest-first (euclidean, matching teleport cost).
+    Hard gates (physics only): the dot is not the bot's own tile, its
+    landing tile is passable, the teleport is fuel-affordable, and the
+    landing viewport has no fresh scan coverage (the user's "clean" --
+    fresh intel worth a radar).
+
+    Qualifying dots are RANKED, not filtered, by hop value (user
+    contract 2026-07-18: "the rule was to prioritize viewports with
+    more dots, more walkable area. but not a 100% rule"):
+
+        score = dots_in_landing_viewport * walkable_fraction / cost
+
+    -- expected pickup value, scaled by how much of the landing
+    viewport is actually reachable, per fuel spent. Closer dots win
+    through the cost denominator. This replaces the 2026-07-03
+    ``walkable_fraction == 1.0`` hard filter, which mis-read "100%
+    clean viewport" as "zero terrain tiles" and rejected 428 of 622
+    dots in the 2026-07-18 diagnostic run, starving the hop cascade
+    into ``no_productive_collect`` exits.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        ``(target_x, target_y)`` of the nearest qualifying dot, or
-        ``None`` when none qualify.
+        ``(target_x, target_y)`` of the highest-value qualifying dot,
+        or ``None`` when none pass the hard gates.
     """
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     viewport = ctx.world["viewport"]
     half_w = viewport["width"] // 2
     half_h = viewport["height"] // 2
 
-    def _distance_sq(dot: tuple[int, int]) -> int:
-        return (dot[0] - sx) ** 2 + (dot[1] - sy) ** 2
+    def _dots_in_viewport(left: int, top: int) -> int:
+        right = left + viewport["width"] - 1
+        bottom = top + viewport["height"] - 1
+        return sum(
+            1
+            for dot_x, dot_y in ctx.map_fuel_dots
+            if left <= dot_x <= right and top <= dot_y <= bottom
+        )
 
-    for target_x, target_y in sorted(ctx.map_fuel_dots, key=_distance_sq):
+    own_tile = 0
+    impassable = 0
+    unaffordable = 0
+    already_scanned = 0
+    best_score = -1.0
+    best_cost = 0
+    best_dot: tuple[int, int] | None = None
+    for target_x, target_y in sorted(ctx.map_fuel_dots):
         if (target_x, target_y) == (sx, sy):
+            own_tile += 1
             continue
         if ctx.terrain is not None and not ctx.terrain.is_passable(target_x, target_y):
+            impassable += 1
             continue
         if not can_afford_teleport(ctx, target_x, target_y):
+            unaffordable += 1
             continue
         landing_left = target_x - half_w
         landing_top = target_y - half_h
@@ -115,20 +145,43 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             landing_top + viewport["height"] - 1,
             ctx.timestamp_ms,
         ):
+            already_scanned += 1
             continue
-        if (
-            _viewport_walkable_fraction(
-                ctx,
-                landing_left,
-                landing_top,
-                viewport["width"],
-                viewport["height"],
-            )
-            < 1.0
-        ):
-            continue
-        return (target_x, target_y)
-    return None
+        cost = teleport_fuel_cost_to(ctx, target_x, target_y)
+        walkable = _viewport_walkable_fraction(
+            ctx,
+            landing_left,
+            landing_top,
+            viewport["width"],
+            viewport["height"],
+        )
+        score = _dots_in_viewport(landing_left, landing_top) * walkable / max(cost, 1)
+        better_tie = score == best_score and best_dot is not None and cost < best_cost
+        if score > best_score or better_tie:
+            best_score = score
+            best_cost = cost
+            best_dot = (target_x, target_y)
+    if best_dot is None:
+        emit_diagnostic(
+            diagnostic_kind="hop_declined",
+            hop_kind="dot",
+            dots_total=len(ctx.map_fuel_dots),
+            own_tile=own_tile,
+            impassable=impassable,
+            unaffordable=unaffordable,
+            already_scanned=already_scanned,
+            fuel=ctx.fuel,
+        )
+        return None
+    emit_diagnostic(
+        diagnostic_kind="hop_selected",
+        hop_kind="dot",
+        target_x=best_dot[0],
+        target_y=best_dot[1],
+        score=round(best_score, 4),
+        cost=best_cost,
+    )
+    return best_dot
 
 
 def is_recently_attempted(
@@ -233,7 +286,7 @@ def make_resource_search_hop(
     *,
     mode: BehaviorMode,
     score: int,
-    reason: str,
+    reason: ReasonKind,
     ai_state: AIStateDict | None = None,
 ) -> TickDecisionDict | None:
     """Create a teleport decision to the nearest clean-viewport fuel dot.

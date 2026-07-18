@@ -21,8 +21,30 @@ from tankpit_bot.bot.ai.reachability import (
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_no_action, transition_to
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
-from tankpit_bot.diagnostics.teleport_attempts import emit_teleport_attempt_outcome
-from tankpit_bot.runtime_logging import emit_diagnostic, emit_sync, emit_wire_complete
+from tankpit_bot.ledger.outcome.collect import (
+    emit_collect_command_rejected,
+    emit_collect_movement_rejected,
+    emit_collect_stall_timeout,
+)
+from tankpit_bot.ledger.outcome.map_open import (
+    emit_map_open_command_rejected,
+    emit_map_open_data_processed,
+    emit_map_open_stall_timeout,
+)
+from tankpit_bot.ledger.outcome.move import (
+    emit_move_command_rejected,
+    emit_move_movement_rejected,
+    emit_move_stall_timeout,
+)
+from tankpit_bot.ledger.outcome.scan import (
+    emit_scan_command_rejected,
+    emit_scan_stall_timeout,
+)
+from tankpit_bot.ledger.outcome.teleport import (
+    emit_teleport_command_rejected,
+    emit_teleport_stall_timeout,
+)
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_sync
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
@@ -273,14 +295,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         ty,
         error_code,
     )
-    emit_wire_complete(
-        action_kind=kind,
-        duration_ms=elapsed_ms,
-        signal="command_rejected",
-        target_x=tx,
-        target_y=ty,
-        error_code=error_code,
-    )
+    _emit_command_rejected_outcome(bot, kind, tx, ty, elapsed_ms, error_code)
     if kind == "collect":
         # Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
         # "blacklist this container forever" are not the same event.
@@ -343,13 +358,10 @@ def _clear_rejected_movement(
     started_ms = action["started_ms"]
     elapsed_ms = now - started_ms if started_ms > 0 else -1
     emit_sync("%s to (%d,%d) rejected by server, replanning", kind, tx, ty)
-    emit_wire_complete(
-        action_kind=kind,
-        duration_ms=elapsed_ms,
-        signal="movement_rejected",
-        target_x=tx,
-        target_y=ty,
-    )
+    if kind == "move":
+        emit_move_movement_rejected(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+    else:
+        emit_collect_movement_rejected(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
     if kind == "collect":
         increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
@@ -385,14 +397,7 @@ def _clear_stalled_action(
         ty,
         elapsed_ms,
     )
-    emit_wire_complete(
-        action_kind=action["kind"],
-        duration_ms=elapsed_ms,
-        signal="stall_timeout",
-        target_x=tx,
-        target_y=ty,
-        timeout_ms=timeout_ms,
-    )
+    _emit_stall_outcome(bot, action["kind"], tx, ty, elapsed_ms, timeout_ms)
     if action["kind"] == "collect":
         increment_container_failed_pickups(get_world_service(), tx, ty)
         emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
@@ -402,10 +407,92 @@ def _clear_stalled_action(
         now = get_current_time_ms()
         mark_move_target_failed(tx, ty, now)
         emit_sync("marked (%d,%d) as failed %s target", tx, ty, action["kind"])
-    if action["kind"] == "teleport":
-        emit_teleport_attempt_outcome(status="stall_timeout", messages=bot._messages)
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
+
+
+def _emit_command_rejected_outcome(
+    bot: Bot,
+    kind: ActionKind,
+    tx: int,
+    ty: int,
+    elapsed_ms: int,
+    error_code: int,
+) -> None:
+    """Route a 0x52 rejection to its kind's typed outcome emitter.
+
+    Args:
+        bot: Bot instance (for the teleport wire window).
+        kind: In-flight action kind that drew the rejection.
+        tx: Action target X.
+        ty: Action target Y.
+        elapsed_ms: Dispatch-to-rejection wall-clock ms.
+        error_code: The 0x52 error code.
+    """
+    if kind == "move":
+        emit_move_command_rejected(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+        )
+    elif kind == "collect":
+        emit_collect_command_rejected(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+        )
+    elif kind == "teleport":
+        emit_teleport_command_rejected(
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            error_code=error_code,
+            messages=bot._messages,
+        )
+    elif kind == "scan":
+        emit_scan_command_rejected(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+        )
+    elif kind == "map_open":
+        emit_map_open_command_rejected(duration_ms=elapsed_ms, error_code=error_code)
+
+
+def _emit_stall_outcome(
+    bot: Bot,
+    kind: ActionKind,
+    tx: int,
+    ty: int,
+    elapsed_ms: int,
+    timeout_ms: int,
+) -> None:
+    """Route a stall timeout to its kind's typed outcome emitter.
+
+    Args:
+        bot: Bot instance (for the teleport wire window).
+        kind: In-flight action kind that stalled.
+        tx: Action target X.
+        ty: Action target Y.
+        elapsed_ms: Dispatch-to-stall wall-clock ms.
+        timeout_ms: The stall threshold that fired.
+    """
+    if kind == "move":
+        emit_move_stall_timeout(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+        )
+    elif kind == "collect":
+        emit_collect_stall_timeout(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+        )
+    elif kind == "teleport":
+        emit_teleport_stall_timeout(
+            duration_ms=elapsed_ms,
+            target_x=tx,
+            target_y=ty,
+            timeout_ms=timeout_ms,
+            messages=bot._messages,
+        )
+    elif kind == "scan":
+        emit_scan_stall_timeout(
+            duration_ms=elapsed_ms, target_x=tx, target_y=ty, timeout_ms=timeout_ms
+        )
+    elif kind == "map_open":
+        emit_map_open_stall_timeout(duration_ms=elapsed_ms, timeout_ms=timeout_ms)
 
 
 def _mark_current_viewport_scan_failed(bot: Bot, timestamp_ms: int) -> None:
@@ -441,11 +528,7 @@ def _clear_completed_map_open(
         return False
     started_ms = action["started_ms"]
     duration_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
-    emit_wire_complete(
-        action_kind="map_open",
-        duration_ms=duration_ms,
-        signal="map_data_processed",
-    )
+    emit_map_open_data_processed(duration_ms=duration_ms)
     bot._state_data = transition_to(
         bot._state_data,
         bot.get_state(),

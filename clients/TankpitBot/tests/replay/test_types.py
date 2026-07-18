@@ -137,7 +137,7 @@ class TestReplayTickTrace:
             fuel=150,
             behavior_mode="HUNT",
             behavior_score=950,
-            behavior_reason="combat_shoot",
+            behavior_reason="shoot_target",
             ai_mode="HUNT",
             ai_mode_state="ENGAGE",
             command_type="shoot",

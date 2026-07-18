@@ -3,14 +3,14 @@
 Four canned queries, each printed to stdout in a stable format that
 ``awk``/``jq`` pipelines can post-process:
 
-  - ``timeline``         -- one line per STATE / WIRE / WIRE_COMPLETE /
+  - ``timeline``         -- one line per STATE / WIRE /
     DIAGNOSTIC event, in file order. The smallest useful "what
     happened?" view.
-  - ``stalls``           -- WIRE_COMPLETE events with
+  - ``stalls``           -- ``action_outcome`` events with
     ``signal=stall_timeout``, including the surrounding ``tick_n`` and
     ``bot_state`` (Tier 3.2 fields).
   - ``action-spans``     -- pairs WIRE dispatch events with their
-    matching WIRE_COMPLETE events; one line per action lifecycle with
+    matching ``action_outcome`` events; one line per action lifecycle with
     duration_ms and signal.
   - ``target-decisions`` -- HUNT score events with the target tile and
     score so reviewers can scan acquisition history without grepping.
@@ -41,7 +41,7 @@ from tankpit_bot import _test_hooks
 DEFAULT_EVENTS_PATH: Path = Path("runs/bot/latest.events.jsonl")
 
 #: Channels surfaced by the ``timeline`` query.
-_TIMELINE_CHANNELS: frozenset[str] = frozenset({"STATE", "WIRE", "WIRE_COMPLETE", "DIAGNOSTIC"})
+_TIMELINE_CHANNELS: frozenset[str] = frozenset({"STATE", "WIRE", "DIAGNOSTIC"})
 
 # Reserved record-level keys stripped from a record's ``fields`` view.
 _RESERVED_RECORD_KEYS: frozenset[str] = frozenset(
@@ -54,7 +54,7 @@ class BotQueryRecord:
 
     Attributes:
         timestamp: ISO timestamp string written by the runtime logger.
-        channel: Event channel (``AI`` / ``WIRE`` / ``WIRE_COMPLETE`` /
+        channel: Event channel (``AI`` / ``WIRE`` /
             ``STATE`` / ``DIAGNOSTIC`` / ``SYNC`` / ``WORLD``).
         message: Human-readable message body.
         fields: Structured-field view with reserved record-level keys
@@ -160,7 +160,7 @@ StreamWrite = Callable[[str], int]
 
 
 def query_timeline(records: list[BotQueryRecord], write: StreamWrite) -> None:
-    """Print one line per STATE / WIRE / WIRE_COMPLETE / DIAGNOSTIC event.
+    """Print one line per STATE / WIRE / DIAGNOSTIC event.
 
     Each line carries the timestamp, channel, the active ``tick_n`` (or
     ``-`` when none was set), and the message body. Reviewers can pipe
@@ -178,8 +178,23 @@ def query_timeline(records: list[BotQueryRecord], write: StreamWrite) -> None:
         write(f"{rec.timestamp}\ttick={tick_str}\t{rec.channel}\t{rec.message}\n")
 
 
+def _is_action_outcome(rec: BotQueryRecord) -> bool:
+    """Report whether a record is an ``action_outcome`` diagnostic.
+
+    Args:
+        rec: Loaded event record.
+
+    Returns:
+        True for DIAGNOSTIC records carrying the unified outcome kind.
+    """
+    return (
+        rec.channel == "DIAGNOSTIC"
+        and optional_str(rec.fields, "diagnostic_kind") == "action_outcome"
+    )
+
+
 def query_stalls(records: list[BotQueryRecord], write: StreamWrite) -> None:
-    """Print every WIRE_COMPLETE event with ``signal=stall_timeout``.
+    """Print every ``action_outcome`` event with ``outcome=stall_timeout``.
 
     Each line carries the timestamp, the action_kind that stalled, its
     duration_ms, the tick_n and bot_state for context, and the message
@@ -190,9 +205,9 @@ def query_stalls(records: list[BotQueryRecord], write: StreamWrite) -> None:
         write: Stream writer.
     """
     for rec in records:
-        if rec.channel != "WIRE_COMPLETE":
+        if not _is_action_outcome(rec):
             continue
-        if optional_str(rec.fields, "signal") != "stall_timeout":
+        if optional_str(rec.fields, "outcome") != "stall_timeout":
             continue
         tick = optional_int(rec.fields, "tick_n")
         tick_str = str(tick) if tick is not None else "-"
@@ -207,7 +222,7 @@ def query_stalls(records: list[BotQueryRecord], write: StreamWrite) -> None:
 
 
 def query_action_spans(records: list[BotQueryRecord], write: StreamWrite) -> None:
-    """Pair WIRE dispatch events with their matching WIRE_COMPLETE events.
+    """Pair WIRE dispatch events with their ``action_outcome`` resolutions.
 
     Args:
         records: All loaded events.
@@ -215,14 +230,16 @@ def query_action_spans(records: list[BotQueryRecord], write: StreamWrite) -> Non
 
     Notes:
         - A WIRE event with an ``action_kind`` field opens a span.
-        - The next WIRE_COMPLETE event with the same ``action_kind``
-          closes it. If a WIRE event opens a span and a second WIRE
-          event of the same kind starts before the first completes,
-          the new dispatch overrides the open span -- the bot only
-          ever has one in-flight action of a given kind at a time.
-        - A WIRE_COMPLETE without a matching WIRE is printed as a
-          ``(orphan)`` line so reviewers see it instead of a silent
-          drop.
+        - The next ``action_outcome`` event with the same
+          ``action_kind`` closes it. If a WIRE event opens a span and
+          a second WIRE event of the same kind starts before the first
+          resolves, the new dispatch overrides the open span -- the
+          bot only ever has one in-flight action of a given kind at a
+          time.
+        - An ``action_outcome`` without a matching WIRE is printed as
+          a ``(orphan)`` line so reviewers see it instead of a silent
+          drop. Executor discards resolve pre-dispatch, so they are
+          expected orphans.
     """
     open_spans: dict[str, BotQueryRecord] = {}
     for rec in records:
@@ -231,24 +248,24 @@ def query_action_spans(records: list[BotQueryRecord], write: StreamWrite) -> Non
             if action_kind is not None:
                 open_spans[action_kind] = rec
             continue
-        if rec.channel != "WIRE_COMPLETE":
+        if not _is_action_outcome(rec):
             continue
         action_kind = optional_str(rec.fields, "action_kind")
         if action_kind is None:
             continue
-        signal = optional_str(rec.fields, "signal") or "-"
+        outcome = optional_str(rec.fields, "outcome") or "-"
         duration_ms = optional_int(rec.fields, "duration_ms")
         duration_str = str(duration_ms) if duration_ms is not None else "-"
         opener = open_spans.pop(action_kind, None)
         if opener is None:
             write(
                 f"{rec.timestamp}\t(orphan)\taction={action_kind}\t"
-                f"signal={signal}\tduration_ms={duration_str}\n"
+                f"outcome={outcome}\tduration_ms={duration_str}\n"
             )
             continue
         write(
             f"{opener.timestamp}\t->\t{rec.timestamp}\taction={action_kind}\t"
-            f"signal={signal}\tduration_ms={duration_str}\n"
+            f"outcome={outcome}\tduration_ms={duration_str}\n"
         )
 
 
@@ -286,9 +303,9 @@ def query_target_decisions(records: list[BotQueryRecord], write: StreamWrite) ->
 
 _USAGE_BLOCK = (
     "usage: bot-query <timeline | stalls | action-spans | target-decisions> [PATH]\n"
-    "  timeline           Print every STATE / WIRE / WIRE_COMPLETE / DIAGNOSTIC line.\n"
-    "  stalls             Print every stall_timeout WIRE_COMPLETE.\n"
-    "  action-spans       Pair WIRE dispatches with WIRE_COMPLETE.\n"
+    "  timeline           Print every STATE / WIRE / DIAGNOSTIC line.\n"
+    "  stalls             Print every stall_timeout action_outcome.\n"
+    "  action-spans       Pair WIRE dispatches with action_outcome.\n"
     "  target-decisions   Print every HUNT score event with target tile.\n"
     "  PATH               Optional events JSONL path (defaults to runs/bot/latest.events.jsonl).\n"
 )

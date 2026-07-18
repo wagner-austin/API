@@ -93,6 +93,17 @@ class ProvenanceRootednessError(ContractError):
     contract_name: ClassVar[str] = "provenance_rootedness"
 
 
+class LedgerInvariantError(ContractError):
+    """A ledger record violates its structural invariants.
+
+    Raised at record time -- e.g. a dispatch context with off-map
+    coordinates or a negative message index can never resolve into a
+    truthful outcome, so it must not enter the ledger at all.
+    """
+
+    contract_name: ClassVar[str] = "ledger_invariant"
+
+
 __all__ = [
     "ConfidenceOutOfBoundsError",
     "ContractError",

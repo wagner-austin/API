@@ -143,7 +143,7 @@ class TestLockedEquipmentTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "equipment_locked"
+        assert decision["behavior"]["reason_kind"] == "equipment_locked"
 
     def test_locked_equipment_target_on_water_releases_lock(self) -> None:
         """A water-locked equipment target is released by the lock-continuation.
@@ -180,7 +180,7 @@ class TestLockedEquipmentTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["behavior"]["reason"] != "equipment_locked"
+        assert decision["behavior"]["reason_kind"] != "equipment_locked"
         assert decision["command"]["cmd_type"] != "pickup_equipment"
 
     def test_locked_equipment_target_clears_when_teleport_unaffordable(self) -> None:
@@ -212,7 +212,7 @@ class TestLockedEquipmentTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
         # Locked target cleared — teleport to (200,200) costs 1200 fuel, only have 550
-        assert decision["behavior"]["reason"] != "equipment_locked"
+        assert decision["behavior"]["reason_kind"] != "equipment_locked"
 
 
 class TestLockedFuelTarget:
@@ -244,7 +244,8 @@ class TestLockedFuelTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert "fuel=700" in decision["behavior"]["reason"]
+        assert decision["behavior"]["reason_kind"] == "fuel_locked"
+        assert decision["behavior"]["reason_context"]["volume"] == 700
 
 
 class TestRadarForEquipment:
@@ -283,7 +284,7 @@ class TestRadarForEquipment:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
 
@@ -372,7 +373,7 @@ class TestEquipmentSearchHopFallback:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 150
         assert decision["command"]["target_y"] == 100
@@ -511,7 +512,7 @@ class TestCriticalEquipmentLockedTarget:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "equipment_locked"
+        assert decision["behavior"]["reason_kind"] == "equipment_locked"
 
     def test_locked_critical_equipment_target_drives_recovery_owner(self) -> None:
         """A locked critical equipment target stays under COLLECT.
@@ -597,7 +598,7 @@ class TestFuelSearchFallbacks:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert "fuel=700" not in decision["behavior"]["reason"]
+        assert "fuel=700" not in decision["behavior"]["reason_kind"]
         assert decision["command"]["cmd_type"] != "pickup_fuel"
 
     def test_fuel_search_hop_when_scanned_no_visible_fuel(self) -> None:
@@ -617,7 +618,7 @@ class TestFuelSearchFallbacks:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_fuel_raises_when_no_hop_affordable_and_no_atlas_dot(self) -> None:

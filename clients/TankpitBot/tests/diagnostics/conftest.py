@@ -20,12 +20,12 @@ def _isolate_diagnostic_emitters() -> Generator[None, None, None]:
     from tankpit_bot.diagnostics.game_log_feedback import reset_game_log_feedback
     from tankpit_bot.diagnostics.registry_truth import reset_registry_truth
     from tankpit_bot.diagnostics.self_alignment import reset_self_alignment_emitter
-    from tankpit_bot.diagnostics.teleport_attempts import reset_teleport_attempt_tracking
+    from tankpit_bot.ledger.outcome.teleport import reset_teleport_dispatch_tracking
 
     reset_entity_alignment_emitter()
     reset_self_alignment_emitter()
     reset_game_log_feedback()
-    reset_teleport_attempt_tracking()
+    reset_teleport_dispatch_tracking()
     reset_registry_truth()
 
     yield
@@ -33,5 +33,5 @@ def _isolate_diagnostic_emitters() -> Generator[None, None, None]:
     reset_entity_alignment_emitter()
     reset_self_alignment_emitter()
     reset_game_log_feedback()
-    reset_teleport_attempt_tracking()
+    reset_teleport_dispatch_tracking()
     reset_registry_truth()

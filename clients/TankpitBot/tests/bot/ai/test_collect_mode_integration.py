@@ -116,7 +116,7 @@ class TestRecoverEquipmentPriority:
             map_fuel_dots=((116, 100),),
         )
 
-        assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 116
         assert decision["command"]["target_y"] == 100
@@ -160,7 +160,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "equipment_restock"
+        assert decision["behavior"]["reason_kind"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_homing_at_break_threshold_triggers_equipment_recovery(self) -> None:
@@ -193,7 +193,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "equipment_restock"
+        assert decision["behavior"]["reason_kind"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
     def test_active_combat_with_subcritical_fuel_interrupts_for_collection(self) -> None:
@@ -275,7 +275,7 @@ class TestRecoverEquipmentPriority:
 
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain)
 
-        assert decision["behavior"]["reason"] != "equipment_restock"
+        assert decision["behavior"]["reason_kind"] != "equipment_restock"
 
     def test_adjacent_blocked_equipment_uses_pickup_move(self) -> None:
         """Adjacent blocked equipment still produces a pickup command."""
@@ -340,7 +340,7 @@ class TestRecoverEquipmentPriority:
         decision = decide(world, self_state, make_scanned_ai_state(), inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "equipment_restock"
+        assert decision["behavior"]["reason_kind"] == "equipment_restock"
         assert decision["command"]["cmd_type"] == "pickup_equipment"
 
 
@@ -365,7 +365,7 @@ class TestRecoverEquipmentSearch:
             None,
         )
 
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_critical_equipment_new_unscanned_viewport_ignores_scan_cooldown(self) -> None:
@@ -381,7 +381,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_critical_equipment_search_relocates_when_viewport_fully_swept(self) -> None:
@@ -411,7 +411,7 @@ class TestRecoverEquipmentSearch:
             map_fuel_dots=((116, 100),),
         )
 
-        assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 116
         assert decision["command"]["target_y"] == 100
@@ -465,7 +465,7 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_equipment_search_skips_when_fuel_too_low(self) -> None:
@@ -528,7 +528,7 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_unscanned_viewport_scans_before_collecting(self) -> None:
@@ -557,7 +557,7 @@ class TestRecoverEquipmentSearch:
         )
 
         assert decision["behavior"]["mode"] == "COLLECT"
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_new_unscanned_viewport_ignores_global_scan_cooldown(self) -> None:
@@ -572,7 +572,7 @@ class TestRecoverEquipmentSearch:
 
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
-        assert decision["behavior"]["reason"] == "scan_on_landing"
+        assert decision["behavior"]["reason_kind"] == "scan_on_landing"
         assert decision["command"]["cmd_type"] == "radar"
 
     def test_low_fuel_fully_covered_viewport_walks_instead_of_repeating_radar(self) -> None:
@@ -608,7 +608,7 @@ class TestRecoverEquipmentSearch:
             map_fuel_dots=((116, 100),),
         )
 
-        assert decision["behavior"]["reason"] == "search_collect_local"
+        assert decision["behavior"]["reason_kind"] == "search_collect_local"
         assert decision["command"]["cmd_type"] == "teleport"
 
     def test_low_fuel_blocked_search_with_visible_threats_falls_back_to_map(self) -> None:
@@ -764,5 +764,6 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert "LiveEnemy" in decision["behavior"]["reason"]
-        assert "DeadEnemy" not in decision["behavior"]["reason"]
+        assert decision["behavior"]["reason_kind"] == "teleport_target"
+        assert decision["behavior"]["reason_context"]["target_name"] == "LiveEnemy"
+        assert "DeadEnemy" not in decision["behavior"]["reason_kind"]

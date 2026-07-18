@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.types import (
     AIStateDict,
     BehaviorMode,
     EnemyThreatDict,
+    ReasonKind,
     make_behavior_score,
 )
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -116,10 +117,11 @@ def make_decision(
     score: int,
     tx: int,
     ty: int,
-    reason: str,
+    reason_kind: ReasonKind,
     ai_state: AIStateDict,
     equip: list[int],
     *,
+    reason_context: dict[str, str | int] | None = None,
     secondary_command: BotCommand | None = None,
 ) -> TickDecisionDict:
     """Build a TickDecisionDict with less boilerplate.
@@ -130,15 +132,16 @@ def make_decision(
         score: Priority score.
         tx: Target X coordinate.
         ty: Target Y coordinate.
-        reason: Decision reason string.
+        reason_kind: Typed decision reason.
         ai_state: Updated AI state for next tick.
         equip: Desired equipment slot list.
+        reason_context: Reason-specific scalar payload.
         secondary_command: Optional secondary command for multi-command ticks.
 
     Returns:
         Complete tick decision.
     """
-    behavior = make_behavior_score(mode, score, tx, ty, reason)
+    behavior = make_behavior_score(mode, score, tx, ty, reason_kind, reason_context=reason_context)
     return make_tick_decision(
         command=command,
         behavior=behavior,

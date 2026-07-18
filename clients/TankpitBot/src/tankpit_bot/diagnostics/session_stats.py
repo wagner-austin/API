@@ -54,6 +54,29 @@ def _is_own_kill(record: RuntimeEventRecordDict) -> bool:
     )
 
 
+def _teleport_landed_verdict(record: RuntimeEventRecordDict) -> bool | None:
+    """Classify a record as a landed/failed teleport resolution, if any.
+
+    Covers both sources: action-lab ``teleport_attempt`` diagnostics
+    (``status`` field) and the bot ledger's ``action_outcome`` events
+    with ``action_kind == "teleport"`` (``outcome`` field).
+
+    Args:
+        record: Decoded event record.
+
+    Returns:
+        True for a landed teleport, False for a failed one, or None
+        when the record is not a teleport resolution at all.
+    """
+    fields = record["fields"]
+    kind = fields.get("diagnostic_kind")
+    if kind == "teleport_attempt":
+        return fields.get("status") in _LANDED_STATUSES
+    if kind == "action_outcome" and fields.get("action_kind") == "teleport":
+        return fields.get("outcome") in _LANDED_STATUSES
+    return None
+
+
 def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionStatsRowDict:
     """Build one stats row from a run's decoded event records.
 
@@ -76,8 +99,8 @@ def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionSta
         kind = fields.get("diagnostic_kind")
         if _is_own_kill(record):
             kills += 1
-        elif kind == "teleport_attempt":
-            if fields.get("status") in _LANDED_STATUSES:
+        elif (landed := _teleport_landed_verdict(record)) is not None:
+            if landed:
                 teleports_ok += 1
             else:
                 teleports_failed += 1
@@ -88,7 +111,7 @@ def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionSta
                 shots += 1
             elif record["message"].startswith("pickup"):
                 pickups += 1
-        if record["channel"] == "WIRE_COMPLETE" and fields.get("signal") == "stall_timeout":
+        if kind == "action_outcome" and fields.get("outcome") == "stall_timeout":
             stalls += 1
     started = records[0]["timestamp"] if records else ""
     ended = records[-1]["timestamp"] if records else ""

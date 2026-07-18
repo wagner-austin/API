@@ -162,22 +162,20 @@ class TestQueryTimeline:
     """Tests for the timeline query."""
 
     def test_emits_one_line_per_target_channel(self) -> None:
-        """STATE / WIRE / WIRE_COMPLETE / DIAGNOSTIC events surface."""
+        """STATE / WIRE / DIAGNOSTIC events surface; AI is skipped."""
         writer = _RecordingWriter()
         records = [
             _record("STATE", "IDLE", tick_n=1),
             _record("AI", "HUNT score=0", tick_n=2),  # not in timeline channels
             _record("WIRE", "WIRE: shoot_at", tick_n=3),
-            _record("WIRE_COMPLETE", "shoot completed", tick_n=4),
             _record("DIAGNOSTIC", "diagnostic_kind=map_data_snapshot", tick_n=5),
         ]
         query_timeline(records, writer)
         lines = writer.text.splitlines()
-        assert len(lines) == 4
+        assert len(lines) == 3
         assert "STATE\tIDLE" in lines[0]
         assert "WIRE\tWIRE: shoot_at" in lines[1]
-        assert "WIRE_COMPLETE\tshoot completed" in lines[2]
-        assert "DIAGNOSTIC\tdiagnostic_kind=map_data_snapshot" in lines[3]
+        assert "DIAGNOSTIC\tdiagnostic_kind=map_data_snapshot" in lines[2]
 
     def test_renders_dash_when_no_tick_n(self) -> None:
         """Records without ``tick_n`` print ``tick=-``."""
@@ -190,23 +188,25 @@ class TestQueryStalls:
     """Tests for the stall_timeout query."""
 
     def test_lists_only_stall_timeout_events(self) -> None:
-        """Other signals (and other channels) are skipped."""
+        """Other outcomes (and other channels) are skipped."""
         writer = _RecordingWriter()
         records = [
             _record(
-                "WIRE_COMPLETE",
-                "map_open completed in 250ms via map_data_processed",
+                "DIAGNOSTIC",
+                "map_open resolved",
                 tick_n=1,
-                signal="map_data_processed",
+                diagnostic_kind="action_outcome",
+                outcome="map_data_processed",
                 action_kind="map_open",
                 duration_ms=250,
                 bot_state="HUNT/searching",
             ),
             _record(
-                "WIRE_COMPLETE",
-                "move completed in 10000ms via stall_timeout",
+                "DIAGNOSTIC",
+                "move stalled",
                 tick_n=2,
-                signal="stall_timeout",
+                diagnostic_kind="action_outcome",
+                outcome="stall_timeout",
                 action_kind="move",
                 duration_ms=10000,
                 bot_state="HUNT/engaging",
@@ -214,7 +214,7 @@ class TestQueryStalls:
             _record(
                 "AI",
                 "stall_timeout",  # wrong channel
-                signal="stall_timeout",
+                outcome="stall_timeout",
             ),
         ]
         query_stalls(records, writer)
@@ -229,9 +229,10 @@ class TestQueryStalls:
         writer = _RecordingWriter()
         records = [
             _record(
-                "WIRE_COMPLETE",
+                "DIAGNOSTIC",
                 "minimal stall",
-                signal="stall_timeout",
+                diagnostic_kind="action_outcome",
+                outcome="stall_timeout",
             )
         ]
         query_stalls(records, writer)
@@ -246,7 +247,7 @@ class TestQueryActionSpans:
     """Tests for the action-spans pair-up query."""
 
     def test_pairs_dispatch_with_completion(self) -> None:
-        """A WIRE dispatch followed by a matching WIRE_COMPLETE prints one line."""
+        """A WIRE dispatch followed by a matching outcome prints one line."""
         writer = _RecordingWriter()
         records = [
             _record(
@@ -256,31 +257,33 @@ class TestQueryActionSpans:
                 action_kind="shoot",
             ),
             _record(
-                "WIRE_COMPLETE",
-                "shoot completed in 80ms via our_shot_response",
+                "DIAGNOSTIC",
+                "shoot resolved",
                 timestamp="2026-06-20T15:00:00",
+                diagnostic_kind="action_outcome",
                 action_kind="shoot",
                 duration_ms=80,
-                signal="our_shot_response",
+                outcome="miss",
             ),
         ]
         query_action_spans(records, writer)
         lines = writer.text.splitlines()
         assert len(lines) == 1
         assert "action=shoot" in lines[0]
-        assert "signal=our_shot_response" in lines[0]
+        assert "outcome=miss" in lines[0]
         assert "duration_ms=80" in lines[0]
 
     def test_orphan_complete_without_matching_dispatch(self) -> None:
-        """A WIRE_COMPLETE without a prior WIRE prints an orphan line."""
+        """An outcome without a prior WIRE prints an orphan line."""
         writer = _RecordingWriter()
         records = [
             _record(
-                "WIRE_COMPLETE",
-                "shoot completed in 80ms via our_shot_response",
+                "DIAGNOSTIC",
+                "shoot resolved",
+                diagnostic_kind="action_outcome",
                 action_kind="shoot",
                 duration_ms=80,
-                signal="our_shot_response",
+                outcome="miss",
             ),
         ]
         query_action_spans(records, writer)
@@ -290,13 +293,13 @@ class TestQueryActionSpans:
     def test_skips_wire_without_action_kind(self) -> None:
         """WIRE events without ``action_kind`` do not open a span.
 
-        Documents the contract: WIRE_COMPLETE events without
+        Documents the contract: outcome events without
         ``action_kind`` also have no opening span and are skipped.
         """
         writer = _RecordingWriter()
         records = [
             _record("WIRE", "wire ping"),
-            _record("WIRE_COMPLETE", "wire complete ping"),
+            _record("DIAGNOSTIC", "outcome ping", diagnostic_kind="action_outcome"),
         ]
         query_action_spans(records, writer)
         # Both lacked action_kind so no output.
@@ -305,10 +308,10 @@ class TestQueryActionSpans:
     def test_skips_records_of_unrelated_channels(self) -> None:
         """STATE / AI / DIAGNOSTIC records are skipped (do not affect spans).
 
-        Documents the contract: action-span pairing only sees the WIRE
-        and WIRE_COMPLETE channels; any other channel interleaved
-        between a dispatch and its completion is invisible to the
-        pairing logic.
+        Documents the contract: action-span pairing only sees WIRE
+        dispatches and ``action_outcome`` resolutions; any other
+        record interleaved between a dispatch and its resolution is
+        invisible to the pairing logic.
         """
         writer = _RecordingWriter()
         records = [
@@ -321,12 +324,13 @@ class TestQueryActionSpans:
             _record("STATE", "IDLE", timestamp="2026-06-20T15:00:01"),
             _record("AI", "decided IDLE", timestamp="2026-06-20T15:00:02"),
             _record(
-                "WIRE_COMPLETE",
-                "move completed",
+                "DIAGNOSTIC",
+                "move resolved",
                 timestamp="2026-06-20T15:00:03",
+                diagnostic_kind="action_outcome",
                 action_kind="move",
                 duration_ms=3000,
-                signal="position_reached",
+                outcome="position_reached",
             ),
         ]
         query_action_spans(records, writer)
@@ -359,12 +363,13 @@ class TestQueryActionSpans:
                 action_kind="move",
             ),
             _record(
-                "WIRE_COMPLETE",
-                "move completed",
+                "DIAGNOSTIC",
+                "move resolved",
                 timestamp="2026-06-20T15:00:02",
+                diagnostic_kind="action_outcome",
                 action_kind="move",
                 duration_ms=2000,
-                signal="position_reached",
+                outcome="position_reached",
             ),
         ]
         query_action_spans(records, writer)
@@ -409,7 +414,7 @@ class TestQueryTargetDecisions:
         assert "target=-" in writer.text
 
     def test_skips_non_ai_channels(self) -> None:
-        """Non-AI events (STATE / WIRE / WIRE_COMPLETE / DIAGNOSTIC) are skipped.
+        """Non-AI events (STATE / WIRE / DIAGNOSTIC) are skipped.
 
         Documents the contract: target-decisions only summarises AI
         HUNT scores. STATE/WIRE/DIAGNOSTIC events appear in other

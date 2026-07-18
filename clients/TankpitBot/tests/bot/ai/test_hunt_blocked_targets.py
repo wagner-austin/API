@@ -48,7 +48,7 @@ class TestDecideBlockedCombatTargets:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
 
     def test_boxed_target_is_teleported_to_directly(self) -> None:
         """Boxed target is still teleported to directly; server handles displacement."""
@@ -152,7 +152,8 @@ class TestDecideBlockedCombatTargets:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert "Reachable" in decision["behavior"]["reason"]
+        assert decision["behavior"]["reason_kind"] == "find_target"
+        assert decision["behavior"]["reason_context"]["target_name"] == "Reachable"
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
     def test_failed_combat_landing_blocks_target_and_reopens_map_when_no_viable_threat(
@@ -196,7 +197,7 @@ class TestDecideBlockedCombatTargets:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "find_enemies"
+        assert decision["behavior"]["reason_kind"] == "find_enemies"
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
         assert decision["updated_ai_state"]["combat_target_id"] == -1
 
@@ -448,4 +449,5 @@ class TestDecideBlockedCombatTargets:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert "Enemy" in decision["behavior"]["reason"]
+        assert decision["behavior"]["reason_kind"] == "teleport_target"
+        assert decision["behavior"]["reason_context"]["target_name"] == "Enemy"

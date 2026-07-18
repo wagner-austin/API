@@ -412,9 +412,10 @@ def _continue_or_release_fuel_lock(
         _COLLECT_SCORE,
         target_x,
         target_y,
-        f"fuel={locked_target['volume']}",
+        "fuel_locked",
         set_resource_target(base_state, "fuel", target_x, target_y),
         ctx.equip,
+        reason_context={"volume": locked_target["volume"]},
     )
     return decision, base_state
 
@@ -440,6 +441,22 @@ def _select_and_pickup_equipment(
         set_resource_target(base_state, "equipment", target_x, target_y),
         ctx.equip,
     )
+
+
+def _emit_hop_declined(hop_kind: str, **tallies: int) -> None:
+    """Record a structured hop decline with per-branch tallies.
+
+    The hop selectors' silent ``continue``/``return None`` branches
+    made the 2026-07-18 early-exit undiagnosable post-hoc (the run
+    ended ``no_productive_collect`` with 10 tracked containers and no
+    record of which filter refused each). Every decline now states
+    its arithmetic.
+
+    Args:
+        hop_kind: Which selector declined (``equipment`` / ``dot``).
+        **tallies: Per-branch counts and the governing numbers.
+    """
+    emit_diagnostic(diagnostic_kind="hop_declined", hop_kind=hop_kind, **tallies)
 
 
 def _hop_toward_equipment(
@@ -488,6 +505,7 @@ def _hop_toward_equipment(
         return None
     candidates = find_all_tracked_equipment(ctx.world)
     if not candidates:
+        _emit_hop_declined("equipment", no_candidates=1)
         return None
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     external = [
@@ -496,8 +514,11 @@ def _hop_toward_equipment(
         if not (left <= container["x"] <= right and top <= container["y"] <= bottom)
     ]
     if not external:
+        _emit_hop_declined("equipment", none_external=len(candidates))
         return None
     landing_reserve = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    no_landing = 0
+    reserve_blocked = 0
     best_cost = -1
     best_landing_x = 0
     best_landing_y = 0
@@ -509,6 +530,7 @@ def _hop_toward_equipment(
             container["y"],
         )
         if landing is None:
+            no_landing += 1
             continue
         landing_x, landing_y = landing
         cost = compute_teleport_fuel_cost(
@@ -518,6 +540,7 @@ def _hop_toward_equipment(
             landing_y,
         )
         if ctx.fuel - cost < landing_reserve:
+            reserve_blocked += 1
             continue
         if best_container is None or cost < best_cost:
             best_cost = cost
@@ -525,6 +548,14 @@ def _hop_toward_equipment(
             best_landing_y = landing_y
             best_container = container
     if best_container is None:
+        _emit_hop_declined(
+            "equipment",
+            external=len(external),
+            no_landing=no_landing,
+            reserve_blocked=reserve_blocked,
+            fuel=ctx.fuel,
+            landing_reserve=landing_reserve,
+        )
         return None
     emit_ai(
         "equipment hop to (%d,%d) landing (%d,%d) cost=%d (dual=%d homing=%d radar=%d)",
@@ -626,9 +657,10 @@ def _select_and_pickup_fuel(
         _COLLECT_SCORE,
         target_x,
         target_y,
-        f"fuel={container['volume']}",
+        "fuel_collect",
         set_resource_target(base_state, "fuel", target_x, target_y),
         ctx.equip,
+        reason_context={"volume": container["volume"]},
     )
 
 

@@ -126,13 +126,13 @@ class TestMakeResourceSearchHop:
         assert command["target_x"] == 160
         assert command["target_y"] == 100
 
-    def test_skips_dirty_viewport_dot(self) -> None:
-        """A dot in a water-flecked viewport loses to a 100% clean one.
+    def test_flecked_viewport_no_longer_disqualifies(self) -> None:
+        """A near dot with one water tile in view beats a distant clean one.
 
-        One water tile inside the nearer dot's landing viewport drops
-        its walkable fraction below 1.0 -- the user contract is "hop to
-        nearest yellow dot with a 100% clean viewport", so the farther
-        clean dot wins.
+        User contract 2026-07-18: walkability is a ranking weight, not
+        a hard bar ("not a 100% rule ofc"). One water tile costs the
+        near dot a sliver of walkable fraction; its far cheaper
+        teleport dominates the score.
         """
         terrain = InMemoryTerrainMap(terrain_data={(125, 95): "W"})
         decision = make_resource_search_hop(
@@ -143,23 +143,48 @@ class TestMakeResourceSearchHop:
         )
 
         if decision is None:
-            raise AssertionError("expected the clean-viewport dot")
+            raise AssertionError("expected the near flecked-viewport dot")
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
-        assert command["target_x"] == 100
-        assert command["target_y"] == 160
+        assert command["target_x"] == 130
+        assert command["target_y"] == 100
 
-    def test_offmap_clipped_viewport_dot_skipped(self) -> None:
-        """A dot whose viewport hangs past the field border is skipped.
+    def test_denser_dot_cluster_outranks_lone_dot(self) -> None:
+        """At comparable cost, a viewport holding more dots wins.
 
-        Off-map tiles count as unwalkable, so a border-adjacent dot can
-        never reach the 100% clean bar when a terrain map is loaded.
+        User contract 2026-07-18: "prioritize viewports with more
+        dots". Two equidistant candidates: one lone dot, one inside a
+        three-dot cluster -- the cluster's landing viewport promises
+        three pickups for the same teleport cost.
+        """
+        decision = make_resource_search_hop(
+            _ctx(
+                terrain=InMemoryTerrainMap(),
+                map_fuel_dots=((100, 40), (100, 160), (103, 162), (98, 165)),
+            ),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the cluster dot")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert (command["target_x"], command["target_y"]) in ((100, 160), (103, 162), (98, 165))
+
+    def test_offmap_clipped_viewport_ranks_below_in_map(self) -> None:
+        """At equal cost, a border-clipped viewport loses to a full one.
+
+        Off-map tiles count as unwalkable, shrinking the clipped
+        viewport's walkable fraction; with equidistant candidates the
+        in-map dot's higher fraction wins the ranking.
         """
         decision = make_resource_search_hop(
             _ctx(
                 terrain=InMemoryTerrainMap(),
                 map_fuel_dots=((100, 130), (100, 252)),
-                self_y=200,
+                self_y=191,
             ),
             mode="COLLECT",
             score=900,
@@ -214,7 +239,7 @@ class TestMakeResourceSearchHop:
         if decision is None:
             raise AssertionError("expected a map_open to load the dot atlas")
         assert decision["command"]["cmd_type"] == "map_open"
-        assert decision["behavior"]["reason"] == "map_for_dots"
+        assert decision["behavior"]["reason_kind"] == "map_for_dots"
         assert decision["updated_ai_state"]["last_map_open_ms"] == 100000
 
     def test_returns_none_when_atlas_empty_after_recent_map_open(self) -> None:

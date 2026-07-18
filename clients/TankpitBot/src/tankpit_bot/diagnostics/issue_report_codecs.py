@@ -6,12 +6,14 @@ from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    require_dict,
     require_int,
     require_list,
     require_str,
 )
 
 from tankpit_bot.diagnostics.issue_report_types import (
+    ActionOutcomeRowDict,
     FuelTargetSelectionRecordDict,
     InventoryCountsDict,
     IssueReportDict,
@@ -21,7 +23,6 @@ from tankpit_bot.diagnostics.issue_report_types import (
     StateBudgetRecordDict,
     TargetedTeleportRecordDict,
     TeleportAttemptRecordDict,
-    WireCompleteRecordDict,
 )
 
 
@@ -167,8 +168,8 @@ def decode_fuel_target_selection_record(
     )
 
 
-def encode_wire_complete_record(record: WireCompleteRecordDict) -> JSONObject:
-    """Encode a wire complete record to JSON.
+def encode_action_outcome_row(record: ActionOutcomeRowDict) -> JSONObject:
+    """Encode an action outcome row to JSON.
 
     Args:
         record: Record to encode.
@@ -178,14 +179,16 @@ def encode_wire_complete_record(record: WireCompleteRecordDict) -> JSONObject:
     """
     return {
         "action_kind": record["action_kind"],
+        "outcome": record["outcome"],
+        "event_id": record["event_id"],
+        "attempt_id": record["attempt_id"],
         "duration_ms": record["duration_ms"],
-        "signal": record["signal"],
         "timestamp": record["timestamp"],
     }
 
 
-def decode_wire_complete_record(data: JSONObject) -> WireCompleteRecordDict:
-    """Decode a wire complete record from JSON.
+def decode_action_outcome_row(data: JSONObject) -> ActionOutcomeRowDict:
+    """Decode an action outcome row from JSON.
 
     Args:
         data: JSON object to decode.
@@ -193,10 +196,12 @@ def decode_wire_complete_record(data: JSONObject) -> WireCompleteRecordDict:
     Returns:
         Validated record.
     """
-    return WireCompleteRecordDict(
+    return ActionOutcomeRowDict(
         action_kind=require_str(data, "action_kind"),
+        outcome=require_str(data, "outcome"),
+        event_id=require_int(data, "event_id"),
+        attempt_id=require_int(data, "attempt_id"),
         duration_ms=require_int(data, "duration_ms"),
-        signal=require_str(data, "signal"),
         timestamp=require_str(data, "timestamp"),
     )
 
@@ -231,6 +236,28 @@ def decode_session_room_record(data: JSONObject) -> SessionRoomRecordDict:
         field_image=require_str(data, "field_image"),
         timestamp=require_str(data, "timestamp"),
     )
+
+
+def _require_str_int_map(data: JSONObject, key: str) -> dict[str, int]:
+    """Validate and extract a str->int map from JSON.
+
+    Args:
+        data: JSON object containing the field.
+        key: Key to extract.
+
+    Returns:
+        Validated mapping.
+
+    Raises:
+        JSONTypeError: If any value is not an int.
+    """
+    raw = require_dict(data, key)
+    result: dict[str, int] = {}
+    for field, value in raw.items():
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise JSONTypeError(f"{key}[{field!r}] must be int")
+        result[field] = value
+    return result
 
 
 def encode_state_budget_record(record: StateBudgetRecordDict) -> JSONObject:
@@ -363,6 +390,7 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         ],
         "equipment_approach_distinct_targets": scorecard["equipment_approach_distinct_targets"],
         "equipment_approach_max_repeats": scorecard["equipment_approach_max_repeats"],
+        "action_outcome_counts": dict(scorecard["action_outcome_counts"]),
         "career_destroyed_last": scorecard["career_destroyed_last"],
         "career_deactivated_last": scorecard["career_deactivated_last"],
         "career_score_last": scorecard["career_score_last"],
@@ -430,6 +458,7 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
             "equipment_approach_distinct_targets",
         ),
         equipment_approach_max_repeats=require_int(data, "equipment_approach_max_repeats"),
+        action_outcome_counts=_require_str_int_map(data, "action_outcome_counts"),
         career_destroyed_last=(
             require_int(data, "career_destroyed_last") if "career_destroyed_last" in data else -1
         ),
@@ -483,7 +512,7 @@ def encode_issue_report(report: IssueReportDict) -> JSONObject:
         "fuel_target_selections": [
             encode_fuel_target_selection_record(r) for r in report["fuel_target_selections"]
         ],
-        "wire_completes": [encode_wire_complete_record(r) for r in report["wire_completes"]],
+        "action_outcomes": [encode_action_outcome_row(r) for r in report["action_outcomes"]],
         "teleport_success_count": report["teleport_success_count"],
         "teleport_failure_count": report["teleport_failure_count"],
         "fuel_selected_count": report["fuel_selected_count"],
@@ -546,9 +575,9 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
             decode_fuel_target_selection_record(item)
             for item in _require_object_list(data, "fuel_target_selections")
         ],
-        wire_completes=[
-            decode_wire_complete_record(item)
-            for item in _require_object_list(data, "wire_completes")
+        action_outcomes=[
+            decode_action_outcome_row(item)
+            for item in _require_object_list(data, "action_outcomes")
         ],
         teleport_success_count=require_int(data, "teleport_success_count"),
         teleport_failure_count=require_int(data, "teleport_failure_count"),
@@ -562,6 +591,7 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
 
 
 __all__ = [
+    "decode_action_outcome_row",
     "decode_fuel_target_selection_record",
     "decode_inventory_counts",
     "decode_issue_report",
@@ -571,7 +601,7 @@ __all__ = [
     "decode_state_budget_record",
     "decode_targeted_teleport_record",
     "decode_teleport_attempt_record",
-    "decode_wire_complete_record",
+    "encode_action_outcome_row",
     "encode_fuel_target_selection_record",
     "encode_inventory_counts",
     "encode_issue_report",
@@ -581,5 +611,4 @@ __all__ = [
     "encode_state_budget_record",
     "encode_targeted_teleport_record",
     "encode_teleport_attempt_record",
-    "encode_wire_complete_record",
 ]

@@ -26,7 +26,7 @@ from tankpit_bot.bot.ai.threats import (
     find_locked_target_pursuit,
     find_relay_travel_target,
 )
-from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
+from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, ReasonKind
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
@@ -43,7 +43,7 @@ def search_for_enemies(
     ctx: DecideCtx,
     *,
     ai_state: AIStateDict,
-    map_reason: str,
+    map_reason: ReasonKind,
 ) -> TickDecisionDict:
     """Open the map for a global enemy snapshot.
 

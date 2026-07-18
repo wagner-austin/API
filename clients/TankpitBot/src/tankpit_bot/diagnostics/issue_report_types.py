@@ -76,21 +76,28 @@ class FuelTargetSelectionRecordDict(TypedDict):
     timestamp: str
 
 
-class WireCompleteRecordDict(TypedDict):
-    """One ``WIRE_COMPLETE`` event.
+class ActionOutcomeRowDict(TypedDict):
+    """One ``action_outcome`` DIAGNOSTIC event (the unified fabric).
 
     Attributes:
-        action_kind: Kind of action that completed (``map_open``,
-            ``move``, ``teleport``, ``collect``, ``scan``).
+        action_kind: Kind of action that resolved (``map_open``,
+            ``move``, ``teleport``, ``collect``, ``scan``, ``shoot``).
+        outcome: Outcome label from the kind's outcome union
+            (``landed_exact``, ``stall_timeout``, ``hit``,
+            ``discarded_hostile_mine``, ...).
+        event_id: Process-wide monotonic event id.
+        attempt_id: Per-kind monotonic attempt counter.
         duration_ms: Wall-clock milliseconds between dispatch and the
-            observed completion signal.
-        signal: Authoritative completion signal name.
+            resolution (0 for pre-dispatch executor discards, -1 when
+            the gate fired with no recorded dispatch time).
         timestamp: ISO timestamp from the event record.
     """
 
     action_kind: str
+    outcome: str
+    event_id: int
+    attempt_id: int
     duration_ms: int
-    signal: str
     timestamp: str
 
 
@@ -231,6 +238,8 @@ class SessionScorecardDict(TypedDict):
             equipment coordinates teleport-approached.
         equipment_approach_max_repeats: Highest event count for any
             single equipment coordinate, ``0`` with no approaches.
+        action_outcome_counts: Per ``"kind:outcome"`` tallies from the
+            unified ``action_outcome`` fabric, sorted by key.
     """
 
     duration_seconds: int
@@ -254,6 +263,7 @@ class SessionScorecardDict(TypedDict):
     equipment_approaches: list[TargetedTeleportRecordDict]
     equipment_approach_distinct_targets: int
     equipment_approach_max_repeats: int
+    action_outcome_counts: dict[str, int]
     # Career-totals snapshot taken at the LAST 0x56 Statistics broadcast
     # the run saw. -1 means the wire never sent one (very short Practice
     # runs sometimes finish before the cadence fires).
@@ -280,23 +290,28 @@ class IssueReportDict(TypedDict):
         session_room: Recorded room/field for this session, or ``None``
             when the artifact does not include a ``session_room_joined``
             diagnostic.
-        teleport_attempts: Every teleport attempt observed.
+        teleport_attempts: Every action-lab ``teleport_attempt``
+            diagnostic observed (probe runs; the live bot records
+            teleports as ``action_outcome`` events instead).
         map_open_skipped: Every ``map_open_skipped_already_open`` event.
         fuel_target_selections: Every fuel target selection (selected
             and rejected).
-        wire_completes: Every ``WIRE_COMPLETE`` event.
-        teleport_success_count: Count of attempts whose status is
-            ``landed_exact`` or ``landed_inexact``.
-        teleport_failure_count: Count of attempts whose status is not a
-            "landed" status (timeouts, etc.).
+        action_outcomes: Every ``action_outcome`` event (the unified
+            per-attempt fabric from the ledger).
+        teleport_success_count: Landed teleports -- action-lab attempts
+            with a landed status plus bot outcomes ``landed_exact`` /
+            ``landed_inexact``.
+        teleport_failure_count: Non-landed teleport resolutions from
+            both sources (timeouts, rejections, discards).
         fuel_selected_count: Count of fuel target selections where
             ``target_present`` is True.
         fuel_rejected_count: Count of fuel target selections where
             ``target_present`` is False.
         map_open_dispatches: Count of ``WIRE`` events whose first
             message starts with ``map_open`` (i.e. successful sends).
-        map_open_completions: Count of ``WIRE_COMPLETE`` events whose
-            ``action_kind`` is ``map_open``.
+        map_open_completions: Count of ``action_outcome`` events with
+            ``action_kind == "map_open"`` and
+            ``outcome == "map_data_processed"``.
         scorecard: Per-run outcome scorecard (time budget, combat,
             fuel trajectory, equipment-approach ledger).
     """
@@ -308,7 +323,7 @@ class IssueReportDict(TypedDict):
     teleport_attempts: list[TeleportAttemptRecordDict]
     map_open_skipped: list[MapOpenSkippedRecordDict]
     fuel_target_selections: list[FuelTargetSelectionRecordDict]
-    wire_completes: list[WireCompleteRecordDict]
+    action_outcomes: list[ActionOutcomeRowDict]
     teleport_success_count: int
     teleport_failure_count: int
     fuel_selected_count: int
@@ -320,6 +335,7 @@ class IssueReportDict(TypedDict):
 
 
 __all__ = [
+    "ActionOutcomeRowDict",
     "FuelTargetSelectionRecordDict",
     "InventoryCountsDict",
     "IssueReportDict",
@@ -329,7 +345,6 @@ __all__ = [
     "StateBudgetRecordDict",
     "TargetedTeleportRecordDict",
     "TeleportAttemptRecordDict",
-    "WireCompleteRecordDict",
     "make_unsampled_inventory_counts",
     "make_zero_inventory_counts",
 ]

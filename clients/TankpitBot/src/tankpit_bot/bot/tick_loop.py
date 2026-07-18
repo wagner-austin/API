@@ -22,7 +22,7 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     capture_page_client_snapshot,
 )
 from tankpit_bot.bot import ai_strategy, executor, world_sync
-from tankpit_bot.bot.ai.types import AIStateDict
+from tankpit_bot.bot.ai.types import AIStateDict, render_reason
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
@@ -38,6 +38,15 @@ from tankpit_bot.diagnostics.runs_index import (
     make_index_row,
 )
 from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
+from tankpit_bot.ledger.decision import latest_decision_event_id, verify_outcome_invariant
+from tankpit_bot.ledger.events import ACTION_KINDS
+from tankpit_bot.ledger.mode_transition import emit_mode_transition
+from tankpit_bot.ledger.outcome.shoot import (
+    emit_shoot_command_rejected,
+    emit_shoot_hit,
+    emit_shoot_miss,
+)
+from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_logging import (
     emit_ai,
@@ -185,6 +194,20 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
     blocked = len(ai["blocked_combat_targets"])
     mode = ai["mode"]
     mode_state = ai["mode_state"]
+    unresolved = verify_outcome_invariant()
+    for kind in ACTION_KINDS:
+        counts = outcome_counts(kind)
+        if counts:
+            emit_diagnostic(
+                diagnostic_kind="session_outcome_counts",
+                action_kind=kind,
+                **dict(sorted(counts.items())),
+            )
+    if unresolved:
+        emit_diagnostic(
+            diagnostic_kind="session_unresolved_decisions",
+            **dict(sorted(unresolved.items())),
+        )
     emit_diagnostic(
         diagnostic_kind="session_scorecard",
         ticks=ticks,
@@ -488,7 +511,17 @@ def _tick_once(bot: Bot) -> None:
     # This prevents speculative shot feedback state from leaking across
     # executor-side validation failures.
     if command_sent:
+        previous_mode = bot._ai_state["mode"]
         bot._ai_state = decision["updated_ai_state"]
+        if bot._ai_state["mode"] != previous_mode:
+            emit_mode_transition(
+                from_mode=previous_mode,
+                to_mode=bot._ai_state["mode"],
+                reason_kind=decision["behavior"]["reason_kind"],
+                caused_by=(
+                    0 if decision["command"]["cmd_type"] == "hold" else latest_decision_event_id()
+                ),
+            )
 
     # 9. Update the in-page HUD so a human watching the browser sees what
     # the bot decided this tick without tailing artifacts.
@@ -499,7 +532,7 @@ def _tick_once(bot: Bot) -> None:
             ai_mode=bot._ai_state["mode"],
             ai_mode_state=bot._ai_state["mode_state"],
             behavior_mode=decision["behavior"]["mode"],
-            behavior_reason=decision["behavior"]["reason"],
+            behavior_reason=render_reason(decision["behavior"]),
             command_type=decision["command"]["cmd_type"],
             target_x=decision["behavior"]["target_x"],
             target_y=decision["behavior"]["target_y"],
@@ -685,27 +718,29 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             **{**bot._ai_state, "session_miss_count": bot._ai_state["session_miss_count"] + 1}
         )
 
+    duration_ms = get_current_time_ms() - bot._ai_state["last_shoot_ms"]
     if got_hit:
         # Distinguish intended-target hit from incidental hit (e.g.
         # homing seeker landed on a closer enemy than commanded).
         on_intended = victim_id == target_id
-        emit_diagnostic(
-            diagnostic_kind="combat_feedback",
-            result="hit",
-            reason="tile_occupied",
-            target_name=target_name,
+        emit_shoot_hit(
+            duration_ms=duration_ms,
             target_id=target_id,
-            actual_victim_id=victim_id,
+            target_name=target_name,
+            victim_id=victim_id,
             on_intended_target=on_intended,
+            hit_signal="tile_occupied",
         )
         _inc_hit()
         return "hit"
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
-        emit_diagnostic(
-            diagnostic_kind="combat_feedback",
-            result="kill",
-            target_name=target_name,
+        emit_shoot_hit(
+            duration_ms=duration_ms,
             target_id=target_id,
+            target_name=target_name,
+            victim_id=target_id,
+            on_intended_target=True,
+            hit_signal="kill_confirmed",
         )
         _inc_hit()
         return "hit"
@@ -716,38 +751,33 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
         # inventory sync still reveals the debit against the pre-shot
         # snapshot. A debit is a landed shot regardless of which wire
         # channel reported it.
-        emit_diagnostic(
-            diagnostic_kind="combat_feedback",
-            result="hit",
-            reason="ammo_delta",
-            target_name=target_name,
+        emit_shoot_hit(
+            duration_ms=duration_ms,
             target_id=target_id,
-            actual_victim_id=victim_id,
+            target_name=target_name,
+            victim_id=victim_id,
             on_intended_target=True,
+            hit_signal="ammo_delta",
         )
         _inc_hit()
         return "hit"
     if got_response:
         # No tile-occupied hit, no ammo debit, and a wire response did
         # arrive -- the shot genuinely missed.
-        emit_diagnostic(
-            diagnostic_kind="combat_feedback",
-            result="miss",
-            reason="tile_empty",
-            target_name=target_name,
+        emit_shoot_miss(
+            duration_ms=duration_ms,
             target_id=target_id,
+            target_name=target_name,
         )
         _inc_miss()
         return "miss"
     if peek_command_error(get_world_service()) in _SHOT_REJECTING_COMMAND_ERRORS:
         error_code = check_and_clear_command_error(get_world_service())
-        emit_diagnostic(
-            diagnostic_kind="combat_feedback",
-            result="rejected",
-            reason="command_error",
-            error_code=error_code,
-            target_name=target_name,
+        emit_shoot_command_rejected(
+            duration_ms=duration_ms,
             target_id=target_id,
+            target_name=target_name,
+            error_code=error_code,
         )
         bot._ai_state = AIStateDict(
             **{

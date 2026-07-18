@@ -28,7 +28,7 @@ class TestMakeTickDecision:
     def test_make_with_move_command(self) -> None:
         """Factory creates TickDecisionDict with move command."""
         cmd = make_move_command(100, 200)
-        behavior = make_behavior_score("HUNT", 50, 100, 200, "patrol_waypoint")
+        behavior = make_behavior_score("HUNT", 50, 100, 200, "search_collect_local")
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(cmd, behavior, ai_state, [2, 5])
         assert decision["command"]["cmd_type"] == "move"
@@ -39,7 +39,7 @@ class TestMakeTickDecision:
     def test_make_with_radar_command(self) -> None:
         """Factory creates TickDecisionDict with radar command."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "proactive_radar")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "forage_radar")
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(cmd, behavior, ai_state, [5])
         assert decision["command"]["cmd_type"] == "radar"
@@ -48,7 +48,7 @@ class TestMakeTickDecision:
     def test_desired_equipment_sorted(self) -> None:
         """Factory sorts desired_equipment list."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "test")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(cmd, behavior, ai_state, [5, 2])
         assert decision["desired_equipment"] == [2, 5]
@@ -60,7 +60,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_move(self) -> None:
         """Encode then decode produces identical TickDecisionDict with move."""
         cmd = make_move_command(50, 75)
-        behavior = make_behavior_score("HUNT", 800, 50, 75, "enemy nearby")
+        behavior = make_behavior_score("HUNT", 800, 50, 75, "find_target")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [2, 4, 5])
         encoded = encode_tick_decision(original)
@@ -72,7 +72,7 @@ class TestEncodeDecodeRoundTrip:
         from tankpit_bot.bot.types import make_shoot_command
 
         cmd = make_shoot_command(128, 64)
-        behavior = make_behavior_score("HUNT", 900, 128, 64, "target acquired")
+        behavior = make_behavior_score("HUNT", 900, 128, 64, "shoot_target")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [2, 5])
         encoded = encode_tick_decision(original)
@@ -82,7 +82,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_radar(self) -> None:
         """Encode then decode produces identical TickDecisionDict with radar."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "proactive_radar")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "forage_radar")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [5])
         encoded = encode_tick_decision(original)
@@ -92,7 +92,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_map_open(self) -> None:
         """Encode then decode produces identical TickDecisionDict with map_open."""
         cmd = make_map_open_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "map_open_enemies")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "find_enemies")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [5])
         encoded = encode_tick_decision(original)
@@ -102,7 +102,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_pickup_fuel(self) -> None:
         """Encode then decode produces identical TickDecisionDict with pickup_fuel."""
         cmd = make_pickup_fuel_command(80, 90)
-        behavior = make_behavior_score("COLLECT", 600, 80, 90, "low fuel")
+        behavior = make_behavior_score("COLLECT", 600, 80, 90, "fuel_collect")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [1, 5])
         encoded = encode_tick_decision(original)
@@ -112,7 +112,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_pickup_equipment(self) -> None:
         """Encode then decode produces identical TickDecisionDict with pickup_equipment."""
         cmd = make_pickup_equipment_command(60, 70)
-        behavior = make_behavior_score("COLLECT", 800, 60, 70, "equipment_low")
+        behavior = make_behavior_score("COLLECT", 800, 60, 70, "equipment_restock")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [2, 5])
         encoded = encode_tick_decision(original)
@@ -122,7 +122,7 @@ class TestEncodeDecodeRoundTrip:
     def test_roundtrip_teleport(self) -> None:
         """Encode then decode produces identical TickDecisionDict with teleport."""
         cmd = make_teleport_command(200, 200)
-        behavior = make_behavior_score("HUNT", 50, 200, 200, "teleport_search")
+        behavior = make_behavior_score("HUNT", 50, 200, 200, "search_collect_local")
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [1, 5])
         encoded = encode_tick_decision(original)
@@ -158,7 +158,7 @@ class TestDecodeValidation:
     def test_decode_invalid_ai_state_raises(self) -> None:
         """Decode rejects non-dict updated_ai_state."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "test")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
         data: JSONObject = {
             "command": {"cmd_type": "radar"},
             "behavior": encode_tick_decision(
@@ -173,7 +173,7 @@ class TestDecodeValidation:
     def test_decode_invalid_equipment_not_list(self) -> None:
         """Decode rejects non-list desired_equipment."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "test")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
         ai_state = make_initial_ai_state()
         full = encode_tick_decision(make_tick_decision(cmd, behavior, ai_state, [5]))
         full["desired_equipment"] = "not_a_list"
@@ -183,7 +183,7 @@ class TestDecodeValidation:
     def test_decode_invalid_equipment_non_int(self) -> None:
         """Decode rejects desired_equipment with non-int items."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "test")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
         ai_state = make_initial_ai_state()
         full = encode_tick_decision(make_tick_decision(cmd, behavior, ai_state, [5]))
         full["desired_equipment"] = ["not_int"]
@@ -193,7 +193,7 @@ class TestDecodeValidation:
     def test_decode_unknown_cmd_type_raises(self) -> None:
         """Decode rejects unknown cmd_type."""
         cmd = make_radar_command()
-        behavior = make_behavior_score("HUNT", 0, 0, 0, "test")
+        behavior = make_behavior_score("HUNT", 0, 0, 0, "manual_hold")
         ai_state = make_initial_ai_state()
         full = encode_tick_decision(make_tick_decision(cmd, behavior, ai_state, [5]))
         # Replace command with a dict that has unknown cmd_type + required fields

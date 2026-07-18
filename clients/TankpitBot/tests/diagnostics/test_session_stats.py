@@ -29,14 +29,15 @@ from tankpit_bot.diagnostics.session_stats import (
     main,
     render_session_stats,
 )
-from tankpit_bot.diagnostics.teleport_attempts import (
-    emit_teleport_attempt_outcome,
+from tankpit_bot.ledger.outcome.teleport import (
+    emit_teleport_landed,
+    emit_teleport_stall_timeout,
     record_teleport_dispatch,
 )
 from tankpit_bot.runtime_logging import (
     configure_bot_runtime_logging,
+    emit_diagnostic,
     emit_wire,
-    emit_wire_complete,
 )
 from tankpit_bot.state import make_empty_world_state
 
@@ -49,21 +50,30 @@ def _emit_first_run_activity() -> None:
         [GameLogEntry(text="purple-8 has been deactivated by you", category="combat")],
         make_empty_world_state(),
     )
+    emit_diagnostic(
+        diagnostic_kind="teleport_attempt",
+        target_x=5,
+        target_y=6,
+        teleport_cycle_id=1,
+        status="landed_exact",
+        duration_ms=200,
+        sent_window="w",
+        received_window="(none)",
+        page_snapshots="(none)",
+        page_snapshot_count=0,
+    )
     record_teleport_dispatch(target_x=10, target_y=20, message_index=0, sent_window="w")
-    assert emit_teleport_attempt_outcome(status="landed_exact", messages=[])
+    emit_teleport_landed(
+        duration_ms=300, target_x=10, target_y=20, landed_x=10, landed_y=20, messages=[]
+    )
     record_teleport_dispatch(target_x=30, target_y=40, message_index=0, sent_window="w")
-    assert emit_teleport_attempt_outcome(status="stall_timeout", messages=[])
+    emit_teleport_stall_timeout(
+        duration_ms=10000, target_x=30, target_y=40, timeout_ms=10000, messages=[]
+    )
     emit_wire("shoot")
     emit_wire("pickup_fuel")
     emit_wire("pickup_equipment")
     emit_wire("radar")
-    emit_wire_complete(
-        action_kind="teleport",
-        duration_ms=10000,
-        signal="stall_timeout",
-        target_x=30,
-        target_y=40,
-    )
     record_pickup_dispatch(13, 172)
     register_world_feedback_from_game_log(
         [GameLogEntry(text="Empty container", category="other")],
@@ -85,7 +95,8 @@ def test_sweeps_runs_and_aggregates(fake_fs: FakeFileSystem) -> None:
     ]
     first = report["rows"][0]
     assert first["kills"] == 1
-    assert first["teleports_ok"] == 1
+    # 1 action-lab teleport_attempt + 1 bot ledger landing = 2 ok.
+    assert first["teleports_ok"] == 2
     assert first["teleports_failed"] == 1
     assert first["shots"] == 1
     assert first["pickups"] == 2

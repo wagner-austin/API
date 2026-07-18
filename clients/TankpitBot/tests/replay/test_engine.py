@@ -255,7 +255,7 @@ class TestBuildTrace:
         ai_state = make_initial_ai_state()
         decision = make_tick_decision(
             command=make_move_command(52, 63),
-            behavior=make_behavior_score("COLLECT", 900, 52, 63, "fuel=500"),
+            behavior=make_behavior_score("COLLECT", 900, 52, 63, "fuel_collect"),
             updated_ai_state=ai_state,
             desired_equipment=[],
         )
@@ -290,7 +290,7 @@ class TestBuildTrace:
         )
         decision = make_tick_decision(
             command=make_map_open_command(),
-            behavior=make_behavior_score("HUNT", 950, 101, 100, "combat_shoot"),
+            behavior=make_behavior_score("HUNT", 950, 101, 100, "shoot_target"),
             updated_ai_state=ai_state,
             desired_equipment=[1, 2, 4],
         )

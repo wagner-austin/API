@@ -9,6 +9,7 @@ from tankpit_bot.contracts.base import (
     ConfidenceOutOfBoundsError,
     ContractError,
     ContractViolationDict,
+    LedgerInvariantError,
     NoUnsourcedFactError,
     ProvenanceRootednessError,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "Contract",
     "ContractError",
     "ContractViolationDict",
+    "LedgerInvariantError",
     "NoUnsourcedFactError",
     "ProvenanceRootednessError",
     "enforce_contract",

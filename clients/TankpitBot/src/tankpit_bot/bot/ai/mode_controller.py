@@ -214,7 +214,7 @@ def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecision
             score=0,
             target_x=0,
             target_y=0,
-            reason="manual_hold",
+            reason_kind="manual_hold",
         ),
         updated_ai_state=AIStateDict(
             **{
@@ -392,7 +392,7 @@ def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:
         Derived HUNT substate for the updated AI state.
     """
     command_type = decision["command"]["cmd_type"]
-    reason = decision["behavior"]["reason"]
+    reason = decision["behavior"]["reason_kind"]
     has_locked_target = decision["updated_ai_state"]["combat_target_id"] != -1
     if reason == "confirm_kill":
         return "CONFIRM_KILL"
@@ -422,7 +422,7 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     Returns:
         Derived collect substate for the updated AI state.
     """
-    reason = decision["behavior"]["reason"]
+    reason = decision["behavior"]["reason_kind"]
     command_type = decision["command"]["cmd_type"]
     if reason in ("forage_radar", "forage_sweep", "scan_on_landing"):
         return "SENSE"

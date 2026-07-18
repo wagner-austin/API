@@ -152,10 +152,12 @@ def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> Non
     assert behavior_counts == Counter({"HUNT": 9})
     assert command_counts.get("map_open", 0) == 0
     assert command_counts["shoot"] == 7
-    assert traces[0]["behavior_reason"] == "teleport orange-1"
+    assert traces[0]["behavior_reason"] == "teleport_target(target_name=orange-1)"
     assert traces[0]["command_type"] == "teleport"
     assert traces[0]["ai_mode"] == "HUNT"
-    assert all(trace["behavior_reason"] == "shoot orange-1" for trace in shoot_traces)
+    assert all(
+        trace["behavior_reason"] == "shoot_target(target_name=orange-1)" for trace in shoot_traces
+    )
     assert all(trace["combat_target_id"] == 527 for trace in shoot_traces)
     assert all(trace["ai_mode"] == "HUNT" for trace in traces)
     assert all(trace["ai_mode_state"] == "ENGAGE" for trace in shoot_traces)
