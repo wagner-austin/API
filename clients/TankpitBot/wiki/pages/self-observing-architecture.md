@@ -3,7 +3,7 @@ title: Self-Observing Bot Architecture
 tags: [architecture, decisions, observability, contracts, ledger, memory]
 related: [[bot-behavior-contract]], [[coding-standards]], [[combat-chase-bug]]
 sources: [docs/handoffs/self-observing-bot-architecture.md; live incident 2026-07-06 20:47:31]
-fact_checked: 2026-07-06
+fact_checked: 2026-07-18
 confidence: high
 ---
 
@@ -27,17 +27,17 @@ The 20:47:31 deadlock under this architecture: at tick 1, the executor sees the 
 
 Each item has the same shape: **missing** state / what it looks like **present** / what we have **today**.
 
-### 1. Standardized WHAT (action outcomes) — ⚠️ partial
+### 1. Standardized WHAT (action outcomes) — ✅ Phase 2 (2026-07-18)
 
 - **Missing:** silent discards, no correlation dispatch↔outcome, three parallel diagnostic channels.
 - **Present:** unified `action_outcome` event per attempt (all six action kinds).
-- **Today:** partial via `combat_feedback` / `wire_complete` / `teleport_attempt`.
+- **Today:** DONE — unified `action_outcome` fabric with per-kind typed emitters, executor discards included; the three legacy channels are deleted.
 
-### 2. Standardized WHY (decision reasoning) — ❌
+### 2. Standardized WHY (decision reasoning) — ✅ Phase 2 (2026-07-18)
 
 - **Missing:** free-text `reason` strings, unstructured, dropped after log.
 - **Present:** `reason_kind` (Literal) + `reason_context` (TypedDict) per Decision.
-- **Today:** `emit_ai("reason=…")` strings only.
+- **Today:** DONE — `reason_kind` (closed 17-value Literal) + `reason_context` on every behavior; free-text reasons deleted.
 
 ### 3. Predictions and their accuracy — ❌
 
@@ -81,23 +81,23 @@ Each item has the same shape: **missing** state / what it looks like **present**
 - **Example:** field01 (Practice room) is played every session. We could know its fuel-dot decay rate, hot combat zones, typical enemy density.
 - **Today:** `docs/handoffs/` accumulates human-authored handoffs; nothing machine-consumable.
 
-### 9. Causal chain — ❌
+### 9. Causal chain — ⚠️ primitives landed (Phase 2)
 
 - **Missing:** "I teleported → landed adjacent → fired dual → hit → homed off → target teleported" is a chain implied by the log, not queryable data.
 - **Present:** every event carries `caused_by: list[EventId]`. Chains form a DAG; queries traverse.
 - **Example:** to answer "when I get a kill, what typical sequence led there?" you eyeball the log. Should be a query.
-- **Today:** only implicit ordering.
+- **Today:** every outcome and mode transition carries `caused_by` (its decision event id); `decision_record(id)` resolves it. Traversal API (`trace_backward`/`forward`) lands with its Phase 3 consumers.
 
 ### 10. Anomaly detection — REJECTED
 
 - The whole category is a symptom of missing contracts. All would-be anomalies are contract violations that should raise at state entry, not after accumulating observations.
 - The one exception: `PredictionModelDriftError` fires when the planner's stated prediction accuracy falls below its own committed threshold — that IS a contract on the planner ("your model is broken"), not anomaly detection over consequences.
 
-### 11. Mode transitions — ⚠️ partial
+### 11. Mode transitions — ✅ Phase 2 (2026-07-18)
 
 - **Missing:** mode changes (COLLECT ↔ HUNT) happen via cascade fall-through, not first-class events. Why did we transition? Was it the right time?
 - **Present:** `mode_transition` diagnostic on every mode change with `from_mode`, `to_mode`, `reason_kind`, world snapshot.
-- **Today:** emitted in `emit_ai` free text.
+- **Today:** DONE — first-class `mode_transition` events with `from_mode`/`to_mode`/`reason_kind`/`caused_by`.
 
 ### 12. Time budgets — ❌
 
@@ -169,7 +169,7 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 | 1b | ✅ landed 2026-07-18: `ContainerStateDict` carries `confidence` + `provenance` (origin derived from `refresh_kind`); `facts/container_facts.py` projects `Fact[ContainerValueDict]` | — | — |
 | 1c | ✅ landed 2026-07-18: `TankStateDict` carries `confidence` + `provenance`; `TankObservation.fact_source` records the exact wire channel at all 12 dispatch sites; `facts/tank_facts.py` projects `Fact[TankValueDict]` | — | — |
 | 1d | ✅ landed 2026-07-18: `SelfStateDict`/`MineStateDict`/`TerrainTileDict`/`ViewportStateDict` carry the fact metadata flat (self/viewport/terrain also gained `observed_ms`); `FactSource` 18 → 23 (0x2B promotion, 0x44 fuel gain, 0x4A terrain update, 0x4B mine placement, 0x64 fuel total); `facts/world_facts.py` projects all four | — | — |
-| 2 | `ledger/` core (Outcomes, Decisions, Ring, Causal, ModeTransitions) | 2500 | 4-6 |
+| 2 | ✅ landed 2026-07-18: `ledger/` core — unified outcome fabric (31+ typed outcomes incl. executor discards + `superseded`), typed `ReasonKind` decisions, Decision↔Outcome correlation via pending-pairing (`caused_by` on every outcome), `verify_outcome_invariant` session sweep, first-class mode transitions, scorecard per-outcome counters | 2500 | 4-6 |
 | 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
 | 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
 | 5 | Aggregation (self-model + baselines + experiments) | 1500 | 2-3 |
@@ -200,7 +200,21 @@ Three documented deviations from the handoff spec: (1) `game_log_scrape` counts 
 
 Same flat-carry pattern as 1b/1c, completing the world-state coverage. Channel-threading highlights: self-position updates flow through `update_self_position(…, fact_source)` — the 0x47 waypoint path and 0x3D movement path each pass their own channel; fuel totals thread per dispatch arm (0x2E sync / 0x44 fuel gain / 0x64 fuel total); rank stamps `wire_0x2B_promotion`; a witnessed mine placement stamps `wire_0x4B_mine_placement` while radar/viewport/map mine sightings derive from their coarse source; terrain distinguishes 0x5A patch grids (default) from 0x4A terrain updates; the viewport's origin is constitutionally `wire_0x5A_viewport_patch` (the only message that sets it — see [[viewport-shift-protocol]]). `ViewportStateDict` construction now goes through `make_viewport_state` (previously raw dict literals). Self/viewport/terrain gained `observed_ms` (they had no timestamp at all); mines already had one.
 
-Phase 1 is COMPLETE. Next: Phase 2 (`ledger/` core — unified `action_outcome`, Decisions with typed reason enums).
+Phase 1 is COMPLETE.
+
+### Phase 2 implementation notes (2026-07-18)
+
+**Correlation via pending-pairing, not parameter threading.** The bot's own invariant (at most one in-flight action per kind) is the pairing rule: `record_decision` (executor entry, every dispatchable command) registers the decision as its kind's pending causal parent; `emit_action_outcome` — the single low-level emission path — consumes it into `caused_by`. A re-dispatch of the same kind closes the unresolved predecessor with an explicit `superseded` outcome, so **every recorded decision resolves to exactly one outcome** except the ≤6 pending at shutdown. `verify_outcome_invariant()` (session end, `_emit_session_scorecard`) raises `LedgerInvariantError` on any decision that is neither resolved nor pending — possible only if a code path bypassed the fabric.
+
+**Two more guard-enforced contracts:** `DecisionRecordContract` (score band, non-empty reason) on `record_decision`; `TeleportDispatchContract` on `record_teleport_dispatch`.
+
+**Mode transitions** (blind spot #11): every mode flip at the tick-loop persist point emits a `mode_transition` event with the driving decision's `reason_kind` and `caused_by` (0 for the non-dispatching manual-hold path).
+
+**Session end** now emits `session_outcome_counts` per action kind (from the rings) and `session_unresolved_decisions`, and the scorecard/issue report carry `action_outcome_counts` (`"kind:outcome"` tallies) — the per-outcome counters replacing ad-hoc hit/miss/reject views.
+
+**Deferred to Phase 3 (consumers don't exist yet, and dead API is banned):** the rich causal-chain traversal (`trace_backward`/`trace_forward`) and `DecideCtx` ledger views — the primitives are in place (`decision_record(id)` lookup, `caused_by` on every outcome and transition, `recent_outcomes`/`outcome_counts` ring queries).
+
+Next: Phase 3 (Decision enrichment — predictions, alternatives, confidence, time budgets).
 
 ## Why we're building this
 

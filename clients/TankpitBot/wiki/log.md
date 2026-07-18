@@ -1086,3 +1086,91 @@ Final Phase 1 substep of [[self-observing-architecture]]: `SelfStateDict`, `Mine
 **Single-path discipline maintained:** raw `SelfStateDict`/`ViewportStateDict` constructor literals across src and 31 test files were converted to the factories; `make_viewport_state` is the sole viewport construction path. Legacy decode converges to contemporary-encoder output (tested by key-deletion round trips).
 
 **Phase 1 (contracts + facts foundation) is COMPLETE** — 1a contracts/facts core + guard rule, 1b containers, 1c tanks, 1d the rest. Next: Phase 2 `ledger/` core.
+
+## [2026-07-18] code | Phase 2 outcome fabric — the three diagnostic channels unified, executor discards recorded
+
+The heart of Phase 2 of [[self-observing-architecture]]: the unified `action_outcome` fabric replacing the three parallel diagnostic mechanisms — and making the executor's silent discards (the 20:47:31 deadlock class) structurally impossible to hide.
+
+**New `ledger/` package:** `events.py` (process-wide monotonic event ids + the six recorded `ActionKind`s), `outcomes.py` (six per-kind outcome vocabularies, 31 labels total, mirroring the real resolution signals), `ring.py` (bounded per-kind ring of typed outcome records, queryable via `recent_outcomes`/`outcome_counts`), and `outcome/` with per-kind emit modules whose helpers carry strict per-outcome typed signatures (no sentinels — map_open has no target fields at all).
+
+**Producers migrated (single classification, single record):**
+- `completions.py` gates → typed emitters (`emit_scan_radar_complete`, `emit_move_position_reached`, `emit_teleport_landed` — which absorbs the old `teleport_attempt` window tracking — `emit_collect_position_reached`/`container_consumed`).
+- `tick_loop_actions.py` 0x52/movement-rejected/stall paths → kind-routing dispatchers to typed emitters.
+- `executor.py`'s nine `emit_ai("rejecting …")` sites → nine typed discard outcomes (`discarded_hostile_mine`, `discarded_combat_target_stale`, `discarded_no_container`, …). **Every silent-loop instance from the [[executor-rejection-loops]] audit now leaves a first-class recorded event.**
+- `tick_loop._get_combat_feedback` → `emit_shoot_hit`/`miss`/`command_rejected` with hit-signal attribution (tile_occupied / kill_confirmed / ammo_delta).
+
+**Deleted (no shims, no fallbacks):** `runtime_logging.emit_wire_complete`, `diagnostics/teleport_attempts.py`, the `combat_feedback` diagnostic kind, the whole `WIRE_COMPLETE` channel. Zero references remain in production code.
+
+**Consumers migrated:** issue report family (`ActionOutcomeRowDict` replaces `WireCompleteRecordDict`; teleport success counts combine action-lab attempts + bot outcomes), `bot_query` (stalls/action-spans read `action_outcome`), `runs_index.count_stall_timeouts`, `session_stats`. The action-lab probes' own `teleport_attempt` diagnostics remain — different producer, still live.
+
+**Guard milestone:** the Phase 1a contract rule enforced its first real code — `record_teleport_dispatch` (a `record_*` mutation in `ledger/`) now carries `@enforce_contract(TeleportDispatchContract())` with `LedgerInvariantError` on off-map coords / negative message index.
+
+**Remaining Phase 2 work (next):** typed Decisions (`reason_kind` enums replacing the 18 free-text `reason` strings), Decision↔Outcome correlation + `OutcomeInvariantContract`, causal chain, first-class mode transitions, `DecideCtx` ledger views, scorecard per-outcome counters.
+
+## [2026-07-18] code | Phase 2 typed decisions — free-text reasons replaced by the ReasonKind vocabulary
+
+Second Phase 2 chunk of [[self-observing-architecture]]: the planner's free-text `reason` string is gone. `BehaviorScoreDict` now carries `reason_kind` (a closed 17-value `ReasonKind` Literal) + `reason_context` (typed scalar map: `target_name` for the combat kinds, `volume` for the fuel kinds).
+
+**Key discovery during migration:** `reason` was never just logging — `derive_hunt_mode_state`/`derive_collect_mode_state` branch on it to derive AI mode substates (`confirm_kill` → CONFIRM_KILL, `scan_on_landing` → SCAN_ON_LANDING, `forage_*` → SENSE, ...). It was stringly-typed control flow; the closed Literal makes an invalid reason a type error instead of a silent substate misroute.
+
+**Vocabulary (17):** scan_on_landing; COLLECT: equipment_locked, fuel_locked, equipment_restock, equipment_hop, fuel_collect, forage_radar, forage_sweep, search_collect_local, map_for_dots; HUNT: find_target, find_enemies, teleport_target, shoot_target, dot_relay, confirm_kill; controller: manual_hold. The f-string reasons (`f"find {name}"`, `f"fuel={vol}"`) split into kind + context.
+
+**All 18 planner `make_decision` sites + the controller's manual_hold migrated**; `map_reason`/`reason` passthrough params retyped to `ReasonKind`. Consumers (executor AI-decision emit, tick-loop HUD overlay, replay narration) render via the single `render_reason()` formatter — `kind(key=value)`. Codec round-trips validate the kind against the closed vocabulary at decode.
+
+Gate: 4417 tests, 100% coverage, guard/ruff/mypy clean.
+
+**Remaining Phase 2:** Decision/Outcome event-id correlation + `OutcomeInvariantContract`, causal chain, first-class mode transitions, `DecideCtx` ledger views, scorecard per-outcome counters.
+
+## [2026-07-18] code | Phase 2 COMPLETE — Decision↔Outcome correlation, mode transitions, invariant sweep
+
+Final Phase 2 chunk of [[self-observing-architecture]]. The correlation layer uses the bot's own one-in-flight-per-kind invariant as the pairing rule: the executor records every dispatchable decision (`ledger/decision.py`, guard-enforced `DecisionRecordContract`); the single outcome-emission path consumes the pending decision into `caused_by`; a same-kind re-dispatch closes its predecessor with an explicit `superseded` outcome. Every recorded decision therefore resolves to exactly one outcome — `verify_outcome_invariant()` raises `LedgerInvariantError` at session end otherwise, which is reachable only by bypassing the fabric (proven by test).
+
+Mode flips are first-class `mode_transition` events (event id + reason_kind + causal decision). Session end emits per-kind outcome counts from the rings plus unresolved-decision ids; the scorecard and issue report carry `action_outcome_counts` tallies.
+
+Gate: 4430 tests, 100% coverage. Phase 2 (~1900 LoC production + tests this session across three chunks) is DONE; roadmap updated. Next: Phase 3 decision enrichment.
+
+## [2026-07-18] live-run | Phase 1+2 stack validated on the wire (60 s diagnostic session)
+
+First live exercise of the entire self-observing stack (`TANKPIT_BOT_SESSION_SECONDS=60`, field01). 23 ticks, 1 kill, 11/11 hits, clean session end. Everything new fired correctly:
+
+- **20 `action_outcome` events, 19 causally attributed** (`caused_by` > 0). The single unattributed one is the map-open `dispatch_command` auto-fires as a teleport precondition — an implementation detail of the teleport decision, not a planner decision; honest attribution. (Possible refinement: attribute auxiliary map-opens to the owning teleport decision.)
+- **The `superseded` path fired on a real mid-action teleport re-dispatch** — the exact case the correlation design predicted.
+- **Teleport outcomes carry full wire windows** (dispatch context + received-message window) — the absorbed teleport-attempt machinery works in situ.
+- **Every shot attributed to its own decision** with target name, victim id, hit signal (`tile_occupied`), and on-intended flag.
+- **Both mode transitions recorded** (UNSET→HUNT via find_enemies, HUNT→COLLECT via equipment_restock) with causal decision ids.
+- **Session-end sweep passed** and correctly reported the one legitimately unresolved decision (the final shot, wire never answered before shutdown) instead of raising.
+- **Issue report renders the new sections**: outcomes tally on the scorecard, ACTION OUTCOMES listing, teleport success/failure now derived from the outcome fabric.
+
+Cosmetic note for later: the report's TELEPORTS header says "0 attempts" (action-lab rows) alongside outcome-derived success/failure counts — phrasing mixes the two sources.
+
+## [2026-07-18] live-run + fix | Early-exit root cause cracked by the new decline instrumentation
+
+Second 60 s run reproduced the `no_productive_collect` early exit in 5 ticks (homings persist at 20/25 across sessions, so the trap springs immediately). The new `hop_declined` diagnostics named the guilty filters precisely:
+
+- **Dot hop:** `dots_total=622, impassable=192, unaffordable=2, already_scanned=0, not_walkable=428`. The `_viewport_walkable_fraction < 1.0` filter — requiring the 16x16 landing viewport to be 100 % walkable ground — rejected **428 of 622 fuel dots**. On terrain-bearing maps the filter is effectively unsatisfiable once nearby clean viewports are used; it is the primary reason the bot "can't hop".
+- **Equipment hop:** `external=1, no_landing=1` — the only out-of-viewport candidate's tile and all four cardinal neighbours are impassable per terrain belief, so no legal landing. Meanwhile **6 in-viewport equipment containers sat `blocked_walk`** — invisible to the hop path by design (it only considers external containers), even though teleporting directly onto a walk-blocked container would work (server displaces; landing auto-pickup).
+- **Gate:** homings 20/25 < capacity blocks HUNT per the Bug 0.4 full-inventory contract.
+
+**Fixes landed this session (report/ledger side, gate-green 4429 tests):** teleport-precondition map-opens now resolve the owning teleport decision via `transfer_pending_decision` (no more handshake `superseded`, no more unattributed map-opens); `superseded` no longer counts as a teleport failure in the report; TELEPORTS header separates outcome-derived counts from action-lab attempt rows; both hop selectors emit structured `hop_declined` tallies on every decline.
+
+**Open policy decisions (fight logic — user's call):** (a) relax the 100 %-walkable landing filter (threshold? landing-tile-only?); (b) allow teleport-to-container for in-viewport `blocked_walk` equipment; (c) whether `no_productive_collect` should end the session or keep searching; (d) the full-homings HUNT gate at 20/25.
+
+## [2026-07-18] fix + live-run | Dot-hop reranked: "prioritize dots + walkable, not a 100% rule" — early-exit cured
+
+**Contract correction (user, verbatim): "the rule was to prioritize viewports with more dots, more walkable area. but not a 100% rule ofc."** The 2026-07-03 implementation had mis-read "100% clean viewport" as a hard `walkable_fraction == 1.0` filter; archaeology traced the quote and the data convicted the filter (428/622 dots rejected).
+
+**New selector** (`_pick_fresh_dot_hop`): hard gates are physics only (own tile, landing tile passable, affordable, viewport unscanned); qualifying dots are RANKED by `score = dots_in_landing_viewport × walkable_fraction ÷ teleport_cost` — expected pickup value scaled by reachable area per fuel spent, with proximity built into the cost denominator. Every hop now also emits a `hop_selected` diagnostic with its score and cost.
+
+**Before/after, same account state (homings 20/25 trap):**
+- Run 2 (old filter): 5 ticks, exit `no_productive_collect`, nothing accomplished.
+- Run 3 (ranking): **full 60 s, exit `completed`** — 2 hops selected (scores 0.0155 and 0.1126 — the second a 24-fuel hop into a dot cluster), 4 equipment gains, **homings restocked 20 → 25/25**, fuel topped to cap 1100, 1 kill at 11/11 hits en route. The exact failure chain (can't hop → can't restock → can't hunt → quit) is broken at its root.
+
+Remaining from the audit trio: (b) in-viewport `blocked_walk` equipment invisible to the hop path (the recurring `equipment hop declined: external=1, no_landing=1` lines — that lake-locked container belief); (c)/(d) session-exit policy and the full-homings gate — now much less load-bearing since the dot hop works, but still open user calls.
+
+**Tests:** two 100%-rule tests rewritten to the ranking contract + new cluster-preference test (the user's "more dots" ask, pinned). Gate green: 4430 tests, 100% coverage.
+
+## [2026-07-18] feature | Graceful Q-quit on session teardown
+
+User request: the bot should press ``q`` (the plain `PLAIN_QUIT` wire command) before closing the browser so the server records a deliberate lobby exit instead of an abrupt socket drop. Implemented: `build_quit_command()` (2-byte LE length header + `-`, no XOR — the sender already passes non-`!` bodies through plain), `CommandService.quit_game()`, and `Bot._send_graceful_quit()` first in the game-loop `finally` while the CDP session is still bound; the send path's existing None-guard means a crashed browser cannot wedge teardown. Wire framing pinned by test (`b"\x01\x00-"`). Gate green.
+
+Also this session: explained the 650-fuel engagement reserve (450 engagement budget + 200 low-fuel floor — a hop may never land below it) and identified the 14:51/14:52 mystery runs as sessions launched by the user's SPA bot service (port 27100): unbounded "until stopped" sessions; the STOP file ends a session but the service process itself persists until killed.
