@@ -92,8 +92,8 @@ SCOPE_NORTHWEST = 0x07  # Home
 PLAIN_QUIT = b"-"  # 'q' key - Quit game and return to lobby
 PLAIN_SOUND_ON = b"V140"  # 'l' key - Sound on
 PLAIN_SOUND_OFF = b"V040"  # 'l' key - Sound off
-PLAIN_AUTOSCROLL_ON = b"A0"  # 'a' key - Autoscroll on
-PLAIN_AUTOSCROLL_OFF = b"A1"  # 'a' key - Autoscroll off
+PLAIN_AUTOSCROLL_ON = b"A1"  # 'a' key - Autoscroll on (JS: "A" + Number(true))
+PLAIN_AUTOSCROLL_OFF = b"A0"  # 'a' key - Autoscroll off (JS: "A" + Number(false))
 
 
 # =============================================================================

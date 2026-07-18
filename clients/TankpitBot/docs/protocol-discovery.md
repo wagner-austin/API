@@ -432,8 +432,8 @@ Response: `Z` + viewport data with entity positions
 | Wire | Key | Action | Description |
 |------|-----|--------|-------------|
 | `-` | Q | QUIT | Exit game and return to lobby |
-| `A0` | A | AUTOSCROLL_ON | Enable autoscroll |
-| `A1` | A | AUTOSCROLL_OFF | Disable autoscroll |
+| `A1` | A | AUTOSCROLL_ON | Enable autoscroll (JS: `"A" + Number(setting)`, true=1) |
+| `A0` | A | AUTOSCROLL_OFF | Disable autoscroll |
 
 **Equipment Toggle Commands** (type=3, cmd_id=0x72):
 
