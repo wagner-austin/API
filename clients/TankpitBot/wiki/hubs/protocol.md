@@ -9,3 +9,4 @@ Wire protocol format, message types, and client data structures. Everything lear
 [Weapon Selection](../pages/weapon-selection.md) -- server decides weapon type based on what's at the fired tile
 [Decode Coverage Map](../pages/decode-coverage.md) -- every message type vs our decoder: gaps, wrong constants, dropped fields (2026-06-18 audit)
 [rank_category Bug](../pages/rank-category-bug.md) -- damage_state field in 3 decoders is actually rank_category; combat targeting affected (2026-06-19)
+[Viewport Shift Protocol](../pages/viewport-shift-protocol.md) -- the three shift triggers (teleport, Rb/Sb scope commands, Ia autoscroll) + 22-event corpus proof; the bot uses none of them
