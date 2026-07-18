@@ -352,6 +352,21 @@ def build_query_command(cmd_id: int) -> bytes:
     return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
 
 
+def build_quit_command() -> bytes:
+    """Build the graceful-quit command ready to send (with length header).
+
+    The plain ``q``-key command (:data:`PLAIN_QUIT`): no XOR encoding,
+    just the 2-byte little-endian length header + ``-``. The server
+    treats it as a deliberate exit to the lobby, unlike the abrupt
+    socket drop a bare browser close produces.
+
+    Returns:
+        Framed quit command bytes ready to send via WebSocket.
+    """
+    length = len(PLAIN_QUIT)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + PLAIN_QUIT
+
+
 def build_move_command(x: int, y: int) -> bytes:
     """Build a MOVE command ready to send (with length header).
 
@@ -527,6 +542,7 @@ __all__ = [
     "build_pickup_equipment_command",
     "build_pickup_fuel_command",
     "build_query_command",
+    "build_quit_command",
     "build_scope_command",
     "build_shoot_command",
     "build_teleport_command",

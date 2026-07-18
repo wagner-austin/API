@@ -32,6 +32,7 @@ from tankpit_bot.protocol.commands import (
     CMD_NEAREST_ENEMY,
     CMD_RADAR,
     build_query_command,
+    build_quit_command,
     build_shoot_command,
     build_toggle_equipment_command,
 )
@@ -76,6 +77,18 @@ class CommandService:
             cmd_name,
             self._send_ws_bytes,
         )
+
+    def quit_game(self) -> bool:
+        """Send the plain graceful-quit command (``q`` key).
+
+        Sent at session teardown before the browser closes so the
+        server records a deliberate lobby exit instead of an abrupt
+        socket drop.
+
+        Returns:
+            True if command was sent.
+        """
+        return self.send_bytes(build_quit_command(), "quit_game")
 
     def enter_game(self) -> bool:
         """Send CMD_ENTER_GAME to activate the tank.

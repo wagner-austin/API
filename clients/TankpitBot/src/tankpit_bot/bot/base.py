@@ -434,10 +434,21 @@ class Bot(DispatchMixin):
             except KeyboardInterrupt:
                 log.info("Bot interrupted by user")
             finally:
+                self._send_graceful_quit()
                 self._save_capture_session()
                 self._cdp = None
                 self._page = None
                 cleanup_browser(browser)
+
+    def _send_graceful_quit(self) -> None:
+        """Send the plain quit command so the server sees a lobby exit.
+
+        Runs first in teardown, while the CDP session is still bound;
+        the send path itself handles an already-gone session (logs and
+        returns False), so a crashed browser cannot wedge shutdown.
+        """
+        self._commands.cdp = self._cdp
+        self._commands.quit_game()
 
     def _save_capture_session(self) -> None:
         """Save accumulated messages as a replayable capture session.

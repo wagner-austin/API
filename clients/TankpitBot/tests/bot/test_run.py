@@ -165,6 +165,26 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
+    def test_send_graceful_quit_uses_current_cdp(self, fake_env: FakeEnv) -> None:
+        """Teardown quit binds the live CDP session and sends quit_game."""
+        from tankpit_bot._test_hooks import CDPSessionProtocol
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes.base import FakeCDPSession
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        sent: list[tuple[str, bytes]] = []
+
+        def _record(cdp: CDPSessionProtocol, data: bytes, label: str) -> str:
+            sent.append((label, data))
+            return ""
+
+        bot._commands._send_ws_bytes = _record
+        bot._cdp = FakeCDPSession()
+
+        bot._send_graceful_quit()
+
+        assert sent == [("quit_game", b"\x01\x00-")]
+
     def test_save_capture_session_returns_when_runtime_artifacts_missing(
         self,
         fake_env: FakeEnv,

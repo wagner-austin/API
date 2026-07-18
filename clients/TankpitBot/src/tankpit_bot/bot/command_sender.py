@@ -61,7 +61,9 @@ def send_command_bytes(
         return False
     if len(data) > 2 and data[2] == COMMAND_PREFIX:
         data = xor_encode_command(xor_table, data)
-    send_ws_bytes(cdp, data, cmd_name)
+    status = send_ws_bytes(cdp, data, cmd_name)
+    if not status.startswith("SENT_"):
+        log.warning("send %s returned status %s", cmd_name, status)
     # Parse the action prefix out of names like "shoot(...)" so
     # smoke / bot-query can filter by ``action_kind`` without
     # parsing the message text. Names without parens (e.g.

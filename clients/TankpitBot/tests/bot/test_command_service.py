@@ -42,6 +42,13 @@ class TestCommandService:
         assert len(self._sent) == 1
         assert self._sent[0][0] == "enter_game"
 
+    def test_quit_game_sends_plain_unencoded_frame(self) -> None:
+        """Graceful quit sends the plain q-key frame, never XOR-encoded."""
+        assert self.svc.quit_game() is True
+        label, data = self._sent[0]
+        assert label == "quit_game"
+        assert data == b"\x01\x00-"
+
     def test_move(self) -> None:
         assert self.svc.move(50, 60) is True
         assert self._sent[0][0] == "move"
