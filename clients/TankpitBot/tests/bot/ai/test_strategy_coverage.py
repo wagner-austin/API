@@ -10,7 +10,14 @@ from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import reset_world_state, update_world_state_from_position
-from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, TankStateDict, WorldStateDict
+from tankpit_bot.state.types import (
+    ContainerStateDict,
+    SelfStateDict,
+    TankStateDict,
+    WorldStateDict,
+    make_self_state,
+    make_viewport_state,
+)
 
 
 def _make_world(
@@ -22,7 +29,7 @@ def _make_world(
     scanned: bool = True,
 ) -> tuple[WorldStateDict, SelfStateDict]:
     """Build a world state for testing."""
-    self_state = SelfStateDict(
+    self_state = make_self_state(
         tank_id=1,
         x=self_x,
         y=self_y,
@@ -49,7 +56,7 @@ def _make_world(
             containers=containers or {},
             mines={},
             terrain={},
-            viewport={"left": vp_left, "top": vp_top, "width": 16, "height": 16},
+            viewport=make_viewport_state(left=vp_left, top=vp_top, width=16, height=16),
             scanned_tiles=scanned_tiles,
             timestamp_ms=100000,
         ),

@@ -10,11 +10,11 @@ from tankpit_bot.bot.ai.tactics import (
 from tankpit_bot.bot.ai.types import make_default_ai_config
 from tankpit_bot.state.types import (
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_self_state,
     make_tank_state,
+    make_viewport_state,
 )
 
 
@@ -26,7 +26,7 @@ def _empty_world() -> WorldStateDict:
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
+        viewport=make_viewport_state(left=0, top=0, width=18, height=18),
         scanned_tiles={},
         timestamp_ms=0,
     )
@@ -95,7 +95,7 @@ class TestShouldProactiveRadar:
         config = make_default_ai_config()
         world = _empty_world()
         world["containers"]["50,50"] = make_container_state(50, 50, is_fuel=True, volume=500)
-        world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
+        world["viewport"] = make_viewport_state(left=100, top=100, width=18, height=18)
 
         result = should_proactive_radar(150, world, 0, 10000, config)
 
@@ -207,7 +207,7 @@ class TestShouldMapOpenForEnemies:
         """Remembered off-viewport enemies do not count as visible enemies."""
         config = make_default_ai_config()
         world = _empty_world()
-        world["viewport"] = ViewportStateDict(left=100, top=100, width=18, height=18)
+        world["viewport"] = make_viewport_state(left=100, top=100, width=18, height=18)
         world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=20,

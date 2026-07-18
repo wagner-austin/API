@@ -17,12 +17,12 @@ from tankpit_bot.action_lab.equipment_targeting import (
 )
 from tankpit_bot.state import (
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_empty_world_state,
     make_self_state,
 )
+from tankpit_bot.state.types import make_viewport_state
 
 
 class _EquipmentTargetingModuleProtocol(Protocol):
@@ -67,7 +67,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         containers=world["containers"],
         mines=world["mines"],
         terrain=world["terrain"],
-        viewport=ViewportStateDict(left=x - 8, top=y - 8, width=16, height=16),
+        viewport=make_viewport_state(left=x - 8, top=y - 8, width=16, height=16),
         scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )

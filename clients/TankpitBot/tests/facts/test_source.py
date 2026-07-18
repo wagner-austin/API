@@ -14,12 +14,13 @@ from tankpit_bot.facts.source import (
 )
 
 
-def test_fact_sources_cover_the_eleven_channels() -> None:
-    """The source set is the nine wire channels + game log + inference."""
-    assert len(FACT_SOURCES) == 11
+def test_fact_sources_cover_the_twenty_three_channels() -> None:
+    """The source set is 20 wire channels + 2 DOM scrapes + inference."""
+    assert len(FACT_SOURCES) == 23
     wire = [name for name in FACT_SOURCES if name.startswith("wire_")]
-    assert len(wire) == 9
+    assert len(wire) == 20
     assert "game_log_scrape" in FACT_SOURCES
+    assert "dom_registry_scrape" in FACT_SOURCES
     assert "client_side_inference" in FACT_SOURCES
 
 
@@ -45,5 +46,6 @@ def test_is_observation_source_splits_inference_from_observation() -> None:
     """Only client_side_inference is a non-observation source."""
     assert is_observation_source("wire_0x3D_movement") is True
     assert is_observation_source("game_log_scrape") is True
+    assert is_observation_source("dom_registry_scrape") is True
     inference: FactSource = INFERENCE_SOURCE
     assert is_observation_source(inference) is False

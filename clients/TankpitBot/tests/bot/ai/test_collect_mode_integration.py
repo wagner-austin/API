@@ -10,8 +10,8 @@ from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import (
     ContainerStateDict,
     TankStateDict,
-    ViewportStateDict,
     make_tank_state,
+    make_viewport_state,
 )
 from tests.bot.ai._support import (
     make_container,
@@ -640,7 +640,7 @@ class TestRecoverEquipmentSearch:
     def test_exploration_candidates_omit_self_and_duplicates(self) -> None:
         """Exploration candidates omit the current tile and duplicate entries."""
         world, self_state = make_world(self_x=107, self_y=100, fuel=800)
-        world["viewport"] = ViewportStateDict(left=92, top=92, width=16, height=16)
+        world["viewport"] = make_viewport_state(left=92, top=92, width=16, height=16)
         ctx = DecideCtx(
             world,
             self_state,

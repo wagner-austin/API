@@ -166,6 +166,9 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 | 0 | Immediate deadlock fix: delete executor position-check | 200 | 1 |
 | 1 | `contracts/` + `facts/` foundation | 800 | 2-3 |
 | 1a | ✅ landed 2026-07-18: `contracts/` (error hierarchy, `require`, `@enforce_contract`) + `facts/` core (`Fact[T]`, `FactSource`, provenance, confidence ops) + guard rule in `scripts/contract_rules.py` | — | — |
+| 1b | ✅ landed 2026-07-18: `ContainerStateDict` carries `confidence` + `provenance` (origin derived from `refresh_kind`); `facts/container_facts.py` projects `Fact[ContainerValueDict]` | — | — |
+| 1c | ✅ landed 2026-07-18: `TankStateDict` carries `confidence` + `provenance`; `TankObservation.fact_source` records the exact wire channel at all 12 dispatch sites; `facts/tank_facts.py` projects `Fact[TankValueDict]` | — | — |
+| 1d | ✅ landed 2026-07-18: `SelfStateDict`/`MineStateDict`/`TerrainTileDict`/`ViewportStateDict` carry the fact metadata flat (self/viewport/terrain also gained `observed_ms`); `FactSource` 18 → 23 (0x2B promotion, 0x44 fuel gain, 0x4A terrain update, 0x4B mine placement, 0x64 fuel total); `facts/world_facts.py` projects all four | — | — |
 | 2 | `ledger/` core (Outcomes, Decisions, Ring, Causal, ModeTransitions) | 2500 | 4-6 |
 | 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
 | 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
@@ -185,7 +188,19 @@ Guard rule `scripts/contract_rules.py` (wired into `scripts/guard.py`, runs in `
 
 Three documented deviations from the handoff spec: (1) `game_log_scrape` counts as an observation origin (the DOM is a second wire, not a derivation) — only `client_side_inference` requires provenance citations; (2) `make_fact` invokes its contract explicitly instead of via the decorator, because decorating a generic function erases its type variable under mypy — the decorator is the mechanism for the non-generic mutations of Phases 1b+; (3) the spec's field-presence and source-membership runtime checks are structural under the typed keyword-only constructor (and re-validated by `require_fact_source` on decode), so the runtime contract checks are the ones typing cannot express: `observed_ms >= 0`, confidence bounds, provenance rootedness, and source/origin coherence.
 
-Remaining Phase 1 substeps: 1b retrofit `ContainerStateDict`, 1c `TankStateDict`, 1d `SelfStateDict`/`MineStateDict`/terrain/viewport.
+### Phase 1b/1c implementation notes (2026-07-18)
+
+**Flat-carry retrofit (deviation from spec's nested `Fact[ContainerValueDict]`):** `ContainerStateDict` and `TankStateDict` keep their flat shape and gain the two missing Fact fields (`confidence: float`, `provenance: ProvenanceChainDict`); `facts/container_facts.py` and `facts/tank_facts.py` provide the true `Fact[T]` projections for Fact-consuming layers. Rationale: nesting the value under `["value"]` would touch ~200 construction sites and ~300 access sites across 68 files for zero information gain — the flat dict already carries every Fact field.
+
+**Provenance sources are message-granular:** `FactSource` grew from the spec's 11 to 18 channels (added 0x21 TankInfo, 0x28 TankEntry, 0x3E TankStatus, 0x42 BuildPickup, 0x47 Movement, 0x48 EnemyDetect, `dom_registry_scrape`; renamed 0x2E to `wire_0x2E_tank_status_sync`) because the spec's list missed the channels that actually update the tank registry. Container origin derives mechanically from `refresh_kind` (`container_fact_source`); tank origin is passed explicitly by every dispatch site via the new `TankObservation.fact_source` field (0x53 shoot / 0x42 build-pickup / 0x47 movement pass through the parameterized `_update_tank_position`).
+
+**Convergent decode defaults:** pre-1b/1c snapshots lacking the new keys decode to exactly what a contemporary encoder writes (confidence 1.0, provenance derived from refresh_kind / coarse source) — the same `_optional_int` precedent tank.py already used, no divergent state possible. Synthetic default fact-sources (`tank_default_fact_source`) exist only for direct constructor calls in tests; the production observation pipeline always supplies the true channel.
+
+### Phase 1d implementation notes (2026-07-18)
+
+Same flat-carry pattern as 1b/1c, completing the world-state coverage. Channel-threading highlights: self-position updates flow through `update_self_position(…, fact_source)` — the 0x47 waypoint path and 0x3D movement path each pass their own channel; fuel totals thread per dispatch arm (0x2E sync / 0x44 fuel gain / 0x64 fuel total); rank stamps `wire_0x2B_promotion`; a witnessed mine placement stamps `wire_0x4B_mine_placement` while radar/viewport/map mine sightings derive from their coarse source; terrain distinguishes 0x5A patch grids (default) from 0x4A terrain updates; the viewport's origin is constitutionally `wire_0x5A_viewport_patch` (the only message that sets it — see [[viewport-shift-protocol]]). `ViewportStateDict` construction now goes through `make_viewport_state` (previously raw dict literals). Self/viewport/terrain gained `observed_ms` (they had no timestamp at all); mines already had one.
+
+Phase 1 is COMPLETE. Next: Phase 2 (`ledger/` core — unified `action_outcome`, Decisions with typed reason enums).
 
 ## Why we're building this
 

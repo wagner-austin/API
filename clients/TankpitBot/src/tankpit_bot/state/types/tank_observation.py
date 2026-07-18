@@ -43,7 +43,9 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from tankpit_bot.facts.source import FactSource, require_fact_source
 from tankpit_bot.state.types.constants import EntitySource, require_entity_source
+from tankpit_bot.state.types.tank import tank_default_fact_source
 
 
 class TankObservation(TypedDict):
@@ -94,6 +96,10 @@ class TankObservation(TypedDict):
     is_wire_sourced: bool
     position_is_authoritative: bool
     storage_source: EntitySource
+    # Phase 1c: the exact channel this observation arrived on (which
+    # wire message, DOM scrape, etc.). Recorded as the tank's
+    # provenance origin by ``apply_tank_observation``.
+    fact_source: FactSource
     position: tuple[int, int] | None
     team: int | None
     rank: int | None
@@ -109,6 +115,7 @@ def make_tank_observation(
     is_wire_sourced: bool,
     storage_source: EntitySource,
     *,
+    fact_source: FactSource | None = None,
     position_is_authoritative: bool | None = None,
     position: tuple[int, int] | None = None,
     team: int | None = None,
@@ -126,6 +133,10 @@ def make_tank_observation(
         is_wire_sourced: True if from a wire message; False for map
             snapshot, radar EnemyDetect, or DOM-scraped refinements.
         storage_source: Which ``EntitySource`` label to record.
+        fact_source: Exact channel this observation arrived on. When
+            omitted, derived coarsely from ``storage_source`` via
+            ``tank_default_fact_source`` (synthetic default for direct
+            construction; dispatch sites pass the true message kind).
         position_is_authoritative: True when ``position`` represents
             the server's authoritative statement about where the tank
             is (wire-with-position OR map snapshot). When omitted,
@@ -146,12 +157,16 @@ def make_tank_observation(
     resolved_authoritative = (
         is_wire_sourced if position_is_authoritative is None else position_is_authoritative
     )
+    resolved_fact_source = (
+        tank_default_fact_source(storage_source) if fact_source is None else fact_source
+    )
     return TankObservation(
         tank_id=tank_id,
         timestamp_ms=timestamp_ms,
         is_wire_sourced=is_wire_sourced,
         position_is_authoritative=resolved_authoritative,
         storage_source=storage_source,
+        fact_source=resolved_fact_source,
         position=position,
         team=team,
         rank=rank,
@@ -268,6 +283,7 @@ def encode_tank_observation(obs: TankObservation) -> JSONObject:
         "is_wire_sourced": obs["is_wire_sourced"],
         "position_is_authoritative": obs["position_is_authoritative"],
         "storage_source": obs["storage_source"],
+        "fact_source": obs["fact_source"],
         "position": [pos[0], pos[1]] if pos is not None else None,
         "team": obs["team"],
         "rank": obs["rank"],
@@ -294,12 +310,18 @@ def decode_tank_observation(data: JSONObject) -> TankObservation:
     # Validate storage_source via the shared EntitySource decoder, which
     # raises JSONTypeError for unsupported values.
     storage_source: EntitySource = require_entity_source(data, "storage_source")
+    fact_source = (
+        require_fact_source(data, "fact_source")
+        if "fact_source" in data
+        else tank_default_fact_source(storage_source)
+    )
     return TankObservation(
         tank_id=require_int(data, "tank_id"),
         timestamp_ms=require_int(data, "timestamp_ms"),
         is_wire_sourced=require_bool(data, "is_wire_sourced"),
         position_is_authoritative=require_bool(data, "position_is_authoritative"),
         storage_source=storage_source,
+        fact_source=fact_source,
         position=_require_position(data, "position"),
         team=_require_optional_int(data, "team"),
         rank=_require_optional_int(data, "rank"),

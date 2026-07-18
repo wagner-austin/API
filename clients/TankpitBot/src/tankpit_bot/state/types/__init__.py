@@ -96,6 +96,7 @@ from tankpit_bot.state.types.viewport import (
     ViewportStateDict,
     decode_viewport_state,
     encode_viewport_state,
+    make_viewport_state,
 )
 from tankpit_bot.state.types.world import (
     WorldStateDict,
@@ -168,6 +169,7 @@ __all__ = [
     "make_tank_observation",
     "make_tank_state",
     "make_terrain_tile",
+    "make_viewport_state",
     "parse_coord_key",
     "viewport_scan_key",
 ]

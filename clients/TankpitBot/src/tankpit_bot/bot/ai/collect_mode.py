@@ -505,8 +505,6 @@ def _hop_toward_equipment(
     for container in external:
         landing = find_teleport_landing_tile(
             ctx.terrain,
-            ctx.self_state["x"],
-            ctx.self_state["y"],
             container["x"],
             container["y"],
         )

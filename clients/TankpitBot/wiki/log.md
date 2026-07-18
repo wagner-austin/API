@@ -1064,3 +1064,25 @@ Total ~9000 LoC production + ~13500 LoC tests. 14-21 sessions of focused work.
 **Design deviations documented on the wiki page:** `game_log_scrape` is an observation origin (only inference requires citations); `make_fact` calls its contract explicitly because mypy erases a generic function's type variable under a decorator.
 
 **Also answered (no code change):** the bot DOES sense mines — three wire channels feed `world["mines"]` (radar responses with team data, viewport tile updates, witnessed `0x4B` placements / `0x45` detonations), and pathing consults `hostile_mines()` (enemy-team only, friendly mines passable). The known gap is unchanged: `choose_combat_landing_tile` deliberately ignores mines (rejection-loop instance #1 in [[executor-rejection-loops]]) and `find_teleport_landing_tile`'s `blocked_mines` param is dead code (fix C, queued).
+
+## [2026-07-18] code | Fix C (dead blocked_mines) + Phase 1b/1c entity fact retrofits
+
+**Fix C landed:** `find_teleport_landing_tile` is now honestly `(terrain, goal_x, goal_y)` — the dead `start_x`/`start_y`/`blocked_mines` parameters (accepted and immediately `del`'d) are gone, along with the false mine-awareness they advertised. `_teleport_fallback_command` shed the same dead arguments; five production callers and all tests updated. The docstring now states explicitly that landing choice does not consult mines (server displaces; planner owns avoidance). Closes the latent item in [[executor-rejection-loops]].
+
+**Phase 1b/1c of [[self-observing-architecture]] landed** — `ContainerStateDict` and `TankStateDict` now carry full fact metadata (`confidence` + `provenance` added to the pre-existing source/timestamps), with `Fact[T]` projections in `facts/container_facts.py` / `facts/tank_facts.py`. Key decisions (full notes on the wiki page):
+
+- **Flat-carry, not nested reshape** — ~200 construction + ~300 access sites unchanged; the projection provides the true `Fact[T]` view.
+- **`FactSource` grew 11 → 18** — the handoff spec's list missed the tank-registry channels (0x21/0x28/0x3E/0x42/0x47/0x48, registry DOM scrape). `TankObservation.fact_source` records the exact channel at all 12 dispatch sites.
+- **Convergent decode defaults** — legacy snapshots decode to byte-identical state vs contemporary encoders; no divergent paths (user-verified concern).
+
+All 4363 pre-existing tests passed unmodified after the retrofit (zero call-site churn proof); 15 new tests cover the mappings, round-trips, legacy decode, projections, and the provenance-recording mutator.
+
+## [2026-07-18] code | Phase 1d — self/mine/terrain/viewport fact retrofits; Phase 1 COMPLETE
+
+Final Phase 1 substep of [[self-observing-architecture]]: `SelfStateDict`, `MineStateDict`, `TerrainTileDict`, and `ViewportStateDict` now carry flat fact metadata (`confidence` + `provenance`; self/viewport/terrain also gained `observed_ms` — they previously had no timestamp at all). Projections for all four in `facts/world_facts.py`.
+
+**Channel threading:** `FactSource` grew 18 → 23 (0x2B promotion, 0x44 fuel gain, 0x4A terrain update, 0x4B mine placement, 0x64 fuel total). Self-position mutators take a `fact_source` param (0x47 waypoint vs 0x3D movement paths pass their own); fuel totals thread per dispatch arm; witnessed mine placements stamp 0x4B while radar/viewport sightings derive from coarse source; terrain distinguishes 0x5A patch grids from 0x4A updates; viewport origin is always 0x5A (see [[viewport-shift-protocol]]).
+
+**Single-path discipline maintained:** raw `SelfStateDict`/`ViewportStateDict` constructor literals across src and 31 test files were converted to the factories; `make_viewport_state` is the sole viewport construction path. Legacy decode converges to contemporary-encoder output (tested by key-deletion round trips).
+
+**Phase 1 (contracts + facts foundation) is COMPLETE** — 1a contracts/facts core + guard rule, 1b containers, 1c tanks, 1d the rest. Next: Phase 2 `ledger/` core.

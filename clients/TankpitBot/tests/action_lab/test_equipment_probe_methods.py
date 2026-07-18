@@ -22,6 +22,7 @@ from tankpit_bot.action_lab.types import TeleportAttemptResultDict, TeleportTarg
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import SelfStateDict, make_container_state, make_self_state
+from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
 
 
@@ -300,10 +301,9 @@ def test_build_no_equipment_visible_result_delegates(
 
 def test_requires_reposition_phase_bridge_delegates_to_targeting() -> None:
     """The reposition phase bridge runs the shared walk-reachability check."""
-    from tankpit_bot.state import ViewportStateDict
 
     probe = _make_probe()
-    get_world_state()["viewport"] = ViewportStateDict(left=92, top=92, width=16, height=16)
+    get_world_state()["viewport"] = make_viewport_state(left=92, top=92, width=16, height=16)
     container = make_container_state(102, 100, False, 0, timestamp_ms=2000)
     equipment_targeting_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(
         {(100, 100), (101, 100), (102, 100)}

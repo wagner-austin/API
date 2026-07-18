@@ -47,7 +47,7 @@ from tankpit_bot.state import (
     make_empty_world_state,
     make_self_state,
 )
-from tankpit_bot.state.types import ContainerStateDict, ViewportStateDict
+from tankpit_bot.state.types import ContainerStateDict, make_viewport_state
 from tankpit_bot.types import CapturedMessage
 
 
@@ -67,7 +67,7 @@ def _make_world() -> WorldStateDict:
         containers=base["containers"],
         mines=base["mines"],
         terrain=base["terrain"],
-        viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
+        viewport=make_viewport_state(left=92, top=92, width=16, height=16),
         scanned_tiles=base["scanned_tiles"],
         timestamp_ms=2000,
     )

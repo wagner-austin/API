@@ -162,8 +162,6 @@ def inspect_tile(
     landing_resolution = _resolve_landing_choice(terrain, target_x, target_y)
     landing = find_teleport_landing_tile(
         terrain,
-        from_x,
-        from_y,
         target_x,
         target_y,
     )

@@ -13,12 +13,12 @@ from tankpit_bot.action_lab.action_trace import (
     log_phase_overlaps,
 )
 from tankpit_bot.state import (
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_empty_world_state,
     make_self_state,
 )
+from tankpit_bot.state.types import make_viewport_state
 
 
 class _FlatTerrain:
@@ -64,7 +64,7 @@ def _world_with_viewport() -> WorldStateDict:
         containers=world["containers"],
         mines=world["mines"],
         terrain=world["terrain"],
-        viewport=ViewportStateDict(left=139, top=102, width=16, height=16),
+        viewport=make_viewport_state(left=139, top=102, width=16, height=16),
         scanned_tiles=world["scanned_tiles"],
         timestamp_ms=40_000,
     )

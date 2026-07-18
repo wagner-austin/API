@@ -17,6 +17,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.inventory import (
     InventoryItem,
     InventoryState,
@@ -255,14 +256,22 @@ class WorldService:
     # Position updates
     # -----------------------------------------------------------------
 
-    def update_world_state_from_position(self, x: int, y: int) -> None:
+    def update_world_state_from_position(
+        self,
+        x: int,
+        y: int,
+        fact_source: FactSource = "wire_0x3D_movement",
+    ) -> None:
         """Update world state with new self position.
 
         Args:
             x: Self X coordinate.
             y: Self Y coordinate.
+            fact_source: Wire channel the position arrived on.
         """
-        self.world_state = update_self_position(self.world_state, x, y, get_current_time_ms())
+        self.world_state = update_self_position(
+            self.world_state, x, y, get_current_time_ms(), fact_source
+        )
 
     # -----------------------------------------------------------------
     # Failed move / scan tracking

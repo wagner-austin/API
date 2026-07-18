@@ -64,7 +64,7 @@ def _handle_waypoint_movement(
     final_x, final_y = _resolve_waypoint_destination(sx, sy, wps)
     for tank in ws.world_state["tanks"].values():
         if tank["x"] == sx and tank["y"] == sy and not tank["is_self"]:
-            _update_tank_position(ws, tank["tank_id"], final_x, final_y)
+            _update_tank_position(ws, tank["tank_id"], final_x, final_y, "wire_0x47_movement")
             break
 
 
@@ -91,7 +91,7 @@ def _dispatch_protocol_movement_update(
     is_self = self_state is not None and tank_id == self_state["tank_id"]
     if is_self:
         final_x, final_y = _resolve_waypoint_destination(start_x, start_y, waypoints)
-        ws.update_world_state_from_position(final_x, final_y)
+        ws.update_world_state_from_position(final_x, final_y, "wire_0x47_movement")
         render_ascii_if_available(ws, "SelfMovement")
     else:
         _handle_waypoint_movement(ws, start_x, start_y, waypoints)

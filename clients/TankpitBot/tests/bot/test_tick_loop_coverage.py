@@ -21,6 +21,7 @@ from tankpit_bot.sniffer.world_state import (
     update_world_state_from_position,
 )
 from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+from tankpit_bot.state.types import make_self_state
 from tests.conftest import FakeEnv, FakeFileSystem
 
 
@@ -757,7 +758,6 @@ class TestClearCommandError:
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
         from tankpit_bot.sniffer.world_state import get_world_service
         from tankpit_bot.state.types import (
-            SelfStateDict,
             WorldStateDict,
             make_container_state,
         )
@@ -767,7 +767,7 @@ class TestClearCommandError:
         ws.world_state = WorldStateDict(
             **{
                 **ws.world_state,
-                "self_state": SelfStateDict(
+                "self_state": make_self_state(
                     tank_id=1,
                     x=100,
                     y=100,

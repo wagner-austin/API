@@ -1,21 +1,60 @@
-"""Tank state TypedDict + factory + encode/decode."""
+"""Tank state TypedDict + factory + encode/decode.
+
+Phase 1c of the self-observing architecture: the tank carries the full
+fact metadata flat -- ``source`` plus the four freshness timestamps
+(pre-existing) and the ``confidence`` / ``provenance`` fields. The
+Fact[T] projection lives in :mod:`tankpit_bot.facts.tank_facts`.
+"""
 
 from __future__ import annotations
 
 from platform_core.json_utils import (
     JSONObject,
     require_bool,
+    require_dict,
+    require_float,
     require_int,
     require_str,
 )
 from typing_extensions import TypedDict
 
+from tankpit_bot.facts.provenance import (
+    ProvenanceChainDict,
+    decode_provenance,
+    encode_provenance,
+    make_provenance,
+)
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state.types.constants import (
     EntitySource,
     TankLiveness,
     require_entity_source,
     require_tank_liveness,
 )
+
+_DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
+    "viewport": "wire_0x28_tank_entry",
+    "radar": "wire_0x48_enemy_detect",
+    "world_state": "wire_0x4C_map_data",
+}
+
+
+def tank_default_fact_source(source: EntitySource) -> FactSource:
+    """Return a synthetic default fact source for a coarse entity source.
+
+    Direct ``make_tank_state`` construction (tests, fixtures) has no
+    wire message behind it; this maps the coarse label to that label's
+    canonical channel (viewport entry, radar enemy-detect, map data).
+    The observation pipeline always overrides with the true message
+    kind (``TankObservation.fact_source``).
+
+    Args:
+        source: Coarse observed source.
+
+    Returns:
+        Canonical fact source for that coarse label.
+    """
+    return _DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE[source]
 
 
 class TankStateDict(TypedDict):
@@ -139,6 +178,13 @@ class TankStateDict(TypedDict):
     last_aim_y: int
     last_aim_weapon: int
     last_aim_ms: int
+    # Phase 1c fact metadata. ``confidence`` is the trust in this tank
+    # belief ([0.0, 1.0]; fresh observations record 1.0 -- decay by age
+    # is a consumer policy, Phase 3). ``provenance`` records the wire
+    # channel of the most recent observation that refreshed this tank
+    # (``TankObservation.fact_source``).
+    confidence: float
+    provenance: ProvenanceChainDict
 
 
 def make_tank_state(
@@ -162,6 +208,8 @@ def make_tank_state(
     last_aim_y: int = -1,
     last_aim_weapon: int = -1,
     last_aim_ms: int = 0,
+    confidence: float = 1.0,
+    provenance: ProvenanceChainDict | None = None,
 ) -> TankStateDict:
     """Create a tank state.
 
@@ -190,10 +238,18 @@ def make_tank_state(
             32-33 = dead corpse.
         liveness: Three-state lifecycle gate. Defaults to ``alive``.
             See :class:`TankStateDict` for the full semantics.
+        confidence: Trust in this belief. Fresh observations use 1.0.
+        provenance: Origin plus derivation references. When omitted,
+            derived from ``source`` via :func:`tank_default_fact_source`
+            (synthetic default for direct construction; the observation
+            pipeline always supplies the true message channel).
 
     Returns:
         TankStateDict with the provided values.
     """
+    resolved_provenance = (
+        make_provenance(tank_default_fact_source(source), []) if provenance is None else provenance
+    )
     return TankStateDict(
         tank_id=tank_id,
         x=x,
@@ -215,6 +271,8 @@ def make_tank_state(
         last_aim_y=last_aim_y,
         last_aim_weapon=last_aim_weapon,
         last_aim_ms=last_aim_ms,
+        confidence=confidence,
+        provenance=resolved_provenance,
     )
 
 
@@ -248,6 +306,8 @@ def encode_tank_state(state: TankStateDict) -> JSONObject:
         "last_aim_y": state["last_aim_y"],
         "last_aim_weapon": state["last_aim_weapon"],
         "last_aim_ms": state["last_aim_ms"],
+        "confidence": state["confidence"],
+        "provenance": encode_provenance(state["provenance"]),
     }
 
 
@@ -263,6 +323,13 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
     Raises:
         JSONTypeError: If required fields are missing or invalid.
     """
+    source = require_entity_source(data, "source")
+    confidence = require_float(data, "confidence") if "confidence" in data else 1.0
+    provenance = (
+        decode_provenance(require_dict(data, "provenance"))
+        if "provenance" in data
+        else make_provenance(tank_default_fact_source(source), [])
+    )
     return TankStateDict(
         tank_id=require_int(data, "tank_id"),
         x=require_int(data, "x"),
@@ -274,7 +341,7 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         name=require_str(data, "name"),
         is_bot=require_bool(data, "is_bot"),
         is_self=require_bool(data, "is_self"),
-        source=require_entity_source(data, "source"),
+        source=source,
         timestamp_ms=require_int(data, "timestamp_ms"),
         last_wire_seen_ms=require_int(data, "last_wire_seen_ms"),
         last_position_update_ms=require_int(data, "last_position_update_ms"),
@@ -284,6 +351,8 @@ def decode_tank_state(data: JSONObject) -> TankStateDict:
         last_aim_y=_optional_int(data, "last_aim_y", -1),
         last_aim_weapon=_optional_int(data, "last_aim_weapon", -1),
         last_aim_ms=_optional_int(data, "last_aim_ms", 0),
+        confidence=confidence,
+        provenance=provenance,
     )
 
 
@@ -318,4 +387,5 @@ __all__ = [
     "decode_tank_state",
     "encode_tank_state",
     "make_tank_state",
+    "tank_default_fact_source",
 ]

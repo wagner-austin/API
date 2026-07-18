@@ -27,6 +27,7 @@ from tankpit_bot.sniffer.world_state_inventory import (
 from tankpit_bot.sniffer.world_state_radar import (
     update_world_state_from_radar as _update_radar,
 )
+from tankpit_bot.state.types import make_self_state, make_viewport_state
 from tests.conftest import FakeEnv
 
 
@@ -419,7 +420,7 @@ class TestBotAIIntegration:
         """_tick_once aborts when the refreshed world loses self_state mid-tick."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _tick_once
-        from tankpit_bot.state.types import SelfStateDict, ViewportStateDict, WorldStateDict
+        from tankpit_bot.state.types import WorldStateDict
 
         class FlakyWorldBot(Bot):
             """Bot whose world state disappears on the second read."""
@@ -439,7 +440,7 @@ class TestBotAIIntegration:
                 self._world_reads += 1
                 if self._world_reads <= 2:
                     return WorldStateDict(
-                        self_state=SelfStateDict(
+                        self_state=make_self_state(
                             tank_id=1,
                             x=100,
                             y=100,
@@ -452,7 +453,7 @@ class TestBotAIIntegration:
                         containers={},
                         mines={},
                         terrain={},
-                        viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
+                        viewport=make_viewport_state(left=91, top=91, width=18, height=18),
                         scanned_tiles={},
                         timestamp_ms=0,
                     )
@@ -462,7 +463,7 @@ class TestBotAIIntegration:
                     containers={},
                     mines={},
                     terrain={},
-                    viewport=ViewportStateDict(left=91, top=91, width=18, height=18),
+                    viewport=make_viewport_state(left=91, top=91, width=18, height=18),
                     scanned_tiles={},
                     timestamp_ms=0,
                 )

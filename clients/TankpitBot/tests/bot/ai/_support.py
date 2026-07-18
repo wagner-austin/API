@@ -8,9 +8,10 @@ from tankpit_bot.state.types import (
     ContainerStateDict,
     SelfStateDict,
     TankStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
+    make_self_state,
+    make_viewport_state,
 )
 
 
@@ -86,7 +87,7 @@ def make_world(
     Returns:
         Tuple of world state and self state.
     """
-    self_state = SelfStateDict(
+    self_state = make_self_state(
         tank_id=1,
         x=self_x,
         y=self_y,
@@ -95,7 +96,7 @@ def make_world(
         fuel=fuel,
         leaderboard_position=5,
     )
-    viewport = ViewportStateDict(left=self_x - 8, top=self_y - 8, width=16, height=16)
+    viewport = make_viewport_state(left=self_x - 8, top=self_y - 8, width=16, height=16)
     left = viewport["left"]
     top = viewport["top"]
     right = left + viewport["width"] - 1

@@ -13,11 +13,13 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import browser
+from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import remove_tank
 from tankpit_bot.state.mutations import apply_tank_observation
-from tankpit_bot.state.types import SelfStateDict, WorldStateDict, make_tank_observation
+from tankpit_bot.state.types import WorldStateDict, make_self_state, make_tank_observation
 
 log = get_logger(__name__)
 
@@ -50,6 +52,7 @@ def update_world_state_from_tank_entry(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source="wire_0x28_tank_entry",
         position=(x, y),
         team=team,
         rank=rank,
@@ -80,6 +83,7 @@ def update_world_state_from_tank_info(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source="wire_0x21_tank_info",
         team=team,
         name=name,
     )
@@ -110,6 +114,7 @@ def update_world_state_from_tank_status(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source="wire_0x3E_tank_status",
         team=team,
         rank=rank,
         name=name,
@@ -145,7 +150,7 @@ def update_world_state_from_move_response_full(
     self_state = ws.world_state["self_state"]
     if self_state is None or self_state["tank_id"] == 0:
         ws.world_state = WorldStateDict(
-            self_state=SelfStateDict(
+            self_state=make_self_state(
                 tank_id=tank_id,
                 x=x,
                 y=y,
@@ -153,6 +158,8 @@ def update_world_state_from_move_response_full(
                 rank=rank,
                 fuel=self_state["fuel"] if self_state else 0,
                 leaderboard_position=0,
+                observed_ms=ts,
+                provenance=make_provenance("wire_0x3D_movement", []),
             ),
             tanks=ws.world_state["tanks"],
             containers=ws.world_state["containers"],
@@ -170,6 +177,7 @@ def update_world_state_from_move_response_full(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source="wire_0x3D_movement",
         position=(x, y),
         team=team,
         rank=rank,
@@ -213,6 +221,7 @@ def update_world_state_from_client_registry(
         timestamp_ms=existing["timestamp_ms"],
         is_wire_sourced=False,
         storage_source="viewport",
+        fact_source="dom_registry_scrape",
         position=(x, y),
         team=team,
         name=name,
@@ -253,6 +262,9 @@ def update_world_state_from_tank_damage(
         timestamp_ms=ts,
         is_wire_sourced=refresh_wire_timestamp,
         storage_source=previous["source"],
+        fact_source=(
+            "wire_0x2E_tank_status_sync" if refresh_wire_timestamp else "dom_registry_scrape"
+        ),
         damage_state=damage_state,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
@@ -285,20 +297,27 @@ def update_world_state_from_tank_remove(ws: WorldService, tank_id: int) -> None:
     ws.world_state = remove_tank(ws.world_state, tank_id, browser.get_current_time_ms())
 
 
-def _update_tank_position(ws: WorldService, tank_id: int, x: int, y: int) -> None:
+def _update_tank_position(
+    ws: WorldService,
+    tank_id: int,
+    x: int,
+    y: int,
+    fact_source: FactSource,
+) -> None:
     """Update a tank's position from a position-bearing wire message.
 
-    Used by container TankUpdate (compact/extended/full) where bytes
-    0-1 carry the new position, by the 0x47 Movement waypoint
-    destination resolution, and by the 0x53 ShootEvent enemy-source
-    position update. The observation declares wire-sourced + position
-    so the position-freshness timestamp advances.
+    Used by the 0x42 BuildPickup source position, the 0x47 Movement
+    waypoint destination resolution, and the 0x53 ShootEvent
+    enemy-source position update. The observation declares
+    wire-sourced + position so the position-freshness timestamp
+    advances.
 
     Args:
         ws: World service instance.
         tank_id: Tank identifier.
         x: Absolute X coordinate.
         y: Absolute Y coordinate.
+        fact_source: Exact wire channel the position arrived on.
     """
     ts = browser.get_current_time_ms()
     obs = make_tank_observation(
@@ -306,6 +325,7 @@ def _update_tank_position(ws: WorldService, tank_id: int, x: int, y: int) -> Non
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source=fact_source,
         position=(x, y),
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
@@ -343,6 +363,7 @@ def _update_enemy_from_detection(
         timestamp_ms=ts,
         is_wire_sourced=False,
         storage_source="world_state",
+        fact_source="wire_0x48_enemy_detect",
         position=(x, y),
         team=team,
         rank=rank,

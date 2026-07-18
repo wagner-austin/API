@@ -9,6 +9,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
@@ -19,18 +20,24 @@ from tankpit_bot.state import (
 log = get_logger(__name__)
 
 
-def update_world_state_from_fuel_total(ws: WorldService, fuel_total: int) -> None:
+def update_world_state_from_fuel_total(
+    ws: WorldService,
+    fuel_total: int,
+    fact_source: FactSource = "wire_0x2E_tank_status_sync",
+) -> None:
     """Update world state with new absolute fuel level.
 
     Args:
         ws: World service instance.
         fuel_total: New absolute fuel level.
+        fact_source: Wire channel the fuel total arrived on (0x2E sync,
+            0x44 fuel gain, or 0x64 fuel total).
     """
     ts = get_current_time_ms()
     old_fuel = (
         ws.world_state["self_state"]["fuel"] if ws.world_state["self_state"] is not None else 0
     )
-    ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts)
+    ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts, fact_source)
     delta = fuel_total - old_fuel
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
 

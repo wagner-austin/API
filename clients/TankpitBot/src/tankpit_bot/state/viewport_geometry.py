@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.state.rank_formulas import free_radar_radius
-from tankpit_bot.state.types import ViewportStateDict
+from tankpit_bot.state.types import ViewportStateDict, make_viewport_state
 
 VISIBLE_VIEWPORT_WIDTH = 16
 VISIBLE_VIEWPORT_HEIGHT = 16
@@ -12,21 +12,24 @@ VIEWPORT_PATCH_WIDTH = VISIBLE_VIEWPORT_WIDTH + (RADAR_ENVELOPE_MARGIN * 2)
 VIEWPORT_PATCH_HEIGHT = VISIBLE_VIEWPORT_HEIGHT + (RADAR_ENVELOPE_MARGIN * 2)
 
 
-def make_visible_viewport_state(left: int, top: int) -> ViewportStateDict:
+def make_visible_viewport_state(left: int, top: int, observed_ms: int = 0) -> ViewportStateDict:
     """Build the canonical visible viewport state.
 
     Args:
         left: Visible viewport left edge X coordinate.
         top: Visible viewport top edge Y coordinate.
+        observed_ms: When the 0x5A update that set this viewport
+            arrived. Zero for fixtures constructed without a clock.
 
     Returns:
         ViewportStateDict for the visible 16x16 viewport.
     """
-    return ViewportStateDict(
+    return make_viewport_state(
         left=left,
         top=top,
         width=VISIBLE_VIEWPORT_WIDTH,
         height=VISIBLE_VIEWPORT_HEIGHT,
+        observed_ms=observed_ms,
     )
 
 

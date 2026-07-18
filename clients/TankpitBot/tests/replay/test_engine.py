@@ -30,10 +30,10 @@ from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.sniffer.xor import reset_xor_state
 from tankpit_bot.state.types import (
-    SelfStateDict,
     WorldStateDict,
     make_container_state,
     make_empty_world_state,
+    make_self_state,
 )
 from tankpit_bot.types import CapturedMessage, CaptureSession
 from tankpit_bot.types.literals import MessageDirection
@@ -194,7 +194,7 @@ class TestBuildTrace:
 
     def test_builds_complete_trace(self) -> None:
         """_build_trace produces a complete ReplayTickTraceDict."""
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             x=100,
             y=120,
             fuel=500,
@@ -235,7 +235,7 @@ class TestBuildTrace:
 
     def test_builds_trace_with_containers(self) -> None:
         """_build_trace counts containers in world state."""
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             x=50,
             y=60,
             fuel=800,
@@ -268,7 +268,7 @@ class TestBuildTrace:
 
     def test_builds_trace_with_durable_hunt_state(self) -> None:
         """_build_trace captures durable hunt mode state and target."""
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             x=100,
             y=100,
             fuel=150,
@@ -314,7 +314,7 @@ def _inject_self_state(x: int, y: int, fuel: int) -> None:
     from tankpit_bot.sniffer.world_state import get_world_service
 
     svc = get_world_service()
-    self_state = SelfStateDict(
+    self_state = make_self_state(
         x=x,
         y=y,
         fuel=fuel,
@@ -406,7 +406,7 @@ class TestReplaySessionMultiTick:
             call_count += 1
             if call_count == 1:
                 svc = get_world_service()
-                self_state = SelfStateDict(
+                self_state = make_self_state(
                     x=70,
                     y=80,
                     fuel=150,

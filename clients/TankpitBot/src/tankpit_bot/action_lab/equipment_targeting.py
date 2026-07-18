@@ -115,14 +115,10 @@ def find_visible_equipment_landing_tile(
     self_state = probe.get_self_state()
     if self_state is None:
         raise EquipmentTargetingError("self state is unavailable")
-    world = probe.get_world_state()
     return find_teleport_landing_tile(
         terrain,
-        self_state["x"],
-        self_state["y"],
         equipment_target["x"],
         equipment_target["y"],
-        hostile_mines(world),
     )
 
 

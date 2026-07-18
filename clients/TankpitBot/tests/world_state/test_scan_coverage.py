@@ -15,9 +15,9 @@ from tankpit_bot.state.scan_coverage import (
 )
 from tankpit_bot.state.types import (
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_self_state,
+    make_viewport_state,
 )
 
 
@@ -69,7 +69,7 @@ def _make_world(scanned_tiles: dict[str, int] | None = None) -> WorldStateDict:
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
+        viewport=make_viewport_state(left=92, top=92, width=16, height=16),
         scanned_tiles=dict(scanned_tiles) if scanned_tiles else {},
         timestamp_ms=0,
     )

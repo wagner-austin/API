@@ -29,7 +29,7 @@ from tankpit_bot.inventory import InventoryItem, InventoryState
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_gain
 from tankpit_bot.state import WorldStateDict, make_empty_world_state, make_self_state
-from tankpit_bot.state.types import ViewportStateDict
+from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
 
 
@@ -115,7 +115,7 @@ def _make_world(timestamp_ms: int) -> WorldStateDict:
         containers=base["containers"],
         mines=base["mines"],
         terrain=base["terrain"],
-        viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
+        viewport=make_viewport_state(left=92, top=92, width=16, height=16),
         scanned_tiles=base["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )

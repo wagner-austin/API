@@ -111,14 +111,10 @@ def find_visible_fuel_landing_tile(
     self_state = probe.get_self_state()
     if self_state is None:
         raise FuelTargetingError("self state is unavailable")
-    world = probe.get_world_state()
     return find_teleport_landing_tile(
         terrain,
-        self_state["x"],
-        self_state["y"],
         fuel_target["x"],
         fuel_target["y"],
-        hostile_mines(world),
     )
 
 

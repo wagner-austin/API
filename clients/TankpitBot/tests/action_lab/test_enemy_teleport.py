@@ -52,12 +52,12 @@ from tankpit_bot.browser import PlaywrightNotInstalledError
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.state import (
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_empty_world_state,
     make_self_state,
     make_tank_state,
 )
+from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage, decode_capture_session
 
 _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_session.json"
@@ -174,7 +174,7 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
         containers=world["containers"],
         mines=world["mines"],
         terrain=world["terrain"],
-        viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
+        viewport=make_viewport_state(left=0, top=0, width=16, height=16),
         scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )

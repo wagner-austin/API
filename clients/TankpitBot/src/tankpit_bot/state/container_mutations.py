@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
+from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.state.types import (
     ContainerRefreshKind,
     EntitySource,
@@ -157,6 +158,7 @@ def add_mine(
         team=team,
         source="viewport",
         timestamp_ms=timestamp_ms,
+        provenance=make_provenance("wire_0x4B_mine_placement", []),
     )
 
     key = coord_key(x, y)

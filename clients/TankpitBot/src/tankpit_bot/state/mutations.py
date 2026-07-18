@@ -6,9 +6,10 @@ new state objects (immutable update pattern).
 
 from __future__ import annotations
 
+from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.facts.source import FactSource
 from tankpit_bot.state.types import (
     DAMAGE_FULL,
-    SelfStateDict,
     TankObservation,
     WorldStateDict,
     coord_key,
@@ -60,6 +61,8 @@ def update_self_from_movement_response(
         rank=rank,
         fuel=state["self_state"]["fuel"] if state["self_state"] else 0,
         leaderboard_position=leaderboard_position,
+        observed_ms=timestamp_ms,
+        provenance=make_provenance("wire_0x3D_movement", []),
     )
     return WorldStateDict(
         self_state=new_self,
@@ -78,6 +81,7 @@ def update_self_position(
     x: int,
     y: int,
     timestamp_ms: int,
+    fact_source: FactSource = "wire_0x3D_movement",
 ) -> WorldStateDict:
     """Update self position without changing viewport bounds.
 
@@ -89,13 +93,16 @@ def update_self_position(
         x: New X coordinate.
         y: New Y coordinate.
         timestamp_ms: Message timestamp.
+        fact_source: Wire channel the position arrived on. Defaults to
+            the canonical 0x3D self-position channel; the 0x47 waypoint
+            path passes its own.
 
     Returns:
         New WorldStateDict with updated position.
     """
     # Get or create self_state with updated position
     if state["self_state"] is not None:
-        new_self = SelfStateDict(
+        new_self = make_self_state(
             tank_id=state["self_state"]["tank_id"],
             x=x,
             y=y,
@@ -103,10 +110,12 @@ def update_self_position(
             rank=state["self_state"]["rank"],
             fuel=state["self_state"]["fuel"],
             leaderboard_position=state["self_state"]["leaderboard_position"],
+            observed_ms=timestamp_ms,
+            provenance=make_provenance(fact_source, []),
         )
     else:
         # Create minimal self_state when we first learn position
-        new_self = SelfStateDict(
+        new_self = make_self_state(
             tank_id=0,
             x=x,
             y=y,
@@ -114,6 +123,8 @@ def update_self_position(
             rank=0,
             fuel=0,
             leaderboard_position=0,
+            observed_ms=timestamp_ms,
+            provenance=make_provenance(fact_source, []),
         )
 
     return WorldStateDict(
@@ -287,6 +298,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         last_aim_y=aim_y,
         last_aim_weapon=aim_weapon,
         last_aim_ms=aim_ms,
+        provenance=make_provenance(obs["fact_source"], []),
     )
 
     new_tanks = dict(state["tanks"])
@@ -335,7 +347,7 @@ def update_terrain_from_viewport(
         New WorldStateDict with updated terrain and viewport.
     """
     new_terrain = dict(state["terrain"])
-    new_viewport = make_visible_viewport_state(viewport_left, viewport_top)
+    new_viewport = make_visible_viewport_state(viewport_left, viewport_top, timestamp_ms)
 
     for col, row, terrain_type, _cache_value, _overlay_value in entities:
         x, y = viewport_patch_world_coords(viewport_left, viewport_top, col, row)
@@ -344,6 +356,7 @@ def update_terrain_from_viewport(
             x=x,
             y=y,
             terrain_type=terrain_type,
+            observed_ms=timestamp_ms,
         )
 
     return WorldStateDict(
@@ -369,6 +382,7 @@ def set_self_fuel(
     state: WorldStateDict,
     fuel: int,
     timestamp_ms: int,
+    fact_source: FactSource = "wire_0x2E_tank_status_sync",
 ) -> WorldStateDict:
     """Set self fuel to absolute value (from inventory or sync messages).
 
@@ -376,6 +390,8 @@ def set_self_fuel(
         state: Current world state.
         fuel: Absolute fuel value.
         timestamp_ms: Message timestamp.
+        fact_source: Wire channel the fuel total arrived on (0x2E sync,
+            0x44 fuel gain, or 0x64 fuel total).
 
     Returns:
         New WorldStateDict with updated fuel, or unchanged if no self_state.
@@ -383,7 +399,7 @@ def set_self_fuel(
     if state["self_state"] is None:
         return state
 
-    new_self = SelfStateDict(
+    new_self = make_self_state(
         tank_id=state["self_state"]["tank_id"],
         x=state["self_state"]["x"],
         y=state["self_state"]["y"],
@@ -391,6 +407,8 @@ def set_self_fuel(
         rank=state["self_state"]["rank"],
         fuel=max(0, fuel),
         leaderboard_position=state["self_state"]["leaderboard_position"],
+        observed_ms=timestamp_ms,
+        provenance=make_provenance(fact_source, []),
     )
 
     return WorldStateDict(
@@ -424,7 +442,7 @@ def set_self_rank(
     if state["self_state"] is None:
         return state
 
-    new_self = SelfStateDict(
+    new_self = make_self_state(
         tank_id=state["self_state"]["tank_id"],
         x=state["self_state"]["x"],
         y=state["self_state"]["y"],
@@ -432,6 +450,8 @@ def set_self_rank(
         rank=rank,
         fuel=state["self_state"]["fuel"],
         leaderboard_position=state["self_state"]["leaderboard_position"],
+        observed_ms=timestamp_ms,
+        provenance=make_provenance("wire_0x2B_promotion", []),
     )
 
     return WorldStateDict(

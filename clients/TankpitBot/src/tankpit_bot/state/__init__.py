@@ -95,6 +95,7 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_tank_state,
     make_terrain_tile,
+    make_viewport_state,
     parse_coord_key,
     viewport_scan_key,
 )
@@ -164,6 +165,7 @@ __all__ = [
     "make_self_state",
     "make_tank_state",
     "make_terrain_tile",
+    "make_viewport_state",
     "parse_coord_key",
     "pickup_container",
     "record_scanned_tiles",

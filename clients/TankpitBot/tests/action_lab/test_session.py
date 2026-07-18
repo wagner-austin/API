@@ -19,11 +19,11 @@ from tankpit_bot.action_lab.session import (
     wait_for_world_sync,
 )
 from tankpit_bot.state import (
-    ViewportStateDict,
     WorldStateDict,
     make_empty_world_state,
     make_self_state,
 )
+from tankpit_bot.state.types import make_viewport_state
 from tankpit_bot.types import CapturedMessage
 
 
@@ -96,7 +96,7 @@ def _make_world(
         containers=world["containers"],
         mines=world["mines"],
         terrain=world["terrain"],
-        viewport=ViewportStateDict(left=0, top=0, width=16, height=16),
+        viewport=make_viewport_state(left=0, top=0, width=16, height=16),
         scanned_tiles=world["scanned_tiles"],
         timestamp_ms=timestamp_ms,
     )

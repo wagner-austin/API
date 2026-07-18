@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TypeVar
 
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.facts.provenance import make_provenance
 from tankpit_bot.runtime_logging import emit_world
 from tankpit_bot.sniffer.viewport import update_viewport_origin
 from tankpit_bot.sniffer.world_service import WorldService
@@ -73,7 +74,7 @@ def update_viewport_entities(
         containers=ws.world_state["containers"],
         mines=ws.world_state["mines"],
         terrain=ws.world_state["terrain"],
-        viewport=make_visible_viewport_state(viewport_left, viewport_top),
+        viewport=make_visible_viewport_state(viewport_left, viewport_top, get_current_time_ms()),
         scanned_tiles=ws.world_state["scanned_tiles"],
         timestamp_ms=ws.world_state["timestamp_ms"],
     )
@@ -201,6 +202,7 @@ def update_viewport_tiles(
             x=abs_x,
             y=abs_y,
             terrain_type=ent["terrain_type"],
+            observed_ms=ts,
         )
 
     ws.world_state = WorldStateDict(
@@ -293,6 +295,8 @@ def update_terrain_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) 
             x=x,
             y=y,
             terrain_type=terrain_type,
+            observed_ms=timestamp_ms,
+            provenance=make_provenance("wire_0x4A_terrain_update", []),
         )
 
     ws.world_state = WorldStateDict(

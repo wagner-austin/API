@@ -59,11 +59,8 @@ class _FindLandingTileProtocol(Protocol):
     def __call__(
         self,
         terrain: TerrainMapProtocol,
-        start_x: int,
-        start_y: int,
         target_x: int,
         target_y: int,
-        mines: dict[str, MineStateDict],
     ) -> tuple[int, int] | None: ...
 
 
@@ -195,15 +192,10 @@ def test_find_visible_fuel_landing_tile_uses_current_state_and_validates_state()
 
     def _find_teleport_landing_tile(
         terrain: TerrainMapProtocol,
-        start_x: int,
-        start_y: int,
         target_x: int,
         target_y: int,
-        mines: dict[str, MineStateDict],
     ) -> tuple[int, int] | None:
-        _ = (terrain, mines)
-        captured["start_x"] = start_x
-        captured["start_y"] = start_y
+        _ = terrain
         captured["target_x"] = target_x
         captured["target_y"] = target_y
         return (102, 100)
@@ -212,8 +204,6 @@ def test_find_visible_fuel_landing_tile_uses_current_state_and_validates_state()
 
     assert find_visible_fuel_landing_tile(probe, target) == (102, 100)
     assert captured == {
-        "start_x": 100,
-        "start_y": 100,
         "target_x": 101,
         "target_y": 100,
     }

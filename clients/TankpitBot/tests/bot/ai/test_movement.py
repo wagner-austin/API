@@ -12,9 +12,9 @@ from tankpit_bot.bot.ai.movement import (
 from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
 from tankpit_bot.state.types import (
     TankStateDict,
-    ViewportStateDict,
     make_mine_state,
     make_tank_state,
+    make_viewport_state,
 )
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -108,7 +108,7 @@ class TestWalkOrTeleport:
         """Standing on the clamp tile selects the next nearest edge tile."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=800)
         # Re-frame the viewport so self sits exactly on its right edge.
-        world["viewport"] = ViewportStateDict(left=85, top=92, width=16, height=16)
+        world["viewport"] = make_viewport_state(left=85, top=92, width=16, height=16)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         terrain = InMemoryTerrainMap()
@@ -479,7 +479,7 @@ class TestWalkOrTeleport:
     def test_viewport_exploration_candidates_return_empty_for_single_tile_viewport(self) -> None:
         """Degenerate one-tile viewports yield no exploration candidates."""
         world, self_state = make_world(self_x=100, self_y=100, fuel=150)
-        world["viewport"] = ViewportStateDict(left=100, top=100, width=1, height=1)
+        world["viewport"] = make_viewport_state(left=100, top=100, width=1, height=1)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")

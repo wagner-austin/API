@@ -30,7 +30,7 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_state import is_move_target_failed, is_scan_viewport_failed
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
-from tankpit_bot.state.types import MineStateDict, viewport_scan_key
+from tankpit_bot.state.types import viewport_scan_key
 
 
 def walk_or_teleport(
@@ -405,7 +405,7 @@ def _walk_or_teleport_with_terrain(
         hostile_mines(ctx.world),
     ):
         return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
-    return _teleport_fallback_command(ctx, terrain, sx, sy, tx, ty, hostile_mines(ctx.world))
+    return _teleport_fallback_command(ctx, terrain, tx, ty)
 
 
 def _surface_clamped_move(
@@ -528,15 +528,7 @@ def _approach_command(
         tx,
         ty,
     )
-    return _teleport_fallback_command(
-        ctx,
-        ctx.terrain,
-        ctx.self_state["x"],
-        ctx.self_state["y"],
-        tx,
-        ty,
-        hostile_mines(ctx.world),
-    )
+    return _teleport_fallback_command(ctx, ctx.terrain, tx, ty)
 
 
 def _direct_move_command(
@@ -585,11 +577,8 @@ def _make_pickup_command(kind: str, tx: int, ty: int) -> BotCommand:
 def _teleport_fallback_command(
     ctx: DecideCtx,
     terrain: TerrainMapProtocol,
-    sx: int,
-    sy: int,
     tx: int,
     ty: int,
-    blocked_mines: dict[str, MineStateDict],
 ) -> BotCommand | None:
     """Return a teleport command for a terrain-blocked target when possible.
 
@@ -598,7 +587,7 @@ def _teleport_fallback_command(
     for in-bounds targets. The only rejection is when the teleport is
     unaffordable.
     """
-    landing = find_teleport_landing_tile(terrain, sx, sy, tx, ty, blocked_mines)
+    landing = find_teleport_landing_tile(terrain, tx, ty)
     if landing is None:
         return None
     lx, ly = landing

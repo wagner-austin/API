@@ -33,10 +33,10 @@ from tankpit_bot.sniffer.world_state_tanks import (
     update_world_state_from_tank_entry,
 )
 from tankpit_bot.state.types import (
-    ViewportStateDict,
     WorldStateDict,
     make_empty_world_state,
     make_self_state,
+    make_viewport_state,
 )
 
 _RegistryItem = dict[str, int | float | bool | str | None]
@@ -114,7 +114,7 @@ def _world_with_self_and_viewport() -> WorldStateDict:
         fuel=800,
         leaderboard_position=0,
     )
-    world["viewport"] = ViewportStateDict(left=123, top=118, width=16, height=16)
+    world["viewport"] = make_viewport_state(left=123, top=118, width=16, height=16)
     return world
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.state.types import make_viewport_state
 
 
 class TestDispatchViewportUpdate:
@@ -114,9 +115,8 @@ class TestDispatchViewportUpdate:
         """Positive ``0x5A`` rows do not overwrite tracked tank positions."""
         from tankpit_bot.protocol import TankEntryDict, ViewportUpdateDict
         from tankpit_bot.protocol.types import ViewportEntityDict
-        from tankpit_bot.state.types import ViewportStateDict
 
-        get_world_service().world_state["viewport"] = ViewportStateDict(
+        get_world_service().world_state["viewport"] = make_viewport_state(
             left=50,
             top=50,
             width=18,
@@ -156,9 +156,8 @@ class TestDispatchViewportUpdate:
             TankEntryDict,
             ViewportUpdateDict,
         )
-        from tankpit_bot.state.types import ViewportStateDict
 
-        get_world_service().world_state["viewport"] = ViewportStateDict(
+        get_world_service().world_state["viewport"] = make_viewport_state(
             left=50,
             top=50,
             width=18,

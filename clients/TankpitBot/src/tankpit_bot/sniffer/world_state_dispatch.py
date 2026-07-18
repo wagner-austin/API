@@ -90,6 +90,7 @@ def _update_tank_from_position_status(
         timestamp_ms=ts,
         is_wire_sourced=True,
         storage_source="viewport",
+        fact_source="wire_0x3D_movement",
         position=(x, y),
         team=team,
         rank=rank,
@@ -172,7 +173,7 @@ def _dispatch_shoot_event(
         )
         mark_combat_hit(ws, weapon, victim_id)
     elif shooter_id > 0:
-        _update_tank_position(ws, shooter_id, sx, sy)
+        _update_tank_position(ws, shooter_id, sx, sy, "wire_0x53_shoot_event")
         _record_enemy_aim(ws, shooter_id, aim_x, aim_y, weapon)
         if aim_drift:
             log.info(
@@ -267,6 +268,7 @@ def _dispatch_map_data(
             is_wire_sourced=False,
             position_is_authoritative=True,
             storage_source="world_state",
+            fact_source="wire_0x4C_map_data",
             position=(entry["x"], entry["y"]),
             team=entry["team"],
             rank=entry["rank"],
@@ -345,14 +347,14 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
     """
     match decoded:
         case {"msg_type": 0x2E, "fuel": int(fuel)} if fuel is not None:
-            update_world_state_from_fuel_total(ws, fuel)
+            update_world_state_from_fuel_total(ws, fuel, "wire_0x2E_tank_status_sync")
             return True
         case {
             "msg_type": 0x44,
             "fuel_total": int(fuel_total),
             "is_free": bool(is_free),
         }:
-            update_world_state_from_fuel_total(ws, fuel_total)
+            update_world_state_from_fuel_total(ws, fuel_total, "wire_0x44_fuel_gain")
             emit_diagnostic(
                 diagnostic_kind="fuel_gain",
                 fuel_total=fuel_total,
@@ -360,7 +362,7 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
             )
             return True
         case {"msg_type": 0x64, "fuel_total": int(fuel_total)}:
-            update_world_state_from_fuel_total(ws, fuel_total)
+            update_world_state_from_fuel_total(ws, fuel_total, "wire_0x64_fuel_total")
             return True
         case {"msg_type": 0x49, "counts": list(counts), "enabled": list(enabled)}:
             update_inventory_from_protocol(ws, counts, enabled)
@@ -516,7 +518,7 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             "drop_y": int(dy),
             "obstacle_type": int(obstacle_type),
         }:
-            _update_tank_position(ws, tid, sx, sy)
+            _update_tank_position(ws, tid, sx, sy, "wire_0x42_build_pickup")
             emit_diagnostic(
                 diagnostic_kind="build_pickup",
                 tank_id=tid,

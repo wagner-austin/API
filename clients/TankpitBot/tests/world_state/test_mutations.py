@@ -5,7 +5,6 @@ from tankpit_bot.state import (
     TERRAIN_FERRY,
     TERRAIN_GROUND,
     TERRAIN_ROCK_A,
-    SelfStateDict,
     WorldStateDict,
     add_mine,
     add_mine_from_radar,
@@ -23,6 +22,7 @@ from tankpit_bot.state import (
     update_self_from_movement_response,
     update_terrain_from_viewport,
 )
+from tankpit_bot.state.types import make_self_state
 from tests.world_state.helpers import get_self_state
 
 
@@ -60,7 +60,7 @@ class TestUpdateSelfFromMovementResponse:
         )
         # Manually set fuel
         state = WorldStateDict(
-            self_state=SelfStateDict(
+            self_state=make_self_state(
                 tank_id=1, x=100, y=100, team=0, rank=0, fuel=750, leaderboard_position=1
             ),
             tanks=state["tanks"],

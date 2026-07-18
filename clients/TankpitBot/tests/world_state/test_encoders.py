@@ -1,7 +1,6 @@
 """Tests for state encode functions."""
 
 from tankpit_bot.state import (
-    ViewportStateDict,
     add_mine,
     encode_container_state,
     encode_mine_state,
@@ -16,6 +15,7 @@ from tankpit_bot.state import (
     make_self_state,
     make_tank_state,
     make_terrain_tile,
+    make_viewport_state,
     update_container_from_radar,
 )
 
@@ -100,7 +100,7 @@ class TestEncodeViewportState:
 
     def test_encodes_all_fields(self) -> None:
         """Encodes all viewport state fields."""
-        viewport = ViewportStateDict(left=100, top=50, width=18, height=18)
+        viewport = make_viewport_state(left=100, top=50, width=18, height=18)
         encoded = encode_viewport_state(viewport)
 
         assert encoded["left"] == 100

@@ -14,7 +14,7 @@ from tankpit_bot.bot.ai.collect_mode import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.state.types import make_container_state
+from tankpit_bot.state.types import SelfStateDict, make_container_state
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -611,7 +611,6 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
     through instead of dispatching a wasted ``pickup_fuel`` that the
     server rejects with ``0x52`` code-5.
     """
-    from tankpit_bot.state.types import SelfStateDict
 
     base_world, base_self = make_world(
         fuel=1300,
@@ -657,7 +656,6 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
     ``resource_target_kind`` cleared before the cascade can produce a
     fresh pickup command.
     """
-    from tankpit_bot.state.types import SelfStateDict
 
     base_world, base_self = make_world(
         fuel=1600,
@@ -713,7 +711,6 @@ def test_would_overfill_true_when_projected_pickup_exceeds_cap() -> None:
     per-tick geometry that produced four consecutive overflow pickups
     and blacklisted four fuel containers in the live run.
     """
-    from tankpit_bot.state.types import SelfStateDict
 
     base_world, base_self = make_world(fuel=1054)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
@@ -741,7 +738,6 @@ def test_would_overfill_false_when_room_covers_walk_and_transfer() -> None:
     ``500 + 2 + min(100, 600) = 602 <= 1100``. The predicate declines
     and the planner proceeds to dispatch the pickup normally.
     """
-    from tankpit_bot.state.types import SelfStateDict
 
     base_world, base_self = make_world(fuel=500)
     self_state = SelfStateDict(**{**base_self, "rank": 1})
@@ -773,7 +769,6 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
     The container is left untouched -- not blacklisted -- so a later
     tick with more headroom can still consume it.
     """
-    from tankpit_bot.state.types import SelfStateDict
 
     base_world, base_self = make_world(
         fuel=1054,

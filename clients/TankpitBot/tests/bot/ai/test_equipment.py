@@ -15,11 +15,11 @@ from tankpit_bot.bot.ai.equipment_search import (
 from tankpit_bot.state.types import (
     MineStateDict,
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_mine_state,
     make_self_state,
+    make_viewport_state,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -42,7 +42,7 @@ def _world_and_self(x: int = 100, y: int = 100) -> tuple[WorldStateDict, SelfSta
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=vp_left, top=vp_top, width=18, height=18),
+        viewport=make_viewport_state(left=vp_left, top=vp_top, width=18, height=18),
         scanned_tiles={
             f"{tx},{ty}": 100000
             for ty in range(vp_top, vp_top + 18)
@@ -112,7 +112,7 @@ class TestFindTeleportLandingTile:
         """Returns target coordinates when the tile is passable ground."""
         terrain = InMemoryTerrainMap()
 
-        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
+        result = find_teleport_landing_tile(terrain, 128, 126)
 
         assert result == (128, 126)
 
@@ -126,7 +126,7 @@ class TestFindTeleportLandingTile:
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
-        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
+        result = find_teleport_landing_tile(terrain, 128, 126)
 
         assert result == (128, 125)
 
@@ -141,7 +141,7 @@ class TestFindTeleportLandingTile:
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
 
-        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126)
+        result = find_teleport_landing_tile(terrain, 128, 126)
 
         assert result is None
 
@@ -149,35 +149,7 @@ class TestFindTeleportLandingTile:
         """Returns None for out-of-bounds coordinates."""
         terrain = InMemoryTerrainMap()
 
-        assert find_teleport_landing_tile(terrain, 10, 10, 300, 300) is None
-
-    def test_returns_target_coords_ignoring_mines(self) -> None:
-        """Returns target coords directly; server displaces around mines."""
-        terrain = InMemoryTerrainMap()
-        blocked_mines: dict[str, MineStateDict] = {
-            "128,126": make_mine_state(
-                x=128,
-                y=126,
-                mine_type=0,
-                tank_id=-1,
-                team=1,
-                source="radar",
-                timestamp_ms=0,
-            ),
-            "129,126": make_mine_state(
-                x=129,
-                y=126,
-                mine_type=0,
-                tank_id=-1,
-                team=1,
-                source="radar",
-                timestamp_ms=0,
-            ),
-        }
-
-        result = find_teleport_landing_tile(terrain, 130, 124, 128, 126, blocked_mines)
-
-        assert result == (128, 126)
+        assert find_teleport_landing_tile(terrain, 300, 300) is None
 
 
 # =============================================================================
@@ -338,7 +310,7 @@ class TestFindNearestFuelExtras:
     def test_uses_viewport_bounds_not_distance_from_self(self) -> None:
         """Visible containers at the far viewport edge are still eligible."""
         world, state = _world_and_self(x=91, y=100)
-        world["viewport"] = ViewportStateDict(left=90, top=91, width=18, height=18)
+        world["viewport"] = make_viewport_state(left=90, top=91, width=18, height=18)
         expected = make_container_state(x=107, y=100, is_fuel=True, volume=300)
         world["containers"]["107,100"] = expected
 

@@ -33,7 +33,7 @@ from tankpit_bot.diagnostics.self_map import (
     render_self_map_report,
 )
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging, emit_diagnostic
-from tankpit_bot.state.types import SelfStateDict
+from tankpit_bot.state.types import make_self_state
 
 
 def _emit_sample(
@@ -45,7 +45,7 @@ def _emit_sample(
     self_fields: dict[str, int | float | bool | str | None],
 ) -> None:
     """Emit one alignment sample through the real emitter pipeline."""
-    self_state = SelfStateDict(
+    self_state = make_self_state(
         tank_id=tank_id,
         x=x,
         y=y,

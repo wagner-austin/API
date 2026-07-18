@@ -12,7 +12,13 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.inventory import InventoryItem, InventoryState
-from tankpit_bot.state.types import SelfStateDict, WorldStateDict, make_container_state
+from tankpit_bot.state.types import (
+    SelfStateDict,
+    WorldStateDict,
+    make_container_state,
+    make_self_state,
+    make_viewport_state,
+)
 
 
 def _world_with_container(
@@ -39,7 +45,7 @@ def _world_with_container(
         },
         mines={},
         terrain={},
-        viewport={"left": 0, "top": 0, "width": 16, "height": 16},
+        viewport=make_viewport_state(left=0, top=0, width=16, height=16),
         scanned_tiles={},
         timestamp_ms=0,
     )
@@ -265,7 +271,7 @@ class TestMakePickupCommandError:
 
 def _self_state() -> SelfStateDict:
     """Build a dummy self state for testing."""
-    return SelfStateDict(
+    return make_self_state(
         tank_id=1,
         x=100,
         y=100,
@@ -294,7 +300,7 @@ class TestTeleportFuelHelpers:
     def test_reports_exact_axis_aligned_teleport_cost(self) -> None:
         """Teleport helper returns the exact cost for an axis-aligned jump."""
         world = _world_with_container(10, 20, True, 100)
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             tank_id=1,
             x=93,
             y=106,
@@ -319,7 +325,7 @@ class TestTeleportFuelHelpers:
     def test_reports_exact_diagonal_teleport_cost(self) -> None:
         """Teleport helper matches the sniffed long diagonal sample."""
         world = _world_with_container(10, 20, True, 100)
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             tank_id=1,
             x=6,
             y=172,
@@ -344,7 +350,7 @@ class TestTeleportFuelHelpers:
     def test_can_afford_teleport_uses_exact_cost(self) -> None:
         """Exact affordability accepts only when current fuel covers the jump."""
         world = _world_with_container(10, 20, True, 100)
-        self_state = SelfStateDict(
+        self_state = make_self_state(
             tank_id=1,
             x=96,
             y=95,

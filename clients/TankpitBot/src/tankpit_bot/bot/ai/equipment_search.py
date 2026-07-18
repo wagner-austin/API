@@ -34,11 +34,8 @@ _MAX_DIST = 512
 
 def find_teleport_landing_tile(
     terrain: TerrainMapProtocol,
-    start_x: int,
-    start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> tuple[int, int] | None:
     """Find a legal teleport landing point for a container target.
 
@@ -48,18 +45,19 @@ def find_teleport_landing_tile(
     all neighbors are impassable (e.g. container in the middle of a
     lake) — the caller should skip this container.
 
+    Landing choice does NOT consult mines: the server displaces on
+    landing, and hostile-mine avoidance is the planner's concern (see
+    fix C in the executor-rejection audit, wiki
+    ``executor-rejection-loops``).
+
     Args:
         terrain: Terrain map for passability checks.
-        start_x: Bot X coordinate before teleporting.
-        start_y: Bot Y coordinate before teleporting.
         goal_x: Target container X coordinate.
         goal_y: Target container Y coordinate.
-        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
         Tuple of landing coordinates, or None when unreachable.
     """
-    del start_x, start_y, blocked_mines
     if not (_MAP_MIN <= goal_x <= _MAP_MAX and _MAP_MIN <= goal_y <= _MAP_MAX):
         return None
     if terrain.is_passable(goal_x, goal_y):

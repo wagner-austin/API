@@ -13,10 +13,10 @@ from tankpit_bot.bot.ai.threats import (
 from tankpit_bot.state.types import (
     SelfStateDict,
     TankStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_self_state,
     make_tank_state,
+    make_viewport_state,
 )
 from tankpit_bot.state.types.constants import TankLiveness
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -81,7 +81,7 @@ def _world(tanks: dict[str, TankStateDict]) -> WorldStateDict:
         containers={},
         mines={},
         terrain={},
-        viewport=ViewportStateDict(left=0, top=0, width=18, height=18),
+        viewport=make_viewport_state(left=0, top=0, width=18, height=18),
         scanned_tiles={},
         timestamp_ms=0,
     )

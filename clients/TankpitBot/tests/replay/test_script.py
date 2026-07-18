@@ -9,6 +9,7 @@ from platform_core.json_utils import dump_json_str
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.replay.types import ReplayTickTraceDict
+from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types import CaptureSession, encode_capture_session
 
 
@@ -356,7 +357,7 @@ class TestMainCLI:
         from tankpit_bot.sniffer.viewport import reset_viewport_tracking
         from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
         from tankpit_bot.sniffer.xor import reset_xor_state
-        from tankpit_bot.state.types import SelfStateDict, WorldStateDict
+        from tankpit_bot.state.types import WorldStateDict
 
         call_count = 0
 
@@ -366,7 +367,7 @@ class TestMainCLI:
             call_count += 1
             if call_count == 1:
                 svc = get_world_service()
-                self_state = SelfStateDict(
+                self_state = make_self_state(
                     x=50,
                     y=60,
                     fuel=150,

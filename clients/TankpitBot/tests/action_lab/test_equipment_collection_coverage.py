@@ -54,13 +54,12 @@ from tankpit_bot.action_lab.types import (
 )
 from tankpit_bot.state import (
     SelfStateDict,
-    ViewportStateDict,
     WorldStateDict,
     make_container_state,
     make_empty_world_state,
     make_self_state,
 )
-from tankpit_bot.state.types import ContainerStateDict
+from tankpit_bot.state.types import ContainerStateDict, make_viewport_state
 from tankpit_bot.types import CapturedMessage
 
 _TARGET = TeleportTargetDict(label="t", x=10, y=20)
@@ -84,7 +83,7 @@ def _world() -> WorldStateDict:
         containers=b["containers"],
         mines=b["mines"],
         terrain=b["terrain"],
-        viewport=ViewportStateDict(left=92, top=92, width=16, height=16),
+        viewport=make_viewport_state(left=92, top=92, width=16, height=16),
         scanned_tiles=b["scanned_tiles"],
         timestamp_ms=2000,
     )

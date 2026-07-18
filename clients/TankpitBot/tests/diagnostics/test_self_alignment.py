@@ -30,7 +30,7 @@ from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
     configure_bot_runtime_logging,
 )
-from tankpit_bot.state.types import SelfStateDict
+from tankpit_bot.state.types import SelfStateDict, make_self_state
 
 _SELF_FIELDS: dict[str, int | float | bool | str | None] = {
     "A": 99,
@@ -45,7 +45,7 @@ _SELF_FIELDS: dict[str, int | float | bool | str | None] = {
 
 def _make_self_state(*, x: int = 131, y: int = 110, fuel: int = 1100) -> SelfStateDict:
     """Return a wire-derived belief state for emitter tests."""
-    return SelfStateDict(
+    return make_self_state(
         tank_id=99,
         x=x,
         y=y,
