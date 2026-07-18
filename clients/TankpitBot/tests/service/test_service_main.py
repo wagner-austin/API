@@ -31,6 +31,7 @@ from tankpit_bot.service.constants import SERVICE_HOST, SERVICE_PORT
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.service_main import (
     _async_main,
+    exit_when_idle,
     main,
     run_service_forever,
 )
@@ -295,7 +296,14 @@ class TestAsyncMain:
 
         assert len(received_apps) == 1
         registered_paths = {resource.canonical for resource in received_apps[0].router.resources()}
-        assert registered_paths == {"/health", "/start", "/stop", "/mode", "/status"}
+        assert registered_paths == {
+            "/health",
+            "/start",
+            "/stop",
+            "/mode",
+            "/status",
+            "/shutdown",
+        }
         assert fake_site.start_calls == 1
         assert fake_site.cleanup_calls == 1
 
@@ -446,3 +454,107 @@ class TestRealHookImplementations:
         # We do not call ``start`` — that would open a socket. But the
         # cleanup exercise proves the AppRunner setup ran.
         await site.cleanup()
+
+
+class _IdleProbeRunner:
+    """``is_running`` stub whose answer the test flips at will."""
+
+    def __init__(self, *, running: bool = False) -> None:
+        """Start with the given running answer."""
+        self.running = running
+
+    def start(self) -> None:
+        """Unused — the idle monitor never starts sessions."""
+        raise AssertionError("exit_when_idle must never call start()")
+
+    def request_stop(self) -> None:
+        """Unused — the idle monitor never stops sessions."""
+        raise AssertionError("exit_when_idle must never call request_stop()")
+
+    def is_running(self) -> bool:
+        return self.running
+
+
+class TestExitWhenIdle:
+    """Idle self-exit contract (2026-07-18 lifecycle pass)."""
+
+    @pytest.mark.asyncio
+    async def test_sets_stop_event_after_sustained_idleness(self) -> None:
+        """No session + no subscriber long enough → shutdown signal fires."""
+        stop_event = asyncio.Event()
+
+        await asyncio.wait_for(
+            exit_when_idle(
+                _IdleProbeRunner(),
+                StatusBus(),
+                stop_event,
+                idle_exit_seconds=0.03,
+                poll_seconds=0.01,
+            ),
+            timeout=2.0,
+        )
+
+        assert stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_an_sse_subscriber_keeps_the_service_alive(self) -> None:
+        """A connected viewer resets the idle clock every poll."""
+        stop_event = asyncio.Event()
+        bus = StatusBus()
+        subscriber = bus.subscribe()
+        task = asyncio.create_task(
+            exit_when_idle(
+                _IdleProbeRunner(),
+                bus,
+                stop_event,
+                idle_exit_seconds=0.03,
+                poll_seconds=0.01,
+            )
+        )
+
+        await asyncio.sleep(0.15)
+        assert not stop_event.is_set()
+
+        # Viewer leaves → the clock finally runs out.
+        bus.unsubscribe(subscriber)
+        await asyncio.wait_for(task, timeout=2.0)
+        assert stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_a_running_session_keeps_the_service_alive(self) -> None:
+        """An active session resets the idle clock every poll."""
+        stop_event = asyncio.Event()
+        runner = _IdleProbeRunner(running=True)
+        task = asyncio.create_task(
+            exit_when_idle(
+                runner,
+                StatusBus(),
+                stop_event,
+                idle_exit_seconds=0.03,
+                poll_seconds=0.01,
+            )
+        )
+
+        await asyncio.sleep(0.15)
+        assert not stop_event.is_set()
+
+        runner.running = False
+        await asyncio.wait_for(task, timeout=2.0)
+        assert stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_returns_promptly_when_stop_event_already_set(self) -> None:
+        """An externally-fired shutdown ends the monitor without a full wait."""
+        stop_event = asyncio.Event()
+        stop_event.set()
+
+        await asyncio.wait_for(
+            exit_when_idle(
+                _IdleProbeRunner(),
+                StatusBus(),
+                stop_event,
+                idle_exit_seconds=10.0,
+                poll_seconds=0.01,
+            ),
+            timeout=2.0,
+        )

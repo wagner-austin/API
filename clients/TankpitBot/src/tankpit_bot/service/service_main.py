@@ -23,8 +23,13 @@ from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol
-from tankpit_bot.service.constants import SERVICE_HOST, SERVICE_PORT
-from tankpit_bot.service.http_server import make_app
+from tankpit_bot.service.constants import (
+    SERVICE_HOST,
+    SERVICE_IDLE_EXIT_SECONDS,
+    SERVICE_IDLE_POLL_SECONDS,
+    SERVICE_PORT,
+)
+from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import SessionRunner
 from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
@@ -61,6 +66,47 @@ async def run_service_forever(
         await site.cleanup()
 
 
+async def exit_when_idle(
+    runner: SessionRunnerHTTPProtocol,
+    status_bus: StatusBusProtocol,
+    stop_event: asyncio.Event,
+    *,
+    idle_exit_seconds: float = SERVICE_IDLE_EXIT_SECONDS,
+    poll_seconds: float = SERVICE_IDLE_POLL_SECONDS,
+) -> None:
+    """Set ``stop_event`` after a sustained stretch of total idleness.
+
+    "Idle" means no session running AND no SSE subscriber — nobody is
+    using the service and nobody is even watching it. The idle clock
+    resets whenever either condition breaks, so an operator staring at
+    the stats strip (SSE open) keeps the service alive indefinitely.
+    Part of the 2026-07-18 lifecycle pass: the phone's START SERVER
+    button relaunches in ~2 s, so an abandoned server has no reason to
+    outlive its last viewer by more than this window.
+
+    Args:
+        runner: Session runner whose ``is_running`` gates the clock.
+        status_bus: Bus whose ``subscriber_count`` gates the clock.
+        stop_event: The service main's shutdown signal.
+        idle_exit_seconds: Sustained idle seconds before exit.
+        poll_seconds: Cadence of the idleness checks.
+    """
+    idle_elapsed = 0.0
+    while not stop_event.is_set():
+        await asyncio.sleep(poll_seconds)
+        if runner.is_running() or status_bus.subscriber_count() > 0:
+            idle_elapsed = 0.0
+            continue
+        idle_elapsed += poll_seconds
+        if idle_elapsed >= idle_exit_seconds:
+            log.info(
+                "No session and no SSE subscriber for %.0f s; exiting idle service.",
+                idle_elapsed,
+            )
+            stop_event.set()
+            return
+
+
 async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> None:
     """Wire the primitives, publish an initial idle frame, and serve forever.
 
@@ -84,10 +130,14 @@ async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> Non
         stop_file_path=_DEFAULT_STOP_FILE,
     )
     status_bus.publish(idle_session_status(get_current_time_ms()))
-    app = make_app(runner, mode_bridge, status_bus)
-    site = await service_hooks.build_site(app, host, port)
     stop_event = asyncio.Event()
-    await run_service_forever(site, stop_event)
+    app = make_app(runner, mode_bridge, status_bus, stop_event.set)
+    site = await service_hooks.build_site(app, host, port)
+    idle_monitor = asyncio.create_task(exit_when_idle(runner, status_bus, stop_event))
+    try:
+        await run_service_forever(site, stop_event)
+    finally:
+        idle_monitor.cancel()
 
 
 def main() -> None:
@@ -124,6 +174,7 @@ def main() -> None:
 
 
 __all__ = [
+    "exit_when_idle",
     "main",
     "run_service_forever",
 ]

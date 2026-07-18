@@ -76,6 +76,10 @@ class _RecordingRunner:
         self.stop_calls += 1
 
 
+def _noop_shutdown() -> None:
+    """Placeholder ``on_shutdown`` for routes that never fire it."""
+
+
 @pytest.fixture()
 async def bus() -> StatusBus:
     """Fresh :class:`StatusBus` per test."""
@@ -101,7 +105,7 @@ async def client(
     bus: StatusBus,
 ) -> AsyncIterator[TestClient[web.Request, web.Application]]:
     """aiohttp TestClient bound to a real app."""
-    app = make_app(runner, bridge, bus)
+    app = make_app(runner, bridge, bus, _noop_shutdown)
     server = TestServer(app)
     async with TestClient(server) as tc:
         yield tc
@@ -147,7 +151,7 @@ class TestStartRoute:
     ) -> None:
         """A start while already running returns 409 without touching runner.start."""
         runner = _RecordingRunner(already_running=True)
-        app = make_app(runner, bridge, bus)
+        app = make_app(runner, bridge, bus, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc:
             response = await tc.post("/start")
@@ -163,7 +167,7 @@ class TestStartRoute:
         """A ``SessionAlreadyRunningError`` from the executor is swallowed at WARN."""
         on_start = threading.Event()
         runner = _RecordingRunner(starts_reject=True, on_start=on_start)
-        app = make_app(runner, bridge, bus)
+        app = make_app(runner, bridge, bus, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc:
             response = await tc.post("/start")
@@ -188,6 +192,27 @@ class TestStopRoute:
         response = await client.post("/stop")
         assert response.status == 202
         assert runner.stop_calls == 1
+
+
+class TestShutdownRoute:
+    """``POST /shutdown`` contract (2026-07-18 lifecycle pass)."""
+
+    @pytest.mark.asyncio
+    async def test_shutdown_stops_session_then_fires_signal(
+        self,
+        bridge: ModeBridge,
+        bus: StatusBus,
+    ) -> None:
+        """The route requests session stop, fires ``on_shutdown``, returns 202."""
+        runner = _RecordingRunner()
+        fired: list[bool] = []
+        app = make_app(runner, bridge, bus, lambda: fired.append(True))
+        server = TestServer(app)
+        async with TestClient(server) as tc:
+            response = await tc.post("/shutdown")
+        assert response.status == 202
+        assert runner.stop_calls == 1
+        assert fired == [True]
 
 
 class TestModeRoute:
@@ -345,7 +370,7 @@ class TestStatusRoute:
         and skips it.
         """
         immediate_bus = _ImmediateCloseBus()
-        app = make_app(runner, bridge, immediate_bus)
+        app = make_app(runner, bridge, immediate_bus, _noop_shutdown)
         server = TestServer(app)
         async with TestClient(server) as tc, tc.get("/status") as response:
             # Read the entire response body — the server closes

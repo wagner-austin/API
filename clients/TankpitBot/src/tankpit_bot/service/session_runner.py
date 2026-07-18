@@ -174,6 +174,17 @@ class SessionRunner:
 
         try:
             self._clear_stop_file()
+            # Phone-driven sessions start PINNED TO IDLE: the operator
+            # releases the bot deliberately (AUTO MODE or a specific
+            # mode) once they've seen where the tank spawned. Submitted
+            # through the same bridge a button tap uses, so the first
+            # tick drains it into ``manual_mode = "UNSET"`` — no
+            # special-case in the AI state. Service sessions ONLY:
+            # ``make run`` / replay / scenario harness construct the
+            # bot directly and keep the auto-from-first-tick default
+            # (they have no phone UI to release an idle pin from).
+            # 2026-07-18 at Austin's request.
+            self._mode_bridge.submit("UNSET")
             bot = self._bot_factory(
                 mode_bridge=self._mode_bridge,
                 status_bus=self._status_bus,

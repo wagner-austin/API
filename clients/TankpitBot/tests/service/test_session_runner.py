@@ -120,6 +120,24 @@ class TestSessionRunnerStateMachine:
 
         assert bot.calls == [(0, _STOP_FILE)]
 
+    def test_start_pins_idle_via_the_mode_bridge(self, fake_fs: FakeFileSystem) -> None:
+        """A service session starts pinned to idle (``"UNSET"`` queued).
+
+        The runner submits ``"UNSET"`` before running the bot so the
+        first tick drains it into ``manual_mode = "UNSET"`` — the
+        operator releases the bot from the phone (AUTO MODE or a
+        specific mode) once they've seen the spawn. Direct-run entry
+        points (``make run``, replay, scenarios) bypass the runner and
+        keep the auto-from-first-tick default.
+        """
+        _ = fake_fs
+        bridge = ModeBridge()
+        runner = _make_runner(_RecordingBot(), bridge=bridge)
+
+        runner.start()
+
+        assert bridge.drain() == "UNSET"
+
     def test_start_returns_to_idle_after_bot_run_completes(self, fake_fs: FakeFileSystem) -> None:
         """After ``bot.run`` returns the runner is idle again."""
         _ = fake_fs

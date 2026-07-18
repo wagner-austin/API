@@ -43,5 +43,24 @@ URL — so tests stay stable regardless of whether a real service
 happens to be running on the developer's machine.
 """
 
+SERVICE_IDLE_EXIT_SECONDS = 1800.0
+"""Idle self-exit threshold (2026-07-18 lifecycle pass).
 
-__all__ = ["HEALTH_URL", "SERVICE_HOST", "SERVICE_PORT"]
+The service exits on its own after this many seconds with no active
+session AND no SSE subscriber — the phone's START SERVER button
+relaunches it in ~2 s (idempotent probe), so an idle server is pure
+waste. Before this existed the server ran forever once started; the
+only stop was closing its cmd window on the PC.
+"""
+
+SERVICE_IDLE_POLL_SECONDS = 60.0
+"""Cadence of the idle-exit monitor's liveness checks."""
+
+
+__all__ = [
+    "HEALTH_URL",
+    "SERVICE_HOST",
+    "SERVICE_IDLE_EXIT_SECONDS",
+    "SERVICE_IDLE_POLL_SECONDS",
+    "SERVICE_PORT",
+]

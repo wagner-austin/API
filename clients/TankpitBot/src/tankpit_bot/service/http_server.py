@@ -1,6 +1,6 @@
 """aiohttp HTTP surface for the bot service.
 
-Exposes five routes to the SPA (via the nginx same-origin proxy):
+Exposes six routes to the SPA (via the nginx same-origin proxy):
 
 * ``GET  /health``  — cheap liveness probe. Returns immediately.
 * ``POST /start``   — spawn one game session. Returns 202 on accept,
@@ -13,6 +13,10 @@ Exposes five routes to the SPA (via the nginx same-origin proxy):
 * ``GET  /status``  — SSE stream. Each :class:`SessionStatusDict`
   frame the tick loop publishes reaches the SPA within one Playwright
   tick + one aiohttp write.
+* ``POST /shutdown`` — stop the whole SERVICE (2026-07-18 lifecycle
+  pass): requests any running session end, then fires the service's
+  shutdown signal. Returns 202. The process exits once the session
+  thread (if any) observes its stop-file at the next tick boundary.
 
 The three thread-crossings are deliberate:
 
@@ -30,6 +34,7 @@ The three thread-crossings are deliberate:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import Protocol
 
 from aiohttp import web
@@ -95,6 +100,7 @@ def make_app(
     runner: SessionRunnerHTTPProtocol,
     mode_bridge: ModeBridgeProtocol,
     status_bus: StatusBusProtocol,
+    on_shutdown: Callable[[], None],
 ) -> web.Application:
     """Build the aiohttp application backing the bot service.
 
@@ -102,6 +108,9 @@ def make_app(
         runner: The single-session runner shared with the service main.
         mode_bridge: Cross-thread mode override channel.
         status_bus: Cross-thread status fan-out.
+        on_shutdown: Fired by ``POST /shutdown`` after any running
+            session has been asked to stop. Production wires the
+            service main's ``stop_event.set``; tests pass a recorder.
 
     Returns:
         A fully-routed :class:`web.Application` ready to be handed to
@@ -151,11 +160,26 @@ def make_app(
         await _drain_status_bus_to_response(status_bus, response)
         return response
 
+    async def shutdown(request: web.Request) -> web.Response:
+        """``POST /shutdown`` — stop the whole service.
+
+        Any running session is asked to stop first (idempotent when
+        idle), then the service's shutdown signal fires. The 202 goes
+        out before teardown because the response must reach the phone
+        over an HTTP surface this call is about to dismantle.
+        """
+        _ = request
+        log.info("Shutdown requested via POST /shutdown")
+        runner.request_stop()
+        on_shutdown()
+        return web.Response(status=202, text="shutting down")
+
     app.router.add_get("/health", health)
     app.router.add_post("/start", start)
     app.router.add_post("/stop", stop)
     app.router.add_post("/mode", mode)
     app.router.add_get("/status", status)
+    app.router.add_post("/shutdown", shutdown)
     return app
 
 
