@@ -165,6 +165,7 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 |---|---|---|---|
 | 0 | Immediate deadlock fix: delete executor position-check | 200 | 1 |
 | 1 | `contracts/` + `facts/` foundation | 800 | 2-3 |
+| 1a | ✅ landed 2026-07-18: `contracts/` (error hierarchy, `require`, `@enforce_contract`) + `facts/` core (`Fact[T]`, `FactSource`, provenance, confidence ops) + guard rule in `scripts/contract_rules.py` | — | — |
 | 2 | `ledger/` core (Outcomes, Decisions, Ring, Causal, ModeTransitions) | 2500 | 4-6 |
 | 3 | Decision enrichment: Predictions, Alternatives, Confidence, Time budgets | 1500 | 2-3 |
 | 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
@@ -173,6 +174,18 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 Total: ~9000 LoC production + ~13500 LoC tests + wiki. 14-21 sessions of focused work.
 
 Detailed phase specs live in `docs/handoffs/self-observing-bot-architecture.md`.
+
+### Phase 1a implementation notes (2026-07-18)
+
+`src/tankpit_bot/contracts/` — `ContractError` hierarchy (`base.py`: `NoUnsourcedFactError`, `ConfidenceOutOfBoundsError`, `ProvenanceRootednessError`, each self-naming via `contract_name`), `require(condition, error, **details)` helper recording the caller's `file:line` (via `traceback.extract_stack` — the monorepo guard bans `import inspect`), and `@enforce_contract(contract)` decorator (`enforcement.py`). The `Contract` protocol is generic over a `ParamSpec`: a contract's `check` carries the same typed signature as the function it guards, so enforcement adds no type erasure (the guard also bans `object` in annotations, which rules out the untyped-kwargs-mapping design).
+
+`src/tankpit_bot/facts/` — generic `Fact[T]` TypedDict (value + source + observed_ms + confidence + provenance), the 11-value `FactSource` literal, `SourceRefDict`/`ProvenanceChainDict` with encode/decode, and confidence ops (`combine_independent` noisy-OR, `combine_weighted`, `decay_by_age`). `make_fact`/`decode_fact` enforce all three contracts — a stored fact violating a contract fails at load.
+
+Guard rule `scripts/contract_rules.py` (wired into `scripts/guard.py`, runs in `make lint`): public `apply_*`/`record_*`/`mutate_*`/`set_*`/`update_*` functions in `facts/`, `ledger/`, `memory/` must carry `@enforce_contract`.
+
+Three documented deviations from the handoff spec: (1) `game_log_scrape` counts as an observation origin (the DOM is a second wire, not a derivation) — only `client_side_inference` requires provenance citations; (2) `make_fact` invokes its contract explicitly instead of via the decorator, because decorating a generic function erases its type variable under mypy — the decorator is the mechanism for the non-generic mutations of Phases 1b+; (3) the spec's field-presence and source-membership runtime checks are structural under the typed keyword-only constructor (and re-validated by `require_fact_source` on decode), so the runtime contract checks are the ones typing cannot express: `observed_ms >= 0`, confidence bounds, provenance rootedness, and source/origin coherence.
+
+Remaining Phase 1 substeps: 1b retrofit `ContainerStateDict`, 1c `TankStateDict`, 1d `SelfStateDict`/`MineStateDict`/terrain/viewport.
 
 ## Why we're building this
 

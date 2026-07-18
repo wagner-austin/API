@@ -1029,3 +1029,38 @@ Total ~9000 LoC production + ~13500 LoC tests. 14-21 sessions of focused work.
 **Structural updates:** architecture hub 6 → 7 pages; index total 52 → 53.
 
 **No code changes landed** — audit only. Fix options queued for user decision.
+
+## [2026-07-17] audit | Viewport shift protocol cracked — game supports what the bot doesn't use
+
+**Motivation:** the user pushed back on treating the executor-rejection audit as "how do we cope with rejection." Better question: what is the bot misperceiving about the game? Concrete lead — viewport modelling: the bot thinks viewport is fixed until teleport (`state/scan_coverage.py:29`, `hunt_mode.py:52-53`); the user asked whether that's actually a game rule or a bot-configuration choice.
+
+**Investigation phases:** (1) wiki survey — [[viewport-frame]], [[viewport-update-algorithm]], [[js-source-map]]; (2) code layer — `state/viewport_geometry.py` (16×16 visible / 18×18 patch), `sniffer/viewport.py::update_viewport_origin`, `sniffer/world_state_tiles.py:68`; (3) JS client read — `tpclient.pretty.js` at 236-243 (`Ia`), 762-788 (`Rb`/`Sb`), 1620-1662 (state 13 dispatch), 5060-5129 (autoscroll settings); (4) capture-corpus decode — `runs/sniff/latest.capture_session.json` decoded via `capture.xor.build_xor_table` + `xor_decode_body`.
+
+**Findings:**
+
+1. **The game fully supports viewport shifting** — three triggers: (a) teleport landing, (b) client-initiated `Rb`/"Z" (3-byte scope-extend, direction 0-8) or `Sb`/"z" (4-byte scope-move to tile), (c) server-side auto-shift on walk when autoscroll is enabled via the `Ia` text control (`"A1"` = ON, `"A0"` = OFF). All three converge on `0x5A ViewportUpdate` from the server, which the sniffer already handles correctly.
+2. **Empirical corpus (2026-07-10 human session, 421.8 s):** 22 × `0x5A`, 22 × `0x3D MovementResponse` (1:1 pairing), 42 × `0x47` walk broadcasts, 4 × sent teleports, 8 × "Extend view {NE|E|SE|W|N}" game-log lines. Every "Extend view" is followed by a `0x5A` within 0-2 s — proves `Rb → 0x5A` round-trip. Remaining ~10 `0x5A` beyond teleports and scope-extends are walk-triggered, evidencing server-side auto-shift.
+3. **The bot never sends `Ia`, `Rb`, or `Sb`.** Sniffer machinery for tracking the shift is correct (`update_viewport_origin` at `sniffer/viewport.py:14-23`); it's simply never exercised outside teleport-landing because the bot doesn't request shifts.
+4. **Wiki correction:** `viewport-frame.md` [^4] cited a 2026-06-21 user quote ("we have viewport shifting off. so the viewport will never move. the only way is to teleport") as a game-rule statement. That's a bot-configuration statement. The game rule is: shifting works; the bot doesn't use it. Page updated to distinguish.
+5. **Latent doc bug:** `src/tankpit_bot/protocol/commands.py:95-96` labels `PLAIN_AUTOSCROLL_ON = b"A0"` and `PLAIN_AUTOSCROLL_OFF = b"A1"` — inverted from JS (`Number(true) == 1`, so `"A1"` = ON). Same swap in `docs/protocol-discovery.md:435-436`. Constants unused in `src/` (grep 2026-07-17), so no live misfire, but any future consumer would enable/disable backwards.
+6. **Connection to [[executor-rejection-loops]]:** the pursuit-shot rejection scenario (enemy walks off fixed viewport, bot re-shoots at off-viewport coord, server refuses with 0x52 code 0) has a fixed structural cause (bot deliberately restricted to the landing viewport). Enabling scope shifts would let the bot extend range without teleports; the 2026-07-03 `_clamp_aim_into_viewport` fix would become less load-bearing.
+
+**Pages written:** [[viewport-shift-protocol]] under [[protocol]] hub — wire contract for `Ia`/`Rb`/`Sb`, corpus proof, state-machine ties. **Pages updated:** [[viewport-frame]] — reframed "shifting is OFF" from game-rule to bot-choice, added [[viewport-shift-protocol]] cross-link.
+
+**Structural updates:** protocol hub 7 → 8 pages; index total 53 → 54.
+
+**No code changes landed** — audit + wiki reframing only. Three directions queued for user decision: (α) status quo — keep teleport-only; (β) send `Ia("A1")` at startup, let server auto-shift, review all fixed-viewport assumptions in bot code; (γ) implement `Rb`/`Sb` dispatch in pursuit + off-viewport-refresh paths.
+
+## [2026-07-18] code | Autoscroll constants fixed + Phase 1a contracts/facts foundation
+
+**Autoscroll fix:** `PLAIN_AUTOSCROLL_ON`/`OFF` in `protocol/commands.py:95-96` un-inverted (`"A1"` = ON per JS `"A" + Number(setting)`), same fix in `docs/protocol-discovery.md`. Constants still unused in `src/`; [[viewport-shift-protocol]] "Latent doc bug" section marked fixed.
+
+**Phase 1a of [[self-observing-architecture]] landed** — the contracts framework + Facts core + guard rule (first chunk of Phase 1; retrofits 1b-1d remain):
+
+- `src/tankpit_bot/contracts/`: `ContractError` hierarchy with self-naming subclasses (`NoUnsourcedFactError`, `ConfidenceOutOfBoundsError`, `ProvenanceRootednessError`), `require()` helper capturing the violation site as `file:line`, `@enforce_contract` decorator whose `Contract` protocol is generic over a `ParamSpec` — a contract's `check` mirrors the guarded function's typed signature (the monorepo guard bans `object` annotations and `import inspect`, which shaped both designs).
+- `src/tankpit_bot/facts/`: generic `Fact[T]` (value/source/observed_ms/confidence/provenance), 11-source `FactSource` literal (9 wire + game_log_scrape + client_side_inference), provenance chains with encode/decode round-trips, confidence arithmetic (noisy-OR combine, weighted combine, exponential decay). All three fact contracts enforced at `make_fact` AND `decode_fact` — a stored fact violating a contract fails at load, not at use.
+- `scripts/contract_rules.py` guard rule wired into `scripts/guard.py` (`make lint`): public `apply_*`/`record_*`/`mutate_*`/`set_*`/`update_*` in `facts/`, `ledger/`, `memory/` must carry `@enforce_contract`.
+
+**Design deviations documented on the wiki page:** `game_log_scrape` is an observation origin (only inference requires citations); `make_fact` calls its contract explicitly because mypy erases a generic function's type variable under a decorator.
+
+**Also answered (no code change):** the bot DOES sense mines — three wire channels feed `world["mines"]` (radar responses with team data, viewport tile updates, witnessed `0x4B` placements / `0x45` detonations), and pathing consults `hostile_mines()` (enemy-team only, friendly mines passable). The known gap is unchanged: `choose_combat_landing_tile` deliberately ignores mines (rejection-loop instance #1 in [[executor-rejection-loops]]) and `find_teleport_landing_tile`'s `blocked_mines` param is dead code (fix C, queued).

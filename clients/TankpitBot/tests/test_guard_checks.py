@@ -174,6 +174,45 @@ def test_verbose_prints_nonzero_exit_code(
     assert "guard_exit_code code=7" in out
 
 
+def test_main_fails_on_contract_rule_violation(tmp_path: Path) -> None:
+    """Contract-rule violations flip a passing guard run to rc=1."""
+    _install_fake_guard_hooks(tmp_path)
+    facts_dir = tmp_path / "src" / "tankpit_bot" / "facts"
+    facts_dir.mkdir(parents=True)
+    (facts_dir / "mutators.py").write_text(
+        "def apply_observation(*, value: int) -> int:\n    return value\n",
+        encoding="utf-8",
+    )
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 1
+
+
+def test_main_keeps_orchestrator_rc_over_contract_rc(tmp_path: Path) -> None:
+    """A nonzero orchestrator rc is not overwritten by contract violations."""
+
+    class _FakeFindRoot:
+        def __call__(self, start: Path) -> Path:
+            return tmp_path
+
+    class _FakeLoader:
+        def __call__(self, monorepo_root: Path) -> _hooks_guard.RunForProjectProto:
+            def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+                return 5
+
+            return _run_for_project
+
+    _hooks_guard.guard_find_monorepo_root = _FakeFindRoot()
+    _hooks_guard.guard_load_orchestrator = _FakeLoader()
+    facts_dir = tmp_path / "src" / "tankpit_bot" / "facts"
+    facts_dir.mkdir(parents=True)
+    (facts_dir / "mutators.py").write_text(
+        "def apply_observation(*, value: int) -> int:\n    return value\n",
+        encoding="utf-8",
+    )
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 5
+
+
 def test_guard_detects_violations(tmp_path: Path) -> None:
     """Test guard.main detects violations and returns non-zero exit code."""
     root = tmp_path

@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
+from scripts.contract_rules import run_contract_rules
 from tankpit_bot import _hooks_guard
 
 
@@ -115,6 +116,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     target_root = root_override if root_override is not None else project_root
     rc = run_for_project(monorepo_root=monorepo_root, project_root=target_root)
+    contract_violations = run_contract_rules(target_root)
+    if contract_violations > 0 and rc == 0:
+        rc = 1
     if verbose:
         sys.stdout.write(f"guard_exit_code code={rc}\n")
     return rc
