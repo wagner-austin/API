@@ -1010,3 +1010,22 @@ Total ~9000 LoC production + ~13500 LoC tests. 14-21 sessions of focused work.
 **Gate:** tankpitbot `make check` green — 4287 tests pass, 100% coverage on 18,378 statements + 5,196 branches. Guard rules `except-without-log-or-raise` and `weak-assertion-isinstance` were both fired during the initial pass and fixed properly (`log.debug` on the probe's swallowed exception; equivalence check between wrapper and parameterized core instead of an `isinstance` check on the runtime-dependent bool).
 
 **Wiki:** [[bot-service-architecture]] Phase-C section extended with the idempotency + SERVER-button design + a new "What Phase C does NOT do" bullet clarifying that Stop-Server stays on the PC (Ctrl+C or close-window), not on the phone.
+
+## [2026-07-17] audit | Executor rejection silent-loop class — structural pattern behind 20:47:31, three more live sites
+
+**Motivation:** revisit the executor after Phase 0 of [[self-observing-architecture]] (2026-07-06) to check whether the `emit_ai("rejecting ...")` deadlock class was actually eliminated. Phase 0 removed one instance (`_is_valid_shoot` position-match); the *class* was left intact.
+
+**Findings:**
+
+1. **AI state rollback on rejection.** `bot/tick_loop.py:490-491` persists `bot._ai_state` only when `command_sent` is True. Every executor rejection discards the tick's AI-state updates, so next tick plans from the same base state — no exit signal from rejection to planner.
+2. **`mark_move_target_failed` is unreachable from executor rejections.** Grep across `src/`: three call sites in `tick_loop_actions.py` and `completions.py`, none in `executor.py`. The `is_move_target_failed`-gated `block_combat_target_and_replan` pathway that would break the loop is disconnected from every one of the executor's nine rejection sites.
+3. **Combat teleport onto hostile mine.** `choose_combat_landing_tile` (`combat_landing.py:46-69`) returns the enemy's exact coord and explicitly discards `world`/`terrain` at line 68 — never consults `hostile_mines`. Enemy standing on same-team mine → `_is_valid_move_destination` (`executor.py:360`) rejects every tick until the enemy moves. Silent per-tick deadlock, no self-heal. Same shape as 20:47:31.
+4. **`_tracked_combat_target` still position-matches.** `executor.py:392` retains `if tank["x"] != ai_state["combat_target_x"] or tank["y"] != ai_state["combat_target_y"]: return None`. Same pattern Phase 0 removed from `_is_valid_shoot`, but on the teleport path. Usually recovers via fresh planner-tick position, but silent per-tick self-rejection until it does.
+5. **`find_teleport_landing_tile` deletes its `blocked_mines` param.** `equipment_search.py:62`: `del start_x, start_y, blocked_mines`. Container-teleport landing never consults mines. Dead code across five callers. Latent — same-shape loop would fire if a container landed on a mine tile.
+6. **Commit `4d11980b`** (2026-07-03) narrowed the mine check from `world["mines"]` to `hostile_mines(world)` for same-team passability. Correct for that motivation, but the planner-executor consistency question was not in scope for that commit, so the mine loop's precondition (planner emits coord on hostile mine, executor rejects) was created there without a corresponding replan wiring.
+
+**Pages written:** [[executor-rejection-loops]] under [[architecture]] hub. Symptom, structural cause, three live instances, one latent, five fix options (A: wire `_is_valid_move_destination` to `mark_move_target_failed`; B: same for `_is_valid_teleport`; C: delete dead `blocked_mines` param; D: per-target-id block for shoot; E: retire position-match in `_tracked_combat_target`). The structural fix is Phase 1 of [[self-observing-architecture]].
+
+**Structural updates:** architecture hub 6 → 7 pages; index total 52 → 53.
+
+**No code changes landed** — audit only. Fix options queued for user decision.
