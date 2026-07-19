@@ -2,8 +2,8 @@
 title: Deactivation (0x41) Wire Format
 tags: [protocol, combat, wire]
 related: [[shoot-event-format]], [[weapon-log-markers]]
-sources: [tpclient.js Pg.h / V.A, see footnotes]
-fact_checked: 2026-06-19
+sources: [tpclient.js Pg.h / V.A, capture replay 2026-07-19, see footnotes]
+fact_checked: 2026-07-19
 confidence: high
 ---
 
@@ -41,7 +41,9 @@ The victim/killer IDs were originally decoded at wrong offsets (offset 0 instead
 
 ## Own kills
 
-0x41 **never fires for own kills**. The game-log banner ("You destroyed ...") is the authoritative own-kill signal. Don't wait for 0x41 to confirm a kill you made.[^2]
+0x41 **fires for own kills**, always tunneled inside a 0x2E envelope.[^2] The June 2026 claim that it "never fires for own kills" was a decoder blind spot, not server behavior: the June-10-era decoder had no 0x2E subtype dispatcher and could not unwrap tunneled 0x41s, so the diagnostics stayed at zero across on-screen kills and the wrong conclusion was codified here. The DOM game-log kill banner ("has been deactivated by you") is the *client's rendering* of this same message — it lags the wire by one to two ticks (render + scraper poll) and carries less information (name only, no killer id, no promo flag, no mine sentinel).
+
+Consequence (2026-07-19): the game-log kill-scraping channel was deleted from the bot; 0x41 is the single kill source. The DOM log is retained as a capture-artifact witness only.
 
 [^1]: protocol analysis 2026-06-10 — offset correction from 0→1 for victim_id, 3→4 for killer_id
-[^2]: observed across all captures — 0x41 arrives for enemy-on-enemy kills only; own kills confirmed via game-log scraping
+[^2]: capture replay 2026-07-19 with the modern 0x2E-tunneled decoder: `bot-20260610-005248` contains 1 own-kill 0x41 (victim 512, killer 1301 = the bot) and `bot-20260610-011333` contains 19 (killer 1301 on every one) — the very captures the "never fires" claim was drawn from. Run `bot-20260719-004608` cross-confirms live: all 4 own kills decoded as 0x41 (victims 500/513/506/511, killer_id 1301) matching the game-log banners 1:1, banners trailing by 0–2 s.

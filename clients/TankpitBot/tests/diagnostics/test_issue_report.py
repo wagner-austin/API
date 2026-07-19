@@ -556,24 +556,24 @@ def test_require_object_list_rejects_non_object_element() -> None:
 
 
 def test_scorecard_counts_tank_deactivated_kills(fake_fs: FakeFileSystem) -> None:
-    """``tank_deactivated`` increments kills; duplicates by ``victim_id`` collapse.
+    """Every ``tank_deactivated`` event counts as one kill.
 
-    Each real kill emits two ``tank_deactivated`` diagnostics (one
-    from the ``0x41 Deactivation`` wire packet, one from the
-    game-log "X deactivated" text). Live run 2026-06-23 23:00:22
-    reported kills=2 for a single purple-8 kill before the dedup.
-    The scorecard must collapse them by ``victim_id`` so the report
-    matches reality.
+    Since the DOM game-log kill channel was retired (2026-07-19), the
+    wire ``0x41 Deactivation`` is the single emitter -- exactly one
+    event per kill. A repeated ``victim_id`` is a respawned tank
+    killed again and must count again (June capture
+    bot-20260610-011333: victim 507 legitimately killed five times in
+    one 45-minute session).
     """
     artifacts = configure_probe_runtime_logging("fuel", "20260331-230405")
     _emit_session_room("1", "field01.gif")
     emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)
-    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)  # duplicate -- ignored
+    emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=42)  # respawn re-kill
     emit_diagnostic(diagnostic_kind="tank_deactivated", victim_id=99)
 
     report = build_issue_report(Path(artifacts["latest_events_path"]))
 
-    assert report["scorecard"]["kills"] == 2
+    assert report["scorecard"]["kills"] == 3
 
 
 def test_scorecard_counts_combat_gate_diagnostics(fake_fs: FakeFileSystem) -> None:

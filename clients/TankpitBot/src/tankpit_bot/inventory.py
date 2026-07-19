@@ -81,6 +81,31 @@ class InventoryChange(TypedDict):
     now_enabled: bool
 
 
+def inventory_all_full(state: InventoryState, capacity: int) -> bool:
+    """Report whether every inventory slot is at capacity.
+
+    User mechanic (2026-07-18, verbatim): equipment containers "fill
+    whatever is empty. you will only get a full inventory message if
+    all your items are full." So all-slots-full is exactly the state
+    in which an equipment pickup can gain nothing and the server would
+    refuse it with 0x52 code 7.
+
+    Args:
+        state: Current inventory state.
+        capacity: Per-slot capacity for the current rank.
+
+    Returns:
+        True when every slot's count is at or above capacity.
+    """
+    return (
+        state["armor_shields"]["count"] >= capacity
+        and state["dual_shots"]["count"] >= capacity
+        and state["missile_shots"]["count"] >= capacity
+        and state["homing_shots"]["count"] >= capacity
+        and state["extra_radars"]["count"] >= capacity
+    )
+
+
 def replace_inventory_slot(
     state: InventoryState,
     slot: ItemType,
@@ -335,6 +360,7 @@ __all__ = [
     "encode_inventory_change",
     "encode_inventory_item",
     "encode_inventory_state",
+    "inventory_all_full",
     "replace_inventory_slot",
     "validate_item_type",
 ]

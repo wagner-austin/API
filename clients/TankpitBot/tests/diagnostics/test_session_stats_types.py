@@ -27,7 +27,6 @@ def _row() -> SessionStatsRowDict:
         shots=81,
         pickups=33,
         stalls=0,
-        feedback_corrections=11,
     )
 
 

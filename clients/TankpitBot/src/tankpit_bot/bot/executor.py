@@ -12,10 +12,6 @@ from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
-from tankpit_bot.diagnostics.game_log_feedback import (
-    record_move_dispatch,
-    record_pickup_dispatch,
-)
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
@@ -99,12 +95,11 @@ def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
 
 
 def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> bool:
-    """Send a move/pickup command and record its target for log feedback.
+    """Send a move or pickup command to its target tile.
 
-    The game log reports failed pickups ("Empty container", "Tank
-    full") and rejected moves ("You can't go there!") without naming a
-    tile, so the dispatch target is recorded here for the feedback
-    consumer to resolve against.
+    Server rejections (0x52 error codes) resolve against the in-flight
+    action's recorded target, so no side-channel dispatch bookkeeping
+    is needed here.
 
     Args:
         bot: Bot instance for sending commands.
@@ -118,28 +113,11 @@ def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> b
         ValueError: If the command is not a tracked-target kind.
     """
     if command["cmd_type"] == "move":
-        dispatched = bot.move_to(command["target_x"], command["target_y"])
-        if dispatched:
-            record_move_dispatch(command["target_x"], command["target_y"])
-        return dispatched
+        return bot.move_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_fuel":
-        dispatched = bot.pickup_fuel_to(command["target_x"], command["target_y"])
-        if dispatched:
-            # A pickup IS a move plus a grab: the tank drives to the
-            # container, so a "You can't go there!" rejection belongs to
-            # THIS target. Without the move record the rejection was
-            # attributed to a stale, long-finished move dispatch (live
-            # run 20260611-000x marked (105,154) for a pickup at
-            # (129,152)).
-            record_pickup_dispatch(command["target_x"], command["target_y"])
-            record_move_dispatch(command["target_x"], command["target_y"])
-        return dispatched
+        return bot.pickup_fuel_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_equipment":
-        dispatched = bot.pickup_equipment_to(command["target_x"], command["target_y"])
-        if dispatched:
-            record_pickup_dispatch(command["target_x"], command["target_y"])
-            record_move_dispatch(command["target_x"], command["target_y"])
-        return dispatched
+        return bot.pickup_equipment_to(command["target_x"], command["target_y"])
     raise ValueError(f"Not a tracked-target command: {command['cmd_type']}")
 
 

@@ -194,6 +194,34 @@ class TestStopRoute:
         assert runner.stop_calls == 1
 
 
+class TestExecutorCrashLogging:
+    """Session crashes on the executor thread must be logged, not swallowed."""
+
+    def test_unexpected_crash_is_logged_and_reraised(self) -> None:
+        """A non-rejection exception logs with traceback and re-raises.
+
+        The executor future this wrapper runs under is never awaited,
+        so without the explicit log a crash vanishes — observed
+        2026-07-19: two ``POST /start`` → 202 with the session dead
+        before its run log existed and no trace anywhere.
+        """
+
+        from tankpit_bot.service.http_server import _run_session_and_log_rejection
+
+        class _CrashingRunner:
+            def start(self) -> None:
+                raise ValueError("simulated pre-log crash")
+
+            def request_stop(self) -> None:
+                raise AssertionError("never called")
+
+            def is_running(self) -> bool:
+                return False
+
+        with pytest.raises(ValueError, match="simulated pre-log crash"):
+            _run_session_and_log_rejection(_CrashingRunner())
+
+
 class TestShutdownRoute:
     """``POST /shutdown`` contract (2026-07-18 lifecycle pass)."""
 

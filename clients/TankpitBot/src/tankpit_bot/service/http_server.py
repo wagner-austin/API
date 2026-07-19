@@ -187,15 +187,25 @@ def _run_session_and_log_rejection(runner: SessionRunnerHTTPProtocol) -> None:
     """Invoke :meth:`SessionRunner.start` on the executor thread.
 
     A :class:`SessionAlreadyRunningError` from a two-``POST /start``
-    race is expected and logged at ``WARNING``. Any other exception
-    propagates out of the executor thread; Python's default excepthook
-    logs it to stderr — a silent teardown would hide real regressions
-    from the tick loop.
+    race is expected and logged at ``WARNING``. EVERY other exception
+    is logged with its traceback at ``ERROR`` — the executor future
+    this function runs under is never awaited, so a propagating
+    exception would be silently swallowed into the future object
+    (observed 2026-07-19: two ``POST /start`` → 202, the session died
+    before its run log existed, and nothing anywhere said why). The
+    original docstring claimed the excepthook would catch it; it does
+    not for ``run_in_executor``.
     """
     try:
         runner.start()
     except SessionAlreadyRunningError as exc:
         log.warning("Session start rejected: %s", exc)
+    except Exception:
+        log.exception("Session crashed before/during run — POST /start had already returned 202")
+        # Re-raised into the executor future (which nobody awaits) —
+        # the log line above is the real record; the raise satisfies
+        # the log-and-raise contract without changing behaviour.
+        raise
 
 
 async def _drain_status_bus_to_response(

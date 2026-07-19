@@ -17,6 +17,7 @@ from tankpit_bot.inventory import (
 )
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
+from tankpit_bot.state.rank_formulas import inventory_capacity
 
 log = get_logger(__name__)
 
@@ -149,6 +150,54 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
         radar=gained[4],
     )
     return changes
+
+
+def update_inventory_from_full_signal(ws: WorldService) -> list[InventoryChange]:
+    """Reconcile every slot to capacity on a 0x52 code-7 rejection.
+
+    User mechanic (2026-07-18): the server sends "Inventory full" only
+    when ALL items are at cap -- the rejection is an authoritative
+    absolute statement of inventory state, so any drifted shadow count
+    snaps up to capacity here. No-op when the rank (and therefore the
+    capacity) is unknown.
+
+    Args:
+        ws: World service instance.
+
+    Returns:
+        List of inventory changes detected (empty when already full or
+        rank unknown).
+    """
+    self_state = ws.world_state["self_state"]
+    if self_state is None:
+        return []
+    cap = inventory_capacity(self_state["rank"])
+    old = ws.inventory_state
+    return _apply_inventory_state(
+        ws,
+        InventoryState(
+            armor_shields=InventoryItem(
+                count=max(old["armor_shields"]["count"], cap),
+                enabled=old["armor_shields"]["enabled"],
+            ),
+            dual_shots=InventoryItem(
+                count=max(old["dual_shots"]["count"], cap),
+                enabled=old["dual_shots"]["enabled"],
+            ),
+            missile_shots=InventoryItem(
+                count=max(old["missile_shots"]["count"], cap),
+                enabled=old["missile_shots"]["enabled"],
+            ),
+            homing_shots=InventoryItem(
+                count=max(old["homing_shots"]["count"], cap),
+                enabled=old["homing_shots"]["enabled"],
+            ),
+            extra_radars=InventoryItem(
+                count=max(old["extra_radars"]["count"], cap),
+                enabled=old["extra_radars"]["enabled"],
+            ),
+        ),
+    )
 
 
 def update_inventory_from_toggle(

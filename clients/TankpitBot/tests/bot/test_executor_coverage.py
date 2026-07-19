@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-import tankpit_bot.diagnostics.game_log_feedback as _feedback
 from tankpit_bot.bot.executor import _dispatch_tracked_target_command
 from tankpit_bot.bot.types import (
     make_move_command,
@@ -85,14 +84,6 @@ class _DispatchFailBot:
 class TestDispatchTrackedTargetCommand:
     """Tests for _dispatch_tracked_target_command failure paths."""
 
-    def setup_method(self) -> None:
-        """Reset feedback state before each test."""
-        _feedback.reset_game_log_feedback()
-
-    def teardown_method(self) -> None:
-        """Reset feedback state after each test."""
-        _feedback.reset_game_log_feedback()
-
     def test_unsupported_command_type_raises_value_error(self) -> None:
         """A command type outside move/pickup_fuel/pickup_equipment raises ValueError."""
         bot = _DispatchFailBot()
@@ -100,7 +91,7 @@ class TestDispatchTrackedTargetCommand:
             _dispatch_tracked_target_command(bot, make_shoot_command(100, 100))
 
     def test_move_dispatch_failure_returns_false(self) -> None:
-        """When move_to returns False, no move dispatch is recorded."""
+        """When move_to returns False, the dispatch reports failure."""
         reset_world_state()
         bot = _DispatchFailBot()
         command = make_move_command(150, 160)
@@ -108,11 +99,9 @@ class TestDispatchTrackedTargetCommand:
         result = _dispatch_tracked_target_command(bot, command)
 
         assert result is False
-        # The module-level _last_move_target stays None when dispatched=False
-        assert _feedback._last_move_target is None
 
     def test_pickup_fuel_dispatch_failure_returns_false(self) -> None:
-        """When pickup_fuel_to returns False, no pickup or move dispatch is recorded."""
+        """When pickup_fuel_to returns False, the dispatch reports failure."""
         reset_world_state()
         bot = _DispatchFailBot()
         command = make_pickup_fuel_command(80, 90)
@@ -120,11 +109,9 @@ class TestDispatchTrackedTargetCommand:
         result = _dispatch_tracked_target_command(bot, command)
 
         assert result is False
-        assert _feedback._last_pickup_target is None
-        assert _feedback._last_move_target is None
 
     def test_pickup_equipment_dispatch_failure_returns_false(self) -> None:
-        """When pickup_equipment_to returns False, no pickup or move dispatch is recorded."""
+        """When pickup_equipment_to returns False, the dispatch reports failure."""
         reset_world_state()
         bot = _DispatchFailBot()
         command = make_pickup_equipment_command(120, 130)
@@ -132,5 +119,3 @@ class TestDispatchTrackedTargetCommand:
         result = _dispatch_tracked_target_command(bot, command)
 
         assert result is False
-        assert _feedback._last_pickup_target is None
-        assert _feedback._last_move_target is None

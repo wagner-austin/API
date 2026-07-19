@@ -147,7 +147,10 @@ def test_collect_mode_grabs_adjacent_equipment_before_fuel() -> None:
             "mode_started_ms": 90000,
         }
     )
-    inventory = make_inventory()
+    # dual below capacity: the all-slots-full pickup gate must permit
+    # (user mechanic 2026-07-18 -- at full inventory the pickup would
+    # be a guaranteed code-7 rejection and is skipped).
+    inventory = make_inventory(dual_count=20)
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
 
     decision = decide_collect_mode(ctx)

@@ -692,12 +692,14 @@ class TestClearCommandError:
         )
 
     def test_command_error_clears_collect_action(self, fake_env: FakeEnv) -> None:
-        """A 0x52 ``Empty container`` aborts a pending collect in < 1 s.
+        """A 0x52 ``You can't do this`` (code 0) aborts a pending collect in < 1 s.
 
         Without the hook the bot waited the full
         ``action_stall_timeout_ms`` (10 s) on every server denial; live
         run 20260620-184223 wasted 40 s of session time on four such
-        rejections.
+        rejections. Illegal geometry blacklists the container position
+        via ``failed_pickups`` (unlike code 4, which removes the
+        belief outright).
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
@@ -709,7 +711,7 @@ class TestClearCommandError:
         bot._state_data["state"] = "MOVING"
         action = self._make_pending_action("collect", target_x=150, target_y=150)
 
-        get_world_service().last_command_error = 4  # "Empty container"
+        get_world_service().last_command_error = 0  # "You can't do this"
         result = _wait_for_movement_action(bot, action)
 
         assert result is False
@@ -717,17 +719,17 @@ class TestClearCommandError:
         assert get_world_service().last_command_error == -1
 
     def test_command_error_clears_collect_on_inventory_full(self, fake_env: FakeEnv) -> None:
-        """A 0x52 ``Inventory full`` (code 7) aborts a pending pickup in < 1 s.
+        """A 0x52 ``Inventory full`` (code 7) aborts the pickup, keeps the container.
 
         Empirical guard: live capture 20260620-190728 / 20260620-190830
         delivered ``error_code=7`` over the wire after pickup dispatches
-        at full inventory (see ``runs/sniff/latest.events.jsonl``); the
-        ``[GAME:EQUIPMENT] Inventory full`` log lines in the same capture
-        cross-confirm the reject. Without code 7 in
-        ``_ACTION_BLOCKING_COMMAND_ERRORS`` the collect would idle the
-        full ``action_stall_timeout_ms`` (10 s) before replanning. The
-        container's ``failed_pickups`` counter is bumped on the same
-        path so downstream blacklisting kicks in.
+        at full inventory. Without code 7 in the blocking set the
+        collect would idle the full ``action_stall_timeout_ms`` (10 s)
+        before replanning. User mechanic (2026-07-18): containers fill
+        whatever is empty and code 7 fires only at all-slots-full --
+        the container is NOT blacklisted (it is fine; the tank is
+        full) and every slot belief reconciles up to capacity, the
+        rejection being an authoritative absolute inventory statement.
         """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
@@ -763,7 +765,19 @@ class TestClearCommandError:
         assert bot.get_state() == "IDLE"
         assert ws.last_command_error == -1
         container = ws.world_state["containers"]["150,150"]
-        assert container["failed_pickups"] == 1
+        assert container["failed_pickups"] == 0
+        # No self_state rank in this fixture-free world? position update
+        # created one at rank 0 -> capacity applies; all slots snapped up.
+        from tankpit_bot.state.rank_formulas import inventory_capacity
+
+        rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] else 0
+        cap = inventory_capacity(rank)
+        inv = ws.inventory_state
+        assert inv["armor_shields"]["count"] >= cap
+        assert inv["dual_shots"]["count"] >= cap
+        assert inv["missile_shots"]["count"] >= cap
+        assert inv["homing_shots"]["count"] >= cap
+        assert inv["extra_radars"]["count"] >= cap
 
     def test_command_error_tank_full_does_not_mark_failed_pickup(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Tank full`` (code 5) clears the action WITHOUT blacklisting.
@@ -829,6 +843,63 @@ class TestClearCommandError:
         assert ws.last_command_error == -1
         container = ws.world_state["containers"]["150,150"]
         assert container["failed_pickups"] == 0
+
+    def test_command_error_empty_container_removes_belief(self, fake_env: FakeEnv) -> None:
+        """A 0x52 ``Empty container`` (code 4) deletes the container belief.
+
+        The server says the container is drained, so the volume the
+        planner acted on is contradicted -- the belief is removed
+        outright rather than blacklisted. (Until 2026-07-19 this
+        removal was done by the DOM game-log "Empty container"
+        consumer one or two ticks later; the wire code is the same
+        signal, earlier, and the DOM channel is now witness-only.)
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+        from tankpit_bot.state.types import (
+            WorldStateDict,
+            make_container_state,
+        )
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        ws.world_state = WorldStateDict(
+            **{
+                **ws.world_state,
+                "self_state": make_self_state(
+                    tank_id=1,
+                    x=100,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    fuel=1000,
+                    leaderboard_position=0,
+                ),
+                "containers": {
+                    "150,150": make_container_state(
+                        x=150,
+                        y=150,
+                        is_fuel=True,
+                        volume=400,
+                        timestamp_ms=get_current_time_ms(),
+                        failed_pickups=0,
+                    )
+                },
+            }
+        )
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("collect", target_x=150, target_y=150)
+
+        ws.last_command_error = 4  # "Empty container"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert bot.get_state() == "IDLE"
+        assert ws.last_command_error == -1
+        assert ws.world_state["containers"] == {}
 
     def test_command_error_clears_teleport_action(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``You can't go there!`` aborts a pending teleport in < 1 s."""

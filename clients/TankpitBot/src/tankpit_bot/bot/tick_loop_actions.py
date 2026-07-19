@@ -53,7 +53,11 @@ from tankpit_bot.sniffer.world_state import (
     mark_scan_viewport_failed,
 )
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_command_error
-from tankpit_bot.sniffer.world_state_containers import increment_container_failed_pickups
+from tankpit_bot.sniffer.world_state_containers import (
+    increment_container_failed_pickups,
+    remove_container_at,
+)
+from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full_signal
 
 # Supervisor (0x52) error codes from tpclient.js ``Gb[]``. The bot
 # reacts to the codes that prove the in-flight action will never
@@ -308,9 +312,18 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         #   Blacklisting a still-full container is wrong -- the next
         #   tick with headroom can consume it.
         # * ``code=4`` ("Empty container"): the container is drained.
-        #   Blacklist.
-        # * ``code=7`` ("Inventory full"): equipment slot at cap.
-        #   Blacklist for this session (the slot won't clear).
+        #   Delete the belief outright -- the volume the planner acted
+        #   on is contradicted by the server. (Until 2026-07-19 this
+        #   removal was done by the DOM game-log consumer one or two
+        #   ticks later; the wire code is the same signal, earlier.)
+        # * ``code=7`` ("Inventory full"): user mechanic 2026-07-18 --
+        #   containers "fill whatever is empty. you will only get a
+        #   full inventory message if all your items are full." The
+        #   container is fine; the TANK is full. Reconcile every slot
+        #   belief up to capacity (the rejection is an authoritative
+        #   absolute inventory statement) and do NOT blacklist.
+        #   Pre-fix (through 2026-07-18) this blacklisted a perfectly
+        #   good container per rejection.
         # * ``code=0`` ("You can't do this"): illegal geometry.
         #   Blacklist per position.
         #
@@ -322,6 +335,21 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             emit_sync(
                 "container at (%d,%d) rejected code=5 (tank full) -- "
                 "not blacklisting, container is not empty",
+                tx,
+                ty,
+            )
+        elif error_code == _COMMAND_ERROR_INVENTORY_FULL:
+            update_inventory_from_full_signal(get_world_service())
+            emit_sync(
+                "container at (%d,%d) rejected code=7 (inventory full) -- "
+                "reconciled all slots to capacity, container kept",
+                tx,
+                ty,
+            )
+        elif error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
+            remove_container_at(get_world_service(), tx, ty)
+            emit_sync(
+                "container at (%d,%d) rejected code=4 (empty) -- belief removed",
                 tx,
                 ty,
             )

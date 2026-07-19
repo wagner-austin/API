@@ -36,8 +36,9 @@ from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand, make_radar_command, make_teleport_command
+from tankpit_bot.inventory import inventory_all_full
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.rank_formulas import fuel_capacity
+from tankpit_bot.state.rank_formulas import fuel_capacity, inventory_capacity
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -424,6 +425,16 @@ def _select_and_pickup_equipment(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
+    """Pick up the best viewport equipment, unless every slot is full.
+
+    User mechanic (2026-07-18): containers fill whatever is empty and
+    the server rejects with code 7 only at all-slots-full -- so at
+    full inventory a pickup can gain nothing and would burn a tick on
+    a guaranteed rejection (8 wasted ticks in the 2026-07-18 5-minute
+    run before this gate).
+    """
+    if inventory_all_full(ctx.inventory, inventory_capacity(ctx.self_state["rank"])):
+        return None
     selection = select_equipment_target(ctx)
     if selection is None:
         return None

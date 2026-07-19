@@ -30,8 +30,6 @@ from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.overlay import OverlayStateDict, update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
-from tankpit_bot.diagnostics.game_log_feedback import register_world_feedback_from_game_log
-from tankpit_bot.diagnostics.game_log_kills import register_kills_from_game_log
 from tankpit_bot.diagnostics.runs_index import (
     append_index_row,
     count_stall_timeouts,
@@ -429,14 +427,15 @@ def _tick_once(bot: Bot) -> None:
     # 1. SYNC — drain CDP message buffer
     world_sync.drain_messages(bot)
 
-    # 1b. Consume the in-game text log. The wire 0x41 Deactivation never
-    # arrives for own kills (proven across two live runs) and the wire is
-    # silent on failed pickups, full-tank pickups, and rejected moves --
-    # the rendered log lines are the only truth channel for all four.
-    log_entries = bot._poll_game_log()
-    log_world = bot.get_world_state()
-    register_kills_from_game_log(log_entries, log_world)
-    register_world_feedback_from_game_log(log_entries)
+    # 1b. Record the in-game text log as a capture witness. The DOM log
+    # is the client's rendering of wire messages the bot already decodes
+    # (0x41 Deactivation for kills, 0x52 error codes for rejections --
+    # capture replay 2026-07-19 falsified the June claim that the wire
+    # was silent on own kills and failed pickups: the messages were
+    # 0x2E-tunneled and the June decoder could not unwrap them). The
+    # entries act on nothing; they land in the capture artifact so the
+    # analyzer can diff the client's rendering against the wire.
+    bot._record_game_log_witness(bot._poll_game_log())
 
     # 2. Read state
     world = bot.get_world_state()
@@ -614,15 +613,18 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
     for tank_id in new_kills:
         merged[str(tank_id)] = now
         emit_ai("kill registered (tank_id=%d)", tank_id)
-    clear_shot_target = ai_state["last_shot_target_id"] in new_kills
+    # The shot-target fields are NOT cleared here: when the killed tank
+    # is the pending shot's target, ``_get_combat_feedback`` must still
+    # see the target id to resolve the shot as ``kill_confirmed`` (a
+    # kill produces no damage-change feedback, so this is the kill
+    # shot's only resolution path). The classifier clears the fields
+    # itself after emitting the outcome.
     clear_combat_target = ai_state["combat_target_id"] in new_kills
     return AIStateDict(
         **{
             **ai_state,
             "killed_tank_ids": merged,
             "session_kill_count": ai_state["session_kill_count"] + len(new_kills),
-            "last_shot_target_id": -1 if clear_shot_target else ai_state["last_shot_target_id"],
-            "last_shot_target_name": "" if clear_shot_target else ai_state["last_shot_target_name"],
             "combat_target_id": -1 if clear_combat_target else ai_state["combat_target_id"],
             "combat_target_x": 0 if clear_combat_target else ai_state["combat_target_x"],
             "combat_target_y": 0 if clear_combat_target else ai_state["combat_target_y"],
@@ -743,6 +745,18 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             hit_signal="kill_confirmed",
         )
         _inc_hit()
+        # Clear the shot-target fields directly: the trigger is
+        # ``killed_tank_ids`` membership, which is not a consumable
+        # wire flag -- without the clear, a tick that dispatches no
+        # command (so ``updated_ai_state`` never persists) would
+        # re-emit this outcome every tick until one does.
+        bot._ai_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "last_shot_target_id": -1,
+                "last_shot_target_name": "",
+            }
+        )
         return "hit"
     if ammo_hit:
         # Reconciliation channel: the per-shot ``weapon`` byte is the

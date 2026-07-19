@@ -10,9 +10,50 @@ from tankpit_bot.bot.ai.collect_mode import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.state.rank_formulas import inventory_capacity
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+
+def test_full_inventory_skips_equipment_pickup() -> None:
+    """At all-slots-full, visible equipment is not dispatched.
+
+    User mechanic (2026-07-18): containers fill whatever is empty and
+    the server rejects with code 7 only at all-slots-full -- a pickup
+    at full inventory is a guaranteed wasted tick (8 of them in the
+    2026-07-18 5-minute run before this gate).
+    """
+    world, self_state = make_world(
+        fuel=400,
+        containers={
+            "101,100": make_container_state(
+                x=101,
+                y=100,
+                is_fuel=False,
+                volume=0,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    rank_cap = inventory_capacity(self_state["rank"])
+    inventory = make_inventory(dual_count=rank_cap, default_count=rank_cap)
+
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+    decision = decide_collect_mode(ctx)
+
+    assert ctx.inventory["dual_shots"]["count"] == rank_cap
+    if decision is not None:
+        assert decision["command"]["cmd_type"] != "pickup_equipment"
 
 
 def test_collect_mode_forages_radar_when_search_hop_is_unaffordable() -> None:

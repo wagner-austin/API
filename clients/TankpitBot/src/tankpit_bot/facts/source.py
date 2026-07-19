@@ -1,12 +1,18 @@
 """Fact source literals: every belief names the channel it came from.
 
 The sources are the complete set of observation and inference channels
-the bot has today: twenty wire message types, two DOM scrape channels
-(the game log and the JS client's tank registry), and client-side
-inference. A fact whose source is ``client_side_inference`` is a
-*derivation* and must cite prior sources in its provenance chain (see
+the bot has today: twenty wire message types, one DOM scrape channel
+(the JS client's tank registry), and client-side inference. A fact
+whose source is ``client_side_inference`` is a *derivation* and must
+cite prior sources in its provenance chain (see
 :mod:`tankpit_bot.facts.provenance`); every other source is a direct
 *observation*.
+
+The DOM game log is deliberately NOT a source: capture replay
+2026-07-19 proved every line it renders is the client's presentation
+of a wire message the bot already decodes (0x41 for kills, 0x52 error
+codes for rejections), so it acts on nothing and is recorded only as
+a capture witness.
 
 Deviation from the Phase 1 handoff spec (11 sources): the spec's list
 missed the wire channels that demonstrably update the tank registry
@@ -43,7 +49,6 @@ FactSource = Literal[
     "wire_0x53_shoot_event",
     "wire_0x5A_viewport_patch",
     "wire_0x64_fuel_total",
-    "game_log_scrape",
     "dom_registry_scrape",
     "client_side_inference",
 ]
@@ -70,7 +75,6 @@ _FACT_SOURCE_BY_NAME: dict[str, FactSource] = {
     "wire_0x53_shoot_event": "wire_0x53_shoot_event",
     "wire_0x5A_viewport_patch": "wire_0x5A_viewport_patch",
     "wire_0x64_fuel_total": "wire_0x64_fuel_total",
-    "game_log_scrape": "game_log_scrape",
     "dom_registry_scrape": "dom_registry_scrape",
     "client_side_inference": "client_side_inference",
 }
@@ -82,12 +86,11 @@ INFERENCE_SOURCE: FactSource = "client_side_inference"
 """The one derivation source; every other source is an observation.
 
 Deviation from the Phase 1 spec text ("non-derived Facts must have a
-wire-originating source"): the DOM scrape channels
-(``game_log_scrape``, ``dom_registry_scrape``) count as observation
-origins here. The page DOM is a second wire the bot reads, not
-something it derives from prior beliefs -- so a DOM-scraped fact with
-an empty derivation list is rooted. Only ``client_side_inference``
-requires citations.
+wire-originating source"): the ``dom_registry_scrape`` channel counts
+as an observation origin here. The page DOM is a second wire the bot
+reads, not something it derives from prior beliefs -- so a
+DOM-scraped fact with an empty derivation list is rooted. Only
+``client_side_inference`` requires citations.
 """
 
 

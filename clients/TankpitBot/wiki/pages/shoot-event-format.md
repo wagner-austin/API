@@ -38,8 +38,7 @@ Top-level 0x53 message: body is 10 bytes (above) after the message-type byte. Tu
 ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:
 
 - **TankStatusSync (0x2E) damage_state transitions** on the target tank — a `damage_state` decrement that occurs within ~200ms of a ShootEvent at the target's tile is a confirmed hit.
-- **Deactivation (0x41)** for enemy-on-enemy kills (does not fire for own kills — see [[deactivation-format]]).
-- **DOM scraping** (game-log "deactivated" banner) is the authoritative own-kill signal.
+- **Deactivation (0x41)** for ALL kills including the bot's own — arrives 0x2E-tunneled; the earlier "does not fire for own kills" claim was a decoder blind spot falsified 2026-07-19 (see [[deactivation-format]]).
 
 ## Hit behavior by target state
 
@@ -48,7 +47,7 @@ ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:
 - **Corpse / deactivated tank**: positive hit (no effect, but the wire reports a hit).
 - **Miss**: the shot literally missed — target moved off the tile between dispatch and resolution.
 
-Shields and corpses do **NOT** return miss. A miss on a stationary target at range is impossible — it means the target moved. The only reliable way to detect a deactivated tank is **DOM scraping** (game-log "deactivated" banner), not wire feedback.[^2]
+Shields and corpses do **NOT** return miss. A miss on a stationary target at range is impossible — it means the target moved. Deactivation detection comes from the 0x41 wire message (0x2E-tunneled, fires for own kills too — falsified-claim history in [[deactivation-format]]), not from per-shot hit/miss feedback.[^2]
 
 ## Damage tiers (from correlated TankStatusSync / MovementResponse)
 

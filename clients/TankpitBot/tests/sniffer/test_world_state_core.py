@@ -318,6 +318,45 @@ class TestInventoryTracking:
         """Reset world state after each test."""
         reset_world_state()
 
+    def test_full_signal_without_self_state_is_noop(self) -> None:
+        """Code-7 reconciliation is a no-op when rank is unknown."""
+        from tankpit_bot.sniffer.world_state_inventory import (
+            update_inventory_from_full_signal,
+        )
+
+        assert update_inventory_from_full_signal(get_world_service()) == []
+        inv = get_inventory_state(get_world_service())
+        assert inv["dual_shots"]["count"] == 0
+
+    def test_full_signal_reconciles_every_slot_to_capacity(self) -> None:
+        """Code 7 is an authoritative all-slots-full statement.
+
+        User mechanic (2026-07-18): containers fill whatever is empty
+        and the server sends Inventory full only when ALL items are at
+        cap -- so the rejection snaps every drifted shadow count up to
+        the rank capacity.
+        """
+        from tankpit_bot.sniffer.world_state import update_world_state_from_position
+        from tankpit_bot.sniffer.world_state_inventory import (
+            update_inventory_from_full_signal,
+        )
+        from tankpit_bot.state.rank_formulas import inventory_capacity
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        changes = update_inventory_from_full_signal(ws)
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("position update must create self_state")
+        cap = inventory_capacity(self_state["rank"])
+        assert len(changes) == 5
+        inv = get_inventory_state(ws)
+        assert inv["armor_shields"]["count"] == cap
+        assert inv["dual_shots"]["count"] == cap
+        assert inv["missile_shots"]["count"] == cap
+        assert inv["homing_shots"]["count"] == cap
+        assert inv["extra_radars"]["count"] == cap
+
     def test_initial_inventory_is_empty(self) -> None:
         """Test inventory starts at zero counts, all disabled."""
         inv = get_inventory_state(get_world_service())

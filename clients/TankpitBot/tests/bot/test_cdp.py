@@ -431,14 +431,14 @@ class TestBotAIIntegration:
                 self._state_data["state"] = "IDLE"
 
             def get_world_state(self) -> WorldStateDict:
-                """Return populated state twice (kills poll + first read), then lose self.
+                """Return populated state once, then lose self.
 
-                Read 1 feeds the game-log kill registration, read 2 the
-                first self check; the disappearance must hit the post-sync
-                re-read to cover the mid-tick abort branch.
+                Read 1 feeds the first self check; the disappearance
+                must hit the post-sync re-read to cover the mid-tick
+                abort branch.
                 """
                 self._world_reads += 1
-                if self._world_reads <= 2:
+                if self._world_reads <= 1:
                     return WorldStateDict(
                         self_state=make_self_state(
                             tank_id=1,
@@ -475,7 +475,7 @@ class TestBotAIIntegration:
 
         _tick_once(bot)
 
-        assert bot._world_reads == 3
+        assert bot._world_reads == 2
 
     def test_tick_once_waits_for_position_before_planning(self, fake_env: FakeEnv) -> None:
         """_tick_once does not execute AI commands while state is WAITING_FOR_POSITION."""
@@ -1912,11 +1912,19 @@ class TestBotEquipmentManagement:
         assert "50" in new_state["killed_tank_ids"]
         assert "60" in new_state["killed_tank_ids"]
 
-    def test_merge_protocol_kills_clears_matching_shot_and_combat_target(
+    def test_merge_protocol_kills_clears_combat_target_keeps_shot_target(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """Kill merge clears stale shot feedback and the matching combat lock."""
+        """Kill merge clears the combat lock but preserves the shot target.
+
+        The shot-target fields must survive the merge so the combat
+        feedback classifier can resolve the kill shot as
+        ``kill_confirmed`` -- a kill produces no damage-change
+        feedback, so clearing the target here would leave the shot's
+        ledger decision pending forever (run 2026-07-19 00:50:37:
+        decision 235 unresolved at shutdown).
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _merge_protocol_kills
         from tankpit_bot.sniffer.world_state import reset_world_state
@@ -1932,8 +1940,8 @@ class TestBotEquipmentManagement:
         mark_tank_killed(get_world_service(), 50)
         new_state = _merge_protocol_kills(bot._ai_state)
 
-        assert new_state["last_shot_target_id"] == -1
-        assert new_state["last_shot_target_name"] == ""
+        assert new_state["last_shot_target_id"] == 50
+        assert new_state["last_shot_target_name"] == "orange-8"
         assert new_state["combat_target_id"] == -1
         assert new_state["combat_target_x"] == 0
         assert new_state["combat_target_y"] == 0
@@ -2016,7 +2024,13 @@ class TestBotEquipmentManagement:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """_get_combat_feedback returns 'hit' when the tracked target was killed."""
+        """_get_combat_feedback returns 'hit' when the tracked target was killed.
+
+        The ``kill_confirmed`` branch must also clear the shot-target
+        fields itself: its trigger (``killed_tank_ids`` membership) is
+        not a consumable wire flag, so without the clear a tick that
+        dispatches no command would re-emit the outcome every tick.
+        """
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.bot.tick_loop import _get_combat_feedback
         from tankpit_bot.sniffer.world_state import reset_world_state
@@ -2028,6 +2042,10 @@ class TestBotEquipmentManagement:
         bot._ai_state["killed_tank_ids"] = {"50": 1000}
         result = _get_combat_feedback(bot)
         assert result == "hit"
+        assert bot._ai_state["last_shot_target_id"] == -1
+        assert bot._ai_state["last_shot_target_name"] == ""
+        second = _get_combat_feedback(bot)
+        assert second == ""
 
     def test_get_combat_feedback_empty_no_shot_pending(
         self,

@@ -3,7 +3,7 @@
 Wire protocol format, message types, and client data structures. Everything learned from sniffing WebSocket traffic and reading tpclient JS.
 
 [ShootEvent Format](../pages/shoot-event-format.md) -- 0x53 wire layout (team, shooter, source pos, target pos, weapon), hit/miss disambiguation, damage tiers
-[Deactivation Format](../pages/deactivation-format.md) -- 0x41 kill detection: status, victim, promo_eligible, killer + mine-kill sentinel; never fires for own kills
+[Deactivation Format](../pages/deactivation-format.md) -- 0x41 kill detection: status, victim, promo_eligible, killer + mine-kill sentinel; fires for ALL kills incl. own (0x2E-tunneled; "never for own kills" falsified 2026-07-19)
 [MAP DATA Decode](../pages/map-data-decode.md) -- 0x14 blob, skip-RLE fuel dot atlas, tank entries, cache semantics
 [Tank Registry](../pages/tank-registry.md) -- activeGame.P.j fields: damage tier, team, viewport position, rank points
 [Weapon Selection](../pages/weapon-selection.md) -- server decides weapon type based on what's at the fired tile

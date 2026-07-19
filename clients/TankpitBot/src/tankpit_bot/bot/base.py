@@ -52,7 +52,7 @@ from tankpit_bot.sniffer.core import (
 )
 from tankpit_bot.sniffer.world_state import get_world_state
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
-from tankpit_bot.types import CapturedMessage
+from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
 log = get_logger(__name__)
 
@@ -139,6 +139,7 @@ class Bot(DispatchMixin):
         )
         self._page: PageProtocol | None = None
         self._game_log_scraper: GameLogScraper | None = None
+        self._game_log_witness: list[GameLogEntryWithTimestamp] = []
         self._shot_screenshot_seq: int = 0
         self._ai_state: AIStateDict = make_initial_ai_state()
         default_mode_bridge: ModeBridgeProtocol = ModeBridge()
@@ -263,12 +264,14 @@ class Bot(DispatchMixin):
     #
     # The bot inherits ``SessionBase`` -- a parallel hierarchy from the
     # ``BrowserSession`` used by the standalone sniffer -- so it owns
-    # its own game-log scraper hooks. The tick loop calls
-    # ``self._poll_game_log()`` each tick and feeds the entries to
-    # ``register_kills_from_game_log`` (own-kill detection, since wire
-    # 0x41 never fires for own kills) and
-    # ``register_world_feedback_from_game_log`` (failed pickups, full
-    # tank, rejected moves -- the only signal for those).
+    # its own game-log scraper hooks. The DOM log is a WITNESS, not an
+    # actor: every line it renders is the client's presentation of a
+    # wire message the bot already decodes (0x41 Deactivation for
+    # kills, 0x52 error codes for rejections -- capture replay
+    # 2026-07-19, see wiki [[deactivation-format]]). The tick loop
+    # polls it each tick and records the entries into the capture
+    # artifact so the analyzer can diff the client's rendering against
+    # the wire; nothing in the bot acts on them.
 
     def _init_game_log_scraper(self, cdp: CDPSessionProtocol) -> None:
         """Create the game log scraper for server feedback visibility.
@@ -289,13 +292,29 @@ class Bot(DispatchMixin):
             return []
         return scraper.get_new_entries()
 
+    def _record_game_log_witness(self, entries: list[GameLogEntry]) -> None:
+        """Timestamp new game-log entries into the capture witness list.
+
+        Args:
+            entries: New log entries from this tick's poll, in order.
+        """
+        now = get_current_time_ms()
+        for entry in entries:
+            self._game_log_witness.append(
+                GameLogEntryWithTimestamp(
+                    timestamp_ms=now,
+                    text=entry["text"],
+                    category=entry["category"],
+                )
+            )
+
     def _capture_account_stats(self, phase: str) -> None:
         """Sample the in-game ``C`` statistics panel and emit it.
 
         The panel carries account-wide ground truth the wire never
         sends (lifetime play time, kills, deactivations, promotion
         points); the startup sample baselines every run so consecutive
-        runs' deltas verify the game-log kill detection. The ``C`` key
+        runs' deltas verify the wire 0x41 kill detection. The ``C`` key
         does not toggle a stateful panel -- each keypress emits a
         fresh ``Statistics:`` block into the in-game DOM log -- so a
         single press is enough to scrape, and a second press would
@@ -472,7 +491,7 @@ class Bot(DispatchMixin):
             base_url=self._target_url,
             messages=self._messages,
             magic=self._magic,
-            game_log=[],
+            game_log=list(self._game_log_witness),
             tank_names={},
         )
         encoded = encode_capture_session(session)

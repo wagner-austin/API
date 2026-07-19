@@ -4,10 +4,9 @@ Every bot run writes a timestamped ``bot-YYYYMMDD-HHMMSS.events.jsonl``
 artifact that is never overwritten, so the full session history is on
 disk -- but every other analyzer reads exactly one artifact. This CLI
 (``tankpit-stats``) sweeps the whole directory and renders one row per
-run (kills, teleport outcomes, shots, pickups, stalls, truth
-corrections) plus an aggregate total, turning the per-run artifacts
-into longitudinal data: regressions show up as a row that breaks the
-trend.
+run (kills, teleport outcomes, shots, pickups, stalls) plus an
+aggregate total, turning the per-run artifacts into longitudinal
+data: regressions show up as a row that breaks the trend.
 """
 
 from __future__ import annotations
@@ -47,10 +46,11 @@ def _elapsed_seconds(first_timestamp: str, last_timestamp: str) -> int:
 
 
 def _is_own_kill(record: RuntimeEventRecordDict) -> bool:
-    """Return True for a game-log registered own-kill diagnostic."""
+    """Return True for a wire-decoded 0x41 own-kill diagnostic."""
     fields = record["fields"]
     return (
-        fields.get("diagnostic_kind") == "tank_deactivated" and fields.get("origin") == "game_log"
+        fields.get("diagnostic_kind") == "tank_deactivated"
+        and fields.get("origin") == "protocol_0x41"
     )
 
 
@@ -93,7 +93,6 @@ def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionSta
     shots = 0
     pickups = 0
     stalls = 0
-    feedback_corrections = 0
     for record in records:
         fields = record["fields"]
         kind = fields.get("diagnostic_kind")
@@ -104,8 +103,6 @@ def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionSta
                 teleports_ok += 1
             else:
                 teleports_failed += 1
-        elif kind == "game_log_feedback":
-            feedback_corrections += 1
         if record["channel"] == "WIRE":
             if record["message"].startswith("shoot"):
                 shots += 1
@@ -127,7 +124,6 @@ def _build_row(run_id: str, records: list[RuntimeEventRecordDict]) -> SessionSta
         shots=shots,
         pickups=pickups,
         stalls=stalls,
-        feedback_corrections=feedback_corrections,
     )
 
 
@@ -151,7 +147,6 @@ def _totals_row(rows: list[SessionStatsRowDict]) -> SessionStatsRowDict:
         shots=sum(row["shots"] for row in rows),
         pickups=sum(row["pickups"] for row in rows),
         stalls=sum(row["stalls"] for row in rows),
-        feedback_corrections=sum(row["feedback_corrections"] for row in rows),
     )
 
 
@@ -195,7 +190,7 @@ def render_session_stats(report: SessionStatsReportDict) -> str:
     """
     header = (
         f"{'run':<22} {'started':<19} {'dur_s':>6} {'events':>6} {'kills':>5} "
-        f"{'tp_ok':>5} {'tp_fail':>7} {'shots':>5} {'pickups':>7} {'stalls':>6} {'corr':>4}"
+        f"{'tp_ok':>5} {'tp_fail':>7} {'shots':>5} {'pickups':>7} {'stalls':>6}"
     )
     lines = [
         "TANKPIT CROSS-SESSION STATS",
@@ -208,7 +203,7 @@ def render_session_stats(report: SessionStatsReportDict) -> str:
             f"{row['run_id']:<22} {row['started']:<19} {row['duration_s']:>6} "
             f"{row['events']:>6} {row['kills']:>5} {row['teleports_ok']:>5} "
             f"{row['teleports_failed']:>7} {row['shots']:>5} {row['pickups']:>7} "
-            f"{row['stalls']:>6} {row['feedback_corrections']:>4}"
+            f"{row['stalls']:>6}"
         )
     return "\n".join(lines)
 

@@ -1174,3 +1174,44 @@ Remaining from the audit trio: (b) in-viewport `blocked_walk` equipment invisibl
 User request: the bot should press ``q`` (the plain `PLAIN_QUIT` wire command) before closing the browser so the server records a deliberate lobby exit instead of an abrupt socket drop. Implemented: `build_quit_command()` (2-byte LE length header + `-`, no XOR — the sender already passes non-`!` bodies through plain), `CommandService.quit_game()`, and `Bot._send_graceful_quit()` first in the game-loop `finally` while the CDP session is still bound; the send path's existing None-guard means a crashed browser cannot wedge teardown. Wire framing pinned by test (`b"\x01\x00-"`). Gate green.
 
 Also this session: explained the 650-fuel engagement reserve (450 engagement budget + 200 low-fuel floor — a hop may never land below it) and identified the 14:51/14:52 mystery runs as sessions launched by the user's SPA bot service (port 27100): unbounded "until stopped" sessions; the STOP file ends a session but the service process itself persists until killed.
+
+## [2026-07-18] contract | Full-inventory HUNT gate reconfirmed strict
+
+User, after reviewing the gate's role in the early-exit chain: **"no keep it strict."** `hunt_entry_permitted` stays full-duals + full-homings + radar-floor with no softening — the restock cost collapsed once the dot hop was fixed (20→25 homings in ~15 s live), so the gate's protection is nearly free. The cardinal-adjacent free-kill override remains the sole exception (Bug 0.5). Remaining open policy call: whether `no_productive_collect` should ever end a session now that hopping works.
+
+## [2026-07-18] mechanic + fix | Equipment containers fill-what's-empty; code 7 = ALL slots full; pickup gate + reconciliation
+
+**User mechanic (verbatim): "the equipment containers are not determined prior to pickup. they fill whatever is empty. you will only get a full inventory message if all your items are full."** This corrects two prior beliefs: containers are not fixed-type grants, and 0x52 code 7 is not "a slot is at cap" but an authoritative statement that EVERY slot is at cap.
+
+**Desync hypothesis retracted.** The suspected inventory desync in the 5-min run was an analysis error: the dual=17 sample at 16:48:01 preceded a +8 dual 0x67 gain at 16:48:03; belief was a truthful 25×5 before the first code-7 at 16:48:05. The fine-grained timeline shows the shadow count tracking the server faithfully all run (per-hit decrements matching the server's weapon mix, 0x67 gains restoring exactly the empty amounts — the fill-what's-empty mechanic visible in the data).
+
+**Single root cause for all 8 wasted rejection ticks: no fullness gate on equipment pickups.** Fixes landed:
+1. `inventory_all_full` predicate + gate in `_select_and_pickup_equipment` — at all-slots-full a pickup is a guaranteed code-7; skip it (saves ~2 s/tick).
+2. Code-7 handling rewritten: previously blacklisted the container ("slot won't clear" — wrong mechanic); now `update_inventory_from_full_signal` reconciles every slot belief up to `inventory_capacity(rank)` (the rejection is an absolute inventory statement — self-healing against any future drift) and the container is KEPT.
+
+Gate green: 4441 tests, 100% coverage.
+
+## [2026-07-19] live-run | Fullness gate verified: 0 code-7 rejections at 4 all-full states
+
+5-min verification run for the equipment-pickup fullness gate + code-7 reconciliation. The bot reached all-slots-full four times (vs twice in the pre-fix run that produced 8 code-7 rejections) and dispatched zero doomed pickups. Sole rejection all run: one code 4 (genuinely empty container, correctly blacklisted). 53/54 hits, 19/19 teleports landed, 0 stalls, ended 25/25/25 at fuel 653 mid-hunt, graceful quit on the wire. Both 2026-07-18 waste findings are closed.
+
+## [2026-07-19] falsification + teardown | 0x41 fires for own kills; DOM game-log consumption deleted (wire is the single actor)
+
+**Trigger:** run bot-20260719-004608's scorecard said Kills: 5 but only 4 tanks died — purple-3 (id 511) was counted twice. The 0x41 wire deactivation landed on tick 122 and the DOM game-log banner was scraped on tick 123; the drain-set dedup only collapses same-tick signals, and `_merge_protocol_kills` incremented `session_kill_count` without consulting the kill cooldown.
+
+**Root-cause archaeology falsified two June claims via capture replay.** Replaying the ORIGINAL June 10 captures through the current decoder (XOR table from each capture's `magic`):
+- `bot-20260610-005248`: 1 own-kill 0x41 (victim 512, killer 1301 = the bot). `bot-20260610-011333`: **19** own-kill 0x41s. These are the exact runs the "0x41 never fires for own kills" claim (and the game-log kill scraper) was built on. Every own-kill 0x41 is 0x2E-tunneled; the June decoder had no 0x2E subtype dispatcher, so it decoded none of them — decoder blind spot, not server behavior.
+- Same replay found 21× 0x52 `error_code=4` (empty container) and 18× code=5 in the June capture — falsifying "the wire is silent on failed pickups", the rationale for the DOM empty-container consumer.
+- "You can't go there!" needed no new capture at all: the client's supervisor error-string table (already in [[client-constants]]) has it at **index 1** — the banner IS the client rendering 0x52 code 1, which the bot already handles (incl. `mark_move_target_failed`). Banner timestamps trail their wire codes by 2–4.6 s (DOM render + scraper poll lag).
+
+**Teardown (all three DOM consumption paths deleted; wire is the single actor):**
+1. `diagnostics/game_log_kills.py` and `diagnostics/game_log_feedback.py` deleted with their tests; executor dispatch-recording side-channel removed. 0x41 is the sole kill channel — the double-count is structurally impossible, not guarded against.
+2. Wire 0x52 code-4 branch now does the empty-container belief removal itself (`remove_container_at`), replacing the DOM consumer's job 1–2 ticks earlier. Code 0 still blacklists via `failed_pickups`.
+3. The DOM log survives as a **witness only**: the bot timestamps polled entries into the capture artifact (`game_log` field, previously always empty for bot runs) so the analyzer can diff the client's rendering against the wire. `game_log_scrape` removed from `FactSource` (23→22).
+4. Legacy dedup removed downstream: scorecard counts every `tank_deactivated` (one per kill now; victim-id dedup would silently drop legitimate respawn re-kills — June capture shows victim 507 killed 5×); `session_stats` counts `origin="protocol_0x41"` and drops the `feedback_corrections` column.
+
+**Bonus fix — the unresolved kill-shot decision (event 235 in the trigger run):** `_merge_protocol_kills` cleared `last_shot_target_id` before `_get_combat_feedback` ran, making the `kill_confirmed` classifier branch unreachable — kill shots never resolved in the ledger (a kill produces no damage-change feedback). The merge now preserves the shot target; the classifier resolves the shot as `kill_confirmed` and clears the fields itself (its trigger is not a consumable wire flag, so it must self-clear to avoid re-emission).
+
+**Pages updated:** [[deactivation-format]] (own-kills section rewritten with replay evidence, fact_checked 2026-07-19), [[shoot-event-format]], protocol hub line, [[self-observing-architecture]] (FactSource deviation note), [[executor-rejection-loops]] (call-site list).
+
+Gate green: 4432 tests, 100% coverage.

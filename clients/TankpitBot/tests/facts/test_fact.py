@@ -136,10 +136,10 @@ def test_fact_round_trip() -> None:
     """A fact survives encode/decode unchanged."""
     fact: Fact[int] = make_fact(
         value=7,
-        source="game_log_scrape",
+        source="dom_registry_scrape",
         observed_ms=123,
         confidence=0.75,
-        provenance=make_provenance("game_log_scrape", []),
+        provenance=make_provenance("dom_registry_scrape", []),
     )
     encoded = encode_fact(fact, _encode_int)
     assert decode_fact(encoded, _decode_int) == fact

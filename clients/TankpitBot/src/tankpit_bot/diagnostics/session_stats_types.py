@@ -19,14 +19,12 @@ class SessionStatsRowDict(TypedDict):
         started: Timestamp of the first event in the run.
         duration_s: Whole seconds between the first and last event.
         events: Total decoded event records.
-        kills: Own kills registered from the game-log banner.
+        kills: Own kills decoded from the wire 0x41 Deactivation.
         teleports_ok: Teleport attempts that landed.
         teleports_failed: Teleport attempts that did not land.
         shots: Shoot commands dispatched on the wire.
         pickups: Pickup commands dispatched on the wire.
         stalls: Actions cleared by the stall timeout.
-        feedback_corrections: Game-log truth corrections applied
-            (empty container, tank full, blocked move, capacity).
     """
 
     run_id: str
@@ -39,7 +37,6 @@ class SessionStatsRowDict(TypedDict):
     shots: int
     pickups: int
     stalls: int
-    feedback_corrections: int
 
 
 class SessionStatsReportDict(TypedDict):
@@ -78,7 +75,6 @@ def encode_session_stats_row(row: SessionStatsRowDict) -> JSONObject:
         "shots": row["shots"],
         "pickups": row["pickups"],
         "stalls": row["stalls"],
-        "feedback_corrections": row["feedback_corrections"],
     }
 
 
@@ -105,7 +101,6 @@ def decode_session_stats_row(data: JSONObject) -> SessionStatsRowDict:
         shots=require_int(data, "shots"),
         pickups=require_int(data, "pickups"),
         stalls=require_int(data, "stalls"),
-        feedback_corrections=require_int(data, "feedback_corrections"),
     )
 
 

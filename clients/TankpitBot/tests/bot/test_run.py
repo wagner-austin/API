@@ -199,6 +199,43 @@ class TestBotRunMethod:
 
         assert all("capture_session.json" not in path for path in fake_fs.get_written_files())
 
+    def test_record_game_log_witness_timestamps_entries(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """Polled game-log entries land in the witness list with timestamps."""
+        from tankpit_bot import _test_hooks
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.browser.dom_scraper import GameLogEntry
+        from tankpit_bot.types import GameLogEntryWithTimestamp
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        original_clock = _test_hooks.get_current_time_ms
+        _test_hooks.get_current_time_ms = lambda: 1234567
+        try:
+            bot._record_game_log_witness(
+                [
+                    GameLogEntry(text="purple-8 has been deactivated by you", category="combat"),
+                    GameLogEntry(text="Empty container", category="other"),
+                ]
+            )
+            bot._record_game_log_witness([])
+        finally:
+            _test_hooks.get_current_time_ms = original_clock
+
+        assert bot._game_log_witness == [
+            GameLogEntryWithTimestamp(
+                timestamp_ms=1234567,
+                text="purple-8 has been deactivated by you",
+                category="combat",
+            ),
+            GameLogEntryWithTimestamp(
+                timestamp_ms=1234567,
+                text="Empty container",
+                category="other",
+            ),
+        ]
+
 
 class TestBotBaseMain:
     """Tests for bot.base.main function."""

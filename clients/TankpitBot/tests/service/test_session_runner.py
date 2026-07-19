@@ -16,6 +16,10 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks
+from tankpit_bot._test_hooks.browser import (
+    SyncPlaywrightContextManagerProtocol,
+    SyncPlaywrightFactoryProtocol,
+)
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import (
     RunnableBotProtocol,
@@ -74,6 +78,18 @@ class _RecordingBot:
             self._on_run()
 
 
+class _NeverStartedSyncPlaywright:
+    """``SyncPlaywrightFactoryProtocol`` fake for slot-identity tests.
+
+    The bootstrap tests only assert WHICH object sits in the loader
+    slot; nothing may actually launch Playwright, so calling the
+    factory is a test bug by definition.
+    """
+
+    def __call__(self) -> SyncPlaywrightContextManagerProtocol:
+        raise AssertionError("the bootstrap tests must never invoke the factory")
+
+
 def _make_runner(
     bot: RunnableBotProtocol,
     *,
@@ -119,6 +135,43 @@ class TestSessionRunnerStateMachine:
         runner.start()
 
         assert bot.calls == [(0, _STOP_FILE)]
+
+    def test_start_bootstraps_the_playwright_loader_hook(self, fake_fs: FakeFileSystem) -> None:
+        """A None ``sync_playwright`` slot is populated via the loader.
+
+        The service path missed this bootstrap while ``make run`` and
+        the sniffer had it — every phone-driven START BOT raised
+        ``PlaywrightNotInstalledError`` before its run log existed
+        (2026-07-19). The runner now mirrors ``bot/entry.py``.
+        """
+        _ = fake_fs
+        original_slot = _test_hooks.sync_playwright
+        original_loader = _test_hooks.get_sync_playwright
+        sentinel = _NeverStartedSyncPlaywright()
+
+        def fake_loader() -> SyncPlaywrightFactoryProtocol:
+            return sentinel
+
+        try:
+            _test_hooks.sync_playwright = None
+            _test_hooks.get_sync_playwright = fake_loader
+            _make_runner(_RecordingBot()).start()
+            assert _test_hooks.sync_playwright is sentinel
+        finally:
+            _test_hooks.sync_playwright = original_slot
+            _test_hooks.get_sync_playwright = original_loader
+
+    def test_start_leaves_an_injected_playwright_fake_alone(self, fake_fs: FakeFileSystem) -> None:
+        """A non-None slot (test-injected fake) is never clobbered."""
+        _ = fake_fs
+        original_slot = _test_hooks.sync_playwright
+        injected = _NeverStartedSyncPlaywright()
+        try:
+            _test_hooks.sync_playwright = injected
+            _make_runner(_RecordingBot()).start()
+            assert _test_hooks.sync_playwright is injected
+        finally:
+            _test_hooks.sync_playwright = original_slot
 
     def test_start_pins_idle_via_the_mode_bridge(self, fake_fs: FakeFileSystem) -> None:
         """A service session starts pinned to idle (``"UNSET"`` queued).

@@ -2,8 +2,8 @@
 
 Every test drives the REAL pipeline:
 :func:`tankpit_bot.runtime_logging.configure_bot_runtime_logging` ->
-real producers (game-log kill registration, teleport attempt tracking,
-wire emits, game-log feedback) -> timestamped JSONL artifacts via
+real producers (wire 0x41 deactivation diagnostics, teleport attempt
+tracking, wire emits) -> timestamped JSONL artifacts via
 :class:`tests.conftest.FakeFileSystem` ->
 :func:`tankpit_bot.diagnostics.session_stats.build_session_stats`
 sweeping the runs directory through the ``glob_paths`` hook. Nothing is
@@ -18,12 +18,6 @@ import pytest
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.browser.dom_scraper import GameLogEntry
-from tankpit_bot.diagnostics.game_log_feedback import (
-    record_pickup_dispatch,
-    register_world_feedback_from_game_log,
-)
-from tankpit_bot.diagnostics.game_log_kills import register_kills_from_game_log
 from tankpit_bot.diagnostics.session_stats import (
     build_session_stats,
     main,
@@ -39,16 +33,17 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_wire,
 )
-from tankpit_bot.state import make_empty_world_state
 
 _RUNS_DIR = Path("runs") / "bot"
 
 
 def _emit_first_run_activity() -> None:
     """Produce one run's worth of events through the real producers."""
-    register_kills_from_game_log(
-        [GameLogEntry(text="purple-8 has been deactivated by you", category="combat")],
-        make_empty_world_state(),
+    emit_diagnostic(
+        diagnostic_kind="tank_deactivated",
+        origin="protocol_0x41",
+        victim_id=513,
+        killer_id=1301,
     )
     emit_diagnostic(
         diagnostic_kind="teleport_attempt",
@@ -74,10 +69,6 @@ def _emit_first_run_activity() -> None:
     emit_wire("pickup_fuel")
     emit_wire("pickup_equipment")
     emit_wire("radar")
-    record_pickup_dispatch(13, 172)
-    register_world_feedback_from_game_log(
-        [GameLogEntry(text="Empty container", category="other")],
-    )
 
 
 def test_sweeps_runs_and_aggregates(fake_fs: FakeFileSystem) -> None:
@@ -101,7 +92,6 @@ def test_sweeps_runs_and_aggregates(fake_fs: FakeFileSystem) -> None:
     assert first["shots"] == 1
     assert first["pickups"] == 2
     assert first["stalls"] == 1
-    assert first["feedback_corrections"] == 1
     assert first["events"] > 0
     assert first["started"] != ""
     assert first["duration_s"] >= 0

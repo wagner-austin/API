@@ -174,6 +174,18 @@ class SessionRunner:
 
         try:
             self._clear_stop_file()
+            # Bootstrap the Playwright loader hook exactly like the
+            # ``make run`` entry point (``bot/entry.py``) and the
+            # sniffer do. ``sync_playwright`` is None by design until
+            # a bootstrap assigns it; ``Bot.run`` reads the slot
+            # directly and raises ``PlaywrightNotInstalledError`` on
+            # None. The service path was the ONLY session entry point
+            # missing this — every phone-driven START BOT died
+            # instantly, and the unawaited executor future swallowed
+            # the traceback (found 2026-07-19; the crash was invisible
+            # until the diag reproduced it in the foreground).
+            if _test_hooks.sync_playwright is None:
+                _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
             # Phone-driven sessions start PINNED TO IDLE: the operator
             # releases the bot deliberately (AUTO MODE or a specific
             # mode) once they've seen where the tank spawned. Submitted
