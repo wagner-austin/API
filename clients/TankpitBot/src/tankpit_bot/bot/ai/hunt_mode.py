@@ -19,6 +19,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     target_position_is_fresh,
 )
+from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
@@ -35,6 +36,7 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.state.rank_formulas import fuel_capacity
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -179,10 +181,13 @@ def _decide_hunt_acquire_fresh(
     enemy passes the acquisition gates -- including affordability --
     the bot first tries a **dot relay**: hop to the fuel dot that best
     closes distance to the nearest otherwise-viable enemy, refuelling
-    on landing (user contract 2026-07-03). Only when there is no enemy
-    worth relaying toward, or no dot makes affordable progress, does
-    the session end with ``no_viable_targets`` (user contract
-    2026-07-02).
+    on landing (user contract 2026-07-03). When no dot makes progress
+    it falls back to **refuel-in-place** -- the best fresh fuel dot in
+    any direction, funding a future engagement instead of approaching
+    it (user ruling 2026-07-19). Only when there is no enemy worth
+    relaying toward, or the tank is at fuel capacity, or no fresh dot
+    qualifies, does the session end with ``no_viable_targets`` (user
+    contract 2026-07-02).
 
     Args:
         ctx: Decision context.
@@ -311,16 +316,25 @@ def _relay_toward_unaffordable_enemy(
 
     Each hop strictly reduces the distance to the enemy, so the relay
     terminates: either acquisition succeeds on a later tick (fuel
-    recovered, distance shortened) or no qualifying dot remains and
-    the session exits.
+    recovered, distance shortened) or no qualifying dot remains.
+
+    When no strict-progress dot exists the deficit may be FUEL, not
+    distance: run 2026-07-19 14:49 rejoined at fuel 653 with orange-2
+    only 26.6 tiles away (engage cost 159 -- unaffordable purely
+    because 159+650 > 653) and only 6 of 628 dots strictly closer, all
+    on water. The strict-progress rule starved the bot amid 622 usable
+    dots. The fallback (:func:`_refuel_toward_engagement`) hops to the
+    best fresh fuel dot in ANY direction -- getting richer instead of
+    closer -- and only when that too is impossible does the caller
+    exit the session.
 
     Args:
         ctx: Decision context.
         ai_state: Base AI state for the produced command.
 
     Returns:
-        Relay teleport decision, or ``None`` when there is no enemy
-        worth relaying toward or no dot makes affordable progress.
+        Relay teleport decision, refuel-hop decision, or ``None`` when
+        there is no enemy worth relaying toward or no dot helps.
     """
     travel = find_relay_travel_target(
         ctx.filtered,
@@ -338,7 +352,7 @@ def _relay_toward_unaffordable_enemy(
         return None
     dot = _pick_relay_dot(ctx, travel)
     if dot is None:
-        return None
+        return _refuel_toward_engagement(ctx, ai_state, travel)
     dot_x, dot_y = dot
     emit_ai(
         "dot-relay toward %s (id=%d) at (%d,%d): hop to dot (%d,%d) (fuel=%d)",
@@ -359,6 +373,65 @@ def _relay_toward_unaffordable_enemy(
         "dot_relay",
         ai_state,
         ctx.equip,
+    )
+
+
+def _refuel_toward_engagement(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+    travel: EnemyThreatDict,
+) -> TickDecisionDict | None:
+    """Hop to the best fresh fuel dot in ANY direction to fund the fight.
+
+    Fired when an otherwise-viable enemy exists but no dot makes
+    strict progress toward it: the deficit is fuel, not distance (run
+    2026-07-19 14:49 -- a human grabs the yellow dot next door, tops
+    up, and pounces; the bot exited the session instead). Reuses the
+    COLLECT restock picker, so the hop inherits its freshness,
+    affordability, and value-ranking gates.
+
+    Refueling only helps below the fuel cap: at capacity a still-
+    unaffordable enemy is genuinely out of range and the caller's
+    session exit is correct. Termination: a fuel-bearing hop raises
+    fuel toward the cap or affordability; a dry hop lowers it toward
+    the picker's own affordability floor -- either way the fallback
+    cannot loop forever, and the ledger's retry-loop audit surfaces
+    repeated same-target hops.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+        travel: The enemy the refuel is funding an engagement with.
+
+    Returns:
+        Refuel teleport decision, or ``None`` when the tank is already
+        at fuel capacity or no fresh dot qualifies.
+    """
+    capacity = fuel_capacity(ctx.self_state["rank"])
+    if ctx.fuel >= capacity:
+        return None
+    engage_cost = compute_teleport_fuel_cost(
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+        travel["x"],
+        travel["y"],
+    )
+    needed = engage_cost + ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    emit_ai(
+        "no progress dot toward %s (id=%d) -- refueling in place "
+        "(fuel=%d, engagement needs ~%d, capacity=%d)",
+        travel["name"],
+        travel["tank_id"],
+        ctx.fuel,
+        needed,
+        capacity,
+    )
+    return make_resource_search_hop(
+        ctx,
+        mode="HUNT",
+        score=800,
+        reason="hunt_refuel",
+        ai_state=ai_state,
     )
 
 

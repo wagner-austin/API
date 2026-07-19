@@ -45,6 +45,7 @@ tankpit-tile-info = "tankpit_bot.diagnostics.tile_inspector:main"
 tankpit-self-map = "tankpit_bot.diagnostics.self_map:main"
 tankpit-entity-map = "tankpit_bot.diagnostics.entity_map:main"
 tankpit-stats = "tankpit_bot.diagnostics.session_stats:main"
+tankpit-run-audit = "tankpit_bot.diagnostics.run_audit:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

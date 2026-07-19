@@ -45,7 +45,7 @@ confidence: high
 
 | Target | What it does |
 |--------|-------------|
-| `make analyze` | Issue report + cross-session stats on latest run |
+| `make analyze` | Issue report + run audit (deterministic verdicts + capture replay diff) + cross-session stats on latest run |
 | `make analyze-timing` | Command-response timing analysis |
 | `make decode` | Replay a capture through real decoders |
 | `make discover` | Extract command constants from JS client |

@@ -22,7 +22,7 @@ from tankpit_bot.bot.tick_loop import (
     request_interrupt,
     reset_interrupt_flag,
 )
-from tests.conftest import FakeEnv
+from tests.conftest import FakeEnv, FakeFileSystem
 
 
 class TestInterruptFlag:
@@ -105,12 +105,20 @@ class TestEntryPointWiring:
     def test_main_installs_handlers_with_request_interrupt(
         self,
         fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
     ) -> None:
         """``main()`` calls ``install_signal_handlers(request_interrupt)``.
 
         We swap the hook for a recorder, run ``main()`` until it tries
         to spin up Playwright, and assert the recorder captured exactly
         one install call whose callback is ``request_interrupt``.
+
+        ``fake_fs`` is load-bearing: ``main()`` configures REAL bot
+        runtime logging before the playwright abort, and without the
+        fake filesystem every test execution wrote a genuine stamped
+        ``runs/bot/bot-<now>.log`` and truncated the real
+        ``latest.events.jsonl`` — the "seven dead sessions" of
+        2026-07-19 were this test running under ``make check``.
         """
         from tankpit_bot.bot import entry
         from tankpit_bot.bot.tick_loop import request_interrupt as production_callback

@@ -1215,3 +1215,39 @@ Gate green: 4441 tests, 100% coverage.
 **Pages updated:** [[deactivation-format]] (own-kills section rewritten with replay evidence, fact_checked 2026-07-19), [[shoot-event-format]], protocol hub line, [[self-observing-architecture]] (FactSource deviation note), [[executor-rejection-loops]] (call-site list).
 
 Gate green: 4432 tests, 100% coverage.
+
+## [2026-07-19] tooling | Deterministic run audit: `tankpit-run-audit` in `make analyze`
+
+**Motivation (user):** "im worried that we cant properly analyze the runs. and that each ai may interpret the runs differently." Run interpretation had already drifted twice (June's "0x41 never fires" mis-read; the retracted inventory-desync claim) because every session re-derived conclusions from 11 MB of raw JSONL by hand.
+
+**Built:** `diagnostics/run_audit{,_types}.py`, `ledger_audit.py`, `capture_audit.py` — a typed-finding audit (`check`, `severity`, `summary`, scalar `evidence`) wired into `make analyze` as `tankpit-run-audit [events.jsonl]` (capture resolved as the sibling artifact). Same artifacts in → same verdicts out, regardless of who runs it.
+
+**Ledger checks** (each encodes a formerly hand-made interpretation — the ratchet rule): `kill_double_registration` (repeat victim inside 30 s = channel regression), `unresolved_decision` (shutdown sweep surfaced per kind), `stall_timeout`, `command_rejection`, `rejection_retry_loop` (≥2 failures on one (kind,target) = replanning not learning; the [[executor-rejection-loops]] class), `executor_discards`, `superseded_churn` (>5/kind), `tick_cadence_gap` (>8 s), `session_exit` (always emitted; missing scorecard is itself a warning), `empty_run`.
+
+**Capture replay checks** (the check class that falsified the June claims, now standing): every received frame re-decoded with the CURRENT decoder (local XOR table from the capture's magic — never touches live decoder state); `decode_error` (frame the decoder raises on), `unknown_container_subtypes` (undecoded 0x2E subtypes — the blind-spot canary), `deactivation_channel_diff` + `supervisor_channel_diff` (wire count vs ledger-ingested count; mismatch = the June class of decode/dispatch gap), `dom_witness_diff` (kill/empty-container/blocked-move banners the client rendered vs the wire messages that explain them — possible because the bot now records the DOM log into the capture as a witness).
+
+**Validation against run bot-20260719-004608:** the audit retroactively finds every bug this week's hand-analysis found — all 4 double-registered kills (pre-teardown run), unresolved shoot decision 235, the code-4 rejection — and verifies wire=ledger on both channels (4/4 deactivations, 3/3 supervisor errors).
+
+Tests: hand-built ledger records for exact window/threshold control; capture tests XOR-encode real frames and run the REAL decoder end to end. Gate green: 4467 tests, 100% coverage.
+
+## [2026-07-19] falsification + fix | The "dead sessions" were test droppings, not sessions
+
+The run audit's `empty_run` finding on `latest.*` surfaced seven zero-event stamped artifacts from today (13:08–14:21). Investigation ruled out every launcher: the service path constructs `Bot` in-process and never calls `configure_bot_runtime_logging` (it cannot produce stamped artifacts at all); the Sunshine/orchestrator profile runs `make run` (300 s bound — the dead logs all say "until stopped"); PowerShell history shows no manual launches.
+
+**Root cause:** `test_main_installs_handlers_with_request_interrupt` used `fake_env` but not `fake_fs`, so it drove the REAL `entry.main()` through real runtime-logging configuration — writing a genuine `bot-<now>.log` (the 4-line/316-byte signature), truncating the real `latest.events.jsonl` to empty — before aborting at its playwright sentinel. One "dead session" per `make check`. Reproduced deliberately: running that single test created `bot-20260719-145249.log` and wiped the events file a live run had just written. Six more `bot.run`/`_game_loop` tests in `test_run.py` leaked the same way one layer down (unconditional `latest.summary.txt` write in `_emit_session_scorecard` — the mystery "Ticks: 1 / stop_file / UNSET" summary was test data).
+
+**This falsifies the 2026-07-18 log entry's attribution** of the evening zero-event artifacts (19:38–21:55) to "sessions launched by the user's SPA bot service" — those were the same test droppings from that evening's `make check` runs. (The 14:51/14:52 July 18 runs with real events were genuine service sessions; that part stands.)
+
+**Fix:** `fake_fs` added to all seven tests, each now intercepting every filesystem write. Verified: full `make check` leaves the artifact count unchanged (774 → 774). ~14 bogus stamped artifacts remain on disk from before the fix (316-byte logs + 0-byte events, Jul 18 19:38–21:55 and Jul 19 13:08–14:52); left in place pending cleanup approval.
+
+Gate green: 4467 tests, 100% coverage.
+
+## [2026-07-19] fix | Refuel-in-place: the session-exit policy call, settled by capture forensics
+
+**Root cause of the tick-4 exit (run 14:49, cracked by replaying its own capture through the real decision code):** the bot rejoined at fuel 653 (tank state persists server-side; 653 = where the previous session quit). Every enemy failed affordability (`cost + 650 ≤ fuel` allows a 0.5-tile engagement at 653). The dot-relay then declined all 628 map dots — its strict-progress rule only hops to dots STRICTLY CLOSER to the travel target, and with orange-2 just 26.6 tiles away only 6 dots were closer, all on field01 water. 622 usable dots surrounded the bot; refueling on any of them would have made orange-2 affordable (809 ≤ 1100) with zero approach needed. **The deficit was fuel, not distance — the strict-progress relay starved the bot in a supermarket.**
+
+**Fix (user ruling "yes"):** `_refuel_toward_engagement` in `hunt_mode.py` — when a travel-worthy enemy exists but no progress dot qualifies, hop to the best fresh fuel dot in ANY direction via the COLLECT restock picker (`make_resource_search_hop`, new `ReasonKind` `"hunt_refuel"`), inheriting its freshness/affordability/value-ranking gates. Session exit now fires only when the tank is at `fuel_capacity(rank)` (refueling can't help) or no fresh dot qualifies. Verified against the exact live state that produced the tick-4 exit: the decision is now `teleport (89,100) reason=hunt_refuel` instead of `SessionExitError`. Termination: fuel-bearing hops rise toward the cap or affordability; dry hops fall toward the picker's affordability floor — no infinite loop, and the run audit's retry-loop check watches for same-target churn.
+
+Also this session: 438 test-dropping artifact pairs deleted from `runs/bot/` (the month-old leak fixed earlier today); 336 genuine run artifacts remain. [[bot-behavior-contract]] §exit row updated.
+
+Gate green: 4469 tests, 100% coverage.

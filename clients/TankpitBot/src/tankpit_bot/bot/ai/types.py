@@ -54,6 +54,7 @@ ReasonKind = Literal[
     "teleport_target",
     "shoot_target",
     "dot_relay",
+    "hunt_refuel",
     "confirm_kill",
     # controller
     "manual_hold",

@@ -1189,6 +1189,85 @@ def test_hunt_relay_exits_when_only_dot_is_impassable() -> None:
         decide_hunt_mode(ctx)
 
 
+def test_hunt_refuels_in_place_when_no_dot_makes_progress() -> None:
+    """With no strict-progress dot, the bot refuels in ANY direction.
+
+    User ruling 2026-07-19 after run 14:49: rejoined at fuel 653 with
+    an enemy 26.6 tiles away, 622 usable dots around it, and only
+    water-locked dots strictly closer -- the strict-progress relay
+    starved the bot amid plenty and exited at tick 4. The deficit was
+    fuel, not distance: hop to the best fresh dot regardless of
+    direction, get richer, then pounce. Here the only dot (50,100) is
+    BEHIND the bot relative to the enemy at (240,100), so the relay
+    declines it but the refuel fallback takes it.
+    """
+    tanks: dict[str, TankStateDict] = {"60": _map_known_enemy()}
+    world, self_state = make_world(fuel=700, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        inventory,
+        100000,
+        None,
+        "",
+        ((50, 100),),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 50
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "hunt_refuel"
+    assert decision["behavior"]["mode"] == "HUNT"
+
+
+def test_hunt_refuel_exits_at_fuel_capacity() -> None:
+    """At fuel capacity a still-unaffordable enemy is genuinely out of range.
+
+    Refueling cannot help a tank already at its cap (rank 2 -> 1200),
+    so the refuel fallback declines and the fail-hard session exit is
+    correct: the enemy at 140 tiles needs 840 + 650 = 1490 fuel
+    end-to-end, beyond what this rank can ever carry.
+    """
+    tanks: dict[str, TankStateDict] = {"60": _map_known_enemy()}
+    world, self_state = make_world(fuel=1200, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        inventory,
+        100000,
+        None,
+        "",
+        ((50, 100),),
+    )
+
+    with pytest.raises(SessionExitError, match="no_viable_targets"):
+        decide_hunt_mode(ctx)
+
+
 def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
     """Pursuit fires at a viewport-legal tile, never the raw off-viewport coords.
 

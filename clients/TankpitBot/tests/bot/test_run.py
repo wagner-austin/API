@@ -14,7 +14,9 @@ _STOP = Path("__nonexistent_stop_file__")
 class TestBotGameLoop:
     """Tests for Bot._game_loop method."""
 
-    def test_game_loop_exits_on_keyboard_interrupt(self, fake_env: FakeEnv) -> None:
+    def test_game_loop_exits_on_keyboard_interrupt(
+        self, fake_env: FakeEnv, fake_fs: FakeFileSystem
+    ) -> None:
         """Test _game_loop exits cleanly on KeyboardInterrupt."""
         from tankpit_bot.bot.base import Bot
         from tests.fakes import FakeCDPSession, FakePageInterrupting
@@ -30,7 +32,9 @@ class TestBotGameLoop:
         with pytest.raises(KeyboardInterrupt):
             bot._game_loop(interrupting_page, session_seconds=0, stop_file_path=_STOP)
 
-    def test_game_loop_returns_at_session_tick_budget(self, fake_env: FakeEnv) -> None:
+    def test_game_loop_returns_at_session_tick_budget(
+        self, fake_env: FakeEnv, fake_fs: FakeFileSystem
+    ) -> None:
         """A positive TANKPIT_BOT_SESSION_SECONDS ends the loop cleanly.
 
         With TICK_RATE_MS=2000, 4 seconds is exactly 2 ticks: the loop
@@ -82,7 +86,7 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
-    def test_run_success_path(self, fake_env: FakeEnv) -> None:
+    def test_run_success_path(self, fake_env: FakeEnv, fake_fs: FakeFileSystem) -> None:
         """Test run() goes through the success path and handles KeyboardInterrupt.
 
         This covers lines 603-614 in run(). The run() method catches
@@ -106,7 +110,9 @@ class TestBotRunMethod:
         finally:
             _test_hooks.sync_playwright = original
 
-    def test_run_maximises_via_cdp_on_streamed_display(self, fake_env: FakeEnv) -> None:
+    def test_run_maximises_via_cdp_on_streamed_display(
+        self, fake_env: FakeEnv, fake_fs: FakeFileSystem
+    ) -> None:
         """Bot.run() flips the window to maximised via CDP on the streamed display.
 
         When Vibeshine's launcher sets ``SUNSHINE_STREAM_DISPLAY_*``,
@@ -335,7 +341,9 @@ class TestBotBaseMain:
 class TestBotGameLoopStates:
     """Tests for Bot._game_loop AI-driven state handling."""
 
-    def test_game_loop_ai_tick_no_self_state(self, fake_env: FakeEnv) -> None:
+    def test_game_loop_ai_tick_no_self_state(
+        self, fake_env: FakeEnv, fake_fs: FakeFileSystem
+    ) -> None:
         """Game loop returns early when tick-loop state has no self tank."""
         from tankpit_bot.bot.base import Bot
         from tankpit_bot.sniffer.world_state import reset_world_state
@@ -358,6 +366,7 @@ class TestBotGameLoopStates:
     def test_game_loop_ai_tick_reaches_ready_state_and_starts_equipment_search(
         self,
         fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
     ) -> None:
         """Game loop reaches IDLE and starts equipment-search radar flow.
 

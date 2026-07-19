@@ -35,7 +35,7 @@ help:
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
-	@Write-Host "  make analyze                     issue report + cross-session stats"
+	@Write-Host "  make analyze                     issue report + run audit + cross-session stats"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
 	@Write-Host ""
 	@Write-Host "Offline tools:" -ForegroundColor Yellow
@@ -222,6 +222,8 @@ analyze:
 	@Write-Host ""
 	@Write-Host "==> analyze (latest run)" -ForegroundColor Cyan
 	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
+	@Write-Host ""
+	poetry run tankpit-run-audit runs/bot/latest.events.jsonl
 	@Write-Host ""
 	poetry run tankpit-stats
 
