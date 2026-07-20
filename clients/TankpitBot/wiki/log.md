@@ -1275,3 +1275,13 @@ Gate green: 4471 tests, 100% coverage.
 Run-audit updated: `clamped_transfer` produces no finding and never feeds the retry-loop detector (repeated clamped pickups on one target are repeated successes); `pickup_empty` and `inventory_full` get their own info verdicts and DO count as failures for retry-loop detection (repeated empties on one target = belief not learning; any `inventory_full` = the fullness gate let a doomed dispatch through).
 
 Gate green: 4474 tests, 100% coverage.
+
+## [2026-07-19] falsification + fix | "Maybe we have the wrong map image?" — no; display art ≠ server collision data. Downloader URL was stale.
+
+**User hypothesis tested**: fetched the live client's field image and hash-compared. The client JS builds `/images/maps/field` + id (verified against the live `tp-*.js` bundle); `field01.gif` from that path is **byte-identical (same MD5) to our cached copy**. The cached map IS the current one, and it is the ONLY map asset the client references — no higher-res variant, no collision overlay exists client-side.
+
+**Conclusion locked in**: the (163,44) "You can't go there!" vs GIF-ground divergence (and the server standing the tank on GIF-water at (167,40)) is a display-art-vs-server-collision-data gap that NOBODY outside the server can close a priori — zero 0x4A terrain messages in the whole capture; the real client doesn't predict passability either (that's why the error string exists). The bot's mark-failed-and-move-on handling (~2 s per lesson, session-scoped) is the same information position a human player has. Cross-session persistence of these verdicts = the nominated Phase 4 memory pilot.
+
+**Latent bug found by the probe**: `scripts/download_fields.py` still pointed at the retired `/play/fieldXX.gif` path, which now serves the SPA's HTML — `make download-fields` would have skipped every field (GIF-magic guard caught the HTML; broken but not destructive). Base URL fixed to `/images/maps`, pinned by test.
+
+Gate green: 4474 tests, 100% coverage.

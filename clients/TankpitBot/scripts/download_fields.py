@@ -12,7 +12,11 @@ from pathlib import Path
 
 from scripts import _test_hooks
 
-_BASE_URL = "https://tankpit.com/play"
+# The client JS builds field-image URLs as "/images/maps/field" + id
+# (verified against the live tp-*.js bundle 2026-07-19). The former
+# "/play/fieldXX.gif" path now serves the SPA's HTML page -- fetching
+# from it would overwrite every terrain map with HTML.
+_BASE_URL = "https://tankpit.com/images/maps"
 _FIELD_RANGE = range(1, 51)
 
 

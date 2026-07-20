@@ -77,9 +77,17 @@ def test_download_skips_non_gif_response(tmp_path: Path) -> None:
 
 
 def test_download_saves_valid_response(tmp_path: Path) -> None:
-    """Valid responses are saved to disk."""
+    """Valid responses are saved to disk, fetched from the client's real path.
+
+    The URL is pinned because the former ``/play/fieldXX.gif`` path now
+    serves the SPA's HTML page (discovered 2026-07-19); the live client
+    JS builds ``/images/maps/field`` + id, and the downloader must
+    match it or every fetch gets skipped by the GIF-magic guard.
+    """
+    requested: list[str] = []
 
     def _fake_get(url: str) -> HttpGetResponseProtocol:
+        requested.append(url)
         return _OK_RESPONSE
 
     _test_hooks.path_exists = lambda p: False
@@ -87,6 +95,7 @@ def test_download_saves_valid_response(tmp_path: Path) -> None:
     paths = download_field_gifs(output_dir=tmp_path)
     assert len(paths) == 50
     assert (tmp_path / "field01_r.gif").read_bytes() == b"GIF89a_fake_data"
+    assert requested[0] == "https://tankpit.com/images/maps/field01.gif"
 
 
 def test_main_runs_without_error(tmp_path: Path) -> None:
