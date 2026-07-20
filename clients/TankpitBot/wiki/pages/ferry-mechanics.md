@@ -42,14 +42,20 @@ off the ferry and stop at the first land tile. you would need to
 click again to reach your destination land tile. it takes two
 actions because you have to embark and disembark."[^4]
 
-Planner consequence: **pickup dispatches route on plain ground only**
-(`GroundOnlyTerrain` gate in `movement.py`) — the riding rule applies
-to piloted moves, never to server-routed `pickup_*` clicks. A land
-container that is only ferry-reachable while riding gets a piloted
-disembark move first (surface-clamped to the first land tile); the
-next tick dispatches the pickup from solid ground.
+Planner consequence: **pickup dispatches route on the CURRENT surface**
+(`SurfaceRouteTerrain` gate in `movement.py`) — plain ground when
+standing on land, water/ferry tiles when riding. A container floating
+on water picks up normally from the ferry (user 2026-07-20: "cant you
+just pick it up essentially like we were on land?"); a land container
+beyond adjacency service from the water gets a piloted disembark move
+first (surface-clamped to the first land tile), and the next tick
+dispatches the pickup from solid ground. Cardinal-adjacency service
+crosses the surface boundary in both directions (shore tile ↔ adjacent
+floating container), matching the reachability layer's long-standing
+adjacent-tile completion rule.[^5]
 
-[^4]: live falsification chain, run 2026-07-19 18:19: pickup at (163,44) dispatched while riding a ferry at (167,40) (riding rule made the channel "reachable"), server routed to the disembark stop (167,44) and refused with 0x52 code 1. Offline reproduction: ferry-aware gate=True, ground-only gate=False, matching the server. Fix pinned by `tests/bot/ai/test_movement.py::TestPickupSurfaceRouting`.
+[^4]: live falsification chain, run 2026-07-19 18:19: pickup at (163,44) dispatched while riding a ferry at (167,40) (riding rule made the channel "reachable"), server routed to the disembark stop (167,44) and refused with 0x52 code 1. Offline reproduction: ferry-aware gate=True, single-surface gate=False (the container sat 4 tiles inland — beyond adjacency), matching the server. Fix pinned by `tests/bot/ai/test_movement.py::TestPickupSurfaceRouting`.
+[^5]: run 2026-07-20 00:57 (bot-20260720-005424): the first fix's ground-ONLY gate was overbroad — equipment on a water tile at (226,196) was never "ground-reachable", so the disembark branch sailed the bot onto the container's own tile and then re-issued a refused move (0x52 code 6) to its own position every tick for 78 ticks (half the session). User contract: containers on water pick up normally while riding. Gate replaced by the surface-matched `SurfaceRouteTerrain`; regression pinned by `test_pickup_of_water_container_while_riding_dispatches` and `test_pickup_on_own_water_tile_while_riding_dispatches`. Whether the server honors cross-surface ADJACENT pickups (clicking a land container from the alongside ferry tile) is untested on the wire; the planner currently assumes yes, symmetric with the land→water-container case.
 
 ## Discovery (2026-06-12)
 

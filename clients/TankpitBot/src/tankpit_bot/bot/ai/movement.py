@@ -16,7 +16,7 @@ from tankpit_bot.bot.ai.context import (
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import (
-    GroundOnlyTerrain,
+    SurfaceRouteTerrain,
     clamp_move_target_at_surface_transition,
     is_riding_ferry,
 )
@@ -386,22 +386,22 @@ def _walk_or_teleport_with_terrain(
         if not is_pickup_target_actionable(ctx, tx, ty):
             return None
         # A pickup is ONE server-routed click, and one command never
-        # chains surfaces (user contract 2026-07-19): the route must
-        # exist on plain ground alone. The riding rule ("water is
-        # passable while on a ferry") applies to piloted moves, not
-        # pickups -- run 2026-07-19 18:20:33 dispatched a pickup
-        # across a channel while riding and drew "You can't go
-        # there!" after the disembark stop.
+        # chains surfaces (user contract 2026-07-19/20): the route
+        # must exist on the tank's CURRENT surface -- plain ground on
+        # land, water while riding a ferry (a floating container
+        # picks up normally from the ferry). Cross-surface targets
+        # need the two-action embark/disembark dance first.
+        riding = is_riding_ferry(ctx.world)
         if not is_collection_reachable_in_viewport(
             ctx.world,
-            GroundOnlyTerrain(terrain),
+            SurfaceRouteTerrain(terrain, water=riding),
             sx,
             sy,
             tx,
             ty,
             hostile_mines(ctx.world),
         ):
-            if is_riding_ferry(ctx.world):
+            if riding:
                 # Two-action contract: disembark first (a piloted move
                 # bounded at the first land tile), then next tick's
                 # replan dispatches the pickup from solid ground.

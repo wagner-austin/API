@@ -204,37 +204,56 @@ class TestSurfaceTransitionClamp:
         assert clamped == (105, 100)
 
 
-class TestGroundOnlyTerrain:
-    """The single-action pickup-routing surface (user contract 2026-07-19)."""
+class TestSurfaceRouteTerrain:
+    """The single-action pickup-routing surface (user contract 2026-07-19/20)."""
 
-    def test_only_plain_ground_is_traversable(self) -> None:
-        """Ground passes; water, rock, and live ferry tiles all block.
+    def test_ground_surface_only_plain_ground_is_traversable(self) -> None:
+        """On land: ground passes; water, rock, and ferry tiles all block.
 
         One server-routed command never chains surfaces: crossing onto
         a ferry is a queue-consuming boarding action, so a pickup route
         may not traverse it even though the riding view calls it
         passable.
         """
-        from tankpit_bot.bot.ai.ferry import GroundOnlyTerrain
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
 
         base = InMemoryTerrainMap({(101, 100): "W", (102, 100): "#"})
         ferry_view = FerryAwareTerrain(base, _ferry_tile(103, 100), riding=True)
-        ground_only = GroundOnlyTerrain(ferry_view)
+        ground_surface = SurfaceRouteTerrain(ferry_view, water=False)
 
-        assert ground_only.is_passable(100, 100) is True  # plain ground
-        assert ground_only.is_passable(101, 100) is False  # water (even riding)
-        assert ground_only.is_passable(102, 100) is False  # rock
-        assert ground_only.is_passable(103, 100) is False  # live ferry tile
+        assert ground_surface.is_passable(100, 100) is True  # plain ground
+        assert ground_surface.is_passable(101, 100) is False  # water (even riding)
+        assert ground_surface.is_passable(102, 100) is False  # rock
+        assert ground_surface.is_passable(103, 100) is False  # live ferry tile
         # Cell display is unchanged -- only passability differs.
-        assert ground_only.get_terrain(103, 100) == "~"
-        assert ground_only.get_terrain(101, 100) == "W"
+        assert ground_surface.get_terrain(103, 100) == "~"
+        assert ground_surface.get_terrain(101, 100) == "W"
+
+    def test_water_surface_water_and_ferry_pass_land_blocks(self) -> None:
+        """Riding: water and ferry tiles pass; ground and rock block.
+
+        A container floating on water picks up normally from the ferry
+        (user 2026-07-20) -- the route stays on the water surface. Land
+        is the OTHER surface: reaching it is a queue-consuming
+        disembark, never part of a pickup route.
+        """
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
+
+        base = InMemoryTerrainMap({(101, 100): "W", (102, 100): "#"})
+        ferry_view = FerryAwareTerrain(base, _ferry_tile(103, 100), riding=True)
+        water_surface = SurfaceRouteTerrain(ferry_view, water=True)
+
+        assert water_surface.is_passable(101, 100) is True  # water
+        assert water_surface.is_passable(103, 100) is True  # live ferry tile
+        assert water_surface.is_passable(100, 100) is False  # plain ground
+        assert water_surface.is_passable(102, 100) is False  # rock
 
     def test_render_viewport_delegates_to_wrapped_view(self) -> None:
         """The rendering is the wrapped view's rendering, verbatim."""
-        from tankpit_bot.bot.ai.ferry import GroundOnlyTerrain
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
 
         base = InMemoryTerrainMap({(100, 100): "W"})
         view = FerryAwareTerrain(base, _ferry_tile(100, 100), riding=False)
-        assert GroundOnlyTerrain(view).render_viewport(100, 100, 1, 1) == view.render_viewport(
+        assert SurfaceRouteTerrain(view, water=False).render_viewport(
             100, 100, 1, 1
-        )
+        ) == view.render_viewport(100, 100, 1, 1)

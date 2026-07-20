@@ -607,13 +607,15 @@ class TestPickupSurfaceRouting:
         return InMemoryTerrainMap(data)
 
     def test_pickup_while_riding_disembarks_first(self) -> None:
-        """Riding + land container across water plans the disembark move.
+        """Riding + inland container across water plans the disembark move.
 
         The ferry-aware view says the container is reachable by
         sailing, but a pickup is one click and the server will not
-        pilot the ferry for it. The planner must issue the piloted
-        move instead -- bounded at the first land tile -- and let the
-        next tick dispatch the pickup from solid ground.
+        pilot the ferry for it. With the container beyond adjacency
+        service from the water (a shore-adjacent one dispatches
+        directly), the planner must issue the piloted move instead --
+        bounded at the first land tile -- and let the next tick
+        dispatch the pickup from solid ground.
         """
         from tankpit_bot.bot.ai.ferry import compose_decision_terrain
         from tankpit_bot.state.types import TERRAIN_FERRY, make_terrain_tile
@@ -632,12 +634,79 @@ class TestPickupSurfaceRouting:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
 
-        result = walk_or_teleport(ctx, 104, 100, pickup_kind="equipment")
+        result = walk_or_teleport(ctx, 105, 100, pickup_kind="equipment")
 
         if result is None:
             raise AssertionError("expected a disembark move, got None")
         assert result["cmd_type"] == "move"
         assert result["target_x"] == 104
+        assert result["target_y"] == 100
+
+    def test_pickup_of_water_container_while_riding_dispatches(self) -> None:
+        """Riding + container floating on water dispatches the pickup.
+
+        The route stays on the water surface, so it is one command --
+        "cant you just pick it up essentially like we were on land?"
+        (user 2026-07-20). Regression guard for run 2026-07-20 00:57,
+        where the ground-only gate refused water containers outright
+        and the disembark branch sailed the bot in circles instead.
+        """
+        from tankpit_bot.bot.ai.ferry import compose_decision_terrain
+        from tankpit_bot.state.types import TERRAIN_FERRY, make_terrain_tile
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        static = self._channel_terrain((100, 101, 102, 103))
+        world["terrain"]["100,100"] = make_terrain_tile(
+            x=100,
+            y=100,
+            terrain_type=TERRAIN_FERRY,
+        )
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        terrain = compose_decision_terrain(world, static)
+        if terrain is None:
+            raise AssertionError("composed terrain unexpectedly None")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = walk_or_teleport(ctx, 103, 100, pickup_kind="equipment")
+
+        if result is None:
+            raise AssertionError("expected a pickup dispatch, got None")
+        assert result["cmd_type"] == "pickup_equipment"
+        assert result["target_x"] == 103
+        assert result["target_y"] == 100
+
+    def test_pickup_on_own_water_tile_while_riding_dispatches(self) -> None:
+        """Riding directly over the container's tile dispatches the pickup.
+
+        The exact run 2026-07-20 00:57 loop: the bot sat ON the water
+        container at (226,196) for 78 ticks re-issuing a refused move
+        to its own tile because a water tile is never ground-reachable.
+        A zero-length route on the current surface is trivially valid.
+        """
+        from tankpit_bot.bot.ai.ferry import compose_decision_terrain
+        from tankpit_bot.state.types import TERRAIN_FERRY, make_terrain_tile
+
+        world, self_state = make_world(self_x=100, self_y=100, fuel=800)
+        static = self._channel_terrain((100, 101, 102, 103))
+        world["terrain"]["100,100"] = make_terrain_tile(
+            x=100,
+            y=100,
+            terrain_type=TERRAIN_FERRY,
+        )
+        ai_state = make_scanned_ai_state()
+        inventory = make_inventory()
+        terrain = compose_decision_terrain(world, static)
+        if terrain is None:
+            raise AssertionError("composed terrain unexpectedly None")
+        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
+
+        result = walk_or_teleport(ctx, 100, 100, pickup_kind="equipment")
+
+        if result is None:
+            raise AssertionError("expected a pickup dispatch, got None")
+        assert result["cmd_type"] == "pickup_equipment"
+        assert result["target_x"] == 100
         assert result["target_y"] == 100
 
     def test_pickup_across_water_on_land_is_skipped(self) -> None:

@@ -132,37 +132,45 @@ class FerryAwareTerrain:
         ]
 
 
-class GroundOnlyTerrain:
-    """Terrain view where only plain ground is traversable.
+class SurfaceRouteTerrain:
+    """Terrain view restricted to one routing surface for pickups.
 
     Encodes the single-action routing surface for server-routed
-    pickups (user contract 2026-07-19): one command never chains
-    surfaces -- boarding a ferry is its own click on the ferry tile,
-    disembarking auto-stops on the first land tile, and a click the
-    server cannot reach on the CURRENT surface draws "You can't go
-    there!". A pickup is one click, so its route must be pure ground:
-    water is impassable and ferry tiles are impassable too (crossing
-    onto one is a queue-consuming transition, not a walk step).
+    pickups (user contract 2026-07-19/20): one command never chains
+    surfaces -- the server routes each click on the tank's CURRENT
+    surface only, and a click it cannot reach that way draws "You
+    can't go there!". Standing on land the surface is plain ground
+    (water and ferry tiles block: crossing onto a ferry is a
+    queue-consuming boarding action, not a walk step). Riding a ferry
+    the surface is water (water and ferry tiles pass, land blocks) --
+    a container floating on water picks up normally while riding.
 
-    Live origin: run 2026-07-19 18:20:33 -- the bot was riding a ferry
-    at (167,40); the riding rule made all water passable, the pickup
-    gate approved a container across a channel, and the server refused
-    with code 1 after the disembark stop.
+    Live origins: run 2026-07-19 18:20:33 -- riding at (167,40), the
+    riding rule made ALL tiles passable, the gate approved a LAND
+    container across a channel, and the server refused with code 1
+    after the disembark stop. Run 2026-07-20 00:57 -- the ground-only
+    overcorrection: the bot sailed onto a water container's own tile
+    and sat there 78 ticks refusing to dispatch the pickup because a
+    water tile is never "ground-reachable".
     """
 
     ROCK = "#"
     GROUND = "."
     WATER = "W"
 
-    def __init__(self, base: TerrainMapProtocol) -> None:
-        """Wrap any terrain view with ground-only passability.
+    def __init__(self, base: TerrainMapProtocol, *, water: bool) -> None:
+        """Wrap any terrain view with single-surface passability.
 
         Args:
             base: Terrain view to read cells from (static or
-                ferry-aware; ferry cells stay visible, just never
+                ferry-aware; excluded cells stay visible, just never
                 traversable).
+            water: The routing surface -- True when the tank is riding
+                a ferry (water/ferry tiles pass), False on land (plain
+                ground passes).
         """
         self._base = base
+        self._water = water
 
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain type at game coordinates.
@@ -184,9 +192,13 @@ class GroundOnlyTerrain:
             y: Y coordinate (0-255).
 
         Returns:
-            True only for plain ground.
+            True when the tile lies on the routing surface: water or
+            ferry while riding, plain ground on land.
         """
-        return self.get_terrain(x, y) == self.GROUND
+        cell = self.get_terrain(x, y)
+        if self._water:
+            return cell == _ASCII_FERRY or cell == self.WATER
+        return cell == self.GROUND
 
     def render_viewport(
         self,
@@ -318,7 +330,7 @@ def clamp_move_target_at_surface_transition(
 
 __all__ = [
     "FerryAwareTerrain",
-    "GroundOnlyTerrain",
+    "SurfaceRouteTerrain",
     "clamp_move_target_at_surface_transition",
     "compose_decision_terrain",
     "is_riding_ferry",
