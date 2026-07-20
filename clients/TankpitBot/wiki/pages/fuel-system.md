@@ -120,13 +120,17 @@ The fuel-dot atlas was restored 2026-07-03 (stripped 2026-06-22):
 
 A teleport can land the tank on a one-tile island in a lake (run
 20260612-131003: dropped at 87 fuel with no walkable exit).
-Marooning has never been recoverable: if fuel is below the cheapest
-teleport cost there is no escape, dot or otherwise. A "marooned
+Marooning is a strand, NOT a death: you cannot deactivate yourself,
+walking is free at zero fuel, and radar stays usable (user contract
+2026-07-20) — a marooned tank survives indefinitely and can walk out
+if any land route exists. Only a true island with no walkable exit is
+a permanent strand — and the one famous "island" case was actually a
+drivable ferry the model misread (see [[ferry-mechanics]]). A "marooned
 escape" used to exist that bypassed the operating-reserve gate to
 fire a fuel-dot teleport. The reserve-vetoed band it covered was
 narrow -- fuel high enough for the teleport but below the hunt
 reserve -- and the actual stranded case (fuel below any teleport
-cost) was always fatal anyway. The escape was removed with the rest
+cost) was a permanent strand, not a death. The escape was removed with the rest
 of the fuel-dot system 2026-06-22; when lock / pickup / sense / hop
 all decline the COLLECT owner ends the session with exit reason
 `out_of_fuel` (`SessionExitError`, 2026-07-02 — previously an uncaught

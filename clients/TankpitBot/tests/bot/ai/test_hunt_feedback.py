@@ -222,18 +222,21 @@ class TestDecideKillCooldown:
                 decision["behavior"]["target_y"],
             ) != (105, 105)
 
-    def test_miss_on_stationary_far_target_blocks_and_replans(self) -> None:
-        """A consumption-miss on a stationary distant target blocks it.
+    def test_miss_on_stationary_far_target_releases_without_block(self) -> None:
+        """A consumption-miss on a stationary distant target releases it.
 
         Consumption = hit (user contract 2026-07-02): pursuit homings
         that land arrive as ``weapon>0`` hits and keep the engagement
         alive through the hit path. A genuine miss (weapon=0, nothing
         spent) at a registry position that has not moved proves the
-        target is NOT there -- a frozen registry entry or an
-        unwitnessed corpse. Repeating the shot cannot change the
-        answer (live run 2026-07-02 01:23: 25+ weapon=0 shots at
-        orange-1's stale tile), so the target is blocked and the lock
-        released.
+        target is NOT there -- it departed (escape past the ~12 s
+        reroute TTL) or died off-viewport to a third party or hidden
+        mine. Since 2026-07-20 the lock is released WITHOUT the 30 s
+        block so the next map snapshot's fresh position can feed a
+        follow-up acquisition (the block forfeited orange-2's
+        guaranteed finish on 2026-07-19); repeat-shot loops stay
+        impossible because the lock itself is cleared (the 2026-07-02
+        01:23 loop kept the lock).
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -270,17 +273,15 @@ class TestDecideKillCooldown:
 
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["updated_ai_state"]["blocked_combat_targets"] == {}
 
-    def test_miss_on_adjacent_stationary_target_blocks(self) -> None:
-        """A consumption-miss on an adjacent stationary target blocks it.
+    def test_miss_on_adjacent_stationary_target_releases(self) -> None:
+        """A consumption-miss on an adjacent stationary target releases it.
 
         The original same-tile re-engage loop (run 20260611-103244:
-        12 shots at a frozen tile): an adjacent live target hits
-        255/255, so a weapon=0 empty-ground response against an
-        unmoved registry position is proof the tank is gone. Blocking
-        uses the kill-cooldown TTL, so a shielded tank is retried
-        later.
+        12 shots at a frozen tile) was caused by KEEPING the lock;
+        releasing it prevents the loop without the 30 s block, and a
+        fresh map acquisition follows the departed tank up.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -320,7 +321,7 @@ class TestDecideKillCooldown:
 
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
-        assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+        assert decision["updated_ai_state"]["blocked_combat_targets"] == {}
 
     def test_miss_on_moved_target_reaims_and_keeps_lock(self) -> None:
         """A miss on a target that moved since the shot re-aims, not blocks.
@@ -591,3 +592,88 @@ class TestDecideKillCooldown:
         assert decision["command"]["cmd_type"] != "shoot"
         assert decision["updated_ai_state"]["combat_target_id"] == -1
         assert "50" not in decision["updated_ai_state"]["blocked_combat_targets"]
+
+
+class TestDepartedTargetFollowUp:
+    """Orange-2 follow-up: released escapees are re-acquired from fresh maps."""
+
+    def test_released_escapee_is_reacquired_at_its_new_position(self) -> None:
+        """After a departure release, the fresh snapshot feeds a follow-up.
+
+        The orange-2 sequence end-to-end (user ruling 2026-07-20): the
+        stationary miss releases the lock without a block; the next
+        map snapshot shows the escapee at its new position; plain
+        nearest-affordable acquisition takes it -- no damage
+        weighting, it simply competes on distance and wins when
+        nearest. Under the former 30 s block this exact acquisition
+        was rejected ("blocked", run 2026-07-19 22:30:36).
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=110,
+                y=110,
+                team=2,
+                rank=1,
+                name="Runner",
+                is_self=False,
+                is_bot=False,
+                damage_state=1,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+                "combat_target_id": 50,
+                "combat_target_x": 110,
+                "combat_target_y": 110,
+                "last_shot_target_id": 50,
+                "last_shot_target_name": "Runner",
+            }
+        )
+        inventory = make_inventory()
+
+        release = decide(world, self_state, ai_state, inventory, 100000, None, "miss")
+        assert release["updated_ai_state"]["combat_target_id"] == -1
+        assert release["updated_ai_state"]["blocked_combat_targets"] == {}
+
+        # Fresh map snapshot: the escapee reappears 20 tiles away with
+        # a map-fresh timestamp (off-viewport, so acquisition goes
+        # through the map-known path).
+        followed = dict(tanks)
+        followed["50"] = make_tank_state(
+            tank_id=50,
+            x=130,
+            y=100,
+            team=2,
+            rank=1,
+            name="Runner",
+            is_self=False,
+            is_bot=False,
+            damage_state=1,
+            timestamp_ms=102000,
+            last_wire_seen_ms=100000,
+            last_position_update_ms=102000,
+            last_viewport_observation_ms=0,
+        )
+        world2, self_state2 = make_world(fuel=900, tanks=followed)
+        chase_state = AIStateDict(
+            **{
+                **release["updated_ai_state"],
+                "mode": "HUNT",
+                "mode_state": "ACQUIRE",
+                "mode_started_ms": 100000,
+                "last_map_open_ms": 102000,
+            }
+        )
+
+        decision = decide(world2, self_state2, chase_state, inventory, 102500, None, "")
+
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["updated_ai_state"]["combat_target_id"] == 50

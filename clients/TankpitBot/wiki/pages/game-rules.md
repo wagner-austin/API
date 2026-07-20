@@ -63,8 +63,16 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 
 ## Fuel
 
-- If you run out of fuel, your tank will be deactivated
-- This is the death spiral: 0 fuel = instant deactivation, not just immobility
+- Deactivation happens when DAMAGE takes your fuel to zero — fuel is
+  the life pool and hits/mines drain it
+- **You cannot deactivate yourself** (user contract 2026-07-20,
+  verbatim: "you cant kill yourself in game its impossible... you
+  cant die from walking, even at zero fuel it stops debiting. you can
+  use radar. you cant teleport if theres insufficient fuel, but you
+  wont die"). Self-spending clamps at zero: walking becomes free at 0
+  fuel, radar stays usable, teleports refuse on insufficient fuel.
+  The How-To-Play "run out of fuel = deactivated" line describes
+  being drained BY ENEMY DAMAGE, not by your own spending
 
 [^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
 [^2]: "Higher rank tanks... have a larger radar" — official text; resolved 2026-07-06 with exact formulas via client mining (tpclient.js Gc gauge draw) + user measurements at ranks 1/3/4/6/7 — see [[game-economy]] and [[radar-mechanics]]

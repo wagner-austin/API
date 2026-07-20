@@ -1325,3 +1325,15 @@ Bonus wire confirmation the same capture: orange-2's return fire arrived as 0x53
 ## [2026-07-19] correction | No time-based damage repair — fuel pickups are the only repair mechanism
 
 User (verbatim): "they do not repair over time. only via fuel pickups." The June-11 reading of purple-3's 1→0→3 healing as "tiers repair over time" is corrected in [[enemy-bot-behavior]] — that recovery was also a fuel pickup. Damage model now closed: hits drain the victim's fuel pool, damage tiers are bands of it, and the ONLY way back up is picking up fuel.
+
+## [2026-07-20] contract + fix | Departed targets are never blocked — orange-2 follow-up lands; self-deactivation impossible
+
+**User rulings**: "i dont want us blocking targets arbitrarily. and for situations like orange 2 i want to ensure we are not blocking them." And the death-mechanics contract (verbatim): "you cant kill yourself in game its impossible... you cant die from walking, even at zero fuel it stops debiting. you can use radar. you cant teleport if theres insufficient fuel, but you wont die." Off-viewport death causes for a chased enemy are exactly two: third-party kill or hidden mine.
+
+**Fix — the follow-up**: the stationary-miss branch (ammo available) now calls `release_combat_target_and_replan` — lock cleared, NO 30 s block, `target_departed` diagnostic, map opens — so the next snapshot's fresh position feeds a plain nearest-affordable re-acquisition (no damage weighting, user ruling). Under the old block, orange-2 was on the very next snapshot (22:30:36, dist 32, critical, affordable) and was rejected `"blocked"`. Loop safety holds because the *lock release* is what prevents repeat-shot loops (the 2026-07-02 01:23 loop kept the lock); corpse follow-ups self-correct on arrival (landing scan reveals corpse direction → liveness flips → dropped). Pinned by `TestDepartedTargetFollowUp` (full release → fresh-map → teleport-reacquire sequence) plus the rewritten stationary-miss tests.
+
+**Remaining block sites audited for the user** — three, all evidence-based (server refused us about a present target) and all practically dormant: rejected shot (fired once ever, pre-aim-clamp 2026-07-03), failed combat landing (never fired — archive sweep: 13 failed teleports total, ALL June 10–20, ALL stall-timeouts at invalid/out-of-bounds coordinates from the blind-hop era; zero since June 20), ammo-exhaustion-with-nothing-collectible (fired once, 2026-07-06, caused by the since-fixed restock starvation). None can catch a departed target.
+
+**Wiki corrections**: [[game-rules]] 0-fuel note rewritten (deactivation = drained BY DAMAGE; self-spending clamps at zero), [[fuel-system]] marooning re-framed as a strand-not-death (and the famous "island" was a drivable ferry).
+
+Gate green: 4479 tests, 100% coverage.
