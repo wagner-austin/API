@@ -1343,3 +1343,25 @@ Gate green: 4479 tests, 100% coverage.
 The end-of-soak −45/+45/−10/+10 pattern decomposed entirely into ALREADY-DOCUMENTED constants: short dot/equipment hops at floor(6×euclid) (wire teleports at 00:57:06/:13 drew exactly −34/−45), radar at 10/fire, walking at 1/tile, and landing auto-pickups clamping back to exactly 1100 at cap. Nothing new — the bot was grazing through a fuel-dense area, every expense instantly refunded by the ground.
 
 Method lesson logged: the first two readings ("incoming fire", then "~5 fuel/tile walking") were guesses that contradicted [[game-economy]]'s own verified walk=1 row — check the wiki before re-deriving. Clean re-measurement: six exact 1/tile SelfMovement segments (added to the page); the stale "Teleport: unknown" row updated to floor(6×euclid) with isolated samples; open item sharpened to per-weapon firing costs (paired −45/−10 per combat tick, undecomposed).
+
+## [2026-07-20] validation | Teleport cost floor(6×euclid) systematically validated — 248/248 exact post-fix; charged on ACTUAL landing tile
+
+User challenged the teleport row ("are we sure about the teleport cost? is that validated?") — and the challenge was earned: the row's "Long-verified... hundreds of hops" claim traced back to [[teleport-mechanics]] footnote [^3], an undocumented assertion with no dataset behind it.
+
+Ran the systematic pairing across ALL `runs/bot/*.events.jsonl`: every `teleport(x,y)` dispatch matched to its wire fuel delta (pre-hop `Self:` fix → post-hop `Fuel: A -> B` line; windows with intervening move/radar/shoot/pickup or a fuel-level mismatch excluded as contaminated). Results:
+
+- **Post-2026-06-24 era** (after the fuel double-count fix): **248/248 clean pairs exact** at floor(6×euclid), costs spanning 6–654 (1-tile hop to ~109-tile jump).
+- **All-era**: 2,335/2,538 exact. Every one of the 203 residuals lives in pre-fix runs (peak: June 10–17, the broken-fuel-tracking / blind-hop era); zero residuals in any run after the 2026-06-23 fix.
+- **New refinement**: 624 of the exact matches were drift hops where the server displaced the landing off the requested target — the charge matches distance to the ACTUAL LANDING tile, not the clicked target. Planner estimates on the target are off by a few fuel on drifted hops; no code change warranted.
+
+[[game-economy]] teleport row and [[teleport-mechanics]] fuel-cost section + footnote rewritten to cite the real dataset. The per-day residual table doubling as an independent confirmation that the 2026-06-23 `pickup_container` double-count fix was the right cut: economy noise vanishes precisely at that boundary.
+
+## [2026-07-20] bug + fix | Ground-only pickup gate was overbroad — soak burned 78 ticks sitting ON a water container; surface-matched routing lands
+
+The verification soak (bot-20260720-005424) scored clean on combat — 1 kill (purple-4, through the reroute window), 12/12 hits, 0 rejected, full inventory, fuel 1096 — but the tail hid a loop: radar revealed equipment on a WATER tile at (226,196); the ground-only gate said "never ground-reachable", the disembark branch sailed the ferry onto the container's own tile, and from tick 72 to 150 (half the session) the bot re-issued a move to its own position, refused by the server with 0x52 code 6, 77 times. The equipment lock never released because nothing in the loop registered as failure.
+
+User correction (the contract, 2026-07-20): "wasnt it on the water? cant you just pick it up essentially like we were on land?" — riding a ferry, a floating container is on the SAME surface; the pickup routes normally. The 2026-07-19 refusal that motivated ground-only was the OTHER surface: riding with the container 4 tiles inland (route needed water→land chaining).
+
+Fix: `GroundOnlyTerrain` → `SurfaceRouteTerrain(base, water=riding)` — pickups route on the tank's current surface (ground on land, water/ferry while riding). Disembark-first now fires only for land containers beyond adjacency service. Cardinal-adjacency service crosses the surface boundary both ways, symmetric with the land-side behavior the reachability layer always had; whether the server honors the riding→adjacent-land-container direction is not yet wire-tested (noted in [[ferry-mechanics]] [^5]).
+
+Both live incidents stay fixed: the 07-19 inland refusal (single-surface gate=False → disembark) and the 07-20 on-tile loop (water container → direct dispatch, trivially at distance 0). Gate green: 4,482 tests, 100% coverage.

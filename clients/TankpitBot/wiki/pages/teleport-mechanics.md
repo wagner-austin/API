@@ -25,6 +25,8 @@ Teleport is the primary mobility model for search and hunting. Never propose rep
 
 `cost = floor(6 * euclidean_distance)`. Cheapest: 6 fuel (1 tile). Diagonal = 8 fuel. Below ~8 fuel no teleport is affordable.[^3]
 
+The distance is measured to the **actual landing tile**, not the clicked target: when the server displaces the landing (occupied tile, mines, terrain — see Placement above), the fuel charge matches `floor(6 × euclid(start, landing))` exactly. 624 drift hops confirm this; the planner's target-based estimate is off by only a few fuel on drifted hops, so no code change is warranted.[^3]
+
 ## Map requirement
 
 The map must be open to teleport. `CMD_MAP_OPEN` (0x6c) opens it; teleport auto-closes it via `CMD_MAP_TELEPORT` (0x74). See [[map-mechanics]].[^4]
@@ -43,7 +45,7 @@ Server tick rate is 2000ms. Commands sent faster are queued by the server. Conse
 
 [^1]: user (Austin), 2026-06-11 — "no walking are you stupid lol"; teleport is the mobility primitive, walking only for short in-viewport closes
 [^2]: user (Austin), 2026-06-16 — "you get moved off if there are mines, or if there is terrain in the way. or if there is water there, you get teleported to the nearest open space"
-[^3]: fuel cost formula verified across multiple runs; floor(6 * euclidean) matches all observed fuel decrements
+[^3]: Systematic validation 2026-07-20: every teleport dispatch in every `runs/bot/*.events.jsonl` paired with its wire fuel delta (pre-hop `Self:` position fix → post-hop `Fuel: A -> B` line; windows with intervening move/radar/shoot/pickup dispatches or a fuel-level mismatch excluded). Post-2026-06-24 era (after the fuel double-count fix): 248/248 pairs exact, costs spanning 6–654. All-era: 2,335/2,538 exact (1,711 on target coords + 624 on actual-landing coords); all 203 residuals live in pre-fix runs with broken fuel tracking. Supersedes the earlier undocumented "verified across multiple runs" assertion.
 [^4]: discovery probe 2026-06-12 — map open/close wire behavior; see [[map-mechanics]] for full details
 [^5]: fuel dot probe 2026-06-11 — 6/6 dots held fuel; sixth auto-picked on landing (fuel 639→1100)
 [^6]: user (Austin), 2026-04-20 — protocol command timing; confirmed no waits needed between map/teleport/fire

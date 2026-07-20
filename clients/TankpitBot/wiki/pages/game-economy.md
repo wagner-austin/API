@@ -41,7 +41,7 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 | Dual shot (`weapon=1`) | unknown precise value; presumed 10 | Higher than single. Tighter sample needed to nail the exact number. |
 | Mine placement (per command) | **~1–2 per mine placed** | Noisy sample; 6 mines correlated with a −10 fuel delta over the placement window |
 | Radar scan | **10** | Verified across 6 radar scans; reliable |
-| Teleport | **floor(6 × euclidean distance)** | Long-verified: the planner's `compute_teleport_fuel_cost` matches the wire delta on every landing (hundreds of hops). Isolated samples 2026-07-20 00:57: short hops of euclid ~5.7 and ~7.5 drew exactly −34 and −45 with no other spend in the window |
+| Teleport | **floor(6 × euclidean distance)** — measured from start to the **actual landing tile** | Systematically validated 2026-07-20: every `teleport(x,y)` dispatch in every run was paired with its wire fuel delta (pre-hop `Self:` fix → post-hop `Fuel: A -> B` line, contaminated windows excluded). Post-2026-06-24 era (after the fuel double-count fix): **248/248 pairs exact**, costs 6–654. All-era: 2,335/2,538 exact; the 203 residuals are all pre-fix runs with broken fuel tracking. When the server drifts the landing off the requested target, the charge matches distance to the LANDING, not the target (624 drift hops confirm this) — planner estimates on the target can be off by a few fuel on drifted hops |
 
 ## Damage taken
 
