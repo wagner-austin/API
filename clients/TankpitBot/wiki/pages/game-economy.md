@@ -36,12 +36,12 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 
 | Action | Fuel cost | Notes |
 |---|---|---|
-| Walk one tile | **1** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8) |
+| Walk one tile | **1** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8). Re-confirmed 2026-07-20: six clean SelfMovement segments, exact at 1/tile (7→7, 14→14, 5→5, 3→3, 2→2, 1→1) |
 | Single shot (`weapon=0`) | **6** | Multiple isolated samples (shot at empty ground with no other wire activity in the 2 s 0x2E window) |
 | Dual shot (`weapon=1`) | unknown precise value; presumed 10 | Higher than single. Tighter sample needed to nail the exact number. |
 | Mine placement (per command) | **~1–2 per mine placed** | Noisy sample; 6 mines correlated with a −10 fuel delta over the placement window |
 | Radar scan | **10** | Verified across 6 radar scans; reliable |
-| Teleport | unknown precise value; high | Sample showed ~−400 fuel during a teleport+walk window, but couldn't isolate from the simultaneous walking and queued mine placement |
+| Teleport | **floor(6 × euclidean distance)** | Long-verified: the planner's `compute_teleport_fuel_cost` matches the wire delta on every landing (hundreds of hops). Isolated samples 2026-07-20 00:57: short hops of euclid ~5.7 and ~7.5 drew exactly −34 and −45 with no other spend in the window |
 
 ## Damage taken
 
@@ -89,7 +89,7 @@ Every row matches `remaining = declared − taken` exactly.
 
 ## What's still open
 
-The first column of "Cost per player action" has two rows marked unknown — dual shot exact fuel cost, teleport exact fuel cost. To pin those down precisely we'd need isolated captures: dual shot in steady state with no other actions; teleport with no other queued commands. Both are quick follow-ups when you next sniff.
+Dual-shot exact fuel cost is still presumed-10, and homing-shot fuel cost has no row at all: in-combat fuel traces show paired −45/−10 deltas per firing tick (2026-07-19 soaks) that are not yet decomposed into per-weapon costs. Pinning them needs an isolated capture: fire one dual, then one homing, with no movement/radar in the same 0x2E windows.
 
 ## How this was discovered
 

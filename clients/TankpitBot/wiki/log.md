@@ -1337,3 +1337,9 @@ User (verbatim): "they do not repair over time. only via fuel pickups." The June
 **Wiki corrections**: [[game-rules]] 0-fuel note rewritten (deactivation = drained BY DAMAGE; self-spending clamps at zero), [[fuel-system]] marooning re-framed as a strand-not-death (and the famous "island" was a drivable ferry).
 
 Gate green: 4479 tests, 100% coverage.
+
+## [2026-07-20] verification | The "fuel oscillation" was the documented economy running at cap; walk=1/tile re-confirmed; teleport row fixed
+
+The end-of-soak −45/+45/−10/+10 pattern decomposed entirely into ALREADY-DOCUMENTED constants: short dot/equipment hops at floor(6×euclid) (wire teleports at 00:57:06/:13 drew exactly −34/−45), radar at 10/fire, walking at 1/tile, and landing auto-pickups clamping back to exactly 1100 at cap. Nothing new — the bot was grazing through a fuel-dense area, every expense instantly refunded by the ground.
+
+Method lesson logged: the first two readings ("incoming fire", then "~5 fuel/tile walking") were guesses that contradicted [[game-economy]]'s own verified walk=1 row — check the wiki before re-deriving. Clean re-measurement: six exact 1/tile SelfMovement segments (added to the page); the stale "Teleport: unknown" row updated to floor(6×euclid) with isolated samples; open item sharpened to per-weapon firing costs (paired −45/−10 per combat tick, undecomposed).
