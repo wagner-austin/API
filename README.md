@@ -1,6 +1,16 @@
 # API Platform
 
-Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no `Any`), 100% test coverage, FastAPI + RQ + Redis architecture.
+Typed Python monorepo for ML training, NLP, media services, and quant-ML risk modeling. Strict mypy (no `Any`, no `cast`, no `type: ignore`), 100% statement + branch test coverage, FastAPI + RQ + Redis + Kafka architecture.
+
+## For recruiters — start here
+
+If evaluating this repo, read these three (15 min total):
+
+1. **[`libs/cleargbm/`](libs/cleargbm)** + **[`libs/cleargbm_rs/`](libs/cleargbm_rs)** — From-scratch interpretable gradient boosting: numpy Python orchestration with a Rust core (histogram building, tree construction, prediction pipeline) exposed via PyO3 bindings. Rare skill demo.
+2. **[`services/covenant-radar-api/`](services/covenant-radar-api)** + **[`libs/covenant_ml/`](libs/covenant_ml)** + **[`libs/covenant_nn/`](libs/covenant_nn)** — Multi-model risk prediction: pluggable ML backends (XGBoost, LightGBM, ClearGBM, LogReg, RF) and PyTorch NN backends (MLP, LSTM), Optuna optimization, Kafka streaming. Quant-ML shop quality.
+3. **[`libs/monorepo_guards/`](libs/monorepo_guards)** — Custom static-analysis framework: 20+ architecture-enforcement rules (Python + Rust) that lint invariants CI-time. Enforcement-as-code pattern.
+
+Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless curious.
 
 ## Services
 
@@ -18,6 +28,7 @@ Typed Python monorepo for ML training, NLP, and media services. Strict mypy (no 
 | [grandma-api](services/grandma-api) | 8008 | Multi-language audio-to-English translation (Whisper STT + language detection, GPT-4o-mini translation) |
 | [github-stats-api](services/github-stats-api) | 8009 | GitHub stats SVG card generation |
 | [opportunity-radar-api](services/opportunity-radar-api) | 8010 | Hackathon and competition discovery |
+| [doc-extract-api](services/doc-extract-api) | 8012 | PDF text extraction with pdfplumber + docTR OCR fallback |
 | [procart-api](services/procart-api) | - | Procedural art rendering orchestration |
 
 ## Clients
