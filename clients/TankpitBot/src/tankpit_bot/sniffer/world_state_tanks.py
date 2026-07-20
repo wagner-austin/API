@@ -294,6 +294,14 @@ def update_world_state_from_tank_remove(ws: WorldService, tank_id: int) -> None:
         ws: World service instance.
         tank_id: Departing tank id.
     """
+    # The 0x58 is the start of the server's ~12 s id-routing grace: a
+    # departed tank stays resolvable for shoot-at-id for roughly 11-13
+    # more seconds (run 2026-07-19 22:30:00 -- last rerouted homing
+    # hit at +11.0 s after the remove, first miss fired at +13.0 s).
+    # The diagnostic timestamps every removal so pursuit misses can be
+    # correlated against it and the TTL constant narrowed across runs
+    # (see wiki [[shoot-event-format]] section "Global action queue").
+    emit_diagnostic(diagnostic_kind="tank_removed", tank_id=tank_id)
     ws.world_state = remove_tank(ws.world_state, tank_id, browser.get_current_time_ms())
 
 

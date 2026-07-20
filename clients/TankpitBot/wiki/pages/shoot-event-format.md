@@ -49,6 +49,46 @@ ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:
 
 Shields and corpses do **NOT** return miss. A miss on a stationary target at range is impossible — it means the target moved. Deactivation detection comes from the 0x41 wire message (0x2E-tunneled, fires for own kills too — falsified-claim history in [[deactivation-format]]), not from per-shot hit/miss feedback.[^2]
 
+## Global action queue, homing reroute, and the post-departure TTL (2026-07-19)
+
+User contract (verbatim): "in game, as a human player, you click on an
+enemy and then you shoot the enemy once your action is processed in
+the global queue. but, if the enemy had a move command prior to your
+shoot command, then they would move and your shot would miss, hitting
+the x,y tile where the enemy was when you entered the shoot command.
+however, if you have homing shots on, you will use a homing shot and
+hit — homing shots never miss. normally, you need to click on an
+enemy and then if they teleport away, no matter how far, your homing
+shot will follow. however, human players can only send one, cuz it
+requires a click on the enemy tank. but we can programmatically send
+the 'shoot at enemy' command and then it gets rerouted to the enemy."
+
+Mechanics this encodes:
+- All actions process through a **global server queue**; a shot
+  resolves against the target's position at processing time, not
+  click time. Homing converts every would-be queue-race miss into a
+  hit. **Homing has no range limit.**
+- A human can fire exactly one post-departure homing (the click needs
+  a visible tank); the bot's id-targeted `shoot(x,y,id)` command can
+  repeat it — the server keeps rerouting to the departed tank.
+- **The reroute has a server-side TTL of ~12 s from the 0x58
+  TankRemove.** Measured (run 2026-07-19 22:30, target orange-2
+  id=528, all 16 shoot commands byte-identical on the wire): 0x58 at
+  +0 s; rerouted homings FIRED at +0.65/+2.7/+4.8/+6.8/+8.9/+11.0 s
+  all debited ammo (= hit, consumption-equals-hit contract); the shot
+  fired at **+13.0 s** drew a response with no debit — genuine miss,
+  the id no longer resolved. Boundary is in **[11.0, 13.0] s**
+  fire-time; the `tank_removed` diagnostic timestamps every 0x58 so
+  future pursuit misses narrow the constant automatically.
+- Tactical rule: after a pursued target's 0x58, ~5–6 more
+  guaranteed-hit homings exist; firing past ~12 s donates ammo to the
+  void. The stationary-miss→block rule already disengages on the
+  first post-TTL miss (one homing = the minimum knowable cost).
+- Confirmed the same run: the departed tank's position goes
+  completely dark between the 0x58 and the next map open (zero wire
+  updates for 22 s) — per-shot victim resolution during reroute is
+  impossible (`victim_id=-1` on every rerouted hit).
+
 ## Damage tiers (from correlated TankStatusSync / MovementResponse)
 
 `damage_state` counts **down** toward deactivation:

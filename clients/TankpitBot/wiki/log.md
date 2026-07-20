@@ -1305,3 +1305,13 @@ Supersedes the earlier "dispatch-time race, could not reconstruct" claim — it 
 **Fix**: `GroundOnlyTerrain` view (only plain ground traversable — water, rock, AND live ferry tiles all block) now gates every pickup dispatch in `movement.py`. When the ground-only gate fails while riding, the planner issues the piloted disembark move (surface-clamped to the first land tile) instead of the doomed pickup; the next tick dispatches from solid ground. Validated against the incident state: new gate=False, disembark clamps to (167,41). Pinned by `TestPickupSurfaceRouting` + `TestGroundOnlyTerrain`.
 
 Gate green: 4478 tests, 100% coverage.
+
+## [2026-07-19] discovery + contract + instrumentation | The ~12 s shoot-at-id TTL after 0x58 TankRemove
+
+The orange-2 escape (soak 22:29, 16 shots, survived at critical) reverse-engineered end to end. User contract captured verbatim in [[shoot-event-format]] §global-action-queue: all actions process through a global server queue; homing converts queue-race misses into hits and has NO range limit; a human can fire exactly one post-departure homing (the click needs a visible tank) while the bot's id-targeted command repeats it — the reroute exploit.
+
+**The boundary measured from the wire**: all 16 shoot commands byte-identical; 0x58 TankRemove(528) at 22:30:00.4; rerouted homings fired at +0.65 … +11.0 s all debited ammo (consumption=hit ⇒ real hits on the departed tank, reaffirmed by user); the shot fired at +13.0 s drew a no-debit response — the id no longer resolved server-side. **Shoot-at-id survives a 0x58 for ~12 s (boundary in [11.0, 13.0] s), then degrades to a tile shot.** Also observed: the departed tank's position goes fully dark until the next map open (22 s, zero updates), and orange-2 was firing back (free singles) right before fleeing.
+
+**Instrumentation added**: `tank_removed` diagnostic on every 0x58 dispatch, so future pursuit-miss timing correlates against removal timestamps and narrows the TTL constant for free. Tactical implication recorded: ~5–6 guaranteed-hit homings exist post-0x58; the stationary-miss→block rule already disengages at the minimum knowable cost (one homing).
+
+Earlier "~16-tile seeker envelope" speculation retracted (that figure is the near-band refusal rule, the opposite regime). The damage 1→2 recovery observation (critical at :29:54, medium at :30:16) remains uncatalogued — first observed damage regression; open question.

@@ -78,11 +78,42 @@ class TestDispatchTankMessages:
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"
 
+        import logging
+
         remove_msg = TankRemoveDict(msg_type=0x58, tank_id=42)
-        dispatch_world_state_update(get_world_service(), remove_msg)
+        logger = logging.getLogger("tankpit_bot.runtime.events")
+        records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                records.append(record)
+
+        handler = _Capture()
+        original_level = logger.level
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        try:
+            dispatch_world_state_update(get_world_service(), remove_msg)
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(original_level)
         tanks = get_world_service().world_state["tanks"]
         assert "42" in tanks
         assert tanks["42"]["liveness"] == "alive"
+        # The removal is timestamped as a diagnostic: the 0x58 starts
+        # the server's ~12 s shoot-at-id grace window, so pursuit-miss
+        # timing can be correlated against it (2026-07-19).
+        removals = [
+            r for r in records if r.getMessage() == "DIAGNOSTIC: diagnostic_kind=tank_removed"
+        ]
+        assert len(removals) == 1
+        record_dict: dict[str, str | int | float | bool | dict[str, str | int | float | bool]] = (
+            removals[0].__dict__
+        )
+        assert record_dict["runtime_fields"] == {
+            "diagnostic_kind": "tank_removed",
+            "tank_id": 42,
+        }
 
     def test_dispatch_tank_exit_does_not_remove_tank(self) -> None:
         """0x29 TankExit is announcement-only; tank stays in world state.
