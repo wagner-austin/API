@@ -56,13 +56,27 @@ CollectOutcome = Literal[
     "container_consumed",
     "movement_rejected",
     "command_rejected",
+    "pickup_empty",
+    "clamped_transfer",
+    "inventory_full",
     "stall_timeout",
     "discarded_no_container",
     "discarded_kind_mismatch",
 ]
 """Collect resolutions. ``discarded_no_container`` /
 ``discarded_kind_mismatch`` are the executor pickup-validation
-discards (container gone, or fuel/equipment kind disagreement)."""
+discards (container gone, or fuel/equipment kind disagreement).
+
+The three typed 0x52 resolutions (2026-07-19) replace the blanket
+``command_rejected`` for their codes so the ledger distinguishes what
+actually happened: ``pickup_empty`` (code 4 -- the container was
+drained; belief removed), ``clamped_transfer`` (code 5 -- the server
+transferred ``min(volume, headroom)`` and kept the remainder; this is
+a SUCCESS, not a failure -- the 5-min soak 2026-07-19 gained +2472
+fuel across four of these while the ledger filed them as rejections),
+and ``inventory_full`` (code 7 -- authoritative all-slots-full
+statement; beliefs reconciled). ``command_rejected`` remains for the
+genuine refusals (code 0 geometry, code 1 can't-go)."""
 
 MapOpenOutcome = Literal[
     "map_data_processed",
@@ -100,6 +114,9 @@ ActionOutcome = Literal[
     "discarded_hostile_mine",
     # collect
     "container_consumed",
+    "pickup_empty",
+    "clamped_transfer",
+    "inventory_full",
     "discarded_no_container",
     "discarded_kind_mismatch",
     # map_open

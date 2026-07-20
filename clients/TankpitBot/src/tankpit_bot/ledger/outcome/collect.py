@@ -95,13 +95,18 @@ def emit_collect_movement_rejected(
 def emit_collect_command_rejected(
     *, duration_ms: int, target_x: int, target_y: int, error_code: int
 ) -> ActionOutcomeRecordDict:
-    """Record a collection the server refused with a 0x52 error.
+    """Record a collection the server genuinely refused with a 0x52 error.
+
+    Since 2026-07-19 this covers only the true refusals (code 0
+    geometry, code 1 can't-go); codes 4/5/7 resolve as their typed
+    outcomes (``pickup_empty`` / ``clamped_transfer`` /
+    ``inventory_full``).
 
     Args:
         duration_ms: Dispatch-to-rejection wall-clock ms.
         target_x: Container X.
         target_y: Container Y.
-        error_code: The 0x52 error code (5=tank full, 6=empty, 7=inventory full, ...).
+        error_code: The 0x52 error code.
 
     Returns:
         The recorded outcome.
@@ -113,6 +118,86 @@ def emit_collect_command_rejected(
         target_x=target_x,
         target_y=target_y,
         error_code=error_code,
+    )
+
+
+def emit_collect_pickup_empty(
+    *, duration_ms: int, target_x: int, target_y: int
+) -> ActionOutcomeRecordDict:
+    """Record a pickup that found the container drained (0x52 code 4).
+
+    Environmental miss -- someone consumed the container between the
+    planner's scan and the pickup. The belief at the target is removed
+    by the same handler that emits this.
+
+    Args:
+        duration_ms: Dispatch-to-resolution wall-clock ms.
+        target_x: Container X.
+        target_y: Container Y.
+
+    Returns:
+        The recorded outcome.
+    """
+    return emit_action_outcome(
+        action_kind="collect",
+        outcome="pickup_empty",
+        duration_ms=duration_ms,
+        target_x=target_x,
+        target_y=target_y,
+    )
+
+
+def emit_collect_clamped_transfer(
+    *, duration_ms: int, target_x: int, target_y: int
+) -> ActionOutcomeRecordDict:
+    """Record a fuel pickup clamped at the cap (0x52 code 5) -- a success.
+
+    The server transferred ``min(volume, headroom)`` and kept the
+    remainder in the container (the 0x43 partial-pickup message
+    updates the container belief; the wire's absolute fuel carries the
+    gain). The code 5 is the completion signal for a clamped
+    transfer, not a refusal.
+
+    Args:
+        duration_ms: Dispatch-to-resolution wall-clock ms.
+        target_x: Container X.
+        target_y: Container Y.
+
+    Returns:
+        The recorded outcome.
+    """
+    return emit_action_outcome(
+        action_kind="collect",
+        outcome="clamped_transfer",
+        duration_ms=duration_ms,
+        target_x=target_x,
+        target_y=target_y,
+    )
+
+
+def emit_collect_inventory_full(
+    *, duration_ms: int, target_x: int, target_y: int
+) -> ActionOutcomeRecordDict:
+    """Record an equipment pickup refused because ALL slots are full (code 7).
+
+    The rejection is an authoritative absolute inventory statement;
+    the handler reconciles every slot belief to capacity and keeps
+    the container (fill-what's-empty mechanic, user 2026-07-18).
+
+    Args:
+        duration_ms: Dispatch-to-resolution wall-clock ms.
+        target_x: Container X.
+        target_y: Container Y.
+
+    Returns:
+        The recorded outcome.
+    """
+    return emit_action_outcome(
+        action_kind="collect",
+        outcome="inventory_full",
+        duration_ms=duration_ms,
+        target_x=target_x,
+        target_y=target_y,
     )
 
 
@@ -188,11 +273,13 @@ def emit_collect_discarded_kind_mismatch(
 
 
 __all__ = [
+    "emit_collect_clamped_transfer",
     "emit_collect_command_rejected",
     "emit_collect_container_consumed",
     "emit_collect_discarded_kind_mismatch",
     "emit_collect_discarded_no_container",
+    "emit_collect_inventory_full",
     "emit_collect_movement_rejected",
-    "emit_collect_position_reached",
+    "emit_collect_pickup_empty",
     "emit_collect_stall_timeout",
 ]

@@ -191,6 +191,25 @@ def _classify_attempt_outcome(
             error_code=-1 if error_code is None else error_code,
             timestamp=record["timestamp"],
         )
+    if outcome == "pickup_empty":
+        return make_finding(
+            "command_rejection",
+            "info",
+            "pickup found the container drained -- consumed by someone "
+            "else between scan and pickup",
+            action_kind=action_kind,
+            timestamp=record["timestamp"],
+        )
+    if outcome == "inventory_full":
+        return make_finding(
+            "command_rejection",
+            "info",
+            "equipment pickup refused: all inventory slots full "
+            "(beliefs reconciled) -- the fullness gate should have "
+            "prevented this dispatch",
+            action_kind=action_kind,
+            timestamp=record["timestamp"],
+        )
     return None
 
 
@@ -269,9 +288,15 @@ def _check_failed_attempts(
         elif outcome.startswith("discarded_"):
             key = (action_kind, outcome)
             discard_counts[key] = discard_counts.get(key, 0) + 1
-        is_failure = outcome in ("command_rejected", "stall_timeout") or outcome.startswith(
-            "discarded_"
-        )
+        # ``clamped_transfer`` is deliberately absent: a cap-clamped
+        # fuel pickup is a success (the fuel arrived), never a
+        # failure signal for the retry-loop detector.
+        is_failure = outcome in (
+            "command_rejected",
+            "stall_timeout",
+            "pickup_empty",
+            "inventory_full",
+        ) or outcome.startswith("discarded_")
         target_x = _int_field(record, "target_x")
         target_y = _int_field(record, "target_y")
         if is_failure and target_x is not None and target_y is not None:

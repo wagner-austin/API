@@ -39,15 +39,29 @@ def test_teleport_to_hostile_mine_records_teleport_discard() -> None:
 
 
 def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:
-    """Each action kind's 0x52 rejection routes to its typed emitter."""
+    """Each action kind's 0x52 rejection routes to its typed emitter.
+
+    Collect codes 4/5/7 resolve as their typed outcomes (2026-07-19:
+    ``pickup_empty`` / ``clamped_transfer`` / ``inventory_full``);
+    collect code 0 and every other kind stay ``command_rejected``.
+    """
     bot = Bot("https://test.tankpit.com/", headless=True)
     _emit_command_rejected_outcome(bot, "move", 1, 2, 100, 0)
+    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 0)
+    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 4)
     _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 5)
+    _emit_command_rejected_outcome(bot, "collect", 1, 2, 100, 7)
     _emit_command_rejected_outcome(bot, "teleport", 1, 2, 100, 8)
     _emit_command_rejected_outcome(bot, "scan", 1, 2, 100, 0)
     _emit_command_rejected_outcome(bot, "map_open", 1, 2, 100, 0)
-    for kind in ("move", "collect", "teleport", "scan", "map_open"):
+    for kind in ("move", "teleport", "scan", "map_open"):
         assert outcome_counts(kind) == {"command_rejected": 1}
+    assert outcome_counts("collect") == {
+        "command_rejected": 1,
+        "pickup_empty": 1,
+        "clamped_transfer": 1,
+        "inventory_full": 1,
+    }
 
 
 def test_stall_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:

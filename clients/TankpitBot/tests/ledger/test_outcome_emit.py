@@ -9,11 +9,14 @@ import pytest
 from tankpit_bot.ledger.events import ACTION_KINDS, next_event_id, reset_event_ids
 from tankpit_bot.ledger.outcome._emit import reset_action_outcome_tracking
 from tankpit_bot.ledger.outcome.collect import (
+    emit_collect_clamped_transfer,
     emit_collect_command_rejected,
     emit_collect_container_consumed,
     emit_collect_discarded_kind_mismatch,
     emit_collect_discarded_no_container,
+    emit_collect_inventory_full,
     emit_collect_movement_rejected,
+    emit_collect_pickup_empty,
     emit_collect_position_reached,
     emit_collect_stall_timeout,
 )
@@ -134,21 +137,33 @@ def test_move_outcomes_carry_typed_payloads() -> None:
     assert discarded["duration_ms"] == 0
 
 
-def test_collect_outcomes_cover_all_seven_labels() -> None:
-    """Every collect resolution is recordable."""
+def test_collect_outcomes_cover_all_ten_labels() -> None:
+    """Every collect resolution is recordable.
+
+    The three typed 0x52 resolutions (2026-07-19) are distinct labels:
+    ``pickup_empty`` (code 4), ``clamped_transfer`` (code 5 -- a
+    success, not a failure), and ``inventory_full`` (code 7);
+    ``command_rejected`` remains for genuine refusals (codes 0/1).
+    """
     emit_collect_position_reached(duration_ms=1, target_x=1, target_y=1, landed_x=1, landed_y=1)
     emit_collect_container_consumed(duration_ms=2, target_x=1, target_y=1, landed_x=0, landed_y=1)
     emit_collect_movement_rejected(duration_ms=3, target_x=1, target_y=1)
-    emit_collect_command_rejected(duration_ms=4, target_x=1, target_y=1, error_code=5)
-    emit_collect_stall_timeout(duration_ms=5, target_x=1, target_y=1, timeout_ms=10000)
+    emit_collect_command_rejected(duration_ms=4, target_x=1, target_y=1, error_code=0)
+    emit_collect_pickup_empty(duration_ms=5, target_x=1, target_y=1)
+    emit_collect_clamped_transfer(duration_ms=6, target_x=1, target_y=1)
+    emit_collect_inventory_full(duration_ms=7, target_x=1, target_y=1)
+    emit_collect_stall_timeout(duration_ms=8, target_x=1, target_y=1, timeout_ms=10000)
     emit_collect_discarded_no_container(target_x=1, target_y=1, pickup_kind="fuel")
     emit_collect_discarded_kind_mismatch(target_x=1, target_y=1, pickup_kind="equipment")
     assert sorted(outcome_counts("collect")) == [
+        "clamped_transfer",
         "command_rejected",
         "container_consumed",
         "discarded_kind_mismatch",
         "discarded_no_container",
+        "inventory_full",
         "movement_rejected",
+        "pickup_empty",
         "position_reached",
         "stall_timeout",
     ]

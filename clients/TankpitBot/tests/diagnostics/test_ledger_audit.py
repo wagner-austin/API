@@ -459,3 +459,126 @@ def test_repeated_records_for_one_tick_keep_the_first_timestamp() -> None:
         ]
     )
     assert _by_check(findings, "tick_cadence_gap") == []
+
+
+def test_typed_collect_resolutions_classify_distinctly() -> None:
+    """pickup_empty and inventory_full get info verdicts; clamped_transfer none.
+
+    A clamped transfer is a SUCCESS (the fuel arrived; the server's
+    code 5 is the completion signal) -- it must produce no finding and
+    never feed the retry-loop detector. The empty pickup and the
+    inventory-full refusal are surfaced as info with their own
+    explanations.
+    """
+    findings = audit_ledger(
+        [
+            _record(
+                "2026-07-19T17:38:44",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="clamped_transfer",
+                target_x=36,
+                target_y=113,
+            ),
+            _record(
+                "2026-07-19T17:39:00",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="pickup_empty",
+                target_x=200,
+                target_y=128,
+            ),
+            _record(
+                "2026-07-19T17:39:10",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="inventory_full",
+                target_x=210,
+                target_y=130,
+            ),
+            _scorecard(),
+        ]
+    )
+    assert _by_check(findings, "command_rejection") == [
+        make_finding(
+            "command_rejection",
+            "info",
+            "pickup found the container drained -- consumed by someone "
+            "else between scan and pickup",
+            action_kind="collect",
+            timestamp="2026-07-19T17:39:00",
+        ),
+        make_finding(
+            "command_rejection",
+            "info",
+            "equipment pickup refused: all inventory slots full "
+            "(beliefs reconciled) -- the fullness gate should have "
+            "prevented this dispatch",
+            action_kind="collect",
+            timestamp="2026-07-19T17:39:10",
+        ),
+    ]
+    assert _by_check(findings, "rejection_retry_loop") == []
+
+
+def test_repeated_clamped_transfers_are_not_a_retry_loop() -> None:
+    """Two clamped transfers on one target are two successes, not churn."""
+    findings = audit_ledger(
+        [
+            _record(
+                "2026-07-19T17:38:44",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="clamped_transfer",
+                target_x=36,
+                target_y=113,
+            ),
+            _record(
+                "2026-07-19T17:39:44",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="clamped_transfer",
+                target_x=36,
+                target_y=113,
+            ),
+            _scorecard(),
+        ]
+    )
+    assert _by_check(findings, "rejection_retry_loop") == []
+    assert _by_check(findings, "command_rejection") == []
+
+
+def test_repeated_empty_pickups_on_one_target_are_a_retry_loop() -> None:
+    """Two pickup_empty on the same target mean the belief is not learning."""
+    findings = audit_ledger(
+        [
+            _record(
+                "2026-07-19T17:39:00",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="pickup_empty",
+                target_x=200,
+                target_y=128,
+            ),
+            _record(
+                "2026-07-19T17:39:30",
+                diagnostic_kind="action_outcome",
+                action_kind="collect",
+                outcome="pickup_empty",
+                target_x=200,
+                target_y=128,
+            ),
+            _scorecard(),
+        ]
+    )
+    assert _by_check(findings, "rejection_retry_loop") == [
+        make_finding(
+            "rejection_retry_loop",
+            "critical",
+            "collect at (200,128) failed 2 times -- replanning is not learning from the failure",
+            action_kind="collect",
+            target_x=200,
+            target_y=128,
+            failures="pickup_empty,pickup_empty",
+        )
+    ]

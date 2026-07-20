@@ -1261,3 +1261,17 @@ Gate green: 4469 tests, 100% coverage.
 Also corrected [[fuel-system]] threshold drift (`fuel_low_threshold` is 200, page said 300 since 06-24; config is the source of truth).
 
 Gate green: 4471 tests, 100% coverage.
+
+## [2026-07-19] fix | Typed collect 0x52 outcomes: empty vs clamped vs inventory-full vs refused
+
+**User ask** (after the 5-min soak filed four +500-fuel clamped pickups as "rejections"): "so we can tell between empty pickups or failed pickups and overfill pickups?" The outcome fabric mapped every applicable collect 0x52 to `command_rejected`, conflating four physically different resolutions.
+
+**Fix**: `CollectOutcome` grew three typed labels, routed by error code in `_emit_command_rejected_outcome`:
+- **code 4 → `pickup_empty`** — container drained by someone else between scan and pickup (belief removed)
+- **code 5 → `clamped_transfer`** — the server transferred `min(volume, headroom)` and kept the remainder; a SUCCESS (the 0x43 partial-pickup updates the container belief, wire absolute fuel carries the gain), not a failure
+- **code 7 → `inventory_full`** — authoritative all-slots-full statement (beliefs reconciled)
+- codes 0/1 (geometry / can't-go) remain `command_rejected` — the genuine refusals
+
+Run-audit updated: `clamped_transfer` produces no finding and never feeds the retry-loop detector (repeated clamped pickups on one target are repeated successes); `pickup_empty` and `inventory_full` get their own info verdicts and DO count as failures for retry-loop detection (repeated empties on one target = belief not learning; any `inventory_full` = the fullness gate let a doomed dispatch through).
+
+Gate green: 4474 tests, 100% coverage.

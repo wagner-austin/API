@@ -22,8 +22,11 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.states import ActionKind, InFlightActionDict, make_no_action, transition_to
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.ledger.outcome.collect import (
+    emit_collect_clamped_transfer,
     emit_collect_command_rejected,
+    emit_collect_inventory_full,
     emit_collect_movement_rejected,
+    emit_collect_pickup_empty,
     emit_collect_stall_timeout,
 )
 from tankpit_bot.ledger.outcome.map_open import (
@@ -462,9 +465,22 @@ def _emit_command_rejected_outcome(
             duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
         )
     elif kind == "collect":
-        emit_collect_command_rejected(
-            duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
-        )
+        # Codes 4/5/7 are resolutions, not refusals (2026-07-19): the
+        # container was empty, the transfer was clamped at the cap (a
+        # success -- the 5-min soak gained +2472 fuel across four of
+        # these), or the inventory is authoritatively full. Only the
+        # genuine refusals (code 0 geometry, code 1 can't-go) stay
+        # ``command_rejected``.
+        if error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
+            emit_collect_pickup_empty(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+        elif error_code == _COMMAND_ERROR_TANK_FULL:
+            emit_collect_clamped_transfer(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+        elif error_code == _COMMAND_ERROR_INVENTORY_FULL:
+            emit_collect_inventory_full(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
+        else:
+            emit_collect_command_rejected(
+                duration_ms=elapsed_ms, target_x=tx, target_y=ty, error_code=error_code
+            )
     elif kind == "teleport":
         emit_teleport_command_rejected(
             duration_ms=elapsed_ms,
