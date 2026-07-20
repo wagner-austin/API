@@ -306,7 +306,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         #
         # * ``code=5`` ("Tank full"): the container was not empty, the
         #   server refused because our tank could not accept the
-        #   transfer. Bug 0.2's ``_would_overfill`` pre-dispatch gate
+        #   transfer. Bug 0.2's ``_pickup_not_worth_walk`` pre-dispatch gate (né _would_overfill)
         #   prevents this in the normal flow, so a surviving code=5 is
         #   a race between planner-time and dispatch-time fuel state.
         #   Blacklisting a still-full container is wrong -- the next

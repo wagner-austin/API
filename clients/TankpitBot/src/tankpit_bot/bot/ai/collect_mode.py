@@ -591,42 +591,51 @@ def _hop_toward_equipment(
     )
 
 
-def _would_overfill(
+_FUEL_GAIN_PER_WALK_TILE = 25
+"""Minimum effective fuel gained per tile of walking for a pickup to pay.
+
+Each walk tile costs roughly one 2-second tick the bot could spend on
+a dot hop, which refuels while traveling. 25/tile keeps adjacent
+pickups always worth taking (walk 0-1 clears at any meaningful gain)
+while refusing long walks for cap-clamped slivers -- the 2026-07-06
+waste class (26 s across four near-cap pickups for ~50 fuel each).
+"""
+
+
+def _pickup_not_worth_walk(
     ctx: DecideCtx,
     container: ContainerStateDict,
 ) -> bool:
-    """Return True when picking up ``container`` would exceed fuel cap.
+    """Return True when the pickup's real transfer is not worth the walk.
 
-    A pickup that transfers less than the container's full volume
-    (because the tank is near cap) draws server ``code=5`` and marks
-    the container ``failed_pickup``; the 2026-07-06 22:37 run spent
-    26 s dispatching four consecutive overflow pickups at fuel
-    1040/1054/1062/1054 (headroom 46/60/46) before every nearby fuel
-    container was blacklisted. Refuse the dispatch instead of paying
-    the walk cost and blacklisting the container.
+    The server clamps a fuel pickup to ``min(volume, headroom)`` and
+    answers ``code=5`` when clamped; since 2026-07-06/-19 that code is
+    handled cleanly (container kept, no blacklist, ledger resolved),
+    so a clamped transfer costs nothing but the walk. The predicate
+    therefore rates the ACTUAL transfer against the walk distance.
 
-    Formula matches the handoff spec: the projected end-state of the
-    walk plus the server's clamped transfer (``min(volume, headroom)``)
-    exceeds cap. When ``walk_cost > 0`` any container whose volume
-    meets or exceeds current headroom will trigger a refusal, since
-    the transfer would fill to cap and still leave fuel in the
-    container -- exactly the wasteful-pickup class the server rejects.
+    This replaces the binary overfill gate, whose formula
+    (``fuel + walk + min(volume, headroom) > cap``) refused ANY
+    clamped pickup at walk >= 1 -- and refused earlier the bigger the
+    container: at fuel 600 it walked past a 1000-volume container one
+    tile away, forfeiting a 500-fuel transfer (falsified 2026-07-19;
+    the 2026-06-23 minimum-volume lesson -- fuel is fuel -- applies at
+    the cap end too).
 
     Args:
         ctx: Decision context.
         container: The candidate fuel container.
 
     Returns:
-        True when the projected pickup would exceed
-        :func:`fuel_capacity` for the current rank.
+        True when ``min(volume, headroom)`` falls below
+        ``_FUEL_GAIN_PER_WALK_TILE`` per tile of Manhattan walk.
     """
-    cap = fuel_capacity(ctx.self_state["rank"])
-    walk_cost = abs(container["x"] - ctx.self_state["x"]) + abs(
+    headroom = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
+    effective_gain = min(container["volume"], headroom)
+    walk_tiles = abs(container["x"] - ctx.self_state["x"]) + abs(
         container["y"] - ctx.self_state["y"]
     )
-    headroom = cap - ctx.fuel
-    projected = ctx.fuel + walk_cost + min(container["volume"], headroom)
-    return projected > cap
+    return effective_gain < _FUEL_GAIN_PER_WALK_TILE * walk_tiles
 
 
 def _select_and_pickup_fuel(
@@ -641,18 +650,18 @@ def _select_and_pickup_fuel(
     container, command = selection
     target_x = container["x"]
     target_y = container["y"]
-    if _would_overfill(ctx, container):
+    if _pickup_not_worth_walk(ctx, container):
         cap = fuel_capacity(ctx.self_state["rank"])
-        walk_cost = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
+        walk_tiles = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
         emit_ai(
-            "skip fuel at (%d,%d) vol=%d: would overfill (fuel=%d cap=%d walk=%d headroom=%d)",
+            "skip fuel at (%d,%d) vol=%d: clamped gain %d not worth %d-tile walk (fuel=%d cap=%d)",
             target_x,
             target_y,
             container["volume"],
+            min(container["volume"], cap - ctx.fuel),
+            walk_tiles,
             ctx.fuel,
             cap,
-            walk_cost,
-            cap - ctx.fuel,
         )
         return None
     emit_ai(

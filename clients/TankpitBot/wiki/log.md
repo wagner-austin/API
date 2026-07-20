@@ -1251,3 +1251,13 @@ Gate green: 4467 tests, 100% coverage.
 Also this session: 438 test-dropping artifact pairs deleted from `runs/bot/` (the month-old leak fixed earlier today); 336 genuine run artifacts remain. [[bot-behavior-contract]] §exit row updated.
 
 Gate green: 4469 tests, 100% coverage.
+
+## [2026-07-19] fix | Fuel pickup gate: binary overfill refusal -> per-tile rate rule
+
+**User question exposed the flaw**: "what if the tank has 600 fuel and there is one 1000-fuel container?" The 2026-07-06 `_would_overfill` gate (`fuel + walk + min(volume, headroom) > cap`) refused ANY clamped pickup at walk ≥ 1 — and refused *earlier* the *bigger* the container: at fuel 600 it walked past a 1000-volume container one tile away, forfeiting a 500-fuel transfer. The gate was really "never take a partial transfer while walking," which contradicts the 2026-06-23 minimum-volume lesson (fuel is fuel) at the cap end.
+
+**Fix**: `_pickup_not_worth_walk` — refuse only when the ACTUAL transfer (`min(volume, headroom)`; the server clamps and answers a now-cleanly-handled code=5) is below **25 fuel per Manhattan walk tile**. Consequences: adjacent pickups always taken (incl. the July-6 canonical 1-tile sliver, +46 for one 2s tile — same rate a good dot hop pays); big clamped containers worth long walks (600-fuel tank walks up to 20 tiles for a 1000-volume container); distant slivers still refused (July-6 26-second waste class cannot return). Boundary: gain == rate×walk is taken.
+
+Also corrected [[fuel-system]] threshold drift (`fuel_low_threshold` is 200, page said 300 since 06-24; config is the source of truth).
+
+Gate green: 4471 tests, 100% coverage.

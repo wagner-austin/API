@@ -784,7 +784,7 @@ class TestClearCommandError:
 
         Bug 0.3 (2026-07-06): a code=5 rejection means the container
         was not empty -- the server refused the transfer because the
-        tank could not accept it. Under Bug 0.2's ``_would_overfill``
+        tank could not accept it. Under Bug 0.2's pre-dispatch gate (now ``_pickup_not_worth_walk``)
         pre-dispatch gate the overflow scenario cannot occur in the
         normal flow, so a surviving code=5 is a race between
         planner-time and dispatch-time fuel state. Blacklisting a

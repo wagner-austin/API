@@ -9,12 +9,15 @@ confidence: high
 
 # Fuel System
 
-## Thresholds (current, as of 2026-06-24)
+## Thresholds (current, re-verified against config 2026-07-19)
 
-- `fuel_low_threshold`: 300 — single fuel threshold. Below this the
-  bot enters `COLLECT`. Also the reserve a combat teleport must
-  leave behind; engaging below it would flip priority to `COLLECT`
-  the next tick.[^1]
+- `fuel_low_threshold`: 200 — single fuel threshold. Below this the
+  bot enters `COLLECT`. Also the reserve a hop must leave behind
+  (relay/dot hops require ``cost + 200 <= fuel``), and one of the two
+  terms of the 650 engagement reserve (450 engagement budget + 200
+  floor). This page previously said 300 (as of 2026-06-24); the
+  config value has been 200 — trust `types.py:make_initial_ai_state`
+  as the source of truth for the number.[^1]
 - `fuel_full_threshold`: 1100 — `COLLECT` releases (along with the
   combat-reserve gate) when fuel reaches this level.
 - `hunt_min_fuel`: 100 — operating reserve for search/recovery
@@ -25,10 +28,19 @@ confidence: high
   had drifted to the same value (300). One threshold now governs
   COLLECT entry, combat-teleport reserve, and the in-cascade
   fuel-pickup predicate.[^5]
-- COLLECT drains every viewport fuel container (`minimum_volume=1`):
-  the old "skip volumes < 500" floor was dropped 2026-06-23 after a
+- COLLECT drains every viewport fuel container (`minimum_volume=1`).
+  The old "skip volumes < 500" floor was dropped 2026-06-23 after a
   live run left 20-fuel partials in viewport while burning ~200 fuel
   per hop to find a fresh one.[^2]
+- At the cap end the only pickup gate is the per-tile rate rule
+  (2026-07-19): refuse when the clamped transfer
+  `min(volume, headroom)` is under 25 fuel per Manhattan walk tile —
+  adjacent pickups always taken, distant cap-slivers refused. The
+  server clamps the transfer and answers code=5, which is handled
+  cleanly (container kept, no blacklist). This replaced the
+  2026-07-06 binary overfill gate, which refused ANY clamped pickup
+  at walk >= 1 — at fuel 600 it walked past a 1000-volume container
+  one tile away, forfeiting a 500-fuel transfer.
 
 ## Fuel data flow (single source of truth)
 

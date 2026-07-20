@@ -6,8 +6,8 @@ import pytest
 
 from tankpit_bot.bot.ai.collect_mode import (
     _continue_or_release_fuel_lock,
+    _pickup_not_worth_walk,
     _select_and_pickup_fuel,
-    _would_overfill,
     decide_collect_mode,
     select_fuel_target,
 )
@@ -708,15 +708,39 @@ def test_locked_fuel_released_at_rank_derived_capacity() -> None:
     assert updated_state["resource_target_y"] == 0
 
 
-def test_would_overfill_true_when_projected_pickup_exceeds_cap() -> None:
-    """``_would_overfill`` returns True for the 2026-07-06 22:37 loop shape.
+def test_pickup_refused_when_clamped_gain_not_worth_the_walk() -> None:
+    """A distant cap-clamped sliver is refused: the 2026-07-06 waste class.
 
-    Private (rank 1, cap 1100) at fuel 1054 planning a 1-tile walk to a
-    386-volume container: projected end-state is
-    ``1054 + 1 + min(386, 46) = 1101``, which exceeds cap. Predicate
-    fires and the planner refuses the dispatch. This is the exact
-    per-tick geometry that produced four consecutive overflow pickups
-    and blacklisted four fuel containers in the live run.
+    Private (rank 1, cap 1100) at fuel 1054: headroom 46, so a
+    386-volume container transfers only 46. At a 2-tile walk the
+    threshold is ``25 * 2 = 50 > 46`` -- not worth it, refuse.
+    """
+
+    base_world, base_self = make_world(fuel=1054)
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    container = make_container_state(
+        x=102,
+        y=100,
+        is_fuel=True,
+        volume=386,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+
+    assert _pickup_not_worth_walk(ctx, container) is True
+
+
+def test_adjacent_clamped_sliver_is_worth_taking() -> None:
+    """The same sliver one tile away IS taken: 46 >= 25 * 1.
+
+    Under the old binary gate this exact geometry (the 2026-07-06
+    canonical shape) was refused; with code=5 handled cleanly, +46
+    fuel for one 2-second walk tile is the same rate a good dot hop
+    pays, so the pickup is worth it.
     """
 
     base_world, base_self = make_world(fuel=1054)
@@ -734,16 +758,43 @@ def test_would_overfill_true_when_projected_pickup_exceeds_cap() -> None:
         failed_pickups=0,
     )
 
-    assert _would_overfill(ctx, container) is True
+    assert _pickup_not_worth_walk(ctx, container) is False
 
 
-def test_would_overfill_false_when_room_covers_walk_and_transfer() -> None:
-    """``_would_overfill`` returns False when the pickup fits below cap.
+def test_big_clamped_container_is_worth_a_long_walk() -> None:
+    """Fuel 600 vs a 1000-volume container: 500 effective gain wins.
 
-    Private (rank 1, cap 1100) at fuel 500 planning a 2-tile walk to a
-    100-volume container: projected end-state is
-    ``500 + 2 + min(100, 600) = 602 <= 1100``. The predicate declines
-    and the planner proceeds to dispatch the pickup normally.
+    The falsifying case for the old binary gate (2026-07-19): because
+    ``volume >= headroom``, the old formula refused this pickup at ANY
+    walk distance -- walking past half a tank of fuel one tile away.
+    The rate predicate scores the actual 500-fuel transfer: worth up
+    to a 20-tile walk at 25/tile, so a 12-tile walk clears easily.
+    """
+
+    base_world, base_self = make_world(fuel=600)
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
+    container = make_container_state(
+        x=106,
+        y=106,
+        is_fuel=True,
+        volume=1000,
+        timestamp_ms=100000,
+        failed_pickups=0,
+    )
+
+    assert _pickup_not_worth_walk(ctx, container) is False
+
+
+def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
+    """Gain exactly equal to the walk threshold is taken, not refused.
+
+    Fuel 500 (headroom 600), 100-volume container 4 tiles away:
+    effective gain 100 == ``25 * 4`` -- the predicate refuses only
+    strictly-below-rate pickups, so the boundary case dispatches.
     """
 
     base_world, base_self = make_world(fuel=500)
@@ -754,35 +805,36 @@ def test_would_overfill_false_when_room_covers_walk_and_transfer() -> None:
     ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, None, "")
     container = make_container_state(
         x=102,
-        y=100,
+        y=102,
         is_fuel=True,
         volume=100,
         timestamp_ms=100000,
         failed_pickups=0,
     )
 
-    assert _would_overfill(ctx, container) is False
+    assert _pickup_not_worth_walk(ctx, container) is False
 
 
 def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> None:
-    """``_select_and_pickup_fuel`` returns None on projected overflow.
+    """``_select_and_pickup_fuel`` returns None on a not-worth-it sliver.
 
-    Wire the 2026-07-06 22:37 scenario end-to-end: private at fuel
-    1054 with a single visible 386-volume fuel container 1 tile east.
-    The at-cap gate on line 431 passes (fuel below cap), the fuel
-    target is selected successfully, but ``_would_overfill`` fires
-    and the planner returns None instead of dispatching a pickup
-    that the server would clamp-transfer and reject with code 5.
-    The container is left untouched -- not blacklisted -- so a later
-    tick with more headroom can still consume it.
+    Wire the 2026-07-06 waste class end-to-end: private at fuel 1054
+    (headroom 46) with a single visible 386-volume fuel container 3
+    tiles east -- effective gain 46 against a ``25 * 3 = 75``
+    threshold. The at-cap gate passes (fuel below cap), the fuel
+    target is selected successfully, but ``_pickup_not_worth_walk``
+    fires and the planner returns None instead of dispatching. The
+    container is left untouched -- not blacklisted -- so a later
+    tick with more headroom (or from an adjacent tile) can still
+    consume it.
     """
 
     base_world, base_self = make_world(
         fuel=1054,
         scanned=True,
         containers={
-            "101,100": make_container_state(
-                x=101,
+            "103,100": make_container_state(
+                x=103,
                 y=100,
                 is_fuel=True,
                 volume=386,
@@ -808,4 +860,4 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
     decision = _select_and_pickup_fuel(ctx, ctx.base)
 
     assert decision is None
-    assert world["containers"]["101,100"]["failed_pickups"] == 0
+    assert world["containers"]["103,100"]["failed_pickups"] == 0

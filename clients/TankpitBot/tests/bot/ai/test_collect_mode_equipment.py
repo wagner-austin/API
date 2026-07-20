@@ -288,7 +288,7 @@ def test_collect_mode_walks_to_biggest_viewport_fuel_when_no_equipment() -> None
     # Fuel + volume chosen so the projected pickup fits under cap:
     # corporal cap is 1200, fuel 800, walk 10 tiles, volume 300 -->
     # 800 + 10 + min(300, 400) = 1110 <= 1200. Overflow-refusal is
-    # covered by ``_would_overfill`` tests in test_collect_mode_fuel.py.
+    # covered by ``_pickup_not_worth_walk`` tests in test_collect_mode_fuel.py.
     world, self_state = make_world(
         fuel=800,
         scanned=True,
