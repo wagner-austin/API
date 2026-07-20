@@ -6,7 +6,7 @@ sources:
   - monorepo-guards.toml
   - libs/monorepo_guards/
   - README.md
-fact_checked: 2026-07-07
+fact_checked: 2026-07-20
 confidence: high
 ---
 

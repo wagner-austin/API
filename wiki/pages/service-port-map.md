@@ -5,15 +5,16 @@ related: [[monorepo-discipline]]
 sources:
   - README.md
   - docker-compose.yml
-fact_checked: 2026-07-07
+  - services/doc-extract-api/docker-compose.yml
+fact_checked: 2026-07-20
 confidence: high
 ---
 
 # Service Port Map
 
-Every FastAPI service in the api monorepo binds to a fixed port. Ports are assigned once in the README's Services table and mirrored in `docker-compose.yml`. New services claim the next free port in the 80xx range.[^1]
+Every FastAPI service in the api monorepo binds to a fixed port. Ports are assigned once in the README's Services table (or, for services that layer their own compose on top of the root, in that service's own `docker-compose.yml`) and are stable across dev / staging / prod. New services claim the next free port in the 80xx range.[^1]
 
-## Assigned ports (13 services)
+## Assigned ports (14 services)
 
 | Port | Service | Purpose |
 |---|---|---|
@@ -29,6 +30,7 @@ Every FastAPI service in the api monorepo binds to a fixed port. Ports are assig
 | 8009 | `github-stats-api` | GitHub stats SVG card generation |
 | 8010 | `opportunity-radar-api` | Hackathon and competition discovery |
 | 8011 | `Art-Trainer` | Image generation model training (SD 1.5, SDXL, FLUX LoRAs via Kohya-ss) |
+| 8012 | `doc-extract-api` | PDF text extraction (pdfplumber + docTR OCR); layered `docker-compose.yml` in the service dir, not the root compose[^2] |
 | — | `procart-api` | Procedural art rendering orchestration (port not yet fixed) |
 
 ## Port binding convention
@@ -50,9 +52,9 @@ Traefik routes by hostname / path prefix, not by port directly. Ports matter for
 
 ## Adding a new service
 
-1. Claim the next port in the 80xx range (currently 8012 is free).
+1. Claim the next port in the 80xx range (currently 8013 is free).
 2. Add the row to the README's Services table.
-3. Add the service block to `docker-compose.yml` with `expose: [<port>]` and the standard Traefik labels.
+3. Add the service block to `docker-compose.yml` with `expose: [<port>]` and the standard Traefik labels — or, if the service needs its own compose overlay (e.g. GPU services with extra volumes, like doc-extract-api), add a `services/<name>/docker-compose.yml` that layers on top of the root compose.
 4. Wire `/healthz` + `/readyz` per the [[platform-workers-rq-pattern]] readyz helpers if the service depends on Redis.
 5. Follow [[monorepo-discipline]] — strict mypy, 100% coverage, `monorepo_guards`.
 
@@ -60,4 +62,5 @@ Traefik routes by hostname / path prefix, not by port directly. Ports matter for
 
 Consistency across dev / staging / prod: the same service is always on the same port. Runbooks, log queries, and troubleshooting scripts can hardcode the tuple `(service, port)` without a lookup. When Traefik or the docker network fails, you can still `curl localhost:8003/healthz` and get a useful signal.
 
-[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim.
+[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim (rows for 8000-8011 + procart-api). doc-extract-api is currently absent from the root README table; its assignment is authoritative in [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml) instead.
+[^2]: [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml) — `ports: "8012:8000"` maps host 8012 → container 8000. The compose file declares "Requires root docker-compose to be running first (provides platform-redis + network)."

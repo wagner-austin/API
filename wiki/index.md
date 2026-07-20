@@ -4,9 +4,9 @@
 
 ## Hubs
 
-[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (1 page)
-[Clients](hubs/clients.md) -- DiscordBot and TankpitBot — the user-facing clients that consume the service surface (0 pages)
-[Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, kaggle, stt, langid, translate) + domain libs (covenant_*, cleargbm, procart) + instrument_io + monorepo_guards (1 page)
+[Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, doc-extract, procart) (1 page)
+[Clients](hubs/clients.md) -- DiscordBot and TankpitBot — the user-facing clients that consume the service surface (0 pages; TankpitBot maintains its own dedicated wiki at `clients/TankpitBot/wiki/`)
+[Libs](hubs/libs.md) -- shared platform_* libraries (core, workers, ml, discord, music, email, calendar, codebase, devpost, kaggle, stt, langid, translate) + domain libs (covenant_*, cleargbm, procart) + instrument_io + monorepo_guards (1 page)
 [Infrastructure](hubs/infrastructure.md) -- docker-compose, Traefik, Redis/RQ, PostgreSQL, monorepo build + test + lint conventions (1 page)
 
 ## How this works
