@@ -15,7 +15,11 @@ from tankpit_bot.bot.ai.context import (
 )
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
-from tankpit_bot.bot.ai.ferry import clamp_move_target_at_surface_transition
+from tankpit_bot.bot.ai.ferry import (
+    GroundOnlyTerrain,
+    clamp_move_target_at_surface_transition,
+    is_riding_ferry,
+)
 from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
@@ -381,15 +385,32 @@ def _walk_or_teleport_with_terrain(
     if pickup_kind is not None:
         if not is_pickup_target_actionable(ctx, tx, ty):
             return None
+        # A pickup is ONE server-routed click, and one command never
+        # chains surfaces (user contract 2026-07-19): the route must
+        # exist on plain ground alone. The riding rule ("water is
+        # passable while on a ferry") applies to piloted moves, not
+        # pickups -- run 2026-07-19 18:20:33 dispatched a pickup
+        # across a channel while riding and drew "You can't go
+        # there!" after the disembark stop.
         if not is_collection_reachable_in_viewport(
             ctx.world,
-            terrain,
+            GroundOnlyTerrain(terrain),
             sx,
             sy,
             tx,
             ty,
             hostile_mines(ctx.world),
         ):
+            if is_riding_ferry(ctx.world):
+                # Two-action contract: disembark first (a piloted move
+                # bounded at the first land tile), then next tick's
+                # replan dispatches the pickup from solid ground.
+                emit_ai(
+                    "pickup at (%d,%d) needs land routing -- disembarking first",
+                    tx,
+                    ty,
+                )
+                return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
             return None
         emit_ai("dispatching %s pickup at (%d,%d)", pickup_kind, tx, ty)
         return _make_pickup_command(pickup_kind, tx, ty)

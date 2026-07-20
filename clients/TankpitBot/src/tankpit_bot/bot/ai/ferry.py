@@ -132,6 +132,84 @@ class FerryAwareTerrain:
         ]
 
 
+class GroundOnlyTerrain:
+    """Terrain view where only plain ground is traversable.
+
+    Encodes the single-action routing surface for server-routed
+    pickups (user contract 2026-07-19): one command never chains
+    surfaces -- boarding a ferry is its own click on the ferry tile,
+    disembarking auto-stops on the first land tile, and a click the
+    server cannot reach on the CURRENT surface draws "You can't go
+    there!". A pickup is one click, so its route must be pure ground:
+    water is impassable and ferry tiles are impassable too (crossing
+    onto one is a queue-consuming transition, not a walk step).
+
+    Live origin: run 2026-07-19 18:20:33 -- the bot was riding a ferry
+    at (167,40); the riding rule made all water passable, the pickup
+    gate approved a container across a channel, and the server refused
+    with code 1 after the disembark stop.
+    """
+
+    ROCK = "#"
+    GROUND = "."
+    WATER = "W"
+
+    def __init__(self, base: TerrainMapProtocol) -> None:
+        """Wrap any terrain view with ground-only passability.
+
+        Args:
+            base: Terrain view to read cells from (static or
+                ferry-aware; ferry cells stay visible, just never
+                traversable).
+        """
+        self._base = base
+
+    def get_terrain(self, x: int, y: int) -> str:
+        """Get terrain type at game coordinates.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            The wrapped view's terrain character.
+        """
+        return self._base.get_terrain(x, y)
+
+    def is_passable(self, x: int, y: int) -> bool:
+        """Check if a single-action server route may cross the tile.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True only for plain ground.
+        """
+        return self.get_terrain(x, y) == self.GROUND
+
+    def render_viewport(
+        self,
+        center_x: int,
+        center_y: int,
+        width: int = 16,
+        height: int = 16,
+    ) -> list[list[str]]:
+        """Render a viewport grid centered on position.
+
+        Args:
+            center_x: Center X coordinate.
+            center_y: Center Y coordinate.
+            width: Viewport width (default 16).
+            height: Viewport height (default 16).
+
+        Returns:
+            The wrapped view's rendering (display is unchanged; only
+            passability differs).
+        """
+        return self._base.render_viewport(center_x, center_y, width, height)
+
+
 def is_riding_ferry(world: WorldStateDict) -> bool:
     """Return True when the tank's own tile is a live ferry tile.
 
@@ -240,6 +318,7 @@ def clamp_move_target_at_surface_transition(
 
 __all__ = [
     "FerryAwareTerrain",
+    "GroundOnlyTerrain",
     "clamp_move_target_at_surface_transition",
     "compose_decision_terrain",
     "is_riding_ferry",
