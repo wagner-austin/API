@@ -1285,3 +1285,13 @@ Gate green: 4474 tests, 100% coverage.
 **Latent bug found by the probe**: `scripts/download_fields.py` still pointed at the retired `/play/fieldXX.gif` path, which now serves the SPA's HTML — `make download-fields` would have skipped every field (GIF-magic guard caught the HTML; broken but not destructive). Base URL fixed to `/images/maps`, pinned by test.
 
 Gate green: 4474 tests, 100% coverage.
+
+## [2026-07-19] correction | The map is NOT diverging from the server — earlier "display art vs collision data" claim retracted
+
+User pushback ("the map is pixel perfect from the game map") prompted a systematic re-test, and they were right; the previous log entry's theory is falsified:
+
+1. **Coordinate mapping verified**: scored all 9 candidate pixel offsets against 25 wire-confirmed stood-on tiles across three runs — offset (0,0) wins decisively (1 violation vs 3–9 for every shift). No off-by-one.
+2. **The one "stood on water" violation is a FERRY** — the viewport legend carries `~=ferry`; tanks ride water tiles. Dynamic object, not a map error.
+3. **The (163,44) "You can't go there!" refusal**: the viewport render shows a friendly 2×2 mine cluster at (162–163, 42–43) beside the approach, and the terrain there is a maze of one-tile water pockets. Decisively: running the PRODUCTION reachability check offline against the reconstructed world returns **False from the bot's actual dispatch position (167,40)** — our own pathfinder AGREES with the server on the end-of-run state. The live dispatch at 18:20:33 passed on some transient mid-ingestion belief (the radar's mine/tile reveals landed :31–:33) that could not be exactly reconstructed. A dispatch-time race, not a map divergence.
+
+**Standing conclusions**: the field GIF is byte-identical to the live client's only map asset, the pixel↔tile mapping is exact, and both pathfinders are 4-directional and agree on settled state. The residual failure class is dispatch-time state races (~1 per 90 ticks, cost ~2 s, self-marking via failed_pickups) plus dynamic objects (ferries, mines) the static map by definition cannot carry — which the world state already tracks live. The Phase 4 terrain-overlay memory pilot nominated earlier is accordingly DOWNGRADED in value: there is no static divergence to remember; the lessons are about dynamic state, which does not persist across sessions anyway.
