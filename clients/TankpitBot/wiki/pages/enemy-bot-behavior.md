@@ -53,12 +53,12 @@ Same-color bots can be directed via chat with commands like **"use the radar"** 
 - A stationary bot is a guaranteed kill if you can maintain adjacency
 - A fleeing bot should be chased with **homing shots** (track off-viewport), not teleport hops[^4]
 - Never abandon a target — shields and corpses both return positive hits, so a "miss" means the target moved, not that it's unkillable[^5]
-- Disengaging forfeits all damage progress — tiers repair over time[^3]
+- Disengaging forfeits all damage progress — the target can refuel and recover tiers (fuel pickups are the ONLY repair mechanism; damage does NOT repair over time — user 2026-07-19)[^3]
 - **Cost-of-engagement asymmetry:** we lose 45 fuel per bot hit (single), bot loses ~1/N of its rank's teleport threshold per our hit. Engaging bots to state 3 then finishing is cheaper than engaging to teleport-off from any earlier state.
 
 [^1]: user (Austin), 2026-06-16 — "tank bots stand ground and fight, only move when low HP, then move every time hit; don't collect fuel or equipment; just run until you chase and finish them or use homing"
 [^2]: user (Austin), 2026-06-11 — practice bots never fight each other; retracted a prior theory
-[^3]: run 20260611-004505 — purple-3 healed 1→0→3 after bot disengaged; see [[tank-registry]]
+[^3]: run 20260611-004505 — purple-3 healed 1→0→3 after bot disengaged; see [[tank-registry]]. Originally read as time-based repair; corrected 2026-07-19 by user: "they do not repair over time. only via fuel pickups" — that healing was a fuel pickup too.
 [^4]: user (Austin), 2026-06-16 — "the bot is able to stay still and just fire homing shots at it. the homing shots go off viewport"
 [^5]: user (Austin), 2026-06-16 — "shields don't return miss. they return a positive hit. a corpse returns a positive hit"
 [^6]: Sigma's TankPit Tournament Guide v3.4, 16-Jan-2015 (`docs/sources/sigmas-tankpit-guide-v3.4.pdf`), §"Fill-fighting to Lieutenant" and Technical Note #1 (shot counts + shade shortcut); §"2 – How to maximize PPH" item 5 (bots return singles); §"Initial equipment fill" tip 1 (chat commands to same-color bots). 2015 human observation, not wire-verified in this project.

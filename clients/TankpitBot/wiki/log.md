@@ -1321,3 +1321,7 @@ Earlier "~16-tile seeker envelope" speculation retracted (that figure is the nea
 The "damage 1→2 recovery" open question is closed. First, the encoding hypothesis was eliminated: near-in-time (0x2E sync, 0x4C map) damage pairs agree on every overlap (17/17), so orange-2's critical→medium change was real. Then the user supplied the mechanic (verbatim): "the bots teleport or walk to the next viewport usually. they dont seek fuel, but sometimes they may teleport away and happen to land or step on a fuel tank." Landing auto-picks the container — so the fleeing bot accidentally refueled, and since fuel is the life pool (0 fuel = instant deactivation; hits drain the victim's fuel), its damage tier recovered with the refill.
 
 Bonus wire confirmation the same capture: orange-2's return fire arrived as 0x53 ShootEvents with `weapon=0` — free singles, exactly what Sigma's 2015 guide claimed ("bots return singles") — upgrading that decade-old human observation to wire-verified. [[enemy-bot-behavior]] updated on all three points.
+
+## [2026-07-19] correction | No time-based damage repair — fuel pickups are the only repair mechanism
+
+User (verbatim): "they do not repair over time. only via fuel pickups." The June-11 reading of purple-3's 1→0→3 healing as "tiers repair over time" is corrected in [[enemy-bot-behavior]] — that recovery was also a fuel pickup. Damage model now closed: hits drain the victim's fuel pool, damage tiers are bands of it, and the ONLY way back up is picking up fuel.
