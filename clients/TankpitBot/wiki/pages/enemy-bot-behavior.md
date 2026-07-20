@@ -13,7 +13,7 @@ confidence: high
 
 - **Stand ground and fight**: enemy tank bots do not move while fighting. They hold position and return fire.[^1]
 - **Flee at low HP**: once a damage threshold triggers (appears to be after taking several hits), bots begin moving away from the attacker. They move **every time they are hit** after this gate triggers.[^1]
-- **No resource collection**: bots never collect fuel or equipment. They fight until destroyed or flee.[^1]
+- **Roam viewport-to-viewport; no deliberate fuel-seeking, but accidental pickups happen** (user, 2026-07-19: "the bots teleport or walk to the next viewport usually. they dont seek fuel, but sometimes they may teleport away and happen to land or step on a fuel tank"). Landing on a container auto-picks it, so a fleeing bot can accidentally refuel — observed: orange-2 (id 528) fled our engagement at damage_state=1 (critical, 22:29:54), teleported away (0x58 at 22:30:00), and reappeared on the next map open at damage_state=2 (medium) — a REAL recovery (sync-vs-map damage encodings agree 17/17 on overlapping observations), explained by an accidental fuel landing. Fuel is the life pool; damage tiers recover when it refills.[^7]
 - **Never fight each other**: practice bots do not engage each other. Only we make corpses.[^2]
 
 ## Chase behavior
@@ -26,7 +26,7 @@ When a bot starts fleeing:
 
 ## Return fire — bots use singles, not duals
 
-Bots fire **single shots** back at attackers, not duals. Water-map humans can extract PPH from bots at reduced risk because damage-per-return-shot is 45 fuel (single-hit victim cost, see [[game-economy]]), not the 90 a dual would land.[^6] Guide-sourced, not yet cross-verified against our own captures but consistent with the observed "corpses and shields return positive hits" model — a bot's return-fire weapon byte should show `weapon=0` on incoming `You hit`/`Fuel: -45` events.
+Bots fire **single shots** back at attackers, not duals. Water-map humans can extract PPH from bots at reduced risk because damage-per-return-shot is 45 fuel (single-hit victim cost, see [[game-economy]]), not the 90 a dual would land.[^6] **Wire-confirmed 2026-07-19**: orange-2 (id 528) returned fire during our engagement with 0x53 ShootEvents carrying `weapon=0` (free singles) at our tile — capture run 22:29:56/:58, exactly the predicted shape.
 
 ## Shots to force a bot off-screen
 
@@ -62,3 +62,4 @@ Same-color bots can be directed via chat with commands like **"use the radar"** 
 [^4]: user (Austin), 2026-06-16 — "the bot is able to stay still and just fire homing shots at it. the homing shots go off viewport"
 [^5]: user (Austin), 2026-06-16 — "shields don't return miss. they return a positive hit. a corpse returns a positive hit"
 [^6]: Sigma's TankPit Tournament Guide v3.4, 16-Jan-2015 (`docs/sources/sigmas-tankpit-guide-v3.4.pdf`), §"Fill-fighting to Lieutenant" and Technical Note #1 (shot counts + shade shortcut); §"2 – How to maximize PPH" item 5 (bots return singles); §"Initial equipment fill" tip 1 (chat commands to same-color bots). 2015 human observation, not wire-verified in this project.
+[^7]: user (Austin), 2026-07-19, plus wire forensics from run bot-20260719-222903: orange-2 damage 1 (0x2E sync 22:29:54) -> teleport departure (0x58 22:30:00) -> damage 2 (0x4C map entry 22:30:16). Cross-channel encoding check over the same run's captures: every near-in-time (0x2E sync, 0x4C map) damage pair agrees (1=1 x1, 2=2 x1, 3=3 x15), so the recovery is a real state change, not an encoding artifact.

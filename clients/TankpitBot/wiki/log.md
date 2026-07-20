@@ -1315,3 +1315,9 @@ The orange-2 escape (soak 22:29, 16 shots, survived at critical) reverse-enginee
 **Instrumentation added**: `tank_removed` diagnostic on every 0x58 dispatch, so future pursuit-miss timing correlates against removal timestamps and narrows the TTL constant for free. Tactical implication recorded: ~5–6 guaranteed-hit homings exist post-0x58; the stationary-miss→block rule already disengages at the minimum knowable cost (one homing).
 
 Earlier "~16-tile seeker envelope" speculation retracted (that figure is the near-band refusal rule, the opposite regime). The damage 1→2 recovery observation (critical at :29:54, medium at :30:16) remains uncatalogued — first observed damage regression; open question.
+
+## [2026-07-19] mechanic | Damage recovery explained: game bots roam and accidentally refuel; damage tiers track the fuel pool
+
+The "damage 1→2 recovery" open question is closed. First, the encoding hypothesis was eliminated: near-in-time (0x2E sync, 0x4C map) damage pairs agree on every overlap (17/17), so orange-2's critical→medium change was real. Then the user supplied the mechanic (verbatim): "the bots teleport or walk to the next viewport usually. they dont seek fuel, but sometimes they may teleport away and happen to land or step on a fuel tank." Landing auto-picks the container — so the fleeing bot accidentally refueled, and since fuel is the life pool (0 fuel = instant deactivation; hits drain the victim's fuel), its damage tier recovered with the refill.
+
+Bonus wire confirmation the same capture: orange-2's return fire arrived as 0x53 ShootEvents with `weapon=0` — free singles, exactly what Sigma's 2015 guide claimed ("bots return singles") — upgrading that decade-old human observation to wire-verified. [[enemy-bot-behavior]] updated on all three points.
