@@ -2,9 +2,9 @@
 
 from tankpit_bot.state import (
     TEAM_BLUE,
+    TERRAIN_BLOCK_BRIDGE,
     TERRAIN_FERRY,
     TERRAIN_GROUND,
-    TERRAIN_ROCK_A,
     WorldStateDict,
     add_mine,
     add_mine_from_radar,
@@ -396,7 +396,7 @@ class TestUpdateTerrainFromViewport:
         state = make_empty_world_state()
         entities = [
             (0, 0, TERRAIN_GROUND, 0, 255),
-            (1, 0, TERRAIN_ROCK_A, -1, 3),
+            (1, 0, TERRAIN_BLOCK_BRIDGE, -1, 3),
             (2, 0, TERRAIN_FERRY, 25, 255),
         ]
         updated = update_terrain_from_viewport(
@@ -408,7 +408,7 @@ class TestUpdateTerrainFromViewport:
         assert "101,49" in updated["terrain"]
 
         assert updated["terrain"]["99,49"]["terrain_type"] == TERRAIN_GROUND
-        assert updated["terrain"]["100,49"]["terrain_type"] == TERRAIN_ROCK_A
+        assert updated["terrain"]["100,49"]["terrain_type"] == TERRAIN_BLOCK_BRIDGE
         assert updated["terrain"]["101,49"]["terrain_type"] == TERRAIN_FERRY
 
     def test_updates_viewport_position(self) -> None:

@@ -12,10 +12,16 @@ from typing import Literal
 
 from platform_core.json_utils import JSONObject, JSONTypeError, require_str
 
+# Wire terrain vocabulary (0x42 obstacle_type ≡ 0x4A tile value ≡ 0x5A
+# terrain_type — one enum, see wiki [[movable-blocks]]). Values 1-3 are
+# movable concrete blocks, pinned 2026-07-20 by manual captures plus a
+# 228-session archive sweep: value 1 appears ONLY over static water
+# (walkable bridge), 2 ONLY over static ground (obstacle), 3 ONLY over
+# static water (stacked, impassable). Formerly misnamed ROCK_A/B/AB.
 TERRAIN_GROUND = 0
-TERRAIN_ROCK_A = 1
-TERRAIN_ROCK_B = 2
-TERRAIN_ROCK_AB = 3
+TERRAIN_BLOCK_BRIDGE = 1
+TERRAIN_BLOCK_LAND = 2
+TERRAIN_BLOCK_STACKED = 3
 TERRAIN_FERRY = 5
 TERRAIN_FERRY_ROCK = 7
 
@@ -33,6 +39,7 @@ DIRECTION_DEAD_THRESHOLD = 32
 
 ASCII_GROUND = "."
 ASCII_ROCK = "#"
+ASCII_BRIDGE = "="
 ASCII_FERRY = "~"
 ASCII_WATER = "W"
 ASCII_FUEL = "F"
@@ -185,6 +192,7 @@ def encode_container_refresh_kind(kind: ContainerRefreshKind) -> str:
 
 __all__ = [
     "ASCII_ALLY",
+    "ASCII_BRIDGE",
     "ASCII_ENEMY",
     "ASCII_EQUIPMENT",
     "ASCII_FERRY",
@@ -207,12 +215,12 @@ __all__ = [
     "TEAM_ORANGE",
     "TEAM_PURPLE",
     "TEAM_RED",
+    "TERRAIN_BLOCK_BRIDGE",
+    "TERRAIN_BLOCK_LAND",
+    "TERRAIN_BLOCK_STACKED",
     "TERRAIN_FERRY",
     "TERRAIN_FERRY_ROCK",
     "TERRAIN_GROUND",
-    "TERRAIN_ROCK_A",
-    "TERRAIN_ROCK_AB",
-    "TERRAIN_ROCK_B",
     "ContainerRefreshKind",
     "EntitySource",
     "TankLiveness",

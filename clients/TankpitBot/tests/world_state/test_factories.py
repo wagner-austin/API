@@ -6,8 +6,8 @@ from tankpit_bot.state import (
     TEAM_BLUE,
     TEAM_PURPLE,
     TEAM_RED,
+    TERRAIN_BLOCK_BRIDGE,
     TERRAIN_GROUND,
-    TERRAIN_ROCK_A,
     make_container_state,
     make_empty_world_state,
     make_mine_state,
@@ -129,12 +129,12 @@ class TestMakeTerrainTile:
         tile = make_terrain_tile(
             x=10,
             y=20,
-            terrain_type=TERRAIN_ROCK_A,
+            terrain_type=TERRAIN_BLOCK_BRIDGE,
         )
 
         assert tile["x"] == 10
         assert tile["y"] == 20
-        assert tile["terrain_type"] == TERRAIN_ROCK_A
+        assert tile["terrain_type"] == TERRAIN_BLOCK_BRIDGE
 
     def test_tile_with_ground_terrain(self) -> None:
         """Creates a ground tile."""

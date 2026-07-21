@@ -7,6 +7,7 @@ import pytest
 from tankpit_bot._pillow import load_pillow_image_module
 from tankpit_bot.state import (
     ASCII_ALLY,
+    ASCII_BRIDGE,
     ASCII_ENEMY,
     ASCII_EQUIPMENT,
     ASCII_FERRY,
@@ -18,12 +19,12 @@ from tankpit_bot.state import (
     ASCII_UNKNOWN,
     TEAM_BLUE,
     TEAM_RED,
+    TERRAIN_BLOCK_BRIDGE,
+    TERRAIN_BLOCK_LAND,
+    TERRAIN_BLOCK_STACKED,
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
-    TERRAIN_ROCK_A,
-    TERRAIN_ROCK_AB,
-    TERRAIN_ROCK_B,
     add_mine,
     apply_tank_observation,
     make_empty_world_state,
@@ -45,11 +46,17 @@ class TestTerrainToAscii:
         """Ground terrain returns dot."""
         assert terrain_to_ascii(TERRAIN_GROUND) == ASCII_GROUND
 
-    def test_rock_types(self) -> None:
-        """Rock terrain types return hash."""
-        assert terrain_to_ascii(TERRAIN_ROCK_A) == ASCII_ROCK
-        assert terrain_to_ascii(TERRAIN_ROCK_B) == ASCII_ROCK
-        assert terrain_to_ascii(TERRAIN_ROCK_AB) == ASCII_ROCK
+    def test_block_types(self) -> None:
+        """Bridges render as '='; land and stacked blocks as rock.
+
+        Wire values 1/2/3 are movable concrete blocks (2026-07-20,
+        [[movable-blocks]]): a bridge is walkable and gets its own
+        glyph so viewport dumps show it; land/stacked blocks are
+        obstacles and render as rock.
+        """
+        assert terrain_to_ascii(TERRAIN_BLOCK_BRIDGE) == ASCII_BRIDGE
+        assert terrain_to_ascii(TERRAIN_BLOCK_LAND) == ASCII_ROCK
+        assert terrain_to_ascii(TERRAIN_BLOCK_STACKED) == ASCII_ROCK
 
     def test_ferry(self) -> None:
         """Ferry terrain returns tilde."""

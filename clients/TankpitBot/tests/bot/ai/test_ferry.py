@@ -82,6 +82,56 @@ class TestFerryAwareTerrain:
         assert grid[1][1] == "~"
         assert grid[0][0] == "."
 
+    def test_block_tiles_compose_by_walkability(self) -> None:
+        """Bridges read as walkable ground; land/stacked blocks as rock.
+
+        Wire terrain values 1/2/3 are movable concrete blocks
+        ([[movable-blocks]], archive-verified 2026-07-20: 4,352 bridge
+        tiles over static water, 2,396 land blocks over static ground,
+        250 stacks over water — the wire value alone determines
+        walkability). A bridge over static water is passable WITHOUT
+        riding; a land or stacked block is impassable even though the
+        static map calls its tile ground/water.
+        """
+        from tankpit_bot.state.types import (
+            TERRAIN_BLOCK_BRIDGE,
+            TERRAIN_BLOCK_LAND,
+            TERRAIN_BLOCK_STACKED,
+        )
+
+        base = InMemoryTerrainMap({(101, 100): "W", (103, 100): "W"})
+        wire = {
+            "101,100": make_terrain_tile(x=101, y=100, terrain_type=TERRAIN_BLOCK_BRIDGE),
+            "102,100": make_terrain_tile(x=102, y=100, terrain_type=TERRAIN_BLOCK_LAND),
+            "103,100": make_terrain_tile(x=103, y=100, terrain_type=TERRAIN_BLOCK_STACKED),
+        }
+        terrain = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+
+        assert terrain.get_terrain(101, 100) == "."  # bridge = ground class
+        assert terrain.is_passable(101, 100) is True  # walkable, not riding
+        assert terrain.get_terrain(102, 100) == "#"  # land block = rock class
+        assert terrain.is_passable(102, 100) is False
+        assert terrain.get_terrain(103, 100) == "#"  # stack = rock class
+        assert terrain.is_passable(103, 100) is False
+
+    def test_bridge_is_routable_for_ground_surface_pickups(self) -> None:
+        """A bridge joins the ground routing surface for pickups.
+
+        Walking onto a bridge is ordinary movement (no queue-consuming
+        surface transition — user capture 2026-07-20 collected
+        equipment reachable only across a built bridge in one
+        dispatch), so the single-surface pickup gate must treat bridge
+        tiles as ground.
+        """
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
+        from tankpit_bot.state.types import TERRAIN_BLOCK_BRIDGE
+
+        base = InMemoryTerrainMap({(101, 100): "W"})
+        wire = {"101,100": make_terrain_tile(x=101, y=100, terrain_type=TERRAIN_BLOCK_BRIDGE)}
+        view = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+
+        assert SurfaceRouteTerrain(view, water=False).is_passable(101, 100) is True
+
     def test_hostile_mine_tile_is_impassable_on_any_surface(self) -> None:
         """A composed hostile mine blocks ground, ferry, and water tiles.
 

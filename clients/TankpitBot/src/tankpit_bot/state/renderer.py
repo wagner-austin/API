@@ -9,6 +9,7 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.state.types import (
     ASCII_ALLY,
+    ASCII_BRIDGE,
     ASCII_ENEMY,
     ASCII_EQUIPMENT,
     ASCII_FERRY,
@@ -18,12 +19,12 @@ from tankpit_bot.state.types import (
     ASCII_ROCK,
     ASCII_SELF,
     ASCII_UNKNOWN,
+    TERRAIN_BLOCK_BRIDGE,
+    TERRAIN_BLOCK_LAND,
+    TERRAIN_BLOCK_STACKED,
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
-    TERRAIN_ROCK_A,
-    TERRAIN_ROCK_AB,
-    TERRAIN_ROCK_B,
     TankStateDict,
     WorldStateDict,
     coord_key,
@@ -45,7 +46,9 @@ def terrain_to_ascii(terrain_type: int) -> str:
     """
     if terrain_type == TERRAIN_GROUND:
         return ASCII_GROUND
-    if terrain_type in (TERRAIN_ROCK_A, TERRAIN_ROCK_B, TERRAIN_ROCK_AB):
+    if terrain_type == TERRAIN_BLOCK_BRIDGE:
+        return ASCII_BRIDGE
+    if terrain_type in (TERRAIN_BLOCK_LAND, TERRAIN_BLOCK_STACKED):
         return ASCII_ROCK
     if terrain_type == TERRAIN_FERRY:
         return ASCII_FERRY
@@ -129,7 +132,7 @@ def render_world_ascii(state: WorldStateDict, terrain_map: _test_hooks.TerrainMa
 
     # Legend
     lines.append("Legend: @=self T=enemy A=ally #=rock .=ground")
-    lines.append("        W=water ~=ferry F=fuel E=equip *=mine")
+    lines.append("        W=water ~=ferry ==bridge F=fuel E=equip *=mine")
     lines.append("")
 
     # Column headers

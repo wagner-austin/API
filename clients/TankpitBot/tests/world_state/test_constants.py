@@ -20,12 +20,12 @@ from tankpit_bot.state import (
     TEAM_ORANGE,
     TEAM_PURPLE,
     TEAM_RED,
+    TERRAIN_BLOCK_BRIDGE,
+    TERRAIN_BLOCK_LAND,
+    TERRAIN_BLOCK_STACKED,
     TERRAIN_FERRY,
     TERRAIN_FERRY_ROCK,
     TERRAIN_GROUND,
-    TERRAIN_ROCK_A,
-    TERRAIN_ROCK_AB,
-    TERRAIN_ROCK_B,
 )
 
 
@@ -35,9 +35,9 @@ class TestConstants:
     def test_terrain_constants(self) -> None:
         """Verify terrain type constants."""
         assert TERRAIN_GROUND == 0
-        assert TERRAIN_ROCK_A == 1
-        assert TERRAIN_ROCK_B == 2
-        assert TERRAIN_ROCK_AB == 3
+        assert TERRAIN_BLOCK_BRIDGE == 1
+        assert TERRAIN_BLOCK_LAND == 2
+        assert TERRAIN_BLOCK_STACKED == 3
         assert TERRAIN_FERRY == 5
         assert TERRAIN_FERRY_ROCK == 7
 

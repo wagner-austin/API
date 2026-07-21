@@ -29,6 +29,9 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.state.types import (
+    TERRAIN_BLOCK_BRIDGE,
+    TERRAIN_BLOCK_LAND,
+    TERRAIN_BLOCK_STACKED,
     TERRAIN_FERRY,
     TerrainTileDict,
     WorldStateDict,
@@ -82,17 +85,33 @@ class FerryAwareTerrain:
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain type at game coordinates.
 
+        Live wire tiles override the static map: ferries render as
+        ``~``; movable concrete blocks ([[movable-blocks]]) collapse
+        to their walkability class -- a block in water (wire value 1)
+        is a walkable bridge and reads as ground, a block on land
+        (value 2) or a stacked block (value 3) is an obstacle and
+        reads as rock. Archive evidence (228 room-1 sessions,
+        2026-07-20): value 1 appears ONLY over static water, value 2
+        ONLY over static ground, value 3 ONLY over static water --
+        the wire value alone determines walkability.
+
         Args:
             x: X coordinate (0-255).
             y: Y coordinate (0-255).
 
         Returns:
             Terrain character: ``~`` for a live ferry tile, otherwise
-            the static map's character (``#``, ``.``, ``W``).
+            ``#``, ``.``, or ``W``.
         """
         tile = self._wire_terrain.get(coord_key(x, y))
-        if tile is not None and tile["terrain_type"] == TERRAIN_FERRY:
-            return _ASCII_FERRY
+        if tile is not None:
+            terrain_type = tile["terrain_type"]
+            if terrain_type == TERRAIN_FERRY:
+                return _ASCII_FERRY
+            if terrain_type == TERRAIN_BLOCK_BRIDGE:
+                return self.GROUND
+            if terrain_type in (TERRAIN_BLOCK_LAND, TERRAIN_BLOCK_STACKED):
+                return self.ROCK
         return self._base.get_terrain(x, y)
 
     def is_passable(self, x: int, y: int) -> bool:
