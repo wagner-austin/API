@@ -2,160 +2,113 @@
 
 *Gradient Boosting You Can See Through*
 
-High-performance interpretable gradient boosting built on numpy. Designed for transparency and explainability with strict typing and zero compromises.
+A strict-typed Python API over a Rust gradient-boosting core. The Python surface is thin: input validation, config marshalling, JSON persistence. The training loop, split finding, tree construction, and prediction all live in Rust ([`cleargbm_rs`](../cleargbm_rs/)) and run in a single native call.
 
-## Features
+There is **no Python fallback and no hook indirection layer** — Rust is the only compute path.
 
-- **High Performance**: Numpy-backed arrays with vectorized histogram building and sibling subtraction
-- **Interpretable by Design**: Rule extraction, contribution breakdown, feature interactions
-- **Histogram-Based Optimization**: LightGBM-style O(K) split finding instead of O(n log n) sorting
-- **Strict Typing**: 100% typed with `NDArray[np.float64]`/`NDArray[np.int64]`, TypedDicts, Protocols - no Any/cast/ignore
-- **Production Ready**: Plugs into covenant_ml as a ClassifierBackend
-
-## Installation
+## Install
 
 ```bash
 poetry add cleargbm
 ```
 
-## Quick Start
+The wheel imports the sibling `cleargbm_rs` extension at load time; if the extension is not available, `import cleargbm.ensemble` raises `ImportError` at the boundary. There is no silent fallback.
+
+## Quick start
 
 ```python
+import numpy as np
 from cleargbm.ensemble import train_gradient_boosting, predict_proba
-from cleargbm.explain import explain_prediction, extract_rules
 from cleargbm.types import GradientBoostingConfig
 
-# Configure
 config: GradientBoostingConfig = {
-    "n_estimators": 100,
-    "max_depth": 4,
-    "learning_rate": 0.1,
-    "min_samples_split": 10,
-    "min_samples_leaf": 5,
+    "n_estimators": 200,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "min_samples_split": 40,
+    "min_samples_leaf": 20,
     "max_features": None,
-    "max_bins": 64,  # histogram bins for O(K) split finding
+    "max_bins": 64,
     "subsample": 1.0,
     "random_state": 42,
-    "track_contributions": True,
+    "track_contributions": False,
     "monotonic_constraints": None,
-    "reg_alpha": 0.0,  # L1 regularization
-    "reg_lambda": 0.0,  # L2 regularization
-    "n_jobs": 1,  # parallel workers (-1 = all cores)
+    "reg_alpha": 0.0,
+    "reg_lambda": 0.0,
+    "n_jobs": 1,
+    "early_stopping_rounds": None,
 }
 
-# Train
 model = train_gradient_boosting(
-    x_train, y_train,
-    x_val, y_val,
-    config,
-    feature_names=("debt_ratio", "coverage", "current_ratio"),
-    progress_callback=None,
+    x_train=x_train, y_train=y_train,
+    x_val=None, y_val=None,
+    config=config,
+    feature_names=("f0", "f1", "f2"),
 )
 
-# Predict
 proba = predict_proba(model, x_test)
-
-# Explain
-explanation = explain_prediction(model, x_test[0])
-rules = extract_rules(model, min_samples=10, max_rules=20)
 ```
 
-## Histogram-Based Split Finding
-
-ClearGBM uses LightGBM-style histogram binning for efficient split finding:
-
-- **O(K) Complexity**: Instead of O(n log n) sorting per split, bins features into K buckets and scans with prefix sums
-- **Configurable Bins**: `max_bins` parameter (default: 64) controls granularity vs speed tradeoff
-- **Gradient/Hessian Histograms**: Accumulates gradients and hessians per bin for split evaluation
-- **Monotonic Constraint Support**: Constraints enforced during single bin scan
-- **Precomputed Bins**: Feature bins computed once at training start, reused across all trees
-- **Micro-Optimizations**: `map`/`itemgetter` for tuple creation, delayed index allocation
+For JSON persistence and feature importance, call the module-level functions on `cleargbm_rs`:
 
 ```python
-# For faster training on large datasets, reduce max_bins
-config["max_bins"] = 32  # Faster but coarser splits
+import cleargbm_rs.cleargbm_rs as native
 
-# For more accurate splits on smaller datasets, increase max_bins
-config["max_bins"] = 128  # Slower but finer splits
+json_str = native.py_gbm_model_to_json_rs(model)
+restored = native.py_gbm_model_from_json_rs(json_str)
+importances: list[tuple[str, float]] = native.py_gbm_model_feature_importances_rs(model)
 ```
 
-## Parallel Training
+## Public API surface
 
-ClearGBM supports parallel histogram building across CPU cores:
+Just two modules:
 
-```python
-# Use all available cores
-config["n_jobs"] = -1
+- `cleargbm.ensemble` — `train_gradient_boosting`, `predict_proba`, `predict_raw`.
+- `cleargbm.types` — TypedDicts (`GradientBoostingConfig`, `GradientBoostingModel`, `DecisionTree`, `TreeNode`, ...) + encode/decode/require_* helpers.
 
-# Use specific number of workers
-config["n_jobs"] = 4
+Everything else is private (`_rust`, `_types_*`, `_hooks_guard`) or lives in `cleargbm_rs`.
 
-# Sequential (default, best for small datasets)
-config["n_jobs"] = 1
-```
+## Design
 
-**Implementation Details**:
-- Pool reuse: Single `multiprocessing.Pool` across all trees
-- Shared memory: Gradients/hessians passed via `SharedMemory` (not pickled per-batch)
-- Pool initializer: Feature bins broadcast once at pool creation
-- Batched workers: Features grouped to reduce IPC calls from O(n_features) to O(n_jobs)
+**Strict typing.** No `Any`, no `cast`, no `type: ignore`. TypedDicts with encode/decode + `require_*` validation everywhere. The dynamic `__import__("cleargbm_rs.cleargbm_rs")` is pinned to Protocol types in `cleargbm._rust` so mypy sees precise signatures.
 
-**When to Use Parallel**:
-- `n_jobs=1` is fastest for datasets < 10K samples (pool overhead dominates)
-- `n_jobs=-1` helps for datasets ≥ 10K samples with 50+ features
-- Use `scripts/autotune.py` to find optimal settings for your hardware
+**Rust is authoritative.** The Rust core stores training data column-first, builds histograms in Rust, finds splits in Rust, constructs trees in Rust, predicts in Rust. Python is a thin API surface, not a computation layer.
 
-```bash
-# Find optimal n_jobs and max_bins for your data
-poetry run python -m scripts.autotune --samples 10000 --features 50
-```
+**No hooks, no fallbacks.** Prior to 2026-07-21 the codebase had per-primitive hooks that could be pointed at either a Python default or a Rust binding — a "dependency-injection for math primitives" architecture. That's been retired: there's a single Protocol-typed native module accessor at `cleargbm._rust`, and every call goes straight through it.
 
-## Why ClearGBM?
+## Benchmarks
 
-| Feature | XGBoost | LightGBM | ClearGBM |
-|---------|---------|----------|----------|
-| Speed | Fast | Faster | Good |
-| Accuracy | Excellent | Excellent | Good |
-| Interpretability | Limited | Limited | First-class |
-| Dependencies | C++ lib | C++ lib | numpy only |
-| Rule extraction | Post-hoc | Post-hoc | Built-in |
-| Split algorithm | Exact/Histogram | Histogram | Histogram |
-| Typing | Weak | Weak | Strict (no Any) |
+Latest head-to-head vs LightGBM on `american_bankruptcy.csv` with a company-disjoint split (78,682 rows, 18 features, 6.63% positive, 3 seeds, `n_estimators=200`, `max_depth=6`, `max_bins=64`):
 
-## Configuration Reference
+| Model | AUC-ROC | AUC-PR | log-loss | Brier | fit_time |
+| ----- | ------- | ------ | -------- | ----- | -------- |
+| lightgbm | 0.687 ± 0.021 | 0.138 ± 0.015 | 0.229 | 0.059 | **0.87s ± 0.09s** |
+| cleargbm | 0.683 ± 0.019 | 0.142 ± 0.018 | 0.230 | 0.058 | 6.88s ± 0.13s (**8.0× slower**) |
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `n_estimators` | int | - | Number of boosting rounds |
-| `max_depth` | int | - | Maximum tree depth |
-| `learning_rate` | float | - | Shrinkage factor for updates |
-| `min_samples_split` | int | - | Minimum samples to split a node |
-| `min_samples_leaf` | int | - | Minimum samples in a leaf |
-| `max_features` | int \| None | None | Max features per split (None = all) |
-| `max_bins` | int | 64 | Histogram bins for split finding |
-| `subsample` | float | 1.0 | Row subsampling ratio |
-| `random_state` | int | - | Random seed for reproducibility |
-| `track_contributions` | bool | - | Store per-tree contributions |
-| `monotonic_constraints` | tuple[int, ...] \| None | None | +1=increasing, -1=decreasing, 0=none per feature |
-| `reg_alpha` | float | 0.0 | L1 regularization (soft thresholding) |
-| `reg_lambda` | float | 0.0 | L2 regularization (leaf shrinkage) |
-| `n_jobs` | int | 1 | Parallel workers (-1 = all cores, 1 = sequential) |
+**Quality: statistical tie.** All differences smaller than the seed std.
+**Speed: 8× slower than LightGBM.** LightGBM has 8+ years of production tuning (SIMD histogram accumulator, uint8 bins, leaf-wise growth, column-major data layout). ClearGBM has none of those yet.
 
-## Development
+Full report + methodology: [`docs/BENCHMARK_RESULTS_2026-07-21.md`](docs/BENCHMARK_RESULTS_2026-07-21.md).
+Prior baseline (pre-Rust-only refactor): [`docs/BENCHMARK_RESULTS_2026-07-20.md`](docs/BENCHMARK_RESULTS_2026-07-20.md).
 
-```bash
-make lint   # guards + ruff + mypy
-make test   # pytest with 100% coverage
-make check  # lint + test
-```
+## Non-goals
 
-## Architecture
+- **Not designed to beat LightGBM on speed.** LightGBM will be faster on production workloads until the perf-fix roadmap ships (see the "future work" section in the 2026-07-21 benchmark report).
+- **Not designed to beat LightGBM on accuracy.** On the datasets tested so far, quality is a tie within seed noise.
+- **Not a batteries-included framework.** No hyperparameter search harness, no persistence infrastructure beyond `to_json`/`from_json`. Consumers (like [`covenant_ml`](../covenant_ml/)) provide those layers.
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture and [docs/rust-core-transition-plan.md](docs/rust-core-transition-plan.md) for the Rust core transition plan.
+The value proposition is: strict-typed Python API + Rust-backed correctness + interpretable model shape.
 
 ## Requirements
 
 - Python 3.11+
-- numpy ^2.3.5
-- 524 tests, 100% statement + branch coverage enforced
-- Strict mypy typing (disallow_any_expr = true)
+- numpy 2.3.5+
+- `cleargbm_rs` (sibling path dep — build with `maturin build --release` from `libs/cleargbm_rs/`, install the wheel)
+
+## Development
+
+```bash
+make lint   # scripts.guard + ruff + mypy
+make test   # pytest with 100% branch coverage
+make check  # lint + test
+```
