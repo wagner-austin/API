@@ -1390,3 +1390,18 @@ Verification soak bot-20260720-192320 (the full-quality process: soak -> validat
 Committed as 6d2afdbe (26 files, +358/−318). New architecture page [[terrain-composition]] documents the single-owner walkability model in full: the layer diagram, the physics split (walk-on-mine = 45 damage = impassable; teleport-at-mine = safe, server displaces = landing finder stays mine-blind by design), the two-owner era and its fixed-point loop, the five-part cut, the invariant/test-pin table, and the standing rule for future dynamic obstacles: compose into `compose_decision_terrain`, never add a parameter beside it. Architecture hub and index updated (55 pages).
 
 Also resolved during the same session: the "8-minute make check hang" was environmental — a concurrent Claude session's covenant_ml workloads plus poetry lock network time; the timed test stage runs 55 s and the full gate passes clean.
+
+## [2026-07-20] measurement | Per-weapon firing costs closed from the archive — dual=10, homing=10, single=6; the −45/−10 pair decomposed
+
+User: "cant we determine cost of firing? like dont we teleport and then just sit and fire for a while?" — and per crack-the-artifact-first, the sit-and-fire windows already existed in the archive. No new capture.
+
+Method: decoded all 204 `runs/bot/*.capture_session.json` with the production protocol decoders (frame split → XOR → typed dicts). Between consecutive absolute fuel readings (0x2E self sync / 0x44 FuelGain), a window is CLEAN for weapon w when it contains only our own 0x53 echoes of weapon w — no enemy shots, no self movement, no sent move/pickup/teleport/radar, no container pickups. Results:
+
+- **Single (weapon=0): 6 fuel** — 62 windows exactly −6; consumes no ammo.
+- **Dual (weapon=1): 10 fuel** — 589 windows exactly −10 (the long-standing "presumed 10" confirmed); 1 dual ammo per landed shot (0x49 count snapshots: 49 windows of exactly one dual fired → dual count −1).
+- **Homing (weapon=3): 10 fuel** — 398 windows exactly −10 plus 124 at −5: the homing debit sometimes splits into two −5 steps across sync boundaries; per-shot total is 10. 1 homing ammo per landed shot.
+- **Missile (weapon=2): never fired** in any archived session — the one remaining unknown.
+
+The 2026-07-19 combat-tick mystery closes with it: the paired −45/−10 per firing tick = our dual/homing cost (−10) + the enemy's return single landing on us (−45, the known victim cost). [[game-economy]] rows updated; the 0x49 equipment-count channel noted as the ammo-consumption cross-check (its snapshots arrive on radar cadence — the uniform radar −1 per window is snapshot timing, not a firing cost).
+
+Bonus wire fact from the sweep: 0x49 counts order is [armor, dual, missile, homing, radar].
