@@ -768,7 +768,7 @@ class TestClearCommandError:
         assert container["failed_pickups"] == 0
         # No self_state rank in this fixture-free world? position update
         # created one at rank 0 -> capacity applies; all slots snapped up.
-        from tankpit_bot.state.rank_formulas import inventory_capacity
+        from tankpit_bot.physics.capacity import inventory_capacity
 
         rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] else 0
         cap = inventory_capacity(rank)

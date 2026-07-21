@@ -20,7 +20,6 @@ from tankpit_bot.bot.ai.context import (
     target_position_is_fresh,
 )
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
-from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
     find_acquisition_target,
@@ -35,8 +34,9 @@ from tankpit_bot.bot.types import (
     make_radar_command,
     make_teleport_command,
 )
+from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.state.rank_formulas import fuel_capacity
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -286,7 +286,7 @@ def _pick_relay_dot(
             continue
         if ctx.terrain is not None and not ctx.terrain.is_passable(dot_x, dot_y):
             continue
-        cost = compute_teleport_fuel_cost(sx, sy, dot_x, dot_y)
+        cost = teleport_cost(sx, sy, dot_x, dot_y)
         if cost + ctx.config["fuel_low_threshold"] > ctx.fuel:
             continue
         if (
@@ -410,7 +410,7 @@ def _refuel_toward_engagement(
     capacity = fuel_capacity(ctx.self_state["rank"])
     if ctx.fuel >= capacity:
         return None
-    engage_cost = compute_teleport_fuel_cost(
+    engage_cost = teleport_cost(
         ctx.self_state["x"],
         ctx.self_state["y"],
         travel["x"],

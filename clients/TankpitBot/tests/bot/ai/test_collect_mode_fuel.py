@@ -613,7 +613,7 @@ def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:
     """``_select_and_pickup_fuel`` refuses to dispatch at capacity.
 
     Sergeant (rank 3) has fuel capacity 1300 per
-    :func:`tankpit_bot.state.rank_formulas.fuel_capacity`. A full tank
+    :func:`tankpit_bot.physics.capacity.fuel_capacity`. A full tank
     at exactly 1300 must skip fuel selection so the cascade falls
     through instead of dispatching a wasted ``pickup_fuel`` that the
     server rejects with ``0x52`` code-5.

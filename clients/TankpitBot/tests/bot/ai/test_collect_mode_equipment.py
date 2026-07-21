@@ -10,7 +10,7 @@ from tankpit_bot.bot.ai.collect_mode import (
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.state.rank_formulas import inventory_capacity
+from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -331,7 +331,7 @@ def test_collect_mode_skips_opportunistic_fuel_at_rank_capacity() -> None:
     Picking up at capacity wastes the action (wire ``0x52`` code-5
     ``Tank full``), so the opportunistic-viewport-fuel branch must
     defer. Capacity here is rank-derived
-    (:func:`tankpit_bot.state.rank_formulas.fuel_capacity`), not a
+    (:func:`tankpit_bot.physics.capacity.fuel_capacity`), not a
     learned watermark: at corporal (``rank=2``) capacity is 1200 and
     the tank is at exactly 1200, so ``_select_and_pickup_fuel``
     returns ``None`` and the cascade falls through to the no-equipment

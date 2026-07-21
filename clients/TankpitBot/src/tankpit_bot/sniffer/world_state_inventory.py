@@ -15,9 +15,9 @@ from tankpit_bot.inventory import (
     InventoryState,
     diff_inventory,
 )
+from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
-from tankpit_bot.state.rank_formulas import inventory_capacity
 
 log = get_logger(__name__)
 

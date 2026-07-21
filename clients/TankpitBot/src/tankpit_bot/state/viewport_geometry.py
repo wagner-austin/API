@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.state.rank_formulas import free_radar_radius
+from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.state.types import ViewportStateDict, make_viewport_state
 
 VISIBLE_VIEWPORT_WIDTH = 16
@@ -79,7 +79,7 @@ def regular_radar_bounds(
     The built-in radar radius is rank-scaled: chebyshev
     ``2 + rank // 3`` (5x5 / 7x7 / 9x9 at rank bands 0-2 / 3-5 / 6-8).
     Only the extra radar sweeps the whole viewport regardless of rank.
-    See :func:`tankpit_bot.state.rank_formulas.free_radar_radius` for
+    See :func:`tankpit_bot.physics.capacity.free_radar_radius` for
     the mining chain.
 
     Args:

@@ -1,7 +1,7 @@
-"""Rank-derived game constants (fuel capacity and built-in radar radius).
+"""Rank-derived limits and the built-in radar radius.
 
-Both formulas are derived from ``self_state["rank"]`` on the wire, so
-the bot knows them at tick 1 with no probing.
+All three formulas are derived from ``self_state["rank"]`` on the
+wire, so the bot knows them at tick 1 with no probing.
 
 The mining chain (see ``wiki/pages/game-economy.md``, ``wiki/pages/
 radar-mechanics.md``, ``wiki/pages/client-constants.md``):
@@ -28,9 +28,17 @@ Rank range is ``0..8`` (recruit .. general); the wire field is a
 
 from __future__ import annotations
 
+DEPOSIT_FLOOR = 100
+"""Server-enforced minimum fuel left in the tank after a max deposit;
+the client also refuses to initiate a deposit at or below this level
+(``ce()`` gate in tpclient.js). Verified at four ranks 2026-07-06.
+Wiki: [[game-economy]]#deposit-floor."""
+
 
 def fuel_capacity(rank: int) -> int:
     """Return the tank's fuel capacity at the given rank.
+
+    Wiki: [[game-economy]]#fuel-capacity.
 
     Args:
         rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
@@ -44,6 +52,8 @@ def fuel_capacity(rank: int) -> int:
 
 def free_radar_radius(rank: int) -> int:
     """Return the chebyshev radius of the built-in radar at the given rank.
+
+    Wiki: [[radar-mechanics]]#free-radar-radius.
 
     Args:
         rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
@@ -66,6 +76,8 @@ def inventory_capacity(rank: int) -> int:
     the same rank-derived cap; the server refuses further pickup with
     ``0x52`` code-7 when a slot would exceed the cap.
 
+    Wiki: [[game-economy]]#inventory-capacity.
+
     Args:
         rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
 
@@ -77,28 +89,8 @@ def inventory_capacity(rank: int) -> int:
     return 20 + 5 * rank
 
 
-def combat_radar_min(rank: int) -> int:
-    """Return the minimum extra-radar count for HUNT-entry readiness.
-
-    User contract (2026-07-06): weapons must be at cap for HUNT entry,
-    but extra radars are permitted up to 5 below cap because scan
-    coverage during the fight consumes them faster than the between-
-    kill restock can top them up. The floor is
-    ``inventory_capacity(rank) - 5``.
-
-    Args:
-        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
-
-    Returns:
-        Minimum extra-radar count below which HUNT entry is refused:
-        15 at recruit, 20 at private, 25 at corporal, ..., 55 at
-        general.
-    """
-    return inventory_capacity(rank) - 5
-
-
 __all__ = [
-    "combat_radar_min",
+    "DEPOSIT_FLOOR",
     "free_radar_radius",
     "fuel_capacity",
     "inventory_capacity",

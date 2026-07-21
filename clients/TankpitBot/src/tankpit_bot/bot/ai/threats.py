@@ -354,7 +354,7 @@ def _acquisition_rejection_reason(
         Rejection reason string, or ``None`` when the enemy is viable.
     """
     from tankpit_bot.bot.ai.combat_strategy import has_passable_adjacent
-    from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
+    from tankpit_bot.physics.costs import teleport_cost
 
     if tank["liveness"] != "alive":
         return "not_alive"
@@ -368,13 +368,13 @@ def _acquisition_rejection_reason(
         return "stale_map_data"
     if not has_passable_adjacent(tank["x"], tank["y"], terrain):
         return "no_passable_adjacent"
-    teleport_cost = compute_teleport_fuel_cost(
+    approach_cost = teleport_cost(
         self_state["x"],
         self_state["y"],
         tank["x"],
         tank["y"],
     )
-    if teleport_cost + engagement_reserve_fuel > self_state["fuel"]:
+    if approach_cost + engagement_reserve_fuel > self_state["fuel"]:
         return "unaffordable"
     return None
 

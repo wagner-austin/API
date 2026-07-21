@@ -213,6 +213,53 @@ def test_main_keeps_orchestrator_rc_over_contract_rc(tmp_path: Path) -> None:
     assert rc == 5
 
 
+def _write_bad_physics_claim(project_root: Path) -> None:
+    """Plant a wiki claim block that contradicts the real physics package.
+
+    Args:
+        project_root: Fake project root to receive the wiki page.
+    """
+    pages_dir = project_root / "wiki" / "pages"
+    pages_dir.mkdir(parents=True)
+    (pages_dir / "economy.md").write_text(
+        "# Economy\n\n```json claims\n"
+        '{"claims": [{"id": "walk-cost",'
+        ' "code": "tankpit_bot.physics.costs:WALK_COST_PER_TILE",'
+        ' "value": 2}]}\n'
+        "```\n",
+        encoding="utf-8",
+    )
+
+
+def test_main_fails_on_physics_claim_violation(tmp_path: Path) -> None:
+    """Physics-claim violations flip a passing guard run to rc=1."""
+    _install_fake_guard_hooks(tmp_path)
+    _write_bad_physics_claim(tmp_path)
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 1
+
+
+def test_main_keeps_orchestrator_rc_over_physics_rc(tmp_path: Path) -> None:
+    """A nonzero orchestrator rc is not overwritten by physics violations."""
+
+    class _FakeFindRoot:
+        def __call__(self, start: Path) -> Path:
+            return tmp_path
+
+    class _FakeLoader:
+        def __call__(self, monorepo_root: Path) -> _hooks_guard.RunForProjectProto:
+            def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+                return 5
+
+            return _run_for_project
+
+    _hooks_guard.guard_find_monorepo_root = _FakeFindRoot()
+    _hooks_guard.guard_load_orchestrator = _FakeLoader()
+    _write_bad_physics_claim(tmp_path)
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 5
+
+
 def test_guard_detects_violations(tmp_path: Path) -> None:
     """Test guard.main detects violations and returns non-zero exit code."""
     root = tmp_path

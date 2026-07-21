@@ -89,6 +89,27 @@ Mechanics this encodes:
   updates for 22 s) — per-shot victim resolution during reroute is
   impossible (`victim_id=-1` on every rerouted hit).
 
+### Machine-checked claim
+
+The TTL estimate is bound to `tankpit_bot.physics.combat`
+([[physics-module-roadmap]] Phase 1) and verified by the
+`physics_claims` guard stage. The value is the midpoint of the
+measured [11.0, 13.0] s boundary — when a future pursuit miss narrows
+the boundary, update the number here AND in `combat.py`, or the gate
+goes red.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "reroute-ttl-ms",
+      "code": "tankpit_bot.physics.combat:REROUTE_TTL_MS",
+      "value": 12000
+    }
+  ]
+}
+```
+
 ## Damage tiers (from correlated TankStatusSync / MovementResponse)
 
 `damage_state` counts **down** toward deactivation:

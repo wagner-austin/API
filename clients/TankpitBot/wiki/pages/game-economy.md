@@ -3,7 +3,7 @@ title: Game Economy (Fuel, Damage, Costs)
 tags: [game, combat, fuel, economy]
 related: [[shoot-event-format]], [[mine-mechanics]], [[deactivation-format]], [[bot-behavior-contract]], [[fuel-system]]
 sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20, tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06]
-fact_checked: 2026-07-06
+fact_checked: 2026-07-21 (make audit: 9 claims re-derived, 21395 clean samples)
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
 ---
@@ -93,6 +93,116 @@ Every row matches `remaining = declared − taken` exactly.
 ## What's still open
 
 **Nothing.** As of 2026-07-20 every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).
+
+## Machine-checked claims
+
+This block binds each fact above to its code symbol in
+`tankpit_bot.physics` ([[physics-module-roadmap]] Phase 1). The
+`physics_claims` guard stage of `make check` imports every `code`
+address and verifies it — constants by equality, formulas on the
+probe grid — and fails the gate if any public physics symbol lacks a
+claim here. Edit the fact → edit the claim → the gate forces the code
+to follow (and vice versa).
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "walk-cost",
+      "code": "tankpit_bot.physics.costs:WALK_COST_PER_TILE",
+      "value": 1
+    },
+    {
+      "id": "single-shot-cost",
+      "code": "tankpit_bot.physics.costs:SINGLE_SHOT_COST",
+      "value": 6
+    },
+    {
+      "id": "dual-shot-cost",
+      "code": "tankpit_bot.physics.costs:DUAL_SHOT_COST",
+      "value": 10
+    },
+    {
+      "id": "missile-shot-cost",
+      "code": "tankpit_bot.physics.costs:MISSILE_SHOT_COST",
+      "value": 10
+    },
+    {
+      "id": "homing-shot-cost",
+      "code": "tankpit_bot.physics.costs:HOMING_SHOT_COST",
+      "value": 10
+    },
+    {
+      "id": "radar-cost",
+      "code": "tankpit_bot.physics.costs:RADAR_COST",
+      "value": 10
+    },
+    {
+      "id": "mine-press-cost",
+      "code": "tankpit_bot.physics.costs:MINE_PRESS_COST",
+      "value": 10
+    },
+    {
+      "id": "block-op-cost",
+      "code": "tankpit_bot.physics.costs:BLOCK_OP_COST",
+      "value": 0
+    },
+    {
+      "id": "teleport-cost",
+      "code": "tankpit_bot.physics.costs:teleport_cost",
+      "formula": "floor(6 * sqrt(dx^2 + dy^2)), charged to the actual landing tile",
+      "probes": [
+        {"args": [0, 0, 1, 0], "expect": 6},
+        {"args": [0, 0, 3, 4], "expect": 30},
+        {"args": [0, 0, 1, 1], "expect": 8},
+        {"args": [10, 20, 10, 20], "expect": 0},
+        {"args": [0, 0, 100, 100], "expect": 848}
+      ]
+    },
+    {
+      "id": "single-hit-victim-cost",
+      "code": "tankpit_bot.physics.damage:SINGLE_HIT_VICTIM_COST",
+      "value": 45
+    },
+    {
+      "id": "dual-hit-victim-cost",
+      "code": "tankpit_bot.physics.damage:DUAL_HIT_VICTIM_COST",
+      "value": 90
+    },
+    {
+      "id": "mine-detonation-cost",
+      "code": "tankpit_bot.physics.damage:MINE_DETONATION_COST",
+      "value": 45
+    },
+    {
+      "id": "fuel-capacity",
+      "code": "tankpit_bot.physics.capacity:fuel_capacity",
+      "formula": "1000 + 100 * rank",
+      "probes": [
+        {"args": [0], "expect": 1000},
+        {"args": [1], "expect": 1100},
+        {"args": [7], "expect": 1700},
+        {"args": [8], "expect": 1800}
+      ]
+    },
+    {
+      "id": "inventory-capacity",
+      "code": "tankpit_bot.physics.capacity:inventory_capacity",
+      "formula": "20 + 5 * rank per slot",
+      "probes": [
+        {"args": [0], "expect": 20},
+        {"args": [1], "expect": 25},
+        {"args": [8], "expect": 60}
+      ]
+    },
+    {
+      "id": "deposit-floor",
+      "code": "tankpit_bot.physics.capacity:DEPOSIT_FLOOR",
+      "value": 100
+    }
+  ]
+}
+```
 
 ## How this was discovered
 

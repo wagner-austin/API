@@ -10,7 +10,7 @@ radar's footprint with the viewport bounds:
 * Free radar at tank ``(X, Y)``: marks tiles
   ``(X-radius..X+radius, Y-radius..Y+radius) intersected with the
   viewport``, where ``radius = 2 + rank // 3`` (see
-  :func:`tankpit_bot.state.rank_formulas.free_radar_radius`). At a
+  :func:`tankpit_bot.physics.capacity.free_radar_radius`). At a
   viewport corner this can be as few as ~3 tiles.
 * Extra radar: marks every tile inside the viewport bounds regardless
   of rank.
@@ -33,7 +33,7 @@ expires; they never become reachable by walking.
 
 from __future__ import annotations
 
-from tankpit_bot.state.rank_formulas import free_radar_radius
+from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.state.types import WorldStateDict
 
 # A swept tile is re-foraged after this interval -- long enough to push

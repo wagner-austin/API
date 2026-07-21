@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
-from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.types import (
     AIConfigDict,
     AIStateDict,
@@ -22,6 +21,7 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.inventory import InventoryState
+from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -439,7 +439,7 @@ def teleport_fuel_cost_to(ctx: DecideCtx, target_x: int, target_y: int) -> int:
     Returns:
         Exact teleport fuel cost for the current self position.
     """
-    return compute_teleport_fuel_cost(
+    return teleport_cost(
         ctx.self_state["x"],
         ctx.self_state["y"],
         target_x,

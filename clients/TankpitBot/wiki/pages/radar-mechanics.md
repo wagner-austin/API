@@ -83,6 +83,32 @@ One viewport sweep reveals ~10 containers. Live data: 32 pickups vs 9 dot hops i
 
 Extra radars come ONLY from equipment containers. No other source. See [[equipment-system]].[^5]
 
+## Machine-checked claims
+
+Binding for the built-in radar radius formula ([[physics-module-roadmap]]
+Phase 1; probes chosen at the measured step boundaries[^14]). Verified
+by the `physics_claims` guard stage on every `make check`.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "free-radar-radius",
+      "code": "tankpit_bot.physics.capacity:free_radar_radius",
+      "formula": "chebyshev radius 2 + rank // 3",
+      "probes": [
+        {"args": [0], "expect": 2},
+        {"args": [2], "expect": 2},
+        {"args": [3], "expect": 3},
+        {"args": [5], "expect": 3},
+        {"args": [6], "expect": 4},
+        {"args": [8], "expect": 4}
+      ]
+    }
+  ]
+}
+```
+
 [^1]: user (Austin), 2026-06-12 — extra radar = full viewport; client tip text confirms
 [^2]: ~120 built-in scans across captures 2026-06-12 — zero reveals beyond chebyshev 2; hits at 1 and 2 only; was an unmeasured 7x7 assumption from April
 [^3]: run 20260611-062453 — extra count series 10→9→...→3, one consumed per scan

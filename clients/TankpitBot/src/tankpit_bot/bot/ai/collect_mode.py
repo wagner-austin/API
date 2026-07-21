@@ -31,14 +31,14 @@ from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.resource_search import (
     make_resource_search_hop,
 )
-from tankpit_bot.bot.ai.teleport_cost import compute_teleport_fuel_cost
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand, make_radar_command, make_teleport_command
 from tankpit_bot.inventory import inventory_all_full
+from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
+from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.rank_formulas import fuel_capacity, inventory_capacity
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -377,7 +377,7 @@ def _continue_or_release_fuel_lock(
         # had no capacity gate, only the selection path did. Every
         # dispatch drew wire 0x52 code-5 "Tank full" and the lock
         # survived to next tick. Capacity is now rank-derived
-        # (:func:`tankpit_bot.state.rank_formulas.fuel_capacity`), so
+        # (:func:`tankpit_bot.physics.capacity.fuel_capacity`), so
         # this gate closes the loop at the root regardless of how the
         # lock was established.
         emit_ai(
@@ -544,7 +544,7 @@ def _hop_toward_equipment(
             no_landing += 1
             continue
         landing_x, landing_y = landing
-        cost = compute_teleport_fuel_cost(
+        cost = teleport_cost(
             ctx.self_state["x"],
             ctx.self_state["y"],
             landing_x,

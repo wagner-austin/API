@@ -336,11 +336,11 @@ class TestInventoryTracking:
         cap -- so the rejection snaps every drifted shadow count up to
         the rank capacity.
         """
+        from tankpit_bot.physics.capacity import inventory_capacity
         from tankpit_bot.sniffer.world_state import update_world_state_from_position
         from tankpit_bot.sniffer.world_state_inventory import (
             update_inventory_from_full_signal,
         )
-        from tankpit_bot.state.rank_formulas import inventory_capacity
 
         update_world_state_from_position(100, 100)
         ws = get_world_service()

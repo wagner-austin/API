@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.state.rank_formulas import free_radar_radius
+from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.state.scan_coverage import (
     FORAGE_COVERAGE_TTL_MS,
     free_radar_revealed_tiles,

@@ -1,4 +1,4 @@
-"""Tests for :mod:`tankpit_bot.state.rank_formulas`.
+"""Tests for :mod:`tankpit_bot.physics.capacity`.
 
 Reference values (see ``wiki/pages/game-economy.md``,
 ``wiki/pages/radar-mechanics.md``): each of the 9 rank rows is
@@ -8,7 +8,12 @@ change fails on the specific rank row it broke.
 
 from __future__ import annotations
 
-from tankpit_bot.state.rank_formulas import free_radar_radius, fuel_capacity
+from tankpit_bot.physics.capacity import (
+    DEPOSIT_FLOOR,
+    free_radar_radius,
+    fuel_capacity,
+    inventory_capacity,
+)
 
 
 class TestFuelCapacity:
@@ -63,6 +68,14 @@ class TestFuelCapacity:
     def test_general_capacity_is_1800(self) -> None:
         """Rank 8 (general) holds 1800 fuel (formula, no direct measurement)."""
         assert fuel_capacity(8) == 1800
+
+
+class TestDepositFloor:
+    """Server-enforced deposit floor, verified at four ranks 2026-07-06."""
+
+    def test_deposit_floor_is_100(self) -> None:
+        """A max deposit always leaves exactly 100 fuel in the tank."""
+        assert DEPOSIT_FLOOR == 100
 
 
 class TestFreeRadarRadius:
@@ -123,3 +136,46 @@ class TestFreeRadarRadius:
     def test_general_radius_is_4(self) -> None:
         """Rank 8 (general) built-in radar covers a 9x9 (radius 4)."""
         assert free_radar_radius(8) == 4
+
+
+class TestInventoryCapacity:
+    """Per-slot cap ``20 + 5 * rank`` from the official rules table."""
+
+    def test_recruit_cap_is_20(self) -> None:
+        """Rank 0 (recruit) caps each slot at 20."""
+        assert inventory_capacity(0) == 20
+
+    def test_private_cap_is_25(self) -> None:
+        """Rank 1 (private) caps each slot at 25.
+
+        Matches the 0x52 code-7 refusals observed at 25 in live runs.
+        """
+        assert inventory_capacity(1) == 25
+
+    def test_corporal_cap_is_30(self) -> None:
+        """Rank 2 (corporal) caps each slot at 30."""
+        assert inventory_capacity(2) == 30
+
+    def test_sergeant_cap_is_35(self) -> None:
+        """Rank 3 (sergeant) caps each slot at 35."""
+        assert inventory_capacity(3) == 35
+
+    def test_lieutenant_cap_is_40(self) -> None:
+        """Rank 4 (lieutenant) caps each slot at 40."""
+        assert inventory_capacity(4) == 40
+
+    def test_captain_cap_is_45(self) -> None:
+        """Rank 5 (captain) caps each slot at 45."""
+        assert inventory_capacity(5) == 45
+
+    def test_major_cap_is_50(self) -> None:
+        """Rank 6 (major) caps each slot at 50."""
+        assert inventory_capacity(6) == 50
+
+    def test_colonel_cap_is_55(self) -> None:
+        """Rank 7 (colonel) caps each slot at 55."""
+        assert inventory_capacity(7) == 55
+
+    def test_general_cap_is_60(self) -> None:
+        """Rank 8 (general) caps each slot at 60."""
+        assert inventory_capacity(8) == 60

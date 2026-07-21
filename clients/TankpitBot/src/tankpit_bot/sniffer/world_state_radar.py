@@ -41,7 +41,7 @@ def _radar_revealed_tiles(ws: WorldService) -> list[tuple[int, int]]:
     Extra radar reveals every tile in the viewport. Free radar reveals
     a ``(2r+1)x(2r+1)`` block around the tank, where
     ``r = free_radar_radius(rank)``, intersected with the viewport
-    (see :func:`tankpit_bot.state.rank_formulas.free_radar_radius`).
+    (see :func:`tankpit_bot.physics.capacity.free_radar_radius`).
     When the tank position is unknown (self_state not yet observed),
     the server falls back to the extra-radar geometry -- mirror that.
 
