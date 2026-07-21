@@ -18,7 +18,6 @@ from covenant_ml.backends.cleargbm import (
 )
 from covenant_ml.backends.cleargbm.backend import (
     _compute_class_weight,
-    _EarlyStoppingTracker,
     _is_cleargbm_config,
 )
 from covenant_ml.backends.protocol import ClassifierBackend, PreparedClassifier
@@ -229,78 +228,13 @@ def test_compute_class_weight_single_positive() -> None:
     assert weight == 9.0
 
 
-# =============================================================================
-# Early Stopping Tracker Tests
-# =============================================================================
-
-
-def test_early_stopping_tracker_improves_on_better_loss() -> None:
-    """_EarlyStoppingTracker updates best when loss improves."""
-    tracker = _EarlyStoppingTracker(early_stopping_rounds=3)
-
-    tracker.update(val_loss=0.5, tree_index=0)
-    assert tracker.best_val_loss == 0.5
-    assert tracker.best_round == 1
-    assert tracker.rounds_without_improvement == 0
-    assert tracker.early_stopped is False
-
-
-def test_early_stopping_tracker_no_improvement() -> None:
-    """_EarlyStoppingTracker increments rounds_without_improvement when no improvement."""
-    tracker = _EarlyStoppingTracker(early_stopping_rounds=3)
-
-    tracker.update(val_loss=0.5, tree_index=0)
-    tracker.update(val_loss=0.6, tree_index=1)  # Worse loss
-
-    assert tracker.best_val_loss == 0.5
-    assert tracker.best_round == 1
-    assert tracker.rounds_without_improvement == 1
-
-
-def test_early_stopping_tracker_triggers_early_stop() -> None:
-    """_EarlyStoppingTracker triggers early_stopped after threshold."""
-    tracker = _EarlyStoppingTracker(early_stopping_rounds=3)
-
-    tracker.update(val_loss=0.5, tree_index=0)
-    tracker.update(val_loss=0.6, tree_index=1)  # No improvement
-    tracker.update(val_loss=0.7, tree_index=2)  # No improvement
-    tracker.update(val_loss=0.8, tree_index=3)  # No improvement - triggers
-
-    assert tracker.rounds_without_improvement == 3
-    assert tracker.early_stopped is True
-
-
-def test_early_stopping_tracker_val_loss_none_no_update() -> None:
-    """_EarlyStoppingTracker handles val_loss=None without updating state."""
-    tracker = _EarlyStoppingTracker(early_stopping_rounds=3)
-
-    # First update with actual loss
-    tracker.update(val_loss=0.5, tree_index=0)
-    assert tracker.best_val_loss == 0.5
-    assert tracker.best_round == 1
-
-    # Update with None - should not change state
-    tracker.update(val_loss=None, tree_index=1)
-    assert tracker.best_val_loss == 0.5
-    assert tracker.best_round == 1
-    assert tracker.rounds_without_improvement == 0
-    assert tracker.early_stopped is False
-
-
-def test_early_stopping_tracker_all_none_no_crash() -> None:
-    """_EarlyStoppingTracker handles all None val_loss without crashing."""
-    tracker = _EarlyStoppingTracker(early_stopping_rounds=3)
-
-    # Multiple updates with None
-    tracker.update(val_loss=None, tree_index=0)
-    tracker.update(val_loss=None, tree_index=1)
-    tracker.update(val_loss=None, tree_index=2)
-
-    # State should remain at defaults
-    assert tracker.best_val_loss == float("inf")
-    assert tracker.best_round == 0
-    assert tracker.rounds_without_improvement == 0
-    assert tracker.early_stopped is False
+# Early stopping is now driven inside the native Rust training loop via the
+# ``early_stopping_rounds`` field on ``GradientBoostingConfig``; the returned
+# model is already trimmed to the best-round ensemble. The former Python-side
+# ``_EarlyStoppingTracker`` class was redundant bookkeeping and was removed
+# when the wrapper switched to the native path — its unit tests moved with it.
+# End-to-end early-stopping behavior is now covered by the integration test
+# that trains through the wrapper and asserts ``TrainOutcome.early_stopped``.
 
 
 # =============================================================================
@@ -545,8 +479,15 @@ def test_cleargbm_backend_raises_on_no_positive_samples(tmp_path: Path) -> None:
         _invoke_cleargbm_train(backend, x, y, names, config, tmp_path)
 
 
-def test_cleargbm_backend_with_progress_callback(tmp_path: Path) -> None:
-    """ClearGBMBackend calls progress callback during training."""
+def test_cleargbm_backend_progress_callback_is_noop_on_native_path(tmp_path: Path) -> None:
+    """Passing a progress callback is accepted but never invoked on the native path.
+
+    The Rust training loop is a single native call — it does not surface per-tree
+    progress to Python. The wrapper's ``train()`` documents this and skips the
+    callback rather than emitting synthetic ``TrainProgress`` events. This test
+    guards the documented behavior: training must succeed to convergence even
+    when a callback is present, and the callback must never fire.
+    """
     backend = create_cleargbm_backend()
     x, y, names = _make_synthetic_dataset()
 
@@ -566,15 +507,10 @@ def test_cleargbm_backend_with_progress_callback(tmp_path: Path) -> None:
         progress=track_progress,
     )
 
-    # Should have progress reports (one per tree)
-    assert len(progress_reports) == 5
-    # Each report should have valid structure
-    for report in progress_reports:
-        assert report["round"] >= 1
-        assert report["total_rounds"] == 5
-        assert report["train_loss"] >= 0.0
+    # Documented no-op on the native path.
+    assert progress_reports == []
 
-    # Verify loss decreased from baseline
+    # Training still completes and beats the random baseline.
     val_loss = outcome["val_metrics"]["loss"]
     assert val_loss < _BASELINE_LOSS, (
         f"Validation loss {val_loss} should be below baseline {_BASELINE_LOSS}"
@@ -861,36 +797,13 @@ def test_cleargbm_backend_us_bankruptcy_full_pipeline(tmp_path: Path) -> None:
     assert len(importances) == len(names)
 
 
-def test_cleargbm_backend_progress_callback_receives_val_loss(tmp_path: Path) -> None:
-    """Progress callback receives validation loss when val set exists."""
-    backend = create_cleargbm_backend()
-    x, y, names = _make_synthetic_dataset(n_samples=100)
-
-    config = _make_cleargbm_config(n_estimators=5)
-
-    progress_reports: list[TrainProgress] = []
-
-    def track_progress(p: TrainProgress) -> None:
-        progress_reports.append(p)
-
-    outcome = backend.train(
-        x_features=x,
-        y_labels=y,
-        feature_names=names,
-        config=config,
-        output_dir=tmp_path,
-        progress=track_progress,
-    )
-
-    # Check that at least one report has val_loss
-    has_val_loss = any(r["val_loss"] is not None for r in progress_reports)
-    assert has_val_loss
-
-    # Verify loss decreased from baseline
-    val_loss = outcome["val_metrics"]["loss"]
-    assert val_loss < _BASELINE_LOSS, (
-        f"Validation loss {val_loss} should be below baseline {_BASELINE_LOSS}"
-    )
+# test_cleargbm_backend_progress_callback_receives_val_loss removed: the native
+# training path does not surface per-tree progress to Python, so there is no
+# per-round ``val_loss`` to observe from the wrapper. The no-op semantics of
+# the ``progress`` argument are covered by
+# ``test_cleargbm_backend_progress_callback_is_noop_on_native_path`` above.
+# The final ``TrainOutcome.val_metrics["loss"]`` value is asserted by other
+# training tests in this module.
 
 
 def test_cleargbm_backend_model_id_is_uuid(tmp_path: Path) -> None:

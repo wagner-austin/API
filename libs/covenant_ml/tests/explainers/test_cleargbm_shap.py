@@ -6,22 +6,32 @@ and computing local explanations.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Protocol
 
 import numpy as np
 import pytest
 from cleargbm.types import DecisionTree, GradientBoostingConfig, GradientBoostingModel, TreeNode
 from numpy.typing import NDArray
+from platform_core.json_utils import JSONValue
 
 from covenant_ml.explainers.cleargbm_shap import (
     ClearGBMShapWrapper,
     _convert_decision_tree,
     _convert_tree_node_to_arrays,
+    _decode_rust_monotonic_constraints,
+    _decode_rust_node,
     _get_default_child_idx,
     _populate_internal_node,
     _ShapArrays,
     convert_cleargbm_to_shap_format,
 )
+
+
+class _NativePyGbmModelProto(Protocol):
+    """Opaque native model handle produced by the Rust training loop."""
+
+    ...
+
 
 # =============================================================================
 # Test data creation helpers
@@ -590,142 +600,173 @@ class TestConvertClearGBMToShapFormat:
 # =============================================================================
 # Tests for ClearGBMShapWrapper
 # =============================================================================
+#
+# The wrapper takes a native ``PyGbmModel`` handle (opaque Rust value)
+# produced by ``train_gradient_boosting_native``. It cannot be constructed from
+# a hand-authored Python-shape ``GradientBoostingModel`` TypedDict — the
+# Rust value has no public constructor from Python-side data. Wrapper tests
+# accordingly train a real small native model and exercise the full path:
+# ``PyGbmModel → to_json_rs → decode → convert_cleargbm_to_shap_format →
+# shap.TreeExplainer``.
 
 
-class TestClearGBMShapWrapper:
-    """Tests for ClearGBMShapWrapper class."""
+def _train_native_binary_model(
+    n_estimators: int = 5,
+    max_depth: int = 3,
+    n_samples: int = 32,
+    n_features: int = 3,
+    random_state: int = 42,
+) -> tuple[_NativePyGbmModelProto, list[str], NDArray[np.float64]]:
+    """Train a small binary-classification native ClearGBM model for SHAP tests.
 
-    def test_init_converts_model(self) -> None:
-        """Initialization converts model to SHAP format."""
-        tree = _make_simple_tree()
-        model = _make_model([tree])
+    Uses a linearly-separable synthetic dataset so a shallow tree ensemble
+    reaches useful splits.
 
-        wrapper = ClearGBMShapWrapper(model)
+    Args:
+        n_estimators: Number of trees in the ensemble.
+        max_depth: Maximum tree depth.
+        n_samples: Number of training rows.
+        n_features: Number of features.
+        random_state: Seed for reproducibility.
 
-        # Verify SHAP format was created with correct structure
-        assert len(wrapper._shap_format["trees"]) == 1
-        assert wrapper._base_prediction == 0.0
+    Returns:
+        Tuple of ``(native_model, feature_names, x_test)`` where ``x_test`` is
+        a small holdout matrix suitable for calling ``explain_local``.
+    """
+    from cleargbm._rust_adapters import use_rust_backend
+    from cleargbm.ensemble import train_gradient_boosting_native
 
-    def test_init_raises_on_empty_model(self) -> None:
-        """Initialization raises for model with no trees."""
-        model = GradientBoostingModel(
-            trees=(),
-            base_prediction=0.0,
-            learning_rate=0.1,
-            feature_names=("f0",),
-            n_classes=2,
-            config=_make_config(),
-        )
+    use_rust_backend()
 
-        with pytest.raises(ValueError, match="Cannot convert model with no trees"):
-            ClearGBMShapWrapper(model)
+    rng = np.random.default_rng(random_state)
+    x_train: NDArray[np.float64] = rng.random((n_samples, n_features), dtype=np.float64)
+    # Linearly separable: label = 1 iff sum of first half > sum of second half.
+    half = n_features // 2 if n_features > 1 else 1
+    left_sum: NDArray[np.float64] = np.sum(x_train[:, :half], axis=1)
+    right_sum: NDArray[np.float64] = np.sum(x_train[:, half:], axis=1)
+    score: NDArray[np.float64] = left_sum - right_sum
+    y_train: NDArray[np.int64] = (score > 0.0).astype(np.int64)
 
-    def test_explain_local_raises_on_feature_mismatch(self) -> None:
-        """explain_local raises when feature count doesn't match."""
-        tree = _make_simple_tree()
-        model = _make_model([tree])
-        wrapper = ClearGBMShapWrapper(model)
+    feature_names = tuple(f"f{i}" for i in range(n_features))
+    cfg: GradientBoostingConfig = {
+        "n_estimators": n_estimators,
+        "max_depth": max_depth,
+        "learning_rate": 0.3,
+        "min_samples_split": 4,
+        "min_samples_leaf": 2,
+        "max_features": None,
+        "max_bins": 8,
+        "subsample": 1.0,
+        "random_state": random_state,
+        "track_contributions": False,
+        "monotonic_constraints": None,
+        "reg_alpha": 0.0,
+        "reg_lambda": 0.0,
+        "n_jobs": 1,
+        "early_stopping_rounds": None,
+    }
+    native_model = train_gradient_boosting_native(
+        x_train=x_train,
+        y_train=y_train,
+        x_val=None,
+        y_val=None,
+        config=cfg,
+        feature_names=feature_names,
+    )
+    x_test = rng.random((3, n_features), dtype=np.float64)
+    return native_model, list(feature_names), x_test
 
-        x = _make_x_1x3()  # 3 features
-        feature_names = ["f0", "f1"]  # Only 2 names
 
+class TestDecodeRustNodeErrors:
+    """Coverage for the ``feature_index`` out-of-range error path in `_decode_rust_node`."""
+
+    def test_decode_rust_node_raises_when_feature_index_out_of_range(self) -> None:
+        """A Rust-shape internal node with a bogus feature_index must be rejected."""
+        # Rust-shape node payload (integer feature_index that references a
+        # feature past the end of the model-level feature_names tuple).
+        node_json: JSONValue = {
+            "node_id": 0,
+            "is_leaf": False,
+            "feature_index": 5,  # out of range: only 2 features declared below.
+            "threshold": 0.5,
+            "value": 0.0,
+            "n_samples": 10,
+            "left_child": 1,
+            "right_child": 2,
+            "nan_goes_left": True,
+        }
+        feature_names = ("f0", "f1")
+        with pytest.raises(ValueError, match="out of range"):
+            _decode_rust_node(node_json, feature_names)
+
+
+class TestDecodeRustMonotonicConstraints:
+    """Coverage for the list-of-labels branch of `_decode_rust_monotonic_constraints`."""
+
+    def test_decode_none_returns_none(self) -> None:
+        """A JSON null input decodes to Python ``None``."""
+        assert _decode_rust_monotonic_constraints(None) is None
+
+    def test_decode_translates_variants_to_ints(self) -> None:
+        """The three known variants translate to the expected integer codes."""
+        result = _decode_rust_monotonic_constraints(["Increasing", "None", "Decreasing"])
+        assert result == (1, 0, -1)
+
+    def test_decode_empty_list_returns_empty_tuple(self) -> None:
+        """An empty JSON list yields an empty tuple (no constraints applied)."""
+        result = _decode_rust_monotonic_constraints([])
+        assert result == ()
+
+    def test_decode_rejects_unknown_variant(self) -> None:
+        """An unrecognized variant label surfaces as ``ValueError``."""
+        with pytest.raises(ValueError, match="unknown monotonic constraint variant"):
+            _decode_rust_monotonic_constraints(["Bogus"])
+
+
+class TestClearGBMShapWrapperNativeIntegration:
+    """End-to-end integration tests for ``ClearGBMShapWrapper``.
+
+    These replace the earlier fake-model-based unit tests. The wrapper's
+    constructor takes a native ``PyGbmModel`` that only ``train_gradient_boosting_native``
+    can produce, so exercising it requires real training.
+    """
+
+    def test_wrapper_construction_from_native_model(self) -> None:
+        """Wrapping a native model produces a populated SHAP format."""
+        native_model, _, _ = _train_native_binary_model()
+        wrapper = ClearGBMShapWrapper(native_model)
+        assert len(wrapper._shap_format["trees"]) == 5
+        assert wrapper._shap_format["num_outputs"] == 1
+        assert wrapper._shap_format["objective"] == "binary:logistic"
+
+    def test_wrapper_explain_local_returns_per_sample_values(self) -> None:
+        """``explain_local`` returns one explanation per input row."""
+        import math
+
+        native_model, feature_names, x = _train_native_binary_model()
+        wrapper = ClearGBMShapWrapper(native_model)
+        result = wrapper.explain_local(x, feature_names)
+        n_rows: int = int(x.shape[0])
+        assert len(result) == n_rows
+        for exp in result:
+            assert exp["feature_names"] == feature_names
+            assert len(exp["values"]) == len(feature_names)
+            base_value: float = float(exp["base_value"])
+            assert math.isfinite(base_value)
+            for v in exp["values"]:
+                v_f: float = float(v)
+                assert math.isfinite(v_f)
+
+    def test_wrapper_explain_local_raises_on_feature_mismatch(self) -> None:
+        """``explain_local`` raises when the feature-name count is wrong."""
+        native_model, _, x = _train_native_binary_model()
+        wrapper = ClearGBMShapWrapper(native_model)
         with pytest.raises(ValueError, match="Feature count mismatch"):
-            wrapper.explain_local(x, feature_names)
-
-    def test_explain_local_returns_list_of_explanations(self) -> None:
-        """explain_local returns LocalExplanation for each sample."""
-        tree = _make_simple_tree()
-        model = _make_model([tree])
-        wrapper = ClearGBMShapWrapper(model)
-
-        x = _make_x_2x2()
-        feature_names = ["f0", "f1"]
-
-        result = wrapper.explain_local(x, feature_names)
-
-        assert len(result) == 2
-        for explanation in result:
-            # Verify structure by accessing actual values
-            assert len(explanation["values"]) == 2
-            assert explanation["feature_names"] == ["f0", "f1"]
-            # base_value should be a finite number
-            assert explanation["base_value"] == explanation["base_value"]  # NaN check
-
-    def test_explain_local_with_single_sample(self) -> None:
-        """explain_local works with single sample."""
-        tree = _make_simple_tree()
-        model = _make_model([tree])
-        wrapper = ClearGBMShapWrapper(model)
-
-        x = _make_x_1x2()
-        feature_names = ["feature_0", "feature_1"]
-
-        result = wrapper.explain_local(x, feature_names)
-
-        assert len(result) == 1
-        explanation = result[0]
-        # Verify values are finite (implicitly checks float type)
-        assert explanation["base_value"] == explanation["base_value"]
-        assert len(explanation["values"]) == 2
-
-    def test_explain_local_values_are_floats(self) -> None:
-        """All SHAP values are converted to Python floats."""
-        tree = _make_simple_tree()
-        model = _make_model([tree])
-        wrapper = ClearGBMShapWrapper(model)
-
-        x = _make_x_1x2()
-        feature_names = ["f0", "f1"]
-
-        result = wrapper.explain_local(x, feature_names)
-
-        for explanation in result:
-            # Values should be finite floats
-            assert explanation["base_value"] == explanation["base_value"]
-            for v in explanation["values"]:
-                assert v == v  # NaN check - finite floats equal themselves
-
-
-# =============================================================================
-# Integration test with realistic model
-# =============================================================================
+            wrapper.explain_local(x, ["only_one_name"])
 
 
 class TestIntegration:
     """Integration tests with more realistic models."""
-
-    def test_full_pipeline_simple_model(self) -> None:
-        """Full pipeline from model to explanations."""
-        # Create a model with 2 trees
-        tree1 = _make_simple_tree()
-        tree2 = _make_deeper_tree()
-        model = GradientBoostingModel(
-            trees=(tree1, tree2),
-            base_prediction=-0.1,
-            learning_rate=0.1,
-            feature_names=("feature_0", "feature_1"),
-            n_classes=2,
-            config=_make_config(),
-        )
-
-        # Convert to SHAP format
-        shap_format = convert_cleargbm_to_shap_format(model)
-        assert shap_format["base_offset"] == -0.1
-        assert len(shap_format["trees"]) == 2
-
-        # Create wrapper and explain
-        wrapper = ClearGBMShapWrapper(model)
-        x = _make_x_3x2()
-        feature_names = ["feature_0", "feature_1"]
-
-        explanations = wrapper.explain_local(x, feature_names)
-
-        assert len(explanations) == 3
-        for exp in explanations:
-            # SHAP values should sum to difference from base value
-            # (within numerical tolerance)
-            assert len(exp["values"]) == 2
-            assert exp["feature_names"] == feature_names
 
     def test_shap_tree_arrays_structure(self) -> None:
         """Verify ShapTreeArrays has correct SHAP format structure."""

@@ -1058,20 +1058,21 @@ class TestShapTreeAdapterDirect:
 def _create_cleargbm_prepared() -> PreparedClassifier:
     """Create a ClearGBM prepared classifier for tests.
 
-    Uses the ClearGBM backend to create a real _ClearGBMPrepared instance
-    that will be recognized by try_extract_cleargbm_model.
+    Trains a real native ``PyGbmModel`` via ``train_gradient_boosting_native``
+    (matching the ClearGBM backend's own training path), wraps it in
+    ``_ClearGBMPrepared``, and returns it. Bypasses save/load so the test
+    exercises the wrapper's in-memory instance directly.
 
     Returns:
-        PreparedClassifier wrapping a ClearGBM model.
+        PreparedClassifier wrapping a ClearGBM native model.
     """
-    import tempfile
-    from pathlib import Path
+    from cleargbm._rust_adapters import use_rust_backend
+    from cleargbm.ensemble import train_gradient_boosting_native
+    from cleargbm.types import GradientBoostingConfig
 
-    from cleargbm.ensemble import train_gradient_boosting
-    from cleargbm.types import GradientBoostingConfig, encode_gradient_boosting_model
-    from platform_core.json_utils import dump_json_str
+    from covenant_ml.backends.cleargbm.backend import _ClearGBMPrepared
 
-    from covenant_ml.backends.cleargbm import ClearGBMBackend
+    use_rust_backend()
 
     rng = np.random.default_rng(42)
     x_train: NDArray[np.float64] = rng.random((100, 4)).astype(np.float64)
@@ -1097,29 +1098,16 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         early_stopping_rounds=10,
     )
 
-    gbm_model = train_gradient_boosting(
+    native_model = train_gradient_boosting_native(
         x_train=x_train,
         y_train=y_train,
         x_val=None,
         y_val=None,
         config=config,
         feature_names=feature_names,
-        progress_callback=None,
     )
 
-    # Use the backend to save/load - this creates a real _ClearGBMPrepared
-    backend = ClearGBMBackend()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        model_path = Path(tmpdir) / "model.json"
-
-        # Save model directly to JSON
-        encoded = encode_gradient_boosting_model(gbm_model)
-        json_str = dump_json_str(encoded, indent=2)
-        with open(model_path, "w", encoding="utf-8") as f:
-            f.write(json_str)
-
-        # Load via backend to get the real _ClearGBMPrepared type
-        return backend.load(path=str(model_path))
+    return _ClearGBMPrepared(native_model)
 
 
 class TestShapTreeAdapterWithClearGBM:

@@ -1,30 +1,28 @@
 """ClearGBM backend for tabular binary classification.
 
-Implements ClassifierBackend protocol using the numpy-based ClearGBM library.
-Provides built-in interpretability (rule extraction, feature contributions).
+Implements ClassifierBackend protocol using the ClearGBM library on the native
+Rust training path (single-call training loop, no per-tree FFI overhead).
 
 Strict typing only: no Any, no casts, no type: ignore.
 """
 
 from __future__ import annotations
 
+import types
 import uuid
 from pathlib import Path
-from typing import TypeGuard
+from typing import Protocol, TypeGuard
 
 import numpy as np
-from cleargbm.ensemble import predict_proba as cgbm_predict_proba
-from cleargbm.ensemble import train_gradient_boosting
-from cleargbm.explain import get_feature_importances
-from cleargbm.types import (
-    GradientBoostingConfig,
-    GradientBoostingModel,
-    TrainingProgress,
-    decode_gradient_boosting_model,
-    encode_gradient_boosting_model,
+from cleargbm._rust_adapters import use_rust_backend
+from cleargbm.ensemble import (
+    predict_proba_native as cgbm_predict_proba_native,
 )
+from cleargbm.ensemble import (
+    train_gradient_boosting_native,
+)
+from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 from platform_core.logging import get_logger
 
 from ...metrics import compute_all_metrics
@@ -39,55 +37,103 @@ from ...types import (
     FeatureImportance,
     TrainOutcome,
 )
-from ...types import (
-    TrainProgress as CovenantTrainProgress,
-)
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
 
 _log = get_logger(__name__)
 
 
-class _EarlyStoppingTracker:
-    """Tracks early stopping state during ClearGBM training.
+# =============================================================================
+# Native model access — Protocol-typed getattr onto the Rust extension
+# =============================================================================
+#
+# The cleargbm_rs Python package re-exports Rust-backed functions as stubs that
+# raise ImportError at the top-level; the real implementations live in the
+# .pyd submodule at ``cleargbm_rs.cleargbm_rs``. We import that submodule
+# directly and pin each function to a Protocol type so mypy sees precise
+# signatures instead of Any leaking from the dynamic __import__.
 
-    Monitors validation loss and determines when to stop training
-    if no improvement is seen for a specified number of rounds.
 
-    Attributes:
-        best_val_loss: Best validation loss seen so far.
-        best_round: Round number where best loss was achieved.
-        rounds_without_improvement: Consecutive rounds without improvement.
-        early_stopped: Whether early stopping was triggered.
-    """
+class _PyGbmModelProto(Protocol):
+    """Opaque model handle produced by the native training loop."""
 
-    def __init__(self, early_stopping_rounds: int) -> None:
-        """Initialize early stopping tracker.
+    ...
 
-        Args:
-            early_stopping_rounds: Stop after this many rounds without improvement.
-        """
-        self._early_stopping_rounds = early_stopping_rounds
-        self.best_val_loss = float("inf")
-        self.best_round = 0
-        self.rounds_without_improvement = 0
-        self.early_stopped = False
 
-    def update(self, val_loss: float | None, tree_index: int) -> None:
-        """Update tracking state with new validation loss.
+class _ToJsonProto(Protocol):
+    """Signature of ``cleargbm_rs.py_gbm_model_to_json_rs``."""
+
+    def __call__(self, model: _PyGbmModelProto) -> str:
+        """Serialize a native model to JSON.
 
         Args:
-            val_loss: Validation loss for current round, or None if not available.
-            tree_index: Zero-based tree/round index.
-        """
-        if val_loss is not None and val_loss < self.best_val_loss:
-            self.best_val_loss = val_loss
-            self.best_round = tree_index + 1
-            self.rounds_without_improvement = 0
-        elif val_loss is not None:
-            self.rounds_without_improvement += 1
+            model: Trained native model handle.
 
-        if self.rounds_without_improvement >= self._early_stopping_rounds:
-            self.early_stopped = True
+        Returns:
+            JSON representation.
+        """
+        ...
+
+
+class _FromJsonProto(Protocol):
+    """Signature of ``cleargbm_rs.py_gbm_model_from_json_rs``."""
+
+    def __call__(self, json_str: str) -> _PyGbmModelProto:
+        """Deserialize a native model from JSON.
+
+        Args:
+            json_str: JSON previously produced by the paired to-JSON function.
+
+        Returns:
+            Native model handle.
+        """
+        ...
+
+
+class _FeatureImportancesProto(Protocol):
+    """Signature of ``cleargbm_rs.py_gbm_model_feature_importances_rs``."""
+
+    def __call__(self, model: _PyGbmModelProto) -> list[tuple[str, float]]:
+        """Return split-count feature importances.
+
+        Args:
+            model: Trained native model handle.
+
+        Returns:
+            List of ``(feature_name, importance)`` pairs in feature-index order,
+            normalized to sum to 1.0 when at least one internal split exists.
+        """
+        ...
+
+
+class _NTreesProto(Protocol):
+    """Signature of ``cleargbm_rs.py_gbm_model_n_trees_rs``."""
+
+    def __call__(self, model: _PyGbmModelProto) -> int:
+        """Return the trained tree count.
+
+        Args:
+            model: Trained native model handle.
+
+        Returns:
+            Number of trees kept in the ensemble.
+        """
+        ...
+
+
+_native_mod: types.ModuleType = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])
+
+_py_gbm_model_to_json: _ToJsonProto = _native_mod.py_gbm_model_to_json_rs
+_py_gbm_model_from_json: _FromJsonProto = _native_mod.py_gbm_model_from_json_rs
+_py_gbm_model_feature_importances: _FeatureImportancesProto = (
+    _native_mod.py_gbm_model_feature_importances_rs
+)
+_py_gbm_model_n_trees: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
+
+# Activate the Rust backend at module import time. Idempotent — safe to call
+# repeatedly. This wrapper's whole promise is native-path training; without
+# this, imports from cleargbm.ensemble would still resolve but per-primitive
+# hook backends would stay set to the Python defaults.
+use_rust_backend()
 
 
 def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]:
@@ -144,14 +190,23 @@ CLEARGBM_CAPABILITIES: BackendCapabilities = {
 
 
 class _ClearGBMPrepared:
-    """Wrapper for a trained ClearGBM model implementing PreparedClassifier.
+    """Wrapper for a trained ClearGBM native model implementing PreparedClassifier.
+
+    Wraps the opaque ``cleargbm_rs.PyGbmModel`` handle produced by the native
+    training loop. All inference goes through ``predict_proba_native``; save,
+    load, and feature-importance extraction go through the native
+    ``py_gbm_model_*_rs`` module functions imported at module scope.
 
     Args:
-        model: Trained ClearGBM model.
+        model: Trained native model handle.
     """
 
-    def __init__(self, model: GradientBoostingModel) -> None:
-        """Initialize with trained model."""
+    def __init__(self, model: _PyGbmModelProto) -> None:
+        """Initialize with a trained native model handle.
+
+        Args:
+            model: Opaque ``PyGbmModel`` from ``train_gradient_boosting_native``.
+        """
         self._model = model
 
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -163,25 +218,26 @@ class _ClearGBMPrepared:
         Returns:
             Probability matrix (n_samples, 2).
         """
-        proba_tuple = cgbm_predict_proba(self._model, x)
+        proba_tuple = cgbm_predict_proba_native(self._model, x)
         return np.array(proba_tuple, dtype=np.float64)
 
     @property
-    def model(self) -> GradientBoostingModel:
-        """Get the underlying ClearGBM model."""
+    def model(self) -> _PyGbmModelProto:
+        """Get the underlying native model handle."""
         return self._model
 
 
 def try_extract_cleargbm_model(
     prepared: PreparedClassifier,
-) -> GradientBoostingModel | None:
-    """Extract GradientBoostingModel from a prepared classifier if ClearGBM.
+) -> _PyGbmModelProto | None:
+    """Extract the native model handle from a prepared classifier if ClearGBM.
 
     Args:
         prepared: Prepared classifier from any backend.
 
     Returns:
-        GradientBoostingModel if prepared is a ClearGBM classifier, None otherwise.
+        Native ``PyGbmModel`` handle if prepared is a ClearGBM classifier,
+        None otherwise.
     """
     if not isinstance(prepared, _ClearGBMPrepared):
         return None
@@ -299,27 +355,9 @@ class ClearGBMBackend(ClassifierBackend):
             early_stopping_rounds=cfg["early_stopping_rounds"],
         )
 
-        # Track best model for early stopping
-        tracker = _EarlyStoppingTracker(cfg["early_stopping_rounds"])
-
-        # Progress callback wrapper
-        def progress_wrapper(prog: TrainingProgress) -> None:
-            tracker.update(prog["val_loss"], prog["tree_index"])
-
-            if progress is not None:
-                covenant_progress = CovenantTrainProgress(
-                    round=prog["tree_index"] + 1,
-                    total_rounds=prog["total_trees"],
-                    train_loss=prog["train_loss"],
-                    train_auc=0.0,  # Computed after training
-                    val_loss=prog["val_loss"],
-                    val_auc=None,
-                )
-                progress(covenant_progress)
-
         # Train model
         _log.info(
-            "Starting ClearGBM training",
+            "Starting ClearGBM training (native Rust loop)",
             extra={
                 "n_estimators": cfg["n_estimators"],
                 "max_depth": cfg["max_depth"],
@@ -329,14 +367,24 @@ class ClearGBMBackend(ClassifierBackend):
             },
         )
 
-        model = train_gradient_boosting(
+        # The native Rust training loop does not accept a Python progress
+        # callback. Early stopping is handled internally by the Rust core via
+        # ``early_stopping_rounds`` in ``gbm_config``; the returned model is
+        # already trimmed to the best-round ensemble. The wrapper's earlier
+        # ``_EarlyStoppingTracker`` was redundant Python-side tracking of the
+        # same signal — removed with the switch to the native path.
+        if progress is not None:
+            _log.info(
+                "ClearGBM native path does not emit per-round progress; "
+                "callback will not be invoked"
+            )
+        model = train_gradient_boosting_native(
             x_train=splits.x_train,
             y_train=splits.y_train,
             x_val=splits.x_val,
             y_val=splits.y_val,
             config=gbm_config,
             feature_names=resolved_names,
-            progress_callback=progress_wrapper,
         )
 
         # Wrap model for evaluation
@@ -351,25 +399,32 @@ class ClearGBMBackend(ClassifierBackend):
         val_metrics = compute_all_metrics(splits.y_val, val_proba)
         test_metrics = compute_all_metrics(splits.y_test, test_proba)
 
+        # The Rust core returns a model already trimmed to the best-round
+        # ensemble; ``best_round`` is the surviving tree count and
+        # ``early_stopped`` is inferred from whether that count is below the
+        # configured n_estimators. No independent tracker needed.
+        surviving_trees = _py_gbm_model_n_trees(model)
+        early_stopped = surviving_trees < cfg["n_estimators"]
+
         _log.info(
             "ClearGBM training complete",
             extra={
                 "train_auc": train_metrics["auc"],
                 "val_auc": val_metrics["auc"],
                 "test_auc": test_metrics["auc"],
-                "best_round": tracker.best_round,
-                "early_stopped": tracker.early_stopped,
+                "surviving_trees": surviving_trees,
+                "early_stopped": early_stopped,
             },
         )
 
-        # Get feature importances
-        importances = get_feature_importances(model)
+        # Get feature importances from the native model
+        native_importances = _py_gbm_model_feature_importances(model)
         feature_importance_list: list[FeatureImportance] = []
-        for rank, imp in enumerate(importances, start=1):
+        for rank, (imp_name, imp_value) in enumerate(native_importances, start=1):
             feature_importance_list.append(
                 FeatureImportance(
-                    name=imp["feature_name"],
-                    importance=imp["total_contribution"],
+                    name=imp_name,
+                    importance=imp_value,
                     rank=rank,
                 )
             )
@@ -391,9 +446,9 @@ class ClearGBMBackend(ClassifierBackend):
             val_metrics=val_metrics,
             test_metrics=test_metrics,
             best_val_auc=val_metrics["auc"],
-            best_round=tracker.best_round if tracker.best_round > 0 else cfg["n_estimators"],
+            best_round=surviving_trees,
             total_rounds=cfg["n_estimators"],
-            early_stopped=tracker.early_stopped,
+            early_stopped=early_stopped,
             config=cfg,
             feature_importances=feature_importance_list,
             scale_pos_weight_computed=scale_pos_weight,
@@ -420,7 +475,7 @@ class ClearGBMBackend(ClassifierBackend):
         return compute_all_metrics(y, proba[:, 1])
 
     def save(self, *, model: PreparedClassifier, path: str) -> None:
-        """Save ClearGBM model to JSON file.
+        """Save ClearGBM native model to a JSON file.
 
         Args:
             model: Trained model (must be _ClearGBMPrepared).
@@ -431,25 +486,23 @@ class ClearGBMBackend(ClassifierBackend):
         """
         if not isinstance(model, _ClearGBMPrepared):
             raise RuntimeError("Model must be _ClearGBMPrepared")
-        encoded = encode_gradient_boosting_model(model.model)
-        json_str = dump_json_str(encoded, indent=2)
+        json_str = _py_gbm_model_to_json(model.model)
         with open(path, "w", encoding="utf-8") as f:
             f.write(json_str)
 
     def load(self, *, path: str) -> PreparedClassifier:
-        """Load ClearGBM model from JSON file.
+        """Load ClearGBM native model from a JSON file.
 
         Args:
             path: Path to the saved model file.
 
         Returns:
-            PreparedClassifier wrapping the loaded model.
+            PreparedClassifier wrapping the deserialized native model.
         """
         with open(path, encoding="utf-8") as f:
             raw_str = f.read()
-        raw = narrow_json_to_dict(load_json_str(raw_str))
-        model = decode_gradient_boosting_model(raw)
-        return _ClearGBMPrepared(model)
+        native_model = _py_gbm_model_from_json(raw_str)
+        return _ClearGBMPrepared(native_model)
 
     def get_feature_importances(
         self,
@@ -457,25 +510,26 @@ class ClearGBMBackend(ClassifierBackend):
         model: PreparedClassifier,
         feature_names: list[str] | None,
     ) -> list[FeatureImportance] | None:
-        """Get feature importances from ClearGBM model.
+        """Get feature importances from the native ClearGBM model.
 
         Args:
             model: Trained model.
-            feature_names: Feature names (not used, extracted from model).
+            feature_names: Feature names (not used, extracted from native model).
 
         Returns:
-            List of feature importances sorted by importance.
+            List of feature importances in feature-index order, or None if the
+            prepared classifier is not a ClearGBM instance.
         """
         if not isinstance(model, _ClearGBMPrepared):
             return None
 
-        importances = get_feature_importances(model.model)
+        native_importances = _py_gbm_model_feature_importances(model.model)
         result: list[FeatureImportance] = []
-        for rank, imp in enumerate(importances, start=1):
+        for rank, (imp_name, imp_value) in enumerate(native_importances, start=1):
             result.append(
                 FeatureImportance(
-                    name=imp["feature_name"],
-                    importance=imp["total_contribution"],
+                    name=imp_name,
+                    importance=imp_value,
                     rank=rank,
                 )
             )
@@ -511,16 +565,14 @@ class ClearGBMBackend(ClassifierBackend):
 
 
 def create_cleargbm_backend() -> ClearGBMBackend:
-    """Create ClearGBM backend instance.
+    """Create a ClearGBM backend instance bound to the native Rust training loop.
+
+    The Rust backend is activated at module import time via
+    ``use_rust_backend()``; this factory is a plain constructor with no
+    additional setup.
 
     Returns:
         ClearGBM backend.
-
-    Note:
-        Call ``cleargbm._rust_adapters.use_rust_backend()`` at application
-        startup (before creating any backends) to activate Rust acceleration
-        for all hot-path operations. Without this call, ClearGBM uses pure
-        Python implementations.
     """
     return ClearGBMBackend()
 
