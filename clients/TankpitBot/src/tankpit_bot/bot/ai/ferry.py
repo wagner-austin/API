@@ -26,10 +26,10 @@ across the water.
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.pathfinding import find_path
 from tankpit_bot.state.types import (
     TERRAIN_FERRY,
-    MineStateDict,
     TerrainTileDict,
     WorldStateDict,
     coord_key,
@@ -58,6 +58,7 @@ class FerryAwareTerrain:
         wire_terrain: dict[str, TerrainTileDict],
         *,
         riding: bool,
+        hostile_mine_keys: frozenset[str],
     ) -> None:
         """Initialize the composed terrain view.
 
@@ -65,10 +66,18 @@ class FerryAwareTerrain:
             base: Static minimap terrain.
             wire_terrain: Live wire terrain tiles keyed by "x,y".
             riding: Whether the tank's own tile is currently a ferry.
+            hostile_mine_keys: "x,y" keys of known hostile mines. A
+                hostile-mine tile cannot be WALKED onto (detonation
+                costs 45 fuel), so it is impassable in this view.
+                Teleport LANDING legality is a different question --
+                the server displaces off mines on landing -- and is
+                deliberately not answered here (see
+                ``find_teleport_landing_tile``).
         """
         self._base = base
         self._wire_terrain = wire_terrain
         self._riding = riding
+        self._hostile_mine_keys = hostile_mine_keys
 
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain type at game coordinates.
@@ -91,7 +100,15 @@ class FerryAwareTerrain:
 
         Ground is always passable, a ferry tile is always passable
         (boarding), and water is passable exactly while riding a
-        ferry -- ferries can go anywhere on water.
+        ferry -- ferries can go anywhere on water. A known hostile
+        mine makes any tile impassable: stepping on it detonates for
+        45 fuel. Composing mines here (like ferries) means every
+        passability consumer -- pathfinding, reachability, selectors,
+        clamps -- shares ONE answer to "can I walk here", instead of
+        each threading a separate mines parameter it can forget
+        (run 2026-07-20 17:16: the dot-hop selector consulted terrain
+        but not mines and looped 23 ticks against the executor's
+        mine veto).
 
         Args:
             x: X coordinate (0-255).
@@ -100,6 +117,8 @@ class FerryAwareTerrain:
         Returns:
             True if the tank can enter the tile this tick.
         """
+        if coord_key(x, y) in self._hostile_mine_keys:
+            return False
         cell = self.get_terrain(x, y)
         if cell == _ASCII_FERRY or cell == self.GROUND:
             return True
@@ -187,14 +206,21 @@ class SurfaceRouteTerrain:
     def is_passable(self, x: int, y: int) -> bool:
         """Check if a single-action server route may cross the tile.
 
+        Intersects the wrapped view's passability (which composes
+        hostile mines) with the surface class, so a mined tile is
+        never routable regardless of surface.
+
         Args:
             x: X coordinate (0-255).
             y: Y coordinate (0-255).
 
         Returns:
-            True when the tile lies on the routing surface: water or
-            ferry while riding, plain ground on land.
+            True when the tile is passable in the wrapped view AND
+            lies on the routing surface: water or ferry while riding,
+            plain ground on land.
         """
+        if not self._base.is_passable(x, y):
+            return False
         cell = self.get_terrain(x, y)
         if self._water:
             return cell == _ASCII_FERRY or cell == self.WATER
@@ -257,6 +283,7 @@ def compose_decision_terrain(
         terrain,
         world["terrain"],
         riding=is_riding_ferry(world),
+        hostile_mine_keys=frozenset(hostile_mines(world)),
     )
 
 
@@ -282,7 +309,6 @@ def clamp_move_target_at_surface_transition(
     start_y: int,
     target_x: int,
     target_y: int,
-    blocked_mines: dict[str, MineStateDict],
 ) -> tuple[int, int]:
     """Bound a planned move at the first queue-consuming transition.
 
@@ -299,7 +325,6 @@ def clamp_move_target_at_surface_transition(
         start_y: Starting Y coordinate.
         target_x: Requested move target X coordinate.
         target_y: Requested move target Y coordinate.
-        blocked_mines: Known mines indexed by coordinate.
 
     Returns:
         ``(x, y)`` of the first surface-transition tile along the
@@ -313,7 +338,6 @@ def clamp_move_target_at_surface_transition(
         start_y,
         target_x,
         target_y,
-        blocked_mines.keys(),
         min_x=left,
         min_y=top,
         max_x=right,

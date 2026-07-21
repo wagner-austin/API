@@ -88,10 +88,22 @@ class TestFindPath:
         for step in path:
             assert (step["x"], step["y"]) not in rock_tiles
 
-    def test_avoids_blocked_mine_coordinates(self) -> None:
-        """Path routes around mine coordinates when provided as dynamic blockers."""
-        terrain = InMemoryTerrainMap()
-        path = find_path(terrain, 10, 10, 14, 10, {"12,10"})
+    def test_avoids_composed_hostile_mine_tiles(self) -> None:
+        """Path routes around mines composed into the terrain view.
+
+        Dynamic blockers are not a parameter anymore (2026-07-20) --
+        hostile mines arrive through ``is_passable`` like every other
+        impassable tile.
+        """
+        from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
+
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"12,10"}),
+        )
+        path = find_path(terrain, 10, 10, 14, 10)
         assert len(path) > 5
         for step in path:
             assert not (step["x"] == 12 and step["y"] == 10)
@@ -198,9 +210,16 @@ class TestDirectPathHelpers:
         assert is_direct_path_clear(terrain, 10, 10, 15, 15) is False
 
     def test_is_direct_path_clear_detects_mine_blocker(self) -> None:
-        """Direct path is blocked when a known mine sits on the line."""
-        terrain = InMemoryTerrainMap()
-        assert is_direct_path_clear(terrain, 10, 10, 15, 10, {"12,10"}) is False
+        """Direct path is blocked when a composed hostile mine sits on the line."""
+        from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
+
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"12,10"}),
+        )
+        assert is_direct_path_clear(terrain, 10, 10, 15, 10) is False
 
     def test_find_path_segment_target_returns_straight_goal(self) -> None:
         """Waypoint helper returns the goal when the first segment stays straight."""
@@ -213,9 +232,16 @@ class TestDirectPathHelpers:
         assert find_path_segment_target(terrain, 10, 10, 14, 10) == (13, 11)
 
     def test_find_path_segment_target_avoids_mined_detour(self) -> None:
-        """Waypoint helper excludes mined tiles from the direct path segment."""
-        terrain = InMemoryTerrainMap({(12, 10): "#"})
-        assert find_path_segment_target(terrain, 10, 10, 14, 10, {"13,11"}) == (13, 9)
+        """Waypoint helper excludes composed-mine tiles from the segment."""
+        from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
+
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap({(12, 10): "#"}),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"13,11"}),
+        )
+        assert find_path_segment_target(terrain, 10, 10, 14, 10) == (13, 9)
 
     def test_find_path_segment_target_returns_none_when_no_path(self) -> None:
         """Waypoint helper returns None when no path exists."""

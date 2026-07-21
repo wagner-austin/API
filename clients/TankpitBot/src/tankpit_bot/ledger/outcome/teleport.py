@@ -271,27 +271,6 @@ def emit_teleport_command_rejected(
     )
 
 
-def emit_teleport_discarded_hostile_mine(
-    *, target_x: int, target_y: int
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: landing tile is a known hostile mine.
-
-    Args:
-        target_x: Requested landing X (the hostile-mine tile).
-        target_y: Requested landing Y.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="teleport",
-        outcome="discarded_hostile_mine",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-    )
-
-
 def emit_teleport_discarded_combat_target_stale(
     *, target_x: int, target_y: int, target_id: int
 ) -> ActionOutcomeRecordDict:
@@ -365,7 +344,6 @@ __all__ = [
     "TeleportDispatchContract",
     "emit_teleport_command_rejected",
     "emit_teleport_discarded_combat_target_stale",
-    "emit_teleport_discarded_hostile_mine",
     "emit_teleport_discarded_resource_target_invalid",
     "emit_teleport_discarded_resource_target_stale",
     "emit_teleport_landed",

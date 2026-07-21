@@ -22,9 +22,40 @@ Two independent mechanisms combine to make executor rejections invisible to the 
 
 Together: rejection → no state persisted → no tile marked failed → same tick next iteration → same rejection. The loop breaks only when world state itself changes (target moves, mine detonates, container regenerates).
 
+## Resolution (2026-07-20): the mine class is dead by construction
+
+The latent instance below FIRED on 2026-07-20 17:16 exactly as
+predicted — the dot-hop selector proposed a mined fuel dot at
+(37,153) and `_is_valid_move_destination` discarded the teleport 23
+consecutive ticks until session end. The fix was neither A nor B
+(feedback wiring) but a root cut, per the user's ruling ("not anti
+loop, but something that addresses the root of the issue"):
+
+- **Hostile mines are composed into the decision terrain**
+  (`compose_decision_terrain` → `FerryAwareTerrain.hostile_mine_keys`),
+  so every passability consumer — pathfinding, reachability,
+  selectors, clamps, the surface-route gate — shares ONE walkability
+  answer. The parallel `blocked_mines` parameter threading was
+  deleted end-to-end (pathfinding, reachability, equipment_search,
+  movement, ferry clamp, tick_loop_actions, action_lab).
+- **`_is_valid_move_destination` is deleted.** For teleports it was
+  wrong physics — the server displaces off mined tiles on landing
+  (see [[teleport-mechanics]] Placement), so instance #1 below was a
+  veto of a perfectly safe command. For walks it is unreachable: the
+  planner cannot produce a mined destination from a terrain view in
+  which mined tiles do not exist.
+- The `discarded_hostile_mine` outcome labels are gone from the
+  ledger. Instances #2 and #3 (stale combat anchor, pickup race) and
+  their discard labels remain — they guard planner cross-tick state,
+  a separate audit.
+
+Side effect: `tick_loop_actions`' stall-clearing reachability checks
+now use the composed view too — they were previously raw static
+terrain, neither ferry- nor mine-aware.
+
 ## Known live instances (as of 2026-07-17)
 
-### 1. Combat teleport onto a hostile-mine tile
+### 1. Combat teleport onto a hostile-mine tile — RESOLVED 2026-07-20 (veto deleted; the teleport is safe, server displaces)
 
 `choose_combat_landing_tile` (`combat_landing.py:46-69`) returns the enemy's exact coordinates by design — server displaces on landing. Line 68 explicitly discards `world`, `self_state`, and `terrain`, so it never consults `hostile_mines`. If an enemy stands on a same-team mine (defensive-minefield scenario — friendly mines are passable per [[mine-mechanics]]), the enemy's coord is a hostile-mine tile from our POV. `_is_valid_move_destination` (`executor.py:360`) rejects every tick until the enemy moves or the mine detonates.[^3]
 

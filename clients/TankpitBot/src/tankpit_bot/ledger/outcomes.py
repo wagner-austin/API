@@ -30,11 +30,11 @@ MoveOutcome = Literal[
     "movement_rejected",
     "command_rejected",
     "stall_timeout",
-    "discarded_hostile_mine",
 ]
-"""Move resolutions. ``discarded_hostile_mine`` is the executor
-discard (destination is a known hostile-mine tile) -- previously a
-silent ``emit_ai`` line."""
+"""Move resolutions. The former ``discarded_hostile_mine`` executor
+discard was removed 2026-07-20: hostile mines are composed into the
+decision terrain (``compose_decision_terrain``), so the planner cannot
+produce a mined walk destination in the first place."""
 
 TeleportOutcome = Literal[
     "landed_exact",
@@ -42,13 +42,15 @@ TeleportOutcome = Literal[
     "landed_inexact",
     "command_rejected",
     "stall_timeout",
-    "discarded_hostile_mine",
     "discarded_combat_target_stale",
     "discarded_resource_target_stale",
     "discarded_resource_target_invalid",
 ]
-"""Teleport resolutions. The four ``discarded_*`` labels are the
-executor validation classes from the rejection-loop audit."""
+"""Teleport resolutions. The ``discarded_*`` labels are the executor
+validation classes from the rejection-loop audit. The former
+``discarded_hostile_mine`` was removed 2026-07-20: it was wrong physics
+(the server displaces off mined tiles on landing, so a mined teleport
+target is safe) and it created the silent loop the audit predicted."""
 
 CollectOutcome = Literal[
     "position_reached",
@@ -110,8 +112,6 @@ ActionOutcome = Literal[
     "discarded_combat_target_stale",
     "discarded_resource_target_stale",
     "discarded_resource_target_invalid",
-    # move / teleport shared
-    "discarded_hostile_mine",
     # collect
     "container_consumed",
     "pickup_empty",

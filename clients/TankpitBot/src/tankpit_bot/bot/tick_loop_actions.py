@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.bot.ai.equipment import hostile_mines
+from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
@@ -596,7 +596,7 @@ def _clear_blocked_walk(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
-    terrain = get_terrain_map()
+    terrain = compose_decision_terrain(world, get_terrain_map())
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
@@ -607,7 +607,6 @@ def _clear_blocked_walk(
         self_state["y"],
         tx,
         ty,
-        hostile_mines(world),
     ):
         return False
     emit_sync("movement to (%d,%d) is terrain-blocked, replanning", tx, ty)
@@ -630,7 +629,7 @@ def _clear_blocked_collection(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
-    terrain = get_terrain_map()
+    terrain = compose_decision_terrain(world, get_terrain_map())
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
@@ -643,7 +642,6 @@ def _clear_blocked_collection(
         self_state["y"],
         tx,
         ty,
-        hostile_mines(world),
     ):
         return False
     emit_sync("collection target (%d,%d) is terrain-blocked, replanning", tx, ty)

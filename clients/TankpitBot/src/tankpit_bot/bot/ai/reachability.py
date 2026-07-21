@@ -2,13 +2,16 @@
 
 These helpers answer the question the live bot actually needs:
 can the current visible viewport execute this command right now?
+Walkability — including dynamic obstacles like hostile mines — is
+owned entirely by the terrain view (see ``compose_decision_terrain``);
+these helpers only add viewport bounding and pickup adjacency service.
 """
 
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import path_exists
-from tankpit_bot.state.types import MineStateDict, WorldStateDict, coord_key
+from tankpit_bot.state.types import WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 _ADJACENT_DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -23,7 +26,6 @@ def is_move_reachable_in_viewport(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> bool:
     """Return True when the viewport contains a walk path to the exact tile.
 
@@ -34,7 +36,6 @@ def is_move_reachable_in_viewport(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
         True if a path exists entirely inside the current visible viewport.
@@ -46,7 +47,6 @@ def is_move_reachable_in_viewport(
         start_y,
         goal_x,
         goal_y,
-        blocked_mines.keys() if blocked_mines is not None else None,
         min_x=left,
         min_y=top,
         max_x=right,
@@ -61,13 +61,14 @@ def is_collection_reachable_in_viewport(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> bool:
     """Return True when a pickup can be completed from the current viewport.
 
     Collection commands can complete either by reaching the target tile itself
     or by reaching a safe cardinally adjacent tile when the target tile cannot
-    be occupied directly.
+    be occupied directly (impassable terrain or a hostile mine on the
+    container's tile — both are impassable in the composed terrain view, and
+    both are serviced from an adjacent tile the same way).
 
     Args:
         world: Current world state with visible viewport bounds.
@@ -76,28 +77,21 @@ def is_collection_reachable_in_viewport(
         start_y: Starting Y coordinate.
         goal_x: Pickup target X coordinate.
         goal_y: Pickup target Y coordinate.
-        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
         True if a collection path exists entirely inside the current viewport.
     """
     left, top, right, bottom = viewport_visible_bounds(world["viewport"])
-    target_key = coord_key(goal_x, goal_y)
-    if (
-        terrain.is_passable(goal_x, goal_y)
-        and (blocked_mines is None or target_key not in blocked_mines)
-        and _viewport_path_exists(
-            terrain,
-            start_x,
-            start_y,
-            goal_x,
-            goal_y,
-            blocked_mines,
-            left=left,
-            top=top,
-            right=right,
-            bottom=bottom,
-        )
+    if terrain.is_passable(goal_x, goal_y) and _viewport_path_exists(
+        terrain,
+        start_x,
+        start_y,
+        goal_x,
+        goal_y,
+        left=left,
+        top=top,
+        right=right,
+        bottom=bottom,
     ):
         return True
 
@@ -106,15 +100,12 @@ def is_collection_reachable_in_viewport(
             continue
         if not terrain.is_passable(landing_x, landing_y):
             continue
-        if blocked_mines is not None and coord_key(landing_x, landing_y) in blocked_mines:
-            continue
         if _viewport_path_exists(
             terrain,
             start_x,
             start_y,
             landing_x,
             landing_y,
-            blocked_mines,
             left=left,
             top=top,
             right=right,
@@ -150,7 +141,6 @@ def _viewport_path_exists(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_mines: dict[str, MineStateDict] | None,
     *,
     left: int,
     top: int,
@@ -165,7 +155,6 @@ def _viewport_path_exists(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_mines: Optional known mines indexed by coordinate.
         left: Inclusive viewport minimum X bound.
         top: Inclusive viewport minimum Y bound.
         right: Inclusive viewport maximum X bound.
@@ -180,7 +169,6 @@ def _viewport_path_exists(
         start_y,
         goal_x,
         goal_y,
-        blocked_mines.keys() if blocked_mines is not None else None,
         min_x=left,
         min_y=top,
         max_x=right,

@@ -1365,3 +1365,20 @@ User correction (the contract, 2026-07-20): "wasnt it on the water? cant you jus
 Fix: `GroundOnlyTerrain` → `SurfaceRouteTerrain(base, water=riding)` — pickups route on the tank's current surface (ground on land, water/ferry while riding). Disembark-first now fires only for land containers beyond adjacency service. Cardinal-adjacency service crosses the surface boundary both ways, symmetric with the land-side behavior the reachability layer always had; whether the server honors the riding→adjacent-land-container direction is not yet wire-tested (noted in [[ferry-mechanics]] [^5]).
 
 Both live incidents stay fixed: the 07-19 inland refusal (single-surface gate=False → disembark) and the 07-20 on-tile loop (water container → direct dispatch, trivially at distance 0). Gate green: 4,482 tests, 100% coverage.
+
+## [2026-07-20] refactor | Mines composed into the decision terrain; executor mine veto deleted — the loop class dies at the root
+
+User ruling on the mine-dot loop fix: "no no no. not anti loop, but something that addresses the root of the issue." The root: "can I enter this tile?" had two owners — static terrain in the terrain view, hostile mines in a parallel `blocked_mines` parameter each consumer had to remember to thread. Pathfinding remembered; the dot-hop selector didn't; the executor veto silently absorbed the difference until it fixed-pointed.
+
+The cut, following the ferry precedent (dynamic impassability composed once, all consumers inherit):
+
+- `FerryAwareTerrain` gains required `hostile_mine_keys`; `compose_decision_terrain` folds in `hostile_mines(world)`. Every passability consumer — A*, reachability, selectors, surface clamp, `SurfaceRouteTerrain` (now intersects base passability) — shares one walkability answer.
+- `blocked_mines` parameter threading deleted end-to-end: pathfinding (also `_is_blocked_coord` gone), reachability, equipment_search, movement, ferry clamp, tick_loop_actions, action_lab targeting. tick_loop_actions' stall-clear checks now use the composed view (previously raw static terrain — neither ferry- nor mine-aware).
+- Executor `_is_valid_move_destination` DELETED, `discarded_hostile_mine` outcomes removed from the ledger. For teleports the veto was wrong physics — the server displaces off mined tiles on landing ([[teleport-mechanics]] Placement) — which also resolves [[executor-rejection-loops]] instance #1 (combat teleport at a mined enemy tile) for free. For walks it is unreachable: the planner cannot emit a destination that does not exist in its terrain.
+- Adjacency service unchanged and now uniform: a container on a mined tile is collected from a cardinal neighbor — exactly how the bot drained (37,153) live.
+
+Regression pins: mined dot skipped by the hop selector (`test_skips_dot_on_hostile_mine_tile`), hostile-vs-friendly composition, mined-tile blocking on both routing surfaces, mined-teleport-is-dispatchable (physics), pathfinding/reachability suites rewritten to composed views.
+
+Remaining executor checks (stale combat anchor, pickup race, shoot target-not-tracked) guard planner cross-tick state — separate audit, instances #2/#3 of the rejection-loops page still open.
+
+Gate green: 4,483 tests, 100% coverage, mypy/ruff/guard clean. (The user's 8-minute `make check` scare was environmental: a concurrent Claude session's covenant_ml workloads + poetry lock network time; the timed test stage runs 55 s.)

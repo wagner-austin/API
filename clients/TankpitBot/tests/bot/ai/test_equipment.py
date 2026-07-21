@@ -13,11 +13,9 @@ from tankpit_bot.bot.ai.equipment_search import (
     is_reachable,
 )
 from tankpit_bot.state.types import (
-    MineStateDict,
     SelfStateDict,
     WorldStateDict,
     make_container_state,
-    make_mine_state,
     make_self_state,
     make_viewport_state,
 )
@@ -88,21 +86,21 @@ class TestIsReachable:
         assert is_reachable(terrain, 10, 10, 15, 10) is False
 
     def test_blocked_by_mines(self) -> None:
-        """Returns False when known mines block the only route."""
-        terrain = InMemoryTerrainMap()
-        blocked_mines: dict[str, MineStateDict] = {
-            f"12,{y}": make_mine_state(
-                x=12,
-                y=y,
-                mine_type=0,
-                tank_id=-1,
-                team=1,
-                source="radar",
-                timestamp_ms=0,
-            )
-            for y in range(256)
-        }
-        assert is_reachable(terrain, 10, 10, 15, 10, blocked_mines) is False
+        """Returns False when composed hostile mines block the only route.
+
+        Mines are not a separate parameter anymore -- they are composed
+        into the terrain view (2026-07-20), so every passability
+        consumer inherits them through ``is_passable``.
+        """
+        from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
+
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset(f"12,{y}" for y in range(256)),
+        )
+        assert is_reachable(terrain, 10, 10, 15, 10) is False
 
 
 class TestFindTeleportLandingTile:

@@ -84,7 +84,7 @@ class ActionOutcomeRowDict(TypedDict):
             ``move``, ``teleport``, ``collect``, ``scan``, ``shoot``).
         outcome: Outcome label from the kind's outcome union
             (``landed_exact``, ``stall_timeout``, ``hit``,
-            ``discarded_hostile_mine``, ...).
+            ``discarded_no_container``, ...).
         event_id: Process-wide monotonic event id.
         attempt_id: Per-kind monotonic attempt counter.
         duration_ms: Wall-clock milliseconds between dispatch and the

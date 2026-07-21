@@ -263,7 +263,6 @@ def _select_walkable_approach_tile(
             sy,
             cx,
             cy,
-            hostile_mines(ctx.world),
         ):
             continue
         return (cx, cy)
@@ -399,7 +398,6 @@ def _walk_or_teleport_with_terrain(
             sy,
             tx,
             ty,
-            hostile_mines(ctx.world),
         ):
             if riding:
                 # Two-action contract: disembark first (a piloted move
@@ -423,7 +421,6 @@ def _walk_or_teleport_with_terrain(
         sy,
         tx,
         ty,
-        hostile_mines(ctx.world),
     ):
         return _surface_clamped_move(ctx, terrain, sx, sy, tx, ty)
     return _teleport_fallback_command(ctx, terrain, tx, ty)
@@ -469,7 +466,6 @@ def _surface_clamped_move(
         sy,
         tx,
         ty,
-        hostile_mines(ctx.world),
     )
     if (clamp_x, clamp_y) != (tx, ty):
         emit_ai(

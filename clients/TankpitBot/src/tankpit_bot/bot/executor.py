@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
-from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
@@ -19,11 +18,9 @@ from tankpit_bot.ledger.outcome.collect import (
     emit_collect_discarded_kind_mismatch,
     emit_collect_discarded_no_container,
 )
-from tankpit_bot.ledger.outcome.move import emit_move_discarded_hostile_mine
 from tankpit_bot.ledger.outcome.shoot import emit_shoot_discarded_target_not_tracked
 from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_discarded_combat_target_stale,
-    emit_teleport_discarded_hostile_mine,
     emit_teleport_discarded_resource_target_invalid,
     emit_teleport_discarded_resource_target_stale,
     record_teleport_dispatch,
@@ -339,33 +336,6 @@ def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
     return True
 
 
-def _is_valid_move_destination(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a move or teleport destination is not a hostile mine.
-
-    Friendly (same-team) mines are passable per tankpit's damage rules;
-    only hostile mines block movement.
-
-    Args:
-        world: Current world-state snapshot.
-        command: Command selected by the planner.
-
-    Returns:
-        True when the destination tile is not a hostile mine.
-    """
-    if command["cmd_type"] == "move" or command["cmd_type"] == "teleport":
-        target_x = command["target_x"]
-        target_y = command["target_y"]
-    else:
-        return True
-    if coord_key(target_x, target_y) in hostile_mines(world):
-        if command["cmd_type"] == "move":
-            emit_move_discarded_hostile_mine(target_x=target_x, target_y=target_y)
-        else:
-            emit_teleport_discarded_hostile_mine(target_x=target_x, target_y=target_y)
-        return False
-    return True
-
-
 def _tracked_combat_target(
     world: WorldStateDict,
     decision: TickDecisionDict,
@@ -488,8 +458,7 @@ def _is_dispatchable(bot: BotProtocol, decision: TickDecisionDict) -> bool:
     world = bot.get_world_state()
     command = decision["command"]
     return (
-        _is_valid_move_destination(world, command)
-        and _is_valid_pickup(world, command)
+        _is_valid_pickup(world, command)
         and _is_valid_shoot(world, command)
         and _is_valid_teleport(world, decision)
     )

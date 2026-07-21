@@ -27,7 +27,6 @@ from tankpit_bot.ledger.outcome.map_open import (
 )
 from tankpit_bot.ledger.outcome.move import (
     emit_move_command_rejected,
-    emit_move_discarded_hostile_mine,
     emit_move_movement_rejected,
     emit_move_position_reached,
     emit_move_stall_timeout,
@@ -46,7 +45,6 @@ from tankpit_bot.ledger.outcome.shoot import (
 from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_command_rejected,
     emit_teleport_discarded_combat_target_stale,
-    emit_teleport_discarded_hostile_mine,
     emit_teleport_discarded_resource_target_invalid,
     emit_teleport_discarded_resource_target_stale,
     emit_teleport_landed,
@@ -132,9 +130,6 @@ def test_move_outcomes_carry_typed_payloads() -> None:
     assert rejected["detail"]["error_code"] == 3
     stalled = emit_move_stall_timeout(duration_ms=10000, target_x=5, target_y=6, timeout_ms=10000)
     assert stalled["detail"]["timeout_ms"] == 10000
-    discarded = emit_move_discarded_hostile_mine(target_x=5, target_y=6)
-    assert discarded["outcome"] == "discarded_hostile_mine"
-    assert discarded["duration_ms"] == 0
 
 
 def test_collect_outcomes_cover_all_ten_labels() -> None:
@@ -243,9 +238,8 @@ def test_teleport_dispatch_context_flows_into_the_outcome() -> None:
     assert follow_up["detail"]["sent_window"] == "(none)"
 
 
-def test_teleport_discards_cover_all_four_classes() -> None:
+def test_teleport_discards_cover_all_three_classes() -> None:
     """Every executor teleport-discard class is recordable."""
-    emit_teleport_discarded_hostile_mine(target_x=1, target_y=2)
     emit_teleport_discarded_combat_target_stale(target_x=1, target_y=2, target_id=530)
     emit_teleport_discarded_resource_target_stale(target_x=1, target_y=2, resource_kind="fuel")
     emit_teleport_discarded_resource_target_invalid(target_x=1, target_y=2, source="world_state")
@@ -255,7 +249,6 @@ def test_teleport_discards_cover_all_four_classes() -> None:
     assert sorted(outcome_counts("teleport")) == [
         "command_rejected",
         "discarded_combat_target_stale",
-        "discarded_hostile_mine",
         "discarded_resource_target_invalid",
         "discarded_resource_target_stale",
     ]

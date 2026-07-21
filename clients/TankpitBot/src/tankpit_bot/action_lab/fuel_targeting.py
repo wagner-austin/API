@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.equipment_search import find_best_fuel, find_teleport_landing_tile
+from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
 from tankpit_bot.sniffer.world_state import get_terrain_map
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
@@ -71,13 +71,13 @@ def visible_fuel_requires_reposition(
     Raises:
         FuelTargetingError: If terrain or self state is unavailable.
     """
-    terrain = get_terrain_map()
-    if terrain is None:
-        raise FuelTargetingError("terrain map is unavailable")
     self_state = probe.get_self_state()
     if self_state is None:
         raise FuelTargetingError("self state is unavailable")
     world = probe.get_world_state()
+    terrain = compose_decision_terrain(world, get_terrain_map())
+    if terrain is None:
+        raise FuelTargetingError("terrain map is unavailable")
     return not is_collection_reachable_in_viewport(
         world,
         terrain,
@@ -85,7 +85,6 @@ def visible_fuel_requires_reposition(
         self_state["y"],
         fuel_target["x"],
         fuel_target["y"],
-        hostile_mines(world),
     )
 
 

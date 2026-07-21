@@ -17,11 +17,11 @@ from tankpit_bot.ledger.mode_transition import (
     mode_transitions,
 )
 from tankpit_bot.ledger.outcome._emit import pending_decision_ids
-from tankpit_bot.ledger.outcome.move import (
-    emit_move_discarded_hostile_mine,
-    emit_move_position_reached,
+from tankpit_bot.ledger.outcome.move import emit_move_position_reached
+from tankpit_bot.ledger.outcome.shoot import (
+    emit_shoot_discarded_target_not_tracked,
+    emit_shoot_miss,
 )
-from tankpit_bot.ledger.outcome.shoot import emit_shoot_miss
 from tankpit_bot.ledger.ring import recent_outcomes
 
 
@@ -73,8 +73,18 @@ def test_outcome_consumes_pending_decision_into_caused_by() -> None:
 
 def test_discard_outcome_resolves_the_discarded_decision() -> None:
     """An executor discard pairs with the decision it discarded."""
-    decision_id = _record_move_decision()
-    discarded = emit_move_discarded_hostile_mine(target_x=10, target_y=20)
+    decision_id = record_decision(
+        action_kind="shoot",
+        cmd_type="shoot",
+        mode="HUNT",
+        score=800,
+        reason_kind="shoot_target",
+        reason_context={},
+        target_x=10,
+        target_y=20,
+        target_id=530,
+    )
+    discarded = emit_shoot_discarded_target_not_tracked(target_x=10, target_y=20, target_id=530)
     assert discarded["caused_by"] == decision_id
 
 

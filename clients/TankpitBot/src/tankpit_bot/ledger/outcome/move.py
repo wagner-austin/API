@@ -108,31 +108,8 @@ def emit_move_stall_timeout(
     )
 
 
-def emit_move_discarded_hostile_mine(*, target_x: int, target_y: int) -> ActionOutcomeRecordDict:
-    """Record an executor discard: destination is a known hostile mine.
-
-    Client-side, pre-dispatch -- ``duration_ms`` is 0 by definition
-    (nothing was sent).
-
-    Args:
-        target_x: Requested X (the hostile-mine tile).
-        target_y: Requested Y.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="move",
-        outcome="discarded_hostile_mine",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-    )
-
-
 __all__ = [
     "emit_move_command_rejected",
-    "emit_move_discarded_hostile_mine",
     "emit_move_movement_rejected",
     "emit_move_position_reached",
     "emit_move_stall_timeout",

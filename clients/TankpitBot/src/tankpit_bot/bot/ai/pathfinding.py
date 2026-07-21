@@ -8,11 +8,9 @@ server can walk directly to a target or needs waypointed path-following.
 from __future__ import annotations
 
 import heapq
-from collections.abc import Collection
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.types import PathStepDict, make_path_step
-from tankpit_bot.state.types import coord_key
 
 # 4-directional movement: right, down, left, up
 _DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (0, 1), (-1, 0), (0, -1))
@@ -33,7 +31,6 @@ def find_path(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_coords: Collection[str] | None = None,
     *,
     min_x: int | None = None,
     min_y: int | None = None,
@@ -43,8 +40,10 @@ def find_path(
     """Find a terrain-aware path using A* search.
 
     Uses Manhattan distance as heuristic and 4-directional movement.
-    Only traverses tiles where terrain.is_passable() returns True.
-    Returns empty list if no path exists within iteration limit.
+    Only traverses tiles where terrain.is_passable() returns True --
+    the terrain view is the single owner of walkability, including
+    dynamic obstacles like hostile mines (composed in
+    ``compose_decision_terrain``).
 
     Args:
         terrain: Terrain map for passability checks.
@@ -52,8 +51,6 @@ def find_path(
         start_y: Starting Y coordinate (0-255).
         goal_x: Goal X coordinate (0-255).
         goal_y: Goal Y coordinate (0-255).
-        blocked_coords: Optional coordinate keys that should be treated as
-            impassable in addition to terrain.
         min_x: Optional inclusive minimum X bound for traversable tiles.
         min_y: Optional inclusive minimum Y bound for traversable tiles.
         max_x: Optional inclusive maximum X bound for traversable tiles.
@@ -105,7 +102,6 @@ def find_path(
             terrain,
             cx,
             cy,
-            blocked_coords,
             min_x=min_x,
             min_y=min_y,
             max_x=max_x,
@@ -130,7 +126,6 @@ def path_exists(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_coords: Collection[str] | None = None,
     *,
     min_x: int | None = None,
     min_y: int | None = None,
@@ -145,7 +140,6 @@ def path_exists(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_coords: Optional coordinate keys treated as impassable.
         min_x: Optional inclusive minimum X bound for traversable tiles.
         min_y: Optional inclusive minimum Y bound for traversable tiles.
         max_x: Optional inclusive maximum X bound for traversable tiles.
@@ -160,7 +154,6 @@ def path_exists(
         start_y,
         goal_x,
         goal_y,
-        blocked_coords,
         min_x=min_x,
         min_y=min_y,
         max_x=max_x,
@@ -175,7 +168,6 @@ def is_direct_path_clear(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_coords: Collection[str] | None = None,
 ) -> bool:
     """Check whether a straight server-side walk can reach the goal.
 
@@ -190,8 +182,6 @@ def is_direct_path_clear(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_coords: Optional coordinate keys that should be treated as
-            impassable in addition to terrain.
 
     Returns:
         True if the direct line is fully passable, False otherwise.
@@ -200,8 +190,6 @@ def is_direct_path_clear(
         if x == start_x and y == start_y:
             continue
         if not terrain.is_passable(x, y):
-            return False
-        if _is_blocked_coord(blocked_coords, x, y):
             return False
     return True
 
@@ -212,7 +200,6 @@ def find_path_segment_target(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_coords: Collection[str] | None = None,
     *,
     min_x: int | None = None,
     min_y: int | None = None,
@@ -233,8 +220,6 @@ def find_path_segment_target(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_coords: Optional coordinate keys that should be treated as
-            impassable in addition to terrain.
         min_x: Optional inclusive minimum X bound for a usable waypoint.
         min_y: Optional inclusive minimum Y bound for a usable waypoint.
         max_x: Optional inclusive maximum X bound for a usable waypoint.
@@ -250,7 +235,6 @@ def find_path_segment_target(
         start_y,
         goal_x,
         goal_y,
-        blocked_coords,
         min_x=min_x,
         min_y=min_y,
         max_x=max_x,
@@ -269,7 +253,6 @@ def find_path_segment_target(
             start_y,
             candidate_x,
             candidate_y,
-            blocked_coords,
         ):
             break
         best_step = (candidate_x, candidate_y)
@@ -324,7 +307,6 @@ def _iter_reachable_neighbors(
     terrain: TerrainMapProtocol,
     current_x: int,
     current_y: int,
-    blocked_coords: Collection[str] | None = None,
     *,
     min_x: int | None = None,
     min_y: int | None = None,
@@ -337,7 +319,6 @@ def _iter_reachable_neighbors(
         terrain: Terrain map for passability checks.
         current_x: Current X coordinate.
         current_y: Current Y coordinate.
-        blocked_coords: Optional blocked coordinate keys.
         min_x: Optional inclusive minimum X bound.
         min_y: Optional inclusive minimum Y bound.
         max_x: Optional inclusive maximum X bound.
@@ -363,8 +344,6 @@ def _iter_reachable_neighbors(
             continue
         if not terrain.is_passable(nx, ny):
             continue
-        if _is_blocked_coord(blocked_coords, nx, ny):
-            continue
         neighbors.append((nx, ny))
     return neighbors
 
@@ -382,22 +361,6 @@ def _heuristic(x: int, y: int, goal_x: int, goal_y: int) -> int:
         Manhattan distance to goal.
     """
     return abs(x - goal_x) + abs(y - goal_y)
-
-
-def _is_blocked_coord(blocked_coords: Collection[str] | None, x: int, y: int) -> bool:
-    """Return True when a coordinate is blocked by dynamic obstacles.
-
-    Args:
-        blocked_coords: Optional blocked coordinate keys.
-        x: Candidate X coordinate.
-        y: Candidate Y coordinate.
-
-    Returns:
-        True if the coordinate is in the blocked set.
-    """
-    if blocked_coords is None:
-        return False
-    return coord_key(x, y) in blocked_coords
 
 
 def _is_candidate_within_bounds(

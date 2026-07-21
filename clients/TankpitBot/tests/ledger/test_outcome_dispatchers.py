@@ -5,37 +5,14 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.bot.base import Bot
-from tankpit_bot.bot.executor import _is_valid_move_destination
 from tankpit_bot.bot.tick_loop_actions import (
     _emit_command_rejected_outcome,
     _emit_stall_outcome,
 )
-from tankpit_bot.bot.types import make_move_command, make_teleport_command
 from tankpit_bot.contracts.base import LedgerInvariantError
 from tankpit_bot.ledger.outcome.teleport import TeleportDispatchContract
-from tankpit_bot.ledger.ring import outcome_counts, recent_outcomes
-from tankpit_bot.state.types import make_mine_state
-from tankpit_bot.state.types.world import make_empty_world_state
+from tankpit_bot.ledger.ring import outcome_counts
 from tests.conftest import FakeEnv
-
-
-def test_move_to_hostile_mine_records_move_discard() -> None:
-    """A move onto a hostile mine records the move discard outcome."""
-    world = make_empty_world_state()
-    world["mines"]["10,20"] = make_mine_state(10, 20, 0, -1, 1, source="radar")
-    assert _is_valid_move_destination(world, make_move_command(10, 20)) is False
-    records = recent_outcomes("move", 1)
-    assert records[0]["outcome"] == "discarded_hostile_mine"
-    assert records[0]["detail"] == {"target_x": 10, "target_y": 20}
-
-
-def test_teleport_to_hostile_mine_records_teleport_discard() -> None:
-    """A teleport onto a hostile mine records the teleport discard."""
-    world = make_empty_world_state()
-    world["mines"]["10,20"] = make_mine_state(10, 20, 0, -1, 1, source="radar")
-    assert _is_valid_move_destination(world, make_teleport_command(10, 20)) is False
-    records = recent_outcomes("teleport", 1)
-    assert records[0]["outcome"] == "discarded_hostile_mine"
 
 
 def test_command_rejected_dispatcher_routes_every_kind(fake_env: FakeEnv) -> None:

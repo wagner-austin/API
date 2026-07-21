@@ -12,14 +12,12 @@ from platform_core.logging import get_logger
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import (
     _viewport_bounds,
-    hostile_mines,
     is_container_pursuable,
 )
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.state.types import (
     ContainerStateDict,
-    MineStateDict,
     SelfStateDict,
     WorldStateDict,
 )
@@ -77,7 +75,6 @@ def is_reachable(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    blocked_mines: dict[str, MineStateDict] | None = None,
 ) -> bool:
     """Check if a target is reachable via terrain-aware pathfinding.
 
@@ -87,7 +84,6 @@ def is_reachable(
         start_y: Starting Y coordinate.
         goal_x: Goal X coordinate.
         goal_y: Goal Y coordinate.
-        blocked_mines: Optional known mines indexed by coordinate.
 
     Returns:
         True if a path exists, False if blocked by terrain.
@@ -100,7 +96,6 @@ def is_reachable(
         start_y,
         goal_x,
         goal_y,
-        blocked_mines.keys() if blocked_mines is not None else None,
     )
     return len(path) > 0
 
@@ -141,7 +136,6 @@ def find_nearest_fuel(
                 sy,
                 cx,
                 cy,
-                blocked_mines=hostile_mines(world),
             ):
                 continue
             best_dist = dist
@@ -207,7 +201,6 @@ def find_equipment_candidates(
             sy,
             cx,
             cy,
-            blocked_mines=hostile_mines(world),
         ):
             continue
         candidates.append((manhattan_distance(sx, sy, cx, cy), container))
@@ -257,7 +250,6 @@ def find_best_fuel(
             sy,
             cx,
             cy,
-            blocked_mines=hostile_mines(world),
         ):
             continue
         score = container["volume"] - dist
@@ -299,7 +291,6 @@ def find_adjacent_container(
             sy,
             container["x"],
             container["y"],
-            blocked_mines=hostile_mines(world),
         ):
             continue
         return container
@@ -375,7 +366,6 @@ def describe_container_search(
                 terrain,
                 want_fuel=want_fuel,
                 minimum_volume=minimum_volume,
-                blocked_mines=hostile_mines(world),
             )
         )
         if is_blocked:
@@ -422,8 +412,6 @@ def _is_actionable_with_terrain(
     start_y: int,
     goal_x: int,
     goal_y: int,
-    *,
-    blocked_mines: dict[str, MineStateDict],
 ) -> bool:
     """Return True when a walk path to the container exists in the viewport.
 
@@ -442,7 +430,6 @@ def _is_actionable_with_terrain(
         start_y,
         goal_x,
         goal_y,
-        blocked_mines,
     )
 
 
@@ -455,7 +442,6 @@ def _describe_candidate_reason(
     *,
     want_fuel: bool,
     minimum_volume: int,
-    blocked_mines: dict[str, MineStateDict],
 ) -> tuple[str, bool, bool, bool, bool]:
     """Describe whether a visible candidate is actionable for diagnostics."""
     if container["failed_pickups"] > 0:
@@ -469,7 +455,6 @@ def _describe_candidate_reason(
         start_y,
         container["x"],
         container["y"],
-        blocked_mines,
     ):
         return ("actionable", True, False, False, False)
     return ("blocked_walk", False, True, False, False)

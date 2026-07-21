@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.resource_search import (
     is_recently_attempted,
     make_resource_search_hop,
@@ -34,7 +36,7 @@ def _ctx(
     self_x: int = 100,
     self_y: int = 100,
     fuel: int = 800,
-    terrain: InMemoryTerrainMap | None = None,
+    terrain: TerrainMapProtocol | None = None,
     ai_state: AIStateDict | None = None,
     scanned_viewport_origins: list[tuple[int, int]] | None = None,
     map_fuel_dots: tuple[tuple[int, int], ...] = (),
@@ -88,6 +90,36 @@ class TestMakeResourceSearchHop:
         command = decision["command"]
         assert command["cmd_type"] == "teleport"
         assert command["target_x"] == 130
+        assert command["target_y"] == 100
+
+    def test_skips_dot_on_hostile_mine_tile(self) -> None:
+        """A dot whose tile carries a hostile mine loses to the next dot.
+
+        Regression guard for run 2026-07-20 17:16: the selector
+        consulted terrain without mines, proposed the mined dot at
+        (37,153) every tick, and the executor's (since-deleted) mine
+        veto discarded it 23 times in a row until session end. Mines
+        now ride inside the composed terrain view, so the selector
+        cannot enumerate the mined dot at all.
+        """
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"130,100"}),
+        )
+        decision = make_resource_search_hop(
+            _ctx(terrain=terrain, map_fuel_dots=((130, 100), (160, 100))),
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the clean dot when the nearest is mined")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 160
         assert command["target_y"] == 100
 
     def test_skips_dot_in_scanned_viewport(self) -> None:

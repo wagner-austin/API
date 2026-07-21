@@ -18,7 +18,6 @@ from tankpit_bot.action_lab.fuel_targeting import (
 )
 from tankpit_bot.state import (
     ContainerStateDict,
-    MineStateDict,
     SelfStateDict,
     WorldStateDict,
     make_container_state,
@@ -49,7 +48,6 @@ class _ReachabilityProtocol(Protocol):
         start_y: int,
         target_x: int,
         target_y: int,
-        mines: dict[str, MineStateDict],
     ) -> bool: ...
 
 
@@ -154,9 +152,8 @@ def test_visible_fuel_requires_reposition_uses_reachability_and_validates_state(
         start_y: int,
         target_x: int,
         target_y: int,
-        mines: dict[str, MineStateDict],
     ) -> bool:
-        _ = (world, terrain, mines)
+        _ = (world, terrain)
         captured["start_x"] = start_x
         captured["start_y"] = start_y
         captured["target_x"] = target_x

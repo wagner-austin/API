@@ -10,7 +10,6 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.executor import (
     _format_desired_equipment,
     _is_dispatchable,
-    _is_valid_move_destination,
     _is_valid_pickup,
     _is_valid_shoot,
     _is_valid_teleport,
@@ -586,12 +585,6 @@ class TestExecutorValidationHelpers:
 
         assert result is False
 
-    def test_valid_move_destination_accepts_safe_move(self) -> None:
-        """Move validation accepts destinations that are not mined."""
-        result = _is_valid_move_destination(_make_world(), make_move_command(104, 100))
-
-        assert result is True
-
     def test_tracked_combat_target_returns_none_for_mismatch(self) -> None:
         """Combat target lookup rejects stale AI coordinates."""
         world = _make_world()
@@ -1032,9 +1025,17 @@ class TestExecute:
 
         assert fake_cdp._sent_methods == []
 
-    def test_execute_rejects_teleport_to_known_mine(self, fake_env: FakeEnv) -> None:
-        """Execute drops teleports whose landing tile is a known mine."""
-        bot, fake_cdp = _make_bot(fake_env)
+    def test_teleport_to_mined_tile_is_dispatchable(self, fake_env: FakeEnv) -> None:
+        """A teleport at a mined tile passes executor validation.
+
+        The server displaces off mined tiles on landing (see
+        [[teleport-mechanics]] Placement), so the former mine veto was
+        wrong physics -- it silently looped combat teleports at mined
+        enemy tiles ([[executor-rejection-loops]] instance #1) and the
+        mined-dot hop (run 2026-07-20 17:16). Walk-planning mine
+        avoidance lives in the composed terrain view instead.
+        """
+        bot, _fake_cdp = _make_bot(fake_env)
 
         get_world_service().world_state = add_mine_from_radar(
             get_world_service().world_state,
@@ -1051,9 +1052,7 @@ class TestExecute:
             desired_equipment=[],
         )
 
-        execute(bot, decision, _make_snapshot())
-
-        assert fake_cdp._sent_methods == []
+        assert _is_dispatchable(bot, decision) is True
 
 
 class TestSecondaryCommandDispatch:
