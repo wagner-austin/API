@@ -133,8 +133,10 @@ Net diff: 26 files, +358/−318 — the system got smaller.
 The general rule for future dynamic impassability (new obstacle
 classes, temporary hazards): compose them into
 `compose_decision_terrain`, never add a parameter beside it. The ferry
-overlay (2026-06-12) and the mine overlay (2026-07-20) are the
-precedents; the required-kwarg pattern is the enforcement.
+overlay (2026-06-12), the mine overlay (2026-07-20), and the
+movable-block overlay (2026-07-20 same day — wire terrain values
+1/2/3 collapse to ground/rock by walkability, see [[movable-blocks]])
+are the precedents; the required-kwarg pattern is the enforcement.
 
 ## Verification soak (bot-20260720-192320)
 

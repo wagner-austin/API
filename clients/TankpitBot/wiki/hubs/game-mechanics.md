@@ -5,6 +5,7 @@ How TankPit works at the game level. Viewport geometry, movement, scanning, fuel
 [Viewport Frame](../pages/viewport-frame.md) -- fixed 16x16 actionable frame, 18x18 observable with radar fringe, recenters on edge walk
 [Teleport Mechanics](../pages/teleport-mechanics.md) -- definitive placement, fuel cost, scatter on obstruction, landing auto-pickup
 [Radar Mechanics](../pages/radar-mechanics.md) -- extra=full viewport, built-in=5x5, auto-consumes extras, death spiral at 0
+[Movable Concrete Blocks](../pages/movable-blocks.md) -- pickup-and-place terrain: bridge on water, obstacle on land/stacked, destroys mines on its tile, blocks non-missile shots; user contract 2026-07-20, NOT yet wire-verified; bot has no knowledge of them
 [Fuel System](../pages/fuel-system.md) -- thresholds, fuel dots (MAP_DATA atlas), dot freshness ~40%, marooning hazard
 [Equipment System](../pages/equipment-system.md) -- container types, priority when depleted, equipment-only refill for radars
 [Map Mechanics](../pages/map-mechanics.md) -- CMD_MAP_OPEN is one-way, no wire close, client-side toggle, server-cached data

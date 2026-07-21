@@ -1405,3 +1405,51 @@ Method: decoded all 204 `runs/bot/*.capture_session.json` with the production pr
 The 2026-07-19 combat-tick mystery closes with it: the paired −45/−10 per firing tick = our dual/homing cost (−10) + the enemy's return single landing on us (−45, the known victim cost). [[game-economy]] rows updated; the 0x49 equipment-count channel noted as the ammo-consumption cross-check (its snapshots arrive on radar cadence — the uniform radar −1 per window is snapshot timing, not a firing cost).
 
 Bonus wire fact from the sweep: 0x49 counts order is [armor, dual, missile, homing, radar].
+
+## [2026-07-20] contract | Missile trigger rule + movable concrete blocks (user contract, verbatim; wire verification pending)
+
+Two new mechanics from the user, recorded before any capture exists:
+
+**Missile trigger** ([[weapon-selection]] updated): missiles fire only when shooting at a visible-viewport enemy with terrain OR any tank (friendly or foe) on the line of sight — rock walls trigger them, water does not (duals cross water). Requires missile slot (3) enabled; the bot keeps it off (`tactics.py`), which is exactly why weapon=2 never appeared in 204 archived sessions.
+
+**Movable concrete blocks** (new page [[movable-blocks]]): pickup-and-place terrain — bridge when placed on water, obstacle on land or when stacked on a water block (stacking only on water), destroys enemy mines on the placement tile (not adjacent), placeable over containers without destroying them, dragged behind the tank (no turning in place; up-over-down to reverse), blocks non-missile enemy shots on one line of sight only. Bot has zero knowledge of them; wire encoding unknown (likely a terrain_type like ferries — [[js-source-map]] dive pending). Composition note: when decoded, they fold into `compose_decision_terrain` per the [[terrain-composition]] rule — water-block passable, land/stacked impassable.
+
+## [2026-07-20] measurement | Missile cost pinned from manual capture — 10 fuel + 1 missile per landed shot; trigger rule wire-confirmed
+
+User ran the manual missile protocol (make sniff, stationary, firing at enemies behind rock): capture sniff-20260720-213208. Ten weapon=2 echoes — the first missiles ever seen on our wire. Isolation: 6 clean single-shot windows (no movement/radar/pickups/enemy fire between fuel syncs), every one exactly −10. Ammo cross-check: 0x49 missile count 25→15, ten consumed for ten shots (consumption-equals-hit holds for missiles too). One weapon=3 homing also fired (target moved on the shot tick — the server-side selection rule doing its thing even in a missile session).
+
+The obstruction trigger rule from the same-day contract is now wire-confirmed: shots at rock-obstructed enemies consistently selected weapon=2. [[game-economy]] missile row added; firing costs are now FULLY closed: single=6 free, dual/missile/homing=10 + 1 round per landed shot. Remaining: mine placement cost (user capturing next).
+
+## [2026-07-20] measurement | Mine press = 10 fuel FLAT — the economy table is complete
+
+User ran the mine protocol (sniff-20260720-214329, place → walk 3 tiles → place): the fuel line reads like a metronome — −3 per walk leg, then exactly −10 per mine press, eight presses straight, regardless of how many of the 3×3 mines actually landed (terrain blocks and enemy-mine overlap detonations don't change the price). User contract confirmed en route: press places a 3×3 centered field, skips terrain, and destroys overlapping enemy mines 1:1 (your overlapping mine is consumed) — all already documented in [[mine-mechanics]] from the 2026-06-20 spec; only the price was open. The old "~1–2 per mine" estimate dissolves: the −10-for-6-mines sample was one press with 3 blocked tiles.
+
+[[game-economy]] "What's still open" now reads **Nothing** — every player-action fuel cost is pinned, and the design is legible: everything costs 10 except walking (1/tile) and the free single (6). Remaining wiki-side unknowns are non-economy: movable-block wire encoding (capture pending) and the reroute-TTL exact constant.
+
+## [2026-07-20] decode | Movable blocks fully cracked in one evening — command 'b', 0x42/0x4A schema, enums pinned by 12 labeled drops
+
+Three manual sniff sessions (user piloting, narrated) took movable blocks from "probably in the js code somewhere" to a complete wire spec. The 0x42/0x4A decoders existed from the JS reverse-engineering all along — they had simply never fired in 204 bot sessions.
+
+- Client command: `type=4 id=98 ('b')` (x,y) — one long-press command for pickup AND drop.
+- 0x42 BlockAction: direction=ASCII compass letter (e/s/n/w) on pickup = which side the block attached; 0 on drop. obstacle_type enum pinned by the 12-labeled-drop session (sniff-20260720-215930): **1 = water (walkable bridge), 2 = land (obstacle — same value on plain ground, next-to-water, on mines, on containers), 3 = stacked on a water block (impassable terrain)**. 0x4A tile updates share the enum (+0=cleared); dragging emits transient 2→0 pairs along the towed path; unstacking reads 3→1.
+- Towing physics wire-confirmed: teleport refused (0x52 code=0, ×3), out-of-reach press refused (code=1), movement at normal 1/tile, block presses FREE (stationary same-tile re-place pairs: zero fuel delta) — the one free action in the game besides walking's baseline.
+- Mine destruction on land placement is WIRE-SILENT (no 0x45, nothing) and kills ANY team's mine — blue (own), red, and purple all destroyed in the labeled capture. Refines the original "enemy mines" contract, and means the bot's mine registry must delete mines on observed 0x42 land drops (nothing else will tell it).
+- Containers under blocks survive, including a fuel container in water becoming a bridge tile with the container intact.
+
+DOM labels for cross-reference: "Obstacle picked up" / "Obstacle dropped" (land + stack) / "Bridge module built" (water). [[movable-blocks]] rewritten to confidence: high; bot-side open work listed (compose 0x42/0x4A into world state + decision terrain per [[terrain-composition]], mine-registry hygiene).
+
+## [2026-07-20] decode | Block arrival encoding cracked — one terrain enum across 0x42/0x4A/0x5A; radar and map are block-blind
+
+The re-arrival capture (sniff-20260720-221239, user-narrated coords) closed the last block unknown, and the answer unifies the whole model: **blocks are dynamic rock-family terrain.** Resting blocks arrive to a fresh client through ordinary 0x5A viewport patches as terrain_type 1 (water bridge = ROCK_A), 2 (land obstacle = ROCK_B), 3 (stack = ROCK_AB) — the SAME values 0x42 calls obstacle_type and 0x4A uses for tile updates. Ferries (5/7) complete one coherent terrain vocabulary across all three channels. Found under the known +1/+1 0x5A entity-alignment offset; the user's moved blocks appeared at their new coords and vanished from the old in subsequent patches, and the fuel container under a bridge stayed visible via cache_value, draining 730→0 as picked.
+
+Radar (0x4F) carries NO blocks (containers/mines only) and the map (0x4C) shows none — both user-confirmed visually and wire-verified. Walking a bridge is plain movement; a bridge-only equipment pickup dispatched normally.
+
+The ingestion rule, when ever needed: wire value 1 is ambiguous (rock-A vs bridge) — disambiguate by static background: rock-family over static WATER = walkable bridge; over land = impassable either way. Also corrected: bot captures DO contain thousands of 1/2/3 tiles (genuine mountains); the zero-blocks claim stands precisely for 0x42 events, 0x4A block values, and rock-family-over-water tiles. [[movable-blocks]] updated; not-wired decision unchanged.
+
+## [2026-07-20] fix + decode | Blocks wired into the composed terrain — the "absent" mechanic was map furniture all along
+
+User challenged the not-wired decision ("why not add blocks to the terrain tho?") and demanded a check first. The deeper archive sweep (every wire rock-family tile in 228 room-1 captures vs the static practice map) overturned the earlier conclusion: **value 1 = 4,352 sightings ALL over static water (bridges), value 2 = 2,396 ALL over static ground (land blocks = live invisible obstacles), value 3 = 250 ALL over water (stacks)**. A persistent bridge complex sits around (130–135, 145–155). Resting blocks are common where the bot plays; only manipulation near it is unobserved. The perfect value/background separation means the wire value alone determines walkability.
+
+Wired the same hour: constants renamed to truth (TERRAIN_ROCK_A/B/AB → TERRAIN_BLOCK_BRIDGE/_LAND/_STACKED — they were never rocks), FerryAwareTerrain collapses wire blocks to walkability class (bridge → ground, land/stack → rock; raw terrain_type stays verbatim in world state — the collapse is only the planning projection), world renderer draws bridges as '=' with legend updated. Fourth verse of the composition pattern. Q&A recorded en route: no wire bytes are dropped anywhere (0x42 all 9 bytes incl. the unexplained flag, 0x4A exact triples, 0x5A all five entity fields); the GROUND/ROCK collapse is the last-step projection, not the decode.
+
+Gate green (4,485 tests, 100%). Verification soak bot-20260720-223x: 5 kills, 66/66 hits, 0 rejected, 0 blocked, analyzer clean; no bridge tiles crossed this run's path (behavior-neutral absent blocks, as designed — correctness pinned by tests + archive semantics). [[movable-blocks]] decision section revised; [[terrain-composition]] precedent list updated.

@@ -40,8 +40,10 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 | Single shot (`weapon=0`) | **6** | Systematic isolation 2026-07-20: 62 clean windows exactly −6 across the 204-capture archive (window = consecutive absolute fuel readings containing only our 0x53 echoes, no movement/radar/pickups/enemy fire). Consumes NO ammo |
 | Dual shot (`weapon=1`) | **10** | Same isolation: **589 clean windows exactly −10**. Consumes 1 dual per LANDED shot (0x49 count snapshots: 49 windows of one dual fired → dual −1) |
 | Homing shot (`weapon=3`) | **10** | Same isolation: 398 clean windows exactly −10, plus 124 at −5 — the homing debit sometimes lands in two −5 steps across sync boundaries; total per shot is 10. Consumes 1 homing per LANDED shot |
-| Mine placement (per command) | **~1–2 per mine placed** | Noisy sample; 6 mines correlated with a −10 fuel delta over the placement window |
+| Missile (`weapon=2`) | **10** | Manual capture sniff-20260720-213208 (user fired 10 missiles at enemies behind rock, stationary): 6 clean single-shot windows exactly −10 each; 0x49 counts 25→15 = 10 missiles consumed for 10 shots. Also live-confirms the obstruction trigger rule ([[weapon-selection]]) |
+| Mine placement (per command) | **10 flat per press** | Manual capture sniff-20260720-214329 (place → walk 3 → place cadence): 8 consecutive presses each exactly −10, independent of how many of the 3×3 mines landed (terrain-blocked tiles and enemy-mine detonations don't change the price). The old "6 mines → −10" sample was one press with 3 blocked tiles — the cost was never per-mine |
 | Radar scan | **10** | Verified across 6 radar scans; reliable |
+| Block pickup / drop | **0 (free)** | Manual captures 2026-07-20: stationary same-tile pickup/re-drop pairs produced zero fuel delta; towing movement costs the normal 1/tile ([[movable-blocks]]) |
 | Teleport | **floor(6 × euclidean distance)** — measured from start to the **actual landing tile** | Systematically validated 2026-07-20: every `teleport(x,y)` dispatch in every run was paired with its wire fuel delta (pre-hop `Self:` fix → post-hop `Fuel: A -> B` line, contaminated windows excluded). Post-2026-06-24 era (after the fuel double-count fix): **248/248 pairs exact**, costs 6–654. All-era: 2,335/2,538 exact; the 203 residuals are all pre-fix runs with broken fuel tracking. When the server drifts the landing off the requested target, the charge matches distance to the LANDING, not the target (624 drift hops confirm this) — planner estimates on the target can be off by a few fuel on drifted hops |
 
 ## Damage taken
@@ -90,7 +92,7 @@ Every row matches `remaining = declared − taken` exactly.
 
 ## What's still open
 
-Per-weapon firing costs are CLOSED (2026-07-20): dual=10, homing=10, single=6, all archive-verified — no new capture was needed, the isolation windows already existed in 204 archived sessions (crack-the-artifact-first, again). The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our dual/homing firing cost + −45 = the incoming enemy single hit landing the same tick. Still open: missile (`weapon=2`) fuel cost — never fired in any archived session; and mine placement remains a noisy ~1–2 estimate.
+**Nothing.** As of 2026-07-20 every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).
 
 ## How this was discovered
 

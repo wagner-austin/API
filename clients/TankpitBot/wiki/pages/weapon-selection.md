@@ -17,7 +17,30 @@ Weapon selection is **server-side**, not client-side. The fire command sends an 
 |-------------------|-------------|------|--------|
 | Enemy tank (stationary) | Dual shot | 0x01 | Hit, damage applied |
 | Enemy tank (has pending move on same tick) | Homing shot | 0x03 | Auto-tracks to new position |
+| Enemy tank with terrain OR another tank in the line of sight | Missile | 0x02 | Fires over the obstruction (missiles slot must be enabled) |
 | Empty ground / terrain / water | Single shot | 0x00 | Miss — nothing there |
+
+## Missile trigger rule (user contract 2026-07-20)
+
+User (verbatim): "missiles only fire when you shoot at an enemy, on
+the visible viewport, and there is terrain or a tank in between you
+and the target enemy. friendly or foe inbetween will trigger
+missiles. same if you shoot at an enemy on the other side of a rock
+wall. you can use dual shots across water ofc."
+
+So the obstruction test is: rock/terrain walls and ANY tank (friendly
+or enemy) on the line of sight → missile; open ground and water are
+NOT obstructions → dual/homing as usual. Movable concrete blocks are
+also line-of-sight obstructions for non-missile shots (see
+[[movable-blocks]]) — missiles shoot over them. Missile firing
+requires the missile equipment slot (3) enabled; the bot currently
+keeps it off (`tactics.py`), which is why `weapon=2` never appeared
+in 204 archived bot sessions.
+
+**Wire-verified 2026-07-20** (manual capture sniff-20260720-213208):
+the user fired at enemies behind rock with missiles enabled — 10
+shots echoed as `weapon=2` exactly as the contract predicts, cost 10
+fuel + 1 missile each ([[game-economy]]).
 
 ## Key implications
 
