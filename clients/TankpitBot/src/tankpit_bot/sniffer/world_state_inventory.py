@@ -15,6 +15,7 @@ from tankpit_bot.inventory import (
     InventoryState,
     diff_inventory,
 )
+from tankpit_bot.ledger.ammo_book import record_ammo_gain, record_ammo_snapshot
 from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.sniffer.world_service import WorldService
@@ -93,6 +94,13 @@ def update_inventory_from_protocol(
     Returns:
         List of inventory changes detected.
     """
+    verdict = record_ammo_snapshot(book=ws.ammo_book, counts=list(counts[:5]))
+    if verdict is not None and not verdict["balanced"]:
+        emit_diagnostic(
+            diagnostic_kind="physics_divergence",
+            divergence_channel="ammo",
+            detail=verdict["detail"],
+        )
     return _apply_inventory_state(
         ws,
         InventoryState(
@@ -115,6 +123,7 @@ def update_inventory_from_gain(ws: WorldService, gained: list[int]) -> list[Inve
     Returns:
         List of inventory changes detected.
     """
+    record_ammo_gain(book=ws.ammo_book)
     old = ws.inventory_state
     changes = _apply_inventory_state(
         ws,

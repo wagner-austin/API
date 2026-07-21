@@ -23,6 +23,7 @@ from tankpit_bot.inventory import (
     InventoryState,
     ItemType,
 )
+from tankpit_bot.ledger.ammo_book import AmmoBookDict, make_ammo_book
 from tankpit_bot.ledger.fuel_book import FuelBookDict, make_fuel_book
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state import (
@@ -85,6 +86,7 @@ class WorldService:
         """Initialize empty world state for a new session."""
         self.world_state: WorldStateDict = make_empty_world_state()
         self.fuel_book: FuelBookDict = make_fuel_book()
+        self.ammo_book: AmmoBookDict = make_ammo_book()
         self.terrain_map: _test_hooks.TerrainMapProtocol | None = None
         self.room_images: dict[str, str] = {}
         self.selected_room: str | None = None

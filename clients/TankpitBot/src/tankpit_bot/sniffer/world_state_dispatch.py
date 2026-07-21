@@ -11,6 +11,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
+from tankpit_bot.ledger.ammo_book import record_ammo_shot
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
@@ -142,6 +143,7 @@ def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> N
         cost = _SHOT_ENTRY_COSTS[weapon]
         hi = -(cost // 2) if weapon == 3 else -cost
         record_fuel_entry(book=ws.fuel_book, kind=_SHOT_ENTRY_KINDS[weapon], lo=-cost, hi=hi)
+        record_ammo_shot(book=ws.ammo_book, weapon=weapon)
     else:
         record_fuel_entry(book=ws.fuel_book, kind="enemy_hit", lo=-DUAL_HIT_VICTIM_COST, hi=0)
 

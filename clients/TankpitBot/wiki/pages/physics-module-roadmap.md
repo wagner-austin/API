@@ -315,9 +315,18 @@ Implemented as designed with these notes:
   tiles. Final soak: heavy combat (67 hits), ONE divergence — a
   double radar debit in a single-entry block (charge-latency
   straggler), a legible candidate residual, not noise.
-- **Deferred within Phase 3**: the ammo book (0x49 cross-check) and
-  divergence-to-candidate-claim extraction in `make analyze` beyond
-  the issue line — next increments on this foundation.
+- **Ammo book (2026-07-21)**: `ledger/ammo_book.py` enforces
+  consumption-equals-hit live — between 0x49 snapshots, weapon slots
+  may fall by at most the own-shot echoes counted (misses consume
+  nothing), the radar slot by at most the scans dispatched, and no
+  slot may rise without a 0x67 gain; armor falls freely (incoming
+  hits are unpredictable) but rises only with a gain. Infeasible
+  deltas emit `physics_divergence` with `divergence_channel="ammo"`.
+  Verification soak with BOTH books live: **zero divergences** across
+  a full combat run (38 hits, 27 radars).
+- **Deferred within Phase 3**: divergence-to-candidate-claim
+  extraction in `make analyze` beyond the issue line — the next
+  increment on this foundation.
 
 
 ## Parallel track (independent of phases): executor staleness audit

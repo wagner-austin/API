@@ -11,6 +11,7 @@ from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
+from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.ledger.fuel_book import record_fuel_entry
@@ -167,6 +168,7 @@ def dispatch_command(
                 lo=-RADAR_COST,
                 hi=-RADAR_COST,
             )
+            record_ammo_scan(book=get_world_service().ammo_book)
         return dispatched_radar
     if command["cmd_type"] == "map_open":
         # CMD_MAP_OPEN is idempotent on the server: every dispatch
