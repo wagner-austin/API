@@ -198,6 +198,7 @@ class TestFormatFunctions:
             damage_state=0,
             is_carrying=False,
             waypoints=[],
+            path_tiles=0,
         )
         result = format_tank_details(msg)
         assert "tank=100" in result

@@ -18,6 +18,7 @@ help:
 	@Write-Host "  make check                       lint + test (the gate)"
 	@Write-Host "  make lint                        guard + ruff + mypy"
 	@Write-Host "  make test                        pytest + coverage"
+	@Write-Host "  make audit                       re-derive wiki physics claims from the runs archive"
 	@Write-Host "  make install                     poetry install + playwright chromium"
 	@Write-Host ""
 	@Write-Host "Live action probes (need browser + accounts.json):" -ForegroundColor Yellow
@@ -226,6 +227,12 @@ analyze:
 	poetry run tankpit-run-audit runs/bot/latest.events.jsonl
 	@Write-Host ""
 	poetry run tankpit-stats
+
+audit:
+	@Write-Host ""
+	@Write-Host "==> audit (re-derive wiki physics claims from the runs archive)" -ForegroundColor Cyan
+	poetry run tankpit-audit --stamp; if ($$LASTEXITCODE -ne 0) { Write-Host "[audit] a claim failed re-derivation" -ForegroundColor Red; exit $$LASTEXITCODE }
+	@Write-Host "[audit] every validated claim re-derived from the archive" -ForegroundColor Green
 
 analyze-timing:
 	@Write-Host ""

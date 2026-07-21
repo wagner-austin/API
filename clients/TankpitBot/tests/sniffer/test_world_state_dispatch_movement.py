@@ -140,6 +140,7 @@ class TestDispatchProtocolMovement:
             damage_state=0,
             is_carrying=False,
             waypoints=[(82, 88)],
+            path_tiles=2,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -168,6 +169,7 @@ class TestDispatchProtocolMovement:
             damage_state=0,
             is_carrying=False,
             waypoints=[],
+            path_tiles=0,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -208,6 +210,7 @@ class TestDispatchProtocolMovement:
             damage_state=0,
             is_carrying=False,
             waypoints=[(110, 110)],
+            path_tiles=1,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -249,6 +252,7 @@ class TestDispatchProtocolMovement:
             damage_state=0,
             is_carrying=False,
             waypoints=[(110, 110)],
+            path_tiles=1,
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -280,6 +284,7 @@ class TestDispatchProtocolMovement:
             damage_state=0,
             is_carrying=False,
             waypoints=[(205, 205)],
+            path_tiles=1,
         )
         dispatch_world_state_update(get_world_service(), msg)
 

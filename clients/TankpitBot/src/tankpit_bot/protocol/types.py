@@ -141,6 +141,11 @@ class MovementDict(TypedDict):
       a[10]   = animation flag (passed to Re constructor, not tank state)
       a[11]   = is_carrying (1=true)
       a[12:]  = waypoints (direction chars)
+
+    ``waypoints`` collapses the nsew path to its final position (one
+    entry, or empty when stationary); ``path_tiles`` preserves the
+    wire's true step count — one fuel per step, exact even on
+    non-minimal paths around obstacles ([[game-economy]] walk row).
     """
 
     msg_type: Literal[0x47]
@@ -154,6 +159,7 @@ class MovementDict(TypedDict):
     flag: int
     is_carrying: bool
     waypoints: list[tuple[int, int]]
+    path_tiles: int
 
 
 class MovementResponseDict(TypedDict):

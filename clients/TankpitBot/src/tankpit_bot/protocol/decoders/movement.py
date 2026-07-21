@@ -66,6 +66,7 @@ def decode_movement(data: bytes) -> MovementDict:
         flag=data[10],
         is_carrying=data[11] == 1,
         waypoints=waypoints,
+        path_tiles=len(path_str),
     )
 
 
