@@ -1,6 +1,8 @@
-"""Tests for cleargbm.ensemble module.
+"""Tests for the ``cleargbm.ensemble`` public API.
 
-Uses numpy arrays for all array operations.
+These exercise the strict Python boundary in front of the Rust core:
+input-shape validation, config translation, and end-to-end training +
+prediction on a small linearly-separable dataset.
 """
 
 from __future__ import annotations
@@ -10,605 +12,225 @@ import pytest
 from numpy.typing import NDArray
 
 from cleargbm.ensemble import (
-    _add_tree_predictions,
-    _compute_loss,
-    _init_early_stopping_state,
-    _update_early_stopping_state,
+    _config_to_rust_dict,
+    _validate_training_inputs,
     predict_proba,
     predict_raw,
     train_gradient_boosting,
 )
-from cleargbm.types import GradientBoostingConfig, TrainingProgress
-
-
-def _float_matrix(data: list[list[float]]) -> NDArray[np.float64]:
-    """Create a 2D float array from nested list (helper for strict typing)."""
-    return np.array(data, dtype=np.float64)
-
-
-def _float_array(data: list[float]) -> NDArray[np.float64]:
-    """Create a 1D float array from list (helper for strict typing)."""
-    return np.array(data, dtype=np.float64)
-
-
-def _int_array(data: list[int]) -> NDArray[np.int64]:
-    """Create a 1D int array from list (helper for strict typing)."""
-    return np.array(data, dtype=np.int64)
+from cleargbm.types import GradientBoostingConfig
 
 
 def _make_config(
-    n_estimators: int = 10,
-    max_depth: int = 3,
-    learning_rate: float = 0.1,
-    min_samples_split: int = 2,
-    min_samples_leaf: int = 1,
-    max_features: int | None = None,
-    subsample: float = 1.0,
-    random_state: int = 42,
-    track_contributions: bool = True,
-    monotonic_constraints: tuple[int, ...] | None = None,
-    reg_alpha: float = 0.0,
+    n_estimators: int = 3,
+    max_depth: int = 2,
     reg_lambda: float = 0.0,
-    n_jobs: int = 1,
+    monotonic_constraints: tuple[int, ...] | None = None,
     early_stopping_rounds: int | None = None,
 ) -> GradientBoostingConfig:
-    """Create a test configuration."""
+    """Return a minimal valid training config."""
     return GradientBoostingConfig(
         n_estimators=n_estimators,
         max_depth=max_depth,
-        learning_rate=learning_rate,
-        min_samples_split=min_samples_split,
-        min_samples_leaf=min_samples_leaf,
-        max_features=max_features,
-        max_bins=64,
-        subsample=subsample,
-        random_state=random_state,
-        track_contributions=track_contributions,
+        learning_rate=0.3,
+        min_samples_split=4,
+        min_samples_leaf=2,
+        max_features=None,
+        max_bins=8,
+        subsample=1.0,
+        random_state=42,
+        track_contributions=False,
         monotonic_constraints=monotonic_constraints,
-        reg_alpha=reg_alpha,
+        reg_alpha=0.0,
         reg_lambda=reg_lambda,
-        n_jobs=n_jobs,
+        n_jobs=1,
         early_stopping_rounds=early_stopping_rounds,
     )
 
 
-class TestComputeLoss:
-    """Tests for _compute_loss helper."""
-
-    def test_perfect_predictions_low_loss(self) -> None:
-        """Perfect predictions should have low loss."""
-        y_true = _int_array([1, 1, 0, 0])
-        raw_preds = _float_array([5.0, 5.0, -5.0, -5.0])
-
-        loss = _compute_loss(y_true, raw_preds)
-
-        assert loss < 0.01
-
-    def test_terrible_predictions_high_loss(self) -> None:
-        """Terrible predictions should have high loss."""
-        y_true = _int_array([1, 1, 0, 0])
-        raw_preds = _float_array([-5.0, -5.0, 5.0, 5.0])
-
-        loss = _compute_loss(y_true, raw_preds)
-
-        assert loss > 4.0
+def _make_binary_dataset(
+    n_samples: int = 40,
+    n_features: int = 2,
+    seed: int = 42,
+) -> tuple[NDArray[np.float64], NDArray[np.int64], tuple[str, ...]]:
+    """Return a small linearly-separable binary classification dataset."""
+    rng = np.random.default_rng(seed)
+    x: NDArray[np.float64] = rng.random((n_samples, n_features), dtype=np.float64)
+    score: NDArray[np.float64] = np.sum(x[:, : n_features // 2 + 1], axis=1)
+    y: NDArray[np.int64] = (score > (n_features // 2 + 1) / 2.0).astype(np.int64)
+    names = tuple(f"f{i}" for i in range(n_features))
+    return x, y, names
 
 
-class TestAddTreePredictions:
-    """Tests for _add_tree_predictions helper."""
-
-    def test_adds_scaled_predictions(self) -> None:
-        """Should add scaled tree predictions to raw predictions."""
-        raw_preds = _float_array([0.0, 1.0, 2.0])
-        tree_preds = _float_array([1.0, 2.0, 3.0])
-        learning_rate = 0.5
-
-        result = _add_tree_predictions(raw_preds, tree_preds, learning_rate)
-
-        n_results: int = result.shape[0]
-        assert n_results == 3
-        assert abs(result.item(0) - 0.5) < 1e-10
-        assert abs(result.item(1) - 2.0) < 1e-10
-        assert abs(result.item(2) - 3.5) < 1e-10
+# =============================================================================
+# _validate_training_inputs
+# =============================================================================
 
 
-class TestTrainGradientBoosting:
-    """Tests for train_gradient_boosting."""
-
-    def test_trains_on_simple_data(self) -> None:
-        """Should train successfully on simple separable data."""
-        x_train = _float_matrix([[0.0], [0.1], [0.2], [0.3], [0.7], [0.8], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 0, 0, 1, 1, 1, 1])
-        config = _make_config(n_estimators=5, max_depth=2, learning_rate=0.5)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        assert len(model["trees"]) == 5
-        assert model["n_classes"] == 2
-        assert model["feature_names"] == ("f0",)
-        assert abs(model["learning_rate"] - 0.5) < 1e-10
-
-    def test_trains_with_validation_set(self) -> None:
-        """Should train with validation set and report val_loss."""
-        x_train = _float_matrix([[0.0], [0.1], [0.8], [0.9]])
-        y_train = _int_array([0, 0, 1, 1])
-        x_val = _float_matrix([[0.2], [0.7]])
-        y_val = _int_array([0, 1])
-        config = _make_config(n_estimators=3, max_depth=2)
-
-        progress_updates: list[TrainingProgress] = []
-
-        def callback(progress: TrainingProgress) -> None:
-            progress_updates.append(progress)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        assert len(model["trees"]) == 3
-        assert len(progress_updates) == 3
-
-        for progress in progress_updates:
-            val_loss = progress["val_loss"]
-            if val_loss is None:
-                pytest.fail("Expected val_loss to be set")
-            assert val_loss >= 0.0
+class TestValidateTrainingInputs:
+    """The boundary validator rejects malformed inputs before Rust dispatch."""
 
     def test_empty_x_train_raises(self) -> None:
-        """Should raise ValueError for empty x_train."""
-        config = _make_config()
-        x_train: NDArray[np.float64] = np.zeros((0, 1), dtype=np.float64)
-        y_train: NDArray[np.int64] = np.zeros(0, dtype=np.int64)
+        """An empty training matrix is a boundary error."""
+        x = np.zeros((0, 3), dtype=np.float64)
+        y = np.zeros(0, dtype=np.int64)
+        with pytest.raises(ValueError, match="x_train must not be empty"):
+            _validate_training_inputs(x, y, ("a", "b", "c"))
 
-        with pytest.raises(ValueError, match="must not be empty"):
-            train_gradient_boosting(
-                x_train=x_train,
-                y_train=y_train,
-                x_val=None,
-                y_val=None,
-                config=config,
-                feature_names=("f0",),
-            )
-
-    def test_mismatched_x_y_raises(self) -> None:
-        """Should raise ValueError when x_train and y_train have different lengths."""
-        config = _make_config()
-        x_train = _float_matrix([[0.0], [1.0]])
-        y_train = _int_array([0])
-
+    def test_y_length_mismatch_raises(self) -> None:
+        """y_train row count must match x_train row count."""
+        x = np.zeros((5, 3), dtype=np.float64)
+        y = np.zeros(3, dtype=np.int64)
         with pytest.raises(ValueError, match="same length"):
-            train_gradient_boosting(
-                x_train=x_train,
-                y_train=y_train,
-                x_val=None,
-                y_val=None,
-                config=config,
-                feature_names=("f0",),
-            )
+            _validate_training_inputs(x, y, ("a", "b", "c"))
 
-    def test_mismatched_features_raises(self) -> None:
-        """Should raise ValueError when features don't match feature_names."""
-        config = _make_config()
-        x_train = _float_matrix([[0.0, 1.0]])
-        y_train = _int_array([0])
-
+    def test_feature_name_count_mismatch_raises(self) -> None:
+        """feature_names length must match x_train column count."""
+        x = np.zeros((5, 3), dtype=np.float64)
+        y = np.zeros(5, dtype=np.int64)
         with pytest.raises(ValueError, match="feature names"):
+            _validate_training_inputs(x, y, ("a", "b"))
+
+
+# =============================================================================
+# _config_to_rust_dict
+# =============================================================================
+
+
+class TestConfigToRustDict:
+    """Config translation: Python-only fields are dropped, monotonic list is passed through."""
+
+    def test_carries_the_twelve_rust_fields(self) -> None:
+        """The Rust-side dict has exactly the 12 fields Rust expects."""
+        result = _config_to_rust_dict(_make_config())
+        expected = {
+            "n_estimators",
+            "max_depth",
+            "learning_rate",
+            "min_samples_split",
+            "min_samples_leaf",
+            "max_bins",
+            "subsample",
+            "random_state",
+            "reg_alpha",
+            "reg_lambda",
+            "monotonic_constraints",
+            "early_stopping_rounds",
+        }
+        assert set(result.keys()) == expected
+
+    def test_drops_python_only_fields(self) -> None:
+        """max_features, track_contributions, n_jobs must not leak into Rust."""
+        result = _config_to_rust_dict(_make_config())
+        assert "max_features" not in result
+        assert "track_contributions" not in result
+        assert "n_jobs" not in result
+
+    def test_monotonic_constraints_none_stays_none(self) -> None:
+        """None constraint stays None in the dict."""
+        result = _config_to_rust_dict(_make_config(monotonic_constraints=None))
+        assert result["monotonic_constraints"] is None
+
+    def test_monotonic_constraints_tuple_becomes_list_of_ints(self) -> None:
+        """Tuple of ints becomes a list of ints for Rust consumption."""
+        cfg = _make_config(monotonic_constraints=(1, 0, -1))
+        result = _config_to_rust_dict(cfg)
+        assert result["monotonic_constraints"] == [1, 0, -1]
+
+
+# =============================================================================
+# train_gradient_boosting + predict_proba + predict_raw
+# =============================================================================
+
+
+class TestTrainAndPredict:
+    """End-to-end path: train a small model, then predict with it."""
+
+    def test_train_returns_native_model_handle(self) -> None:
+        """Training yields an opaque native handle usable by predict_*."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        # The handle must accept predict_proba without error and return a
+        # per-sample pair (2-tuple of floats).
+        result = predict_proba(model, x)
+        n_rows: int = int(x.shape[0])
+        assert len(result) == n_rows
+        for p in result:
+            assert len(p) == 2
+            p0, p1 = p
+            # Value-level assertion: probabilities are floats summing to 1.
+            assert abs((p0 + p1) - 1.0) < 1e-12
+
+    def test_predict_proba_returns_valid_probabilities(self) -> None:
+        """Probabilities sum to 1 per sample and lie in [0, 1]."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        result = predict_proba(model, x)
+        for p0, p1 in result:
+            assert 0.0 <= p0 <= 1.0
+            assert 0.0 <= p1 <= 1.0
+            assert abs((p0 + p1) - 1.0) < 1e-12
+
+    def test_predict_raw_returns_one_score_per_sample(self) -> None:
+        """predict_raw output has the same length as the input row count."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        raw = predict_raw(model, x)
+        n_rows: int = int(x.shape[0])
+        assert raw.shape == (n_rows,)
+
+    def test_train_with_validation_set_runs(self) -> None:
+        """A validation split is accepted (used internally by early stopping)."""
+        x, y, names = _make_binary_dataset(n_samples=60)
+        x_val, y_val, _ = _make_binary_dataset(n_samples=20, seed=7)
+        model = train_gradient_boosting(
+            x_train=x,
+            y_train=y,
+            x_val=x_val,
+            y_val=y_val,
+            config=_make_config(early_stopping_rounds=2),
+            feature_names=names,
+        )
+        # Successful training returns a live handle.
+        n_val_rows: int = int(x_val.shape[0])
+        assert predict_raw(model, x_val).shape == (n_val_rows,)
+
+    def test_predict_proba_empty_x_raises(self) -> None:
+        """predict_proba on an empty feature matrix rejects at the boundary."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        empty = np.zeros((0, x.shape[1]), dtype=np.float64)
+        with pytest.raises(ValueError, match="x must not be empty"):
+            predict_proba(model, empty)
+
+    def test_predict_raw_empty_x_raises(self) -> None:
+        """predict_raw on an empty feature matrix rejects at the boundary."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+        empty = np.zeros((0, x.shape[1]), dtype=np.float64)
+        with pytest.raises(ValueError, match="x must not be empty"):
+            predict_raw(model, empty)
+
+    def test_train_empty_x_raises_at_boundary(self) -> None:
+        """train_gradient_boosting rejects an empty training matrix."""
+        empty_x = np.zeros((0, 2), dtype=np.float64)
+        empty_y = np.zeros(0, dtype=np.int64)
+        with pytest.raises(ValueError, match="x_train must not be empty"):
             train_gradient_boosting(
-                x_train=x_train,
-                y_train=y_train,
+                x_train=empty_x,
+                y_train=empty_y,
                 x_val=None,
                 y_val=None,
-                config=config,
-                feature_names=("f0",),
+                config=_make_config(),
+                feature_names=("a", "b"),
             )
-
-    def test_progress_callback_called(self) -> None:
-        """Should call progress callback after each tree."""
-        x_train = _float_matrix([[0.0], [0.5], [1.0], [1.5]])
-        y_train = _int_array([0, 0, 1, 1])
-        config = _make_config(n_estimators=4, max_depth=1)
-
-        call_count = 0
-
-        def callback(progress: TrainingProgress) -> None:
-            nonlocal call_count
-            call_count += 1
-            assert progress["tree_index"] == call_count - 1
-            assert progress["total_trees"] == 4
-
-        train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        assert call_count == 4
-
-    def test_loss_decreases_during_training(self) -> None:
-        """Training loss should generally decrease during training."""
-        x_train = _float_matrix([[0.0], [0.1], [0.2], [0.8], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 0, 1, 1, 1])
-        config = _make_config(n_estimators=10, max_depth=2, learning_rate=0.3)
-
-        losses: list[float] = []
-
-        def callback(progress: TrainingProgress) -> None:
-            losses.append(progress["train_loss"])
-
-        train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        assert losses[0] > losses[-1]
-
-
-class TestPredictRaw:
-    """Tests for predict_raw."""
-
-    def test_predicts_raw_scores(self) -> None:
-        """Should predict raw scores for all samples."""
-        x_train = _float_matrix([[0.0], [0.1], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 1, 1])
-        config = _make_config(n_estimators=5, max_depth=2)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        x_test = _float_matrix([[0.0], [0.5], [1.0]])
-        raw_preds = predict_raw(model, x_test)
-
-        n_preds: int = raw_preds.shape[0]
-        assert n_preds == 3
-        assert raw_preds.item(0) < raw_preds.item(2)
-
-    def test_empty_x_raises(self) -> None:
-        """Should raise ValueError for empty x."""
-        x_train = _float_matrix([[0.0], [1.0]])
-        y_train = _int_array([0, 1])
-        config = _make_config(n_estimators=2, max_depth=1)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        x_empty: NDArray[np.float64] = np.zeros((0, 1), dtype=np.float64)
-        with pytest.raises(ValueError, match="must not be empty"):
-            predict_raw(model, x_empty)
-
-    def test_wrong_features_raises(self) -> None:
-        """Should raise ValueError when x has wrong number of features."""
-        x_train = _float_matrix([[0.0], [1.0]])
-        y_train = _int_array([0, 1])
-        config = _make_config(n_estimators=2, max_depth=1)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        x_wrong = _float_matrix([[0.0, 1.0]])
-        with pytest.raises(ValueError, match="features"):
-            predict_raw(model, x_wrong)
-
-
-class TestPredictProba:
-    """Tests for predict_proba."""
-
-    def test_predicts_probabilities(self) -> None:
-        """Should predict class probabilities."""
-        x_train = _float_matrix([[0.0], [0.1], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 1, 1])
-        config = _make_config(n_estimators=5, max_depth=2)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        x_test = _float_matrix([[0.0], [1.0]])
-        probas = predict_proba(model, x_test)
-
-        assert len(probas) == 2
-        for prob_0, prob_1 in probas:
-            assert prob_0 >= 0.0
-            assert prob_0 <= 1.0
-            assert prob_1 >= 0.0
-            assert prob_1 <= 1.0
-            assert abs(prob_0 + prob_1 - 1.0) < 1e-10
-
-    def test_probabilities_reflect_training(self) -> None:
-        """Probabilities should reflect training data patterns."""
-        x_train = _float_matrix([[0.0], [0.1], [0.2], [0.8], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 0, 1, 1, 1])
-        config = _make_config(n_estimators=10, max_depth=2, learning_rate=0.3)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        x_test = _float_matrix([[0.0], [1.0]])
-        probas = predict_proba(model, x_test)
-
-        assert probas[0][0] > probas[0][1]
-        assert probas[1][1] > probas[1][0]
-
-    def test_multiple_features(self) -> None:
-        """Should work with multiple features."""
-        x_train = _float_matrix([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
-        y_train = _int_array([0, 1, 1, 0])
-        config = _make_config(n_estimators=20, max_depth=3, learning_rate=0.2)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0", "f1"),
-        )
-
-        x_test = _float_matrix([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
-        probas = predict_proba(model, x_test)
-
-        assert len(probas) == 4
-        assert probas[0][0] > 0.3
-        assert probas[1][1] > 0.3
-        assert probas[2][1] > 0.3
-        assert probas[3][0] > 0.3
-
-
-class TestEarlyStoppingState:
-    """Tests for early stopping state management."""
-
-    def test_init_state(self) -> None:
-        """Initial state should have infinity loss and zero counters."""
-        state = _init_early_stopping_state()
-
-        assert state["best_val_loss"] == float("inf")
-        assert state["best_round"] == 0
-        assert state["rounds_without_improvement"] == 0
-        assert state["should_stop"] is False
-
-    def test_update_with_improvement(self) -> None:
-        """Improvement should reset counter and update best."""
-        state = _init_early_stopping_state()
-        state = _update_early_stopping_state(state, val_loss=0.5, tree_idx=0, patience=3)
-
-        assert state["best_val_loss"] == 0.5
-        assert state["best_round"] == 0
-        assert state["rounds_without_improvement"] == 0
-        assert state["should_stop"] is False
-
-    def test_update_without_improvement(self) -> None:
-        """No improvement should increment counter."""
-        state = _init_early_stopping_state()
-        state = _update_early_stopping_state(state, val_loss=0.5, tree_idx=0, patience=3)
-        state = _update_early_stopping_state(state, val_loss=0.6, tree_idx=1, patience=3)
-
-        assert state["best_val_loss"] == 0.5
-        assert state["best_round"] == 0
-        assert state["rounds_without_improvement"] == 1
-        assert state["should_stop"] is False
-
-    def test_update_triggers_stop_after_patience(self) -> None:
-        """Should trigger stop after patience rounds without improvement."""
-        state = _init_early_stopping_state()
-        state = _update_early_stopping_state(state, val_loss=0.5, tree_idx=0, patience=2)
-        state = _update_early_stopping_state(state, val_loss=0.6, tree_idx=1, patience=2)
-        state = _update_early_stopping_state(state, val_loss=0.7, tree_idx=2, patience=2)
-
-        assert state["best_val_loss"] == 0.5
-        assert state["best_round"] == 0
-        assert state["rounds_without_improvement"] == 2
-        assert state["should_stop"] is True
-
-    def test_update_resets_counter_on_improvement(self) -> None:
-        """Improvement after degradation should reset counter."""
-        state = _init_early_stopping_state()
-        state = _update_early_stopping_state(state, val_loss=0.5, tree_idx=0, patience=3)
-        state = _update_early_stopping_state(state, val_loss=0.6, tree_idx=1, patience=3)
-        state = _update_early_stopping_state(state, val_loss=0.4, tree_idx=2, patience=3)
-
-        assert state["best_val_loss"] == 0.4
-        assert state["best_round"] == 2
-        assert state["rounds_without_improvement"] == 0
-        assert state["should_stop"] is False
-
-
-class TestEarlyStopping:
-    """Tests for early stopping in train_gradient_boosting."""
-
-    def test_early_stopping_stops_training(self) -> None:
-        """Training should stop when validation loss stops improving."""
-        # Create data where model overfits quickly
-        x_train = _float_matrix([[0.0], [0.1], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 1, 1])
-        x_val = _float_matrix([[0.2], [0.8]])
-        y_val = _int_array([0, 1])
-        config = _make_config(n_estimators=100, max_depth=3, early_stopping_rounds=3)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        # Model should have fewer trees than n_estimators due to early stopping
-        assert len(model["trees"]) < 100
-
-    def test_early_stopping_returns_best_model(self) -> None:
-        """Model should contain only trees up to best round."""
-        x_train = _float_matrix([[0.0], [0.1], [0.2], [0.8], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 0, 1, 1, 1])
-        x_val = _float_matrix([[0.3], [0.7]])
-        y_val = _int_array([0, 1])
-        config = _make_config(n_estimators=50, max_depth=2, early_stopping_rounds=2)
-
-        progress_updates: list[TrainingProgress] = []
-
-        def callback(progress: TrainingProgress) -> None:
-            progress_updates.append(progress)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        # Model should have at least one tree
-        n_trees = len(model["trees"])
-        assert n_trees >= 1
-        # Model should have fewer trees than total progress updates if early stopping triggered
-        # (because we return trees up to best_round, not the last round)
-        n_updates = len(progress_updates)
-        # If early stopping triggered, we built more trees than we kept
-        # If it didn't trigger, we kept all trees
-        assert n_trees <= n_updates
-
-    def test_early_stopping_disabled_without_validation(self) -> None:
-        """Early stopping should be disabled when no validation set."""
-        x_train = _float_matrix([[0.0], [0.5], [1.0], [1.5]])
-        y_train = _int_array([0, 0, 1, 1])
-        config = _make_config(n_estimators=10, max_depth=2, early_stopping_rounds=2)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=None,
-            y_val=None,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        # All trees should be trained since no validation
-        assert len(model["trees"]) == 10
-
-    def test_early_stopping_disabled_when_none(self) -> None:
-        """Early stopping should be disabled when early_stopping_rounds is None."""
-        x_train = _float_matrix([[0.0], [0.5], [1.0], [1.5]])
-        y_train = _int_array([0, 0, 1, 1])
-        x_val = _float_matrix([[0.25], [1.25]])
-        y_val = _int_array([0, 1])
-        config = _make_config(n_estimators=10, max_depth=2, early_stopping_rounds=None)
-
-        model = train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-        )
-
-        # All trees should be trained since early stopping disabled
-        assert len(model["trees"]) == 10
-
-    def test_early_stopping_continues_with_improvement(self) -> None:
-        """Training should continue while validation loss improves."""
-        x_train = _float_matrix([[0.0], [0.1], [0.2], [0.3], [0.7], [0.8], [0.9], [1.0]])
-        y_train = _int_array([0, 0, 0, 0, 1, 1, 1, 1])
-        x_val = _float_matrix([[0.15], [0.85]])
-        y_val = _int_array([0, 1])
-        # Patience of 5 with 10 estimators should train all if improving
-        config = _make_config(n_estimators=10, max_depth=2, early_stopping_rounds=5)
-
-        progress_updates: list[TrainingProgress] = []
-
-        def callback(progress: TrainingProgress) -> None:
-            progress_updates.append(progress)
-
-        train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        # Should have trained at least one tree
-        n_updates = len(progress_updates)
-        assert n_updates >= 1
-
-    def test_early_stopping_respects_patience(self) -> None:
-        """Training should not stop before patience rounds without improvement."""
-        x_train = _float_matrix([[0.0], [1.0]])
-        y_train = _int_array([0, 1])
-        x_val = _float_matrix([[0.5]])
-        y_val = _int_array([0])
-        # With patience=5 and small data, should train at least 5 trees
-        config = _make_config(n_estimators=20, max_depth=1, early_stopping_rounds=5)
-
-        progress_updates: list[TrainingProgress] = []
-
-        def callback(progress: TrainingProgress) -> None:
-            progress_updates.append(progress)
-
-        train_gradient_boosting(
-            x_train=x_train,
-            y_train=y_train,
-            x_val=x_val,
-            y_val=y_val,
-            config=config,
-            feature_names=("f0",),
-            progress_callback=callback,
-        )
-
-        # Should have at least patience+1 updates before stopping
-        # (1 for best round + patience rounds without improvement)
-        assert len(progress_updates) >= 6

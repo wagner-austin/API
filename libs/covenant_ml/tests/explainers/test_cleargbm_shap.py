@@ -602,7 +602,7 @@ class TestConvertClearGBMToShapFormat:
 # =============================================================================
 #
 # The wrapper takes a native ``PyGbmModel`` handle (opaque Rust value)
-# produced by ``train_gradient_boosting_native``. It cannot be constructed from
+# produced by ``train_gradient_boosting``. It cannot be constructed from
 # a hand-authored Python-shape ``GradientBoostingModel`` TypedDict — the
 # Rust value has no public constructor from Python-side data. Wrapper tests
 # accordingly train a real small native model and exercise the full path:
@@ -633,10 +633,7 @@ def _train_native_binary_model(
         Tuple of ``(native_model, feature_names, x_test)`` where ``x_test`` is
         a small holdout matrix suitable for calling ``explain_local``.
     """
-    from cleargbm._rust_adapters import use_rust_backend
-    from cleargbm.ensemble import train_gradient_boosting_native
-
-    use_rust_backend()
+    from cleargbm.ensemble import train_gradient_boosting
 
     rng = np.random.default_rng(random_state)
     x_train: NDArray[np.float64] = rng.random((n_samples, n_features), dtype=np.float64)
@@ -665,7 +662,7 @@ def _train_native_binary_model(
         "n_jobs": 1,
         "early_stopping_rounds": None,
     }
-    native_model = train_gradient_boosting_native(
+    native_model = train_gradient_boosting(
         x_train=x_train,
         y_train=y_train,
         x_val=None,
@@ -727,7 +724,7 @@ class TestClearGBMShapWrapperNativeIntegration:
     """End-to-end integration tests for ``ClearGBMShapWrapper``.
 
     These replace the earlier fake-model-based unit tests. The wrapper's
-    constructor takes a native ``PyGbmModel`` that only ``train_gradient_boosting_native``
+    constructor takes a native ``PyGbmModel`` that only ``train_gradient_boosting``
     can produce, so exercising it requires real training.
     """
 

@@ -604,8 +604,8 @@ class ClearGBMShapWrapper:
     forwards to ``convert_cleargbm_to_shap_format`` for SHAP consumption.
 
     Example:
-        >>> from cleargbm.ensemble import train_gradient_boosting_native
-        >>> native_model = train_gradient_boosting_native(...)
+        >>> from cleargbm.ensemble import train_gradient_boosting
+        >>> native_model = train_gradient_boosting(...)
         >>> wrapper = ClearGBMShapWrapper(native_model)
         >>> explanations = wrapper.explain_local(x_data, feature_names)
     """
@@ -615,7 +615,7 @@ class ClearGBMShapWrapper:
 
         Args:
             model: Native ``PyGbmModel`` returned by
-                ``train_gradient_boosting_native``.
+                ``train_gradient_boosting``.
 
         Raises:
             ValueError: If the decoded model has no trees.

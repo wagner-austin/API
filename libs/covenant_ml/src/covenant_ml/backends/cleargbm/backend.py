@@ -14,12 +14,9 @@ from pathlib import Path
 from typing import Protocol, TypeGuard
 
 import numpy as np
-from cleargbm._rust_adapters import use_rust_backend
 from cleargbm.ensemble import (
-    predict_proba_native as cgbm_predict_proba_native,
-)
-from cleargbm.ensemble import (
-    train_gradient_boosting_native,
+    predict_proba as cgbm_predict_proba,
+    train_gradient_boosting,
 )
 from cleargbm.types import GradientBoostingConfig
 from numpy.typing import NDArray
@@ -129,11 +126,9 @@ _py_gbm_model_feature_importances: _FeatureImportancesProto = (
 )
 _py_gbm_model_n_trees: _NTreesProto = _native_mod.py_gbm_model_n_trees_rs
 
-# Activate the Rust backend at module import time. Idempotent — safe to call
-# repeatedly. This wrapper's whole promise is native-path training; without
-# this, imports from cleargbm.ensemble would still resolve but per-primitive
-# hook backends would stay set to the Python defaults.
-use_rust_backend()
+# cleargbm auto-imports the Rust extension at its own module load, so simply
+# importing ``cleargbm.ensemble`` above already guarantees the native path is
+# live. No hook-activation call is required.
 
 
 def _is_cleargbm_config(cfg: ClassifierTrainConfig) -> TypeGuard[ClearGBMConfig]:
@@ -193,7 +188,7 @@ class _ClearGBMPrepared:
     """Wrapper for a trained ClearGBM native model implementing PreparedClassifier.
 
     Wraps the opaque ``cleargbm_rs.PyGbmModel`` handle produced by the native
-    training loop. All inference goes through ``predict_proba_native``; save,
+    training loop. All inference goes through ``predict_proba``; save,
     load, and feature-importance extraction go through the native
     ``py_gbm_model_*_rs`` module functions imported at module scope.
 
@@ -205,7 +200,7 @@ class _ClearGBMPrepared:
         """Initialize with a trained native model handle.
 
         Args:
-            model: Opaque ``PyGbmModel`` from ``train_gradient_boosting_native``.
+            model: Opaque ``PyGbmModel`` from ``train_gradient_boosting``.
         """
         self._model = model
 
@@ -218,7 +213,7 @@ class _ClearGBMPrepared:
         Returns:
             Probability matrix (n_samples, 2).
         """
-        proba_tuple = cgbm_predict_proba_native(self._model, x)
+        proba_tuple = cgbm_predict_proba(self._model, x)
         return np.array(proba_tuple, dtype=np.float64)
 
     @property
@@ -378,7 +373,7 @@ class ClearGBMBackend(ClassifierBackend):
                 "ClearGBM native path does not emit per-round progress; "
                 "callback will not be invoked"
             )
-        model = train_gradient_boosting_native(
+        model = train_gradient_boosting(
             x_train=splits.x_train,
             y_train=splits.y_train,
             x_val=splits.x_val,
@@ -568,7 +563,7 @@ def create_cleargbm_backend() -> ClearGBMBackend:
     """Create a ClearGBM backend instance bound to the native Rust training loop.
 
     The Rust backend is activated at module import time via
-    ``use_rust_backend()``; this factory is a plain constructor with no
+    ``cleargbm._rust`` module load; this factory is a plain constructor with no
     additional setup.
 
     Returns:

@@ -1058,7 +1058,7 @@ class TestShapTreeAdapterDirect:
 def _create_cleargbm_prepared() -> PreparedClassifier:
     """Create a ClearGBM prepared classifier for tests.
 
-    Trains a real native ``PyGbmModel`` via ``train_gradient_boosting_native``
+    Trains a real native ``PyGbmModel`` via ``train_gradient_boosting``
     (matching the ClearGBM backend's own training path), wraps it in
     ``_ClearGBMPrepared``, and returns it. Bypasses save/load so the test
     exercises the wrapper's in-memory instance directly.
@@ -1066,13 +1066,10 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
     Returns:
         PreparedClassifier wrapping a ClearGBM native model.
     """
-    from cleargbm._rust_adapters import use_rust_backend
-    from cleargbm.ensemble import train_gradient_boosting_native
+    from cleargbm.ensemble import train_gradient_boosting
     from cleargbm.types import GradientBoostingConfig
 
     from covenant_ml.backends.cleargbm.backend import _ClearGBMPrepared
-
-    use_rust_backend()
 
     rng = np.random.default_rng(42)
     x_train: NDArray[np.float64] = rng.random((100, 4)).astype(np.float64)
@@ -1098,7 +1095,7 @@ def _create_cleargbm_prepared() -> PreparedClassifier:
         early_stopping_rounds=10,
     )
 
-    native_model = train_gradient_boosting_native(
+    native_model = train_gradient_boosting(
         x_train=x_train,
         y_train=y_train,
         x_val=None,

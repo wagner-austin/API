@@ -1,13 +1,6 @@
-"""Pytest configuration and fixtures for cleargbm tests.
-
-Uses numpy arrays for all array operations.
-"""
+"""Pytest configuration and fixtures for cleargbm tests."""
 
 from __future__ import annotations
-
-from collections.abc import Generator
-
-import pytest
 
 from cleargbm.types import GradientBoostingConfig
 
@@ -64,19 +57,7 @@ def make_config(
     )
 
 
-@pytest.fixture(autouse=True)
-def reset_test_hooks() -> Generator[None, None, None]:
-    """Reset test hooks after each test.
-
-    Yields:
-        None (test runs during yield).
-    """
-    from cleargbm import _hooks_infra
-
-    # Store original factory
-    original_factory = _hooks_infra._random_state_factory
-
-    yield
-
-    # Restore original factory
-    _hooks_infra._random_state_factory = original_factory
+# The former ``reset_test_hooks`` autouse fixture reset a Python-side random-
+# state factory hook on ``_hooks_infra``. That module and its hook mechanism
+# no longer exist — the Rust training loop owns all randomness end-to-end —
+# so there is nothing left to reset between tests.
