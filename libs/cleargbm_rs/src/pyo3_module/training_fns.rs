@@ -11,21 +11,246 @@ use pyo3::types::{PyDict, PyList, PyTuple};
 use crate::error::ClearGbmError;
 use crate::pyo3_module::array_helpers::{i64_to_usize, try_convert_int};
 use crate::pyo3_module::prediction_fns::extract_rows;
+use crate::pyo3_module::tree_fns::ser_err;
 use crate::split::MonotonicConstraint;
 use crate::training::{
-    train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel,
+    feature_importances, train_gradient_boosting, GradientBoostingConfig,
+    GradientBoostingConfigParams, GradientBoostingModel,
 };
 
 /// Opaque Python wrapper around a trained [`GradientBoostingModel`].
 ///
 /// Created by [`train_gradient_boosting_rs`] and consumed by
 /// [`predict_model_rs`] and [`predict_proba_model_rs`].
+///
+/// JSON persistence and feature-importance extraction are exposed as
+/// module-level functions (`py_gbm_model_to_json_rs`,
+/// `py_gbm_model_from_json_rs`, `py_gbm_model_feature_importances_rs`,
+/// `py_gbm_model_n_trees_rs`, `py_gbm_model_n_classes_rs`) rather than
+/// `#[pymethods]` so the crate's `question_mark_used` / `useless_conversion`
+/// forbids stay clean (`#[pymethods]` expansion is incompatible).
 #[pyclass]
 #[derive(Debug, Clone)]
 pub(crate) struct PyGbmModel {
     /// The underlying trained model.
     inner: GradientBoostingModel,
+}
+
+/// Converts a deserialization failure description into a [`PyErr`].
+///
+/// Companion to [`ser_err`]; kept module-local because deserialization is only
+/// exposed on `PyGbmModel` right now. If more callers need it, lift alongside
+/// `ser_err` in `tree_fns`.
+///
+/// # Args
+///
+/// * `reason` - Human-readable description of the deserialization failure.
+///
+/// # Returns
+///
+/// A Python `RuntimeError` wrapping the deserialization error.
+fn de_err(reason: String) -> PyErr {
+    ClearGbmError::DeserializationFailed { reason }.into()
+}
+
+/// Serializes a [`PyGbmModel`] to a JSON string.
+///
+/// # Args
+///
+/// * `model` - The `PyGbmModel` reference.
+///
+/// # Returns
+///
+/// JSON string representation of the model. Round-trips through
+/// [`py_gbm_model_from_json_rs`] without loss beyond one ULP on float text
+/// representation; see the Rust unit test
+/// `test_model_roundtrip_predictions_identical` for the per-sample prediction
+/// preservation guarantee at 1e-15.
+///
+/// # Errors
+///
+/// Returns `RuntimeError` if serialization fails.
+pub(crate) fn py_gbm_model_to_json_rs(model: &PyGbmModel) -> PyResult<String> {
+    serde_json::to_string(&model.inner).map_err(|e| ser_err(e.to_string()))
+}
+
+/// Deserializes a [`PyGbmModel`] from a JSON string.
+///
+/// # Args
+///
+/// * `json_str` - JSON string previously produced by [`py_gbm_model_to_json_rs`].
+///
+/// # Returns
+///
+/// A new `PyGbmModel` instance.
+///
+/// # Errors
+///
+/// Returns `RuntimeError` on parse failures or on validation errors from the
+/// model's config validator (e.g. an invalid `learning_rate` value in the
+/// payload).
+pub(crate) fn py_gbm_model_from_json_rs(json_str: &str) -> PyResult<PyGbmModel> {
+    let inner: GradientBoostingModel = match serde_json::from_str(json_str) {
+        Ok(m) => m,
+        Err(e) => return Err(de_err(e.to_string())),
+    };
+    Ok(PyGbmModel { inner })
+}
+
+/// Returns per-feature split-count importance from a [`PyGbmModel`], normalized
+/// to sum to 1.0.
+///
+/// A feature that never appears at an internal (split) node has importance 0.0.
+/// If the ensemble has zero internal nodes (every tree is a single leaf), every
+/// feature has importance 0.0.
+///
+/// # Args
+///
+/// * `model` - The `PyGbmModel` reference.
+///
+/// # Returns
+///
+/// A list of `(feature_name, importance)` pairs in feature-index order.
+pub(crate) fn py_gbm_model_feature_importances_rs(model: &PyGbmModel) -> Vec<(String, f64)> {
+    feature_importances(&model.inner)
+}
+
+/// Returns the number of trees in a [`PyGbmModel`] ensemble.
+///
+/// # Args
+///
+/// * `model` - The `PyGbmModel` reference.
+///
+/// # Returns
+///
+/// Tree count (equal to `n_estimators` unless early stopping trimmed the
+/// ensemble).
+pub(crate) fn py_gbm_model_n_trees_rs(model: &PyGbmModel) -> usize {
+    model.inner.n_trees()
+}
+
+/// Returns the number of classes in a [`PyGbmModel`].
+///
+/// Always `2` for binary classification; the current library only trains
+/// binary classifiers.
+///
+/// # Args
+///
+/// * `model` - The `PyGbmModel` reference.
+///
+/// # Returns
+///
+/// Class count (2).
+pub(crate) fn py_gbm_model_n_classes_rs(model: &PyGbmModel) -> usize {
+    model.inner.n_classes()
+}
+
+/// Extracts a [`PyGbmModel`] from arg 0 and serializes it to JSON.
+///
+/// # Args (positional)
+///
+/// 0. `model` (`PyGbmModel`)
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction or serialization fails.
+pub(crate) fn py_gbm_model_to_json_from_args(args: &Bound<'_, PyTuple>) -> PyResult<String> {
+    let arg0 = match args.get_item(0_usize) {
+        Ok(obj) => obj,
+        Err(e) => return Err(e),
+    };
+    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
+        Ok(v) => v,
+        Err(e) => return Err(e.into()),
+    };
+    py_gbm_model_to_json_rs(&model)
+}
+
+/// Extracts a JSON string from arg 0 and deserializes it into a [`PyGbmModel`].
+///
+/// # Args (positional)
+///
+/// 0. `json_str` (str)
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction or deserialization fails.
+pub(crate) fn py_gbm_model_from_json_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyGbmModel> {
+    let arg0 = match args.get_item(0_usize) {
+        Ok(obj) => obj,
+        Err(e) => return Err(e),
+    };
+    let json_str: String = match arg0.extract() {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+    py_gbm_model_from_json_rs(&json_str)
+}
+
+/// Extracts a [`PyGbmModel`] from arg 0 and returns its feature-importance
+/// list.
+///
+/// # Args (positional)
+///
+/// 0. `model` (`PyGbmModel`)
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction fails.
+pub(crate) fn py_gbm_model_feature_importances_from_args(
+    args: &Bound<'_, PyTuple>,
+) -> PyResult<Vec<(String, f64)>> {
+    let arg0 = match args.get_item(0_usize) {
+        Ok(obj) => obj,
+        Err(e) => return Err(e),
+    };
+    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
+        Ok(v) => v,
+        Err(e) => return Err(e.into()),
+    };
+    Ok(py_gbm_model_feature_importances_rs(&model))
+}
+
+/// Extracts a [`PyGbmModel`] from arg 0 and returns its tree count.
+///
+/// # Args (positional)
+///
+/// 0. `model` (`PyGbmModel`)
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction fails.
+pub(crate) fn py_gbm_model_n_trees_from_args(args: &Bound<'_, PyTuple>) -> PyResult<usize> {
+    let arg0 = match args.get_item(0_usize) {
+        Ok(obj) => obj,
+        Err(e) => return Err(e),
+    };
+    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
+        Ok(v) => v,
+        Err(e) => return Err(e.into()),
+    };
+    Ok(py_gbm_model_n_trees_rs(&model))
+}
+
+/// Extracts a [`PyGbmModel`] from arg 0 and returns its class count.
+///
+/// # Args (positional)
+///
+/// 0. `model` (`PyGbmModel`)
+///
+/// # Errors
+///
+/// Returns `PyErr` if argument extraction fails.
+pub(crate) fn py_gbm_model_n_classes_from_args(args: &Bound<'_, PyTuple>) -> PyResult<usize> {
+    let arg0 = match args.get_item(0_usize) {
+        Ok(obj) => obj,
+        Err(e) => return Err(e),
+    };
+    let model: PyRef<'_, PyGbmModel> = match arg0.extract() {
+        Ok(v) => v,
+        Err(e) => return Err(e.into()),
+    };
+    Ok(py_gbm_model_n_classes_rs(&model))
 }
 
 // =============================================================================

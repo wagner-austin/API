@@ -5,7 +5,58 @@
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{NanDirection, SplitResult, SplitResultConfig};
+use super::{MonotonicConstraint, NanDirection, SplitResult, SplitResultConfig};
+
+// =============================================================================
+// MonotonicConstraint Serialization
+// =============================================================================
+
+impl Serialize for MonotonicConstraint {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::None => serializer.serialize_str("None"),
+            Self::Increasing => serializer.serialize_str("Increasing"),
+            Self::Decreasing => serializer.serialize_str("Decreasing"),
+        }
+    }
+}
+
+/// Visitor for deserializing `MonotonicConstraint` from string.
+struct MonotonicConstraintVisitor;
+
+impl<'de> Visitor<'de> for MonotonicConstraintVisitor {
+    type Value = MonotonicConstraint;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("\"None\", \"Increasing\", or \"Decreasing\"")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value {
+            "None" => Ok(MonotonicConstraint::None),
+            "Increasing" => Ok(MonotonicConstraint::Increasing),
+            "Decreasing" => Ok(MonotonicConstraint::Decreasing),
+            _ => Err(E::custom(format!(
+                "unknown MonotonicConstraint variant: {value}"
+            ))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MonotonicConstraint {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(MonotonicConstraintVisitor)
+    }
+}
 
 // =============================================================================
 // NanDirection Serialization

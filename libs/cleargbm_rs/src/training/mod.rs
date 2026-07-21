@@ -11,8 +11,10 @@
 
 pub(crate) mod config;
 pub(crate) mod early_stopping;
+pub(crate) mod importance;
 pub(crate) mod model;
 pub(crate) mod rng;
+pub(crate) mod serde_impl;
 pub(crate) mod subsampling;
 pub(crate) mod train;
 pub(crate) mod validation;
@@ -21,5 +23,6 @@ pub(crate) mod validation;
 mod tests;
 
 pub use config::{GradientBoostingConfig, GradientBoostingConfigParams};
+pub use importance::feature_importances;
 pub use model::GradientBoostingModel;
 pub use train::train_gradient_boosting;

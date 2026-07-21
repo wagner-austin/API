@@ -355,6 +355,61 @@ fn register_all(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         )
     })
     .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"py_gbm_model_to_json_rs"),
+            Some(c"Serialize a PyGbmModel to a JSON string."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::py_gbm_model_to_json_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"py_gbm_model_from_json_rs"),
+            Some(c"Deserialize a PyGbmModel from a JSON string."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::py_gbm_model_from_json_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"py_gbm_model_feature_importances_rs"),
+            Some(c"Return per-feature split-count importance for a PyGbmModel."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::py_gbm_model_feature_importances_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"py_gbm_model_n_trees_rs"),
+            Some(c"Return the number of trees in a PyGbmModel."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::py_gbm_model_n_trees_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
+    .and_then(|()| {
+        PyCFunction::new_closure(
+            py,
+            Some(c"py_gbm_model_n_classes_rs"),
+            Some(c"Return the number of classes in a PyGbmModel."),
+            |args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>| {
+                training_fns::py_gbm_model_n_classes_from_args(args)
+            },
+        )
+    })
+    .and_then(|f| m.add_function(f))
     // --- Classes ---
     .and_then(|()| m.add_class::<PyTree>())
     .and_then(|()| m.add_class::<PyGbmModel>())

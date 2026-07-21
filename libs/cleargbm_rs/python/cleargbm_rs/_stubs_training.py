@@ -102,9 +102,104 @@ def predict_raw_model_rs(
     raise ImportError(NOT_BUILT_MSG)
 
 
+def py_gbm_model_to_json_rs(model: PyGbmModel) -> str:
+    """Serialize a PyGbmModel to a JSON string.
+
+    Args:
+        model: Trained PyGbmModel.
+
+    Returns:
+        JSON string representation of the model. Round-trips through
+        ``py_gbm_model_from_json_rs`` without loss beyond one ULP on float text
+        representation; per-sample predictions match at 1e-15 tolerance (see
+        Rust test ``test_model_roundtrip_predictions_identical``).
+
+    Raises:
+        ImportError: When native extension is not built.
+        RuntimeError: If serialization fails at native layer.
+    """
+    raise ImportError(NOT_BUILT_MSG)
+
+
+def py_gbm_model_from_json_rs(json_str: str) -> PyGbmModel:
+    """Deserialize a PyGbmModel from a JSON string.
+
+    Args:
+        json_str: JSON string previously produced by ``py_gbm_model_to_json_rs``.
+
+    Returns:
+        A new PyGbmModel wrapping the decoded ensemble.
+
+    Raises:
+        ImportError: When native extension is not built.
+        RuntimeError: On parse failures or on validation errors from the model's
+            config validator (e.g. an invalid ``learning_rate`` value in the
+            payload).
+    """
+    raise ImportError(NOT_BUILT_MSG)
+
+
+def py_gbm_model_feature_importances_rs(model: PyGbmModel) -> list[tuple[str, float]]:
+    """Return per-feature split-count importance, normalized to sum to 1.0.
+
+    A feature that never appears at an internal (split) node has importance 0.0.
+    If the ensemble has zero internal nodes (every tree is a single leaf), every
+    feature has importance 0.0.
+
+    Args:
+        model: Trained PyGbmModel.
+
+    Returns:
+        List of ``(feature_name, importance)`` pairs in feature-index order.
+
+    Raises:
+        ImportError: When native extension is not built.
+    """
+    raise ImportError(NOT_BUILT_MSG)
+
+
+def py_gbm_model_n_trees_rs(model: PyGbmModel) -> int:
+    """Return the number of trees in a PyGbmModel ensemble.
+
+    Args:
+        model: Trained PyGbmModel.
+
+    Returns:
+        Tree count (equal to ``n_estimators`` unless early stopping trimmed the
+        ensemble).
+
+    Raises:
+        ImportError: When native extension is not built.
+    """
+    raise ImportError(NOT_BUILT_MSG)
+
+
+def py_gbm_model_n_classes_rs(model: PyGbmModel) -> int:
+    """Return the number of classes in a PyGbmModel.
+
+    Always ``2`` for binary classification; the current library only trains
+    binary classifiers.
+
+    Args:
+        model: Trained PyGbmModel.
+
+    Returns:
+        Class count (2).
+
+    Raises:
+        ImportError: When native extension is not built.
+    """
+    raise ImportError(NOT_BUILT_MSG)
+
+
 __all__ = [
     "PyGbmModel",
     "predict_proba_model_rs",
     "predict_raw_model_rs",
+    "py_gbm_model_feature_importances_rs",
+    "py_gbm_model_from_json_rs",
+    "py_gbm_model_n_classes_rs",
+    "py_gbm_model_n_trees_rs",
+    "py_gbm_model_to_json_rs",
     "train_gradient_boosting_rs",
 ]

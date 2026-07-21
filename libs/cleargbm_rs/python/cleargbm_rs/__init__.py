@@ -42,6 +42,11 @@ from cleargbm_rs._stubs_training import (
     PyGbmModel,
     predict_proba_model_rs,
     predict_raw_model_rs,
+    py_gbm_model_feature_importances_rs,
+    py_gbm_model_from_json_rs,
+    py_gbm_model_n_classes_rs,
+    py_gbm_model_n_trees_rs,
+    py_gbm_model_to_json_rs,
     train_gradient_boosting_rs,
 )
 from cleargbm_rs._stubs_tree import (
@@ -76,6 +81,11 @@ __all__ = [
     "predict_raw_model_rs",
     "predict_single_rs",
     "predict_tree_rs",
+    "py_gbm_model_feature_importances_rs",
+    "py_gbm_model_from_json_rs",
+    "py_gbm_model_n_classes_rs",
+    "py_gbm_model_n_trees_rs",
+    "py_gbm_model_to_json_rs",
     "py_tree_from_json_rs",
     "py_tree_max_depth_rs",
     "py_tree_n_leaves_rs",
