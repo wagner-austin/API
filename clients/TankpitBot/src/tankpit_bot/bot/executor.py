@@ -13,6 +13,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
+from tankpit_bot.ledger.fuel_book import record_fuel_entry
 from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
 from tankpit_bot.ledger.outcome.collect import (
     emit_collect_discarded_kind_mismatch,
@@ -25,6 +26,7 @@ from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_discarded_resource_target_stale,
     record_teleport_dispatch,
 )
+from tankpit_bot.physics.costs import RADAR_COST, teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict, coord_key
@@ -157,7 +159,15 @@ def dispatch_command(
         ws.pending_shot_inventory_snapshot = ws.inventory_state
         return bot.shoot_at(command["target_x"], command["target_y"], command["target_id"])
     if command["cmd_type"] == "radar":
-        return bot.use_radar()
+        dispatched_radar = bot.use_radar()
+        if dispatched_radar:
+            record_fuel_entry(
+                book=get_world_service().fuel_book,
+                kind="radar",
+                lo=-RADAR_COST,
+                hi=-RADAR_COST,
+            )
+        return dispatched_radar
     if command["cmd_type"] == "map_open":
         # CMD_MAP_OPEN is idempotent on the server: every dispatch
         # produces a fresh MAP_DATA payload regardless of whether the
@@ -201,6 +211,7 @@ def dispatch_command(
     message_index = bot.captured_message_count()
     dispatched = bot.teleport_to(command["target_x"], command["target_y"])
     if dispatched:
+        _record_teleport_fuel_entry(command["target_x"], command["target_y"])
         record_teleport_dispatch(
             target_x=command["target_x"],
             target_y=command["target_y"],
@@ -392,6 +403,35 @@ def _tracked_resource_target(
     if resource_kind == "equipment" and container["is_fuel"]:
         return None
     return container
+
+
+_TELEPORT_DRIFT_FUEL = 36
+"""Displacement drift bound for the live fuel book: the server may
+displace a landing several tiles off the requested target (mines,
+terrain), changing the charge accordingly. Soak 3 (2026-07-21)
+measured drift-priced misses up to ~16 fuel beyond the old 3-tile
+bound, so the book prices a dispatched teleport as target cost +/-
+6 tiles * 6 fuel."""
+
+
+def _record_teleport_fuel_entry(target_x: int, target_y: int) -> None:
+    """Record a dispatched teleport's fuel effect into the live book.
+
+    Args:
+        target_x: Requested landing X.
+        target_y: Requested landing Y.
+    """
+    ws = get_world_service()
+    self_state = ws.world_state["self_state"]
+    if self_state is None:
+        return
+    cost = teleport_cost(self_state["x"], self_state["y"], target_x, target_y)
+    record_fuel_entry(
+        book=ws.fuel_book,
+        kind="teleport",
+        lo=-(cost + _TELEPORT_DRIFT_FUEL),
+        hi=-max(cost - _TELEPORT_DRIFT_FUEL, 0),
+    )
 
 
 def _is_valid_teleport(world: WorldStateDict, decision: TickDecisionDict) -> bool:

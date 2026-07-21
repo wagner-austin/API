@@ -385,6 +385,7 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "equipment_gained": encode_inventory_counts(scorecard["equipment_gained"]),
         "scans_extra": scorecard["scans_extra"],
         "scans_builtin": scorecard["scans_builtin"],
+        "physics_divergences": scorecard["physics_divergences"],
         "equipment_approaches": [
             encode_targeted_teleport_record(r) for r in scorecard["equipment_approaches"]
         ],
@@ -449,6 +450,7 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
         equipment_gained=decode_inventory_counts(_require_object(data, "equipment_gained")),
         scans_extra=require_int(data, "scans_extra"),
         scans_builtin=require_int(data, "scans_builtin"),
+        physics_divergences=require_int(data, "physics_divergences"),
         equipment_approaches=[
             decode_targeted_teleport_record(item)
             for item in _require_object_list(data, "equipment_approaches")

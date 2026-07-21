@@ -103,6 +103,7 @@ class ScorecardAccumulatorDict(TypedDict):
     equipment_gained: InventoryCountsDict
     scans_extra: int
     scans_builtin: int
+    physics_divergences: int
     equipment_approaches: list[TargetedTeleportRecordDict]
     action_outcome_counts: dict[str, int]
     first_timestamp: str
@@ -143,6 +144,7 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         equipment_gain_events=0,
         equipment_gained=make_zero_inventory_counts(),
         scans_extra=0,
+        physics_divergences=0,
         scans_builtin=0,
         equipment_approaches=[],
         action_outcome_counts={},
@@ -272,6 +274,8 @@ def _route_scorecard_diagnostic(
             accumulator["equipment_gained"],
             _classify_inventory_counts(record),
         )
+    elif kind == "physics_divergence":
+        accumulator["physics_divergences"] += 1
     elif kind == "radar_dispatch":
         if require_bool_field(record["fields"], "uses_extra"):
             accumulator["scans_extra"] += 1
@@ -442,6 +446,7 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         equipment_gained=accumulator["equipment_gained"],
         scans_extra=accumulator["scans_extra"],
         scans_builtin=accumulator["scans_builtin"],
+        physics_divergences=accumulator["physics_divergences"],
         equipment_approaches=approaches,
         equipment_approach_distinct_targets=len(approach_counts),
         equipment_approach_max_repeats=(max(approach_counts.values()) if approach_counts else 0),
@@ -491,6 +496,7 @@ def render_scorecard_section(scorecard: SessionScorecardDict) -> list[str]:
         f"armor={gained['armor']} dual={gained['dual']} missile={gained['missile']} "
         f"homing={gained['homing']} radar={gained['radar']}",
         f"  scans: extra={scorecard['scans_extra']} builtin={scorecard['scans_builtin']}",
+        f"  physics divergences: {scorecard['physics_divergences']}",
         f"  equipment approaches: events={len(scorecard['equipment_approaches'])} "
         f"distinct={scorecard['equipment_approach_distinct_targets']} "
         f"max_repeats={scorecard['equipment_approach_max_repeats']}",
@@ -514,6 +520,13 @@ def collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
         Human-readable issue lines (possibly empty).
     """
     issues: list[str] = []
+    if scorecard["physics_divergences"] > 0:
+        issues.append(
+            f"physics divergences: {scorecard['physics_divergences']} fuel window(s) "
+            "outside the physics-predicted feasibility interval -- each is a candidate "
+            "wiki claim (new mechanic or drifted constant); query "
+            "diagnostic_kind=physics_divergence in the events log"
+        )
     if scorecard["equipment_approach_max_repeats"] >= _EQUIPMENT_ORBIT_REPEAT_THRESHOLD:
         issues.append(
             "equipment-approach orbit: one container teleport-approached "

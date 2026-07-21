@@ -11,6 +11,14 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
+from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
+from tankpit_bot.physics.costs import (
+    DUAL_SHOT_COST,
+    HOMING_SHOT_COST,
+    MISSILE_SHOT_COST,
+    SINGLE_SHOT_COST,
+)
+from tankpit_bot.physics.damage import DUAL_HIT_VICTIM_COST, MINE_DETONATION_COST
 from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
@@ -98,6 +106,44 @@ def _update_tank_from_position_status(
         direction=direction,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
+
+
+_SHOT_ENTRY_KINDS: dict[int, FuelEntryKind] = {
+    0: "shot_single",
+    1: "shot_dual",
+    2: "shot_missile",
+    3: "shot_homing",
+}
+_SHOT_ENTRY_COSTS: dict[int, int] = {
+    0: SINGLE_SHOT_COST,
+    1: DUAL_SHOT_COST,
+    2: MISSILE_SHOT_COST,
+    3: HOMING_SHOT_COST,
+}
+
+
+def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> None:
+    """Record a 0x53 echo's fuel effect into the live fuel book.
+
+    Own shots debit their physics cost exactly (homing may split its
+    debit across the sync boundary, so its ceiling is -5 and the book
+    seeds a carry); enemy shots are optional debits bounded by the
+    worst known victim cost — the shot may have targeted someone else.
+
+    Args:
+        ws: World service instance.
+        shooter_id: Who fired the shot.
+        weapon: Weapon byte (0=single, 1=dual, 2=missile, 3=homing).
+    """
+    if weapon not in _SHOT_ENTRY_KINDS:
+        return
+    self_state = ws.world_state["self_state"]
+    if self_state is not None and shooter_id == self_state["tank_id"]:
+        cost = _SHOT_ENTRY_COSTS[weapon]
+        hi = -(cost // 2) if weapon == 3 else -cost
+        record_fuel_entry(book=ws.fuel_book, kind=_SHOT_ENTRY_KINDS[weapon], lo=-cost, hi=hi)
+    else:
+        record_fuel_entry(book=ws.fuel_book, kind="enemy_hit", lo=-DUAL_HIT_VICTIM_COST, hi=0)
 
 
 def _dispatch_shoot_event(
@@ -706,6 +752,7 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             "weapon": int(weapon),
         }:
             _dispatch_shoot_event(ws, shooter_id, sx, sy, tx, ty, aim_x, aim_y, weapon)
+            _record_shot_fuel_entry(ws, shooter_id, weapon)
             return True
         case {
             "msg_type": 0x48,
@@ -900,6 +947,7 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
         }:
             return _dispatch_mine_placement(ws, mine_type, tank_id, positions)
         case {"msg_type": 0x45, "positions": list(positions)}:
+            record_fuel_entry(book=ws.fuel_book, kind="detonation", lo=-MINE_DETONATION_COST, hi=0)
             return _dispatch_mine_detonation(ws, positions)
         case {"msg_type": "container_pickup", "pickups": tuple(pickups)}:
             _apply_container_pickups(ws, pickups)

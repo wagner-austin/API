@@ -362,6 +362,7 @@ class TestBuildScorecard:
             equipment_gained=make_zero_inventory_counts(),
             scans_extra=0,
             scans_builtin=0,
+            physics_divergences=0,
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
@@ -525,6 +526,7 @@ class TestRenderAndIssues:
             equipment_gained=InventoryCountsDict(armor=0, dual=15, missile=0, homing=5, radar=3),
             scans_extra=3,
             scans_builtin=2,
+            physics_divergences=0,
             equipment_approaches=[],
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=equipment_approach_max_repeats,
@@ -592,3 +594,28 @@ class TestRenderAndIssues:
         issues = collect_scorecard_issues(self._scorecard(radar_last=0, inventory_sample_count=0))
 
         assert issues == []
+
+
+def test_physics_divergence_routing_and_issue() -> None:
+    """physics_divergence events count into the scorecard and raise an issue."""
+    accumulator = new_scorecard_accumulator()
+    route_scorecard_record(
+        _record(
+            channel="DIAGNOSTIC",
+            fields={
+                "diagnostic_kind": "physics_divergence",
+                "residual": -45,
+                "feasible_lo": -10,
+                "feasible_hi": -10,
+                "entry_kinds": "shot_dual",
+                "fact_source": "wire_0x2E_tank_status_sync",
+            },
+        ),
+        accumulator,
+    )
+    assert accumulator["physics_divergences"] == 1
+    scorecard = build_session_scorecard(accumulator)
+    assert scorecard["physics_divergences"] == 1
+    assert "  physics divergences: 1" in render_scorecard_section(scorecard)
+    issues = collect_scorecard_issues(scorecard)
+    assert any("physics divergences: 1" in issue for issue in issues)

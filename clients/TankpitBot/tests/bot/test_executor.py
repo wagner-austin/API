@@ -1176,3 +1176,23 @@ class TestTickDecisionCodecs:
         encoded = encode_tick_decision(decision)
         decoded = decode_tick_decision(encoded)
         assert decoded["secondary_command"] is None
+
+
+class TestFuelBookEntries:
+    """Dispatch-side fuel-book entries (Phase 3 live divergence)."""
+
+    def test_failed_radar_dispatch_records_no_entry(self) -> None:
+        """A radar the page refused must not enter the fuel book."""
+        reset_world_state()
+        bot = _WorldOnlyBot(make_empty_world_state())
+        result = dispatch_command(bot, make_radar_command(), _make_snapshot())
+        assert result is False
+        assert get_world_service().fuel_book["entries"] == []
+
+    def test_teleport_entry_needs_a_self_position(self) -> None:
+        """Without a self fix the teleport cost cannot be priced."""
+        from tankpit_bot.bot.executor import _record_teleport_fuel_entry
+
+        reset_world_state()
+        _record_teleport_fuel_entry(10, 20)
+        assert get_world_service().fuel_book["entries"] == []

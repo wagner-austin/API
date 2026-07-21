@@ -5,6 +5,7 @@ from __future__ import annotations
 from platform_core.logging import get_logger
 
 from tankpit_bot import protocol
+from tankpit_bot.ledger.fuel_book import record_fuel_entry
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_tanks import (
     _update_tank_position,
@@ -74,6 +75,7 @@ def _dispatch_protocol_movement_update(
     start_x: int,
     start_y: int,
     waypoints: list[tuple[int, int]],
+    path_tiles: int,
 ) -> bool:
     """Dispatch one decoded protocol ``0x47`` movement message.
 
@@ -83,6 +85,7 @@ def _dispatch_protocol_movement_update(
         start_x: Absolute movement start x.
         start_y: Absolute movement start y.
         waypoints: Absolute waypoint tuples from the protocol decoder.
+        path_tiles: True wire step count of the commanded path.
 
     Returns:
         True after handling the movement.
@@ -92,6 +95,8 @@ def _dispatch_protocol_movement_update(
     if is_self:
         final_x, final_y = _resolve_waypoint_destination(start_x, start_y, waypoints)
         ws.update_world_state_from_position(final_x, final_y, "wire_0x47_movement")
+        if path_tiles > 0:
+            record_fuel_entry(book=ws.fuel_book, kind="walk", lo=-path_tiles, hi=0)
         render_ascii_if_available(ws, "SelfMovement")
     else:
         _handle_waypoint_movement(ws, start_x, start_y, waypoints)
@@ -156,8 +161,9 @@ def _dispatch_position_update(ws: WorldService, decoded: protocol.BinaryMessage)
             "start_x": int(sx),
             "start_y": int(sy),
             "waypoints": list(wps),
+            "path_tiles": int(path_tiles),
         }:
-            return _dispatch_protocol_movement_update(ws, tid, sx, sy, wps)
+            return _dispatch_protocol_movement_update(ws, tid, sx, sy, wps, path_tiles)
         case {
             "msg_type": 0x3D,
             "tank_id": int(tid),

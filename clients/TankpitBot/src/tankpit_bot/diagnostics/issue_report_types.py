@@ -232,6 +232,9 @@ class SessionScorecardDict(TypedDict):
             ``equipment_gain`` event.
         scans_extra: Radar dispatches that consumed an extra radar.
         scans_builtin: Radar dispatches that used the free 5x5 scan.
+        physics_divergences: Count of ``physics_divergence``
+            DIAGNOSTIC events -- fuel windows outside the physics
+            book's feasibility interval.
         equipment_approaches: Every ``equipment_approach`` event in
             order.
         equipment_approach_distinct_targets: Number of distinct
@@ -260,6 +263,7 @@ class SessionScorecardDict(TypedDict):
     equipment_gained: InventoryCountsDict
     scans_extra: int
     scans_builtin: int
+    physics_divergences: int
     equipment_approaches: list[TargetedTeleportRecordDict]
     equipment_approach_distinct_targets: int
     equipment_approach_max_repeats: int

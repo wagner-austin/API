@@ -10,7 +10,9 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.facts.source import FactSource
-from tankpit_bot.runtime_logging import emit_world
+from tankpit_bot.ledger.fuel_book import record_fuel_entry, record_fuel_reading
+from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import (
     pickup_container,
@@ -40,6 +42,23 @@ def update_world_state_from_fuel_total(
     ws.world_state = set_self_fuel(ws.world_state, fuel_total, ts, fact_source)
     delta = fuel_total - old_fuel
     emit_world("Fuel: %d -> %d (%+d)", old_fuel, fuel_total, delta)
+    if fact_source != "wire_0x2E_tank_status_sync" and ws.fuel_book["last_fuel"] is not None:
+        # 0x44 gains and 0x64 deposit totals ANNOUNCE their own delta:
+        # the wire message is the explanation, so the book credits it
+        # exactly before folding the reading in (2026-07-21 soak 2:
+        # every positive-residual divergence was an unentered gain).
+        announced = fuel_total - ws.fuel_book["last_fuel"]
+        record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=announced, hi=announced)
+    verdict = record_fuel_reading(book=ws.fuel_book, fuel_total=fuel_total)
+    if verdict is not None and not verdict["balanced"]:
+        emit_diagnostic(
+            diagnostic_kind="physics_divergence",
+            residual=verdict["residual"],
+            feasible_lo=verdict["lo"],
+            feasible_hi=verdict["hi"],
+            entry_kinds=verdict["entry_kinds"],
+            fact_source=fact_source,
+        )
 
 
 def update_world_state_from_container_pickup(
@@ -66,6 +85,8 @@ def update_world_state_from_container_pickup(
     """
     ts = get_current_time_ms()
     ws.world_state = pickup_container(ws.world_state, x, y, ts, remaining_volume)
+    rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] is not None else 8
+    record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=0, hi=fuel_capacity(rank))
     if remaining_volume <= 0:
         emit_world("Picked up container at (%d, %d)", x, y)
     else:

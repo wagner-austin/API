@@ -242,6 +242,84 @@ flagged. (This is what would have auto-decomposed the −45/−10
 combat-tick mystery months earlier.) Touches the tick loop and
 ledger; do it last, after Phases 1–2 make predictions cheap.
 
+### Phase 3 design (locked 2026-07-21, pre-implementation)
+
+**Instrument: an interval double-entry fuel book**
+(`ledger/fuel_book.py`, pure functions over a typed book dict).
+Between two absolute wire fuel readings the book accumulates ENTRIES
+— each a predicted delta with a feasibility range, because live
+windows contain events whose exact fuel effect is legitimately
+unknowable at prediction time:
+
+- exact debits: own shots by weapon (homing carries a −5/−10 split
+  tolerance), radar 10, mine press 10, teleport floor(6*euclid) on
+  the ACTUAL landing;
+- ranged debits: own 0x47 walk echo = [0, path_tiles] (paths truncate
+  on collision — Phase 2 finding); optional enemy hits = {0, −45} or
+  {0, −90} per lone echo; own-mine detonation −45 optional;
+- open credits: container pickups = [0, capacity − fuel].
+
+**Reconciliation** happens at the single wire choke point
+`update_world_state_from_fuel_total` (all of 0x2E sync / 0x44 gain /
+0x64 deposit-total flow through it): measured residual must fall in
+the entries' feasible interval; outside = a `physics_divergence`
+diagnostic event carrying the residual and the window's entry list.
+Strict windows (exact entries only) demand equality — the live
+equivalent of the audit's clean windows.
+
+**Entry sources**: wire-echo entries recorded in the
+world_state_dispatch handlers (0x53 own/enemy, self 0x47, 0x43
+pickup, 0x45 detonation); dispatch-side entries (radar, mine press,
+teleport-landed with pre-position) recorded from the executor/ledger
+outcome path. Ammo book v1: 0x49 snapshots must never exceed the
+previous snapshot plus pickups nor undercut it by more than shots
+fired — the consumption-equals-hit cross-check, live.
+
+**Surfacing**: scorecard line `physics divergences: N` (counted from
+events.jsonl by session_scorecard); `make analyze` lists each
+divergence with its window as a candidate wiki claim. Verification:
+gate + a soak whose only behavioral change is the new scorecard line;
+divergences on a healthy run should be ~0.
+
+### Phase 3 as-built (2026-07-21, core loop)
+
+Implemented as designed with these notes:
+
+- **`ledger/fuel_book.py`** — the interval double-entry book, pure
+  functions over a typed dict, contract-enforced mutations
+  (`FuelEntryContract`, `FuelReadingContract`), owned per-session by
+  `WorldService.fuel_book`.
+- **Entry sources wired**: own 0x53 echoes debit their physics cost
+  exactly (homing ceiling −5 + a `homing_carry` [−5, 0] seeded into
+  the next window); enemy 0x53 echoes are optional debits [−90, 0];
+  self 0x47 walks are ranged [−path_tiles, 0]; 0x43 pickups are open
+  credits [0, fuel_capacity(rank)]; 0x45 detonations optional [−45,
+  0]; executor-side radar dispatch [−10, −10] and teleport dispatch
+  [−(cost+18), −max(cost−18, 0)] (displacement drift bound).
+- **Reconciliation** at `update_world_state_from_fuel_total` — the
+  single choke point all three wire fuel channels flow through; an
+  out-of-interval residual emits a `physics_divergence` DIAGNOSTIC
+  with residual, feasible interval, entry kinds, and fact source.
+- **Surfaced**: scorecard line `physics divergences: N` +
+  `collect_scorecard_issues` entry pointing analysts at the events
+  query; issue_report codecs round-trip the new field.
+- **Live calibration (four soaks, 2026-07-21)**: 71 → 12 → 18 → 1
+  divergences. Each round's residual signatures named the next fix:
+  (1) per-sync windows mis-attribute because charges lag their cause
+  echoes → the book judges at QUIET boundaries (zero-delta reading,
+  no new entries; forced at 50 readings) — the live twin of the
+  audit's episode method; (2) 0x44/0x64 fuel totals announce their
+  own delta → credited exactly at the choke point; (3) the pickup
+  credit only fired on emptied containers → moved above the
+  partial-pickup branch; (4) teleport drift bound widened to ±6
+  tiles. Final soak: heavy combat (67 hits), ONE divergence — a
+  double radar debit in a single-entry block (charge-latency
+  straggler), a legible candidate residual, not noise.
+- **Deferred within Phase 3**: the ammo book (0x49 cross-check) and
+  divergence-to-candidate-claim extraction in `make analyze` beyond
+  the issue line — next increments on this foundation.
+
+
 ## Parallel track (independent of phases): executor staleness audit
 
 [[executor-rejection-loops]] instances #2 and #3 remain: the

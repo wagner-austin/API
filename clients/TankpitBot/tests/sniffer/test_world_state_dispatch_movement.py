@@ -388,3 +388,37 @@ class TestDispatchMoveResponseUpdatesSelf:
         assert self_state["y"] == 100
         # But tank 99 should be registered
         assert "99" in get_world_service().world_state["tanks"]
+
+    def test_stationary_self_echo_records_no_walk_entry(self) -> None:
+        """A 0x47 for self with no path leaves the fuel book untouched."""
+        from tankpit_bot.protocol import MovementDict, MovementResponseDict
+
+        first = MovementResponseDict(
+            msg_type=0x3D,
+            team=1,
+            tank_id=11,
+            x=100,
+            y=100,
+            direction=0,
+            damage_state=0,
+            rank=2,
+            lb_score=5,
+            carrying=0,
+        )
+        dispatch_world_state_update(get_world_service(), first)
+        msg = MovementDict(
+            msg_type=0x47,
+            tank_id=11,
+            start_x=100,
+            start_y=100,
+            direction=0,
+            flag=0,
+            lb_score=5,
+            rank=0,
+            damage_state=0,
+            is_carrying=False,
+            waypoints=[],
+            path_tiles=0,
+        )
+        dispatch_world_state_update(get_world_service(), msg)
+        assert get_world_service().fuel_book["entries"] == []
