@@ -425,6 +425,108 @@ class TestComputeSplitGain:
         assert gain == 0.0
 
 
+class TestComputeSplitGainRegLambda:
+    """Regression tests: L2 regularization must be applied to the histogram-path gain.
+
+    Prior to the 2026-07-20 fix, _compute_split_gain silently discarded reg_lambda
+    on the histogram runtime path (parallel.py + histogram.py) while the exact
+    path in split.py applied it. This meant users setting reg_lambda > 0 got
+    regularized leaf values but unregularized split gains -- an asymmetric behavior
+    that diverges from LightGBM/XGBoost semantics.
+    """
+
+    def test_reg_lambda_zero_matches_omitted(self) -> None:
+        """Explicit reg_lambda=0.0 is exactly the pre-regularization formula."""
+        gain_omitted = _compute_split_gain(
+            g_left=-2.0,
+            h_left=0.5,
+            g_right=2.0,
+            h_right=0.5,
+            g_total=0.0,
+            h_total=1.0,
+        )
+        gain_explicit_zero = _compute_split_gain(
+            g_left=-2.0,
+            h_left=0.5,
+            g_right=2.0,
+            h_right=0.5,
+            g_total=0.0,
+            h_total=1.0,
+            reg_lambda=0.0,
+        )
+        assert gain_omitted == gain_explicit_zero
+
+    def test_reg_lambda_changes_gain_value(self) -> None:
+        """reg_lambda > 0 must reduce the pre-reg gain (larger denominators)."""
+        gain_zero = _compute_split_gain(
+            g_left=-2.0,
+            h_left=0.5,
+            g_right=2.0,
+            h_right=0.5,
+            g_total=0.0,
+            h_total=1.0,
+            reg_lambda=0.0,
+        )
+        gain_lambda = _compute_split_gain(
+            g_left=-2.0,
+            h_left=0.5,
+            g_right=2.0,
+            h_right=0.5,
+            g_total=0.0,
+            h_total=1.0,
+            reg_lambda=1.0,
+        )
+        # G_L^2/(H_L+1) + G_R^2/(H_R+1) - G^2/(H+1) = 4/1.5 + 4/1.5 - 0/2 = 16/3
+        # vs unreg: 4/0.5 + 4/0.5 - 0 = 16
+        assert _approx_equal(gain_zero, 16.0)
+        assert _approx_equal(gain_lambda, 16.0 / 3.0)
+        assert gain_lambda < gain_zero
+
+    def test_reg_lambda_matches_analytic_formula(self) -> None:
+        """Formula: G_L^2/(H_L+lambda) + G_R^2/(H_R+lambda) - G^2/(H+lambda)."""
+        g_l, h_l, g_r, h_r, g_t, h_t, lam = -1.5, 0.4, 2.5, 0.6, 1.0, 1.0, 0.75
+        expected = (g_l * g_l) / (h_l + lam) + (g_r * g_r) / (h_r + lam) - (g_t * g_t) / (h_t + lam)
+        actual = _compute_split_gain(
+            g_left=g_l,
+            h_left=h_l,
+            g_right=g_r,
+            h_right=h_r,
+            g_total=g_t,
+            h_total=h_t,
+            reg_lambda=lam,
+        )
+        assert _approx_equal(actual, expected, tol=1e-12)
+
+    def test_large_reg_lambda_drives_gain_to_zero(self) -> None:
+        """Very large reg_lambda dominates the hessian sums; gain -> 0."""
+        gain = _compute_split_gain(
+            g_left=-2.0,
+            h_left=0.5,
+            g_right=2.0,
+            h_right=0.5,
+            g_total=0.0,
+            h_total=1.0,
+            reg_lambda=1e9,
+        )
+        # 4/1e9 + 4/1e9 - 0/1e9 ~= 8e-9
+        assert 0.0 < gain < 1e-6
+
+    def test_reg_lambda_zeros_out_gain_via_eps_guard(self) -> None:
+        """h_left_reg near zero (via negative lambda offsetting) trips eps guard."""
+        # Contrived: reg_lambda large enough to bring h_left_reg above eps trivially.
+        # This exercises the eps guard on the regularized path (h_left_reg check).
+        gain = _compute_split_gain(
+            g_left=1.0,
+            h_left=-1.0,  # negative hessian
+            g_right=1.0,
+            h_right=0.5,
+            g_total=2.0,
+            h_total=0.5,
+            reg_lambda=1.0,  # h_left_reg = 0.0 -> eps guard fires
+        )
+        assert gain == 0.0
+
+
 class TestFindBestSplitFromHistogram:
     """Tests for find_best_split_from_histogram function."""
 
@@ -593,6 +695,49 @@ class TestFindBestSplitFromHistogram:
             raise AssertionError("Expected split satisfying decreasing constraint")
         assert split.gain > 0
         assert split.feature_index == 0
+
+    def test_reg_lambda_changes_reported_gain(self) -> None:
+        """Regression guard for the 2026-07-20 fix.
+
+        Prior to the fix, reg_lambda was silently discarded by
+        find_best_split_from_histogram. Confirms it's now threaded through to
+        _compute_split_gain and produces the expected regularized gain value.
+        """
+        histogram = HistogramBuffer.from_tuples(
+            gradient_sums=(-2.0, 2.0),
+            hessian_sums=(0.5, 0.5),
+            counts=(5, 5),
+        )
+        bin_edges = BinEdges(edges=(0.5,))
+
+        split_unreg = find_best_split_from_histogram(
+            histogram=histogram,
+            bin_edges=bin_edges,
+            feature_index=0,
+            min_samples_leaf=1,
+            monotonic_constraint=0,
+            reg_lambda=0.0,
+        )
+        split_reg = find_best_split_from_histogram(
+            histogram=histogram,
+            bin_edges=bin_edges,
+            feature_index=0,
+            min_samples_leaf=1,
+            monotonic_constraint=0,
+            reg_lambda=1.0,
+        )
+
+        if split_unreg is None or split_reg is None:
+            raise AssertionError("Expected both splits to be found on separable data")
+        # Same feature, same bin (regularization doesn't change the ranking here) but
+        # different gain values.
+        assert split_unreg.feature_index == split_reg.feature_index == 0
+        assert split_unreg.bin_index == split_reg.bin_index == 0
+        assert split_reg.gain < split_unreg.gain
+        # unreg: 4/0.5 + 4/0.5 - 0/1.0 = 16.0
+        # reg=1: 4/1.5 + 4/1.5 - 0/2.0 = 16/3 ~= 5.333
+        assert _approx_equal(split_unreg.gain, 16.0)
+        assert _approx_equal(split_reg.gain, 16.0 / 3.0)
 
 
 class TestPartitionByBin:

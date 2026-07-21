@@ -233,10 +233,12 @@ def _compute_split_gain(
     h_right: float,
     g_total: float,
     h_total: float,
+    reg_lambda: float = 0.0,
 ) -> float:
-    """Compute gain from a split.
+    """Compute gain from a split with L2 regularization.
 
-    Gain = (G_L^2/H_L + G_R^2/H_R) - (G^2/H)
+    Without regularization: Gain = G_L^2/H_L + G_R^2/H_R - G^2/H.
+    With L2:                Gain = G_L^2/(H_L+lambda) + G_R^2/(H_R+lambda) - G^2/(H+lambda).
 
     Args:
         g_left: Sum of gradients in left child.
@@ -245,18 +247,24 @@ def _compute_split_gain(
         h_right: Sum of hessians in right child.
         g_total: Total sum of gradients.
         h_total: Total sum of hessians.
+        reg_lambda: L2 regularization term added to each hessian sum (default: 0.0,
+            preserving the pre-regularization gain formula).
 
     Returns:
         Split gain (higher is better).
     """
     eps = 1e-10
 
-    if abs(h_left) < eps or abs(h_right) < eps or abs(h_total) < eps:
+    h_left_reg = h_left + reg_lambda
+    h_right_reg = h_right + reg_lambda
+    h_total_reg = h_total + reg_lambda
+
+    if abs(h_left_reg) < eps or abs(h_right_reg) < eps or abs(h_total_reg) < eps:
         return 0.0
 
-    score_left = (g_left * g_left) / h_left
-    score_right = (g_right * g_right) / h_right
-    score_total = (g_total * g_total) / h_total
+    score_left = (g_left * g_left) / h_left_reg
+    score_right = (g_right * g_right) / h_right_reg
+    score_total = (g_total * g_total) / h_total_reg
 
     return score_left + score_right - score_total
 
@@ -326,6 +334,7 @@ def find_best_split_from_histogram(
     feature_index: int,
     min_samples_leaf: int,
     monotonic_constraint: int,
+    reg_lambda: float = 0.0,
 ) -> HistogramSplit | None:
     """Find best split by scanning histogram bins.
 
@@ -338,6 +347,9 @@ def find_best_split_from_histogram(
         feature_index: Feature index.
         min_samples_leaf: Minimum samples in each leaf.
         monotonic_constraint: -1, 0, or +1.
+        reg_lambda: L2 regularization term forwarded to the gain formula. Matches
+            the treatment applied to leaf values in ``split.py::_compute_leaf_value``
+            and the exact-path gain in ``split.py::_compute_split_gain`` (default: 0.0).
 
     Returns:
         Best split or None if no valid split.
@@ -406,7 +418,9 @@ def find_best_split_from_histogram(
             ):
                 continue
 
-            gain = _compute_split_gain(g_left, h_left, g_right, h_right, g_total, h_total)
+            gain = _compute_split_gain(
+                g_left, h_left, g_right, h_right, g_total, h_total, reg_lambda
+            )
 
             if gain > best_gain:
                 best_gain = gain

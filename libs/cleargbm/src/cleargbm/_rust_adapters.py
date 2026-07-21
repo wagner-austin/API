@@ -454,11 +454,15 @@ def _rust_build_histogram(
     Returns:
         HistogramBuffer with gradient/hessian sums per bin.
     """
+    # Column slices from 2D sample_bins are strided (non-contiguous) views;
+    # the Rust binding requires C-contiguous input. np.ascontiguousarray is a
+    # no-op if the array is already contiguous; otherwise it copies once.
+    sample_bins_c: NDArray[np.int64] = np.ascontiguousarray(sample_bins)
     grad_sums, hess_sums, counts_u64 = _rs_build_histogram(
         sample_indices,
         gradients,
         hessians,
-        sample_bins,
+        sample_bins_c,
         n_bins,
     )
     counts_i64: NDArray[np.int64] = counts_u64.astype(np.int64)

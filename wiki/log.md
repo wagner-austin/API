@@ -36,3 +36,9 @@ Verified (no changes needed):
 Root causes recorded for the misses: (a) the wiki cites the root `README.md` as its primary for service enumeration, which itself omits doc-extract-api — future audits should cross-check `ls services/` against the README, not trust the README alone; (b) the qr-api "doesn't need workers" example was a guess based on the service name, not a grep of its imports.
 
 `fact_checked` on all three content pages bumped to 2026-07-20.
+
+## [2026-07-20] add | ClearGBM histogram split path page
+Pages written: cleargbm-histogram-split-path
+Hubs updated: libs (+1, 1 -> 2 pages)
+Index updated: page count 3 -> 4; libs hub count 1 -> 2
+Notes: written alongside the ClearGBM validation + reg_lambda fix session (libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md). Page captures the durable knowledge — the two split paths (histogram at runtime, exact retained for tests), the O(K) claim with empirical verification (10k -> 1M samples: 0.92x ratio at K=64), sibling subtraction verified to 1e-15 per bin, the reg_lambda semantic fix that landed in this session's histogram.py + parallel.py, and the Rust vs Python fallback hook indirection. Every claim cites a code path with line-range or function locator. `confidence: high` on the pure math + verified empirical claims; the reg_alpha "not applied to split gain in either path" note is a design-boundary claim, not a bug claim.

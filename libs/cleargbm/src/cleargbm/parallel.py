@@ -37,6 +37,30 @@ from cleargbm.types import FeatureBins, GradientBoostingConfig, SplitCandidate
 _WORKER_FEATURE_BINS: FeatureBins | None = None
 
 
+def _set_worker_feature_bins_for_test(bins: FeatureBins) -> None:
+    """Set the worker-global FeatureBins from a test.
+
+    Complements ``_worker_initializer`` — the real code path sets this global
+    inside a fresh worker process. Tests that exercise the worker functions in
+    the parent process (via a fake pool) need to seed the global first, then
+    reset it in a ``finally`` block. This function is the DI-friendly seam so
+    tests do not need to mutate the module attribute directly.
+    """
+    global _WORKER_FEATURE_BINS
+    _WORKER_FEATURE_BINS = bins
+
+
+def _reset_worker_feature_bins_for_test() -> None:
+    """Clear the worker-global FeatureBins after a test.
+
+    Pairs with ``_set_worker_feature_bins_for_test`` — call in a ``finally``
+    block so a failing assertion never leaks worker-global state into the next
+    test.
+    """
+    global _WORKER_FEATURE_BINS
+    _WORKER_FEATURE_BINS = None
+
+
 def _worker_initializer(
     bin_edges: tuple[tuple[float, ...], ...],
     sample_bins_flat: bytes,
@@ -281,6 +305,7 @@ def _find_best_histogram_split_sequential(
             feat_idx,
             config["min_samples_leaf"],
             constraint,
+            config["reg_lambda"],
         )
 
         # Deterministic tie-breaking: prefer higher gain, then lower feature_index
@@ -517,6 +542,7 @@ def _select_best_split(
             feat_idx,
             config["min_samples_leaf"],
             constraint,
+            config["reg_lambda"],
         )
 
         if split_result is None or split_result.gain <= 0:

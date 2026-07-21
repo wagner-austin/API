@@ -22,7 +22,9 @@ from cleargbm.parallel import (
     _find_best_histogram_split_parallel,
     _find_best_histogram_split_sequential,
     _find_best_histogram_split_with_cache,
+    _reset_worker_feature_bins_for_test,
     _resolve_n_jobs,
+    _set_worker_feature_bins_for_test,
     _worker_initializer,
 )
 from cleargbm.tree import build_tree
@@ -116,15 +118,17 @@ class _FakeSequentialPool:
             List of lists of results.
         """
         # Set up global like the real pool initializer does
-        parallel_module._WORKER_FEATURE_BINS = FeatureBins(
-            bin_edges=tuple(BinEdges(edges=edges) for edges in self._bin_edges),
-            sample_bins=self._sample_bins,
+        _set_worker_feature_bins_for_test(
+            FeatureBins(
+                bin_edges=tuple(BinEdges(edges=edges) for edges in self._bin_edges),
+                sample_bins=self._sample_bins,
+            )
         )
         try:
             return [func(args) for args in args_list]
         finally:
             # Clean up global after use
-            parallel_module._WORKER_FEATURE_BINS = None
+            _reset_worker_feature_bins_for_test()
 
     def close(self) -> None:
         """No-op for fake pool."""
@@ -242,9 +246,11 @@ class TestBuildHistogramWorkerBatched:
                 struct.pack_into("d", hess_buf, i * 8, hessians[i])
 
             # Set up global feature_bins (mimics pool initializer)
-            parallel_module._WORKER_FEATURE_BINS = FeatureBins(
-                bin_edges=(BinEdges(edges=(0.5,)), BinEdges(edges=(0.5,))),
-                sample_bins=sample_bins,
+            _set_worker_feature_bins_for_test(
+                FeatureBins(
+                    bin_edges=(BinEdges(edges=(0.5,)), BinEdges(edges=(0.5,))),
+                    sample_bins=sample_bins,
+                )
             )
             try:
                 args: tuple[
@@ -311,9 +317,11 @@ class TestBuildHistogramWorkerBatched:
                 struct.pack_into("d", hess_buf, i * 8, hess_val)
 
             # Set up global feature_bins (mimics pool initializer)
-            parallel_module._WORKER_FEATURE_BINS = FeatureBins(
-                bin_edges=(BinEdges(edges=(0.5,)),),
-                sample_bins=sample_bins_2d,
+            _set_worker_feature_bins_for_test(
+                FeatureBins(
+                    bin_edges=(BinEdges(edges=(0.5,)),),
+                    sample_bins=sample_bins_2d,
+                )
             )
             try:
                 args = (
