@@ -1382,3 +1382,11 @@ Regression pins: mined dot skipped by the hop selector (`test_skips_dot_on_hosti
 Remaining executor checks (stale combat anchor, pickup race, shoot target-not-tracked) guard planner cross-tick state — separate audit, instances #2/#3 of the rejection-loops page still open.
 
 Gate green: 4,483 tests, 100% coverage, mypy/ruff/guard clean. (The user's 8-minute `make check` scare was environmental: a concurrent Claude session's covenant_ml workloads + poetry lock network time; the timed test stage runs 55 s.)
+
+## [2026-07-20] verification + docs | Mine-composition refactor soaked clean, committed 6d2afdbe; [[terrain-composition]] page added
+
+Verification soak bot-20260720-192320 (the full-quality process: soak -> validate -> commit -> document): 2 kills, 23/23 hits, 0 rejected, 0 blocked, ended full (1100 fuel, 25/25 duals/homings). The specific fix signals, measured by direct event scan: **0 discard events, 0 error-code-6 move refusals (previous soak: 77), 0 mine detonations, 0 terrain-blocked replans**, and the analyzer's first "no top-level issues detected" verdict in three soaks. 77 mine tiles crossed the viewport during the session without incident. Longest identical-decision run was 13 consecutive shoots at one live target — sustained combat, not a stall.
+
+Committed as 6d2afdbe (26 files, +358/−318). New architecture page [[terrain-composition]] documents the single-owner walkability model in full: the layer diagram, the physics split (walk-on-mine = 45 damage = impassable; teleport-at-mine = safe, server displaces = landing finder stays mine-blind by design), the two-owner era and its fixed-point loop, the five-part cut, the invariant/test-pin table, and the standing rule for future dynamic obstacles: compose into `compose_decision_terrain`, never add a parameter beside it. Architecture hub and index updated (55 pages).
+
+Also resolved during the same session: the "8-minute make check hang" was environmental — a concurrent Claude session's covenant_ml workloads plus poetry lock network time; the timed test stage runs 55 s and the full gate passes clean.
