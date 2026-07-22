@@ -92,19 +92,25 @@ Mechanics this encodes:
 - A human can fire exactly one post-departure homing (the click needs
   a visible tank); the bot's id-targeted `shoot(x,y,id)` command can
   repeat it — the server keeps rerouting to the departed tank.
-- **The reroute has a server-side TTL of ~12 s from the 0x58
-  TankRemove.** Measured (run 2026-07-19 22:30, target orange-2
-  id=528, all 16 shoot commands byte-identical on the wire): 0x58 at
-  +0 s; rerouted homings FIRED at +0.65/+2.7/+4.8/+6.8/+8.9/+11.0 s
-  all debited ammo (= hit, consumption-equals-hit contract); the shot
-  fired at **+13.0 s** drew a response with no debit — genuine miss,
-  the id no longer resolved. Boundary is in **[11.0, 13.0] s**
-  fire-time; the `tank_removed` diagnostic timestamps every 0x58 so
-  future pursuit misses narrow the constant automatically.
-- Tactical rule: after a pursued target's 0x58, ~5–6 more
-  guaranteed-hit homings exist; firing past ~12 s donates ammo to the
-  void. The stationary-miss→block rule already disengages on the
-  first post-TTL miss (one homing = the minimum knowable cost).
+- **The reroute has a server-side TTL of ~12.9 s from the 0x58
+  TankRemove.** First measured 2026-07-19 (run 22:30, boundary
+  [11.0, 13.0] s from 16 byte-identical shots). CORPUS-SWEPT
+  2026-07-22 across all 246 sessions: every sent id-shot at a
+  removed-and-still-dark id, echo-paired with its own 0x53 (weapon=3
+  debit == hit, per the consumption-equals-hit contract; corpse
+  0x58s and 0x29 room-quits excluded) — **704 hits and 137 misses,
+  hits dense up to +12.91 s, ZERO hits later, and a dense miss wall
+  from +12.93 s**. Boundary **[12.91, 12.93] s** fire-time; the
+  machine-checked constant is the 12 920 ms midpoint. The early
+  minority of misses (28/137 below the boundary) trace to
+  non-TTL causes: quits the 0x29 sweep missed and empty homing
+  slots.
+- Tactical rule: after a pursued target's 0x58, ~6 more
+  guaranteed-hit homings exist; firing past ~12.9 s donates ammo to
+  the void. The pre-sweep 12.0 s constant quit ~0.9 s early —
+  donating one guaranteed hit per chase. The
+  stationary-miss→block rule already disengages on the first
+  post-TTL miss (one homing = the minimum knowable cost).
 - Confirmed the same run: the departed tank's position goes
   completely dark between the 0x58 and the next map open (zero wire
   updates for 22 s) — per-shot victim resolution during reroute is
@@ -112,12 +118,13 @@ Mechanics this encodes:
 
 ### Machine-checked claim
 
-The TTL estimate is bound to `tankpit_bot.physics.combat`
+The TTL is bound to `tankpit_bot.physics.combat`
 ([[physics-module-roadmap]] Phase 1) and verified by the
 `physics_claims` guard stage. The value is the midpoint of the
-measured [11.0, 13.0] s boundary — when a future pursuit miss narrows
-the boundary, update the number here AND in `combat.py`, or the gate
-goes red.
+corpus-swept [12.91, 12.93] s boundary (2026-07-22, 704 hits / 137
+misses across 246 sessions) — when a future sweep narrows it
+further, update the number here AND in `combat.py`, or the gate goes
+red.
 
 Since 2026-07-22 the law is also executable: `sim/combat.py`
 implements id-targeted resolution end-to-end (visible-target reroute,
@@ -131,7 +138,7 @@ free-single miss past it) — see the law-4 as-built in
     {
       "id": "reroute-ttl-ms",
       "code": "tankpit_bot.physics.combat:REROUTE_TTL_MS",
-      "value": 12000
+      "value": 12920
     }
   ]
 }

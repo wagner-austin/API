@@ -1,10 +1,15 @@
 ---
 title: Teleport Mechanics
 tags: [teleport, movement, fuel]
-related: [[viewport-frame]], [[fuel-system]], [[map-mechanics]]
-sources: [see footnotes]
-fact_checked: 2026-06-12
+related:
+  - "[[viewport-frame]]"
+  - "[[fuel-system]]"
+  - "[[map-mechanics]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-12"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Teleport Mechanics
@@ -68,9 +73,21 @@ displacements (sent teleport target vs 0x3D landing fix):
   north at (29,67); repeating from (29,67) landed east again.
 - **West observed only when east and north were both rock**
   ((61,53) inside the rock mass → landed (60,53)).
-- South never isolated (no case where E, N, and W were all blocked);
-  search depth beyond ring 1 unobserved (every probe target had an
-  open adjacent tile). Both remain open questions.
+- ~~South never isolated; search depth beyond ring 1 unobserved.
+  Both remain open questions.~~ **CLOSED by the 2026-07-22 corpus
+  sweep** (2,861 sent teleports paired with their 0x3D landing fixes
+  across all 246 sessions, rejections excluded): 2,020 landed exact
+  and 841 displaced — cardinal ring-1 dominates with **E 448 ≫ N 89 >
+  S 31 ≈ W 28**. SOUTH IS REAL (31 samples), so the full cardinal
+  set E→N→W→S stands with the E-then-N ordering probe-verified and
+  the relative order of the last two unresolvable from frequencies
+  alone (blockage geometry confounds). **The search also extends
+  BEYOND ring 1**: ~24 % of displaced landings are ring-2 or
+  diagonal offsets ((-2,-2) 30, (-2,-3) 25, (1,1) 23, (2,0) 17,
+  (1,2) 16, (2,2) 11, ...), so a fully blocked ring 1 widens the
+  search rather than rejecting. The sim currently models ring-1
+  E→N→W→S then cant_go — the wider search is a DOCUMENTED
+  simplification ([[physics-module-roadmap]]).
 - Legality contract (user, same day): displacement applies to ENEMY
   mines and terrain; you can land on and walk over your OWN or
   ally-colored mines, and you cannot teleport onto enemy mines.

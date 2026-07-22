@@ -963,17 +963,23 @@ seam; (3) the Phase 3 fuel/ammo books judge those sessions
 divergence-free, with a negative control proving the detector fires;
 (4) `make audit`'s archive validators re-derive the economy claims
 from sim-generated wire at real-archive exactness. NOT covered by
-this certification: spawn distributions, enemy minds, radar
-cache-diff byte layout (sim sends full-info scans), the viewport-edge
-mine clip (mine placement clips to map bounds — the sim viewport is
-centered on the tank, while the real visible screen is a scrolling
-window), the S-displacement last-resort assumption, the reroute TTL
-VALUE (the 12 000 ms midpoint of a [11.0, 13.0] s measured boundary —
-law 4's mechanics are implemented, its constant is an estimate), the
-equipment grant's randomness (sim grants deterministically to the
-most-deficient slot with midpoint stacks), and the radar-zero
-emergency grant. Gate at close: 4,730 tests, 100 % stmt+branch
-(4,754 after the law-4 and equipment follow-ups).
+this certification: enemy minds, radar cache-diff byte layout (sim
+sends full-info scans), spawn placement distributions and volumes
+(rate and freshness laws ARE mined — [[game-economy]]), the
+teleport displacement search beyond ring 1 (the 2026-07-22 corpus
+sweep measured a ~24 % ring-2/diagonal tail; the sim models ring-1
+E→N→W→S then cant_go), the equipment grant's randomness (sim grants
+deterministically to the most-deficient slot with midpoint stacks),
+and the radar-zero emergency grant. RETIRED from this list by the
+2026-07-22 archive mining: the S-displacement assumption (south is
+measured, 31 corpus samples), the reroute TTL estimate (corpus-swept
+to [12.91, 12.93] s — ``REROUTE_TTL_MS`` = 12 920), and the
+centered-viewport approximation (3,387 bot-session samples put the
+at-rest tank at exactly offset (8,8); the dispersion is client
+animation lag the sim rightly lacks, and the bot only acts from
+rest-center, so the viewport-edge mine clip cannot bite in bot
+play). Gate at close: 4,730 tests, 100 % stmt+branch (4,754 after
+the law-4 and equipment follow-ups).
 
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 

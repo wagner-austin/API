@@ -10,13 +10,16 @@ bookkeeping identity, not a constant — it is documented in
 
 from __future__ import annotations
 
-REROUTE_TTL_MS = 12_000
-"""ESTIMATE — how long after a target's 0x58 TankRemove the server
-keeps rerouting id-targeted shots to the departed tank. Measured
-boundary is [11.0, 13.0] s fire-time (run 2026-07-19 22:30: hits at
-+0.65..+11.0 s all debited ammo; +13.0 s drew no debit). 12_000 ms is
-the midpoint; the ``tank_removed`` diagnostic timestamps every 0x58
-so future pursuit misses narrow it.
+REROUTE_TTL_MS = 12_920
+"""How long after a living target's 0x58 TankRemove the server keeps
+rerouting id-targeted shots to it. Corpus-swept 2026-07-22 across all
+246 sessions (echo-paired: each sent id-shot at a removed-and-dark id
+matched to its own 0x53, weapon=3 debit == hit): 704 hits and 137
+misses, with hits dense up to +12.91 s, ZERO hits later, and a dense
+miss wall from +12.93 s. Boundary [12.91, 12.93] s fire-time;
+12_920 ms is the midpoint. Supersedes the single-run 2026-07-19
+estimate (boundary [11.0, 13.0] s, midpoint 12_000 — which donated
+one guaranteed pursuit hit per chase by quitting ~0.9 s early).
 Wiki: [[shoot-event-format]]#reroute-ttl-ms."""
 
 __all__ = [

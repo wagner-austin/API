@@ -10,14 +10,17 @@ from tankpit_bot.physics.combat import REROUTE_TTL_MS
 
 
 class TestRerouteTtl:
-    """The homing-reroute TTL estimate and its measured boundary."""
+    """The homing-reroute TTL and its corpus-measured boundary."""
 
-    def test_estimate_is_12_seconds(self) -> None:
-        """The working estimate is the midpoint of the measured window."""
-        assert REROUTE_TTL_MS == 12_000
+    def test_value_is_the_corpus_swept_midpoint(self) -> None:
+        """The constant is the midpoint of the swept [12.91, 12.93] s.
 
-    def test_estimate_sits_inside_the_measured_boundary(self) -> None:
-        """Hits observed through +11.0 s, first miss at +13.0 s — the
-        constant must stay inside [11.0, 13.0] s until a live pursuit
-        miss narrows it."""
-        assert 11_000 <= REROUTE_TTL_MS <= 13_000
+        2026-07-22 archive sweep: 704 echo-paired hits dense to
+        +12.91 s, zero later, dense misses from +12.93 s.
+        """
+        assert REROUTE_TTL_MS == 12_920
+
+    def test_value_sits_inside_the_measured_boundary(self) -> None:
+        """Latest hit +12.91 s, earliest boundary miss +12.93 s — the
+        constant must stay inside until a future sweep narrows it."""
+        assert 12_910 <= REROUTE_TTL_MS <= 12_930
