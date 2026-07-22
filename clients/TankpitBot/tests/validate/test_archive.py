@@ -209,13 +209,18 @@ class TestHitDamage:
             _window(delta=-45, enemy=[0], spending=1),
             _window(delta=-45, enemy=[0], pickups=1),
             _window(delta=-90, enemy=[0], detonations=1),
+            _window(delta=-45, enemy=[9]),
         ]
         evidence = validate_hit_damage(windows)
-        single, dual = evidence
+        single, dual, missile, homing = evidence
         assert single["claim_id"] == "single-hit-victim-cost"
         assert (single["samples"], single["exact"], single["mismatches"]) == (2, 1, 1)
         assert dual["claim_id"] == "dual-hit-victim-cost"
         assert (dual["samples"], dual["exact"], dual["mismatches"]) == (1, 1, 0)
+        assert missile["claim_id"] == "missile-hit-victim-cost"
+        assert (missile["samples"], missile["exact"], missile["mismatches"]) == (1, 1, 0)
+        assert homing["claim_id"] == "homing-hit-victim-cost"
+        assert (homing["samples"], homing["exact"], homing["mismatches"]) == (0, 0, 0)
 
 
 class TestFuelCapacity:

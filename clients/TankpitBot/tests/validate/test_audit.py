@@ -68,6 +68,10 @@ def _green_capture() -> CaptureSession:
         fuel_gain_message(8000, 917),
         shot_message(8500, ENEMY_ID, 1),
         fuel_gain_message(9000, 827),
+        shot_message(9500, ENEMY_ID, 2),
+        fuel_gain_message(10000, 782),
+        shot_message(10500, ENEMY_ID, 3),
+        fuel_gain_message(11000, 737),
     ]
     return make_session(messages)
 
@@ -117,7 +121,7 @@ def test_green_tree_passes_and_stamps(tmp_path: Path, capsys: pytest.CaptureFixt
     page_text = (wiki_dir / "game-economy.md").read_text(encoding="utf-8")
     expected = (
         f"fact_checked: {date.today().isoformat()} "
-        "(make audit: 9 claims re-derived, 17 clean samples)"
+        "(make audit: 11 claims re-derived, 21 clean samples)"
     )
     assert expected in page_text
 
