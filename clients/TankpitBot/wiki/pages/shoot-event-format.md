@@ -1,10 +1,17 @@
 ---
 title: ShootEvent (0x53) Wire Format
 tags: [protocol, combat, wire]
-related: [[deactivation-format]], [[weapon-log-markers]], [[shot-range]]
-sources: [tpclient.js Gg.h / V.S, runs/bot/bot-20260619-050303 capture t+25.47s, see footnotes]
-fact_checked: 2026-06-19
+related:
+  - "[[deactivation-format]]"
+  - "[[weapon-log-markers]]"
+  - "[[shot-range]]"
+source_paths:
+  - tpclient.js Gg.h / V.S
+  - runs/bot/bot-20260619-050303 capture t+25.47s
+  - see footnotes
+fact_checked: "2026-06-19"
 confidence: high
+hubs: [protocol]
 ---
 
 # ShootEvent (0x53) Wire Format
@@ -111,6 +118,12 @@ The TTL estimate is bound to `tankpit_bot.physics.combat`
 measured [11.0, 13.0] s boundary — when a future pursuit miss narrows
 the boundary, update the number here AND in `combat.py`, or the gate
 goes red.
+
+Since 2026-07-22 the law is also executable: `sim/combat.py`
+implements id-targeted resolution end-to-end (visible-target reroute,
+the 0x58 departure clock, guaranteed homing hits inside the TTL, the
+free-single miss past it) — see the law-4 as-built in
+[[physics-module-roadmap]].
 
 ```json claims
 {

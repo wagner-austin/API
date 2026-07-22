@@ -1,21 +1,37 @@
 ---
 title: Physics Module Roadmap — Wiki as Executable Truth
 tags: [architecture, roadmap, physics, wiki, enforcement]
-related: [[terrain-composition]], [[game-economy]], [[executor-rejection-loops]], [[self-observing-architecture]], [[coding-standards]], [[movable-blocks]], [[walk-mechanics]], [[weapon-selection]], [[mine-mechanics]], [[teleport-mechanics]]
-sources: [design session 2026-07-20 (user + AI), user-approved direction; mcps-workspace precedent PLAN_WIKI_AUDIT_SEARCH_MCP_REFACTOR.md]
-fact_checked: 2026-07-20
-confidence: high (Phases 1-2 IMPLEMENTED 2026-07-20/21; Phase 3 + executor track designed, not started)
+related:
+  - "[[terrain-composition]]"
+  - "[[game-economy]]"
+  - "[[executor-rejection-loops]]"
+  - "[[self-observing-architecture]]"
+  - "[[coding-standards]]"
+  - "[[movable-blocks]]"
+  - "[[walk-mechanics]]"
+  - "[[weapon-selection]]"
+  - "[[mine-mechanics]]"
+  - "[[teleport-mechanics]]"
+source_paths:
+  - design session 2026-07-20 (user + AI)
+  - user-approved direction; mcps-workspace precedent PLAN_WIKI_AUDIT_SEARCH_MCP_REFACTOR.md
+fact_checked: "2026-07-20"
+confidence: high
+hubs: [architecture]
 ---
 
 # Physics Module Roadmap — Wiki as Executable Truth
 
-**Status: Phases 1–3 and the executor track IMPLEMENTED (2026-07-20/21;
-make audit 11/11 claims, both live books at zero divergences, executor
-pure dispatch). Phase 4 steps (a)–(d) IMPLEMENTED 2026-07-21/22,
-INCLUDING the live CDP seam: the production ``_tick_once`` plays full
-rounds against the sim over real wire bytes. Remaining: step (e) —
-the timed soak entry point with capture/events artifacts, the
-divergence-zero verdict, and the audit cross-check.**
+**Status: Phase 4 COMPLETE (2026-07-22), all eight laws implemented.
+Phases 1–3 and the executor track IMPLEMENTED 2026-07-20/21 (make
+audit 11/11 claims, both live books at zero divergences, executor
+pure dispatch). Phase 4 steps (a)–(e) IMPLEMENTED 2026-07-21/22:
+encoders byte-identical on the full corpus, laws 1–8 (law 4 landed
+last, with the viewport model it required), the live CDP seam, the
+divergence-zero soak with a proven-teeth negative control, and the
+audit cross-check — `make audit`'s validators price sim-generated
+wire at real-archive exactness. Fidelity statement in the step-(e)
+as-built below.**
 Written for a future session (human or AI) to execute end-to-end
 without access to the 2026-07-20 design conversation. Read
 [[terrain-composition]] first — it is the completed seed of this plan.
@@ -624,9 +640,207 @@ from wiring the real loop:
   raise `SimError`.
 - Gate: 4,719 tests, 100% stmt+branch; 84 sim tests.
 
-Not yet implemented from the law list: **law 4** (homing reroute +
-TTL) — the sim has no departure semantics yet; and equipment
-containers / ferries / movable blocks are out of the world model.
+~~Not yet implemented from the law list: **law 4** (homing reroute +
+TTL) — the sim has no departure semantics yet~~ — RESOLVED 2026-07-22,
+see the law-4 as-built below. Equipment containers / ferries /
+movable blocks remain out of the world model.
+
+### Law 4 as-built (2026-07-22): the viewport model, 0x58 departure, and the reroute TTL
+
+The reroute law needed a real trigger for 0x58, which forced the
+per-client viewport model the step-(d) assumptions listed as missing:
+
+- **Viewport**: Chebyshev radius 8 around the client — the SAME
+  constant the extra-radar scan already used (`VIEWPORT_RADIUS`,
+  promoted from the radar law; [[radar-mechanics]]: extra = whole
+  viewport). Tank POSITIONS are viewport-scoped on the wire:
+  the join burst 0x3D-states only in-view tanks (identities 0x21 stay
+  global), each tick diffs membership after relocations — exit emits
+  **0x58 TankRemove** and starts the reroute clock, re-entry emits a
+  fresh 0x3D. A deactivated tank just drops from the visible set (its
+  exit is announced by 0x41, not 0x58).
+- **Id-targeted resolution** (`sim/commands.py` already decoded the
+  shoot command's `target_id`): an id-shot at a living VISIBLE tank
+  reroutes the click to the tank's current tile before positional
+  resolution — the queue-race conversion (a same-tick mover drawn
+  from stale coordinates resolves as homing, not a miss). An id-shot
+  at a DEPARTED tank keeps firing guaranteed homing hits — ammo
+  debited, damage applied, position dark — while
+  ``departed_age_ms <= REROUTE_TTL_MS`` (`physics.combat`, the
+  machine-checked 12 000 ms midpoint of the measured [11.0, 13.0] s
+  boundary); past the TTL the id no longer resolves and the shot is
+  the measured free single miss with nothing debited. A shooter
+  without a ready homing slot cannot reroute (the human analogue
+  needs homing enabled).
+- Server plumbing: `_removed_at` records the 0x58 tick;
+  `advance_tick` prices the age in ticks × 2 000 ms for the shot
+  processor.
+
+Behavior check that fell out for free: with positions
+viewport-scoped, the seam's seeded enemy (Chebyshev 10 from spawn)
+is position-dark at join — and the production bot still finds and
+engages it through map blips + teleport, the real gameplay loop.
+
+### Equipment containers as-built (2026-07-22): the archive-mined grant law — and the bug it flushed out
+
+The last world-model gap ("the sim bot can restock fuel but never
+ammo") closed in four pieces, each forced by the previous:
+
+1. **The grant law was archive-mined, not trusted** (crack-before-
+   code): 1,154 ``0x67 -> next 0x49`` exact-pre pairs across 246
+   sessions. One slot per grant; hard cap 25; stack rolls 5-9
+   (dual/homing) and 2-4 (radar); slot choice RANDOM among deficient
+   slots — the wiki's "deterministic most-behind" contract is
+   falsified and rewritten ([[equipment-system]]). Plus 5 unexplained
+   ``show_message=False`` multi-slot grants, all at radar=0.
+   Sim assumption (documented in ``sim/equipment.py``): deterministic
+   most-deficient slot with midpoint stacks (7 weapons / 3 radar) —
+   distribution traded for reproducibility.
+2. **The 0x5A viewport model**: the AI's equipment path gates on
+   in-viewport walk-reachability, and 0x5A ViewportUpdate is the ONLY
+   message that sets the viewport ([[viewport-shift-protocol]]) — the
+   sim had never emitted one, so equipment candidates could never be
+   actionable. The sim now sends origin-only 0x5A patches (entities
+   empty — every sim entity is hidden-layer/radar-owned, and the
+   production reset-then-apply sweep spares radar-sourced entries) at
+   handshake and on every client relocation, window centered on the
+   client (the real window scrolls; documented approximation).
+3. **The empty-container rejection**: no wire message announces a
+   consumed container (0x67 travels alone, 1,154/1,154) — the client
+   learns by re-clicking and receiving 0x52 error 4. The sim
+   validates pickup destinations and answers exactly that.
+4. **A REAL production bug, sim-found**: the re-click at a consumed
+   container the bot is STANDING ON completes instantly by
+   ``position_reached`` — completions run before the in-flight error
+   handler, so the code=4 orphans, the stale belief survives, and the
+   bot re-clicks the ghost forever (the live DOM-consumer removal was
+   deleted 2026-07-19 on the assumption the wire code-4 path would
+   attribute; same-tile collects never wait). Fix in
+   ``completions._maybe_complete_collection``: a pending 0x52 defers
+   position-completion one phase so the error handler attributes it
+   and deletes the belief. Regression-pinned in
+   ``tests/bot/test_completion_events.py``.
+
+End-to-end proof (`tests/sim/test_equipment.py`): the production bot,
+seeded at 8 extra radars, radar-reveals the seeded equipment
+(0x4F ``0xFFFF -> -1`` cache marker), walks both containers, takes
+two grants over the real wire, eats the code-4 on each re-click,
+deletes the beliefs, and returns to fuel collection.
+
+### Scripted opponent as-built (2026-07-22): return fire — and the dead wiring it exposed
+
+``sim/opponent.py`` is a deterministic aggressor (pure function of
+the world tick: dodge / shoot / hold / shoot on a 4-beat, acting only
+while the client is inside its own viewport radius). It is NOT a
+model of enemy minds — those stay uncertified — it exists to run the
+client-side channels a passive world never touches. Wiring it forced
+two fixes:
+
+1. **Per-recipient sweep**: 0x52 supervisor rejections, 0x67 gains,
+   and the inventory-full error are PER-CONNECTION on the real wire.
+   The sim had been appending them to its single batch regardless of
+   the commanding tank — harmless while only the client acted, a
+   belief-corrupting leak the moment the opponent moved (production
+   treats any 0x67 as a SELF gain; same class as the step-(c)
+   fuel-sync leak). All three now emit only for the client's own
+   commands.
+2. **A second REAL production catch — dead instrument wiring**:
+   ``ledger.ammo_book.record_ammo_enemy_shot`` was defined, exported,
+   unit-tested — and called from NOWHERE in production. The ammo
+   book's armor rule bounds shield loss by ``2 x enemy_shots``, so
+   with the counter frozen at 0 the FIRST armor-absorbed hit in a
+   real fight would have raised a false ammo divergence. Unit tests
+   could never catch it (they call the function directly); the
+   fighting soak's positive control (``enemy_shots > 0``) failed
+   instantly. Now wired at the 0x53 dispatch point next to the
+   fuel book's enemy-hit entry.
+
+The fighting soak (`tests/sim/test_soak.py`): 24 production rounds
+under return fire — the enemy lands real duals, the client's fuel
+pays real 90s, the fuel book absorbs them as enemy-hit feasibility
+entries — and both books still judge ZERO divergences, with zero
+``physics_divergence`` events in the captured stream.
+
+Still out of the world model: ferries, movable blocks, the
+radar-zero emergency grant, and real enemy minds (the scripted
+opponent is a harness, not a model).
+
+### Step (e) as-built (2026-07-22): the verdict — soak, negative control, audit cross-check
+
+The Phase 3 instruments judge the sim, and the sim passes. Three
+tests close the phase (`tests/sim/test_soak.py`,
+`tests/sim/test_audit_crosscheck.py`, shared boot in
+`tests/sim/seam.py`):
+
+- **Divergence-zero soak**: 30 rounds of the production `_tick_once`
+  under a stepped `SeamClock` (the scenarios-harness clock
+  discipline, 1 s/round), events captured via
+  `configure_bot_runtime_logging` + the fake filesystem. Positive
+  controls first (commands crossed the seam, the fuel book judged
+  windows, the ammo book anchored snapshots, events flowed), then the
+  verdict: **zero divergences** in both book counters AND zero
+  `physics_divergence` records in the captured `events.jsonl`.
+- **Negative control — the detector has teeth**: a corrupted self
+  fuel sync (+700 with no announcing gain) delivered through the REAL
+  ingestion path, followed by a quiet reading so the block closes.
+  The fuel book counts the divergence and `physics_divergence` lands
+  in the event stream. A soak that can't fail is not evidence.
+- **Audit cross-check**: `SimCDPSession` now records every frame in
+  both directions (`wire_log`) and `build_capture_session` assembles
+  the standard `CaptureSession` shape. A 40-round session written to
+  a temp runs tree and fed to the real `collect_evidence`:
+  walk-cost 1/1 exact, dual-shot-cost 20 samples / 19 exact,
+  fuel-capacity 45/45 exact — every sampled claim at or above
+  `EXACTNESS_FLOOR`, the audit's own gate. The single dual-shot
+  "mismatch" is the measured charge latency splitting a burst's first
+  echo and its debit across a window boundary — the same
+  positive-signed noise shape the real archive shows, which is
+  fidelity evidence in itself.
+
+The instruments forced three catches before they went green:
+
+1. **Sync cadence**: the sim emitted 0x2E syncs only when fuel
+   changed; the measured wire broadcasts one per living tank every
+   ~2 s regardless of activity ([[tank-freshness-model]]). Without
+   quiet zero-delta readings the fuel book can NEVER close a block —
+   the soak sat at zero judged windows until the sim matched the
+   wire. `advance_tick` now syncs every living tank every tick.
+2. **Handshake self-identity**: the audit's `wire_timeline` names
+   self from the FIRST received 0x21 (the archive convention), but
+   the sim join burst carried no own-identity message. The handshake
+   now opens with the client's own 0x21, matching real choreography.
+3. **Latent test-infra contamination** (pre-existing, exposed by the
+   new tests changing xdist scheduling): the client-structure
+   survey's once-per-session gate was never reset by the central
+   isolation fixture, so any tick-loop test that emitted the survey
+   poisoned later tick-loop tests on the same worker.
+   `reset_client_structure_survey()` joined
+   `_isolate_protocol_singletons`.
+
+Behavior finding worth recording: over 40 rounds the production bot
+NEVER walks — its collect style is 100 % teleport locomotion
+(fuel-dot hops), so the walk-cost positive control needed one
+scripted walk driven through the real command service.
+
+**Fidelity statement.** The sim is certified by the same instruments
+that watch the real server: (1) encoders byte-identical on
+72,916/72,916 archive messages; (2) the unmodified production tick
+loop plays full sessions over real wire bytes through the live CDP
+seam; (3) the Phase 3 fuel/ammo books judge those sessions
+divergence-free, with a negative control proving the detector fires;
+(4) `make audit`'s archive validators re-derive the economy claims
+from sim-generated wire at real-archive exactness. NOT covered by
+this certification: spawn distributions, enemy minds, radar
+cache-diff byte layout (sim sends full-info scans), the viewport-edge
+mine clip (mine placement clips to map bounds — the sim viewport is
+centered on the tank, while the real visible screen is a scrolling
+window), the S-displacement last-resort assumption, the reroute TTL
+VALUE (the 12 000 ms midpoint of a [11.0, 13.0] s measured boundary —
+law 4's mechanics are implemented, its constant is an estimate), the
+equipment grant's randomness (sim grants deterministically to the
+most-deficient slot with midpoint stacks), and the radar-zero
+emergency grant. Gate at close: 4,730 tests, 100 % stmt+branch
+(4,754 after the law-4 and equipment follow-ups).
 
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 

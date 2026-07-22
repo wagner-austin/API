@@ -1,10 +1,14 @@
 ---
 title: Equipment System
 tags: [equipment, containers, inventory]
-related: [[radar-mechanics]], [[fuel-system]]
-sources: [see footnotes]
-fact_checked: 2026-06-21
+related:
+  - "[[radar-mechanics]]"
+  - "[[fuel-system]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-21"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Equipment System
@@ -20,15 +24,47 @@ confidence: high
 
 Containers hold dual shots, homing shots, and extra radars. In viewport entities: `entity_id == -1` (0xFFFF) = equipment container; `entity_id > 0` = fuel container (entity_id ~ fuel volume).[^3]
 
-## Pickup mechanic (deterministic, NOT random)
+## Pickup mechanic (ARCHIVE-MINED 2026-07-22 — random slot among deficient, typed stack rolls)
 
-A single ``pickup_equipment`` on an equipment container fills the slot you are currently most behind on -- always, deterministically. The amount delivered varies by item type (dual shots arrive in larger stacks than radars / homing). Examples:[^6]
+The 2026-06-21 user contract described the pickup as "deterministic,
+fills the slot you are most behind on". Corpus mining falsified the
+determinism: pairing every ``0x67 EquipmentGain`` with its immediately
+following ``0x49`` snapshot (``pre = post - gained`` is exact — all
+1,154 gains across 246 sessions are followed by their snapshot in the
+very next frame) shows:
 
-- armor=25, dual=22, missile=25, homing=23, radar=12 → pickup gives 3 dual shots (dual was furthest from cap).
-- armor=25, dual=25, missile=25, homing=25, radar=0 → pickup gives a stack of extra radars.
-- armor=25, dual=25, missile=25, homing=25, radar=25 → server returns **"Inventory full"**, no pickup, container stays.
+- **Exactly ONE slot gains per pickup** (the 1,149 ``show_message=True``
+  container pickups; see the radar-zero exception below).
+- **Hard cap 25** — zero grants pushed a count past it; gains clip at
+  the cap (every gain of 1-4 on a weapon slot was a cap-clip).
+- **True stack rolls, visible when below the deficit**: dual and
+  homing roll **5-9** (uncapped distribution ≈ uniform); radar rolls
+  **2-4**. Radar really is the smallest stack — the user's
+  "radars are the least frequent" (2026-06-16) survives as amounts,
+  not selection odds.
+- **Slot choice is RANDOM among deficient slots**, not neediest-first:
+  128 grants chose homing while dual was needier, 37 the reverse, and
+  89 chose radar while a weapon slot was short. The "you get what you
+  need" feel comes from the common state where only one slot is
+  deficient. Armor gains when deficient too (2 samples); missile was
+  never observed deficient.
+- armor=25, dual=25, missile=25, homing=25, radar=25 → server returns
+  **"Inventory full"** (0x52 error 7), no pickup, container stays.[^6]
 
-Consequence for the bot: **a pickup is never wasted unless every slot is at cap**. Don't pre-filter containers based on "we have enough of X" -- the server picks the right slot, including the one you happen to need.
+**Radar-zero exception**: the archive holds exactly 5
+``show_message=False`` 0x67s, every one MULTI-slot (dual+homing+radar
+grants of 1-2 each) and every one with the tank at **radar = 0**. An
+undocumented emergency-grant mechanic; not yet reproduced or modeled.
+
+Consequence for the bot unchanged: **a pickup is never wasted unless
+every slot is at cap** — the server always picks a deficient slot.
+
+**Container-consumed signal**: no wire message announces the pickup
+consumed the container — 0x67 always travels alone (1,154/1,154),
+then its 0x49. The client learns a container is GONE by re-clicking
+it: the server answers 0x52 error 4 ("empty container") and the bot
+deletes the belief (``tick_loop_actions``, code=4 path). The sim
+implements exactly this pair ([[physics-module-roadmap]]).
 
 ## "Inventory full" wire signal
 
@@ -57,5 +93,5 @@ The pre-2026-06-26 blacklist was driven by `find_teleport_landing_tile()` return
 [^3]: viewport entity decode in state/viewport_entities.py — entity_id field mapping
 [^4]: three consecutive runs at extras=0 — gained duals/homings but zero radars; see [[radar-mechanics]]
 [^5]: run 20260610 — container (91,65) attempted 3 times with "no passable landing tile" each time; 30s TTL was the cause
-[^6]: user (Austin), 2026-06-21 — "you get inventory items of whatever you need. the equipment isnt determined until pick up. if you have 24 homing shots and full everything else, you'll get 1 homing shot... if you have 25 everything you'll get 'inventory full' and the pickup will fail"
+[^6]: user (Austin), 2026-06-21 — "you get inventory items of whatever you need. the equipment isnt determined until pick up. if you have 24 homing shots and full everything else, you'll get 1 homing shot... if you have 25 everything you'll get 'inventory full' and the pickup will fail". The contents-decided-at-pickup and inventory-full parts are archive-confirmed; the always-the-neediest-slot part is falsified by the 2026-07-22 corpus mining above (random among deficient slots).
 [^7]: protocol/constants.py:147 defines `SUPERVISOR_ERROR_INVENTORY_FULL = 7`. bot/tick_loop_actions.py:44 `_ACTION_BLOCKING_COMMAND_ERRORS` now includes codes 0, 1, 4, 5, 7, 8 (code 7 added 2026-06-21). Two `error_code=7` events recorded in `runs/sniff/latest.events.jsonl` at 19:07:28 / 19:08:30 plus parallel `[GAME:EQUIPMENT] Inventory full` in `runs/sniff/latest.log`.
