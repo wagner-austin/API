@@ -182,6 +182,7 @@ class TestSnifferCoverageBranches:
             msg_type=0x44,
             fuel_total=100,
             is_free=False,
+            flag=1,
         )
         result = format_message_details(msg)
         # FuelGain should include fuel_total

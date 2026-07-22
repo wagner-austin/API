@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip
 
 help:
 	@Write-Host ""
@@ -233,6 +233,12 @@ audit:
 	@Write-Host "==> audit (re-derive wiki physics claims from the runs archive)" -ForegroundColor Cyan
 	poetry run tankpit-audit --stamp; if ($$LASTEXITCODE -ne 0) { Write-Host "[audit] a claim failed re-derivation" -ForegroundColor Red; exit $$LASTEXITCODE }
 	@Write-Host "[audit] every validated claim re-derived from the archive" -ForegroundColor Green
+
+roundtrip:
+	@Write-Host ""
+	@Write-Host "==> roundtrip (encode(decode(x)) == x for every archived binary message)" -ForegroundColor Cyan
+	poetry run tankpit-roundtrip; if ($$LASTEXITCODE -ne 0) { Write-Host "[roundtrip] an encoder disagrees with its decoder" -ForegroundColor Red; exit $$LASTEXITCODE }
+	@Write-Host "[roundtrip] every archived binary message re-encodes byte-identically" -ForegroundColor Green
 
 analyze-timing:
 	@Write-Host ""

@@ -335,7 +335,7 @@ class BotScenario:
                 carrying=0,
             )
         )
-        self.ingest(FuelGainDict(msg_type=0x44, fuel_total=fuel, is_free=False))
+        self.ingest(FuelGainDict(msg_type=0x44, fuel_total=fuel, is_free=False, flag=1))
         self.ingest(
             InventoryDict(
                 msg_type=0x49,

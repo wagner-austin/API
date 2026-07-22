@@ -153,6 +153,7 @@ class TestFormatFunctions:
             msg_type=0x3E,
             team=2,
             rank=5,
+            damage_state=0,
             tank_id=100,
             decoration_state=b"\x00\x00\x00\x00",
             leaderboard_score=1000,
@@ -260,7 +261,7 @@ class TestFormatFunctions:
         """Test format_resource_details for fuel refill (0x44)."""
         from tankpit_bot.protocol import FuelGainDict
 
-        msg = FuelGainDict(msg_type=0x44, fuel_total=500, is_free=True)
+        msg = FuelGainDict(msg_type=0x44, fuel_total=500, is_free=True, flag=0)
         result = format_resource_details(msg)
         assert "fuel=500" in result
         assert "free=True" in result

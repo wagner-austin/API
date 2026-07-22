@@ -110,10 +110,6 @@ from tankpit_bot.protocol.decoders import (
     decode_text_message,
     decode_viewport_update,
     decode_world_info,
-    encode_radar_container,
-    encode_radar_mine,
-    encode_radar_mine_clear,
-    encode_radar_scan_result,
     require_radar_container,
     require_radar_mine,
     require_radar_mine_clear,
@@ -126,6 +122,12 @@ from tankpit_bot.protocol.decoders import (
     viewport_entity_has_equipment_cache,
     viewport_entity_has_fuel_cache,
     viewport_entity_has_no_cache,
+)
+from tankpit_bot.protocol.encoders.radar import (
+    encode_radar_container,
+    encode_radar_mine,
+    encode_radar_mine_clear,
+    encode_radar_scan_result,
 )
 from tankpit_bot.protocol.helpers import (
     DecodeError,

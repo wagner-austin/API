@@ -41,6 +41,7 @@ class TestDispatchTankMessages:
             msg_type=0x3E,
             team=2,
             rank=5,
+            damage_state=0,
             tank_id=99,
             decoration_state=b"\x00",
             leaderboard_score=1000,

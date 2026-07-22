@@ -11,6 +11,10 @@ class DecodeError(Exception):
     """Raised when message decoding fails."""
 
 
+class EncodeError(Exception):
+    """Raised when message encoding fails (unsupported message shape)."""
+
+
 def x16(low: int, high: int) -> int:
     """Combine two bytes into 16-bit value (JS X function).
 
@@ -36,6 +40,30 @@ def x24(a: int, b: int, c: int) -> int:
         Combined 24-bit unsigned value.
     """
     return 256 * (256 * a + b) + c
+
+
+def pack16(value: int) -> bytes:
+    """Pack a 16-bit unsigned value into two bytes (inverse of :func:`x16`).
+
+    Args:
+        value: 16-bit unsigned value.
+
+    Returns:
+        Two bytes, low byte first.
+    """
+    return bytes([value & 255, (value >> 8) & 255])
+
+
+def pack24(value: int) -> bytes:
+    """Pack a 24-bit unsigned value into three bytes (inverse of :func:`x24`).
+
+    Args:
+        value: 24-bit unsigned value.
+
+    Returns:
+        Three bytes, high byte first (big-endian).
+    """
+    return bytes([(value >> 16) & 255, (value >> 8) & 255, value & 255])
 
 
 def require_min_length(data: bytes, min_len: int, msg_name: str) -> None:
@@ -100,6 +128,9 @@ def require_parts(parts: list[str], min_parts: int, msg_name: str) -> None:
 
 __all__ = [
     "DecodeError",
+    "EncodeError",
+    "pack16",
+    "pack24",
     "require_exact_length",
     "require_min_length",
     "require_parts",

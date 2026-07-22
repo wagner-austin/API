@@ -203,6 +203,7 @@ def decode_tank_status(data: bytes) -> TankStatusDict:
     require_min_length(data, 13, "TankStatus")
     info_byte = data[0]
     team = info_byte & 0x03
+    damage_state = (info_byte >> 2) & 0x03
     rank = (info_byte >> 4) & 0x0F
     tank_id = x16(data[1], data[2])
     decoration_state = bytes(data[3:7])
@@ -213,6 +214,7 @@ def decode_tank_status(data: bytes) -> TankStatusDict:
         msg_type=0x3E,
         team=team,
         rank=rank,
+        damage_state=damage_state,
         tank_id=tank_id,
         decoration_state=decoration_state,
         leaderboard_score=lb_score,

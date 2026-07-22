@@ -33,6 +33,7 @@ def decode_fuel_gain(data: bytes) -> FuelGainDict:
         msg_type=0x44,
         fuel_total=x16(data[0], data[1]),
         is_free=data[2] == 0,
+        flag=data[2],
     )
 
 

@@ -198,11 +198,18 @@ class MovementResponseDict(TypedDict):
 
 
 class FuelGainDict(TypedDict):
-    """Fuel gain event (D message). fuel_total is the new absolute fuel level."""
+    """Fuel gain event (D message). fuel_total is the new absolute fuel level.
+
+    ``flag`` is the raw wire byte at offset 2; ``is_free`` derives from
+    it (``flag == 0``). Corpus 2026-07-21 (295 samples): 294 bodies
+    carry 0, one carries 0x2B — the byte is a value, not a boolean, so
+    the encoder needs it verbatim for byte-identical round-trips.
+    """
 
     msg_type: Literal[0x44]
     fuel_total: int
     is_free: bool
+    flag: int
 
 
 class FuelDepositDict(TypedDict):
@@ -572,11 +579,19 @@ class TankStatusSyncDict(TypedDict):
 
 
 class TankStatusDict(TypedDict):
-    """Full tank status (0x3E '>' message)."""
+    """Full tank status (0x3E '>' message).
+
+    ``damage_state`` is bits 2-3 of the info byte (the packed-byte
+    convention shared with TankEntry/MapTankEntry: team 0-1, damage
+    2-3, rank 4-7). Corpus 2026-07-21: 223 of 244 bodies carry a
+    nonzero value there — dropping it broke byte-identical
+    round-trips.
+    """
 
     msg_type: Literal[0x3E]
     team: int
     rank: int
+    damage_state: int
     tank_id: int
     decoration_state: bytes
     leaderboard_score: int

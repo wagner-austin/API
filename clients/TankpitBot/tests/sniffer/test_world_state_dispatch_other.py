@@ -50,7 +50,7 @@ class TestDispatchOther:
         # First set up a position to create self_state
         update_world_state_from_position(100, 100)
 
-        msg = FuelGainDict(msg_type=0x44, fuel_total=25, is_free=False)
+        msg = FuelGainDict(msg_type=0x44, fuel_total=25, is_free=False, flag=1)
         dispatch_world_state_update(get_world_service(), msg)
 
         state = get_world_service().world_state
