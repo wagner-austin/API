@@ -11,8 +11,10 @@ confidence: high (Phases 1-2 IMPLEMENTED 2026-07-20/21; Phase 3 + executor track
 
 **Status: Phases 1–3 and the executor track IMPLEMENTED (2026-07-20/21;
 make audit 11/11 claims, both live books at zero divergences, executor
-pure dispatch). Phase 4 (the simulator) SPEC'd 2026-07-21 — not
-started.**
+pure dispatch). Phase 4: steps (a) encoders, (b) laws 1–3, (d) laws
+5–8, and the step-(c) wire integration IMPLEMENTED 2026-07-21/22;
+remaining: the live CDP substitution (step c completion) and the
+divergence-zero soak + audit cross-check (step e).**
 Written for a future session (human or AI) to execute end-to-end
 without access to the 2026-07-20 design conversation. Read
 [[terrain-composition]] first — it is the completed seed of this plan.
@@ -447,6 +449,148 @@ static seeded world, no respawn).
 `server.py` with laws 1–3; (c) `transport.py` + bot-vs-sim smoke
 session; (d) laws 4–8; (e) divergence-zero soak + audit cross-check +
 fidelity statement.
+
+### Step (a) as-built (2026-07-21): encoders — 72,916/72,916 corpus messages byte-identical
+
+- **`protocol/encoders/` package** mirrors `decoders/`
+  module-for-module (tank, movement, resources, combat, world,
+  map_data, radar, session_events) — a separate package, not
+  same-file placement, because `decoders/tank.py` already sits at the
+  400-line ceiling. `container/encoders.py` covers the five
+  container-only bodies. The radar encode trio moved from
+  `decoders/radar.py` into `encoders/radar.py` so every encoder has
+  one home (`tankpit_bot.protocol` still re-exports them).
+- **`encoders/envelope.py`** is the keystone:
+  `encode_message_payload` (top-level frame payload) and
+  `encode_envelope_body` (0x2E body — subtype byte + payload for
+  protocol messages, verbatim body for container messages), grouped
+  if-chain dispatch mirroring `decoders/routing.py`. Match-statement
+  dispatch was rejected by mypy's tagged-union narrowing; literal
+  `==` if-chains narrow correctly.
+- **Two decoders were provably lossy** and their TypedDicts gained
+  the missing wire bits: `TankStatusDict.damage_state` (info-byte
+  bits 2–3 — 223/244 corpus bodies nonzero) and `FuelGainDict.flag`
+  (the raw byte behind ``is_free`` — one corpus body carries 0x2B).
+  Corpus-constant bytes were NOT added as fields, just re-derived and
+  documented: TankEntry's flags byte equals team (6/6), the sync
+  has-fuel-bar byte is 1 (21,278/21,278), the 0x3F body is 1
+  (1,166/1,166), the 0x5A no-mine overlay nibble is 8 (3,724 bodies).
+- **Greedy skip-RLE encodings confirmed canonical**: the linear-cursor
+  greedy emitter reproduces every 0x4C fuel-dot atlas (3,797) and
+  every 0x5A viewport patch (3,724) byte-for-byte.
+- **`make roundtrip`** (`tankpit-roundtrip`,
+  `validate/roundtrip.py`): re-encodes every archived binary message;
+  244 sessions, 72,916 messages, 28 families, **0 mismatches**; 9
+  invalid frames counted, not judged. Lobby TEXT frames
+  (`is_text_message`: `= + % * $ - ~ \` R`) are excluded — the
+  outer `+`/`=` frames the old census counted as undecodable are
+  plaintext room listings and profile rows, not binary messages.
+- Gate green (4,639 tests, 100% stmt+branch); `make audit` unchanged
+  at 11/11 claims.
+
+### Step (b) as-built (2026-07-21/22): `sim/` — laws 1–3 live
+
+New package `src/tankpit_bot/sim/`, layered and DI'd
+(`TerrainMapProtocol` from `_test_hooks`, so tests drive the sim on
+in-memory terrain):
+
+- **`world.py`** — `SimWorldDict` (tanks / containers / mines / tick)
+  with full encode/decode codecs and require_* validation; worlds
+  seed from JSON snapshots.
+- **`pathfind.py`** — the deterministic quadrant-keyed router:
+  single-turn L with vertical-first legs (horizontal-first toward NE,
+  the measured exception), the other L on obstruction, and a
+  fixed-order BFS for forced staircases/detours; hard 256×256 map
+  bounds.
+- **`movement.py`** — law 2: route → relocate → bill 1/tile → resolve
+  destination pickup (capacity-clamped) and enemy-mine detonation
+  (−45), all in one call; `cant_go` / `insufficient_fuel` as typed
+  outcomes. Enemy mines block interior routing; own-color mines are
+  walkable; the destination itself may hold an enemy mine.
+- **`combat.py`** — law 3: Bresenham ray clipping to the first rock
+  or tank (water is not an obstruction), server-side weapon selection
+  (dual default, homing for same-tick movers, missile only vs
+  obstructed enemies and only when the slot is ready), damage table
+  with armor absorption at damage/45, tier progression 0→3→2→1,
+  deactivation at zero fuel, and the two-packet mine cascade.
+- **`commands.py`** — typed decode of client `[!][type][cmd]` frames
+  (move/shoot/teleport/radar/mine/map/pickups; unknowns preserved);
+  `SimError` for anything outside the current build stage.
+- **`server.py`** — law 1: arrival-order queue, everything processed
+  and flushed per 2 s tick; shooter debits bill the NEXT tick
+  (charge latency), victims instantly; emits decoded messages (0x47
+  echoes, 0x2E fuel syncs, 0x43 pickups, 0x45 cascades, 0x52 command
+  errors, 0x49 client snapshots, 0x41 kills) for the step-(c)
+  transport to encode.
+- 55 sim tests; gate green at 100% stmt+branch (4,690 tests).
+  Radar/map/teleport/mine placement raise `SimError` until step (d)
+  — explicit refusal, not silent stubs.
+
+### Step (c) wire integration (2026-07-22): the production bot consumes sim bytes
+
+`sim/transport.py` closes the loop the unit tests could not:
+`encode_tick_payload` turns a tick's batch into length-prefixed 0x2E
+envelope frames (step-(a) encoders + the session XOR table, framed
+exactly as `process_received_message` ingests), and
+`decode_client_payload` turns the bot's real `!`-command frames back
+into typed commands. `SimServer.handshake()` emits the join burst
+(own 0x3D/0x44/0x49, then 0x21+0x3D per living tank — the scenario
+harness's `place_self`/`place_enemy` choreography, on the wire).
+
+`tests/sim/test_integration.py` is the standing proof, all through
+PRODUCTION code paths: the handshake establishes `self_state` and the
+enemy registry via `sniffer.decoders.process_received_message`; a
+`build_move_command` byte frame (XOR'd as the command sender
+transmits it) drives the sim and the bot's believed position/fuel
+equal sim ground truth after the tick — pickup included; and the real
+planner `decide()` produces a HUNT/COLLECT decision from sim-fed
+beliefs.
+
+**Bugs the wiring caught that typed-dict testing could not:**
+1. The sim long-form-synced EVERY fuel-changed tank; the production
+   dispatcher treats any fuel-bearing 0x2E as SELF fuel (the real
+   wire is per-recipient), so a victim's sync would have corrupted
+   the bot's own fuel belief. Fixed: long form for the client only,
+   short form otherwise — and a regression test pins it.
+2. A 0x21 with an empty decoration field shifts the whole wire
+   layout; the handshake must emit the full 4-byte field. Direct
+   typed ingestion (the scenario harness) can never catch either.
+
+Still open for step (c) completion: the live `CDPSessionProtocol`
+substitution so `make run`'s full tick loop (not just the planner)
+plays against the sim.
+
+### Step (d) as-built (2026-07-22): laws 5–8 — the full bot command set processes
+
+`sim/actions.py` + tick-processor wiring:
+
+- **Teleport (law 5)**: cost `floor(6 × euclid)` to the ACTUAL
+  landing; ring-1 displacement E→N→W (S as the documented last-resort
+  assumption; a sealed ring rejects with cant_go); other tanks and
+  enemy mines block, own-color mines don't; landing auto-pickup via
+  the shared `resolve_pickup`; rejections emit 0x52 with the
+  map-close flag.
+- **Radar (law 8, scan side)**: an available extra is consumed and
+  covers the viewport (Chebyshev radius 8), else
+  `free_radar_radius(rank)`; emits 0x4F (containers + mines in the
+  square) and 0x46 (enemy-found); bills 10. Sim assumption: full-info
+  scans, not cache diffs — semantically safe (the client dedups),
+  not byte-faithful to the diff protocol.
+- **Map open (law 8, map side)**: free; 0x4C with atlas-ordered fuel
+  dots from live containers + living-tank blips; no mines, per the
+  measured map contents.
+- **Mine press (law 6)**: 10 flat; 3×3 centered on the placer, skips
+  rock/water/tanks, trades 1:1 with enemy mines (0x45), places own
+  (0x4B); mines are not inventory. Sim assumption: clipped to map
+  bounds — the viewport-edge clip needs a per-client viewport model.
+- Pickup-fuel/equipment clicks route through the move law (they are
+  destination clicks on the wire). Only unknown command bytes still
+  raise `SimError`.
+- Gate: 4,719 tests, 100% stmt+branch; 84 sim tests.
+
+Not yet implemented from the law list: **law 4** (homing reroute +
+TTL) — the sim has no departure semantics yet; and equipment
+containers / ferries / movable blocks are out of the world model.
 
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 

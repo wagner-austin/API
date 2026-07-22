@@ -3,7 +3,7 @@ title: Game Economy (Fuel, Damage, Costs)
 tags: [game, combat, fuel, economy]
 related: [[shoot-event-format]], [[mine-mechanics]], [[deactivation-format]], [[bot-behavior-contract]], [[fuel-system]]
 sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20, tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06]
-fact_checked: 2026-07-21 (make audit: 11 claims re-derived, 22903 clean samples)
+fact_checked: 2026-07-21 (make audit: 11 claims re-derived, 22941 clean samples)
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
 ---
