@@ -176,14 +176,19 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
                 let n_regular_bins = 6_usize;
                 let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
 
-                // Create bins that distribute samples across bins
-                let bins: Vec<Vec<usize>> = (0_usize..n_samples)
-                    .map(|i| vec![i % n_regular_bins])
+                // Create column-major flat bin storage (1 feature).
+                // n_regular_bins = 6, so each `i % n_regular_bins` fits in u8.
+                let bins: Vec<u8> = (0_usize..n_samples)
+                    .map(|i| {
+                        let bin_usize = i % n_regular_bins;
+                        u8::try_from(bin_usize).unwrap_or(0_u8)
+                    })
                     .collect();
 
                 let (left, right) = split_samples(
                     &sample_indices,
                     &bins,
+                    n_samples,
                     0_usize,
                     split_bin,
                     nan_goes_left,

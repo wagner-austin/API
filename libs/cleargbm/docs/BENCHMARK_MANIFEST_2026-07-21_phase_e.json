@@ -1,0 +1,98 @@
+{
+  "timestamp_utc": "2026-07-21T-phase-e",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "numpy": "2.3.5",
+  "sklearn": "1.7.2",
+  "lightgbm": "4.6.0",
+  "cleargbm_module_path": "C:\\Users\\Test\\PROJECTS\\API\\libs\\cleargbm\\src\\cleargbm\\__init__.py",
+  "cleargbm_compute_path": "rust (column-major + uint8 + unrolled hot-loop)",
+  "csv_path": "C:\\Users\\Test\\PROJECTS\\api\\libs\\covenant_ml\\tests\\data\\american_bankruptcy.csv",
+  "csv_sha256": "cff2c899a97ecd629415cb22f59186000e74e1c0a78cfae036c0a53025419b5e",
+  "dataset_n_rows": 78682,
+  "dataset_n_features": 18,
+  "positive_rate": 0.06634300094049465,
+  "split_type": "company-disjoint",
+  "split_ratios": {
+    "train": 0.7,
+    "val": 0.15,
+    "test": 0.15
+  },
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "config": {
+    "n_estimators": 200,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "max_bins": 64,
+    "min_data_in_leaf": 20,
+    "reg_alpha": 0.0,
+    "reg_lambda": 0.0,
+    "n_jobs": 1
+  },
+  "all_runs": [
+    {
+      "model": "lightgbm",
+      "seed": 42,
+      "auc_roc": 0.6903419941093615,
+      "auc_pr": 0.16781136722295548,
+      "log_loss": 0.23578819694362052,
+      "fit_time_s": 0.6139876999659464,
+      "n_test": 11760,
+      "positive_rate_test": 0.06853741496598639
+    },
+    {
+      "model": "cleargbm",
+      "seed": 42,
+      "auc_roc": 0.700384044533626,
+      "auc_pr": 0.18349430892209034,
+      "log_loss": 0.23359871646113578,
+      "fit_time_s": 2.420122000039555,
+      "n_test": 11760,
+      "positive_rate_test": 0.06853741496598639
+    },
+    {
+      "model": "lightgbm",
+      "seed": 43,
+      "auc_roc": 0.716612554832586,
+      "auc_pr": 0.17942180637115646,
+      "log_loss": 0.2346750313180738,
+      "fit_time_s": 0.7788670000154525,
+      "n_test": 12039,
+      "positive_rate_test": 0.07027161724395714
+    },
+    {
+      "model": "cleargbm",
+      "seed": 43,
+      "auc_roc": 0.714490481745282,
+      "auc_pr": 0.17685510829003262,
+      "log_loss": 0.2363565681463888,
+      "fit_time_s": 2.4798764000297524,
+      "n_test": 12039,
+      "positive_rate_test": 0.07027161724395714
+    },
+    {
+      "model": "lightgbm",
+      "seed": 44,
+      "auc_roc": 0.6811347103686409,
+      "auc_pr": 0.12438560554969814,
+      "log_loss": 0.22015037393884357,
+      "fit_time_s": 0.7740450000273995,
+      "n_test": 11896,
+      "positive_rate_test": 0.06077673167451244
+    },
+    {
+      "model": "cleargbm",
+      "seed": 44,
+      "auc_roc": 0.6822916686009136,
+      "auc_pr": 0.12562013364387462,
+      "log_loss": 0.22081753869507922,
+      "fit_time_s": 2.4961643000133336,
+      "n_test": 11896,
+      "positive_rate_test": 0.06077673167451244
+    }
+  ]
+}

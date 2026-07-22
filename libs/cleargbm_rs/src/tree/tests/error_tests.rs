@@ -167,7 +167,8 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize];
     let gradients = vec![1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64];
-    let bins: Vec<Vec<usize>> = vec![vec![], vec![]]; // No features
+    // n_features = 0 → empty flat bin slice
+    let bins: Vec<u8> = vec![];
 
     let hooks = Hooks::default();
     let config = BuildHistogramConfig {
@@ -175,6 +176,7 @@ fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 2_usize,
         n_features: 0_usize,
         n_bins: 3_usize,
         hooks: &hooks,
@@ -264,12 +266,9 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
     let right_indices = vec![2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![
-        vec![0_usize, 0_usize], // 2 features
-        vec![1_usize, 1_usize],
-        vec![0_usize, 0_usize],
-        vec![1_usize, 1_usize],
-    ];
+    // 4 samples, 2 features column-major:
+    // feat 0: [0, 1, 0, 1]; feat 1: [0, 1, 0, 1]
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8];
 
     // Only 1 parent histogram, but n_features = 2
     let parent_histograms = vec![HistogramBuffer::new(3_usize)];
@@ -281,6 +280,7 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
         n_features: 2_usize, // 2 features, but only 1 parent histogram
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -302,7 +302,8 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
     let right_indices = vec![2_usize, 3_usize];
     let gradients = vec![1.0_f64, 2.0_f64, -1.0_f64, -2.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![0_usize], vec![1_usize], vec![1_usize]];
+    // 4 samples, 1 feature. Column-major flat: [0, 0, 1, 1]
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8];
 
     // Create parent histogram with proper values
     let mut parent_hist = HistogramBuffer::new(3_usize);
@@ -324,6 +325,7 @@ fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
         n_features: 1_usize,
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -355,7 +357,7 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let input = BuildTreeInput {
@@ -363,6 +365,8 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 100_usize, // Large but histogram will have n_bins = 101
         bin_thresholds: &bin_thresholds,
         config: &cfg,
@@ -380,7 +384,9 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
 
 #[test]
 fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
-    // Test with bin values that exceed n_bins to trigger error in build_feature_histograms
+    // Test with bin values that exceed n_bins to trigger error in build_feature_histograms.
+    // With u8 bin dtype, the maximum representable bin is 255 — set that at a sample
+    // to exceed n_regular_bins + 1 = 5.
     let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -393,8 +399,8 @@ fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    // Bin value 100 exceeds n_bins (n_regular_bins + 1 = 5)
-    let bins = vec![vec![0_usize], vec![1_usize], vec![100_usize], vec![3_usize]];
+    // Bin value 100 exceeds n_bins (n_regular_bins + 1 = 5).
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 100_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let input = BuildTreeInput {
@@ -402,6 +408,8 @@ fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 4_usize,
         bin_thresholds: &bin_thresholds,
         config: &cfg,
@@ -445,7 +453,7 @@ fn error_histogram(
     _: &[usize],
     _: &[f64],
     _: &[f64],
-    _: &[usize],
+    _: &[u8],
     _: usize,
 ) -> Result<HistogramBuffer, ClearGbmError> {
     Err(ClearGbmError::EmptyInput {
@@ -455,7 +463,7 @@ fn error_histogram(
 
 #[test]
 fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmError> {
-    // Use hooks to inject error during histogram building (exercises line 474's `?`)
+    // Use hooks to inject error during histogram building
     let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -468,7 +476,7 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let input = BuildTreeInput {
@@ -476,6 +484,8 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 4_usize,
         bin_thresholds: &bin_thresholds,
         config: &cfg,
@@ -500,7 +510,7 @@ fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbm
     let sample_indices = vec![0_usize, 1_usize];
     let gradients = vec![1.0_f64, 2.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![1_usize]];
+    let bins: Vec<u8> = vec![0_u8, 1_u8];
 
     // Create cached histograms
     let mut cached = HistogramBuffer::new(3_usize);
@@ -520,6 +530,7 @@ fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbm
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 2_usize,
         n_features: 1_usize,
         n_bins: 3_usize,
         hooks: &hooks,
@@ -542,7 +553,8 @@ fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmE
     let sample_indices = vec![0_usize, 1_usize];
     let gradients = vec![1.0_f64, 2.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize, 1_usize], vec![1_usize, 0_usize]]; // 2 features
+    // 2 samples, 2 features column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 1_u8, 0_u8];
 
     // Create cache with wrong size (1 instead of 2)
     let cached = HistogramBuffer::new(3_usize);
@@ -554,6 +566,7 @@ fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmE
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 2_usize,
         n_features: 2_usize, // 2 features
         n_bins: 3_usize,
         hooks: &hooks,
@@ -576,7 +589,7 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
     let right_indices = vec![2_usize, 3_usize];
     let gradients = vec![1.0_f64, 2.0_f64, -1.0_f64, -2.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![0_usize], vec![1_usize], vec![1_usize]];
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8];
 
     let mut parent_hist = HistogramBuffer::new(3_usize);
     match parent_hist.accumulate(0_usize, 3.0_f64, 2.0_f64) {
@@ -597,6 +610,7 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
         n_features: 1_usize,
         n_bins: 3_usize,
         parent_histograms: &parent_histograms,
@@ -617,7 +631,7 @@ fn undersized_histogram(
     _: &[usize],
     _: &[f64],
     _: &[f64],
-    _: &[usize],
+    _: &[u8],
     _: usize,
 ) -> Result<HistogramBuffer, ClearGbmError> {
     // Return a histogram with only 2 bins, regardless of requested size
@@ -628,7 +642,6 @@ fn undersized_histogram(
 #[test]
 fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
     // Use hooks to inject undersized histogram, causing split finding to fail
-    // This exercises the `?` at line 482 in build_tree
     let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -641,7 +654,7 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let input = BuildTreeInput {
@@ -649,6 +662,8 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 4_usize, // 4 regular bins, but hook returns 2-bin histogram
         bin_thresholds: &bin_thresholds,
         config: &cfg,
@@ -667,7 +682,6 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
 #[test]
 fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> {
     // Test error propagation from finalize_nodes via hook injection.
-    // This covers the Err arm at line 383 in build_tree.
     let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -680,7 +694,7 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
     let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let input = BuildTreeInput {
@@ -688,6 +702,8 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 4_usize,
         bin_thresholds: &bin_thresholds,
         config: &cfg,

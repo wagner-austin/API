@@ -17,7 +17,7 @@ fn prop_histogram_sums_inner(
     sample_indices: &[usize],
     gradients: &[f64],
     hessians: &[f64],
-    bins: &[usize],
+    bins: &[u8],
     n_bins: usize,
 ) -> Result<(), proptest::test_runner::TestCaseError> {
     let hist = match to_test_error(
@@ -65,7 +65,7 @@ fn prop_subtract_correctness_inner(
 #[test]
 fn test_prop_histogram_sums_inner_error() -> Result<(), ClearGbmError> {
     // Cover error path by using empty indices
-    let result = prop_histogram_sums_inner(&[], &[1.0_f64], &[1.0_f64], &[0_usize], 2_usize);
+    let result = prop_histogram_sums_inner(&[], &[1.0_f64], &[1.0_f64], &[0_u8], 2_usize);
     assert!(result.is_err());
     Ok(())
 }
@@ -113,7 +113,15 @@ fn prop_histogram_sums_equal_input_sums() -> Result<(), ClearGbmError> {
                 };
                 let hessians: Vec<f64> = (0_usize..n_samples).map(|_| 1.0_f64).collect();
                 let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
-                let bins: Vec<usize> = (0_usize..n_samples).map(|i| i % n_bins).collect();
+                let bins: Vec<u8> = (0_usize..n_samples)
+                    .map(|i| {
+                        let b = i % n_bins;
+                        match u8::try_from(b) {
+                            Ok(v) => v,
+                            Err(_) => 0_u8,
+                        }
+                    })
+                    .collect();
                 prop_histogram_sums_inner(&sample_indices, &gradients, &hessians, &bins, n_bins)
             },
         )

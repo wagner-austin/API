@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 
 use crate::binning;
+use crate::binning::FeatureBins;
 use crate::error::ClearGbmError;
 use crate::pyo3_module::array_helpers::{i64_to_usize, try_convert_int};
 use crate::pyo3_module::prediction_fns::extract_rows;
@@ -49,8 +50,8 @@ pub(crate) fn precompute_feature_bins_rs<'py>(
     let thresholds = fb.bin_thresholds();
     let py_thresholds = propagate!(build_thresholds_list(py, &thresholds));
 
-    // Convert sample_bins to 2D i64 numpy array
-    let py_bins = propagate!(build_bins_array(py, fb.sample_bins()));
+    // Convert column-major u8 storage back to row-major 2D i64 for Python.
+    let py_bins = propagate!(build_bins_array_from_feature_bins(py, &fb));
 
     let n_reg = fb.n_regular_bins();
     let n_reg_py = propagate!(n_reg.into_pyobject(py).map_err(Into::<PyErr>::into)).into_any();
@@ -149,7 +150,13 @@ pub(crate) fn build_thresholds_list<'py>(
     PyList::new(py, items)
 }
 
-/// Converts sample bins `[n_samples][n_features]` (usize) to a 2D i64 numpy array.
+/// Converts row-major sample bins (`usize`, `[n_samples][n_features]`) to a 2D
+/// i64 numpy array.
+///
+/// Used by [`bin_samples_rs`], which still returns `Vec<Vec<usize>>` from the
+/// standalone `bin_samples` public function. The training-path bindings use
+/// [`build_bins_array_from_feature_bins`] instead, which walks the flat
+/// column-major u8 storage that lives inside [`FeatureBins`].
 ///
 /// # Errors
 ///
@@ -173,6 +180,52 @@ pub(crate) fn build_bins_array<'py>(
         for &val in row {
             let converted: i64 = propagate_into!(try_convert_int(val, "sample bin index"));
             row_i64.push(converted);
+        }
+        rows_i64.push(row_i64);
+    }
+
+    match PyArray2::from_vec2(py, &rows_i64) {
+        Ok(a) => Ok(a),
+        Err(e) => Err(ClearGbmError::ShapeMismatch {
+            expected: "uniform row lengths".to_string(),
+            got: format!("{e}"),
+        }
+        .into()),
+    }
+}
+
+/// Converts a `FeatureBins` (flat column-major u8) to a 2D i64 numpy array
+/// in row-major `[n_samples][n_features]` layout for Python consumers.
+///
+/// The Python surface has historically returned the sample-bins array as a
+/// 2D i64 numpy array in row-major shape. This helper transposes the internal
+/// column-major u8 storage back to that shape at the binding boundary — the
+/// core training path never allocates the row-major layout at all.
+///
+/// # Errors
+///
+/// Returns `PyErr` if array creation fails (should not happen — the transpose
+/// produces uniform row lengths by construction).
+pub(crate) fn build_bins_array_from_feature_bins<'py>(
+    py: Python<'py>,
+    fb: &FeatureBins,
+) -> PyResult<Bound<'py, PyArray2<i64>>> {
+    let n_samples = fb.n_samples();
+    let n_features = fb.n_features();
+
+    if n_samples == 0_usize {
+        return Ok(propagate_into!(PyArray2::from_vec2(
+            py,
+            &Vec::<Vec<i64>>::new()
+        )));
+    }
+
+    let mut rows_i64: Vec<Vec<i64>> = Vec::with_capacity(n_samples);
+    for sample_idx in 0_usize..n_samples {
+        let mut row_i64 = Vec::with_capacity(n_features);
+        for feat_idx in 0_usize..n_features {
+            let bin_u8 = fb.bins()[feat_idx * n_samples + sample_idx];
+            row_i64.push(i64::from(bin_u8));
         }
         rows_i64.push(row_i64);
     }

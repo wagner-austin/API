@@ -19,10 +19,13 @@ fn test_precompute_basic() -> Result<(), ClearGbmError> {
 
     assert_eq!(fb.bin_edges().len(), 2_usize);
     assert_eq!(fb.n_regular_bins(), 4_usize);
-    assert_eq!(fb.sample_bins().len(), 4_usize);
-    for row in fb.sample_bins() {
-        assert_eq!(row.len(), 2_usize);
-    }
+    assert_eq!(fb.n_samples(), 4_usize);
+    assert_eq!(fb.n_features(), 2_usize);
+    // Flat storage length = n_samples * n_features
+    assert_eq!(fb.bins().len(), 8_usize);
+    // Per-feature slices are contiguous n_samples-long views
+    assert_eq!(fb.bins_for_feature(0_usize).len(), 4_usize);
+    assert_eq!(fb.bins_for_feature(1_usize).len(), 4_usize);
     Ok(())
 }
 
@@ -58,9 +61,20 @@ fn test_precompute_with_nan() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    assert_eq!(fb.sample_bins()[1][0], fb.n_regular_bins());
-    assert!(fb.sample_bins()[0][0] < fb.n_regular_bins());
-    assert!(fb.sample_bins()[2][0] < fb.n_regular_bins());
+    let nan_bin_u8 = match u8::try_from(fb.n_regular_bins()) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ClearGbmError::IntegerConversion {
+                context: "nan_bin_u8 test setup".to_string(),
+            })
+        }
+    };
+    // Feature 0, sample 1 has NaN → NaN bin.
+    let col0 = fb.bins_for_feature(0_usize);
+    assert_eq!(col0[1_usize], nan_bin_u8);
+    // Samples 0 and 2 are non-NaN → regular bin (< n_regular_bins).
+    assert!(col0[0_usize] < nan_bin_u8);
+    assert!(col0[2_usize] < nan_bin_u8);
     Ok(())
 }
 
@@ -73,8 +87,16 @@ fn test_precompute_all_nan_feature() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    for row in fb.sample_bins() {
-        assert_eq!(row[0], fb.n_regular_bins());
+    let nan_bin_u8 = match u8::try_from(fb.n_regular_bins()) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ClearGbmError::IntegerConversion {
+                context: "nan_bin_u8 test setup".to_string(),
+            })
+        }
+    };
+    for &b in fb.bins_for_feature(0_usize) {
+        assert_eq!(b, nan_bin_u8);
     }
     let thresholds = fb.bin_thresholds();
     for &t in &thresholds[0] {
@@ -96,12 +118,19 @@ fn test_precompute_roundtrip_with_build_tree_input() -> Result<(), ClearGbmError
         Err(e) => return Err(e),
     };
 
-    assert_eq!(fb.sample_bins().len(), 3_usize);
-    for row in fb.sample_bins() {
-        assert_eq!(row.len(), 2_usize);
-        for &bin in row {
-            assert!(bin <= fb.n_regular_bins());
+    assert_eq!(fb.n_samples(), 3_usize);
+    assert_eq!(fb.n_features(), 2_usize);
+    let nan_bin_u8 = match u8::try_from(fb.n_regular_bins()) {
+        Ok(v) => v,
+        Err(_) => {
+            return Err(ClearGbmError::IntegerConversion {
+                context: "nan_bin_u8 test setup".to_string(),
+            })
         }
+    };
+    // Every value is within `0..=n_regular_bins`
+    for &b in fb.bins() {
+        assert!(b <= nan_bin_u8);
     }
 
     let thresholds = fb.bin_thresholds();
@@ -135,6 +164,19 @@ fn test_precompute_error_max_bins_1() -> Result<(), ClearGbmError> {
 }
 
 #[test]
+fn test_precompute_error_max_bins_over_255() -> Result<(), ClearGbmError> {
+    // The u8 bin-index invariant caps max_bins at 255.
+    let data: Vec<Vec<f64>> = vec![vec![1.0_f64]];
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let result = precompute_feature_bins(&refs, 256_usize);
+    assert!(matches!(
+        result,
+        Err(ClearGbmError::InvalidParameter { .. })
+    ));
+    Ok(())
+}
+
+#[test]
 fn test_precompute_error_empty() -> Result<(), ClearGbmError> {
     let refs: Vec<&[f64]> = Vec::new();
     let result = precompute_feature_bins(&refs, 4_usize);
@@ -159,5 +201,17 @@ fn test_bin_thresholds_padding_with_fewer_edges() -> Result<(), ClearGbmError> {
     for item in thresholds[0].iter().skip(n_actual_edges) {
         assert_eq!(*item, f64::INFINITY);
     }
+    Ok(())
+}
+
+#[test]
+fn test_bins_for_feature_out_of_range_returns_empty() -> Result<(), ClearGbmError> {
+    let data: Vec<Vec<f64>> = vec![vec![1.0_f64], vec![2.0_f64]];
+    let refs: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+    let fb = match precompute_feature_bins(&refs, 4_usize) {
+        Ok(f) => f,
+        Err(e) => return Err(e),
+    };
+    assert!(fb.bins_for_feature(999_usize).is_empty());
     Ok(())
 }

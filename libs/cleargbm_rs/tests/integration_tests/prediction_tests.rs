@@ -17,14 +17,8 @@ fn test_end_to_end_build_then_predict() -> std::result::Result<(), ClearGbmError
     let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // 6 samples, 1 feature. Column-major flat: [0,0,0,1,1,1].
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -41,6 +35,8 @@ fn test_end_to_end_build_then_predict() -> std::result::Result<(), ClearGbmError
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -86,14 +82,8 @@ fn test_prediction_batch_matches_individual() -> std::result::Result<(), ClearGb
     let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // 6 samples, 1 feature. Column-major flat: [0,0,0,1,1,1].
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -110,6 +100,8 @@ fn test_prediction_batch_matches_individual() -> std::result::Result<(), ClearGb
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -150,14 +142,8 @@ fn test_ensemble_prediction_mathematical_correctness() -> std::result::Result<()
     let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // 6 samples, 1 feature. Column-major flat: [0,0,0,1,1,1].
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -174,6 +160,8 @@ fn test_ensemble_prediction_mathematical_correctness() -> std::result::Result<()
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,

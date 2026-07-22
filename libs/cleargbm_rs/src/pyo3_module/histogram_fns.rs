@@ -10,7 +10,8 @@ use pyo3::types::PyTuple;
 use crate::error::ClearGbmError;
 use crate::histogram;
 use crate::pyo3_module::array_helpers::{
-    i64_slice_to_usize_vec, i64_to_usize, u64_slice_to_usize_vec, usize_slice_to_u64_vec,
+    i64_slice_to_u8_vec, i64_slice_to_usize_vec, i64_to_usize, u64_slice_to_usize_vec,
+    usize_slice_to_u64_vec,
 };
 use crate::types::HistogramBuffer;
 
@@ -95,7 +96,7 @@ pub(crate) fn build_histogram_rs<'py>(
             .into())
         }
     };
-    let bins_usize = match i64_slice_to_usize_vec(bins_i64_slice, "bins") {
+    let bins_u8 = match i64_slice_to_u8_vec(bins_i64_slice, "bins") {
         Ok(v) => v,
         Err(e) => return Err(e.into()),
     };
@@ -110,7 +111,7 @@ pub(crate) fn build_histogram_rs<'py>(
         &sample_idx,
         grad_slice,
         hess_slice,
-        &bins_usize,
+        &bins_u8,
         n_bins_usize,
     ) {
         Ok(h) => h,

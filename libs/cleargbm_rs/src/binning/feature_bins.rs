@@ -2,11 +2,35 @@
 //!
 //! Wraps bin edges and sample bin assignments into a single struct
 //! that produces output compatible with `BuildTreeInput`.
+//!
+//! # Storage layout
+//!
+//! `sample_bins` is a flat, column-major `Vec<u8>`: bin `[feat_idx, sample_idx]`
+//! lives at `sample_bins[feat_idx * n_samples + sample_idx]`. A per-feature
+//! histogram scan walks `n_samples` contiguous bytes, so cache prefetching
+//! hits and a 256-bit AVX load pulls 32 bin values instead of 4. Bin values
+//! are in `0..=n_regular_bins`; the NaN bin is at `n_regular_bins` and is
+//! representable in `u8` because the training config caps `max_bins ≤ 255`.
 
 use crate::error::ClearGbmError;
 
 use super::assignment::assign_bin;
 use super::edges::{compute_bin_edges, BinEdges};
+
+/// Converts a `usize` to `u8`, returning an `IntegerConversion` error on overflow.
+///
+/// Used at the storage boundary where bin indices are packed into `u8` for
+/// cache density. Under the `max_bins ≤ 255` invariant enforced upstream by
+/// the training config, the `try_from` call cannot fail — the Err arm is a
+/// defense-in-depth guard against callers that bypass the invariant.
+fn usize_to_u8(value: usize, context: &str) -> Result<u8, ClearGbmError> {
+    match u8::try_from(value) {
+        Ok(v) => Ok(v),
+        Err(_) => Err(ClearGbmError::IntegerConversion {
+            context: format!("{context}: {value} does not fit in u8"),
+        }),
+    }
+}
 
 /// Combined binning result: edges + sample assignments.
 ///
@@ -17,9 +41,17 @@ pub struct FeatureBins {
     /// One `BinEdges` per feature.
     bin_edges: Vec<BinEdges>,
 
-    /// Bin index per (sample, feature). Shape: `[n_samples][n_features]`.
-    /// Values in `0..=n_regular_bins` (NaN bin at `n_regular_bins`).
-    sample_bins: Vec<Vec<usize>>,
+    /// Flat column-major bin index storage.
+    ///
+    /// `sample_bins[feat_idx * n_samples + sample_idx]`. Values in
+    /// `0..=n_regular_bins` (NaN bin at `n_regular_bins`).
+    sample_bins: Vec<u8>,
+
+    /// Number of samples (row count in the original feature matrix).
+    n_samples: usize,
+
+    /// Number of features (column count in the original feature matrix).
+    n_features: usize,
 
     /// Uniform regular bin count (= `max_bins`).
     n_regular_bins: usize,
@@ -32,10 +64,40 @@ impl FeatureBins {
         &self.bin_edges
     }
 
-    /// Returns sample bin assignments `[n_samples][n_features]`.
+    /// Returns the flat column-major bin storage.
+    ///
+    /// Access as `bins()[feat_idx * n_samples() + sample_idx]`. Callers that
+    /// want a per-feature slice should use [`Self::bins_for_feature`].
     #[must_use]
-    pub fn sample_bins(&self) -> &[Vec<usize>] {
+    pub fn bins(&self) -> &[u8] {
         &self.sample_bins
+    }
+
+    /// Returns the contiguous bin slice for a single feature.
+    ///
+    /// Returns `&sample_bins[feat_idx * n_samples..(feat_idx + 1) * n_samples]`.
+    /// The slice is empty (and the return still valid) when the feature index
+    /// is out of range; callers should validate before use.
+    #[must_use]
+    pub fn bins_for_feature(&self, feat_idx: usize) -> &[u8] {
+        if feat_idx >= self.n_features {
+            return &[];
+        }
+        let start = feat_idx * self.n_samples;
+        let end = start + self.n_samples;
+        &self.sample_bins[start..end]
+    }
+
+    /// Returns the sample count (row count of the original feature matrix).
+    #[must_use]
+    pub fn n_samples(&self) -> usize {
+        self.n_samples
+    }
+
+    /// Returns the feature count (column count of the original feature matrix).
+    #[must_use]
+    pub fn n_features(&self) -> usize {
+        self.n_features
     }
 
     /// Returns the uniform regular bin count.
@@ -77,48 +139,86 @@ impl FeatureBins {
 /// Precomputes bin edges and sample bin assignments for all features.
 ///
 /// This is the single entry point called once per training run. It computes
-/// quantile-based bin edges, then assigns each sample to its bin.
+/// quantile-based bin edges, then assigns each sample to its bin. The output
+/// is a flat column-major `Vec<u8>` — see the module-level docs for the
+/// layout rationale.
 ///
 /// # Args
 ///
 /// * `x` - Row-major feature matrix `[n_samples][n_features]`.
-/// * `max_bins` - Maximum number of bins per feature (>= 2).
+/// * `max_bins` - Maximum number of bins per feature (`2 ≤ max_bins ≤ 255`).
+///   The upper bound is enforced by
+///   [`GradientBoostingConfig::new`](crate::training::GradientBoostingConfig::new)
+///   before this function is called; this function relies on the invariant to
+///   pack bin indices into `u8`.
 ///
 /// # Returns
 ///
-/// A `FeatureBins` containing edges, sample assignments, and the bin count.
+/// A `FeatureBins` containing edges, flat column-major u8 assignments, and
+/// the bin count.
 ///
 /// # Errors
 ///
-/// Propagates errors from `compute_bin_edges`.
+/// * Propagates errors from `compute_bin_edges`.
+/// * Returns `ClearGbmError::InvalidParameter` if `max_bins > 255` — the u8
+///   bin-index invariant is broken.
+/// * Returns `ClearGbmError::IntegerConversion` if a computed bin index cannot
+///   be represented in `u8` (dead branch under the `max_bins ≤ 255` guard, but
+///   the check is kept as a defense in depth).
 pub fn precompute_feature_bins(
     x: &[&[f64]],
     max_bins: usize,
 ) -> Result<FeatureBins, ClearGbmError> {
+    if max_bins > 255_usize {
+        return Err(ClearGbmError::InvalidParameter {
+            name: "max_bins".to_string(),
+            reason: format!("must be <= 255 (u8 bin index), got {max_bins}"),
+        });
+    }
+
     let bin_edges = match compute_bin_edges(x, max_bins) {
         Ok(e) => e,
         Err(e) => return Err(e),
     };
 
-    // Assign bins directly using assign_bin (validation already done by compute_bin_edges).
-    let nan_bin = max_bins;
-    let mut sample_bins = Vec::with_capacity(x.len());
-    for row in x {
-        let mut row_bins = Vec::with_capacity(bin_edges.len());
-        for (feat_idx, be) in bin_edges.iter().enumerate() {
+    let n_samples = x.len();
+    let n_features = bin_edges.len();
+    let nan_bin_usize = max_bins;
+    let nan_bin: u8 = match usize_to_u8(nan_bin_usize, "nan_bin_index") {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+
+    // Flat column-major storage: sample_bins[feat_idx * n_samples + sample_idx]
+    let mut sample_bins = vec![0_u8; n_samples * n_features];
+
+    for (feat_idx, be) in bin_edges.iter().enumerate() {
+        let feat_edges = be.edges();
+        let feat_col_start = feat_idx * n_samples;
+        for (sample_idx, row) in x.iter().enumerate() {
             let val = row[feat_idx];
-            if val.is_nan() {
-                row_bins.push(nan_bin);
+            let bin_idx_usize = if val.is_nan() {
+                nan_bin_usize
             } else {
-                row_bins.push(assign_bin(val, be.edges()));
-            }
+                assign_bin(val, feat_edges)
+            };
+            let bin_idx: u8 = if bin_idx_usize == nan_bin_usize {
+                nan_bin
+            } else {
+                match usize_to_u8(bin_idx_usize, "bin_index") {
+                    Ok(v) => v,
+                    Err(e) => return Err(e),
+                }
+            };
+            sample_bins[feat_col_start + sample_idx] = bin_idx;
         }
-        sample_bins.push(row_bins);
     }
 
     Ok(FeatureBins {
         bin_edges,
         sample_bins,
+        n_samples,
+        n_features,
         n_regular_bins: max_bins,
     })
 }

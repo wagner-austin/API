@@ -144,14 +144,8 @@ fn test_loss_feeds_tree_building() -> std::result::Result<(), ClearGbmError> {
     // Build a tree using the computed gradients/hessians
     let sample_indices: Vec<usize> = (0_usize..6_usize).collect();
     // Feature: first 3 samples have low values, last 3 have high values
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // 6 samples, 1 feature, column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -168,6 +162,8 @@ fn test_loss_feeds_tree_building() -> std::result::Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,

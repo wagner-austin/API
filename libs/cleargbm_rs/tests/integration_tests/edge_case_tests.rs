@@ -18,7 +18,8 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
     let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![vec![0_usize], vec![1_usize], vec![2_usize], vec![3_usize]];
+    // 4 samples, 1 feature, column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -35,6 +36,8 @@ fn test_no_useful_split() -> std::result::Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 4_usize,
+        n_features: 1_usize,
         n_regular_bins: 4_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -79,14 +82,8 @@ fn test_tree_node_accessors() -> std::result::Result<(), ClearGbmError> {
     let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // 6 samples, 1 feature, column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -103,6 +100,8 @@ fn test_tree_node_accessors() -> std::result::Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,

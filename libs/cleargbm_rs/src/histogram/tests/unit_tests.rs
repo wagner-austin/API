@@ -11,7 +11,7 @@ fn test_build_histogram_simple() -> Result<(), ClearGbmError> {
         let sample_indices = vec![0_usize, 1_usize, 2_usize];
         let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
         let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize, 0_usize];
+        let bins = vec![0_u8, 1_u8, 0_u8];
         let n_bins = 3_usize;
 
         let hist = match build_histogram(&sample_indices, &gradients, &hessians, &bins, n_bins) {
@@ -37,7 +37,7 @@ fn test_build_histogram_simple() -> Result<(), ClearGbmError> {
         let sample_indices: Vec<usize> = vec![];
         let gradients = vec![0.1_f64];
         let hessians = vec![1.0_f64];
-        let bins = vec![0_usize];
+        let bins = vec![0_u8];
         let n_bins = 3_usize;
 
         match build_histogram(&sample_indices, &gradients, &hessians, &bins, n_bins) {
@@ -62,7 +62,7 @@ fn test_build_histogram_subset_of_samples() -> Result<(), ClearGbmError> {
         let sample_indices = vec![0_usize, 2_usize]; // Only samples 0 and 2
         let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
         let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize, 0_usize];
+        let bins = vec![0_u8, 1_u8, 0_u8];
         let n_bins = 2_usize;
 
         let hist = match build_histogram(&sample_indices, &gradients, &hessians, &bins, n_bins) {
@@ -83,7 +83,7 @@ fn test_build_histogram_subset_of_samples() -> Result<(), ClearGbmError> {
         let sample_indices: Vec<usize> = vec![];
         let gradients = vec![0.1_f64];
         let hessians = vec![1.0_f64];
-        let bins = vec![0_usize];
+        let bins = vec![0_u8];
         let n_bins = 2_usize;
 
         match build_histogram(&sample_indices, &gradients, &hessians, &bins, n_bins) {
@@ -106,7 +106,7 @@ fn test_build_histogram_empty_indices_fails() -> Result<(), ClearGbmError> {
     let sample_indices: Vec<usize> = vec![];
     let gradients = vec![0.1_f64];
     let hessians = vec![1.0_f64];
-    let bins = vec![0_usize];
+    let bins = vec![0_u8];
 
     let result = build_histogram(&sample_indices, &gradients, &hessians, &bins, 2_usize);
 
@@ -120,7 +120,7 @@ fn test_build_histogram_index_out_of_bounds() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 5_usize]; // 5 is out of bounds
     let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![0_usize, 1_usize, 0_usize];
+    let bins = vec![0_u8, 1_u8, 0_u8];
 
     let result = build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize);
 
@@ -137,7 +137,7 @@ fn test_build_histogram_hessians_length_mismatch() -> Result<(), ClearGbmError> 
     let sample_indices = vec![0_usize, 1_usize];
     let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
     let hessians = vec![1.0_f64, 1.0_f64]; // Wrong length
-    let bins = vec![0_usize, 1_usize, 0_usize];
+    let bins = vec![0_u8, 1_u8, 0_u8];
 
     let result = build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize);
 
@@ -151,7 +151,7 @@ fn test_build_histogram_bins_length_mismatch() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize];
     let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![0_usize, 1_usize]; // Wrong length
+    let bins = vec![0_u8, 1_u8]; // Wrong length
 
     let result = build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize);
 
@@ -165,7 +165,7 @@ fn test_build_histogram_bin_out_of_bounds() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_usize, 1_usize, 2_usize];
     let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![0_usize, 5_usize, 0_usize]; // bin 5 is out of bounds for n_bins=3
+    let bins = vec![0_u8, 5_u8, 0_u8]; // bin 5 is out of bounds for n_bins=3
 
     let result = build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize);
 
@@ -188,7 +188,15 @@ fn test_build_histogram_large() -> Result<(), ClearGbmError> {
         .map(|i| f64::from(i) * 0.001_f64)
         .collect();
     let hessians: Vec<f64> = vec![1.0_f64; n];
-    let bins: Vec<usize> = (0_usize..n).map(|i| i % 64_usize).collect();
+    let bins: Vec<u8> = (0_usize..n)
+        .map(|i| {
+            let b = i % 64_usize;
+            match u8::try_from(b) {
+                Ok(v) => v,
+                Err(_) => 0_u8,
+            }
+        })
+        .collect();
 
     let hist = match build_histogram(&sample_indices, &gradients, &hessians, &bins, 64_usize) {
         Ok(h) => h,

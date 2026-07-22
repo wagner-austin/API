@@ -114,7 +114,7 @@ fn test_histogram_accumulation_correctness() -> std::result::Result<(), ClearGbm
     let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize, 4_usize, 5_usize];
     let gradients = vec![0.1_f64, 0.2_f64, 0.3_f64, 0.4_f64, 0.5_f64, 0.6_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let bins = vec![0_usize, 1_usize, 2_usize, 0_usize, 1_usize, 2_usize];
+    let bins = vec![0_u8, 1_u8, 2_u8, 0_u8, 1_u8, 2_u8];
 
     let hist = match build_histogram(&sample_indices, &gradients, &hessians, &bins, 3_usize) {
         Ok(h) => h,

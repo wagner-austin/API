@@ -10,6 +10,16 @@ use cleargbm_rs::{
 
 use super::EPSILON;
 
+/// Converts a `usize` bin index into `u8`, falling back to `0_u8` when the value
+/// exceeds `u8::MAX`. Used only in test fixtures where `usize` inputs are known
+/// to be well under 255 by construction.
+fn bin_u8(idx: usize) -> u8 {
+    match u8::try_from(idx) {
+        Ok(v) => v,
+        Err(_) => 0_u8,
+    }
+}
+
 /// Test building a tree on simple binary classification data
 /// and verify the predictions are correct
 #[test]
@@ -35,8 +45,8 @@ fn test_tree_binary_classification_correctness() -> std::result::Result<(), Clea
         0.25_f64, 0.25_f64, 0.25_f64, 0.25_f64, 0.25_f64, 0.25_f64, 0.25_f64, 0.25_f64,
     ];
 
-    // Bins: 8 bins (one per sample for simplicity)
-    let bins: Vec<Vec<usize>> = (0_usize..8_usize).map(|i| vec![i]).collect();
+    // 8 samples, 1 feature. Column-major flat: [bin(0..8)] for feature 0.
+    let bins: Vec<u8> = (0_usize..8_usize).map(bin_u8).collect();
     let bin_thresholds = vec![vec![
         0.15_f64, 0.25_f64, 0.35_f64, 0.45_f64, 0.55_f64, 0.65_f64, 0.75_f64, 0.85_f64,
     ]];
@@ -55,6 +65,8 @@ fn test_tree_binary_classification_correctness() -> std::result::Result<(), Clea
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 8_usize,
+        n_features: 1_usize,
         n_regular_bins: 8_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -115,15 +127,8 @@ fn test_tree_minimizes_squared_error() -> std::result::Result<(), ClearGbmError>
     let gradients = vec![-1.0_f64, -1.0_f64, -1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    // Two bins: first 3 samples in bin 0, last 3 in bin 1
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![1_usize],
-    ];
+    // Two bins: first 3 samples in bin 0, last 3 in bin 1. Column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8, 1_u8, 1_u8, 1_u8];
     let bin_thresholds = vec![vec![0.5_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -140,6 +145,8 @@ fn test_tree_minimizes_squared_error() -> std::result::Result<(), ClearGbmError>
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 2_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -216,14 +223,8 @@ fn test_monotonic_constraint_enforcement() -> std::result::Result<(), ClearGbmEr
     let gradients = vec![-1.0_f64, -1.0_f64, 0.0_f64, 0.0_f64, 1.0_f64, 1.0_f64];
     let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
 
-    let bins = vec![
-        vec![0_usize],
-        vec![0_usize],
-        vec![1_usize],
-        vec![1_usize],
-        vec![2_usize],
-        vec![2_usize],
-    ];
+    // 6 samples, 1 feature, column-major flat.
+    let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8, 2_u8, 2_u8];
     let bin_thresholds = vec![vec![0.33_f64, 0.66_f64, 1.0_f64]];
 
     let split_config = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
@@ -242,6 +243,8 @@ fn test_monotonic_constraint_enforcement() -> std::result::Result<(), ClearGbmEr
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 6_usize,
+        n_features: 1_usize,
         n_regular_bins: 3_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,
@@ -297,7 +300,8 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64,
     ];
 
-    let bins: Vec<Vec<usize>> = (0_usize..8_usize).map(|i| vec![i]).collect();
+    // 8 samples, 1 feature, column-major flat.
+    let bins: Vec<u8> = (0_usize..8_usize).map(bin_u8).collect();
     let bin_thresholds = vec![vec![
         0.125_f64, 0.25_f64, 0.375_f64, 0.5_f64, 0.625_f64, 0.75_f64, 0.875_f64, 1.0_f64,
     ]];
@@ -318,6 +322,8 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 8_usize,
+        n_features: 1_usize,
         n_regular_bins: 8_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config_no_reg,
@@ -345,6 +351,8 @@ fn test_regularization_effects() -> std::result::Result<(), ClearGbmError> {
         gradients: &gradients,
         hessians: &hessians,
         bins: &bins,
+        n_samples: 8_usize,
+        n_features: 1_usize,
         n_regular_bins: 8_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config_l2,

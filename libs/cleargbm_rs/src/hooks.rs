@@ -36,13 +36,13 @@ use crate::types::HistogramBuffer;
 
 /// Function signature for building a single histogram.
 ///
-/// Takes sample indices, gradients, hessians, bin assignments, and number of bins.
-/// Returns a histogram buffer or an error.
+/// Takes sample indices, gradients, hessians, bin assignments (`u8` per
+/// sample), and number of bins. Returns a histogram buffer or an error.
 pub type BuildHistogramFn = fn(
     sample_indices: &[usize],
     gradients: &[f64],
     hessians: &[f64],
-    bins: &[usize],
+    bins: &[u8],
     n_bins: usize,
 ) -> Result<HistogramBuffer, ClearGbmError>;
 
@@ -131,7 +131,7 @@ mod tests {
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize];
+        let bins = vec![0_u8, 1_u8];
         let result =
             (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
         assert!(result.is_ok());
@@ -144,7 +144,7 @@ mod tests {
             _: &[usize],
             _: &[f64],
             _: &[f64],
-            _: &[usize],
+            _: &[u8],
             _: usize,
         ) -> Result<HistogramBuffer, ClearGbmError> {
             Err(ClearGbmError::EmptyInput {
@@ -156,7 +156,7 @@ mod tests {
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize];
+        let bins = vec![0_u8, 1_u8];
         let result =
             (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
         assert!(result.is_err());
@@ -171,7 +171,7 @@ mod tests {
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize];
+        let bins = vec![0_u8, 1_u8];
 
         let result1 =
             (hooks1.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
@@ -196,7 +196,7 @@ mod tests {
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize];
+        let bins = vec![0_u8, 1_u8];
         let result =
             (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
         assert!(result.is_ok());
@@ -216,7 +216,7 @@ mod tests {
             _: &[usize],
             _: &[f64],
             _: &[f64],
-            _: &[usize],
+            _: &[u8],
             _: usize,
         ) -> Result<HistogramBuffer, ClearGbmError> {
             Ok(HistogramBuffer::new(3_usize))
@@ -229,7 +229,7 @@ mod tests {
         let sample_indices = vec![0_usize, 1_usize];
         let gradients = vec![1.0_f64, 2.0_f64];
         let hessians = vec![1.0_f64, 1.0_f64];
-        let bins = vec![0_usize, 1_usize];
+        let bins = vec![0_u8, 1_u8];
         let result =
             (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
         assert!(result.is_ok());

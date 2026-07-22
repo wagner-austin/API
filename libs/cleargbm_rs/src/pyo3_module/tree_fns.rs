@@ -143,22 +143,36 @@ pub(crate) fn py_tree_repr_rs(tree: &PyTree) -> String {
 // clippy::too_many_arguments (16 params). The tree building logic
 // lives directly in the argument extraction wrapper.
 
-/// Unflattens a row-major i64 slice into `Vec<Vec<usize>>` with shape
-/// `(n_rows, n_features)`.
+/// Transposes a row-major i64 bin-index slice into a column-major flat `Vec<u8>`
+/// with layout `bins[feat_idx * n_samples + sample_idx]`.
+///
+/// The Python binding accepts bins as an `i64` numpy array with shape
+/// `(n_samples, n_features)` in row-major order. The Rust tree builder wants
+/// the same data in column-major u8 (see `FeatureBins` for the rationale).
+/// This helper performs both conversions at the boundary: `i64 → u8` with
+/// range-checked `TryFrom` for each element, and row-major → column-major
+/// index remapping.
 ///
 /// # Args
 ///
-/// * `flat` - Flattened i64 data.
+/// * `flat` - Row-major `[sample_idx * n_features + feat_idx]` i64 data.
 /// * `n_features` - Number of columns (features).
 ///
 /// # Returns
 ///
-/// Nested vector indexed as `[sample][feature]`.
+/// A tuple `(column_major_bins, n_samples)` where `column_major_bins.len() ==
+/// n_samples * n_features`.
 ///
 /// # Errors
 ///
-/// Returns error if length is not divisible by `n_features`, or conversion fails.
-fn unflatten_bins(flat: &[i64], n_features: usize) -> Result<Vec<Vec<usize>>, ClearGbmError> {
+/// * `ClearGbmError::InvalidParameter` if `n_features == 0`.
+/// * `ClearGbmError::ShapeMismatch` if `flat.len()` is not divisible by
+///   `n_features`.
+/// * `ClearGbmError::IntegerConversion` if any entry is out of `u8` range.
+fn bins_to_column_major_u8(
+    flat: &[i64],
+    n_features: usize,
+) -> Result<(Vec<u8>, usize), ClearGbmError> {
     if n_features == 0_usize {
         return Err(ClearGbmError::InvalidParameter {
             name: "n_features".to_string(),
@@ -173,19 +187,27 @@ fn unflatten_bins(flat: &[i64], n_features: usize) -> Result<Vec<Vec<usize>>, Cl
     }
 
     let n_samples = flat.len() / n_features;
-    let mut result = Vec::with_capacity(n_samples);
+    let mut column_major = vec![0_u8; n_samples * n_features];
 
-    for row_start_idx in 0_usize..n_samples {
-        let start = row_start_idx * n_features;
-        let end = start + n_features;
-        let row = match i64_slice_to_usize_vec(&flat[start..end], "bins") {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
-        result.push(row);
+    for sample_idx in 0_usize..n_samples {
+        let row_start = sample_idx * n_features;
+        for feat_idx in 0_usize..n_features {
+            let src_val = flat[row_start + feat_idx];
+            let dst_val: u8 = match u8::try_from(src_val) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(ClearGbmError::IntegerConversion {
+                        context: format!(
+                            "bins: {src_val} at (sample {sample_idx}, feat {feat_idx}) does not fit in u8"
+                        ),
+                    })
+                }
+            };
+            column_major[feat_idx * n_samples + sample_idx] = dst_val;
+        }
     }
 
-    Ok(result)
+    Ok((column_major, n_samples))
 }
 
 /// Unflattens a row-major f64 slice into `Vec<Vec<f64>>` with shape
@@ -542,7 +564,7 @@ pub(crate) fn build_tree_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyTree
             .into())
         }
     };
-    let bins = match unflatten_bins(bins_i64, n_features_usize) {
+    let (bins, n_samples_usize) = match bins_to_column_major_u8(bins_i64, n_features_usize) {
         Ok(v) => v,
         Err(e) => return Err(e.into()),
     };
@@ -595,6 +617,8 @@ pub(crate) fn build_tree_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyTree
         gradients: grad_slice,
         hessians: hess_slice,
         bins: &bins,
+        n_samples: n_samples_usize,
+        n_features: n_features_usize,
         n_regular_bins: n_regular_bins_usize,
         bin_thresholds: &bin_thresholds,
         config: &tree_config,

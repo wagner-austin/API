@@ -58,6 +58,14 @@ pub(super) struct BuildNode {
 }
 
 /// Configuration for `build_tree` to avoid too many arguments.
+///
+/// # Bin storage
+///
+/// `bins` is a flat column-major slice: bin `[feat_idx, sample_idx]` lives at
+/// `bins[feat_idx * n_samples + sample_idx]`. Each entry is a `u8` (bin index,
+/// `0..=n_regular_bins`). Column-major means a per-feature histogram scan
+/// walks `n_samples` contiguous bytes — cache-friendly and SIMD-loadable —
+/// instead of striding through fragmented row-major heap allocations.
 #[derive(Debug, Clone)]
 pub struct BuildTreeInput<'a> {
     /// Sample indices to include in tree.
@@ -69,8 +77,17 @@ pub struct BuildTreeInput<'a> {
     /// Hessians for all samples.
     pub hessians: &'a [f64],
 
-    /// Bin assignments per sample per feature (n_samples x n_features).
-    pub bins: &'a [Vec<usize>],
+    /// Bin assignments in flat column-major u8 storage.
+    ///
+    /// Length must equal `n_samples * n_features`. Access as
+    /// `bins[feat_idx * n_samples + sample_idx]`.
+    pub bins: &'a [u8],
+
+    /// Sample count (row count of the original feature matrix).
+    pub n_samples: usize,
+
+    /// Feature count (column count of the original feature matrix).
+    pub n_features: usize,
 
     /// Number of regular bins (excluding NaN bin).
     pub n_regular_bins: usize,
@@ -178,15 +195,23 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
         });
     }
 
-    let n_features = if input.bins.is_empty() {
-        0_usize
-    } else {
-        input.bins.first().map_or(0_usize, Vec::len)
-    };
+    let n_features = input.n_features;
 
     if n_features == 0_usize {
         return Err(ClearGbmError::EmptyInput {
             context: "bins (no features)".to_string(),
+        });
+    }
+
+    // Validate that the flat bin slice matches the declared shape.
+    let expected_bins_len = input.n_samples * n_features;
+    if input.bins.len() != expected_bins_len {
+        return Err(ClearGbmError::ShapeMismatch {
+            expected: format!(
+                "bins length {expected_bins_len} (n_samples={} * n_features={})",
+                input.n_samples, n_features
+            ),
+            got: format!("bins length {}", input.bins.len()),
         });
     }
 
@@ -277,6 +302,7 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
             gradients: input.gradients,
             hessians: input.hessians,
             bins: input.bins,
+            n_samples: input.n_samples,
             n_features,
             n_bins,
             hooks,
@@ -336,6 +362,7 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
         let (left_indices, right_indices) = split_samples(
             &pending.sample_indices,
             input.bins,
+            input.n_samples,
             split.feature_index(),
             split.split_bin(),
             split.nan_goes_left(),
@@ -349,6 +376,7 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
             gradients: input.gradients,
             hessians: input.hessians,
             bins: input.bins,
+            n_samples: input.n_samples,
             n_features,
             n_bins,
             parent_histograms: &histograms,
@@ -451,8 +479,10 @@ pub(super) struct BuildHistogramConfig<'a> {
     pub(super) gradients: &'a [f64],
     /// Hessians for all samples.
     pub(super) hessians: &'a [f64],
-    /// Bin assignments per sample per feature.
-    pub(super) bins: &'a [Vec<usize>],
+    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
+    pub(super) bins: &'a [u8],
+    /// Sample count (row count of the original feature matrix).
+    pub(super) n_samples: usize,
     /// Number of features.
     pub(super) n_features: usize,
     /// Number of bins.
@@ -466,7 +496,17 @@ pub(super) struct BuildHistogramConfig<'a> {
 /// Builds histograms for all features.
 ///
 /// Uses cached histograms from parent's sibling subtraction when available,
-/// otherwise builds histograms from scratch.
+/// otherwise builds histograms from scratch by dispatching to the histogram
+/// hook with a per-feature contiguous bin slice.
+///
+/// # Column-major fast path
+///
+/// The bins slice is column-major, so the per-feature bin column is
+/// `bins[feat_idx * n_samples..(feat_idx + 1) * n_samples]` — a contiguous
+/// `n_samples`-long byte slice. The full `sample_indices`, `gradients`, and
+/// `hessians` are threaded through directly; the histogram builder does the
+/// per-index gather. This eliminates the three per-(node, feature) allocations
+/// the pre-refactor row-major path required.
 pub(super) fn build_feature_histograms(
     config: &BuildHistogramConfig<'_>,
 ) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
@@ -481,31 +521,15 @@ pub(super) fn build_feature_histograms(
     let mut histograms = Vec::with_capacity(config.n_features);
 
     for feat_idx in 0_usize..config.n_features {
-        // Extract bins for this feature
-        let feat_bins: Vec<usize> = config
-            .sample_indices
-            .iter()
-            .filter_map(|&idx| config.bins.get(idx).and_then(|b| b.get(feat_idx).copied()))
-            .collect();
-
-        // Build histogram
-        let sample_idx_vec: Vec<usize> = (0_usize..feat_bins.len()).collect();
-        let feat_gradients: Vec<f64> = config
-            .sample_indices
-            .iter()
-            .filter_map(|&idx| config.gradients.get(idx).copied())
-            .collect();
-        let feat_hessians: Vec<f64> = config
-            .sample_indices
-            .iter()
-            .filter_map(|&idx| config.hessians.get(idx).copied())
-            .collect();
+        let feat_col_start = feat_idx * config.n_samples;
+        let feat_col_end = feat_col_start + config.n_samples;
+        let feat_bins = &config.bins[feat_col_start..feat_col_end];
 
         let hist = match (config.hooks.build_histogram)(
-            &sample_idx_vec,
-            &feat_gradients,
-            &feat_hessians,
-            &feat_bins,
+            config.sample_indices,
+            config.gradients,
+            config.hessians,
+            feat_bins,
             config.n_bins,
         ) {
             Ok(h) => h,
@@ -557,23 +581,30 @@ pub(super) fn find_best_split_across_features_internal(
 }
 
 /// Splits samples into left and right based on split result.
+///
+/// Reads bin values from a flat column-major `u8` slice. Samples whose bin
+/// index is out of range for the flat slice are treated as NaN — the
+/// pre-refactor behavior (missing per-row Vec → NaN) carried over.
 pub(super) fn split_samples(
     sample_indices: &[usize],
-    bins: &[Vec<usize>],
+    bins: &[u8],
+    n_samples: usize,
     feature_index: usize,
     split_bin: usize,
     nan_goes_left: bool,
     n_regular_bins: usize,
 ) -> (Vec<usize>, Vec<usize>) {
     let nan_bin = n_regular_bins;
+    let feat_col_start = feature_index * n_samples;
     let mut left = Vec::new();
     let mut right = Vec::new();
 
     for &idx in sample_indices {
-        let bin = bins
-            .get(idx)
-            .and_then(|b| b.get(feature_index).copied())
-            .unwrap_or(nan_bin);
+        let bin = if idx < n_samples {
+            usize::from(bins[feat_col_start + idx])
+        } else {
+            nan_bin
+        };
 
         // NaN bin handling
         if bin == nan_bin {
@@ -602,8 +633,10 @@ pub(super) struct ChildHistogramConfig<'a> {
     pub(super) gradients: &'a [f64],
     /// Hessians for all samples.
     pub(super) hessians: &'a [f64],
-    /// Bin assignments per sample per feature.
-    pub(super) bins: &'a [Vec<usize>],
+    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
+    pub(super) bins: &'a [u8],
+    /// Sample count (row count of the original feature matrix).
+    pub(super) n_samples: usize,
     /// Number of features.
     pub(super) n_features: usize,
     /// Number of bins.
@@ -634,27 +667,15 @@ pub(super) fn compute_child_histograms(
     let mut right_histograms = Vec::with_capacity(config.n_features);
 
     for feat_idx in 0_usize..config.n_features {
-        // Build histogram for smaller child
-        let feat_bins: Vec<usize> = smaller_indices
-            .iter()
-            .filter_map(|&idx| config.bins.get(idx).and_then(|b| b.get(feat_idx).copied()))
-            .collect();
-
-        let sample_idx_vec: Vec<usize> = (0_usize..feat_bins.len()).collect();
-        let feat_gradients: Vec<f64> = smaller_indices
-            .iter()
-            .filter_map(|&idx| config.gradients.get(idx).copied())
-            .collect();
-        let feat_hessians: Vec<f64> = smaller_indices
-            .iter()
-            .filter_map(|&idx| config.hessians.get(idx).copied())
-            .collect();
+        let feat_col_start = feat_idx * config.n_samples;
+        let feat_col_end = feat_col_start + config.n_samples;
+        let feat_bins = &config.bins[feat_col_start..feat_col_end];
 
         let smaller_hist = match (config.hooks.build_histogram)(
-            &sample_idx_vec,
-            &feat_gradients,
-            &feat_hessians,
-            &feat_bins,
+            smaller_indices,
+            config.gradients,
+            config.hessians,
+            feat_bins,
             config.n_bins,
         ) {
             Ok(h) => h,

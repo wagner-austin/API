@@ -111,6 +111,30 @@ pub(crate) fn i64_slice_to_usize_vec(
     convert_int_slice(slice, context)
 }
 
+/// Converts a slice of `i64` values to `Vec<u8>`.
+///
+/// Used to bridge the Python histogram binding, which receives bin
+/// assignments as an `i64` numpy array, to the Rust histogram code, which
+/// consumes bin indices as `u8` (see `histogram::build_histogram`'s module
+/// docs for the storage-layout rationale).
+///
+/// # Args
+///
+/// * `slice` - The input `i64` slice.
+/// * `context` - Description of what is being converted (for error messages).
+///
+/// # Returns
+///
+/// A `Vec<u8>` with all values converted.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::IntegerConversion`] if any value is negative or
+/// exceeds `u8::MAX` (255).
+pub(crate) fn i64_slice_to_u8_vec(slice: &[i64], context: &str) -> Result<Vec<u8>, ClearGbmError> {
+    convert_int_slice(slice, context)
+}
+
 /// Converts a slice of `usize` values to `Vec<u64>`.
 ///
 /// # Args

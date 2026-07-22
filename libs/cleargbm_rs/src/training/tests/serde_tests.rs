@@ -18,7 +18,7 @@ fn default_params() -> GradientBoostingConfigParams {
         learning_rate: 0.1_f64,
         min_samples_split: 2_usize,
         min_samples_leaf: 1_usize,
-        max_bins: 256_usize,
+        max_bins: 255_usize,
         subsample: 1.0_f64,
         random_state: 42_u64,
         monotonic_constraints: None,

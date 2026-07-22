@@ -132,6 +132,15 @@ impl GradientBoostingConfig {
                 reason: "must be >= 2".to_string(),
             });
         }
+        // Bin indices are packed into u8 for cache-line density
+        // (see FeatureBins storage layout). Enforce the u8 upper bound
+        // here so downstream code can rely on it without another check.
+        if max_bins > 255_usize {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "max_bins".to_string(),
+                reason: format!("must be <= 255 (u8 bin index), got {max_bins}"),
+            });
+        }
         if subsample <= 0.0_f64 || subsample > 1.0_f64 {
             return Err(ClearGbmError::InvalidParameter {
                 name: "subsample".to_string(),
