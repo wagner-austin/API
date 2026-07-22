@@ -164,9 +164,9 @@ fn test_finalize_nodes_leaf_node_success() -> Result<(), ClearGbmError> {
 #[test]
 fn test_build_feature_histograms_empty_features() -> Result<(), ClearGbmError> {
     // Test with n_features = 0
-    let sample_indices = vec![0_usize, 1_usize];
-    let gradients = vec![1.0_f64, 1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32];
+    let gradients = vec![1.0_f32, 1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32];
     // n_features = 0 → empty flat bin slice
     let bins: Vec<u8> = vec![];
 
@@ -262,10 +262,10 @@ fn test_find_best_split_across_features_internal_multiple_features() -> Result<(
 #[test]
 fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), ClearGbmError> {
     // Test error when parent_histograms has fewer entries than n_features
-    let left_indices = vec![0_usize, 1_usize];
-    let right_indices = vec![2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let left_indices = vec![0_u32, 1_u32];
+    let right_indices = vec![2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     // 4 samples, 2 features column-major:
     // feat 0: [0, 1, 0, 1]; feat 1: [0, 1, 0, 1]
     let bins: Vec<u8> = vec![0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8, 0_u8, 1_u8];
@@ -298,10 +298,10 @@ fn test_compute_child_histograms_parent_histograms_too_short() -> Result<(), Cle
 #[test]
 fn test_compute_child_histograms_success() -> Result<(), ClearGbmError> {
     // Test successful child histogram computation
-    let left_indices = vec![0_usize, 1_usize];
-    let right_indices = vec![2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 2.0_f64, -1.0_f64, -2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let left_indices = vec![0_u32, 1_u32];
+    let right_indices = vec![2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 2.0_f32, -1.0_f32, -2.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     // 4 samples, 1 feature. Column-major flat: [0, 0, 1, 1]
     let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8];
 
@@ -354,9 +354,9 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -385,11 +385,11 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
 #[test]
 fn test_build_tree_bins_out_of_bounds_via_validated_hook() -> Result<(), ClearGbmError> {
     // Bin values exceeding n_bins. The DEFAULT hook uses the trusted
-    // fast path (`build_histogram_trusted`) which assumes the caller has
-    // already validated bins by construction (FeatureBins guarantees
-    // `bin <= n_regular_bins <= 255`) — an OOB bin under the trusted
-    // hook would panic during safe indexing, not return an error,
-    // because the trusted invariant was broken by the caller. To
+    // fast path (`build_histogram_ordered_trusted`) which assumes the
+    // caller has already validated bins by construction (FeatureBins
+    // guarantees `bin <= n_regular_bins <= 255`) — an OOB bin under the
+    // trusted hook would panic during safe indexing, not return an
+    // error, because the trusted invariant was broken by the caller. To
     // exercise the "OOB bins bubble up as an error" path we swap in the
     // validated `build_histogram` via `Hooks::with_histogram_builder`;
     // that mirrors how the Python binding surfaces the same class of
@@ -404,9 +404,9 @@ fn test_build_tree_bins_out_of_bounds_via_validated_hook() -> Result<(), ClearGb
         Err(e) => return Err(e),
     };
 
-    let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     // Bin value 100 exceeds n_bins (n_regular_bins + 1 = 5).
     let bins: Vec<u8> = vec![0_u8, 1_u8, 100_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
@@ -459,9 +459,9 @@ fn test_is_increasing_is_decreasing_methods() -> Result<(), ClearGbmError> {
 
 /// Histogram builder that always returns an error (for testing error propagation)
 fn error_histogram(
-    _: &[usize],
-    _: &[f64],
-    _: &[f64],
+    _: &[u32],
+    _: &[f32],
+    _: &[f32],
     _: &[u8],
     _: usize,
 ) -> Result<HistogramBuffer, ClearGbmError> {
@@ -482,9 +482,9 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
         Err(e) => return Err(e),
     };
 
-    let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -516,9 +516,9 @@ fn test_build_tree_hooks_error_in_histogram_building() -> Result<(), ClearGbmErr
 #[test]
 fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbmError> {
     // Test that cached histograms are used when available
-    let sample_indices = vec![0_usize, 1_usize];
-    let gradients = vec![1.0_f64, 2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32];
+    let gradients = vec![1.0_f32, 2.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 1_u8];
 
     // Create cached histograms
@@ -559,9 +559,9 @@ fn test_build_feature_histograms_with_cached_histograms() -> Result<(), ClearGbm
 #[test]
 fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmError> {
     // Test that wrong-size cache is ignored and histograms are built fresh
-    let sample_indices = vec![0_usize, 1_usize];
-    let gradients = vec![1.0_f64, 2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32];
+    let gradients = vec![1.0_f32, 2.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32];
     // 2 samples, 2 features column-major flat.
     let bins: Vec<u8> = vec![0_u8, 1_u8, 1_u8, 0_u8];
 
@@ -594,10 +594,10 @@ fn test_build_feature_histograms_with_wrong_size_cache() -> Result<(), ClearGbmE
 #[test]
 fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
     // Test error propagation from hooks in compute_child_histograms
-    let left_indices = vec![0_usize, 1_usize];
-    let right_indices = vec![2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 2.0_f64, -1.0_f64, -2.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let left_indices = vec![0_u32, 1_u32];
+    let right_indices = vec![2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 2.0_f32, -1.0_f32, -2.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8];
 
     let mut parent_hist = HistogramBuffer::new(3_usize);
@@ -637,9 +637,9 @@ fn test_compute_child_histograms_hooks_error() -> Result<(), ClearGbmError> {
 
 /// Histogram builder that returns undersized histogram (for testing error propagation)
 fn undersized_histogram(
-    _: &[usize],
-    _: &[f64],
-    _: &[f64],
+    _: &[u32],
+    _: &[f32],
+    _: &[f32],
     _: &[u8],
     _: usize,
 ) -> Result<HistogramBuffer, ClearGbmError> {
@@ -660,9 +660,9 @@ fn test_build_tree_hooks_error_in_split_finding() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -700,9 +700,9 @@ fn test_build_tree_finalize_nodes_error_via_hook() -> Result<(), ClearGbmError> 
         Err(e) => return Err(e),
     };
 
-    let sample_indices = vec![0_usize, 1_usize, 2_usize, 3_usize];
-    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
-    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
+    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
+    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 

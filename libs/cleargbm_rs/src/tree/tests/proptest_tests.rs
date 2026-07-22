@@ -175,7 +175,9 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
             &(2_usize..20_usize, 0_usize..5_usize, proptest::bool::ANY),
             |(n_samples, split_bin, nan_goes_left)| {
                 let n_regular_bins = 6_usize;
-                let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
+                let sample_indices: Vec<u32> = (0_u32..)
+                    .take(n_samples)
+                    .collect();
 
                 // Create column-major flat bin storage (1 feature).
                 // n_regular_bins = 6, so each `i % n_regular_bins` fits in u8.
@@ -207,7 +209,7 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
                 );
 
                 // No duplicates
-                let mut all: Vec<usize> = left.iter().chain(right.iter()).copied().collect();
+                let mut all: Vec<u32> = left.iter().chain(right.iter()).copied().collect();
                 all.sort();
                 all.dedup();
                 prop_assert_eq!(all.len(), n_samples, "Duplicate samples found");
