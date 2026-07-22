@@ -51,6 +51,9 @@ hubs: [codebase]
 | Target | What it does |
 |--------|-------------|
 | `make analyze` | Issue report + run audit (deterministic verdicts + capture replay diff) + cross-session stats on latest run |
+| `make audit` | Re-derive every validated wiki physics claim from the full runs archive (`tankpit-audit --stamp` rewrites `fact_checked:` on green pages). See [[physics-module-roadmap]] Phase 2. |
+| `make shadow` | Price the SIM's laws against the archive — every validator imports its predictor from sim source (sync cadence, grant invariants, kill mercy bundle, corpse window). A failure = sim and real server disagree. See [[physics-module-roadmap]]. |
+| `make roundtrip` | Decode→encode→decode every archive message; byte-identity proof for the sim's encoders |
 | `make analyze-timing` | Command-response timing analysis |
 | `make decode` | Replay a capture through real decoders |
 | `make discover` | Extract command constants from JS client |

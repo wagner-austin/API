@@ -985,6 +985,58 @@ zero grants a silent mercy bundle, 5/5 vs 0/254; implemented in the
 sim, [[equipment-system]]). Gate at close: 4,730 tests, 100 %
 stmt+branch (4,754 after the law-4 and equipment follow-ups).
 
+### Shadow comparator as-built (2026-07-22): `make shadow` — the archive judges the sim
+
+The inverse instrument of the seam soaks, closing the certification
+loop from the other side: the soaks prove the BOT cannot tell the sim
+from the real server; the shadow proves the SIM cannot be told apart
+from the archive. `tankpit_bot/validate/shadow*.py`, CLI
+`tankpit-shadow`, target `make shadow`.
+
+Design rule: every validator imports its predictor FROM THE SIM
+SOURCE — the same constants and predicates `SimServer` executes —
+never a restated copy. A shadow mismatch therefore always means "the
+sim and the real server disagree": a wiki gap or a sim bug, both
+demanding investigation (same non-softening posture as `make audit`,
+whose `EXACTNESS_FLOOR` gates the table). This graduates the one-off
+2026-07-22 mining sweeps into a standing instrument: every future
+live run lands in `runs/` and is automatically re-judged against the
+sim's laws.
+
+First full-archive run (245 decodable sessions):
+
+| law | samples | exact | verdict |
+|---|---|---|---|
+| sync-cadence | 126 | 118 (94 %) | PASS — other-tank median 0x2E gap within 500 ms of `TICK_MS` |
+| grant-invariants | 1,149 | 1,149 | PASS — one deficient slot, cap-25 clip, rolls 5-9 / 2-4 |
+| kill-mercy-bundle | 283 | 283 | PASS — silent bundle iff radar zero, amounts in rolls |
+| corpse-window | 17 | 17 | PASS — kill→0x58 gap = `CORPSE_WINDOW_TICKS × TICK_MS` |
+
+The measured roll ranges moved into sim source as part of this build
+(`sim/equipment.py`: `WEAPON_STACK_ROLL`, `RADAR_STACK_ROLL`,
+`MERCY_BUNDLE_ROLLS`, `kill_grants_mercy()` — the deterministic sim
+stacks are now DERIVED midpoints of the measured ranges, and the
+server's mercy branch calls the shared predicate).
+
+**Calibration discovery — the self-sync cadence anomaly.** The first
+calibration sweep judged all tanks and failed 31 of 346; outlier
+triage showed 23 of the 31 were the session's OWN tank, drifting to
+3-4 s+ median gaps, while other-tank inlier medians pinned at
+1981-2010 ms — the 2 s law, dead on. ~10 % of sessions show the self
+drift; other tanks never do (their only outliers are
+brief-observation noise). The law was scoped to non-self tanks by
+measurement, the finding recorded in [[tank-freshness-model]], and
+the sim's every-tick self-sync stands as a documented simplification
+(the self tank's truth rides 0x44/0x64/0x49, so its 0x2E cadence is
+evidently not load-bearing). Open question: what condition triggers
+the sparse self schedule.
+
+Corpse-window note: 17 clean samples vs the mining sweep's 37 —
+the shadow's filters are stricter (any victim-id 0x2E sync between
+kill and removal disqualifies the pair as slot reuse, and quits
+disqualify via 0x29), and all 17 survivors sit inside ±1 s of
+22.0 s. Gate at close: 4,852 tests, 100 % stmt+branch.
+
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 
 RESOLVED — see [[executor-rejection-loops]] Resolution 2026-07-21:
