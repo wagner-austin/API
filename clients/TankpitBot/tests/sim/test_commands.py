@@ -1,0 +1,68 @@
+"""Typed client-command decoding for the sim server."""
+
+from __future__ import annotations
+
+import pytest
+
+from tankpit_bot.protocol.commands import (
+    CMD_MAP_OPEN,
+    CMD_MAP_TELEPORT,
+    CMD_MINE,
+    CMD_MOVE,
+    CMD_PICKUP_EQUIPMENT,
+    CMD_PICKUP_FUEL,
+    CMD_RADAR,
+    CMD_SHOOT,
+)
+from tankpit_bot.protocol.helpers import DecodeError
+from tankpit_bot.sim.commands import decode_client_command
+
+
+def test_coordinate_commands_decode_kind_and_coords() -> None:
+    """Move / teleport / pickup commands carry their click tile."""
+    expected = {
+        CMD_MOVE: "move",
+        CMD_MAP_TELEPORT: "teleport",
+        CMD_PICKUP_FUEL: "pickup_fuel",
+        CMD_PICKUP_EQUIPMENT: "pickup_equipment",
+    }
+    for command, kind in expected.items():
+        decoded = decode_client_command(bytes([4, command, 42, 161]))
+        assert decoded["kind"] == kind
+        assert decoded["x"] == 42
+        assert decoded["y"] == 161
+        assert decoded["target_id"] == 0
+
+
+def test_shoot_decodes_with_and_without_target_id() -> None:
+    """The shoot command's trailing entity id is optional."""
+    bare = decode_client_command(bytes([6, CMD_SHOOT, 55, 167]))
+    assert bare["kind"] == "shoot"
+    assert bare["target_id"] == 0
+    targeted = decode_client_command(bytes([6, CMD_SHOOT, 55, 167, 0x10, 0x02]))
+    assert targeted["target_id"] == 0x0210
+
+
+def test_bare_commands_decode_without_coords() -> None:
+    """Radar / mine / map-open carry no coordinates."""
+    for command, kind in ((CMD_RADAR, "radar"), (CMD_MINE, "mine"), (CMD_MAP_OPEN, "map_open")):
+        decoded = decode_client_command(bytes([2, command]))
+        assert decoded["kind"] == kind
+        assert decoded["x"] == 0
+
+
+def test_unknown_command_preserves_raw_byte() -> None:
+    """Unmapped commands decode as ``other`` with the byte kept."""
+    decoded = decode_client_command(bytes([2, 90]))
+    assert decoded["kind"] == "other"
+    assert decoded["command"] == 90
+
+
+def test_short_payloads_raise() -> None:
+    """Truncated payloads are a decode failure, never a guess."""
+    with pytest.raises(DecodeError):
+        decode_client_command(bytes([4]))
+    with pytest.raises(DecodeError):
+        decode_client_command(bytes([4, CMD_MOVE, 42]))
+    with pytest.raises(DecodeError):
+        decode_client_command(bytes([6, CMD_SHOOT, 55]))

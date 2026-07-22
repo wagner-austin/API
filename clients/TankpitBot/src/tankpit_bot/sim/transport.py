@@ -1,0 +1,105 @@
+"""Step (c) wire layer: sim messages to real bytes and back.
+
+Server -> client: every decoded message becomes a length-prefixed
+0x2E envelope frame (the real wire tunnels everything through the
+container), XOR'd exactly the way ``sniffer.xor.xor_decode`` inverts
+it — the production ingestion path consumes the output unchanged.
+
+Client -> server: the bot's ``!``-prefixed command frames (as built
+by ``protocol.commands``) decode back into typed
+:class:`~tankpit_bot.sim.commands.ClientCommandDict` values.
+"""
+
+from __future__ import annotations
+
+import base64
+
+from tankpit_bot.protocol.commands import COMMAND_PREFIX
+from tankpit_bot.protocol.encoders import encode_envelope_body
+from tankpit_bot.protocol.helpers import DecodeError, pack16
+from tankpit_bot.protocol.types import BinaryMessage
+from tankpit_bot.sim.commands import ClientCommandDict, decode_client_command
+
+_ENVELOPE_TYPE = 0x2E
+
+
+def _xor_with_table(table: bytes, data: bytes) -> bytes:
+    """XOR data against the session table, passing through beyond it.
+
+    Mirrors ``sniffer.xor.xor_decode`` (which is its own inverse):
+    bytes past the table length travel in the clear.
+
+    Args:
+        table: Session XOR table.
+        data: Bytes to transform.
+
+    Returns:
+        Transformed bytes, same length.
+    """
+    out = bytearray(len(data))
+    for index in range(len(data)):
+        key = table[index] if index < len(table) else 0
+        out[index] = data[index] ^ key
+    return bytes(out)
+
+
+def encode_tick_payload(messages: list[BinaryMessage], table: bytes) -> str:
+    """Encode one tick's message batch as a wire frame payload.
+
+    Args:
+        messages: The tick's decoded messages, in emission order.
+        table: Session XOR table.
+
+    Returns:
+        Base64 payload holding one length-prefixed 0x2E envelope
+        frame per message — exactly what the production
+        ``process_received_message`` ingests.
+    """
+    out = bytearray()
+    for message in messages:
+        body = bytes([_ENVELOPE_TYPE]) + _xor_with_table(table, encode_envelope_body(message))
+        out += pack16(len(body)) + body
+    return base64.b64encode(bytes(out)).decode("ascii")
+
+
+def decode_client_payload(payload: str, table: bytes) -> list[ClientCommandDict]:
+    """Decode a client frame payload into typed commands.
+
+    Args:
+        payload: Base64 payload as sent by the bot's command sender
+            (length-prefixed ``!`` frames, XOR after the prefix).
+        table: Session XOR table.
+
+    Returns:
+        The decoded commands, in frame order.
+
+    Raises:
+        DecodeError: If the payload is not valid base64, a frame is
+            torn, or a frame does not carry the ``!`` command prefix.
+    """
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except ValueError as error:
+        raise DecodeError(f"client payload is not valid base64: {error}") from error
+    commands: list[ClientCommandDict] = []
+    offset = 0
+    while offset + 2 < len(data):
+        frame_len = data[offset] | (data[offset + 1] << 8)
+        offset += 2
+        if frame_len == 0 or offset + frame_len > len(data):
+            raise DecodeError(
+                f"torn client frame: length {frame_len} at offset {offset - 2} "
+                f"in a {len(data)}-byte payload"
+            )
+        body = data[offset : offset + frame_len]
+        offset += frame_len
+        if body[0] != COMMAND_PREFIX:
+            raise DecodeError(f"client frame missing '!' prefix: 0x{body[0]:02X}")
+        commands.append(decode_client_command(_xor_with_table(table, body[1:])))
+    return commands
+
+
+__all__ = [
+    "decode_client_payload",
+    "encode_tick_payload",
+]

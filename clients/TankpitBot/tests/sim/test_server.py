@@ -1,0 +1,334 @@
+"""Law 1 — the global queue, tick batching, and charge latency."""
+
+from __future__ import annotations
+
+import pytest
+from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
+)
+from tankpit_bot.protocol.types import (
+    BinaryMessage,
+    InventoryDict,
+    ShootEventDict,
+    SupervisorDict,
+    TankStatusSyncDict,
+)
+from tankpit_bot.sim.combat import SLOT_DUAL, SLOT_HOMING
+from tankpit_bot.sim.commands import ClientCommandDict, SimError
+from tankpit_bot.sim.server import SimServer
+from tankpit_bot.sim.world import (
+    SimContainerDict,
+    SimMineDict,
+    SimWorldDict,
+    make_sim_tank,
+    make_sim_world,
+)
+
+
+def _move(x: int, y: int) -> ClientCommandDict:
+    """A decoded move command to (x, y)."""
+    return ClientCommandDict(kind="move", command=112, x=x, y=y, target_id=0)
+
+
+def _shoot(x: int, y: int) -> ClientCommandDict:
+    """A decoded shoot command at (x, y)."""
+    return ClientCommandDict(kind="shoot", command=115, x=x, y=y, target_id=0)
+
+
+def _server() -> SimServer:
+    """Client tank 9 at (10, 10) and enemy 11 at (15, 10)."""
+    world: SimWorldDict = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    world["tanks"][11] = make_sim_tank(11, 1, 1, 15, 10, 500)
+    return SimServer(world, InMemoryTerrainMap(), client_id=9)
+
+
+def _kinds(messages: list[BinaryMessage]) -> list[int | str]:
+    """The msg_type of every message, in emission order."""
+    return [message["msg_type"] for message in messages]
+
+
+def _shots(messages: list[BinaryMessage]) -> list[ShootEventDict]:
+    """All 0x53 echoes in the batch."""
+    shots: list[ShootEventDict] = []
+    for message in messages:
+        if message["msg_type"] == 0x53:
+            shots.append(message)
+    return shots
+
+
+def _syncs(messages: list[BinaryMessage]) -> list[TankStatusSyncDict]:
+    """All 0x2E fuel syncs in the batch."""
+    syncs: list[TankStatusSyncDict] = []
+    for message in messages:
+        if message["msg_type"] == 0x2E:
+            syncs.append(message)
+    return syncs
+
+
+def _supervisors(messages: list[BinaryMessage]) -> list[SupervisorDict]:
+    """All 0x52 command-result messages in the batch."""
+    results: list[SupervisorDict] = []
+    for message in messages:
+        if message["msg_type"] == 0x52:
+            results.append(message)
+    return results
+
+
+def _snapshots(messages: list[BinaryMessage]) -> list[InventoryDict]:
+    """All 0x49 inventory snapshots in the batch."""
+    snapshots: list[InventoryDict] = []
+    for message in messages:
+        if message["msg_type"] == 0x49:
+            snapshots.append(message)
+    return snapshots
+
+
+def test_unsupported_kind_and_unknown_tank_raise() -> None:
+    """Out-of-scope kinds and unknown/dead tanks fail loudly at queue time."""
+    server = _server()
+    unknown = ClientCommandDict(kind="other", command=90, x=0, y=0, target_id=0)
+    with pytest.raises(SimError):
+        server.queue_command(9, unknown)
+    with pytest.raises(SimError):
+        server.queue_command(404, _move(1, 1))
+    server.world["tanks"][11]["alive"] = False
+    with pytest.raises(SimError):
+        server.queue_command(11, _move(1, 1))
+
+
+def test_move_tick_emits_echo_then_fuel_sync() -> None:
+    """One move: 0x47 echo with the route, then the fuel sync."""
+    server = _server()
+    server.queue_command(9, _move(13, 12))
+    messages = server.advance_tick()
+    assert server.world["tick"] == 1
+    echo = messages[0]
+    assert echo["msg_type"] == 0x47
+    assert echo["path"] == "sseee"
+    syncs = _syncs(messages)
+    assert [sync["fuel"] for sync in syncs] == [995]
+
+
+def test_rejected_moves_emit_supervisor_errors() -> None:
+    """cant_go and insufficient_fuel surface as 0x52 messages."""
+    server = _server()
+    server.world["tanks"][9]["fuel"] = 2
+    server.queue_command(9, _move(20, 10))
+    insufficient = _supervisors(server.advance_tick())
+    assert [record["error_code"] for record in insufficient] == [SUPERVISOR_ERROR_INSUFFICIENT_FUEL]
+    server.queue_command(9, _move(15, 10))
+    occupied = _supervisors(server.advance_tick())
+    assert [record["error_code"] for record in occupied] == [SUPERVISOR_ERROR_CANT_GO]
+
+
+def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
+    """Pickups and destination mines ride the same tick's batch."""
+    server = _server()
+    server.world["containers"].append(SimContainerDict(x=11, y=10, volume=50))
+    server.world["mines"].append(SimMineDict(x=11, y=10, team=1))
+    server.queue_command(9, _move(11, 10))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x47, 0x45, "container_pickup", 0x2E]
+    pickup = messages[2]
+    assert pickup["msg_type"] == "container_pickup"
+    assert pickup["pickups"][0]["remaining_volume"] == 0
+
+
+def test_shot_bills_the_shooter_on_the_next_tick() -> None:
+    """Charge latency: the firing cost lands one tick later."""
+    server = _server()
+    server.queue_command(9, _shoot(12, 12))
+    first = server.advance_tick()
+    assert [shot["weapon"] for shot in _shots(first)] == [0]
+    assert server.world["tanks"][9]["fuel"] == 1000
+    second = server.advance_tick()
+    assert server.world["tanks"][9]["fuel"] == 994
+    assert [sync["fuel"] for sync in _syncs(second)] == [994]
+
+
+def test_hit_victim_syncs_and_client_ammo_snapshot() -> None:
+    """A dual hit syncs the victim's fuel and snapshots client ammo."""
+    server = _server()
+    server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
+    server.queue_command(9, _shoot(15, 10))
+    messages = server.advance_tick()
+    assert [shot["weapon"] for shot in _shots(messages)] == [1]
+    syncs = _syncs(messages)
+    assert [(sync["tank_id"], sync["fuel"]) for sync in syncs] == [(11, None)]
+    assert server.world["tanks"][11]["fuel"] == 410
+    snapshots = _snapshots(messages)
+    assert [snapshot["counts"][SLOT_DUAL] for snapshot in snapshots] == [2]
+
+
+def test_same_tick_move_then_shot_selects_homing() -> None:
+    """A queued move before the shot marks the mover for homing."""
+    server = _server()
+    server.world["tanks"][9]["counts"][SLOT_HOMING] = 1
+    server.queue_command(11, _move(15, 12))
+    server.queue_command(9, _shoot(15, 12))
+    messages = server.advance_tick()
+    assert [shot["weapon"] for shot in _shots(messages)] == [3]
+
+
+def test_armored_victim_marks_ammo_not_fuel() -> None:
+    """A fully-absorbed hit changes the victim's shields, not fuel."""
+    server = _server()
+    server.world["tanks"][11]["counts"][0] = 5
+    server.queue_command(9, _shoot(15, 10))
+    messages = server.advance_tick()
+    assert _syncs(messages) == []
+    assert server.world["tanks"][11]["counts"][0] == 4
+    assert server.world["tanks"][11]["fuel"] == 500
+
+
+def test_shot_mine_cascade_rides_the_batch() -> None:
+    """Shooting a mine emits its 0x45 packets in the same tick."""
+    server = _server()
+    server.world["mines"].append(SimMineDict(x=12, y=12, team=1))
+    server.queue_command(9, _shoot(12, 12))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x53, 0x45]
+    assert server.world["mines"] == []
+
+
+def test_handshake_covers_client_and_living_tanks_only() -> None:
+    """The join burst: self position/fuel/inventory, then live others."""
+    server = _server()
+    server.world["tanks"][12] = make_sim_tank(12, 3, 1, 20, 20, 100)
+    server.world["tanks"][12]["alive"] = False
+    kinds = _kinds(server.handshake())
+    assert kinds == [0x3D, 0x44, 0x49, 0x21, 0x3D]
+
+
+def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:
+    """A killed tank's queued command is dropped, and 0x41 fires."""
+    server = _server()
+    server.world["tanks"][11]["fuel"] = 45
+    server.queue_command(9, _shoot(15, 10))
+    server.queue_command(11, _move(15, 12))
+    messages = server.advance_tick()
+    kinds = _kinds(messages)
+    assert 0x41 in kinds
+    assert 0x47 not in kinds
+    assert server.world["tanks"][11]["alive"] is False
+
+
+def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCommandDict:
+    """A decoded client command of the given (kind, byte) pair."""
+    kind, command = kind_command
+    move_kind: ClientCommandDict = ClientCommandDict(
+        kind="move", command=command, x=x, y=y, target_id=0
+    )
+    if kind == "teleport":
+        return ClientCommandDict(kind="teleport", command=command, x=x, y=y, target_id=0)
+    if kind == "radar":
+        return ClientCommandDict(kind="radar", command=command, x=x, y=y, target_id=0)
+    if kind == "mine":
+        return ClientCommandDict(kind="mine", command=command, x=x, y=y, target_id=0)
+    if kind == "map_open":
+        return ClientCommandDict(kind="map_open", command=command, x=x, y=y, target_id=0)
+    if kind == "pickup_fuel":
+        return ClientCommandDict(kind="pickup_fuel", command=command, x=x, y=y, target_id=0)
+    return move_kind
+
+
+def test_teleport_tick_emits_landing_position_and_sync() -> None:
+    """A landed hop: teleport_landed, 0x3D position, then the sync."""
+    server = _server()
+    server.world["containers"].append(SimContainerDict(x=30, y=30, volume=40))
+    server.queue_command(9, _command(("teleport", 116), 30, 30))
+    messages = server.advance_tick()
+    assert _kinds(messages) == ["teleport_landed", 0x3D, "container_pickup", 0x2E]
+    assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == (30, 30)
+
+
+def test_teleport_rejections_emit_supervisor_with_map_close() -> None:
+    """An unaffordable hop surfaces as 0x52 with the map-close flag."""
+    server = _server()
+    server.world["tanks"][9]["fuel"] = 3
+    server.queue_command(9, _command(("teleport", 116), 30, 30))
+    poor = _supervisors(server.advance_tick())
+    assert [(r["error_code"], r["close_map"]) for r in poor] == [
+        (SUPERVISOR_ERROR_INSUFFICIENT_FUEL, 1)
+    ]
+
+
+def test_teleport_onto_sealed_tile_is_cant_go() -> None:
+    """A fully sealed ring rejects the hop with cant_go."""
+    world: SimWorldDict = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    walls = {(30, 30): "#", (31, 30): "#", (30, 29): "#", (29, 30): "#", (30, 31): "#"}
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=walls), client_id=9)
+    server.queue_command(9, _command(("teleport", 116), 30, 30))
+    rejected = _supervisors(server.advance_tick())
+    assert [r["error_code"] for r in rejected] == [SUPERVISOR_ERROR_CANT_GO]
+
+
+def test_radar_tick_emits_scan_ack_sync_and_snapshot() -> None:
+    """A scan with an extra: 0x4F, 0x46, fuel sync, ammo snapshot."""
+    server = _server()
+    server.world["tanks"][9]["counts"][4] = 3
+    server.queue_command(9, _command(("radar", 102)))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x4F, 0x46, 0x2E, 0x49]
+    assert server.world["tanks"][9]["fuel"] == 990
+    assert server.world["tanks"][9]["counts"][4] == 2
+
+
+def test_mine_press_tick_emits_placement_and_trades() -> None:
+    """A press: 0x4B placement, 0x45 for 1:1 trades, fuel sync."""
+    server = _server()
+    server.world["mines"].append(SimMineDict(x=11, y=11, team=1))
+    server.queue_command(9, _command(("mine", 107)))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x4B, 0x45, 0x2E]
+    assert server.world["tanks"][9]["fuel"] == 990
+
+
+def test_teleport_to_empty_ground_has_no_pickup_message() -> None:
+    """A landing on bare ground emits no container message."""
+    server = _server()
+    server.queue_command(9, _command(("teleport", 116), 30, 30))
+    assert _kinds(server.advance_tick()) == ["teleport_landed", 0x3D, 0x2E]
+
+
+def test_radar_without_extras_has_no_snapshot() -> None:
+    """A built-in scan changes no counts, so no 0x49 follows."""
+    server = _server()
+    server.queue_command(9, _command(("radar", 102)))
+    assert _kinds(server.advance_tick()) == [0x4F, 0x46, 0x2E]
+
+
+def test_mine_press_on_sealed_ground_places_nothing() -> None:
+    """A fully blocked 3x3 emits neither 0x4B nor 0x45 — just the bill."""
+    world: SimWorldDict = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    ring = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)]
+    rocks = {(10 + dx, 10 + dy): "#" for dx, dy in ring}
+    world["mines"].append(SimMineDict(x=10, y=10, team=0))
+    server = SimServer(world, InMemoryTerrainMap(terrain_data=rocks), client_id=9)
+    server.queue_command(9, _command(("mine", 107)))
+    assert _kinds(server.advance_tick()) == [0x2E]
+    assert server.world["tanks"][9]["fuel"] == 990
+
+
+def test_map_open_tick_emits_map_data() -> None:
+    """A map open costs nothing and returns the 0x4C snapshot."""
+    server = _server()
+    server.queue_command(9, _command(("map_open", 108)))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x4C]
+    assert server.world["tanks"][9]["fuel"] == 1000
+
+
+def test_pickup_click_routes_through_the_move_law() -> None:
+    """A pickup-fuel click walks to the container and drains it."""
+    server = _server()
+    server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30))
+    server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x47, "container_pickup", 0x2E]

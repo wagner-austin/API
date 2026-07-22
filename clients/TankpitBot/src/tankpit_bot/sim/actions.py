@@ -1,0 +1,307 @@
+"""Laws 5-8 (step d): teleport, radar, map, and mine placement.
+
+Each processor mutates the world under a measured wiki law and
+returns typed outcomes; the tick processor turns them into wire
+messages. Documented sim assumptions (wiki [[physics-module-roadmap]]
+Phase 4): displacement south is tried LAST (only E->N->W are
+measured), beyond-ring-1 displacement does not exist (blocked ring-1
+rejects the hop), and mine placement clips to map bounds (the
+viewport-edge clip needs a per-client viewport model).
+"""
+
+from __future__ import annotations
+
+from typing import Literal, TypedDict
+
+from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
+from tankpit_bot.physics.capacity import free_radar_radius
+from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
+from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
+from tankpit_bot.sim.combat import SLOT_RADAR
+from tankpit_bot.sim.movement import PickupRecordDict, resolve_pickup
+from tankpit_bot.sim.world import SimMineDict, SimWorldDict
+
+# Ring-1 displacement preference when the teleport target is blocked
+# (wiki [[teleport-mechanics]], 2026-07-21: E, then N, then W measured;
+# S is the documented last-resort assumption).
+_DISPLACEMENT_ORDER: tuple[tuple[int, int], ...] = ((0, 0), (1, 0), (0, -1), (-1, 0), (0, 1))
+
+# The radar an extra-radar scan covers: the full 16x16 viewport
+# expressed as a Chebyshev radius around the tank
+# (wiki [[radar-mechanics]]: extra = whole viewport).
+_EXTRA_RADAR_RADIUS = 8
+
+
+class TeleportOutcomeDict(TypedDict):
+    """One processed teleport: landing, cost, and arrival pickups."""
+
+    kind: Literal["landed", "blocked", "insufficient_fuel"]
+    tank_id: int
+    landed_x: int
+    landed_y: int
+    cost: int
+    pickups: list[PickupRecordDict]
+
+
+class RadarOutcomeDict(TypedDict):
+    """One processed radar scan: what it revealed and what it consumed."""
+
+    tank_id: int
+    containers: list[RadarContainerDict]
+    mines: list[RadarMineDict]
+    enemy_found: bool
+    consumed_extra: bool
+
+
+class MinePressOutcomeDict(TypedDict):
+    """One processed mine press: placed mines and 1:1 detonations."""
+
+    tank_id: int
+    mine_type: int
+    placed: list[tuple[int, int]]
+    detonated: list[tuple[int, int]]
+
+
+def _tile_blocked_for_landing(
+    world: SimWorldDict, terrain: TerrainMapProtocol, tank_id: int, team: int, x: int, y: int
+) -> bool:
+    """Report whether a teleport may land on a tile.
+
+    Rock/water, any OTHER living tank (self-occupancy of the target
+    tile counts as blocked only for other tanks — the mover vacates
+    its own tile), and enemy mines all block; own-color mines do not
+    (wiki [[teleport-mechanics]]).
+
+    Args:
+        world: Simulated world.
+        terrain: Static terrain.
+        tank_id: The teleporting tank.
+        team: The teleporting tank's team.
+        x: Candidate landing X.
+        y: Candidate landing Y.
+
+    Returns:
+        True when the tile cannot be landed on.
+    """
+    if not terrain.is_passable(x, y):
+        return True
+    for tank in world["tanks"].values():
+        if tank["alive"] and tank["tank_id"] != tank_id and (tank["x"], tank["y"]) == (x, y):
+            return True
+    return any(mine["team"] != team and (mine["x"], mine["y"]) == (x, y) for mine in world["mines"])
+
+
+def process_teleport(
+    world: SimWorldDict,
+    terrain: TerrainMapProtocol,
+    tank_id: int,
+    target_x: int,
+    target_y: int,
+) -> TeleportOutcomeDict:
+    """Process one map-teleport command (law 5).
+
+    Args:
+        world: Simulated world (mutated on success).
+        terrain: Static terrain.
+        tank_id: The teleporting tank.
+        target_x: Clicked map tile X.
+        target_y: Clicked map tile Y.
+
+    Returns:
+        The typed outcome: cost is ``floor(6 x euclid)`` to the ACTUAL
+        landing tile; a blocked target displaces E -> N -> W (-> S)
+        within ring 1 or rejects the hop.
+    """
+    tank = world["tanks"][tank_id]
+    outcome = TeleportOutcomeDict(
+        kind="blocked",
+        tank_id=tank_id,
+        landed_x=tank["x"],
+        landed_y=tank["y"],
+        cost=0,
+        pickups=[],
+    )
+    for dx, dy in _DISPLACEMENT_ORDER:
+        x, y = target_x + dx, target_y + dy
+        if _tile_blocked_for_landing(world, terrain, tank_id, tank["team"], x, y):
+            continue
+        cost = teleport_cost(tank["x"], tank["y"], x, y)
+        if cost > tank["fuel"]:
+            outcome["kind"] = "insufficient_fuel"
+            return outcome
+        tank["x"] = x
+        tank["y"] = y
+        tank["fuel"] -= cost
+        outcome["kind"] = "landed"
+        outcome["landed_x"] = x
+        outcome["landed_y"] = y
+        outcome["cost"] = cost
+        resolve_pickup(world, tank_id, outcome["pickups"])
+        return outcome
+    return outcome
+
+
+def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
+    """Process one radar command (law 8, scan side).
+
+    An available extra radar is consumed and covers the full viewport;
+    otherwise the rank-scaled built-in radius applies. The scan
+    reveals containers and mines in the square radius and reports
+    whether any living enemy sits inside it. The 10-fuel cost is
+    billed by the caller.
+
+    Args:
+        world: Simulated world (mutated: extra-radar consumption).
+        tank_id: The scanning tank.
+
+    Returns:
+        The typed scan result.
+    """
+    tank = world["tanks"][tank_id]
+    consumed = False
+    if tank["enabled"][SLOT_RADAR] and tank["counts"][SLOT_RADAR] > 0:
+        tank["counts"][SLOT_RADAR] -= 1
+        consumed = True
+        radius = _EXTRA_RADAR_RADIUS
+    else:
+        radius = free_radar_radius(tank["rank"])
+    cx, cy = tank["x"], tank["y"]
+
+    def inside(x: int, y: int) -> bool:
+        """Report whether a tile lies inside the scan square."""
+        return abs(x - cx) <= radius and abs(y - cy) <= radius
+
+    containers = [
+        RadarContainerDict(x=c["x"], y=c["y"], volume=c["volume"])
+        for c in world["containers"]
+        if c["volume"] > 0 and inside(c["x"], c["y"])
+    ]
+    mines = [
+        RadarMineDict(x=m["x"], y=m["y"], team=m["team"])
+        for m in world["mines"]
+        if inside(m["x"], m["y"])
+    ]
+    enemy_found = any(
+        other["alive"] and other["team"] != tank["team"] and inside(other["x"], other["y"])
+        for other in world["tanks"].values()
+    )
+    return RadarOutcomeDict(
+        tank_id=tank_id,
+        containers=containers,
+        mines=mines,
+        enemy_found=enemy_found,
+        consumed_extra=consumed,
+    )
+
+
+def _atlas_order(dot: tuple[int, int]) -> int:
+    """Linear atlas position of one fuel dot (row-major over 256 columns).
+
+    Args:
+        dot: The (x, y) dot position.
+
+    Returns:
+        The dot's linear stream position.
+    """
+    return dot[1] * 256 + dot[0]
+
+
+def build_map_data(world: SimWorldDict) -> MapDataDict:
+    """Build the 0x4C strategic-map snapshot (law 8, map side).
+
+    Fuel dots are the non-empty containers in atlas stream order
+    (ascending linear position — the skip-RLE encoder's requirement);
+    tank blips cover every living tank. Mines are NOT on the map
+    (wiki [[map-data-decode]], user-confirmed 2026-07-21).
+
+    Args:
+        world: Simulated world.
+
+    Returns:
+        The map snapshot.
+    """
+    dots = sorted(
+        ((c["x"], c["y"]) for c in world["containers"] if c["volume"] > 0),
+        key=_atlas_order,
+    )
+    tanks = [
+        MapTankEntry(
+            x=tank["x"],
+            y=tank["y"],
+            tank_id=tank["tank_id"],
+            rank=tank["rank"],
+            damage=tank["damage_state"],
+            team=tank["team"],
+        )
+        for tank_id, tank in sorted(world["tanks"].items())
+        if tank["alive"]
+    ]
+    return MapDataDict(msg_type=0x4C, fuel_dots=dots, tanks=tanks)
+
+
+def process_mine_press(
+    world: SimWorldDict,
+    terrain: TerrainMapProtocol,
+    tank_id: int,
+) -> MinePressOutcomeDict:
+    """Process one mine press (law 6).
+
+    A 3x3 placement centered on the placer: rock/water/tank tiles are
+    skipped, tiles holding an enemy mine trade 1:1 (the enemy mine
+    detonates, nothing is placed there), and clear tiles receive the
+    placer's mine. The flat 10-fuel press cost is billed by the
+    caller. Mines are not inventory — nothing is consumed.
+
+    Args:
+        world: Simulated world (mutated).
+        terrain: Static terrain.
+        tank_id: The placing tank.
+
+    Returns:
+        The typed outcome with placed and detonated positions.
+    """
+    tank = world["tanks"][tank_id]
+    outcome = MinePressOutcomeDict(tank_id=tank_id, mine_type=tank["team"], placed=[], detonated=[])
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            x, y = tank["x"] + dx, tank["y"] + dy
+            if not terrain.is_passable(x, y):
+                continue
+            if any(
+                other["alive"]
+                and other["tank_id"] != tank_id
+                and (other["x"], other["y"]) == (x, y)
+                for other in world["tanks"].values()
+            ):
+                continue
+            enemy_mines = [
+                mine
+                for mine in world["mines"]
+                if mine["team"] != tank["team"] and (mine["x"], mine["y"]) == (x, y)
+            ]
+            if enemy_mines:
+                for mine in enemy_mines:
+                    world["mines"].remove(mine)
+                outcome["detonated"].append((x, y))
+                continue
+            if any((mine["x"], mine["y"]) == (x, y) for mine in world["mines"]):
+                continue
+            world["mines"].append(SimMineDict(x=x, y=y, team=tank["team"]))
+            outcome["placed"].append((x, y))
+    return outcome
+
+
+RADAR_FUEL_COST = RADAR_COST
+MINE_PRESS_FUEL_COST = MINE_PRESS_COST
+
+__all__ = [
+    "MINE_PRESS_FUEL_COST",
+    "RADAR_FUEL_COST",
+    "MinePressOutcomeDict",
+    "RadarOutcomeDict",
+    "TeleportOutcomeDict",
+    "build_map_data",
+    "process_mine_press",
+    "process_radar",
+    "process_teleport",
+]
