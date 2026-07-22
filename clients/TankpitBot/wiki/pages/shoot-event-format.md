@@ -33,6 +33,20 @@ Top-level 0x53 message: body is 10 bytes (above) after the message-type byte. Tu
 
 **2026-06-20:** `a[7]`/`a[8]` promoted from `unk1`/`unk2` to `aim_x`/`aim_y` after JS proof: `Gg.h` passes them to the projectile-animation constructor `yf` as `z` and `O`; inside `yf`, `this.qa = 24 * z + 12` and `this.ta = 16 * O + 8` compute the PIXEL CENTRE of the aim tile, and `yf.start()` uses `atan2(this.h - this.qa, this.ta - this.i)` to set the tank's facing direction. For straight shots aim == target; for missile/homing weapons the aim is the initial barrel direction and the target is the impact tile.
 
+## Terrain clipping: target is the RESOLVED impact tile (2026-07-21)
+
+When a non-missile shot's line of sight crosses blocking terrain, the
+projectile stops there and `target_x/y` reports the OBSTRUCTION tile,
+not the click. Wire sample (manual capture sniff-20260721-212348,
+t+169.91): shooter at (42,164) clicked a mine at (55,167); the echo
+carried `weapon=0 tgt=(46,165)` — exactly on the shooter→click ray
+where the mountain stands. The blocked shot still billed the full
+firing cost (−6). So a `target` that differs from the commanded tile
+is obstruction clipping, and clipped shots are pure fuel loss.
+Missiles are the exception that flies over terrain — but they trigger
+only against enemy tanks, never mines or ground ([[weapon-selection]],
+user contract 2026-07-21).
+
 ## Hit vs miss
 
 ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:

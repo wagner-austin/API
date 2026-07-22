@@ -5,7 +5,7 @@ related: [[shoot-event-format]], [[decode-coverage]], [[bot-behavior-contract]],
 sources: [user 2026-06-20 (game-mechanic interview), runs/sniff/sniff-20260620-150155.capture_session.json (Artax vs Yuppler PvP), tpclient.js Dg (V.K MinePlacement) and dh (V.E MineDetonation)]
 fact_checked: 2026-06-20
 confidence: high
-verified: 2026-06-20 (real-combat capture matched the documented mechanic byte-for-byte)
+verified: 2026-07-21 (cascade re-confirmed in manual capture sniff-20260721-212348; original 2026-06-20 real-combat capture matched the documented mechanic byte-for-byte)
 ---
 
 # Mine Mechanics
@@ -14,14 +14,15 @@ The complete server-side rules for the 3x3 mine placement primitive (`0x4B` Mine
 
 ## Placement primitive
 
-A player or bot issues one mine command. The server attempts a **3x3 placement** centered on the placer's tile, walking each of the 9 tiles in turn and classifying it:
+A player or bot issues one mine command. Mines are **not an inventory item** — nothing is consumed from the 0x49 equipment slots; the command just costs its flat 10 fuel ([[game-economy]]). The server attempts a **3x3 placement** centered on the placer's tile, **clipped to the visible viewport** (user contract 2026-07-21: standing on the viewport edge places 6 instead of 9), walking each of the remaining tiles in turn and classifying it:
 
 | Tile contents at placement time | Server action |
 |---|---|
+| Outside the visible viewport | Skip silently. The 3x3 never extends past the viewport edge. |
 | Water | Skip silently. Tile is unchanged. No wire signal. |
 | Terrain block (rock, etc.) | Skip silently. |
 | Another tank (any team) | Skip silently. |
-| Enemy mine | Detonate that mine. Tile is now **empty** -- the placement does NOT add a friendly mine here. Server includes the tile in the same-tick `0x45` MineDetonation payload. |
+| Enemy mine | Detonate that mine **1:1**. Tile is now **empty** -- the placement does NOT add a friendly mine here. Server includes the tile in the same-tick `0x45` MineDetonation payload. |
 | Clear ground | Place your mine. Server includes the tile in the `0x4B` MinePlacement payload. |
 | Equipment / fuel container | Place your mine. Containers can coexist with mines on the same tile. |
 
@@ -64,6 +65,12 @@ Real-combat sample (practice-vs-real-20260620-150138, t+62.15s, Artax shot `(134
 0x45 MineDetonate positions=[(135, 126), (134, 127), (133, 126),
                              (135, 127), (135, 125), (133, 127)]   # 6-mine cascade
 ```
+
+Re-confirmed 2026-07-21 (manual capture sniff-20260721-212348, t+173.91): a
+single shot at `(54,170)` produced `0x45 [(54,170)]` plus a same-tick second
+packet `0x45 [(55,170),(54,171),(55,171)]` — 4 mines destroyed by one shot,
+matching the user's on-screen count exactly. `0x45` IS the mine-removal wire
+signal; there is no separate removal message.
 
 Both packets arrive within the same WebSocket frame. The bot's world-state must apply each `0x45` independently -- iterating its positions and removing any mine at that tile regardless of team -- and tolerate consecutive packets without double-counting. This is the existing semantics of `_dispatch_mine_detonation`; the cascade tests in `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` lock it in.
 

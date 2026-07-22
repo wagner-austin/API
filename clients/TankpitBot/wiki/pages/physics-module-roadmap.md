@@ -1,7 +1,7 @@
 ---
 title: Physics Module Roadmap — Wiki as Executable Truth
 tags: [architecture, roadmap, physics, wiki, enforcement]
-related: [[terrain-composition]], [[game-economy]], [[executor-rejection-loops]], [[self-observing-architecture]], [[coding-standards]], [[movable-blocks]]
+related: [[terrain-composition]], [[game-economy]], [[executor-rejection-loops]], [[self-observing-architecture]], [[coding-standards]], [[movable-blocks]], [[walk-mechanics]], [[weapon-selection]], [[mine-mechanics]], [[teleport-mechanics]]
 sources: [design session 2026-07-20 (user + AI), user-approved direction; mcps-workspace precedent PLAN_WIKI_AUDIT_SEARCH_MCP_REFACTOR.md]
 fact_checked: 2026-07-20
 confidence: high (Phases 1-2 IMPLEMENTED 2026-07-20/21; Phase 3 + executor track designed, not started)
@@ -9,9 +9,10 @@ confidence: high (Phases 1-2 IMPLEMENTED 2026-07-20/21; Phase 3 + executor track
 
 # Physics Module Roadmap — Wiki as Executable Truth
 
-**Status: Phase 1 implemented 2026-07-20, Phase 2 implemented
-2026-07-21 (make audit green, 9/9 claims). Phase 3 and the executor
-track remain designed-not-started.**
+**Status: Phases 1–3 and the executor track IMPLEMENTED (2026-07-20/21;
+make audit 11/11 claims, both live books at zero divergences, executor
+pure dispatch). Phase 4 (the simulator) SPEC'd 2026-07-21 — not
+started.**
 Written for a future session (human or AI) to execute end-to-end
 without access to the 2026-07-20 design conversation. Read
 [[terrain-composition]] first — it is the completed seed of this plan.
@@ -188,12 +189,13 @@ Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
   sync in the same millisecond; 738/738 lone-hit windows pin it);
   validators for the four firing costs (one-shot clean windows;
   homing −5 split counted as sample, not mismatch), WALK EPISODES
-  (a walk drains across many windows, so single windows cannot price
-  it: an episode runs from a walk-only window through event-free
-  windows to a zero-delta quiet window; SINGLE-ECHO only, because a
-  second 0x47 means a mid-walk re-command whose full commanded path
-  was never fully stepped — the 2026-07-21 probe showed every
-  multi-echo mismatch overcounts tiles, never fuel), hit damage
+  (as-designed rationale said "a walk drains across many windows" —
+  SUPERSEDED 2026-07-21: movement is instant and the full cost lands
+  in the echo window ([[walk-mechanics]]); the episode structure is
+  retained because it also absorbs boundary-straddling debits;
+  SINGLE-ECHO only, because a second 0x47 can be a route that never
+  executed — the 2026-07-21 probes showed every multi-echo mismatch
+  overcounts tiles, never fuel, and zero mid-path echoes), hit damage
   (lone-enemy-shot windows; zero-delta = shot at someone else, not a
   sample), and fuel capacity (every reading vs the rank bound).
 - **`events_validators.py`** — the events.jsonl teleport pairing
@@ -328,6 +330,123 @@ Implemented as designed with these notes:
   extraction in `make analyze` beyond the issue line — the next
   increment on this foundation.
 
+
+## Phase 4 — the simulator (wiki-derived fake server) — SPEC 2026-07-21, not started
+
+**Goal**: the production bot runs UNCHANGED against a simulated server
+whose every rule cites a wiki claim. Planner changes get graded on
+thousands of simulated sessions before one live run; any live
+sim-vs-wire disagreement is automatically a candidate claim (Phase 3
+divergence machinery grades the sim with the same instruments it
+grades the real server).
+
+### Architecture decision: wire-level fake server
+
+The sim speaks REAL BYTES — framing, XOR, 0x2E tunneling — behind the
+seams the codebase already has:
+
+- **Inbound to bot**: the received-message buffer
+  (`Bot._on_message_captured`, `CapturedMessage` dicts) — the same
+  path `replay.engine` already drives headless.
+- **Outbound from bot**: `command_sender.send_command_bytes`'s
+  `send_ws_bytes` callback + `_test_hooks.CDPSessionProtocol` — the
+  protocols tests already fake. A `SimTransport` implements them:
+  commands leave the bot as production-encoded frames; the sim decodes
+  them with the PRODUCTION decode path (frame split → XOR →
+  `decode_message`), advances the world one law at a time, and answers
+  with encoded server frames.
+
+Why wire-level and not a state-level stub: the bot's decoders,
+dispatch, world-state, books, and planner all run untouched, so a sim
+bug and a decoder bug stay distinguishable; and sim sessions are
+CAPTURES in the standard format — `make audit` and the replay engine
+work on them for free.
+
+### New code
+
+- **`protocol` encoders** (the one real gap): we decode every server
+  message but encode almost none. Each `decode_*` for a message the
+  world-state consumes gains an `encode_*` sibling IN THE SAME FILE
+  (layout knowledge stays in one place; the coding standard already
+  wants encode/decode pairs). Inventory = exactly what
+  `world_state_dispatch` + the tick loop consume: 0x21 identity, 0x2E
+  short/long sync and its tunneled subtypes (0x53 shoot, 0x47
+  movement, 0x43 pickup, 0x44 fuel gain, 0x64 deposit, 0x45/0x4B
+  mines, 0x49 counts, 0x67 equipment gain, 0x58 remove, 0x41
+  deactivation, 0x52 errors), 0x3E full status, 0x4C map data,
+  0x46/0x4F radar, viewport/terrain frames, cache/overlay patches.
+- **`src/tankpit_bot/sim/`** (production-typed, no mocks):
+  - `world.py` — `SimWorldDict`: terrain (`TerrainMap`), containers,
+    mines, tanks, tick counter. v1 seeding: from a real capture
+    snapshot; generated worlds come after the spawn-distribution
+    crack.
+  - `server.py` — the tick processor (laws below), pure functions
+    over the world dict.
+  - `transport.py` — the seam adapter (`CDPSessionProtocol` +
+    `send_ws_bytes` + message delivery into the buffer).
+  - `policy.py` — `SimPolicy` protocol (world view → commands) for
+    opponents. v1 policies: stationary dummy, scripted walker,
+    capture-replay ghost. Enemy MINDS are not physics — the sim never
+    hardcodes "realistic" enemies; it takes policies as plugins.
+
+### The laws (every rule carries its wiki anchor)
+
+1. **Global queue, 2 s tick**: commands queue and process in order at
+   tick boundaries; wire flushes batch per tick ([[shoot-event-format]]
+   queue model; log 2026-07-21 sync cadence).
+2. **Movement is instant** ([[walk-mechanics]]): deterministic
+   quadrant-keyed pathfinder (vertical-first, NE quadrant
+   horizontal-first; routes around terrain + enemy mines), full path
+   billed 1/tile at processing, destination pickup same tick, 0x47
+   echo carries the route.
+3. **Shots** ([[weapon-selection]], [[shoot-event-format]],
+   [[game-economy]]): resolve against the target TILE at processing
+   (no range mechanic); server-side weapon selection (dual default,
+   homing on same-tick mover, missile only vs obstructed ENEMY);
+   terrain clips non-missile shots to the impact tile and still bills;
+   damage 45/90/45/45 with armor absorbing at damage/45; victim billed
+   instantly, shooter debit next tick; consumption-equals-hit.
+4. **Homing reroute** with the ~12 s TTL after 0x58
+   ([[shoot-event-format]], `REROUTE_TTL_MS`).
+5. **Teleport** ([[teleport-mechanics]]): cost floor(6×euclid) on the
+   ACTUAL landing; ring-1 displacement preference E→N→W; enemy-mine
+   tiles block landing; landing auto-pickup.
+6. **Mines** ([[mine-mechanics]]): 3×3 viewport-clipped placement,
+   skips terrain/water/tanks, 1:1 enemy-mine exchange, two-packet
+   cascade detonation, walking into an enemy mine −45.
+7. **Fuel/equipment** ([[game-economy]], [[fuel-system]]):
+   capacity 1000+100×rank, deposit floor 100, pickup volume
+   semantics, duplicate pickup broadcasts.
+8. **Radar/map** ([[radar-mechanics]], [[map-data-decode]]): 0x4F as
+   CACHE DIFF against what the client has seen; 0x4C fuel-dot atlas +
+   5-byte blips (no mines on the map).
+
+Documented sim assumptions (revisit when measured): max single-click
+walk distance (23 wire-confirmed; sim accepts any in-viewport click),
+displacement south-preference/beyond-ring-1, container respawn (v1:
+static seeded world, no respawn).
+
+### Verification ladder (definition of done)
+
+1. **Encoder round-trip**: `decode(encode(x)) == x` property tests
+   PLUS corpus round-trip — every consumed server message in the
+   archive re-encodes byte-identically.
+2. **Divergence-zero soak**: the production bot plays a full session
+   against the sim; fuel book + ammo book report **0 physics
+   divergences**. This is the acceptance test — the Phase 3
+   instruments cannot tell the sim from the real server.
+3. **Audit cross-check**: `make audit` over sim-generated captures
+   re-derives every archive-validatable claim exactly.
+4. **Fidelity statement** on this page: 1:1 for every measured law;
+   explicitly NOT 1:1 for spawn distributions (until cracked), enemy
+   minds (by design), and the listed assumptions.
+
+### Build order (one commit each, gate green throughout)
+
+(a) encoders + round-trip corpus tests; (b) `sim/world.py` +
+`server.py` with laws 1–3; (c) `transport.py` + bot-vs-sim smoke
+session; (d) laws 4–8; (e) divergence-zero soak + audit cross-check +
+fidelity statement.
 
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 

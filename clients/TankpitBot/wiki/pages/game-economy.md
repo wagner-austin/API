@@ -3,7 +3,7 @@ title: Game Economy (Fuel, Damage, Costs)
 tags: [game, combat, fuel, economy]
 related: [[shoot-event-format]], [[mine-mechanics]], [[deactivation-format]], [[bot-behavior-contract]], [[fuel-system]]
 sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20, tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06]
-fact_checked: 2026-07-21 (make audit: 9 claims re-derived, 21395 clean samples)
+fact_checked: 2026-07-21 (make audit: 11 claims re-derived, 22903 clean samples)
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
 ---
@@ -36,7 +36,7 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 
 | Action | Fuel cost | Notes |
 |---|---|---|
-| Walk one tile | **1** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8). Re-confirmed 2026-07-20: six clean SelfMovement segments, exact at 1/tile (7→7, 14→14, 5→5, 3→3, 2→2, 1→1) |
+| Walk one tile | **1** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8). Re-confirmed 2026-07-20: six clean SelfMovement segments, exact at 1/tile (7→7, 14→14, 5→5, 3→3, 2→2, 1→1). Billed IN FULL at the echo tick — server movement is instant, see [[walk-mechanics]] (2026-07-21: 200/200 archive episodes) |
 | Single shot (`weapon=0`) | **6** | Systematic isolation 2026-07-20: 62 clean windows exactly −6 across the 204-capture archive (window = consecutive absolute fuel readings containing only our 0x53 echoes, no movement/radar/pickups/enemy fire). Consumes NO ammo |
 | Dual shot (`weapon=1`) | **10** | Same isolation: **589 clean windows exactly −10**. Consumes 1 dual per LANDED shot (0x49 count snapshots: 49 windows of one dual fired → dual −1) |
 | Homing shot (`weapon=3`) | **10** | Same isolation: 398 clean windows exactly −10, plus 124 at −5 — the homing debit sometimes lands in two −5 steps across sync boundaries; total per shot is 10. Consumes 1 homing per LANDED shot |
@@ -51,11 +51,15 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 | Source | Fuel loss to victim | Notes |
 |---|---|---|
 | Single shot HIT (taken from enemy `weapon=0`) | **45** | Verified by 3 Yuppler hits in the multi-tank PvP capture, all 3 matched −45 each |
-| Dual shot HIT (taken from enemy `weapon=1`) | **90** | Verified by 3 Yuppler dual hits in the same capture, all 3 matched −90 each |
+| Dual shot HIT (taken from enemy `weapon=1`) | **90** | Verified by 3 Yuppler dual hits in the same capture, all 3 matched −90 each; re-confirmed 2026-07-21 via armor (2 shields consumed per dual = 90/45) |
+| Missile HIT (taken from enemy `weapon=2`) | **45** | Measured 2026-07-21: 5 isolated hits, each exactly −45 at the echo instant; container-drain cross-check 235 = 5×45 + radar 10 |
+| Homing HIT (taken from enemy `weapon=3`) | **45** | Same session: 5 isolated hits, each exactly −45. Dual is the game's ONLY double-damage hit |
 | Walking into an enemy mine | **45** | Verified at t+373.35s of the multi-pickup capture: 1-tile walk into mine at (92, 185) → −45 fuel |
 | Mine cascade damage (your own mine detonating you) | not observed | Bot tests where player blew up their own mines didn't show a fuel delta on the placer |
 
 Damage manifests as a fuel decrement — the game's "health" is essentially "fuel reserve" for combat purposes. When you take damage your fuel drops; when fuel hits zero the tank is deactivated.
+
+**Armor shields (measured 2026-07-21, 16 incoming hits, fuel untouched):** with shields enabled, damage is FULLY absorbed and shields are consumed at damage/45 per hit — singles/missiles/homings eat 1 shield, duals eat 2. Victim-side timing note from the same session: incoming-hit fuel debits land the SAME INSTANT as the 0x53 echo (no tick lag, unlike shooter-side charges).
 
 ## Container pickup mechanics
 
@@ -172,6 +176,21 @@ to follow (and vice versa).
     {
       "id": "mine-detonation-cost",
       "code": "tankpit_bot.physics.damage:MINE_DETONATION_COST",
+      "value": 45
+    },
+    {
+      "id": "missile-hit-victim-cost",
+      "code": "tankpit_bot.physics.damage:MISSILE_HIT_VICTIM_COST",
+      "value": 45
+    },
+    {
+      "id": "homing-hit-victim-cost",
+      "code": "tankpit_bot.physics.damage:HOMING_HIT_VICTIM_COST",
+      "value": 45
+    },
+    {
+      "id": "armor-absorb-per-shield",
+      "code": "tankpit_bot.physics.damage:ARMOR_ABSORB_PER_SHIELD",
       "value": 45
     },
     {

@@ -105,8 +105,18 @@ confirmation: zero validator discards in any run since the mine fix.
 Deleted: `_is_valid_shoot` / `_is_valid_pickup` / `_is_valid_teleport`
 / `_is_dispatchable` and their `_tracked_*` helpers, the six
 `emit_*_discarded_*` ledger emitters, six `discarded_*` outcome
-literals, and the ledger-audit discard analytics. Bonus mechanic
-unlocked: id-targeted shots at departed tanks now DISPATCH — the old
-shoot veto was silently blocking the reroute-TTL pursuit window
-([[shoot-event-format]]) the whole time. The AI-state persistence
-gate survives for genuine CDP dispatch failures only.
+literals, and the ledger-audit discard analytics. The AI-state
+persistence gate survives for genuine CDP dispatch failures only.
+
+ERRATUM (same day): the first version of this entry (and commit
+59fce8e1's message) claimed the shoot veto had been "silently
+blocking the reroute-TTL pursuit window." Wrong — `remove_tank` is
+deliberately a NO-OP (2026-06-22: 0x58 fires on tracking churn, not
+just death; 0x41 is the only authoritative death signal), so the
+registry keeps departed tanks and `_tracked_tank` always passed.
+The pursuit volley ([[shoot-event-format]]) was never blocked; it
+has been firing all along (`find_locked_target_pursuit` → homing at
+the frozen position → server reroutes → hits confirm → first
+genuine miss at TTL expiry trips the stationary-miss classifier →
+release). Soaks 2026-07-21 show 4–12 pursuit shots per run. The
+veto was dead code either way — the deletion stands unchanged.

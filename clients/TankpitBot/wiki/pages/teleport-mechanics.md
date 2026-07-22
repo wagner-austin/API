@@ -51,3 +51,29 @@ Server tick rate is 2000ms. Commands sent faster are queued by the server. Conse
 [^6]: user (Austin), 2026-04-20 — protocol command timing; confirmed no waits needed between map/teleport/fire
 [^7]: bot-20260614-142159.capture_session.json — server response latency 56ms-2002ms; 2000ms responses = server HOLDING queued command until cooldown elapses
 [^8]: user (Austin), 2026-06-16 — "I teleport to the same exact position as the enemy tank. so the game puts me adjacent. you don't have to click on map to teleport right below them"; confirmed by official How To Play: "Open the map, then click on it to teleport"
+
+## Displacement preference order (measured 2026-07-21)
+
+User-piloted probe sniff-20260721-200527, 11 wire-verified
+displacements (sent teleport target vs 0x3D landing fix):
+
+- **The server tries the target's neighbors in a fixed ABSOLUTE
+  order: EAST first, then NORTH, then WEST** — independent of
+  approach direction (the mine at (17,63) was approached from the
+  northwest, due north, and due west; all three landed at (18,63),
+  its east neighbor; a solo mine and two rock targets also landed
+  east).
+- **A tile occupied by your own tank counts as blocked**: teleporting
+  at (29,68) while standing on its east neighbor (30,68) landed
+  north at (29,67); repeating from (29,67) landed east again.
+- **West observed only when east and north were both rock**
+  ((61,53) inside the rock mass → landed (60,53)).
+- South never isolated (no case where E, N, and W were all blocked);
+  search depth beyond ring 1 unobserved (every probe target had an
+  open adjacent tile). Both remain open questions.
+- Legality contract (user, same day): displacement applies to ENEMY
+  mines and terrain; you can land on and walk over your OWN or
+  ally-colored mines, and you cannot teleport onto enemy mines.
+- Bonus re-confirmation: every probe hop's fuel delta matched
+  floor(6 x euclid) to the ACTUAL landing (e.g. (12,56)->(18,63):
+  55 fuel, wire 1100->1045).

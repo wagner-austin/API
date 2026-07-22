@@ -42,6 +42,17 @@ the user fired at enemies behind rock with missiles enabled — 10
 shots echoed as `weapon=2` exactly as the contract predicts, cost 10
 fuel + 1 missile each ([[game-economy]]).
 
+**Missiles are ENEMY-ONLY (user contract 2026-07-21)**: "missiles
+only work for enemies, not for shooting mines or the ground." A shot
+at a mine or empty tile behind terrain does NOT escalate to a missile
+— it fires a single that stops at the obstruction (wire-verified,
+sniff-20260721-212348 t+169.91: click on a solo mine at (55,167)
+behind a mountain echoed `weapon=0` with the CLIPPED impact tile
+(46,165) on the shooter→click ray, billed the full −6, destroyed
+nothing). Consequence: mines behind terrain cannot be shot from
+cover; the bot must gain line of sight first. See
+[[shoot-event-format]] for the impact-tile clipping semantics.
+
 ## Key implications
 
 - **weapon_byte=0 is a genuine miss** — the target was not at the fired coordinates[^1]
