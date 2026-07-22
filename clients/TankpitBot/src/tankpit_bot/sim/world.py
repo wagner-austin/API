@@ -72,6 +72,18 @@ class SimEquipmentDict(TypedDict):
     y: int
 
 
+class SimFerryDict(TypedDict):
+    """One ferry: a single dynamic water tile that moves with its rider.
+
+    Ferries are wire terrain (``TERRAIN_FERRY`` in 0x5A viewport
+    patches), not static map content — the client composes them over
+    the minimap ([[ferry-mechanics]]).
+    """
+
+    x: int
+    y: int
+
+
 class SimWorldDict(TypedDict):
     """The whole simulated world at one tick.
 
@@ -85,6 +97,7 @@ class SimWorldDict(TypedDict):
     containers: list[SimContainerDict]
     mines: list[SimMineDict]
     equipment: list[SimEquipmentDict]
+    ferries: list[SimFerryDict]
 
 
 def make_sim_tank(
@@ -129,10 +142,12 @@ def make_sim_world(field: str) -> SimWorldDict:
         field: Terrain GIF file name (e.g. ``field01_r.gif``).
 
     Returns:
-        A world at tick 0 with no tanks, containers, mines, or
-        equipment.
+        A world at tick 0 with no tanks, containers, mines,
+        equipment, or ferries.
     """
-    return SimWorldDict(field=field, tick=0, tanks={}, containers=[], mines=[], equipment=[])
+    return SimWorldDict(
+        field=field, tick=0, tanks={}, containers=[], mines=[], equipment=[], ferries=[]
+    )
 
 
 def encode_sim_tank(tank: SimTankDict) -> JSONObject:
@@ -251,6 +266,7 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
     ]
     mines: list[JSONValue] = [{"x": m["x"], "y": m["y"], "team": m["team"]} for m in world["mines"]]
     equipment: list[JSONValue] = [{"x": e["x"], "y": e["y"]} for e in world["equipment"]]
+    ferries: list[JSONValue] = [{"x": f["x"], "y": f["y"]} for f in world["ferries"]]
     return {
         "field": world["field"],
         "tick": world["tick"],
@@ -258,7 +274,46 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
         "containers": containers,
         "mines": mines,
         "equipment": equipment,
+        "ferries": ferries,
     }
+
+
+def _require_record_list(data: JSONObject, key: str) -> list[JSONObject]:
+    """Validate a world section as a list of JSON objects.
+
+    Args:
+        data: Enclosing JSON object.
+        key: Section field name.
+
+    Returns:
+        The section's records.
+
+    Raises:
+        ValueError: If the section is not a list.
+    """
+    raw = data.get(key)
+    if not isinstance(raw, list):
+        raise ValueError(f"SimWorld.{key}: expected a list")
+    return [narrow_json_to_dict(item) for item in raw]
+
+
+def _decode_xy_list(data: JSONObject, key: str) -> list[tuple[int, int]]:
+    """Decode a section of bare (x, y) records.
+
+    Args:
+        data: Enclosing JSON object.
+        key: Section field name.
+
+    Returns:
+        The validated positions.
+
+    Raises:
+        ValueError: If the section is malformed.
+    """
+    return [
+        (require_int(record, "x"), require_int(record, "y"))
+        for record in _require_record_list(data, key)
+    ]
 
 
 def decode_sim_world(data: JSONObject) -> SimWorldDict:
@@ -285,46 +340,30 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
     for item in raw_tanks:
         tank = decode_sim_tank(narrow_json_to_dict(item))
         tanks[tank["tank_id"]] = tank
-    raw_containers = data.get("containers")
-    if not isinstance(raw_containers, list):
-        raise ValueError("SimWorld.containers: expected a list")
-    containers: list[SimContainerDict] = []
-    for item in raw_containers:
-        record = narrow_json_to_dict(item)
-        containers.append(
-            SimContainerDict(
-                x=require_int(record, "x"),
-                y=require_int(record, "y"),
-                volume=require_int(record, "volume"),
-            )
+    containers = [
+        SimContainerDict(
+            x=require_int(record, "x"),
+            y=require_int(record, "y"),
+            volume=require_int(record, "volume"),
         )
-    raw_mines = data.get("mines")
-    if not isinstance(raw_mines, list):
-        raise ValueError("SimWorld.mines: expected a list")
-    mines: list[SimMineDict] = []
-    for item in raw_mines:
-        record = narrow_json_to_dict(item)
-        mines.append(
-            SimMineDict(
-                x=require_int(record, "x"),
-                y=require_int(record, "y"),
-                team=require_int(record, "team"),
-            )
+        for record in _require_record_list(data, "containers")
+    ]
+    mines = [
+        SimMineDict(
+            x=require_int(record, "x"),
+            y=require_int(record, "y"),
+            team=require_int(record, "team"),
         )
-    raw_equipment = data.get("equipment")
-    if not isinstance(raw_equipment, list):
-        raise ValueError("SimWorld.equipment: expected a list")
-    equipment: list[SimEquipmentDict] = []
-    for item in raw_equipment:
-        record = narrow_json_to_dict(item)
-        equipment.append(SimEquipmentDict(x=require_int(record, "x"), y=require_int(record, "y")))
+        for record in _require_record_list(data, "mines")
+    ]
     return SimWorldDict(
         field=field,
         tick=require_int(data, "tick"),
         tanks=tanks,
         containers=containers,
         mines=mines,
-        equipment=equipment,
+        equipment=[SimEquipmentDict(x=x, y=y) for x, y in _decode_xy_list(data, "equipment")],
+        ferries=[SimFerryDict(x=x, y=y) for x, y in _decode_xy_list(data, "ferries")],
     )
 
 
@@ -332,6 +371,7 @@ __all__ = [
     "EQUIPMENT_SLOTS",
     "SimContainerDict",
     "SimEquipmentDict",
+    "SimFerryDict",
     "SimMineDict",
     "SimTankDict",
     "SimWorldDict",

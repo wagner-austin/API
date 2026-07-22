@@ -1,10 +1,15 @@
 ---
 title: Ferry Mechanics
 tags: [ferry, movement, terrain, water]
-related: [[viewport-frame]], [[teleport-mechanics]], [[fuel-system]]
-sources: [see footnotes]
-fact_checked: 2026-06-12
+related:
+  - "[[viewport-frame]]"
+  - "[[teleport-mechanics]]"
+  - "[[fuel-system]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-12"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Ferry Mechanics
@@ -56,6 +61,15 @@ adjacent-tile completion rule.[^5]
 
 [^4]: live falsification chain, run 2026-07-19 18:19: pickup at (163,44) dispatched while riding a ferry at (167,40) (riding rule made the channel "reachable"), server routed to the disembark stop (167,44) and refused with 0x52 code 1. Offline reproduction: ferry-aware gate=True, single-surface gate=False (the container sat 4 tiles inland — beyond adjacency), matching the server. Fix pinned by `tests/bot/ai/test_movement.py::TestPickupSurfaceRouting`.
 [^5]: run 2026-07-20 00:57 (bot-20260720-005424): the first fix's ground-ONLY gate was overbroad — equipment on a water tile at (226,196) was never "ground-reachable", so the disembark branch sailed the bot onto the container's own tile and then re-issued a refused move (0x52 code 6) to its own position every tick for 78 ticks (half the session). User contract: containers on water pick up normally while riding. Gate replaced by the surface-matched `SurfaceRouteTerrain`; regression pinned by `test_pickup_of_water_container_while_riding_dispatches` and `test_pickup_on_own_water_tile_while_riding_dispatches`. Whether the server honors cross-surface ADJACENT pickups (clicking a land container from the alongside ferry tile) is untested on the wire; the planner currently assumes yes, symmetric with the land→water-container case.
+
+## Executable since 2026-07-22
+
+The whole contract runs in the simulator (`sim/movement.py` law 2b:
+surface-gated routing, boarding/disembark truncation, the ferry
+following its rider; `SimServer` patches ferries as 0x5A wire terrain
+with explicit reverts) and is proven against the production ingestion
+over real wire bytes — see the ferries as-built in
+[[physics-module-roadmap]].
 
 ## Discovery (2026-06-12)
 

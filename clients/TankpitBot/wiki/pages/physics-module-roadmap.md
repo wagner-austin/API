@@ -761,9 +761,10 @@ pays real 90s, the fuel book absorbs them as enemy-hit feasibility
 entries — and both books still judge ZERO divergences, with zero
 ``physics_divergence`` events in the captured stream.
 
-Still out of the world model: ferries, movable blocks, the
-radar-zero emergency grant, and real enemy minds (the scripted
-opponent is a harness, not a model).
+Still out of the world model: movable blocks, the radar-zero
+emergency grant, and real enemy minds (the scripted opponent is a
+harness, not a model). Ferries landed 2026-07-22 — see the ferries
+as-built below.
 
 ### `make sim-run` as-built (2026-07-22): the free soak — real terrain, and production gap #4
 
@@ -804,6 +805,40 @@ The first real-terrain runs earned their keep immediately:
    winnable around both facts; the reference 150-round run: fight →
    kill → refuel to cap → collect → ``no_viable_targets``, the
    production HUNT owner's clean end.
+
+### Ferries as-built (2026-07-22): law 2b — surface routing over live wire terrain
+
+The single-command surface contract ([[ferry-mechanics]], user
+verbatim 2026-07-19) is now executable end to end:
+
+- **World**: ``SimFerryDict`` — one dynamic water tile that moves
+  with its rider.
+- **Movement law** (``sim/movement.py``): routing is surface-gated —
+  on land the router opens ground + ferry tiles (a water click is
+  cant_go, exactly the measured "you can't reach that"); riding
+  opens water + land. The FIRST queue-consuming transition truncates
+  the move ON the transition tile: boarding stops on the ferry even
+  when the click was beyond it, disembarking stops one step onto
+  land with the ferry left on the last water tile; billed cost and
+  the echoed 0x47 path cover only the tiles actually walked. The
+  ferry ends every afloat move under its rider. Floating containers
+  pick up normally from the water (the 2026-07-20 user contract).
+- **Wire** (``SimServer._viewport_update``): ferries travel as 0x5A
+  visible-layer entities (wire terrain 5) with explicit reverts
+  (terrain 0 → the static map value) for vacated tiles, deferred
+  until the window covers them. Integration caught the patch-grid
+  border: the 0x5A grid is 18x18 with a one-tile margin around the
+  16x16 window, so ``col = x - left + 1`` — the first seam delivery
+  landed the ferry one tile off in both axes.
+- **Proof over the seam**: the production ingestion
+  (``update_viewport_entities`` → ``FerryAwareTerrain``) learns the
+  sim's ferry tile through real wire bytes
+  (``tests/sim/test_ferry.py``).
+
+Not modeled: ``TERRAIN_FERRY_ROCK`` (7), multi-tile ferries (the sim
+ferry is one tile), teleport landings on ferry tiles (still blocked
+by static water), and ferry fuel costs beyond the standard walk
+tile rate (assumption — unmeasured).
 
 ### Respawn as-built (2026-07-22): the world replenishes, players return
 

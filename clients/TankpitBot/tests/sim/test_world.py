@@ -9,6 +9,7 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sim.world import (
     SimContainerDict,
     SimEquipmentDict,
+    SimFerryDict,
     SimMineDict,
     decode_sim_tank,
     decode_sim_world,
@@ -44,6 +45,7 @@ def test_world_codec_round_trip() -> None:
     world["containers"].append(SimContainerDict(x=3, y=4, volume=200))
     world["mines"].append(SimMineDict(x=7, y=8, team=2))
     world["equipment"].append(SimEquipmentDict(x=9, y=2))
+    world["ferries"].append(SimFerryDict(x=11, y=6))
     world["tick"] = 12
     assert decode_sim_world(encode_sim_world(world)) == world
 
@@ -75,6 +77,7 @@ def test_decode_world_rejects_malformed_sections() -> None:
         ("containers", 5),
         ("mines", {}),
         ("equipment", "nope"),
+        ("ferries", 3),
     ]
     for key, bad in cases:
         broken = dict(good)

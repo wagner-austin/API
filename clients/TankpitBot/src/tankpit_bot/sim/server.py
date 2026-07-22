@@ -44,6 +44,7 @@ from tankpit_bot.protocol.types import (
     TankInfoDict,
     TankRemoveDict,
     TankStatusSyncDict,
+    ViewportEntityDict,
     ViewportUpdateDict,
 )
 from tankpit_bot.sim.actions import (
@@ -71,6 +72,14 @@ _TELEPORT_LANDED_SUBTYPE = 0x0C
 # a documented approximation.
 _VIEWPORT_SPAN = 16
 _MAP_SPAN = 256
+
+# Wire terrain vocabulary shared by 0x42/0x4A/0x5A ([[movable-blocks]]):
+# ferries patch as 5; a vacated ferry tile reverts by patching 0
+# (ground), which the client's composition resolves back to the
+# static map value (water under a ferry).
+_WIRE_TERRAIN_FERRY = 5
+_WIRE_TERRAIN_REVERT = 0
+_OVERLAY_NO_MINE = 8
 
 _SUPPORTED_KINDS = frozenset(
     {
@@ -177,6 +186,7 @@ class SimServer:
         self._pending_debits: list[tuple[int, int]] = []
         self._removed_at: dict[int, int] = {}
         self._pending_announcements: list[BinaryMessage] = []
+        self._patched_ferry_tiles: set[tuple[int, int]] = set()
         # Steady-state populations for the replenishment law: the
         # seeded world defines its own equilibrium ([[game-economy]],
         # archive-mined 2026-07-22 — spawns replace consumption at
@@ -193,12 +203,14 @@ class SimServer:
         """Build the client's 0x5A viewport statement.
 
         The origin centers the 16x16 window on the client (clamped at
-        the map edge). Entities are empty by design: every sim entity
-        is hidden-layer and radar-owned (containers and mines reveal
-        only by scan, [[radar-mechanics]]), and the production
-        reset-then-apply sweep explicitly SPARES radar-sourced entries
-        on silent tiles — an origin-only patch is exactly the truthful
-        statement "the window moved; the visible layer shows nothing".
+        the map edge). Entities enumerate the VISIBLE layer only:
+        in-window ferry tiles (wire terrain 5 — the client composes
+        them over the static map, [[ferry-mechanics]]) plus explicit
+        reverts (wire terrain 0) for previously patched ferry tiles a
+        moving ferry has vacated. Hidden-layer entities (containers,
+        mines) stay absent by design: they reveal only by radar, and
+        the production reset-then-apply sweep explicitly SPARES
+        radar-sourced entries on silent tiles.
 
         Returns:
             The viewport update for the client's current position.
@@ -206,7 +218,47 @@ class SimServer:
         client = self.world["tanks"][self.client_id]
         left = min(max(client["x"] - VIEWPORT_RADIUS, 0), _MAP_SPAN - _VIEWPORT_SPAN)
         top = min(max(client["y"] - VIEWPORT_RADIUS, 0), _MAP_SPAN - _VIEWPORT_SPAN)
-        return ViewportUpdateDict(msg_type=0x5A, viewport_left=left, viewport_top=top, entities=[])
+
+        def in_patch(x: int, y: int) -> bool:
+            """Report whether a tile sits inside the 18x18 patch grid.
+
+            The wire patch grid carries a one-tile border around the
+            16x16 window: ``col = x - left + 1`` (production
+            ``viewport_patch_world_coords`` subtracts the border).
+            """
+            return left - 1 <= x < left + _VIEWPORT_SPAN + 1 and (
+                top - 1 <= y < top + _VIEWPORT_SPAN + 1
+            )
+
+        entities: list[ViewportEntityDict] = []
+        current = {(ferry["x"], ferry["y"]) for ferry in self.world["ferries"]}
+        for x, y in sorted(self._patched_ferry_tiles - current):
+            if in_patch(x, y):
+                entities.append(
+                    ViewportEntityDict(
+                        col=x - left + 1,
+                        row=y - top + 1,
+                        cache_value=0,
+                        overlay_value=_OVERLAY_NO_MINE,
+                        terrain_type=_WIRE_TERRAIN_REVERT,
+                    )
+                )
+                self._patched_ferry_tiles.discard((x, y))
+        for x, y in sorted(current):
+            if in_patch(x, y):
+                entities.append(
+                    ViewportEntityDict(
+                        col=x - left + 1,
+                        row=y - top + 1,
+                        cache_value=0,
+                        overlay_value=_OVERLAY_NO_MINE,
+                        terrain_type=_WIRE_TERRAIN_FERRY,
+                    )
+                )
+                self._patched_ferry_tiles.add((x, y))
+        return ViewportUpdateDict(
+            msg_type=0x5A, viewport_left=left, viewport_top=top, entities=entities
+        )
 
     def _in_viewport(self, tank_id: int) -> bool:
         """Report whether a tank sits inside the client's viewport.
