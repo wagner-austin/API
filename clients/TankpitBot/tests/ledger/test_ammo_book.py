@@ -67,19 +67,28 @@ def test_rise_requires_an_equipment_gain() -> None:
     assert good["balanced"] is True
 
 
-def test_armor_may_fall_freely_but_not_rise_freely() -> None:
-    """Incoming hits drain armor unpredictably; refills still need gains."""
+def test_armor_falls_bounded_by_enemy_shots() -> None:
+    """Armor absorbs at most 2 shields per incoming hit (a dual)."""
+    from tankpit_bot.ledger.ammo_book import record_ammo_enemy_shot
+
     book = make_ammo_book()
     record_ammo_snapshot(book=book, counts=[5, 20, 20, 20, 20])
+    record_ammo_enemy_shot(book=book)
+    record_ammo_enemy_shot(book=book)
     fell = record_ammo_snapshot(book=book, counts=[1, 20, 20, 20, 20])
     if fell is None:
         raise AssertionError("expected a snapshot verdict")
     assert fell["balanced"] is True
+    unexplained = record_ammo_snapshot(book=book, counts=[0, 20, 20, 20, 20])
+    if unexplained is None:
+        raise AssertionError("expected a snapshot verdict")
+    assert unexplained["balanced"] is False
+    assert "armor fell 1 with only 0 enemy shots observed" in unexplained["detail"]
     rose = record_ammo_snapshot(book=book, counts=[5, 20, 20, 20, 20])
     if rose is None:
         raise AssertionError("expected a snapshot verdict")
     assert rose["balanced"] is False
-    assert "armor rose 4 with no equipment gain" in rose["detail"]
+    assert "armor rose 5 with no equipment gain" in rose["detail"]
 
 
 def test_malformed_snapshots_are_rejected() -> None:
