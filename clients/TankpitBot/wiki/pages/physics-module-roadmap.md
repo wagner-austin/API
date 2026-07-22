@@ -11,10 +11,11 @@ confidence: high (Phases 1-2 IMPLEMENTED 2026-07-20/21; Phase 3 + executor track
 
 **Status: Phases 1–3 and the executor track IMPLEMENTED (2026-07-20/21;
 make audit 11/11 claims, both live books at zero divergences, executor
-pure dispatch). Phase 4: steps (a) encoders, (b) laws 1–3, (d) laws
-5–8, and the step-(c) wire integration IMPLEMENTED 2026-07-21/22;
-remaining: the live CDP substitution (step c completion) and the
-divergence-zero soak + audit cross-check (step e).**
+pure dispatch). Phase 4 steps (a)–(d) IMPLEMENTED 2026-07-21/22,
+INCLUDING the live CDP seam: the production ``_tick_once`` plays full
+rounds against the sim over real wire bytes. Remaining: step (e) —
+the timed soak entry point with capture/events artifacts, the
+divergence-zero verdict, and the audit cross-check.**
 Written for a future session (human or AI) to execute end-to-end
 without access to the 2026-07-20 design conversation. Read
 [[terrain-composition]] first — it is the completed seed of this plan.
@@ -556,9 +557,44 @@ beliefs.
    layout; the handshake must emit the full 4-byte field. Direct
    typed ingestion (the scenario harness) can never catch either.
 
-Still open for step (c) completion: the live `CDPSessionProtocol`
-substitution so `make run`'s full tick loop (not just the planner)
-plays against the sim.
+### Step (c) completed (2026-07-22): the real bot plays the sim
+
+`sim/session.py` closes the seam. `SimCDPSession` implements the same
+`CDPSessionProtocol` the production tick loop talks to, answering
+every `Runtime.evaluate` from SIM WORLD TRUTH — no canned values:
+
+- the page-client snapshot query answers with a truthfully-built
+  `PageClientSnapshotDict` (`client_present=True` and
+  `ws_ready_state=1` because the sim link genuinely is the client and
+  is genuinely open; `map_visible` tracks map-open/teleport commands;
+  the JS-heap field maps are empty — the type's honest "not captured"
+  form, which the alignment samplers already treat as absent);
+- the injected websocket send (`atob('<b64>')`) decodes through the
+  sim transport into typed commands and queues on the server;
+- unmodeled expressions RAISE `EncodeError` — loud, never best-effort.
+
+Wiring recipe (pinned by `tests/sim/test_session.py`): construct
+`Bot(url, headless=True)` (no browser), `bot._on_magic_captured(magic)`
+builds the command XOR table from the shared static key,
+`bot._cdp = SimCDPSession(server, table)`, and sim batches are
+delivered as base64 payloads into `bot._cdp_message_buffer` — the
+exact shape `world_sync.drain_messages` consumes.
+
+**The smoke test**: 12 rounds of the PRODUCTION `_tick_once` against
+a seeded world. The bot toggled its equipment, radared, collected the
+container, hunted, and fought the rank-8 enemy — and its believed
+position and fuel equalled sim ground truth at the end. Two findings
+from wiring the real loop:
+
+1. The bot's actual opening move is **equipment toggling (cmd 114)**,
+   which the sim didn't model — law added: the toggle flips the slot
+   server-side and answers the documented `t + 5 bytes` 0x74 state.
+2. A too-poor world (one container, weak enemy) ends the session the
+   PRODUCTION way: after killing the enemy and draining the map, the
+   COLLECT owner raised the real `SessionExitError`
+   (`no_productive_collect`). Sim worlds must be seeded sustainably —
+   and equipment containers are still absent from the world model, so
+   the sim bot can restock fuel but never ammo.
 
 ### Step (d) as-built (2026-07-22): laws 5–8 — the full bot command set processes
 
