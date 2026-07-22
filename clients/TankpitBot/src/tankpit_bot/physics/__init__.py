@@ -38,19 +38,25 @@ from tankpit_bot.physics.costs import (
     teleport_cost,
 )
 from tankpit_bot.physics.damage import (
+    ARMOR_ABSORB_PER_SHIELD,
     DUAL_HIT_VICTIM_COST,
+    HOMING_HIT_VICTIM_COST,
     MINE_DETONATION_COST,
+    MISSILE_HIT_VICTIM_COST,
     SINGLE_HIT_VICTIM_COST,
 )
 
 __all__ = [
+    "ARMOR_ABSORB_PER_SHIELD",
     "BLOCK_OP_COST",
     "DEPOSIT_FLOOR",
     "DUAL_HIT_VICTIM_COST",
     "DUAL_SHOT_COST",
+    "HOMING_HIT_VICTIM_COST",
     "HOMING_SHOT_COST",
     "MINE_DETONATION_COST",
     "MINE_PRESS_COST",
+    "MISSILE_HIT_VICTIM_COST",
     "MISSILE_SHOT_COST",
     "RADAR_COST",
     "REROUTE_TTL_MS",
