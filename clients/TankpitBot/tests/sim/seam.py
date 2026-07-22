@@ -1,0 +1,150 @@
+"""Shared seam boot for the sim tests.
+
+One place builds "a real ``Bot`` wired to a fresh sim world over the
+seam" so the step-(c) smoke, the step-(e) divergence soak, and the
+audit cross-check all exercise the identical wiring: real command
+service, real encoders, real ingestion — only ``bot._cdp`` is the sim
+link.
+"""
+
+from __future__ import annotations
+
+from tankpit_bot.bot.base import Bot
+from tankpit_bot.sim.server import SimServer
+from tankpit_bot.sim.session import SimCDPSession, deliver_batch
+from tankpit_bot.sim.world import (
+    SimContainerDict,
+    SimEquipmentDict,
+    make_sim_tank,
+    make_sim_world,
+)
+from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.xor import (
+    build_global_xor_table,
+    get_global_xor_table,
+    reset_xor_state,
+)
+from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+SEAM_MAGIC = "simmagic"
+SEAM_CLIENT_ID = 9
+SEAM_ENEMY_ID = 11
+
+#: Default container seeding: (x, y, volume) triples near the client
+#: spawn, enough that a 12-round smoke never runs the world dry
+#: (an exhausted world ends the session the production way with
+#: ``SessionExitError: no_productive_collect`` — a real finding from
+#: the step-(c) smoke, now a seeding rule).
+DEFAULT_CONTAINERS: tuple[tuple[int, int, int], ...] = (
+    (103, 100, 300),
+    (97, 104, 400),
+    (106, 95, 400),
+)
+
+#: Rich seeding for long soaks: enough fuel on the ground that a
+#: 30-40 round session stays productive even after the enemy dies.
+RICH_CONTAINERS: tuple[tuple[int, int, int], ...] = (
+    *DEFAULT_CONTAINERS,
+    (94, 97, 400),
+    (109, 104, 400),
+    (100, 108, 400),
+    (92, 103, 300),
+    (105, 92, 300),
+)
+
+
+class SeamClock:
+    """Deterministic stepping clock for multi-round seam sessions.
+
+    Install on ``_test_hooks.get_current_time_ms`` via save-and-restore
+    (the scenarios-harness discipline) so every timestamp in the
+    system — wire stamps, diagnostics, the seam's capture recording —
+    advances at the pace the test dictates instead of collapsing into
+    one wall-clock millisecond burst.
+    """
+
+    def __init__(self, start_ms: int) -> None:
+        """Start the clock.
+
+        Args:
+            start_ms: Initial clock value in milliseconds.
+        """
+        self.now_ms = start_ms
+
+    def __call__(self) -> int:
+        """Return the current clock value.
+
+        Returns:
+            The clock value in milliseconds.
+        """
+        return self.now_ms
+
+    def advance(self, delta_ms: int) -> None:
+        """Advance the clock.
+
+        Args:
+            delta_ms: Milliseconds to add.
+        """
+        self.now_ms += delta_ms
+
+
+def boot_seam(
+    *,
+    enemy_fuel: int = 1800,
+    containers: tuple[tuple[int, int, int], ...] = DEFAULT_CONTAINERS,
+    counts: tuple[int, int, int, int, int] = (25, 25, 25, 25, 25),
+    equipment: tuple[tuple[int, int], ...] = (),
+    enemy_counts: tuple[int, int, int, int, int] = (0, 0, 0, 0, 0),
+) -> tuple[Bot, SimServer, SimCDPSession, bytes]:
+    """Build a real Bot wired to a fresh sim world over the seam.
+
+    Args:
+        enemy_fuel: Starting fuel for the seeded enemy (rank 8, so a
+            damage tier survives long enough for real fights).
+        containers: Fuel-container seeding as (x, y, volume) triples.
+        counts: The client's starting 0x49 slot counts.
+        equipment: Equipment-container seeding as (x, y) pairs.
+        enemy_counts: The enemy's slot counts (arm it for fighting
+            soaks driven by ``sim.opponent``).
+
+    Returns:
+        The bot, the sim server, the sim CDP link, and the XOR table,
+        with the join handshake already delivered to the bot's buffer.
+
+    Raises:
+        RuntimeError: If the repo's XOR static key is unavailable.
+    """
+    reset_world_state()
+    reset_xor_state()
+    build_global_xor_table(SEAM_MAGIC)
+    table = get_global_xor_table()
+    if table is None:
+        raise RuntimeError("XOR static key unavailable — cannot boot the seam")
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][SEAM_CLIENT_ID] = make_sim_tank(SEAM_CLIENT_ID, 2, 1, 100, 100, 800)
+    world["tanks"][SEAM_CLIENT_ID]["counts"] = list(counts)
+    world["tanks"][SEAM_ENEMY_ID] = make_sim_tank(SEAM_ENEMY_ID, 1, 8, 110, 100, enemy_fuel)
+    world["tanks"][SEAM_ENEMY_ID]["counts"] = list(enemy_counts)
+    for x, y, volume in containers:
+        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume))
+    for x, y in equipment:
+        world["equipment"].append(SimEquipmentDict(x=x, y=y))
+    server = SimServer(world, InMemoryTerrainMap(), client_id=SEAM_CLIENT_ID)
+    bot = Bot("https://sim.tankpit.local/", headless=True)
+    bot._magic = SEAM_MAGIC
+    bot._on_magic_captured(SEAM_MAGIC)
+    link = SimCDPSession(server, table)
+    bot._cdp = link
+    deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
+    return bot, server, link, table
+
+
+__all__ = [
+    "DEFAULT_CONTAINERS",
+    "RICH_CONTAINERS",
+    "SEAM_CLIENT_ID",
+    "SEAM_ENEMY_ID",
+    "SEAM_MAGIC",
+    "SeamClock",
+    "boot_seam",
+]

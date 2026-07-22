@@ -1,5 +1,5 @@
-"""Law 3 — queue-model shot resolution (wiki [[shoot-event-format]],
-[[weapon-selection]], [[game-economy]]).
+"""Laws 3 and 4 — queue-model shot resolution and homing reroute
+(wiki [[shoot-event-format]], [[weapon-selection]], [[game-economy]]).
 
 A shot resolves against the TILE state at processing time — there is
 no range mechanic. The server picks the weapon (dual by default
@@ -8,6 +8,14 @@ only against an obstructed enemy), clips non-missile shots at the
 first blocking tile, applies the measured damage table with armor
 absorption, bills the victim instantly, and defers the shooter's
 firing cost to the next tick (charge latency).
+
+Law 4 adds id-targeted resolution: an id-carrying shot follows the
+tank, not the clicked tile. A visible target reroutes the click to
+its current position (the queue-race conversion — a same-tick mover
+draws homing instead of a miss); a DEPARTED target (0x58 emitted)
+keeps drawing guaranteed homing hits until the measured reroute TTL
+(``physics.combat.REROUTE_TTL_MS``, boundary [11.0, 13.0] s), after
+which the id no longer resolves and the shot is a free single miss.
 """
 
 from __future__ import annotations
@@ -15,6 +23,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
+from tankpit_bot.physics.combat import REROUTE_TTL_MS
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
     HOMING_SHOT_COST,
@@ -276,6 +285,60 @@ def _detonate_mines(world: SimWorldDict, x: int, y: int, outcome: ShotOutcomeDic
         outcome["mine_cascade"].append([(mine["x"], mine["y"]) for mine in chain])
 
 
+def _reroute_departed(
+    shooter: SimTankDict,
+    target: SimTankDict,
+    target_x: int,
+    target_y: int,
+    departed_age_ms: int,
+) -> ShotOutcomeDict:
+    """Resolve an id-shot at a departed tank (law 4).
+
+    Within the measured TTL the server keeps rerouting: the shot fires
+    as a guaranteed homing hit (ammo debited = hit, per the
+    consumption-equals-hit contract) even though the target's position
+    is dark. Past the TTL the id no longer resolves — a free single
+    with nothing debited, the measured genuine miss. A shooter without
+    a ready homing slot cannot reroute either (the human analogue
+    needs homing enabled).
+
+    Args:
+        shooter: The firing tank (mutated on ammo debit).
+        target: The departed tank (mutated on hit).
+        target_x: Clicked tile X (the stale aim — position is dark).
+        target_y: Clicked tile Y.
+        departed_age_ms: Milliseconds since the target's 0x58.
+
+    Returns:
+        The typed outcome.
+    """
+    rerouted = departed_age_ms <= REROUTE_TTL_MS and _slot_ready(shooter, SLOT_HOMING)
+    weapon = WEAPON_HOMING if rerouted else WEAPON_SINGLE
+    outcome = ShotOutcomeDict(
+        shooter_id=shooter["tank_id"],
+        weapon=weapon,
+        source_x=shooter["x"],
+        source_y=shooter["y"],
+        aim_x=target_x,
+        aim_y=target_y,
+        impact_x=target_x,
+        impact_y=target_y,
+        victim_id=None,
+        victim_deactivated=False,
+        shields_consumed=0,
+        mine_cascade=[],
+        shooter_debit=_FIRING_COSTS[weapon],
+        ammo_slot=None,
+        kind="shot",
+    )
+    if rerouted:
+        outcome["victim_id"] = target["tank_id"]
+        _apply_hit(target, WEAPON_HOMING, outcome)
+        shooter["counts"][SLOT_HOMING] = max(0, shooter["counts"][SLOT_HOMING] - 1)
+        outcome["ammo_slot"] = SLOT_HOMING
+    return outcome
+
+
 def process_shot(
     world: SimWorldDict,
     terrain: TerrainMapProtocol,
@@ -283,6 +346,8 @@ def process_shot(
     target_x: int,
     target_y: int,
     moved_this_tick: frozenset[int],
+    target_id: int,
+    departed_age_ms: int | None,
 ) -> ShotOutcomeDict:
     """Process one shoot command at the current tick.
 
@@ -294,6 +359,13 @@ def process_shot(
         target_y: Clicked tile Y.
         moved_this_tick: Ids of tanks whose move commands processed
             earlier in this same tick (drives homing selection).
+        target_id: The shot's entity id (0 = positional shot). An
+            id-shot at a living VISIBLE tank reroutes the click to the
+            tank's current tile before positional resolution — the
+            law-4 queue-race conversion.
+        departed_age_ms: Milliseconds since the target's 0x58
+            TankRemove, or None when the target has not departed —
+            drives the reroute-TTL path for id-shots.
 
     Returns:
         The typed outcome; the world reflects it. The firing cost is
@@ -301,6 +373,11 @@ def process_shot(
         next tick (measured charge latency).
     """
     shooter = world["tanks"][shooter_id]
+    target = world["tanks"].get(target_id) if target_id != 0 else None
+    if target is not None and target["alive"]:
+        if departed_age_ms is not None:
+            return _reroute_departed(shooter, target, target_x, target_y, departed_age_ms)
+        target_x, target_y = target["x"], target["y"]
     enemy_at_click = _living_enemy_at(world, shooter, target_x, target_y)
     impact_x, impact_y, obstructed = _clip_impact(world, terrain, shooter, target_x, target_y)
     weapon = _select_weapon(

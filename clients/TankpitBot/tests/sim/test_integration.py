@@ -71,7 +71,7 @@ def _boot() -> tuple[SimServer, bytes]:
     world = make_sim_world("field01_r.gif")
     world["tanks"][_CLIENT] = make_sim_tank(_CLIENT, 2, 1, 100, 100, 800)
     world["tanks"][_CLIENT]["counts"] = [25, 25, 25, 25, 25]
-    world["tanks"][_ENEMY] = make_sim_tank(_ENEMY, 1, 1, 110, 100, 500)
+    world["tanks"][_ENEMY] = make_sim_tank(_ENEMY, 1, 1, 107, 100, 500)
     world["containers"].append(SimContainerDict(x=103, y=100, volume=300))
     server = SimServer(world, InMemoryTerrainMap(), client_id=_CLIENT)
     _deliver(server.handshake(), table)
@@ -96,7 +96,7 @@ def test_handshake_reaches_production_world_state() -> None:
     assert (self_state["x"], self_state["y"]) == (100, 100)
     assert self_state["fuel"] == 800
     enemy = world["tanks"][str(_ENEMY)]
-    assert (enemy["x"], enemy["y"]) == (110, 100)
+    assert (enemy["x"], enemy["y"]) == (107, 100)
     assert server.world["tick"] == 0
 
 
@@ -136,7 +136,7 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     """
     server, table = _boot()
     server.queue_command(
-        _CLIENT, ClientCommandDict(kind="shoot", command=115, x=110, y=100, target_id=0, slot=0)
+        _CLIENT, ClientCommandDict(kind="shoot", command=115, x=107, y=100, target_id=0, slot=0)
     )
     _deliver(server.advance_tick(), table)
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90

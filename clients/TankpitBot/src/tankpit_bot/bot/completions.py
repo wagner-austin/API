@@ -276,6 +276,18 @@ class CompletionsMixin(SessionBase):
         """
         if self._state_data["state"] != "COLLECTING" or self_state is None:
             return False
+        if get_world_service().last_command_error != -1:
+            # A 0x52 rejection is pending attribution. Completing by
+            # position now would orphan it and strand the belief it
+            # contradicts: a same-tile pickup at a consumed container
+            # completes instantly by position, so the code=4
+            # ("empty container") that should delete the belief never
+            # reaches the in-flight handler and the bot re-clicks the
+            # ghost forever (sim-found 2026-07-22, the equipment
+            # restock loop). Defer one phase — the in-flight error
+            # handler runs later this same tick, applies the belief
+            # mutation, and replans.
+            return False
         action = self._state_data["in_flight_action"]
         tx, ty = action["target_x"], action["target_y"]
         target_key = f"{tx},{ty}"

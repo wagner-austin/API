@@ -18,6 +18,12 @@ from SIM WORLD TRUTH:
 :func:`run_sim_session` drives the PRODUCTION ``_tick_once`` against
 a :class:`SimServer`: handshake into the bot's real message buffer,
 then tick after tick of decide -> command bytes -> sim -> wire batch.
+
+Step (e) addition: the link keeps a ``wire_log`` of every frame that
+crossed it, in both directions, as :class:`CapturedMessage` records —
+:func:`build_capture_session` assembles them into the standard
+``CaptureSession`` shape so ``make audit``'s validators can re-derive
+the archive claims from sim-generated wire.
 """
 
 from __future__ import annotations
@@ -35,6 +41,7 @@ from tankpit_bot.protocol.helpers import EncodeError
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.transport import decode_client_payload, encode_tick_payload
+from tankpit_bot.types import CapturedMessage, CaptureSession
 
 _WS_OPEN = 1
 _SIM_WS_URL = "wss://sim.tankpit.local/ws"
@@ -58,6 +65,7 @@ class SimCDPSession:
         self.server = server
         self.table = table
         self.sent_commands: list[str] = []
+        self.wire_log: list[CapturedMessage] = []
         self.map_visible = False
         self._last_send_ms: int | None = None
         self._detached = False
@@ -114,7 +122,16 @@ class SimCDPSession:
             if command["kind"] == "teleport":
                 self.map_visible = False
             self.server.queue_command(self.server.client_id, command)
-        self._last_send_ms = get_current_time_ms()
+        now = get_current_time_ms()
+        self._last_send_ms = now
+        self.wire_log.append(
+            CapturedMessage(
+                timestamp_ms=now,
+                direction="sent",
+                payload=payload,
+                ws_url=_SIM_WS_URL,
+            )
+        )
         byte_count = len(payload) * 3 // 4
         return {"result": {"value": f"SENT_{byte_count}_BYTES via {_SIM_WS_URL}"}}
 
@@ -165,22 +182,74 @@ class SimCDPSession:
         self._detached = True
 
 
-def deliver_batch(buffer: list[str], messages: list[BinaryMessage], table: bytes) -> None:
+def deliver_batch(buffer: list[str], messages: list[BinaryMessage], link: SimCDPSession) -> None:
     """Encode one sim batch to wire bytes and append it to the bot buffer.
+
+    The encoded frame is also recorded on the link's ``wire_log`` so a
+    finished seam session can be assembled into a standard capture via
+    :func:`build_capture_session`.
 
     Args:
         buffer: The bot's received-message buffer
             (``bot._cdp_message_buffer`` — base64 payload strings, the
             exact shape ``world_sync.drain_messages`` consumes).
         messages: The sim's decoded batch.
-        table: Session XOR table.
+        link: The seam link (provides the XOR table and the wire log).
     """
     if not messages:
         return
-    buffer.append(encode_tick_payload(messages, table))
+    payload = encode_tick_payload(messages, link.table)
+    link.wire_log.append(
+        CapturedMessage(
+            timestamp_ms=get_current_time_ms(),
+            direction="received",
+            payload=payload,
+            ws_url=_SIM_WS_URL,
+        )
+    )
+    buffer.append(payload)
+
+
+def build_capture_session(link: SimCDPSession, magic: str, session_id: str) -> CaptureSession:
+    """Assemble the link's recorded traffic as a standard capture session.
+
+    The result is byte-compatible with what the production sniffer
+    writes to ``runs/*/<id>.capture_session.json`` — the ``make
+    audit`` validators consume it unchanged, which is exactly the
+    point: the same instruments that watch the real server judge the
+    sim's wire.
+
+    Args:
+        link: The seam link whose ``wire_log`` holds the session.
+        magic: The session's XOR magic key (the validators rebuild the
+            table from it, so it must be the one the seam was booted
+            with).
+        session_id: Identifier for the assembled session.
+
+    Returns:
+        The capture session, messages in recorded order.
+
+    Raises:
+        EncodeError: If the link recorded no traffic — an empty
+            capture means the seam never ran, which is a harness bug,
+            not a session.
+    """
+    if not link.wire_log:
+        raise EncodeError("sim session recorded no wire traffic — nothing to capture")
+    return CaptureSession(
+        session_id=session_id,
+        start_timestamp_ms=link.wire_log[0]["timestamp_ms"],
+        end_timestamp_ms=link.wire_log[-1]["timestamp_ms"],
+        base_url="https://sim.tankpit.local/",
+        messages=list(link.wire_log),
+        magic=magic,
+        game_log=[],
+        tank_names={},
+    )
 
 
 __all__ = [
     "SimCDPSession",
+    "build_capture_session",
     "deliver_batch",
 ]

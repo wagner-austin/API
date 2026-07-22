@@ -26,10 +26,13 @@ from tankpit_bot.sim.world import SimMineDict, SimWorldDict
 # S is the documented last-resort assumption).
 _DISPLACEMENT_ORDER: tuple[tuple[int, int], ...] = ((0, 0), (1, 0), (0, -1), (-1, 0), (0, 1))
 
-# The radar an extra-radar scan covers: the full 16x16 viewport
-# expressed as a Chebyshev radius around the tank
-# (wiki [[radar-mechanics]]: extra = whole viewport).
-_EXTRA_RADAR_RADIUS = 8
+# The client's viewport as a Chebyshev radius around the tank: the
+# extra-radar scan covers exactly the viewport (wiki
+# [[radar-mechanics]]: extra = whole viewport), and tank-position
+# visibility is viewport-scoped — leaving it triggers the 0x58
+# TankRemove the law-4 reroute clock starts from
+# ([[shoot-event-format]]).
+VIEWPORT_RADIUS = 8
 
 
 class TeleportOutcomeDict(TypedDict):
@@ -146,9 +149,10 @@ def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
 
     An available extra radar is consumed and covers the full viewport;
     otherwise the rank-scaled built-in radius applies. The scan
-    reveals containers and mines in the square radius and reports
-    whether any living enemy sits inside it. The 10-fuel cost is
-    billed by the caller.
+    reveals containers (fuel by volume, equipment as the wire's
+    ``0xFFFF -> -1`` cache marker) and mines in the square radius and
+    reports whether any living enemy sits inside it. The 10-fuel cost
+    is billed by the caller.
 
     Args:
         world: Simulated world (mutated: extra-radar consumption).
@@ -162,7 +166,7 @@ def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
     if tank["enabled"][SLOT_RADAR] and tank["counts"][SLOT_RADAR] > 0:
         tank["counts"][SLOT_RADAR] -= 1
         consumed = True
-        radius = _EXTRA_RADAR_RADIUS
+        radius = VIEWPORT_RADIUS
     else:
         radius = free_radar_radius(tank["rank"])
     cx, cy = tank["x"], tank["y"]
@@ -176,6 +180,11 @@ def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
         for c in world["containers"]
         if c["volume"] > 0 and inside(c["x"], c["y"])
     ]
+    containers.extend(
+        RadarContainerDict(x=e["x"], y=e["y"], volume=-1)
+        for e in world["equipment"]
+        if inside(e["x"], e["y"])
+    )
     mines = [
         RadarMineDict(x=m["x"], y=m["y"], team=m["team"])
         for m in world["mines"]
@@ -297,6 +306,7 @@ MINE_PRESS_FUEL_COST = MINE_PRESS_COST
 __all__ = [
     "MINE_PRESS_FUEL_COST",
     "RADAR_FUEL_COST",
+    "VIEWPORT_RADIUS",
     "MinePressOutcomeDict",
     "RadarOutcomeDict",
     "TeleportOutcomeDict",

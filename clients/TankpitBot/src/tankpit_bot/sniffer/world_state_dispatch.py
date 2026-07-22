@@ -11,7 +11,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
-from tankpit_bot.ledger.ammo_book import record_ammo_shot
+from tankpit_bot.ledger.ammo_book import record_ammo_enemy_shot, record_ammo_shot
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
@@ -129,7 +129,12 @@ def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> N
     Own shots debit their physics cost exactly (homing may split its
     debit across the sync boundary, so its ceiling is -5 and the book
     seeds a carry); enemy shots are optional debits bounded by the
-    worst known victim cost — the shot may have targeted someone else.
+    worst known victim cost — the shot may have targeted someone else
+    — and count toward the ammo book's armor feasibility bound
+    (shields may only fall for observed incoming fire; unwired until
+    the 2026-07-22 fighting soak caught ``enemy_shots`` frozen at 0,
+    which would have raised a FALSE ammo divergence on the first
+    armor-absorbed hit).
 
     Args:
         ws: World service instance.
@@ -146,6 +151,7 @@ def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> N
         record_ammo_shot(book=ws.ammo_book, weapon=weapon)
     else:
         record_fuel_entry(book=ws.fuel_book, kind="enemy_hit", lo=-DUAL_HIT_VICTIM_COST, hi=0)
+        record_ammo_enemy_shot(book=ws.ammo_book)
 
 
 def _dispatch_shoot_event(

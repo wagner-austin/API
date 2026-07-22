@@ -332,6 +332,48 @@ class TestActionOutcomeEventsOnAuthoritativeCompletion:
         assert require_int_field(fields, "target_x") == 80
         assert require_int_field(fields, "target_y") == 90
 
+    def test_collection_completion_defers_while_a_command_error_is_pending(
+        self,
+        fake_env: FakeEnv,
+        fake_fs: FakeFileSystem,
+    ) -> None:
+        """A pending 0x52 blocks position-completion until it is attributed.
+
+        Regression (sim-found 2026-07-22): a same-tile pickup at a
+        consumed container completes instantly by position, so the
+        code=4 "empty container" that should delete the stale belief
+        orphans and the bot re-clicks the ghost forever. The
+        completion must yield to the in-flight error handler.
+        """
+        reset_world_state()
+        update_world_state_from_position(50, 50)
+        configure_bot_runtime_logging("20260331-230405")
+
+        bot = _make_bot_with_in_flight(
+            state="COLLECTING",
+            action_kind="collect",
+            target_x=80,
+            target_y=90,
+            started_ms=get_current_time_ms() - 1,
+        )
+        landed_state = make_self_state(
+            tank_id=1,
+            x=80,
+            y=90,
+            team=2,
+            rank=1,
+            fuel=750,
+            leaderboard_position=1,
+        )
+        ws = get_world_service()
+        ws.last_command_error = 4
+
+        assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is False
+        assert bot.get_state() == "COLLECTING"
+
+        ws.last_command_error = -1
+        assert bot._maybe_complete_collection(bot.get_world_state(), landed_state) is True
+
     def test_collection_completion_emits_event_with_container_consumed_signal(
         self,
         fake_env: FakeEnv,
