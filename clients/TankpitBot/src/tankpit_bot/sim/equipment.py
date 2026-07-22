@@ -27,11 +27,44 @@ from tankpit_bot.sim.world import EQUIPMENT_SLOTS, SimTankDict, SimWorldDict
 EQUIPMENT_CAP = 25
 """Hard per-slot cap — 0/1,149 corpus grants pushed a count past it."""
 
-WEAPON_STACK = 7
+RADAR_SLOT = 4
+"""Index of the extra-radar slot in the five-slot counts array."""
+
+WEAPON_STACK_ROLL = (5, 9)
+"""Measured uncapped weapon-slot stack range (dual/homing, 1,149 grants)."""
+
+RADAR_STACK_ROLL = (2, 4)
+"""Measured uncapped radar stack range — radar really is the smallest."""
+
+WEAPON_STACK = (WEAPON_STACK_ROLL[0] + WEAPON_STACK_ROLL[1]) // 2
 """Deterministic weapon-slot stack: midpoint of the measured 5-9 rolls."""
 
-RADAR_STACK = 3
+RADAR_STACK = (RADAR_STACK_ROLL[0] + RADAR_STACK_ROLL[1]) // 2
 """Deterministic radar stack: midpoint of the measured 2-4 rolls."""
+
+MERCY_BUNDLE_ROLLS = ((0, 0), (1, 4), (0, 0), (1, 1), (1, 2))
+"""Measured radar-zero kill-reward ranges per slot (armor, dual,
+missile, homing, radar) — the archive's 5 silent bundles rolled dual
++1..4, homing exactly +1, radar +1..2, and may overfill past the cap."""
+
+MERCY_BUNDLE = tuple((low + high) // 2 for low, high in MERCY_BUNDLE_ROLLS)
+"""Deterministic sim mercy bundle: per-slot midpoints of the rolls."""
+
+
+def kill_grants_mercy(radar_count: int) -> bool:
+    """The radar-zero kill-reward trigger (archive-cracked 2026-07-22).
+
+    Deterministic in the corpus: 5/5 kills at radar zero granted the
+    silent bundle, 0/254 kills at radar > 0 granted, no exceptions.
+
+    Args:
+        radar_count: The killer's extra-radar count at the kill.
+
+    Returns:
+        True when the kill earns the silent mercy bundle.
+    """
+    return radar_count == 0
+
 
 _SLOT_STACKS = (WEAPON_STACK, WEAPON_STACK, WEAPON_STACK, WEAPON_STACK, RADAR_STACK)
 
@@ -96,8 +129,14 @@ def _grant(tank: SimTankDict) -> list[int]:
 
 __all__ = [
     "EQUIPMENT_CAP",
+    "MERCY_BUNDLE",
+    "MERCY_BUNDLE_ROLLS",
+    "RADAR_SLOT",
     "RADAR_STACK",
+    "RADAR_STACK_ROLL",
     "WEAPON_STACK",
+    "WEAPON_STACK_ROLL",
     "EquipmentGrantDict",
+    "kill_grants_mercy",
     "resolve_equipment_pickup",
 ]

@@ -62,7 +62,12 @@ from tankpit_bot.sim.actions import (
 from tankpit_bot.sim.blocks import block_tile_value, process_block_press
 from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
-from tankpit_bot.sim.equipment import resolve_equipment_pickup
+from tankpit_bot.sim.equipment import (
+    MERCY_BUNDLE,
+    RADAR_SLOT,
+    kill_grants_mercy,
+    resolve_equipment_pickup,
+)
 from tankpit_bot.sim.movement import MoveOutcomeDict, process_move
 from tankpit_bot.sim.spawn import respawn_containers
 from tankpit_bot.sim.world import SimWorldDict
@@ -563,9 +568,9 @@ class SimServer:
             ammo_changed: Accumulator of tanks whose counts moved.
         """
         killer = self.world["tanks"][killer_id]
-        if killer["counts"][4] != 0:
+        if not kill_grants_mercy(killer["counts"][RADAR_SLOT]):
             return
-        gained = [0, 2, 0, 1, 1]
+        gained = list(MERCY_BUNDLE)
         for slot, amount in enumerate(gained):
             killer["counts"][slot] += amount
         ammo_changed.add(killer_id)

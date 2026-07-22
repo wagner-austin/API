@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
 
 help:
 	@Write-Host ""
@@ -234,6 +234,12 @@ audit:
 	@Write-Host "==> audit (re-derive wiki physics claims from the runs archive)" -ForegroundColor Cyan
 	poetry run tankpit-audit --stamp; if ($$LASTEXITCODE -ne 0) { Write-Host "[audit] a claim failed re-derivation" -ForegroundColor Red; exit $$LASTEXITCODE }
 	@Write-Host "[audit] every validated claim re-derived from the archive" -ForegroundColor Green
+
+shadow:
+	@Write-Host ""
+	@Write-Host "==> shadow (price the sim's laws against the real runs archive)" -ForegroundColor Cyan
+	poetry run tankpit-shadow; if ($$LASTEXITCODE -ne 0) { Write-Host "[shadow] a sim law diverges from the archive" -ForegroundColor Red; exit $$LASTEXITCODE }
+	@Write-Host "[shadow] every sim law priced at archive exactness" -ForegroundColor Green
 
 sim-run:
 	@Write-Host ""

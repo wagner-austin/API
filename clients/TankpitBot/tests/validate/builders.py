@@ -159,6 +159,26 @@ def inventory_message(timestamp_ms: int, counts: list[int]) -> CapturedMessage:
     return frame_message(timestamp_ms, xor_encode_body(0x49, payload), "received")
 
 
+def deactivation_message(timestamp_ms: int, victim_id: int, killer_id: int) -> CapturedMessage:
+    """Build a 0x41 Deactivation (kill) event."""
+    payload = bytes([0, victim_id & 0xFF, victim_id >> 8, 0, killer_id & 0xFF, killer_id >> 8])
+    return frame_message(timestamp_ms, xor_encode_body(0x41, payload), "received")
+
+
+def equipment_gain_message(
+    timestamp_ms: int, gained: list[int], show_message: bool
+) -> CapturedMessage:
+    """Build a 0x67 EquipmentGain (loud pickup or silent bundle)."""
+    payload = bytes([1 if show_message else 0, *gained])
+    return frame_message(timestamp_ms, xor_encode_body(0x67, payload), "received")
+
+
+def tank_exit_message(timestamp_ms: int, tank_id: int) -> CapturedMessage:
+    """Build a 0x29 TankExit announcement for the given tank."""
+    payload = bytes([TEAM_SELF, tank_id & 0xFF, tank_id >> 8, 0, 0])
+    return frame_message(timestamp_ms, xor_encode_body(0x29, payload), "received")
+
+
 def sent_command_message(
     timestamp_ms: int, command: int, x: int = 0, y: int = 0
 ) -> CapturedMessage:
@@ -185,8 +205,10 @@ __all__ = [
     "ENEMY_ID",
     "MAGIC",
     "SELF_ID",
+    "deactivation_message",
     "deposit_message",
     "detonation_message",
+    "equipment_gain_message",
     "frame_message",
     "fuel_gain_message",
     "identity_message",
@@ -198,6 +220,7 @@ __all__ = [
     "short_sync_message",
     "shot_message",
     "sync_message",
+    "tank_exit_message",
     "tank_remove_message",
     "xor_encode_body",
 ]
