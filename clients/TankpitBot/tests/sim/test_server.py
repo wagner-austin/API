@@ -233,6 +233,29 @@ def test_handshake_covers_client_and_living_tanks_only() -> None:
     assert viewport["entities"] == []
 
 
+def test_corpse_window_closes_with_0x58_after_exactly_22_seconds() -> None:
+    """The killed tank's 0x58 arrives 11 ticks after its 0x41.
+
+    Corpus-swept 2026-07-22: 37 kill->remove pairs, min = median =
+    exactly 22.0 s at the 2 s cadence.
+    """
+    from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS
+
+    server = _server()
+    server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
+    server.world["tanks"][11]["fuel"] = 45
+    server.queue_command(9, _shoot(15, 10))
+    first = server.advance_tick()
+    assert 0x41 in _kinds(first)
+    assert 0x58 not in _kinds(first)
+    for _ in range(CORPSE_WINDOW_TICKS - 1):
+        assert 0x58 not in _kinds(server.advance_tick())
+    closing = server.advance_tick()
+    removes = [m for m in closing if m["msg_type"] == 0x58]
+    assert [m["tank_id"] for m in removes] == [11]
+    assert server._removed_at == {}
+
+
 def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:
     """A killed tank's queued command is dropped, and 0x41 fires."""
     server = _server()

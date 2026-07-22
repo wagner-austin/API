@@ -1,10 +1,16 @@
 ---
 title: Deactivation (0x41) Wire Format
 tags: [protocol, combat, wire]
-related: [[shoot-event-format]], [[weapon-log-markers]]
-sources: [tpclient.js Pg.h / V.A, capture replay 2026-07-19, see footnotes]
-fact_checked: 2026-07-19
+related:
+  - "[[shoot-event-format]]"
+  - "[[weapon-log-markers]]"
+source_paths:
+  - tpclient.js Pg.h / V.A
+  - capture replay 2026-07-19
+  - see footnotes
+fact_checked: "2026-07-19"
 confidence: high
+hubs: [protocol]
 ---
 
 # Deactivation (0x41) Wire Format
@@ -47,3 +53,28 @@ Consequence (2026-07-19): the game-log kill-scraping channel was deleted from th
 
 [^1]: protocol analysis 2026-06-10 — offset correction from 0→1 for victim_id, 3→4 for killer_id
 [^2]: capture replay 2026-07-19 with the modern 0x2E-tunneled decoder: `bot-20260610-005248` contains 1 own-kill 0x41 (victim 512, killer 1301 = the bot) and `bot-20260610-011333` contains 19 (killer 1301 on every one) — the very captures the "never fires" claim was drawn from. Run `bot-20260719-004608` cross-confirms live: all 4 own kills decoded as 0x41 (victims 500/513/506/511, killer_id 1301) matching the game-log banners 1:1, banners trailing by 0–2 s.
+
+## The corpse window is exactly 22 seconds (corpus-swept 2026-07-22)
+
+The single 2026-06-20 observation ("0x58 TankRemove arrives ~22 s
+later") is now a corpus constant: 37 kill→remove pairs across all
+246 sessions give min = median = **exactly 22.0 s** (the
+distribution tail is id-reuse pairing noise — a respawned tank's
+later viewport-exit 0x58 matched against the old kill). The sim
+implements it as ``CORPSE_WINDOW_TICKS = 11`` at the 2 s cadence
+([[physics-module-roadmap]]); the corpse 0x58 does NOT start the
+law-4 reroute clock — rerouting only follows LIVING departures.
+
+## Damage healing: measured but unresolved (2026-07-22)
+
+The same sweep mined every tank's damage timeline off the 2 s 0x2E
+cadence. Healing is real and starts after a quiet dwell (~6–10 s
+median at tiers 1–2 with no shots in flight), but the transitions
+jump MULTIPLE tiers per sync window (quiet heals: 1→3 ×257,
+2→3 ×199, 1→0 ×143, 2→0 ×44, single-step 1→2 only ×32) and
+full-heals from tier 3 are strangely rare (×7). The tier ladder's
+wire semantics have a subtlety (tier-0 doubles as full/unsynced)
+that the archive alone does not resolve — the healing RATE law
+needs a controlled live measurement before the sim models repair.
+The sim currently does not heal damage tiers; documented as a named
+gap.

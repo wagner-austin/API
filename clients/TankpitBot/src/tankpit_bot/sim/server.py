@@ -85,6 +85,12 @@ _WIRE_TERRAIN_FERRY = 5
 _WIRE_TERRAIN_REVERT = 0
 _OVERLAY_NO_MINE = 8
 
+# The corpse window: a killed tank's 0x58 TankRemove arrives EXACTLY
+# 22 s after its 0x41 (corpus-swept 2026-07-22: 37 kill->remove
+# pairs, min = median = 22.0 s; the tail is id-reuse pairing noise).
+# 11 ticks at the 2 s cadence.
+CORPSE_WINDOW_TICKS = 11
+
 _SUPPORTED_KINDS = frozenset(
     {
         "move",
@@ -190,6 +196,7 @@ class SimServer:
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_debits: list[tuple[int, int]] = []
         self._removed_at: dict[int, int] = {}
+        self._died_at: dict[int, int] = {}
         self._pending_announcements: list[BinaryMessage] = []
         self._patched_dynamic_tiles: dict[tuple[int, int], int] = {}
         # Steady-state populations for the replenishment law: the
@@ -531,6 +538,7 @@ class SimServer:
                 )
             )
             self._maybe_emit_kill_mercy_bundle(tank_id, outcome_messages, ammo_changed)
+            self._died_at[outcome["victim_id"]] = self.world["tick"]
 
     def _maybe_emit_kill_mercy_bundle(
         self,
@@ -995,6 +1003,13 @@ class SimServer:
                 continue
             self._process_command(tank_id, command, messages, ammo_changed, moved)
         self._queue = []
+        for tank_id in sorted(self._died_at):
+            if self.world["tick"] - self._died_at[tank_id] >= CORPSE_WINDOW_TICKS:
+                # The corpse window closes: 0x58 removes the corpse
+                # exactly 22 s after the 0x41. NOT a departure — the
+                # law-4 reroute clock only runs for living exits.
+                messages.append(TankRemoveDict(msg_type=0x58, tank_id=tank_id))
+                del self._died_at[tank_id]
         self._emit_viewport_transitions(messages)
         for tank_id in sorted(self.world["tanks"]):
             if self.world["tanks"][tank_id]["alive"]:
