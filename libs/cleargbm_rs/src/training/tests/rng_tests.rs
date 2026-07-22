@@ -93,7 +93,7 @@ fn test_next_usize_below_zero_errors() -> Result<(), ClearGbmError> {
 #[test]
 fn test_shuffle_partial_full() -> Result<(), ClearGbmError> {
     let mut rng = SimpleRng::new(42_u64);
-    let mut indices: Vec<usize> = (0_usize..10_usize).collect();
+    let mut indices: Vec<u32> = (0_u32..10_u32).collect();
     match rng.shuffle_partial(&mut indices, 10_usize) {
         Ok(()) => {}
         Err(e) => return Err(e),
@@ -101,7 +101,7 @@ fn test_shuffle_partial_full() -> Result<(), ClearGbmError> {
     // All original values should still be present (permutation)
     let mut sorted = indices.clone();
     sorted.sort();
-    let expected: Vec<usize> = (0_usize..10_usize).collect();
+    let expected: Vec<u32> = (0_u32..10_u32).collect();
     assert_eq!(sorted, expected);
     Ok(())
 }
@@ -109,19 +109,19 @@ fn test_shuffle_partial_full() -> Result<(), ClearGbmError> {
 #[test]
 fn test_shuffle_partial_subset() -> Result<(), ClearGbmError> {
     let mut rng = SimpleRng::new(42_u64);
-    let mut indices: Vec<usize> = (0_usize..20_usize).collect();
+    let mut indices: Vec<u32> = (0_u32..20_u32).collect();
     match rng.shuffle_partial(&mut indices, 5_usize) {
         Ok(()) => {}
         Err(e) => return Err(e),
     };
     // First 5 elements are a random sample from 0..20
     for &val in &indices[0_usize..5_usize] {
-        assert!(val < 20_usize);
+        assert!(val < 20_u32);
     }
     // All 20 values still present
     let mut sorted = indices.clone();
     sorted.sort();
-    let expected: Vec<usize> = (0_usize..20_usize).collect();
+    let expected: Vec<u32> = (0_u32..20_u32).collect();
     assert_eq!(sorted, expected);
     Ok(())
 }
@@ -129,20 +129,20 @@ fn test_shuffle_partial_subset() -> Result<(), ClearGbmError> {
 #[test]
 fn test_shuffle_partial_zero_take() -> Result<(), ClearGbmError> {
     let mut rng = SimpleRng::new(42_u64);
-    let mut indices: Vec<usize> = vec![1_usize, 2_usize, 3_usize];
+    let mut indices: Vec<u32> = vec![1_u32, 2_u32, 3_u32];
     match rng.shuffle_partial(&mut indices, 0_usize) {
         Ok(()) => {}
         Err(e) => return Err(e),
     };
     // No elements shuffled — original order preserved
-    assert_eq!(indices, vec![1_usize, 2_usize, 3_usize]);
+    assert_eq!(indices, vec![1_u32, 2_u32, 3_u32]);
     Ok(())
 }
 
 #[test]
 fn test_shuffle_partial_exceeds_length() -> Result<(), ClearGbmError> {
     let mut rng = SimpleRng::new(42_u64);
-    let mut indices: Vec<usize> = vec![1_usize, 2_usize];
+    let mut indices: Vec<u32> = vec![1_u32, 2_u32];
     let result = rng.shuffle_partial(&mut indices, 5_usize);
     match result {
         Ok(()) => Err(ClearGbmError::TreeConstructionFailed {

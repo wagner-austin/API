@@ -153,7 +153,7 @@ fn test_full_subsample() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     assert_eq!(indices.len(), 10_usize);
-    let expected: Vec<usize> = (0_usize..10_usize).collect();
+    let expected: Vec<u32> = (0_u32..10_u32).collect();
     assert_eq!(indices, expected);
     Ok(())
 }
@@ -168,7 +168,7 @@ fn test_partial_subsample() -> Result<(), ClearGbmError> {
     assert_eq!(indices.len(), 50_usize);
     // All indices in valid range
     for &idx in &indices {
-        assert!(idx < 100_usize);
+        assert!(idx < 100_u32);
     }
     // No duplicates
     let mut sorted = indices.clone();
@@ -188,7 +188,7 @@ fn test_subsample_minimum_one() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     assert_eq!(indices.len(), 1_usize);
-    assert!(indices[0_usize] < 100_usize);
+    assert!(indices[0_usize] < 100_u32);
     Ok(())
 }
 
@@ -233,7 +233,7 @@ fn test_subsample_above_one() -> Result<(), ClearGbmError> {
         Err(e) => return Err(e),
     };
     assert_eq!(indices.len(), 5_usize);
-    let expected: Vec<usize> = (0_usize..5_usize).collect();
+    let expected: Vec<u32> = (0_u32..5_u32).collect();
     assert_eq!(indices, expected);
     Ok(())
 }
@@ -247,7 +247,7 @@ fn test_subsample_single_sample() -> Result<(), ClearGbmError> {
     };
     // max(1, floor(1 * 0.5)) = max(1, 0) = 1
     assert_eq!(indices.len(), 1_usize);
-    assert_eq!(indices[0_usize], 0_usize);
+    assert_eq!(indices[0_usize], 0_u32);
     Ok(())
 }
 
