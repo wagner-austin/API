@@ -214,7 +214,9 @@ def run_benchmark_suite(
         ("max_bins=32", make_config(n_estimators=n_estimators, max_bins=32)),
         ("max_bins=64 (default)", make_config(n_estimators=n_estimators, max_bins=64)),
         ("max_bins=128", make_config(n_estimators=n_estimators, max_bins=128)),
-        ("max_bins=256", make_config(n_estimators=n_estimators, max_bins=256)),
+        # max_bins caps at 255 to keep bin indices in u8 (see cleargbm_rs
+        # FeatureBins storage layout).
+        ("max_bins=255", make_config(n_estimators=n_estimators, max_bins=255)),
         # Vary n_jobs
         ("n_jobs=1 (sequential)", make_config(n_estimators=n_estimators, n_jobs=1)),
         ("n_jobs=2", make_config(n_estimators=n_estimators, n_jobs=2)),
