@@ -279,16 +279,19 @@ def update_world_state_from_tank_damage(
 
 
 def update_world_state_from_tank_remove(ws: WorldService, tank_id: int) -> None:
-    """Remove tank from world state on TankRemove (0x58) or container TankLeave.
+    """Handle TankRemove (0x58) or container TankLeave — which does NOT delete.
 
-    Server-driven removal — clears the tile entry and drops the rendered
-    tank. Distinct from 0x29 TankExit, which is an announcement-only
-    message (the player-visible "left the game" / "eliminated" log line)
-    and does not mutate world state.
-
-    Removal is a deletion, not an observation, so it does not flow
-    through the observation pipeline; it goes straight to
-    :func:`remove_tank`.
+    MISLEADING NAME, DELIBERATE NO-OP DOWNSTREAM: :func:`remove_tank`
+    intentionally keeps the registry entry (0x58 fires on tracking
+    churn as well as death — five removes across two actual kills in
+    the 2026-06-20 ghost capture; 0x41 Deactivation is the only
+    authoritative death signal). Keeping the frozen entry is what
+    powers the pursuit volley: HUNT keeps firing homing at the last
+    wire position and the server reroutes those shots to the departed
+    tank for the ~12 s TTL ([[shoot-event-format]]). This docstring
+    previously said "removal is a deletion" and misled a 2026-07-21
+    analysis into believing the volley was blocked — read
+    :func:`remove_tank` itself before trusting any summary here.
 
     Args:
         ws: World service instance.
