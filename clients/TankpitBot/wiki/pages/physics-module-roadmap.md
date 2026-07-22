@@ -761,10 +761,45 @@ pays real 90s, the fuel book absorbs them as enemy-hit feasibility
 entries — and both books still judge ZERO divergences, with zero
 ``physics_divergence`` events in the captured stream.
 
-Still out of the world model: movable blocks, the radar-zero
-emergency grant, and real enemy minds (the scripted opponent is a
-harness, not a model). Ferries landed 2026-07-22 — see the ferries
-as-built below.
+Still out of the world model: the radar-zero emergency grant and
+real enemy minds (the scripted opponent is a harness, not a model).
+Ferries and movable blocks both landed 2026-07-22 — see their
+as-builts below. With blocks in, the world model holds EVERY
+documented entity class: tanks, fuel containers, equipment, mines,
+ferries, and blocks.
+
+### Movable blocks as-built (2026-07-22): law 6b — the full pickup/drop cycle
+
+The wire-cracked block contract ([[movable-blocks]]) is executable:
+
+- **One command, carry-state routed** (`CMD_BLOCK` 98 'b', now a
+  named constant with `build_block_command`): empty-handed presses
+  pick up a CARDINALLY adjacent block (0x42 direction = the measured
+  compass letter), towing presses drop. Out-of-reach and refused
+  drops answer the measured 0x52 code 1; teleport while towing
+  refuses with the measured code 0 (three-for-three capture).
+- **The shared enum end to end**: one block over static water is a
+  walkable bridge (1), on land an obstacle (2), two on water stacked
+  (3) — derived from context, emitted identically on 0x42
+  ``obstacle_type``, 0x4A tile updates, and 0x5A ``terrain_type``
+  (the dynamic-terrain patcher now serves ferries AND blocks with
+  value-change repatching and explicit reverts).
+- **Law interactions**: bridges route as ordinary ground (surface
+  classifier), land/stacked blocks are impassable and CLIP
+  non-missile shots (bridge exemption is a documented assumption);
+  block tiles refuse teleport landings, are skipped by mine
+  placement, and exclude container respawns; a land drop destroys
+  ANY team's mine wire-silently (the measured friendly-fire
+  refinement); block ops are FREE.
+- **Seam proof**: the production ingestion composes sim block tiles
+  into wire terrain (obstacle class) from real wire bytes, and the
+  real command service round-trips the block press.
+
+Assumptions documented in ``sim/blocks.py``: cardinal-adjacency
+reach, refusal codes for unmeasured rejects, and the untowed
+transient 0x4A pairs along a towed walk are not modeled. The BOT
+still has no block planner awareness — that remains the open work
+the [[movable-blocks]] page names.
 
 ### `make sim-run` as-built (2026-07-22): the free soak — real terrain, and production gap #4
 

@@ -24,6 +24,7 @@ from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import WALK_COST_PER_TILE
 from tankpit_bot.physics.damage import SINGLE_HIT_VICTIM_COST
+from tankpit_bot.sim.blocks import BLOCK_BRIDGE, block_tile_value
 from tankpit_bot.sim.pathfind import route
 from tankpit_bot.sim.world import SimFerryDict, SimWorldDict
 
@@ -71,11 +72,16 @@ def tile_surface(
 
     Returns:
         ``ferry`` for a live ferry tile, ``land`` for passable static
-        ground, ``water`` for static water, and None for rock
-        (impassable on every surface).
+        ground (including a walkable water-block bridge —
+        [[movable-blocks]]: walking on a bridge is ordinary movement),
+        ``water`` for static water, and None for rock, land-block
+        obstacles, and stacked blocks (impassable on every surface).
     """
     if ferry_at(world, x, y) is not None:
         return "ferry"
+    block_value = block_tile_value(world, terrain, x, y)
+    if block_value != 0:
+        return "land" if block_value == BLOCK_BRIDGE else None
     if terrain.is_passable(x, y):
         return "land"
     if terrain.get_terrain(x, y) == terrain.WATER:

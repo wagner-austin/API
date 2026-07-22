@@ -13,6 +13,7 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, deliver_batch
 from tankpit_bot.sim.world import (
+    SimBlockDict,
     SimContainerDict,
     SimEquipmentDict,
     SimFerryDict,
@@ -97,6 +98,7 @@ def boot_seam(
     equipment: tuple[tuple[int, int], ...] = (),
     enemy_counts: tuple[int, int, int, int, int] = (0, 0, 0, 0, 0),
     ferries: tuple[tuple[int, int], ...] = (),
+    blocks: tuple[tuple[int, int], ...] = (),
 ) -> tuple[Bot, SimServer, SimCDPSession, bytes]:
     """Build a real Bot wired to a fresh sim world over the seam.
 
@@ -109,6 +111,7 @@ def boot_seam(
         enemy_counts: The enemy's slot counts (arm it for fighting
             soaks driven by ``sim.opponent``).
         ferries: Ferry seeding as (x, y) pairs (water tiles).
+        blocks: Resting movable-block seeding as (x, y) pairs.
 
     Returns:
         The bot, the sim server, the sim CDP link, and the XOR table,
@@ -134,6 +137,8 @@ def boot_seam(
         world["equipment"].append(SimEquipmentDict(x=x, y=y))
     for x, y in ferries:
         world["ferries"].append(SimFerryDict(x=x, y=y))
+    for x, y in blocks:
+        world["blocks"].append(SimBlockDict(x=x, y=y))
     server = SimServer(world, InMemoryTerrainMap(), client_id=SEAM_CLIENT_ID)
     bot = Bot("https://sim.tankpit.local/", headless=True)
     bot._magic = SEAM_MAGIC

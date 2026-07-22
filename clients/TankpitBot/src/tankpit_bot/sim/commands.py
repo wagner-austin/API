@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from tankpit_bot.protocol.commands import (
+    CMD_BLOCK,
     CMD_MAP_OPEN,
     CMD_MAP_TELEPORT,
     CMD_MINE,
@@ -33,6 +34,7 @@ ClientCommandKind = Literal[
     "pickup_fuel",
     "pickup_equipment",
     "toggle_equipment",
+    "block",
     "other",
 ]
 
@@ -41,6 +43,7 @@ _COORD_KINDS: dict[int, ClientCommandKind] = {
     CMD_MAP_TELEPORT: "teleport",
     CMD_PICKUP_FUEL: "pickup_fuel",
     CMD_PICKUP_EQUIPMENT: "pickup_equipment",
+    CMD_BLOCK: "block",
 }
 _BARE_KINDS: dict[int, ClientCommandKind] = {
     CMD_RADAR: "radar",

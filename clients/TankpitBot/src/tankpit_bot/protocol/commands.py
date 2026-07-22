@@ -61,6 +61,12 @@ CMD_MAP_TELEPORT = 116  # 0x74 - Map click - Teleport via map (fuel cost varies 
 # Teleport payload: X (1 byte) + Y (1 byte) = destination coordinates
 # Requires map to be open first (CMD_MAP_OPEN)
 
+# Movable concrete blocks (wiki [[movable-blocks]], wire-cracked
+# 2026-07-20): ONE command for both pickup and drop — the server
+# decides from carry state. Client binds it as "Click and Hold:
+# Pick Up / Drop".
+CMD_BLOCK = 98  # 0x62 / 'b' - Long press - Pick up / drop a movable block
+
 # XOR-encoded commands (type=6, start with '!') - Combat
 CMD_SHOOT = 115  # 0x73 - Spacebar - Fire at target position
 # Shoot payload: X (1 byte) + Y (1 byte) + target_id_lo (1 byte) + target_id_hi (1 byte)
@@ -384,6 +390,24 @@ def build_move_command(x: int, y: int) -> bytes:
     return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
 
 
+def build_block_command(x: int, y: int) -> bytes:
+    """Build a block pickup/drop command ready to send (with header).
+
+    One command serves both actions — the server decides pickup vs
+    drop from the tank's carry state (wiki [[movable-blocks]]).
+
+    Args:
+        x: Target block/drop tile X (0-255).
+        y: Target block/drop tile Y (0-255).
+
+    Returns:
+        Framed command bytes ready to send via WebSocket.
+    """
+    body = bytes([COMMAND_PREFIX, TYPE_MOVEMENT, CMD_BLOCK, x & 0xFF, y & 0xFF])
+    length = len(body)
+    return bytes([length & 0xFF, (length >> 8) & 0xFF]) + body
+
+
 def build_pickup_fuel_command(x: int, y: int) -> bytes:
     """Build a fuel pickup command ready to send (with length header).
 
@@ -501,6 +525,7 @@ def build_toggle_equipment_command(slot: int) -> bytes:
 __all__ = [
     "CMD_ACTIVE_FORCES",
     "CMD_ACTIVE_PLAYERS",
+    "CMD_BLOCK",
     "CMD_ENTER_GAME",
     "CMD_INVENTORY",
     "CMD_MAP_OPEN",
@@ -538,6 +563,7 @@ __all__ = [
     "ActionCommand",
     "CommandType",
     "QueryCommand",
+    "build_block_command",
     "build_move_command",
     "build_pickup_equipment_command",
     "build_pickup_fuel_command",

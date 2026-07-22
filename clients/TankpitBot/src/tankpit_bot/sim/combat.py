@@ -37,6 +37,7 @@ from tankpit_bot.physics.damage import (
     MISSILE_HIT_VICTIM_COST,
     SINGLE_HIT_VICTIM_COST,
 )
+from tankpit_bot.sim.blocks import BLOCK_LAND, BLOCK_STACKED, block_tile_value
 from tankpit_bot.sim.world import SimTankDict, SimWorldDict
 
 WEAPON_SINGLE = 0
@@ -174,13 +175,18 @@ def _clip_impact(
 
     Returns:
         ``(impact_x, impact_y, obstructed)`` — the first blocking tile
-        (rock terrain or any tank) or the click tile when the line of
-        sight is clear. Water is NOT an obstruction.
+        (rock terrain, a land/stacked movable block, or any tank) or
+        the click tile when the line of sight is clear. Water is NOT
+        an obstruction, and neither is a flat water-block bridge
+        ([[weapon-selection]]: blocks obstruct non-missile shots;
+        the bridge-at-water-level exemption is a sim assumption).
     """
     for x, y in _ray_tiles(shooter["x"], shooter["y"], target_x, target_y):
         if (x, y) == (target_x, target_y):
             break
         if terrain.get_terrain(x, y) == terrain.ROCK:
+            return x, y, True
+        if block_tile_value(world, terrain, x, y) in (BLOCK_LAND, BLOCK_STACKED):
             return x, y, True
         for tank in world["tanks"].values():
             if (

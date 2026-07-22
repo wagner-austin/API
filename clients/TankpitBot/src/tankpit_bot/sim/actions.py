@@ -17,6 +17,7 @@ from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
+from tankpit_bot.sim.blocks import blocks_at
 from tankpit_bot.sim.combat import SLOT_RADAR
 from tankpit_bot.sim.movement import PickupRecordDict, resolve_pickup
 from tankpit_bot.sim.world import SimMineDict, SimWorldDict
@@ -87,6 +88,8 @@ def _tile_blocked_for_landing(
         True when the tile cannot be landed on.
     """
     if not terrain.is_passable(x, y):
+        return True
+    if blocks_at(world, x, y) > 0:
         return True
     for tank in world["tanks"].values():
         if tank["alive"] and tank["tank_id"] != tank_id and (tank["x"], tank["y"]) == (x, y):
@@ -275,6 +278,8 @@ def process_mine_press(
         for dx in (-1, 0, 1):
             x, y = tank["x"] + dx, tank["y"] + dy
             if not terrain.is_passable(x, y):
+                continue
+            if blocks_at(world, x, y) > 0:
                 continue
             if any(
                 other["alive"]

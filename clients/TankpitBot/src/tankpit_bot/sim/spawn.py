@@ -57,6 +57,8 @@ def _tile_occupied(world: SimWorldDict, x: int, y: int) -> bool:
     for equipment in world["equipment"]:
         if (equipment["x"], equipment["y"]) == (x, y):
             return True
+    if any((block["x"], block["y"]) == (x, y) for block in world["blocks"]):
+        return True
     return any((mine["x"], mine["y"]) == (x, y) for mine in world["mines"])
 
 

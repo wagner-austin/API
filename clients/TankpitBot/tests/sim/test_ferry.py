@@ -160,7 +160,7 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     world = _world(10, 10)
     server = SimServer(world, _channel_map(), client_id=9)
     server.handshake()
-    assert (13, 10) in server._patched_ferry_tiles
+    assert (13, 10) in server._patched_dynamic_tiles
     world["ferries"][0] = SimFerryDict(x=13, y=12)
     server.queue_command(
         9, ClientCommandDict(kind="teleport", command=116, x=40, y=10, target_id=0, slot=0)
@@ -168,7 +168,7 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     batch = server.advance_tick()
     patch = next(m for m in batch if m["msg_type"] == 0x5A)
     assert patch["entities"] == []
-    assert (13, 10) in server._patched_ferry_tiles
+    assert (13, 10) in server._patched_dynamic_tiles
 
 
 def test_production_world_learns_the_ferry_over_the_seam() -> None:

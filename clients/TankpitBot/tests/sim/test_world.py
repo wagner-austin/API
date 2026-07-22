@@ -7,6 +7,7 @@ from platform_core.json_utils import JSONValue
 
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sim.world import (
+    SimBlockDict,
     SimContainerDict,
     SimEquipmentDict,
     SimFerryDict,
@@ -46,6 +47,7 @@ def test_world_codec_round_trip() -> None:
     world["mines"].append(SimMineDict(x=7, y=8, team=2))
     world["equipment"].append(SimEquipmentDict(x=9, y=2))
     world["ferries"].append(SimFerryDict(x=11, y=6))
+    world["blocks"].append(SimBlockDict(x=2, y=14))
     world["tick"] = 12
     assert decode_sim_world(encode_sim_world(world)) == world
 

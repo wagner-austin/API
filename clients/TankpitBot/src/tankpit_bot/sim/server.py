@@ -23,6 +23,7 @@ from tankpit_bot.container.types import (
 )
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_EMPTY_CONTAINER,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
@@ -30,6 +31,7 @@ from tankpit_bot.protocol.constants import (
 )
 from tankpit_bot.protocol.types import (
     BinaryMessage,
+    BuildPickupDict,
     DeactivationDict,
     EquipmentGainDict,
     EquipmentToggleDict,
@@ -44,6 +46,7 @@ from tankpit_bot.protocol.types import (
     TankInfoDict,
     TankRemoveDict,
     TankStatusSyncDict,
+    TerrainUpdateDict,
     ViewportEntityDict,
     ViewportUpdateDict,
 )
@@ -56,6 +59,7 @@ from tankpit_bot.sim.actions import (
     process_radar,
     process_teleport,
 )
+from tankpit_bot.sim.blocks import block_tile_value, process_block_press
 from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.equipment import resolve_equipment_pickup
@@ -92,6 +96,7 @@ _SUPPORTED_KINDS = frozenset(
         "pickup_fuel",
         "pickup_equipment",
         "toggle_equipment",
+        "block",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
@@ -186,7 +191,7 @@ class SimServer:
         self._pending_debits: list[tuple[int, int]] = []
         self._removed_at: dict[int, int] = {}
         self._pending_announcements: list[BinaryMessage] = []
-        self._patched_ferry_tiles: set[tuple[int, int]] = set()
+        self._patched_dynamic_tiles: dict[tuple[int, int], int] = {}
         # Steady-state populations for the replenishment law: the
         # seeded world defines its own equilibrium ([[game-economy]],
         # archive-mined 2026-07-22 — spawns replace consumption at
@@ -203,14 +208,15 @@ class SimServer:
         """Build the client's 0x5A viewport statement.
 
         The origin centers the 16x16 window on the client (clamped at
-        the map edge). Entities enumerate the VISIBLE layer only:
-        in-window ferry tiles (wire terrain 5 — the client composes
-        them over the static map, [[ferry-mechanics]]) plus explicit
-        reverts (wire terrain 0) for previously patched ferry tiles a
-        moving ferry has vacated. Hidden-layer entities (containers,
-        mines) stay absent by design: they reveal only by radar, and
-        the production reset-then-apply sweep explicitly SPARES
-        radar-sourced entries on silent tiles.
+        the map edge). Entities enumerate the VISIBLE dynamic-terrain
+        layer only: in-window ferry tiles (wire terrain 5,
+        [[ferry-mechanics]]) and resting movable blocks (1/2/3 by
+        context, [[movable-blocks]]) plus explicit reverts (wire
+        terrain 0) for previously patched tiles the entity has left.
+        Hidden-layer entities (containers, mines) stay absent by
+        design: they reveal only by radar, and the production
+        reset-then-apply sweep explicitly SPARES radar-sourced
+        entries on silent tiles.
 
         Returns:
             The viewport update for the client's current position.
@@ -230,32 +236,31 @@ class SimServer:
                 top - 1 <= y < top + _VIEWPORT_SPAN + 1
             )
 
+        def entity(x: int, y: int, terrain_type: int) -> ViewportEntityDict:
+            """Build one patch entity for an absolute tile."""
+            return ViewportEntityDict(
+                col=x - left + 1,
+                row=y - top + 1,
+                cache_value=0,
+                overlay_value=_OVERLAY_NO_MINE,
+                terrain_type=terrain_type,
+            )
+
+        current: dict[tuple[int, int], int] = {
+            (ferry["x"], ferry["y"]): _WIRE_TERRAIN_FERRY for ferry in self.world["ferries"]
+        }
+        for block in self.world["blocks"]:
+            tile = (block["x"], block["y"])
+            current[tile] = block_tile_value(self.world, self.terrain, tile[0], tile[1])
         entities: list[ViewportEntityDict] = []
-        current = {(ferry["x"], ferry["y"]) for ferry in self.world["ferries"]}
-        for x, y in sorted(self._patched_ferry_tiles - current):
+        for x, y in sorted(set(self._patched_dynamic_tiles) - set(current)):
             if in_patch(x, y):
-                entities.append(
-                    ViewportEntityDict(
-                        col=x - left + 1,
-                        row=y - top + 1,
-                        cache_value=0,
-                        overlay_value=_OVERLAY_NO_MINE,
-                        terrain_type=_WIRE_TERRAIN_REVERT,
-                    )
-                )
-                self._patched_ferry_tiles.discard((x, y))
-        for x, y in sorted(current):
-            if in_patch(x, y):
-                entities.append(
-                    ViewportEntityDict(
-                        col=x - left + 1,
-                        row=y - top + 1,
-                        cache_value=0,
-                        overlay_value=_OVERLAY_NO_MINE,
-                        terrain_type=_WIRE_TERRAIN_FERRY,
-                    )
-                )
-                self._patched_ferry_tiles.add((x, y))
+                entities.append(entity(x, y, _WIRE_TERRAIN_REVERT))
+                del self._patched_dynamic_tiles[(x, y)]
+        for (x, y), value in sorted(current.items()):
+            if in_patch(x, y) and self._patched_dynamic_tiles.get((x, y)) != value:
+                entities.append(entity(x, y, value))
+                self._patched_dynamic_tiles[(x, y)] = value
         return ViewportUpdateDict(
             msg_type=0x5A, viewport_left=left, viewport_top=top, entities=entities
         )
@@ -656,11 +661,7 @@ class SimServer:
             )
             return
         if kind == "teleport":
-            if self._emit_teleport(tank_id, command, messages):
-                moved.add(tank_id)
-                if tank_id == self.client_id:
-                    messages.append(self._viewport_update())
-                self._emit_equipment_pickup(tank_id, kind, messages, ammo_changed)
+            self._process_teleport_command(tank_id, command, messages, ammo_changed, moved)
             return
         if kind == "radar":
             self._emit_radar(tank_id, messages, ammo_changed)
@@ -670,6 +671,9 @@ class SimServer:
             return
         if kind == "toggle_equipment":
             self._emit_equipment_toggle(tank_id, command["slot"], messages)
+            return
+        if kind == "block":
+            self._emit_block_action(tank_id, command, messages)
             return
         messages.append(build_map_data(self.world))
 
@@ -715,6 +719,45 @@ class SimServer:
             if tank_id == self.client_id:
                 messages.append(self._viewport_update())
             self._emit_equipment_pickup(tank_id, kind, messages, ammo_changed)
+
+    def _process_teleport_command(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+        ammo_changed: set[int],
+        moved: set[int],
+    ) -> None:
+        """Route one teleport command through the towing gate and law 5.
+
+        Teleport while towing a block is refused with the measured
+        0x52 code 0 ("You can't do this") — three-for-three in the
+        2026-07-20 capture. A landed hop refreshes the client's
+        viewport and resolves equipment on arrival.
+
+        Args:
+            tank_id: The hopping tank.
+            command: The queued command.
+            messages: This tick's outgoing batch (appended).
+            ammo_changed: Accumulator of tanks whose counts moved.
+            moved: Accumulator of tanks that relocated this tick.
+        """
+        if self.world["tanks"][tank_id]["carrying"]:
+            if tank_id == self.client_id:
+                messages.append(
+                    SupervisorDict(
+                        msg_type=0x52,
+                        reset_action=1,
+                        close_map=1,
+                        error_code=SUPERVISOR_ERROR_CANT_DO,
+                    )
+                )
+            return
+        if self._emit_teleport(tank_id, command, messages):
+            moved.add(tank_id)
+            if tank_id == self.client_id:
+                messages.append(self._viewport_update())
+            self._emit_equipment_pickup(tank_id, "teleport", messages, ammo_changed)
 
     def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
         """Validate a pickup click's destination before any movement.
@@ -784,6 +827,60 @@ class SimServer:
                     error_code=SUPERVISOR_ERROR_INVENTORY_FULL,
                 )
             )
+
+    def _emit_block_action(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+    ) -> None:
+        """Resolve one 'b' press and emit its wire consequences.
+
+        Success emits the 0x42 BuildPickup event plus the 0x4A tile
+        update carrying the tile's post-action value; failures answer
+        the client with the measured 0x52 code 1. Block operations
+        are FREE (zero fuel delta measured across seven pick/drop
+        pairs).
+
+        Args:
+            tank_id: The pressing tank.
+            command: The block command.
+            messages: This tick's outgoing batch (appended).
+        """
+        outcome = process_block_press(self.world, self.terrain, tank_id, command["x"], command["y"])
+        if outcome["kind"] in ("out_of_reach", "refused"):
+            if tank_id == self.client_id:
+                messages.append(
+                    SupervisorDict(
+                        msg_type=0x52,
+                        reset_action=1,
+                        close_map=0,
+                        error_code=SUPERVISOR_ERROR_CANT_GO,
+                    )
+                )
+            return
+        tank = self.world["tanks"][tank_id]
+        messages.append(
+            BuildPickupDict(
+                msg_type=0x42,
+                tank_id=tank_id,
+                source_x=tank["x"],
+                source_y=tank["y"],
+                drop_x=outcome["x"],
+                drop_y=outcome["y"],
+                direction=outcome["direction"],
+                obstacle_type=outcome["tile_value"],
+                flag=0,
+            )
+        )
+        messages.append(
+            TerrainUpdateDict(
+                msg_type=0x4A,
+                updates=[(outcome["x"], outcome["y"], outcome["tile_value"])],
+            )
+        )
+        if tank_id == self.client_id:
+            messages.append(self._viewport_update())
 
     def _emit_equipment_toggle(
         self, tank_id: int, slot: int, messages: list[BinaryMessage]

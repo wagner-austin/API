@@ -100,9 +100,13 @@ def test_sealed_map_spawns_nothing() -> None:
 
 
 def test_tile_occupancy_blocks_every_entity_kind() -> None:
-    """Tanks, stocked containers, equipment, and mines all block."""
+    """Tanks, stocked containers, equipment, mines, and blocks all block."""
+    from tankpit_bot.sim.world import SimBlockDict
+
     world = _world()
     world["mines"].append(SimMineDict(x=50, y=50, team=1))
+    world["blocks"].append(SimBlockDict(x=55, y=55))
+    assert _tile_occupied(world, 55, 55) is True
     assert _tile_occupied(world, 10, 10) is True
     assert _tile_occupied(world, 20, 20) is True
     assert _tile_occupied(world, 30, 30) is False

@@ -42,6 +42,7 @@ class SimTankDict(TypedDict):
     counts: list[int]
     enabled: list[bool]
     alive: bool
+    carrying: bool
 
 
 class SimContainerDict(TypedDict):
@@ -84,6 +85,19 @@ class SimFerryDict(TypedDict):
     y: int
 
 
+class SimBlockDict(TypedDict):
+    """One resting movable concrete block ([[movable-blocks]]).
+
+    A carried block has NO tile — it leaves this list on pickup and
+    returns on drop. The wire value derives from context: one block
+    over static water is a walkable bridge (1), a block on land is an
+    obstacle (2), two blocks on a water tile are stacked terrain (3).
+    """
+
+    x: int
+    y: int
+
+
 class SimWorldDict(TypedDict):
     """The whole simulated world at one tick.
 
@@ -98,6 +112,7 @@ class SimWorldDict(TypedDict):
     mines: list[SimMineDict]
     equipment: list[SimEquipmentDict]
     ferries: list[SimFerryDict]
+    blocks: list[SimBlockDict]
 
 
 def make_sim_tank(
@@ -132,6 +147,7 @@ def make_sim_tank(
         counts=[0] * EQUIPMENT_SLOTS,
         enabled=[True] * EQUIPMENT_SLOTS,
         alive=True,
+        carrying=False,
     )
 
 
@@ -143,10 +159,17 @@ def make_sim_world(field: str) -> SimWorldDict:
 
     Returns:
         A world at tick 0 with no tanks, containers, mines,
-        equipment, or ferries.
+        equipment, ferries, or blocks.
     """
     return SimWorldDict(
-        field=field, tick=0, tanks={}, containers=[], mines=[], equipment=[], ferries=[]
+        field=field,
+        tick=0,
+        tanks={},
+        containers=[],
+        mines=[],
+        equipment=[],
+        ferries=[],
+        blocks=[],
     )
 
 
@@ -170,6 +193,7 @@ def encode_sim_tank(tank: SimTankDict) -> JSONObject:
         "counts": list(tank["counts"]),
         "enabled": list(tank["enabled"]),
         "alive": tank["alive"],
+        "carrying": tank["carrying"],
     }
 
 
@@ -248,6 +272,7 @@ def decode_sim_tank(data: JSONObject) -> SimTankDict:
         counts=_require_int_list(data, "counts", EQUIPMENT_SLOTS),
         enabled=_require_bool_list(data, "enabled", EQUIPMENT_SLOTS),
         alive=require_bool(data, "alive"),
+        carrying=require_bool(data, "carrying"),
     )
 
 
@@ -267,6 +292,7 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
     mines: list[JSONValue] = [{"x": m["x"], "y": m["y"], "team": m["team"]} for m in world["mines"]]
     equipment: list[JSONValue] = [{"x": e["x"], "y": e["y"]} for e in world["equipment"]]
     ferries: list[JSONValue] = [{"x": f["x"], "y": f["y"]} for f in world["ferries"]]
+    blocks: list[JSONValue] = [{"x": b["x"], "y": b["y"]} for b in world["blocks"]]
     return {
         "field": world["field"],
         "tick": world["tick"],
@@ -275,6 +301,7 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
         "mines": mines,
         "equipment": equipment,
         "ferries": ferries,
+        "blocks": blocks,
     }
 
 
@@ -364,11 +391,13 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
         mines=mines,
         equipment=[SimEquipmentDict(x=x, y=y) for x, y in _decode_xy_list(data, "equipment")],
         ferries=[SimFerryDict(x=x, y=y) for x, y in _decode_xy_list(data, "ferries")],
+        blocks=[SimBlockDict(x=x, y=y) for x, y in _decode_xy_list(data, "blocks")],
     )
 
 
 __all__ = [
     "EQUIPMENT_SLOTS",
+    "SimBlockDict",
     "SimContainerDict",
     "SimEquipmentDict",
     "SimFerryDict",
