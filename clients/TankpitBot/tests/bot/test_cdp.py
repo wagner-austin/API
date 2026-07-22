@@ -1138,9 +1138,9 @@ class TestBotEquipmentManagement:
 
         Executor-side shoot validation was deleted 2026-07-21 (the tick
         is synchronous, so decide-time registry truth cannot go stale
-        before dispatch) -- and id-shots at departed tanks are the
-        reroute-TTL pursuit mechanic, which the old veto silently
-        blocked. State persistence is the dispatch contract.
+        before dispatch). State persistence is the dispatch contract.
+        (The registry keeps departed tanks -- remove_tank is a no-op --
+        so untracked ids only occur for genuinely unknown tanks.)
         """
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
