@@ -145,7 +145,9 @@ class MovementDict(TypedDict):
     ``waypoints`` collapses the nsew path to its final position (one
     entry, or empty when stationary); ``path_tiles`` preserves the
     wire's true step count — one fuel per step, exact even on
-    non-minimal paths around obstacles ([[game-economy]] walk row).
+    non-minimal paths around obstacles ([[game-economy]] walk row) —
+    and ``path`` keeps the raw nsew route the SERVER chose, since the
+    client only sends a destination click and the server pathfinds.
     """
 
     msg_type: Literal[0x47]
@@ -160,6 +162,7 @@ class MovementDict(TypedDict):
     is_carrying: bool
     waypoints: list[tuple[int, int]]
     path_tiles: int
+    path: str
 
 
 class MovementResponseDict(TypedDict):
