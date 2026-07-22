@@ -2,11 +2,11 @@
   "timestamp_utc": "2026-07-21",
   "python": "3.11.9",
   "platform": "Windows-10-10.0.26200-SP0",
-  "numpy": "2.3.5",
-  "sklearn": "1.7.2",
-  "lightgbm": "4.6.0",
+  "numpy": "2.4.0",
+  "sklearn": "1.9.0",
+  "lightgbm": "4.7.0",
   "cleargbm_module_path": "C:\\Users\\Test\\PROJECTS\\API\\libs\\cleargbm\\src\\cleargbm\\__init__.py",
-  "cleargbm_rs_module_path": "C:\\Users\\Test\\PROJECTS\\api\\libs\\covenant_ml\\.venv\\Lib\\site-packages\\cleargbm_rs\\cleargbm_rs.cp311-win_amd64.pyd",
+  "cleargbm_rs_module_path": "C:\\Users\\Test\\PROJECTS\\api\\libs\\cleargbm_rs\\python\\cleargbm_rs\\cleargbm_rs.cp311-win_amd64.pyd",
   "cleargbm_compute_path": "rust (single, always-native; no fallback)",
   "csv_path": "C:\\Users\\Test\\PROJECTS\\api\\libs\\covenant_ml\\tests\\data\\american_bankruptcy.csv",
   "csv_sha256": "cff2c899a97ecd629415cb22f59186000e74e1c0a78cfae036c0a53025419b5e",
@@ -61,8 +61,8 @@
       "mean_pred": 0.47520488779946574,
       "positive_rate": 0.0682943783126249,
       "calibration_slope": 0.24491686412559216,
-      "fit_time_s": 0.09435389999998733,
-      "predict_time_s": 0.003348099999129772
+      "fit_time_s": 0.14361179998377338,
+      "predict_time_s": 0.0038904999964870512
     },
     {
       "model": "lightgbm",
@@ -75,22 +75,22 @@
       "mean_pred": 0.0635711129667353,
       "positive_rate": 0.0682943783126249,
       "calibration_slope": 0.7939317533229753,
-      "fit_time_s": 0.7490016000228934,
-      "predict_time_s": 0.02297990000806749
+      "fit_time_s": 0.9362413000199012,
+      "predict_time_s": 0.025037000013981014
     },
     {
       "model": "cleargbm",
       "seed": 42,
       "auc_roc": 0.6967066107691274,
       "auc_pr": 0.15545098099866198,
-      "log_loss": 0.2351794821746787,
-      "brier": 0.06159981332905994,
+      "log_loss": 0.23517948219218587,
+      "brier": 0.06159981333348205,
       "accuracy_at_0.5": 0.9310105135111651,
-      "mean_pred": 0.06368589299310948,
+      "mean_pred": 0.0636858929979074,
       "positive_rate": 0.0682943783126249,
-      "calibration_slope": 0.7798230316368985,
-      "fit_time_s": 6.741259599977639,
-      "predict_time_s": 0.04927780001889914
+      "calibration_slope": 0.7798230313823463,
+      "fit_time_s": 1.042072799988091,
+      "predict_time_s": 0.05871849996037781
     },
     {
       "model": "baseline_majority",
@@ -117,8 +117,8 @@
       "mean_pred": 0.46710214612498746,
       "positive_rate": 0.07088651259054847,
       "calibration_slope": 0.14557213921634246,
-      "fit_time_s": 0.10343990003457293,
-      "predict_time_s": 0.0036300999927334487
+      "fit_time_s": 0.11346780002349988,
+      "predict_time_s": 0.00446270004613325
     },
     {
       "model": "lightgbm",
@@ -131,22 +131,22 @@
       "mean_pred": 0.06532990599915212,
       "positive_rate": 0.07088651259054847,
       "calibration_slope": 0.6420073015045934,
-      "fit_time_s": 0.9778234999976121,
-      "predict_time_s": 0.023252699989825487
+      "fit_time_s": 0.9677640000008978,
+      "predict_time_s": 0.027988000016193837
     },
     {
       "model": "cleargbm",
       "seed": 43,
-      "auc_roc": 0.6563565775406865,
-      "auc_pr": 0.15337061556884046,
-      "log_loss": 0.2595669775220603,
-      "brier": 0.06479487012209047,
-      "accuracy_at_0.5": 0.9270438082097275,
-      "mean_pred": 0.06494078111527309,
+      "auc_roc": 0.6553342461372945,
+      "auc_pr": 0.1525146465440707,
+      "log_loss": 0.2602374349569465,
+      "brier": 0.06483013864716966,
+      "accuracy_at_0.5": 0.9268713349430838,
+      "mean_pred": 0.06480402954669887,
       "positive_rate": 0.07088651259054847,
-      "calibration_slope": 0.6669641611252856,
-      "fit_time_s": 6.85527150001144,
-      "predict_time_s": 0.04777260002447292
+      "calibration_slope": 0.6680803715082434,
+      "fit_time_s": 1.0375498000066727,
+      "predict_time_s": 0.052717800019308925
     },
     {
       "model": "baseline_majority",
@@ -173,8 +173,8 @@
       "mean_pred": 0.47361275878630466,
       "positive_rate": 0.05146940741930304,
       "calibration_slope": 0.2040921473412153,
-      "fit_time_s": 0.12803029996575788,
-      "predict_time_s": 0.003591199987567961
+      "fit_time_s": 0.13057519996073097,
+      "predict_time_s": 0.004384400031995028
     },
     {
       "model": "lightgbm",
@@ -187,27 +187,27 @@
       "mean_pred": 0.06439133214541641,
       "positive_rate": 0.05146940741930304,
       "calibration_slope": 0.5968735912277651,
-      "fit_time_s": 0.8808630999992602,
-      "predict_time_s": 0.026497799961362034
+      "fit_time_s": 0.9428086999687366,
+      "predict_time_s": 0.027053500001784414
     },
     {
       "model": "cleargbm",
       "seed": 44,
-      "auc_roc": 0.6944703691813126,
-      "auc_pr": 0.11600235461235317,
-      "log_loss": 0.19450897094190617,
-      "brier": 0.04890323554194727,
-      "accuracy_at_0.5": 0.9468443873454312,
-      "mean_pred": 0.06459668507936267,
+      "auc_roc": 0.6944708974340519,
+      "auc_pr": 0.11603159746686464,
+      "log_loss": 0.1945035846906715,
+      "brier": 0.04890054712066183,
+      "accuracy_at_0.5": 0.9469246828328248,
+      "mean_pred": 0.06459393463580453,
       "positive_rate": 0.05146940741930304,
-      "calibration_slope": 0.571549589097477,
-      "fit_time_s": 7.054396999999881,
-      "predict_time_s": 0.05232479999540374
+      "calibration_slope": 0.5716200105019931,
+      "fit_time_s": 1.057063099986408,
+      "predict_time_s": 0.054346100019756705
     }
   ],
   "agreement": {
     "feature_rank_spearman_last_seed": 0.8555211558307534,
-    "prediction_pearson_last_seed": 0.929904837990503,
+    "prediction_pearson_last_seed": 0.9299405355475459,
     "top_1000_risky_overlap_last_seed": 768
   }
 }
