@@ -78,6 +78,7 @@ pub struct Hooks {
 /// tree-building path skips the redundant O(N) validation scan on
 /// `sample_indices` and `bins`. The tree builder establishes those
 /// invariants by construction (see the docs on `build_histogram_trusted`).
+#[inline]
 fn default_trusted_build_histogram(
     sample_indices: &[usize],
     gradients: &[f64],

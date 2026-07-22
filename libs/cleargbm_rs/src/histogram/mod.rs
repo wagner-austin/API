@@ -143,6 +143,7 @@ pub fn build_histogram(
 /// Rust's safe indexing will panic if any invariant listed above is
 /// violated. That is a bug in the caller, not a recoverable runtime error.
 #[must_use]
+#[inline]
 pub(crate) fn build_histogram_trusted(
     sample_indices: &[usize],
     gradients: &[f64],
@@ -158,36 +159,53 @@ pub(crate) fn build_histogram_trusted(
     let counts = &mut histogram.counts;
 
     // ------------------------------------------------------------
-    // Vectorized main loop: unrolled 4-wide.
+    // Vectorized main loop: unrolled 8-wide.
     //
-    // Processing samples in chunks of 4 gives the compiler space to
-    // interleave the four independent RMW streams — modern CPUs can
-    // execute 3-4 memory operations per cycle, and the unrolled shape
-    // maps onto that pipeline width. Chunks that aren't a multiple of
-    // 4 fall through to the scalar tail below.
+    // Processing samples in chunks of 8 gives the compiler space to
+    // interleave eight independent RMW streams — modern out-of-order
+    // cores can pipeline more than four memory operations concurrently,
+    // and the wider unroll maps onto a full 512-bit cache-line worth
+    // of gradient/hessian bytes at a time. Chunks that aren't a
+    // multiple of 8 fall through to the scalar tail below.
     // ------------------------------------------------------------
-    let chunks = sample_indices.chunks_exact(4_usize);
+    let chunks = sample_indices.chunks_exact(8_usize);
     let remainder = chunks.remainder();
     for chunk in chunks {
         let idx0 = chunk[0_usize];
         let idx1 = chunk[1_usize];
         let idx2 = chunk[2_usize];
         let idx3 = chunk[3_usize];
+        let idx4 = chunk[4_usize];
+        let idx5 = chunk[5_usize];
+        let idx6 = chunk[6_usize];
+        let idx7 = chunk[7_usize];
 
         let b0 = usize::from(bins[idx0]);
         let b1 = usize::from(bins[idx1]);
         let b2 = usize::from(bins[idx2]);
         let b3 = usize::from(bins[idx3]);
+        let b4 = usize::from(bins[idx4]);
+        let b5 = usize::from(bins[idx5]);
+        let b6 = usize::from(bins[idx6]);
+        let b7 = usize::from(bins[idx7]);
 
         let g0 = gradients[idx0];
         let g1 = gradients[idx1];
         let g2 = gradients[idx2];
         let g3 = gradients[idx3];
+        let g4 = gradients[idx4];
+        let g5 = gradients[idx5];
+        let g6 = gradients[idx6];
+        let g7 = gradients[idx7];
 
         let h0 = hessians[idx0];
         let h1 = hessians[idx1];
         let h2 = hessians[idx2];
         let h3 = hessians[idx3];
+        let h4 = hessians[idx4];
+        let h5 = hessians[idx5];
+        let h6 = hessians[idx6];
+        let h7 = hessians[idx7];
 
         gradient_sums[b0] += g0;
         hessian_sums[b0] += h0;
@@ -204,9 +222,25 @@ pub(crate) fn build_histogram_trusted(
         gradient_sums[b3] += g3;
         hessian_sums[b3] += h3;
         counts[b3] += 1_usize;
+
+        gradient_sums[b4] += g4;
+        hessian_sums[b4] += h4;
+        counts[b4] += 1_usize;
+
+        gradient_sums[b5] += g5;
+        hessian_sums[b5] += h5;
+        counts[b5] += 1_usize;
+
+        gradient_sums[b6] += g6;
+        hessian_sums[b6] += h6;
+        counts[b6] += 1_usize;
+
+        gradient_sums[b7] += g7;
+        hessian_sums[b7] += h7;
+        counts[b7] += 1_usize;
     }
 
-    // Scalar tail for the last (n_samples mod 4) elements.
+    // Scalar tail for the last (n_samples mod 8) elements.
     for &idx in remainder {
         let bin = usize::from(bins[idx]);
         gradient_sums[bin] += gradients[idx];
