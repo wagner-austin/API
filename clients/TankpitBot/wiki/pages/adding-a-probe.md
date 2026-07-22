@@ -1,10 +1,16 @@
 ---
 title: Adding a New Probe
 tags: [codebase, action-lab, howto]
-related: [[services]], [[module-map]], [[testing-patterns]], [[make-targets]]
-sources: [codebase inspection 2026-06-16]
-fact_checked: 2026-06-16
+related:
+  - "[[services]]"
+  - "[[module-map]]"
+  - "[[testing-patterns]]"
+  - "[[make-targets]]"
+source_paths:
+  - codebase inspection 2026-06-16
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [codebase]
 ---
 
 # Adding a New Probe

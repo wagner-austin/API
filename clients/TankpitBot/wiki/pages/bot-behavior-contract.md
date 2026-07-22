@@ -1,11 +1,19 @@
 ---
 title: Bot Behavior Contract
 tags: [bot, contract, verification]
-related: [[client-state-machine]], [[decode-coverage]], [[tank-freshness-model]], [[gameplay-loop]]
-sources: [tankpit_bot/bot/, tankpit_bot/sniffer/, runs/bot/latest.events.jsonl format]
-fact_checked: 2026-07-03
+related:
+  - "[[client-state-machine]]"
+  - "[[decode-coverage]]"
+  - "[[tank-freshness-model]]"
+  - "[[gameplay-loop]]"
+source_paths:
+  - tankpit_bot/bot/
+  - tankpit_bot/sniffer/
+  - runs/bot/latest.events.jsonl format
+fact_checked: "2026-07-03"
 confidence: high
 verified: 2026-06-20 (anchored to specific code paths + integration tests)
+hubs: [architecture]
 ---
 
 # Bot Behavior Contract

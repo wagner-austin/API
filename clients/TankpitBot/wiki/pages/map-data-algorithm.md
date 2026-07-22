@@ -1,11 +1,16 @@
 ---
 title: MAP_DATA Algorithm
 tags: [js-client, protocol, map-data]
-related: [[v-table-complete]], [[map-mechanics]], [[fuel-system]]
-sources: [tpclient.js lines 171-173 (V.L / Ig.h parser)]
-fact_checked: 2026-06-19
+related:
+  - "[[v-table-complete]]"
+  - "[[map-mechanics]]"
+  - "[[fuel-system]]"
+source_paths:
+  - tpclient.js lines 171-173 (V.L / Ig.h parser)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete parse algorithm traced line by line from JS)
+hubs: [js-client]
 ---
 
 # MAP_DATA Algorithm

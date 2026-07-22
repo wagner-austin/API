@@ -1,11 +1,18 @@
 ---
 title: Obstacle & Bridge Mechanics
 tags: [js-client, game-mechanics, obstacles]
-related: [[terrain-system]], [[client-commands]], [[v-table-complete]]
-sources: [tpclient.js lines 66-68 (state 7 handler), lines 173-176 (V.B handler), line 70 (be function)]
-fact_checked: 2026-06-19
+related:
+  - "[[terrain-system]]"
+  - "[[client-commands]]"
+  - "[[v-table-complete]]"
+source_paths:
+  - tpclient.js lines 66-68 (state 7 handler)
+  - lines 173-176 (V.B handler)
+  - line 70 (be function)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (traced through JS state machine and V.B handler)
+hubs: [js-client]
 ---
 
 # Obstacle & Bridge Mechanics

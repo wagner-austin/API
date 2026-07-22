@@ -1,11 +1,17 @@
 ---
 title: V Table Complete
 tags: [js-client, protocol, v-table]
-related: [[js-source-map]], [[decode-coverage]], [[client-commands]]
-sources: [tpclient.js lines 155-203 (V table definitions), all .h() static parsers]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[decode-coverage]]"
+  - "[[client-commands]]"
+source_paths:
+  - tpclient.js lines 155-203 (V table definitions)
+  - all .h() static parsers
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every V[x].h() parser traced line by line)
+hubs: [js-client]
 ---
 
 # V Table Complete

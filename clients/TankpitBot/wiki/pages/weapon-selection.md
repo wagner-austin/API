@@ -1,10 +1,15 @@
 ---
 title: Weapon Selection (Server-Side)
 tags: [combat, weapons, protocol]
-related: [[shoot-event-format]], [[weapon-log-markers]], [[shot-range]]
-sources: [see footnotes]
-fact_checked: 2026-07-02
+related:
+  - "[[shoot-event-format]]"
+  - "[[weapon-log-markers]]"
+  - "[[shot-range]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-02"
 confidence: high
+hubs: [combat, protocol]
 ---
 
 # Weapon Selection

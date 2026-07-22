@@ -1,10 +1,15 @@
 ---
 title: Services — DI Architecture
 tags: [codebase, di, services]
-related: [[module-map]], [[inheritance-chain]], [[testing-patterns]]
-sources: [codebase inspection 2026-06-16]
-fact_checked: 2026-06-16
+related:
+  - "[[module-map]]"
+  - "[[inheritance-chain]]"
+  - "[[testing-patterns]]"
+source_paths:
+  - codebase inspection 2026-06-16
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [codebase]
 ---
 
 # Services — DI Architecture

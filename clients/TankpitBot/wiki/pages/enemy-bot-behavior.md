@@ -1,10 +1,15 @@
 ---
 title: Enemy Bot Behavior
 tags: [combat, enemies, ai]
-related: [[shot-range]], [[combat-chase-bug]], [[tournament-strategy]]
-sources: [see footnotes]
-fact_checked: 2026-07-06
+related:
+  - "[[shot-range]]"
+  - "[[combat-chase-bug]]"
+  - "[[tournament-strategy]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-06"
 confidence: high
+hubs: [combat]
 ---
 
 # Enemy Bot Behavior

@@ -1,11 +1,16 @@
 ---
 title: Viewport Update Algorithm
 tags: [js-client, protocol, viewport]
-related: [[v-table-complete]], [[terrain-system]], [[viewport-frame]]
-sources: [tpclient.js lines 187-190 (V.Z / Vg handler)]
-fact_checked: 2026-06-19
+related:
+  - "[[v-table-complete]]"
+  - "[[terrain-system]]"
+  - "[[viewport-frame]]"
+source_paths:
+  - tpclient.js lines 187-190 (V.Z / Vg handler)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete parse and render algorithm traced from JS)
+hubs: [js-client]
 ---
 
 # Viewport Update Algorithm

@@ -1,11 +1,19 @@
 ---
 title: Game Modes
 tags: [js-client, game-mechanics, modes]
-related: [[connection-protocol]], [[client-constants]], [[game-rules]], [[tournament-strategy]]
-sources: [tpclient.js lines 207 (Jf class), line 217 (mode parsing), lines 265-266 (tournament guide); docs/sources/sigmas-tankpit-guide-v3.4.pdf for the tournament capacity ladder]
-fact_checked: 2026-07-06
+related:
+  - "[[connection-protocol]]"
+  - "[[client-constants]]"
+  - "[[game-rules]]"
+  - "[[tournament-strategy]]"
+source_paths:
+  - tpclient.js lines 207 (Jf class)
+  - line 217 (mode parsing)
+  - lines 265-266 (tournament guide); docs/sources/sigmas-tankpit-guide-v3.4.pdf for the tournament capacity ladder
+fact_checked: "2026-07-06"
 confidence: high
 verified: 2026-06-19 (mode encoding/values traced from JS lobby handler); tournament capacity ladder guide-sourced, not verified against a tournament capture
+hubs: [js-client]
 ---
 
 # Game Modes

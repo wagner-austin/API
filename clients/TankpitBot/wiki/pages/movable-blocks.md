@@ -1,10 +1,17 @@
 ---
 title: Movable Concrete Blocks
 tags: [terrain, blocks, game-mechanics, combat]
-related: [[ferry-mechanics]], [[terrain-composition]], [[mine-mechanics]], [[weapon-selection]], [[js-source-map]]
-sources: [user (Austin) 2026-07-20 contract + manual captures sniff-20260720-214839 (mixed session, 7 pick/drop pairs, 3 refused teleports) and sniff-20260720-215930 (12 labeled drops incl. mines, containers, same-tile re-place)]
-fact_checked: 2026-07-20
-confidence: high (wire-verified same day the contract was recorded)
+related:
+  - "[[ferry-mechanics]]"
+  - "[[terrain-composition]]"
+  - "[[mine-mechanics]]"
+  - "[[weapon-selection]]"
+  - "[[js-source-map]]"
+source_paths:
+  - user (Austin) 2026-07-20 contract + manual captures sniff-20260720-214839 (mixed session, 7 pick/drop pairs, 3 refused teleports) and sniff-20260720-215930 (12 labeled drops incl. mines, containers, same-tile re-place)
+fact_checked: "2026-07-20"
+confidence: high
+hubs: [combat, game-mechanics]
 ---
 
 # Movable Concrete Blocks

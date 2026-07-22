@@ -1,10 +1,14 @@
 ---
 title: Weapon-Specific Game Log Markers
 tags: [combat, weapons, game-log]
-related: [[shoot-event-format]], [[shot-range]]
-sources: [see footnotes]
-fact_checked: 2026-06-10
+related:
+  - "[[shoot-event-format]]"
+  - "[[shot-range]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-10"
 confidence: high
+hubs: [combat]
 ---
 
 # Weapon-Specific Game Log Markers

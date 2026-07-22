@@ -1,10 +1,14 @@
 ---
 title: Client Tank Registry (activeGame.P.j)
 tags: [protocol, registry, client-js]
-related: [[shoot-event-format]], [[shot-range]]
-sources: [see footnotes]
-fact_checked: 2026-06-11
+related:
+  - "[[shoot-event-format]]"
+  - "[[shot-range]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-11"
 confidence: high
+hubs: [protocol]
 ---
 
 # Client Tank Registry

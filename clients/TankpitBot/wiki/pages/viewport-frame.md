@@ -1,10 +1,15 @@
 ---
 title: Viewport Frame Geometry
 tags: [viewport, movement, geometry]
-related: [[radar-mechanics]], [[teleport-mechanics]], [[viewport-shift-protocol]]
-sources: [see footnotes]
-fact_checked: 2026-07-17
+related:
+  - "[[radar-mechanics]]"
+  - "[[teleport-mechanics]]"
+  - "[[viewport-shift-protocol]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-17"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Viewport Frame Geometry

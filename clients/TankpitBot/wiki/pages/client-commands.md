@@ -1,11 +1,17 @@
 ---
 title: Client Commands
 tags: [js-client, protocol, commands]
-related: [[js-source-map]], [[v-table-complete]], [[decode-coverage]]
-sources: [tpclient.js lines 25-31 (K subclasses), lines 6-10 (va subclasses)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[v-table-complete]]"
+  - "[[decode-coverage]]"
+source_paths:
+  - tpclient.js lines 25-31 (K subclasses)
+  - lines 6-10 (va subclasses)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every command class traced through JS source)
+hubs: [js-client]
 ---
 
 # Client Commands

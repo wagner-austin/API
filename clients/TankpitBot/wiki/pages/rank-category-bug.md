@@ -1,11 +1,18 @@
 ---
 title: b.u Dual-Purpose Field (rank_category on init, damage_state during gameplay)
 tags: [protocol, bug, decoder]
-related: [[v-table-complete]], [[decode-coverage]], [[js-source-map]]
-sources: [tpclient.js line 127 (Xc.u field), lines 158-161 (all handlers setting b.u), 2026-06-19 JS trace]
-fact_checked: 2026-06-19
+related:
+  - "[[v-table-complete]]"
+  - "[[decode-coverage]]"
+  - "[[js-source-map]]"
+source_paths:
+  - tpclient.js line 127 (Xc.u field)
+  - lines 158-161 (all handlers setting b.u)
+  - 2026-06-19 JS trace
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (traced b.u assignment across all 5 V-table handlers)
+hubs: [protocol]
 ---
 
 # rank_category Mislabeled as damage_state

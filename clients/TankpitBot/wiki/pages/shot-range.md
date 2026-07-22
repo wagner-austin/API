@@ -1,10 +1,15 @@
 ---
 title: Shot Range
 tags: [combat, shooting, geometry]
-related: [[shoot-event-format]], [[tank-registry]], [[combat-chase-bug]]
-sources: [see footnotes]
-fact_checked: 2026-07-03
+related:
+  - "[[shoot-event-format]]"
+  - "[[tank-registry]]"
+  - "[[combat-chase-bug]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-03"
 confidence: high
+hubs: [combat]
 ---
 
 # Shot Range

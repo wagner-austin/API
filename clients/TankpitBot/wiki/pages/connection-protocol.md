@@ -1,11 +1,17 @@
 ---
 title: Connection Protocol
 tags: [js-client, protocol, connection]
-related: [[js-source-map]], [[xor-cipher]], [[client-commands]]
-sources: [tpclient.js lines 214-224 (bootstrap IIFE), lines 11-14 (WebSocket transport)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[xor-cipher]]"
+  - "[[client-commands]]"
+source_paths:
+  - tpclient.js lines 214-224 (bootstrap IIFE)
+  - lines 11-14 (WebSocket transport)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (full connection flow traced through JS)
+hubs: [js-client]
 ---
 
 # Connection Protocol

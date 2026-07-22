@@ -1,10 +1,13 @@
 ---
 title: Inheritance Chain and Composition
 tags: [architecture, di, composition]
-related: [[coding-standards]]
-sources: [see footnotes]
-fact_checked: 2026-06-16
+related:
+  - "[[coding-standards]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [architecture]
 ---
 
 # Inheritance Chain and Composition

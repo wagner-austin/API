@@ -1,10 +1,16 @@
 ---
 title: Executor Rejection Silent Loops
 tags: [architecture, bug, executor, planner]
-related: [[self-observing-architecture]], [[combat-chase-bug]], [[bot-behavior-contract]], [[mine-mechanics]]
-sources: [see footnotes]
-fact_checked: 2026-07-17
+related:
+  - "[[self-observing-architecture]]"
+  - "[[combat-chase-bug]]"
+  - "[[bot-behavior-contract]]"
+  - "[[mine-mechanics]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-17"
 confidence: high
+hubs: [architecture]
 ---
 
 # Executor Rejection Silent Loops

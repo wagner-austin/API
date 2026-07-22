@@ -1,10 +1,13 @@
 ---
 title: Coding Standards
 tags: [architecture, testing, quality]
-related: [[inheritance-chain]]
-sources: [see footnotes]
-fact_checked: 2026-06-16
+related:
+  - "[[inheritance-chain]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [architecture]
 ---
 
 # Coding Standards

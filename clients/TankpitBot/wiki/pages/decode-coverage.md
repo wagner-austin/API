@@ -1,11 +1,21 @@
 ---
 title: Wire Decode Coverage Map
 tags: [protocol, decode, coverage]
-related: [[shoot-event-format]], [[tank-registry]], [[deactivation-format]], [[v-table-complete]], [[js-source-map]], [[tank-freshness-model]]
-sources: [tpclient.js V table, runs/bot/bot-20260619-053210 capture, 2026-06-19 unification audit]
-fact_checked: 2026-06-19
+related:
+  - "[[shoot-event-format]]"
+  - "[[tank-registry]]"
+  - "[[deactivation-format]]"
+  - "[[v-table-complete]]"
+  - "[[js-source-map]]"
+  - "[[tank-freshness-model]]"
+source_paths:
+  - tpclient.js V table
+  - runs/bot/bot-20260619-053210 capture
+  - 2026-06-19 unification audit
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (unified dispatcher + JS source + production captures)
+hubs: [protocol]
 ---
 
 # Wire Decode Coverage Map

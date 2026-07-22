@@ -1,10 +1,15 @@
 ---
 title: Fuel System
 tags: [fuel, containers, map-data]
-related: [[teleport-mechanics]], [[radar-mechanics]], [[map-data-decode]]
-sources: [see footnotes]
-fact_checked: 2026-07-03
+related:
+  - "[[teleport-mechanics]]"
+  - "[[radar-mechanics]]"
+  - "[[map-data-decode]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-03"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Fuel System

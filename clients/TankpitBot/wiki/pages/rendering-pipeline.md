@@ -1,11 +1,17 @@
 ---
 title: Rendering Pipeline
 tags: [js-client, rendering, canvas]
-related: [[js-source-map]], [[client-constants]]
-sources: [tpclient.js lines 4-5 (canvas), 108-127 (animations), 142-155 (tile grid)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[client-constants]]"
+source_paths:
+  - tpclient.js lines 4-5 (canvas)
+  - 108-127 (animations)
+  - 142-155 (tile grid)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (rendering system traced through JS)
+hubs: [js-client]
 ---
 
 # Rendering Pipeline

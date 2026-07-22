@@ -1,10 +1,18 @@
 ---
 title: Terrain Composition — Single-Owner Walkability
 tags: [architecture, terrain, mines, ferry, planner, executor]
-related: [[ferry-mechanics]], [[mine-mechanics]], [[teleport-mechanics]], [[executor-rejection-loops]], [[self-observing-architecture]], [[bot-behavior-contract]]
-sources: [see footnotes]
-fact_checked: 2026-07-20
+related:
+  - "[[ferry-mechanics]]"
+  - "[[mine-mechanics]]"
+  - "[[teleport-mechanics]]"
+  - "[[executor-rejection-loops]]"
+  - "[[self-observing-architecture]]"
+  - "[[bot-behavior-contract]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-20"
 confidence: high
+hubs: [architecture]
 ---
 
 # Terrain Composition — Single-Owner Walkability

@@ -1,11 +1,16 @@
 ---
 title: Terrain System
 tags: [js-client, terrain, rendering]
-related: [[js-source-map]], [[rendering-pipeline]], [[viewport-frame]]
-sources: [tpclient.js lines 145-155 (terrain encoding, sg/ug functions)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[rendering-pipeline]]"
+  - "[[viewport-frame]]"
+source_paths:
+  - tpclient.js lines 145-155 (terrain encoding, sg/ug functions)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (terrain byte encoding fully traced through JS)
+hubs: [js-client]
 ---
 
 # Terrain System

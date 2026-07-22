@@ -1,10 +1,19 @@
 ---
 title: Tank Registry Freshness Model
 tags: [architecture, world-state, freshness, combat]
-related: [[decode-coverage]], [[combat-chase-bug]], [[shoot-event-format]]
-sources: [src/tankpit_bot/state/types/tank.py, src/tankpit_bot/state/types/tank_observation.py, src/tankpit_bot/state/mutations.py, runs/bot/bot-20260619-050303 stale-position miss loop, runs/bot/bot-20260620-191622 target-block loop]
-fact_checked: 2026-06-20
+related:
+  - "[[decode-coverage]]"
+  - "[[combat-chase-bug]]"
+  - "[[shoot-event-format]]"
+source_paths:
+  - src/tankpit_bot/state/types/tank.py
+  - src/tankpit_bot/state/types/tank_observation.py
+  - src/tankpit_bot/state/mutations.py
+  - runs/bot/bot-20260619-050303 stale-position miss loop
+  - runs/bot/bot-20260620-191622 target-block loop
+fact_checked: "2026-06-20"
 confidence: high
+hubs: [architecture]
 ---
 
 # Tank Registry Freshness Model

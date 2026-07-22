@@ -1,11 +1,19 @@
 ---
 title: Client Constants
 tags: [js-client, constants, game-mechanics]
-related: [[js-source-map]], [[game-rules]], [[equipment-system]]
-sources: [tpclient.js lines 15-16, 31-33, 205, 261-266]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[game-rules]]"
+  - "[[equipment-system]]"
+source_paths:
+  - tpclient.js lines 15-16
+  - 31-33
+  - 205
+  - 261-266
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (extracted directly from JS source)
+hubs: [js-client]
 ---
 
 # Client Constants

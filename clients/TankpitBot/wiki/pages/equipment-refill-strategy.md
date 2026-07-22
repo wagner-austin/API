@@ -1,10 +1,14 @@
 ---
 title: Equipment Refill Strategy
 tags: [equipment, radar, strategy]
-related: [[radar-mechanics]], [[equipment-system]]
-sources: [see footnotes]
-fact_checked: 2026-06-16
+related:
+  - "[[radar-mechanics]]"
+  - "[[equipment-system]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [combat]
 ---
 
 # Equipment Refill Strategy

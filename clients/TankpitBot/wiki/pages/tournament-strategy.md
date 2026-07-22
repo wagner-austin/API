@@ -1,10 +1,16 @@
 ---
 title: Tournament Strategy (Sigma v3.4, 2015)
 tags: [combat, strategy, tournament, community, preservation]
-related: [[game-modes]], [[enemy-bot-behavior]], [[gameplay-loop]], [[equipment-refill-strategy]]
-sources: [docs/sources/sigmas-tankpit-guide-v3.4.pdf]
-fact_checked: 2026-07-06
+related:
+  - "[[game-modes]]"
+  - "[[enemy-bot-behavior]]"
+  - "[[gameplay-loop]]"
+  - "[[equipment-refill-strategy]]"
+source_paths:
+  - docs/sources/sigmas-tankpit-guide-v3.4.pdf
+fact_checked: "2026-07-06"
 confidence: medium
+hubs: [combat]
 ---
 
 # Tournament Strategy (Sigma v3.4, 2015)

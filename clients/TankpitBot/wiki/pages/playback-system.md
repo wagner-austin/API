@@ -1,11 +1,16 @@
 ---
 title: Playback System
 tags: [js-client, recording, playback]
-related: [[js-source-map]], [[v-table-complete]]
-sources: [tpclient.js lines 92-94 (re/Kf classes), lines 132-134 (If recording class)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[v-table-complete]]"
+source_paths:
+  - tpclient.js lines 92-94 (re/Kf classes)
+  - lines 132-134 (If recording class)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (recording format and playback logic traced from JS)
+hubs: [js-client]
 ---
 
 # Playback System

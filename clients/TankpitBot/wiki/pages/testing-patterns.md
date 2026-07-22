@@ -1,10 +1,14 @@
 ---
 title: Testing Patterns
 tags: [codebase, testing, di]
-related: [[services]], [[coding-standards]]
-sources: [codebase inspection 2026-06-16]
-fact_checked: 2026-06-16
+related:
+  - "[[services]]"
+  - "[[coding-standards]]"
+source_paths:
+  - codebase inspection 2026-06-16
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [codebase]
 ---
 
 # Testing Patterns

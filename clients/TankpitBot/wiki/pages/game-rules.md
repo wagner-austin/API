@@ -1,10 +1,17 @@
 ---
 title: Official Game Rules (How To Play Screens)
 tags: [game-mechanics, rules, official]
-related: [[shot-range]], [[radar-mechanics]], [[equipment-system]], [[teleport-mechanics]], [[ferry-mechanics]]
-sources: [see footnotes]
-fact_checked: 2026-06-16
+related:
+  - "[[shot-range]]"
+  - "[[radar-mechanics]]"
+  - "[[equipment-system]]"
+  - "[[teleport-mechanics]]"
+  - "[[ferry-mechanics]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Official Game Rules

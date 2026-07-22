@@ -1,11 +1,15 @@
 ---
 title: Fingerprint Algorithm
 tags: [js-client, auth, fingerprint]
-related: [[connection-protocol]], [[xor-cipher]]
-sources: [tpclient.js lines 17-21 (sb class, MurmurHash3)]
-fact_checked: 2026-06-19
+related:
+  - "[[connection-protocol]]"
+  - "[[xor-cipher]]"
+source_paths:
+  - tpclient.js lines 17-21 (sb class, MurmurHash3)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete fingerprint + hash algorithm traced from JS)
+hubs: [js-client]
 ---
 
 # Fingerprint Algorithm

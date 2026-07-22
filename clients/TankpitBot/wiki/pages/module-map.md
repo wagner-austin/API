@@ -1,10 +1,14 @@
 ---
 title: Module Map
 tags: [codebase, architecture, navigation]
-related: [[services]], [[inheritance-chain]]
-sources: [codebase inspection 2026-06-16]
-fact_checked: 2026-06-16
+related:
+  - "[[services]]"
+  - "[[inheritance-chain]]"
+source_paths:
+  - codebase inspection 2026-06-16
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [codebase]
 ---
 
 # Module Map

@@ -1,3 +1,11 @@
+---
+title: "Bot Service Architecture"
+tags: []
+fact_checked: "1970-01-01"
+confidence: low
+hubs: []
+---
+
 # Bot Service Architecture
 
 The bot service (`tankpit-bot-service`) is the long-running Python process that lets the phone SPA drive live tankpit sessions over HTTP. It hosts an aiohttp server on `127.0.0.1:27100`; the fiesta docker container's nginx proxies `/api/tankbot/*` to it. Landed 2026-07-12 as Phase A of the SPA-driven bot design.

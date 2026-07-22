@@ -1,10 +1,16 @@
 ---
 title: MAP_DATA (0x14) Decode
 tags: [protocol, map, fuel]
-related: [[map-mechanics]], [[fuel-system]], [[tank-registry]], [[map-data-algorithm]]
-sources: [see footnotes]
-fact_checked: 2026-06-13
+related:
+  - "[[map-mechanics]]"
+  - "[[fuel-system]]"
+  - "[[tank-registry]]"
+  - "[[map-data-algorithm]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-06-13"
 confidence: high
+hubs: [protocol]
 ---
 
 # MAP_DATA (0x14) Decode

@@ -1,10 +1,15 @@
 ---
 title: Self-Observing Bot Architecture
 tags: [architecture, decisions, observability, contracts, ledger, memory]
-related: [[bot-behavior-contract]], [[coding-standards]], [[combat-chase-bug]]
-sources: [docs/handoffs/self-observing-bot-architecture.md; live incident 2026-07-06 20:47:31]
-fact_checked: 2026-07-18
+related:
+  - "[[bot-behavior-contract]]"
+  - "[[coding-standards]]"
+  - "[[combat-chase-bug]]"
+source_paths:
+  - docs/handoffs/self-observing-bot-architecture.md; live incident 2026-07-06 20:47:31
+fact_checked: "2026-07-18"
 confidence: high
+hubs: [architecture]
 ---
 
 # Self-Observing Bot Architecture

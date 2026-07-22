@@ -1,11 +1,15 @@
 ---
 title: Toolbar Layout
 tags: [js-client, ui, toolbar]
-related: [[js-source-map]], [[client-commands]]
-sources: [tpclient.js lines 33-34 (pc/qc/rc/sc arrays, xc function)]
-fact_checked: 2026-06-19
+related:
+  - "[[js-source-map]]"
+  - "[[client-commands]]"
+source_paths:
+  - tpclient.js lines 33-34 (pc/qc/rc/sc arrays, xc function)
+fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (all 18 hitbox regions traced from JS arrays)
+hubs: [js-client]
 ---
 
 # Toolbar Layout

@@ -1,10 +1,16 @@
 ---
 title: Core Gameplay Loop
 tags: [strategy, combat, equipment, fuel]
-related: [[equipment-refill-strategy]], [[enemy-bot-behavior]], [[radar-mechanics]], [[teleport-mechanics]]
-sources: [see footnotes]
-fact_checked: 2026-07-01
+related:
+  - "[[equipment-refill-strategy]]"
+  - "[[enemy-bot-behavior]]"
+  - "[[radar-mechanics]]"
+  - "[[teleport-mechanics]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-01"
 confidence: high
+hubs: [combat]
 ---
 
 # Core Gameplay Loop
