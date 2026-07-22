@@ -16,8 +16,10 @@ pub(crate) const EPSILON: f64 = 1e-10_f64;
 /// Internal struct for tracking pending nodes during tree building.
 #[derive(Debug)]
 pub(super) struct PendingNode {
-    /// Sample indices at this node.
-    pub(super) sample_indices: Vec<usize>,
+    /// Sample indices at this node (u32 per lightgbm-score-t-float
+    /// `data_size_t = int32` pattern; widened via `crate::narrow::index_widen`
+    /// at access sites).
+    pub(super) sample_indices: Vec<u32>,
 
     /// Current depth.
     pub(super) depth: usize,
@@ -144,19 +146,20 @@ pub(super) fn should_stop(
 ///
 /// Handles out-of-bounds indices defensively by skipping them.
 pub(super) fn compute_sums(
-    sample_indices: &[usize],
-    gradients: &[f64],
-    hessians: &[f64],
+    sample_indices: &[u32],
+    gradients: &[f32],
+    hessians: &[f32],
 ) -> (f64, f64) {
     let mut g_sum = 0.0_f64;
     let mut h_sum = 0.0_f64;
 
     for &idx in sample_indices {
-        if idx < gradients.len() {
-            g_sum += gradients[idx];
+        let idx_usize = crate::narrow::index_widen(idx);
+        if idx_usize < gradients.len() {
+            g_sum += f64::from(gradients[idx_usize]);
         }
-        if idx < hessians.len() {
-            h_sum += hessians[idx];
+        if idx_usize < hessians.len() {
+            h_sum += f64::from(hessians[idx_usize]);
         }
     }
 
@@ -169,22 +172,23 @@ pub(super) fn compute_sums(
 /// index is out of range for the flat slice are treated as NaN — the
 /// pre-refactor behavior (missing per-row Vec → NaN) carried over.
 pub(super) fn split_samples(
-    sample_indices: &[usize],
+    sample_indices: &[u32],
     bins: &[u8],
     n_samples: usize,
     feature_index: usize,
     split_bin: usize,
     nan_goes_left: bool,
     n_regular_bins: usize,
-) -> (Vec<usize>, Vec<usize>) {
+) -> (Vec<u32>, Vec<u32>) {
     let nan_bin = n_regular_bins;
     let feat_col_start = feature_index * n_samples;
     let mut left = Vec::new();
     let mut right = Vec::new();
 
     for &idx in sample_indices {
-        let bin = if idx < n_samples {
-            usize::from(bins[feat_col_start + idx])
+        let idx_usize = crate::narrow::index_widen(idx);
+        let bin = if idx_usize < n_samples {
+            usize::from(bins[feat_col_start + idx_usize])
         } else {
             nan_bin
         };

@@ -19,7 +19,9 @@ mod histograms;
 mod nodes;
 mod serde_impl;
 
-pub use builder::{build_tree, compute_leaf_value, BuildTreeInput};
+pub use builder::{
+    build_tree, build_tree_with_leaf_assignment, compute_leaf_value, BuildTreeInput,
+};
 
 use crate::error::ClearGbmError;
 use crate::types::{SplitConfig, TreeNode};

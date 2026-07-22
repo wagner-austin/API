@@ -39,14 +39,16 @@ pub(crate) use super::nodes::EPSILON;
 /// instead of striding through fragmented row-major heap allocations.
 #[derive(Debug, Clone)]
 pub struct BuildTreeInput<'a> {
-    /// Sample indices to include in tree.
-    pub sample_indices: &'a [usize],
+    /// Sample indices to include in tree (u32 per lightgbm-score-t-float
+    /// `data_size_t = int32` pattern; widened at access sites via
+    /// `crate::narrow::index_widen`).
+    pub sample_indices: &'a [u32],
 
-    /// Gradients for all samples.
-    pub gradients: &'a [f64],
+    /// Gradients for all samples (f32 score-space per lightgbm-score-t-float).
+    pub gradients: &'a [f32],
 
-    /// Hessians for all samples.
-    pub hessians: &'a [f64],
+    /// Hessians for all samples (f32 score-space per lightgbm-score-t-float).
+    pub hessians: &'a [f32],
 
     /// Bin assignments in flat column-major u8 storage.
     ///
@@ -94,6 +96,35 @@ pub struct BuildTreeInput<'a> {
 /// - Histogram building fails
 /// - Split finding fails
 pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, ClearGbmError> {
+    match build_tree_with_leaf_assignment(input, hooks) {
+        Ok((tree, _leaf_assignment)) => Ok(tree),
+        Err(e) => Err(e),
+    }
+}
+
+/// Builds a tree AND returns a per-sample-index → leaf-value mapping.
+///
+/// The mapping is populated as leaves are finalized during construction:
+/// for every sample that ends up in a leaf, `leaf_value_per_sample[sample_idx]`
+/// records that leaf's prediction value. Callers whose sample_indices cover
+/// the full training set (i.e. `subsample = 1.0`) can use this to skip
+/// `predict_tree` on those samples entirely — direct O(N) lookup + add
+/// instead of an O(N × depth) tree walk. Samples NOT in the input
+/// `sample_indices` (subsampled-out) will not be updated here and are
+/// left at the caller-supplied initial value (typically `f64::NAN` as a
+/// sentinel so the caller knows to fall back to tree-walk).
+///
+/// The caller passes a pre-sized `Vec<f64>` of length ≥ the max
+/// sample-index encountered in the tree. It's populated in place as a
+/// side effect of tree construction.
+///
+/// # Errors
+///
+/// Same as [`build_tree`].
+pub fn build_tree_with_leaf_assignment(
+    input: &BuildTreeInput<'_>,
+    hooks: &Hooks,
+) -> Result<(Tree, Vec<f64>), ClearGbmError> {
     let n_samples = input.sample_indices.len();
 
     // Handle empty input
@@ -142,6 +173,12 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
 
     let config = input.config;
     let split_config = config.split_config();
+
+    // Per-sample leaf-value output. Size = input.n_samples (max index the
+    // tree could touch). NaN sentinel: samples not in sample_indices
+    // (subsampled-out) keep NaN so the caller can detect + fall back to
+    // predict_tree for them.
+    let mut leaf_value_per_sample: Vec<f64> = vec![f64::NAN; input.n_samples];
 
     // Build tree using depth-first stack
     let mut nodes: Vec<BuildNode> = Vec::new();
@@ -205,6 +242,16 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
             let leaf_value =
                 compute_leaf_value(g_sum, h_sum, config.reg_alpha(), config.reg_lambda());
 
+            // Record leaf-value assignment for every sample in this leaf.
+            // sample_indices are u32 per lightgbm-score-t-float; widen for
+            // Vec<f64> access via the infallible crate::narrow::index_widen.
+            for &sample_idx in &pending.sample_indices {
+                let sample_idx_usize = crate::narrow::index_widen(sample_idx);
+                if sample_idx_usize < leaf_value_per_sample.len() {
+                    leaf_value_per_sample[sample_idx_usize] = leaf_value;
+                }
+            }
+
             nodes.push(BuildNode {
                 node_id,
                 is_leaf: true,
@@ -252,6 +299,16 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
                 compute_sums(&pending.sample_indices, input.gradients, input.hessians);
             let leaf_value =
                 compute_leaf_value(g_sum, h_sum, config.reg_alpha(), config.reg_lambda());
+
+            // Record leaf-value assignment for every sample in this leaf.
+            // sample_indices are u32 per lightgbm-score-t-float; widen for
+            // Vec<f64> access via the infallible crate::narrow::index_widen.
+            for &sample_idx in &pending.sample_indices {
+                let sample_idx_usize = crate::narrow::index_widen(sample_idx);
+                if sample_idx_usize < leaf_value_per_sample.len() {
+                    leaf_value_per_sample[sample_idx_usize] = leaf_value;
+                }
+            }
 
             nodes.push(BuildNode {
                 node_id,
@@ -334,5 +391,8 @@ pub fn build_tree(input: &BuildTreeInput<'_>, hooks: &Hooks) -> Result<Tree, Cle
             Err(e) => return Err(e),
         };
 
-    Ok(Tree::new(final_nodes, max_depth_found, n_leaves))
+    Ok((
+        Tree::new(final_nodes, max_depth_found, n_leaves),
+        leaf_value_per_sample,
+    ))
 }
