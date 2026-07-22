@@ -8,8 +8,9 @@ use crate::binning::precompute_feature_bins;
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array};
+use crate::narrow::score_narrow;
 use crate::predict::predict_tree;
-use crate::tree::{build_tree, BuildTreeInput, Tree, TreeBuildConfig};
+use crate::tree::{build_tree_with_leaf_assignment, BuildTreeInput, Tree, TreeBuildConfig};
 use crate::types::SplitConfig;
 
 use super::config::GradientBoostingConfig;
@@ -151,13 +152,22 @@ pub fn train_gradient_boosting(
         // a. Compute probabilities from current raw predictions
         let probas = sigmoid_array(&raw_preds_train);
 
-        // b. Compute gradients and hessians (inline — lengths match by construction)
-        let gradients: Vec<f64> = probas
+        // b. Compute gradients and hessians (inline — lengths match by
+        // construction). Narrowed to f32 for the histogram hot loop's memory
+        // bandwidth (halves per-sample bytes for the two hottest streams);
+        // the HistogramBuffer accumulator stays f64. Binary-log-loss grad is
+        // bounded [-1, 1] and hess is bounded [0, 0.25], well inside f32's
+        // 7-digit precision range. See `crate::narrow::score_narrow` +
+        // `~/PROJECTS/tech-wiki/pages/lightgbm-score-t-float.md`.
+        let gradients: Vec<f32> = probas
             .iter()
             .zip(y_train.iter())
-            .map(|(&p, &y)| p - f64::from(y))
+            .map(|(&p, &y)| score_narrow(p - f64::from(y)))
             .collect();
-        let hessians: Vec<f64> = probas.iter().map(|&p| p * (1.0_f64 - p)).collect();
+        let hessians: Vec<f32> = probas
+            .iter()
+            .map(|&p| score_narrow(p * (1.0_f64 - p)))
+            .collect();
 
         // c. Get sample indices (subsampling)
         let sample_indices = propagate!(get_sample_indices(n_train, config.subsample(), &mut rng));
@@ -176,13 +186,35 @@ pub fn train_gradient_boosting(
             monotonic_constraints: config.monotonic_constraints(),
         };
 
-        // e. Build tree
-        let tree = propagate!(build_tree(&input, &hooks));
+        // e. Build tree (and capture per-sample leaf assignments as a
+        // side effect — see build_tree_with_leaf_assignment docs)
+        let (tree, leaf_value_per_sample) =
+            propagate!(build_tree_with_leaf_assignment(&input, &hooks));
 
-        // f. Update training predictions
-        let train_preds = propagate!(predict_tree(&tree, x_train));
+        // f. Update training predictions.
+        // Fast path: for samples covered by sample_indices (leaf_value not
+        // NaN), the leaf-value is known from tree building — direct O(N)
+        // lookup + add, no tree walk. Fallback path: NaN samples
+        // (subsampled-out this round) need predict_tree. When subsample=1.0
+        // every sample is covered by the fast path.
+        let lr = config.learning_rate();
+        let mut needs_fallback: Vec<usize> = Vec::new();
         for i in 0_usize..n_train {
-            raw_preds_train[i] += config.learning_rate() * train_preds[i];
+            let lv = leaf_value_per_sample[i];
+            if lv.is_nan() {
+                needs_fallback.push(i);
+            } else {
+                raw_preds_train[i] += lr * lv;
+            }
+        }
+        if !needs_fallback.is_empty() {
+            // Only walk the tree for samples the tree wasn't built on.
+            let fallback_features: Vec<&[f64]> =
+                needs_fallback.iter().map(|&i| x_train[i]).collect();
+            let fallback_preds = propagate!(predict_tree(&tree, &fallback_features));
+            for (j, &i) in needs_fallback.iter().enumerate() {
+                raw_preds_train[i] += lr * fallback_preds[j];
+            }
         }
 
         // g. Early stopping check on validation set (before push, so we can borrow tree)

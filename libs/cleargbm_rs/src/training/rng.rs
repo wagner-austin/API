@@ -146,7 +146,7 @@ impl SimpleRng {
     /// Returns `ClearGbmError::InvalidParameter` if `n_take > slice.len()`.
     pub(crate) fn shuffle_partial(
         &mut self,
-        slice: &mut [usize],
+        slice: &mut [u32],
         n_take: usize,
     ) -> Result<(), ClearGbmError> {
         let len = slice.len();

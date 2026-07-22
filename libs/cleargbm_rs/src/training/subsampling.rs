@@ -86,7 +86,7 @@ pub(crate) fn get_sample_indices(
     n_samples: usize,
     subsample: f64,
     rng: &mut SimpleRng,
-) -> Result<Vec<usize>, ClearGbmError> {
+) -> Result<Vec<u32>, ClearGbmError> {
     if n_samples == 0_usize {
         return Err(ClearGbmError::InvalidParameter {
             name: "n_samples".to_string(),
@@ -94,19 +94,25 @@ pub(crate) fn get_sample_indices(
         });
     }
 
-    if subsample >= 1.0_f64 {
-        return Ok((0_usize..n_samples).collect());
-    }
-
-    // Compute subsample count: max(1, floor(n_samples * subsample))
-    let n_samples_f64 = f64::from(match u32::try_from(n_samples) {
+    // sample_indices are stored as u32 to halve the cache-line pressure vs
+    // usize (LightGBM's data_size_t = int32 pattern; see wiki page
+    // `lightgbm-score-t-float`). Any dataset above u32::MAX rows is
+    // out-of-scope for a single-node histogram GBM anyway.
+    let n_samples_u32 = match u32::try_from(n_samples) {
         Ok(v) => v,
         Err(_) => {
             return Err(ClearGbmError::IntegerConversion {
                 context: format!("n_samples = {n_samples} exceeds u32::MAX"),
             })
         }
-    });
+    };
+
+    if subsample >= 1.0_f64 {
+        return Ok((0_u32..n_samples_u32).collect());
+    }
+
+    // Compute subsample count: max(1, floor(n_samples * subsample))
+    let n_samples_f64 = f64::from(n_samples_u32);
     let n_sub_f64 = (n_samples_f64 * subsample).floor();
     let n_sub_raw = propagate!(f64_to_usize_checked(n_sub_f64, "subsample count"));
     let n_sub = if n_sub_raw < 1_usize {
@@ -115,8 +121,10 @@ pub(crate) fn get_sample_indices(
         n_sub_raw
     };
 
-    // Create index array and partially shuffle
-    let mut indices: Vec<usize> = (0_usize..n_samples).collect();
+    // Create index array and partially shuffle. Shuffle in u32 space to
+    // match the eventual storage; SimpleRng.shuffle_partial is generic
+    // over the slice element type.
+    let mut indices: Vec<u32> = (0_u32..n_samples_u32).collect();
     propagate!(rng.shuffle_partial(&mut indices, n_sub));
     indices.truncate(n_sub);
 
