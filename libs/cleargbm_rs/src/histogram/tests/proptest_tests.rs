@@ -6,6 +6,7 @@ use super::helpers::{
 };
 use crate::error::ClearGbmError;
 use crate::histogram::build_histogram;
+use crate::narrow::score_narrow;
 use crate::types::HistogramBuffer;
 
 // =========================================================================
@@ -14,9 +15,9 @@ use crate::types::HistogramBuffer;
 
 /// Inner function for prop_histogram_sums - uses validate_histogram_sums.
 fn prop_histogram_sums_inner(
-    sample_indices: &[usize],
-    gradients: &[f64],
-    hessians: &[f64],
+    sample_indices: &[u32],
+    gradients: &[f32],
+    hessians: &[f32],
     bins: &[u8],
     n_bins: usize,
 ) -> Result<(), proptest::test_runner::TestCaseError> {
@@ -28,7 +29,10 @@ fn prop_histogram_sums_inner(
         Err(e) => return Err(e),
     };
 
-    let expected_grad: f64 = gradients.iter().sum();
+    // Sum in f64 to match the histogram accumulator's precision domain
+    // (grad/hess narrow to f32 at the input boundary; the accumulator + sums
+    // stay f64 per lightgbm-score-t-float's asymmetric-precision shape).
+    let expected_grad: f64 = gradients.iter().map(|&g| f64::from(g)).sum();
     validate_histogram_sums(&hist, expected_grad, sample_indices.len())
 }
 
@@ -65,7 +69,7 @@ fn prop_subtract_correctness_inner(
 #[test]
 fn test_prop_histogram_sums_inner_error() -> Result<(), ClearGbmError> {
     // Cover error path by using empty indices
-    let result = prop_histogram_sums_inner(&[], &[1.0_f64], &[1.0_f64], &[0_u8], 2_usize);
+    let result = prop_histogram_sums_inner(&[], &[1.0_f32], &[1.0_f32], &[0_u8], 2_usize);
     assert!(result.is_err());
     Ok(())
 }
@@ -102,17 +106,17 @@ fn prop_histogram_sums_equal_input_sums() -> Result<(), ClearGbmError> {
         .run(
             &(1_usize..50_usize, 2_usize..10_usize),
             |(n_samples, n_bins)| {
-                let gradients: Vec<f64> = {
+                let gradients: Vec<f32> = {
                     let mut v = Vec::with_capacity(n_samples);
                     let mut acc = 0.0_f64;
                     for _ in 0_usize..n_samples {
-                        v.push(acc);
+                        v.push(score_narrow(acc));
                         acc += 0.1_f64;
                     }
                     v
                 };
-                let hessians: Vec<f64> = (0_usize..n_samples).map(|_| 1.0_f64).collect();
-                let sample_indices: Vec<usize> = (0_usize..n_samples).collect();
+                let hessians: Vec<f32> = (0_usize..n_samples).map(|_| 1.0_f32).collect();
+                let sample_indices: Vec<u32> = (0_u32..).take(n_samples).collect();
                 let bins: Vec<u8> = (0_usize..n_samples)
                     .map(|i| {
                         let b = i % n_bins;
