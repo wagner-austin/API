@@ -530,6 +530,41 @@ class SimServer:
                     is_mine_kill=False,
                 )
             )
+            self._maybe_emit_kill_mercy_bundle(tank_id, outcome_messages, ammo_changed)
+
+    def _maybe_emit_kill_mercy_bundle(
+        self,
+        killer_id: int,
+        messages: list[BinaryMessage],
+        ammo_changed: set[int],
+    ) -> None:
+        """Apply the radar-zero kill reward (archive-cracked 2026-07-22).
+
+        A kill scored while the killer's extra-radar count is ZERO
+        grants a silent (``show_message=False``) multi-slot bundle —
+        deterministic in the corpus: 5/5 radar-zero kills granted,
+        0/254 kills at radar > 0 granted, no exceptions. Measured
+        amounts: dual +1..4, homing exactly +1, radar +1..2, and the
+        bundle may OVERFILL past the 25 cap (one sample landed dual
+        at 26). The sim grants the deterministic medians (+2/+1/+1).
+        Per-recipient: only the client's own bundle rides the wire.
+
+        Args:
+            killer_id: The killing tank.
+            messages: This tick's outgoing batch (appended).
+            ammo_changed: Accumulator of tanks whose counts moved.
+        """
+        killer = self.world["tanks"][killer_id]
+        if killer["counts"][4] != 0:
+            return
+        gained = [0, 2, 0, 1, 1]
+        for slot, amount in enumerate(gained):
+            killer["counts"][slot] += amount
+        ammo_changed.add(killer_id)
+        if killer_id == self.client_id:
+            messages.append(
+                EquipmentGainDict(msg_type=0x67, show_message=False, gained=list(gained))
+            )
 
     def _emit_teleport(
         self,

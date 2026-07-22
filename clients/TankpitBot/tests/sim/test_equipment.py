@@ -167,6 +167,59 @@ def test_radar_reveals_equipment_with_the_wire_marker() -> None:
     assert [(c["x"], c["y"], c["volume"]) for c in scans[0]["containers"]] == [(14, 12, -1)]
 
 
+def test_radar_zero_kill_grants_the_mercy_bundle() -> None:
+    """A kill at radar 0 rides the batch with the silent bundle.
+
+    Archive-cracked 2026-07-22: 5/5 radar-zero kills granted,
+    0/254 kills at radar > 0 granted — deterministic. The bundle is
+    show_message=False and may overfill the cap.
+    """
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    world["tanks"][9]["counts"] = [25, 25, 25, 25, 0]
+    world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    shot = ClientCommandDict(kind="shoot", command=115, x=12, y=10, target_id=0, slot=0)
+    server.queue_command(9, shot)
+    messages = server.advance_tick()
+    bundles = [m for m in messages if m["msg_type"] == 0x67]
+    assert len(bundles) == 1
+    assert bundles[0]["show_message"] is False
+    assert bundles[0]["gained"] == [0, 2, 0, 1, 1]
+    assert world["tanks"][9]["counts"] == [25, 26, 25, 26, 1]
+    snapshots = [m for m in messages if m["msg_type"] == 0x49]
+    assert len(snapshots) == 1
+
+
+def test_kills_with_radar_stock_grant_nothing() -> None:
+    """The 0/254 side: any radar stock means no bundle."""
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
+    world["tanks"][9]["counts"] = [25, 25, 25, 25, 1]
+    world["tanks"][11] = make_sim_tank(11, 1, 1, 12, 10, 45)
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    shot = ClientCommandDict(kind="shoot", command=115, x=12, y=10, target_id=0, slot=0)
+    server.queue_command(9, shot)
+    messages = server.advance_tick()
+    assert [m for m in messages if m["msg_type"] == 0x67] == []
+
+
+def test_enemy_killers_take_their_bundle_silently() -> None:
+    """Per-recipient: another tank's mercy bundle never rides our wire."""
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 30, 30, 45)
+    world["tanks"][9]["counts"] = [0, 25, 25, 25, 25]
+    world["tanks"][9]["enabled"][0] = False
+    world["tanks"][11] = make_sim_tank(11, 1, 1, 32, 30, 1000)
+    world["tanks"][11]["counts"] = [25, 25, 25, 25, 0]
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    shot = ClientCommandDict(kind="shoot", command=115, x=30, y=30, target_id=0, slot=0)
+    server.queue_command(11, shot)
+    messages = server.advance_tick()
+    assert [m for m in messages if m["msg_type"] == 0x67] == []
+    assert world["tanks"][11]["counts"][4] == 1
+
+
 def test_production_bot_restocks_ammo_over_the_seam() -> None:
     """The full pipeline: radar reveal -> pickup -> 0x67 -> belief rises.
 

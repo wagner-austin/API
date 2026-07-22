@@ -51,10 +51,17 @@ very next frame) shows:
 - armor=25, dual=25, missile=25, homing=25, radar=25 → server returns
   **"Inventory full"** (0x52 error 7), no pickup, container stays.[^6]
 
-**Radar-zero exception**: the archive holds exactly 5
-``show_message=False`` 0x67s, every one MULTI-slot (dual+homing+radar
-grants of 1-2 each) and every one with the tank at **radar = 0**. An
-undocumented emergency-grant mechanic; not yet reproduced or modeled.
+**The radar-zero KILL REWARD (cracked 2026-07-22)**: the archive's 5
+``show_message=False`` multi-slot 0x67s are all same-frame with an
+own-kill 0x41 — and the trigger is deterministic: **a kill scored
+while the killer's extra-radar count is ZERO grants a silent mercy
+bundle**. Corpus proof: 5/5 radar-zero kills granted, 0/254 kills at
+radar > 0 granted, zero exceptions. Measured amounts: dual +1..4,
+homing exactly +1, radar +1..2 — and the bundle may OVERFILL past
+the 25 cap (one sample landed dual at 26). Tactical meaning: a
+radar-blind kill self-rescues the pursuit loop with one fresh scan.
+The sim implements the deterministic medians (+2 dual, +1 homing,
++1 radar; ``SimServer._maybe_emit_kill_mercy_bundle``).
 
 Consequence for the bot unchanged: **a pickup is never wasted unless
 every slot is at cap** — the server always picks a deficient slot.
