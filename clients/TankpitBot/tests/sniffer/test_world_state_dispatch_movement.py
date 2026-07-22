@@ -141,6 +141,7 @@ class TestDispatchProtocolMovement:
             is_carrying=False,
             waypoints=[(82, 88)],
             path_tiles=2,
+            path="ee",
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -170,6 +171,7 @@ class TestDispatchProtocolMovement:
             is_carrying=False,
             waypoints=[],
             path_tiles=0,
+            path="",
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -211,6 +213,7 @@ class TestDispatchProtocolMovement:
             is_carrying=False,
             waypoints=[(110, 110)],
             path_tiles=1,
+            path="e",
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -253,6 +256,7 @@ class TestDispatchProtocolMovement:
             is_carrying=False,
             waypoints=[(110, 110)],
             path_tiles=1,
+            path="e",
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -285,6 +289,7 @@ class TestDispatchProtocolMovement:
             is_carrying=False,
             waypoints=[(205, 205)],
             path_tiles=1,
+            path="e",
         )
         dispatch_world_state_update(get_world_service(), msg)
 
@@ -419,6 +424,7 @@ class TestDispatchMoveResponseUpdatesSelf:
             is_carrying=False,
             waypoints=[],
             path_tiles=0,
+            path="",
         )
         dispatch_world_state_update(get_world_service(), msg)
         assert get_world_service().fuel_book["entries"] == []
