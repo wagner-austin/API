@@ -41,6 +41,7 @@ class AmmoBookDict(TypedDict):
 
     last_counts: list[int] | None
     shots: list[int]
+    enemy_shots: int
     gains: int
     snapshots: int
     divergences: int
@@ -53,7 +54,12 @@ def make_ammo_book() -> AmmoBookDict:
         A book with no anchoring snapshot and zero activity counters.
     """
     return AmmoBookDict(
-        last_counts=None, shots=[0, 0, 0, 0, 0], gains=0, snapshots=0, divergences=0
+        last_counts=None,
+        shots=[0, 0, 0, 0, 0],
+        enemy_shots=0,
+        gains=0,
+        snapshots=0,
+        divergences=0,
     )
 
 
@@ -148,6 +154,20 @@ def record_ammo_scan(*, book: AmmoBookDict) -> None:
 
 
 @enforce_contract(AmmoActivityContract())
+def record_ammo_enemy_shot(*, book: AmmoBookDict) -> None:
+    """Count one enemy shot echo (bounds armor consumption).
+
+    Armor absorbs at most 2 shields per incoming hit (a dual), so
+    between snapshots the armor slot may fall by at most twice the
+    enemy shots observed ([[game-economy]] armor rules, 2026-07-21).
+
+    Args:
+        book: The book being updated.
+    """
+    book["enemy_shots"] += 1
+
+
+@enforce_contract(AmmoActivityContract())
 def record_ammo_gain(*, book: AmmoBookDict) -> None:
     """Count one 0x67 equipment gain (any slots may rise).
 
@@ -171,9 +191,11 @@ def record_ammo_snapshot(*, book: AmmoBookDict, counts: list[int]) -> AmmoVerdic
     """
     last_counts = book["last_counts"]
     shots = book["shots"]
+    enemy_shots = book["enemy_shots"]
     gains = book["gains"]
     book["last_counts"] = list(counts)
     book["shots"] = [0, 0, 0, 0, 0]
+    book["enemy_shots"] = 0
     book["gains"] = 0
     if last_counts is None:
         return None
@@ -183,6 +205,8 @@ def record_ammo_snapshot(*, book: AmmoBookDict, counts: list[int]) -> AmmoVerdic
         delta = counts[slot] - last_counts[slot]
         if delta > 0 and gains == 0:
             problems.append(f"{name} rose {delta} with no equipment gain")
+        elif delta < 0 and slot == SLOT_ARMOR and -delta > 2 * enemy_shots:
+            problems.append(f"armor fell {-delta} with only {enemy_shots} enemy shots observed")
         elif delta < 0 and slot != SLOT_ARMOR and -delta > shots[slot]:
             problems.append(f"{name} fell {-delta} with only {shots[slot]} uses recorded")
     balanced = not problems
@@ -203,6 +227,7 @@ __all__ = [
     "AmmoSnapshotContract",
     "AmmoVerdictDict",
     "make_ammo_book",
+    "record_ammo_enemy_shot",
     "record_ammo_gain",
     "record_ammo_scan",
     "record_ammo_shot",
