@@ -2,6 +2,8 @@
 //!
 //! Contains the core tree building algorithm with histogram-based split finding.
 
+use rayon::prelude::*;
+
 use crate::error::ClearGbmError;
 use crate::histogram::subtract_histogram;
 use crate::hooks::Hooks;
@@ -517,25 +519,34 @@ pub(super) fn build_feature_histograms(
         }
     }
 
-    // Build histograms from scratch
+    // Build histograms from scratch, in parallel across features.
+    // Each feature's histogram is an independent walk over `sample_indices`
+    // gathering into its own bin column — no shared mutable state. Rayon's
+    // work-stealing scheduler distributes the 18-ish features across the
+    // available CPU cores. Order is preserved by `map`+`collect`, so
+    // `histograms[feat_idx]` still indexes the right feature.
+    let results: Vec<Result<HistogramBuffer, ClearGbmError>> = (0_usize..config.n_features)
+        .into_par_iter()
+        .map(|feat_idx| {
+            let feat_col_start = feat_idx * config.n_samples;
+            let feat_col_end = feat_col_start + config.n_samples;
+            let feat_bins = &config.bins[feat_col_start..feat_col_end];
+            (config.hooks.build_histogram)(
+                config.sample_indices,
+                config.gradients,
+                config.hessians,
+                feat_bins,
+                config.n_bins,
+            )
+        })
+        .collect();
+
     let mut histograms = Vec::with_capacity(config.n_features);
-
-    for feat_idx in 0_usize..config.n_features {
-        let feat_col_start = feat_idx * config.n_samples;
-        let feat_col_end = feat_col_start + config.n_samples;
-        let feat_bins = &config.bins[feat_col_start..feat_col_end];
-
-        let hist = match (config.hooks.build_histogram)(
-            config.sample_indices,
-            config.gradients,
-            config.hessians,
-            feat_bins,
-            config.n_bins,
-        ) {
-            Ok(h) => h,
+    for r in results {
+        match r {
+            Ok(h) => histograms.push(h),
             Err(e) => return Err(e),
-        };
-        histograms.push(hist);
+        }
     }
 
     Ok(histograms)
@@ -663,41 +674,54 @@ pub(super) fn compute_child_histograms(
         config.right_indices
     };
 
+    // Parallel per-feature: build the smaller child's histogram, then
+    // derive the larger sibling via subtraction. Each feature's
+    // (smaller, larger) tuple is independent, so rayon parallelizes it.
+    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> = (0_usize
+        ..config.n_features)
+        .into_par_iter()
+        .map(|feat_idx| {
+            let feat_col_start = feat_idx * config.n_samples;
+            let feat_col_end = feat_col_start + config.n_samples;
+            let feat_bins = &config.bins[feat_col_start..feat_col_end];
+
+            let smaller_hist = match (config.hooks.build_histogram)(
+                smaller_indices,
+                config.gradients,
+                config.hessians,
+                feat_bins,
+                config.n_bins,
+            ) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
+
+            let parent_hist = match config.parent_histograms.get(feat_idx) {
+                Some(h) => h,
+                None => {
+                    return Err(ClearGbmError::FeatureIndexOutOfBounds {
+                        index: feat_idx,
+                        n_features: config.n_features,
+                    })
+                }
+            };
+
+            let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
+
+            Ok((smaller_hist, larger_hist))
+        })
+        .collect();
+
     let mut left_histograms = Vec::with_capacity(config.n_features);
     let mut right_histograms = Vec::with_capacity(config.n_features);
-
-    for feat_idx in 0_usize..config.n_features {
-        let feat_col_start = feat_idx * config.n_samples;
-        let feat_col_end = feat_col_start + config.n_samples;
-        let feat_bins = &config.bins[feat_col_start..feat_col_end];
-
-        let smaller_hist = match (config.hooks.build_histogram)(
-            smaller_indices,
-            config.gradients,
-            config.hessians,
-            feat_bins,
-            config.n_bins,
-        ) {
-            Ok(h) => h,
+    for pair in pairs {
+        let (smaller_hist, larger_hist) = match pair {
+            Ok(p) => p,
             Err(e) => return Err(e),
         };
-
-        // Derive larger child via subtraction
-        let parent_hist = match config.parent_histograms.get(feat_idx) {
-            Some(h) => h,
-            None => {
-                return Err(ClearGbmError::FeatureIndexOutOfBounds {
-                    index: feat_idx,
-                    n_features: config.n_features,
-                })
-            }
-        };
-
-        let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
-            Ok(h) => h,
-            Err(e) => return Err(e),
-        };
-
         if left_is_smaller {
             left_histograms.push(smaller_hist);
             right_histograms.push(larger_hist);

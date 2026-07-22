@@ -1,0 +1,10 @@
+# Build against the local machine's CPU feature set.
+#
+# ClearGBM's histogram accumulation is the hot path; letting LLVM emit
+# AVX2 / AVX-512 / BMI / FMA instructions when the target CPU supports
+# them typically gives a 2-4x speedup over the baseline x86-64 target.
+# The resulting shared library is not portable across CPU generations,
+# which is acceptable for a locally-installed maturin-develop wheel; a
+# distributable wheel build would drop or scope this flag.
+[build]
+rustflags = ["-C", "target-cpu=native"]

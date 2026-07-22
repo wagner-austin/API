@@ -24,6 +24,12 @@ ndarray = "0.17"
 thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# Rayon powers cross-feature parallelism in the histogram build passes
+# (`build_feature_histograms` and `compute_child_histograms`). Each feature's
+# per-node histogram is independent, so 18 features × 3-4 cores gives roughly
+# 3-4x speedup on the tree-building hot loop. All safe-Rust; no unsafe code
+# escape hatches added.
+rayon = "1.10"
 
 [dev-dependencies]
 proptest = "1.5"
