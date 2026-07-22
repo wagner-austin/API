@@ -37,9 +37,9 @@ use crate::types::HistogramBuffer;
 /// * `ClearGbmError::ShapeMismatch` - If array lengths don't match.
 /// * `ClearGbmError::BinIndexOutOfBounds` - If any bin index is out of bounds.
 pub fn build_histogram(
-    sample_indices: &[usize],
-    gradients: &[f64],
-    hessians: &[f64],
+    sample_indices: &[u32],
+    gradients: &[f32],
+    hessians: &[f32],
     bins: &[u8],
     n_bins: usize,
 ) -> Result<HistogramBuffer, ClearGbmError> {
@@ -84,13 +84,25 @@ pub fn build_histogram(
     // ------------------------------------------------------------
     let mut max_bin_used: u8 = 0_u8;
     for &idx in sample_indices {
-        if idx >= n_samples {
+        // sample_indices are stored as u32 (halves cache-line pressure vs
+        // usize on x86_64); widen only at the access site. On every
+        // supported target usize >= 32 bits, so the try_from never fails
+        // — the match is a lint-clean substitute for `as usize`.
+        let idx_usize = match usize::try_from(idx) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(ClearGbmError::IntegerConversion {
+                    context: format!("sample index {idx} exceeds usize::MAX"),
+                })
+            }
+        };
+        if idx_usize >= n_samples {
             return Err(ClearGbmError::SampleIndexOutOfBounds {
-                index: idx,
+                index: idx_usize,
                 n_samples,
             });
         }
-        let b = bins[idx];
+        let b = bins[idx_usize];
         if b > max_bin_used {
             max_bin_used = b;
         }
@@ -103,82 +115,107 @@ pub fn build_histogram(
         });
     }
 
-    Ok(build_histogram_trusted(
+    // Reorder into position-space then dispatch the single trusted hot loop.
+    // For the pyo3 one-shot boundary call this is one extra O(N) scan; the
+    // tree builder's amortized-across-features path avoids this cost by
+    // calling `build_histogram_ordered_trusted` directly with a shared
+    // per-node reorder (see `tree/histograms.rs`).
+    let n_at_node = sample_indices.len();
+    let mut ordered_gradients: Vec<f32> = vec![0.0_f32; n_at_node];
+    let mut ordered_hessians: Vec<f32> = vec![0.0_f32; n_at_node];
+    reorder_grad_hess_into(
         sample_indices,
         gradients,
         hessians,
+        &mut ordered_gradients,
+        &mut ordered_hessians,
+    );
+
+    Ok(build_histogram_ordered_trusted(
+        sample_indices,
+        &ordered_gradients,
+        &ordered_hessians,
         bins,
         n_bins,
     ))
 }
 
-/// Fast-path histogram build that skips input validation.
+/// Histogram build fast path that reads gradients + hessians sequentially.
 ///
-/// Bypasses the sample-index bounds check, the array-length shape check,
-/// and the bin-range check performed by [`build_histogram`]. This is the
-/// hot-path call made from the tree builder, where the invariants are
-/// established by construction:
+/// Assumes `ordered_gradients[i]` is the gradient for the sample at
+/// `sample_indices[i]` — i.e. the caller has pre-permuted the gradient and
+/// hessian streams into position-space instead of sample-space. The hot loop
+/// then reads `ordered_gradients[i]` and `ordered_hessians[i]` with pure
+/// sequential access; the bin lookup is the only random-index access (per
+/// LightGBM's own shape — see the wiki page `lightgbm-construct-histogram-inner`).
 ///
-/// * `sample_indices` are drawn from `get_sample_indices(n_train, ..)`,
-///   which returns a subset of `0..n_train`, and every downstream child
-///   node's indices are a subset of the parent's — so `idx < n_samples`
-///   is a compile-time-known invariant of the tree traversal.
-/// * `bins` originate in [`FeatureBins::bins`], whose constructor caps
-///   each entry at `max_bins ≤ 255` and whose length equals
-///   `n_samples * n_features`.
-///
-/// Callers outside this crate should use the validated [`build_histogram`]
-/// entry point instead.
+/// Amortization: the caller does one reorder pass per node (cost:
+/// `sample_indices.len()` gathers on each of `gradients` + `hessians`), then
+/// reuses the two ordered arrays across all `n_features` histogram builds
+/// for that node. For 18 features per node the effective gather count on
+/// gradients + hessians drops 18×.
 ///
 /// # Args
 ///
-/// * `sample_indices` - Indices of samples at this node.
-/// * `gradients` - Gradient values for all samples.
-/// * `hessians` - Hessian values for all samples.
-/// * `bins` - Pre-computed bin assignments for this feature (`u8` per sample).
+/// * `sample_indices` - Indices of samples at this node (used only for the
+///   bin gather; NOT indexed into `ordered_gradients` / `ordered_hessians`).
+/// * `ordered_gradients` - Pre-permuted gradient stream: `ordered_gradients[i]`
+///   equals `gradients[sample_indices[i]]`. Length must equal `sample_indices.len()`.
+/// * `ordered_hessians` - Pre-permuted hessian stream, same shape.
+/// * `bins` - Pre-computed bin assignments (`u8` per sample).
 /// * `n_bins` - Number of bins (including NaN bin).
+///
+/// # Returns
+///
+/// A populated [`HistogramBuffer`].
 ///
 /// # Panics
 ///
-/// Rust's safe indexing will panic if any invariant listed above is
-/// violated. That is a bug in the caller, not a recoverable runtime error.
+/// Rust's safe indexing will panic if any invariant is violated. That is a
+/// bug in the caller, not a recoverable runtime error.
 #[must_use]
 #[inline]
-pub(crate) fn build_histogram_trusted(
-    sample_indices: &[usize],
-    gradients: &[f64],
-    hessians: &[f64],
+pub(crate) fn build_histogram_ordered_trusted(
+    sample_indices: &[u32],
+    ordered_gradients: &[f32],
+    ordered_hessians: &[f32],
     bins: &[u8],
     n_bins: usize,
 ) -> HistogramBuffer {
     let mut histogram = HistogramBuffer::new(n_bins);
-    // Direct field access: skips the `accumulate` function-call boundary
-    // and its per-sample bin bounds check (established by the caller).
     let gradient_sums = &mut histogram.gradient_sums;
     let hessian_sums = &mut histogram.hessian_sums;
     let counts = &mut histogram.counts;
 
     // ------------------------------------------------------------
-    // Vectorized main loop: unrolled 8-wide.
+    // Vectorized main loop: unrolled 8-wide, sequential reads on the
+    // pre-permuted gradient + hessian streams. The `bins[idx]` gather is
+    // the only random-index access — grouping all 8 gathers before the
+    // dependent RMW gives the compiler room to schedule them in parallel
+    // on modern out-of-order cores. Chunks not a multiple of 8 fall to
+    // the scalar tail.
     //
-    // Processing samples in chunks of 8 gives the compiler space to
-    // interleave eight independent RMW streams — modern out-of-order
-    // cores can pipeline more than four memory operations concurrently,
-    // and the wider unroll maps onto a full 512-bit cache-line worth
-    // of gradient/hessian bytes at a time. Chunks that aren't a
-    // multiple of 8 fall through to the scalar tail below.
+    // Grad/hess reads are f32; the accumulator is f64. `f64::from(f32)` is
+    // an exact widening (no rounding); the double-precision accumulator
+    // preserves 15-digit precision across billions of adds. LightGBM's
+    // `hist_t += score_t` shape (see wiki page `lightgbm-score-t-float`).
     // ------------------------------------------------------------
     let chunks = sample_indices.chunks_exact(8_usize);
     let remainder = chunks.remainder();
+    // Zip in the ordered streams; both are length == sample_indices.len().
+    let mut pos: usize = 0_usize;
     for chunk in chunks {
-        let idx0 = chunk[0_usize];
-        let idx1 = chunk[1_usize];
-        let idx2 = chunk[2_usize];
-        let idx3 = chunk[3_usize];
-        let idx4 = chunk[4_usize];
-        let idx5 = chunk[5_usize];
-        let idx6 = chunk[6_usize];
-        let idx7 = chunk[7_usize];
+        // sample_indices are u32; widen for slice-indexing via the
+        // infallible `crate::narrow::index_widen` (see wiki page
+        // `lightgbm-score-t-float` and the `data_size_t = int32` pattern).
+        let idx0 = crate::narrow::index_widen(chunk[0_usize]);
+        let idx1 = crate::narrow::index_widen(chunk[1_usize]);
+        let idx2 = crate::narrow::index_widen(chunk[2_usize]);
+        let idx3 = crate::narrow::index_widen(chunk[3_usize]);
+        let idx4 = crate::narrow::index_widen(chunk[4_usize]);
+        let idx5 = crate::narrow::index_widen(chunk[5_usize]);
+        let idx6 = crate::narrow::index_widen(chunk[6_usize]);
+        let idx7 = crate::narrow::index_widen(chunk[7_usize]);
 
         let b0 = usize::from(bins[idx0]);
         let b1 = usize::from(bins[idx1]);
@@ -189,23 +226,23 @@ pub(crate) fn build_histogram_trusted(
         let b6 = usize::from(bins[idx6]);
         let b7 = usize::from(bins[idx7]);
 
-        let g0 = gradients[idx0];
-        let g1 = gradients[idx1];
-        let g2 = gradients[idx2];
-        let g3 = gradients[idx3];
-        let g4 = gradients[idx4];
-        let g5 = gradients[idx5];
-        let g6 = gradients[idx6];
-        let g7 = gradients[idx7];
+        let g0 = f64::from(ordered_gradients[pos]);
+        let g1 = f64::from(ordered_gradients[pos + 1_usize]);
+        let g2 = f64::from(ordered_gradients[pos + 2_usize]);
+        let g3 = f64::from(ordered_gradients[pos + 3_usize]);
+        let g4 = f64::from(ordered_gradients[pos + 4_usize]);
+        let g5 = f64::from(ordered_gradients[pos + 5_usize]);
+        let g6 = f64::from(ordered_gradients[pos + 6_usize]);
+        let g7 = f64::from(ordered_gradients[pos + 7_usize]);
 
-        let h0 = hessians[idx0];
-        let h1 = hessians[idx1];
-        let h2 = hessians[idx2];
-        let h3 = hessians[idx3];
-        let h4 = hessians[idx4];
-        let h5 = hessians[idx5];
-        let h6 = hessians[idx6];
-        let h7 = hessians[idx7];
+        let h0 = f64::from(ordered_hessians[pos]);
+        let h1 = f64::from(ordered_hessians[pos + 1_usize]);
+        let h2 = f64::from(ordered_hessians[pos + 2_usize]);
+        let h3 = f64::from(ordered_hessians[pos + 3_usize]);
+        let h4 = f64::from(ordered_hessians[pos + 4_usize]);
+        let h5 = f64::from(ordered_hessians[pos + 5_usize]);
+        let h6 = f64::from(ordered_hessians[pos + 6_usize]);
+        let h7 = f64::from(ordered_hessians[pos + 7_usize]);
 
         gradient_sums[b0] += g0;
         hessian_sums[b0] += h0;
@@ -238,17 +275,57 @@ pub(crate) fn build_histogram_trusted(
         gradient_sums[b7] += g7;
         hessian_sums[b7] += h7;
         counts[b7] += 1_usize;
+
+        pos += 8_usize;
     }
 
-    // Scalar tail for the last (n_samples mod 8) elements.
     for &idx in remainder {
-        let bin = usize::from(bins[idx]);
-        gradient_sums[bin] += gradients[idx];
-        hessian_sums[bin] += hessians[idx];
+        let idx_usize = crate::narrow::index_widen(idx);
+        let bin = usize::from(bins[idx_usize]);
+        gradient_sums[bin] += f64::from(ordered_gradients[pos]);
+        hessian_sums[bin] += f64::from(ordered_hessians[pos]);
         counts[bin] += 1_usize;
+        pos += 1_usize;
     }
 
     histogram
+}
+
+/// Fills the ordered scratch buffers `ordered_gradients[i] = gradients[sample_indices[i]]`
+/// (and the same for hessians) in one pass.
+///
+/// This is the amortization step for [`build_histogram_ordered_trusted`]: one
+/// scan over `sample_indices` produces two sequential-access-shaped arrays
+/// that all per-feature histogram builds for this node reuse.
+///
+/// # Args
+///
+/// * `sample_indices` - Sample indices at this node.
+/// * `gradients` - Full gradient array (indexed by sample index).
+/// * `hessians` - Full hessian array (indexed by sample index).
+/// * `ordered_gradients` - Output scratch, length must equal `sample_indices.len()`.
+/// * `ordered_hessians` - Output scratch, length must equal `sample_indices.len()`.
+///
+/// # Panics
+///
+/// Panics if any output length disagrees with `sample_indices.len()` or if any
+/// sample index is out of bounds for `gradients` / `hessians`. The tree builder
+/// establishes both invariants by construction.
+#[inline]
+pub(crate) fn reorder_grad_hess_into(
+    sample_indices: &[u32],
+    gradients: &[f32],
+    hessians: &[f32],
+    ordered_gradients: &mut [f32],
+    ordered_hessians: &mut [f32],
+) {
+    assert!(ordered_gradients.len() == sample_indices.len());
+    assert!(ordered_hessians.len() == sample_indices.len());
+    for (i, &idx) in sample_indices.iter().enumerate() {
+        let idx_usize = crate::narrow::index_widen(idx);
+        ordered_gradients[i] = gradients[idx_usize];
+        ordered_hessians[i] = hessians[idx_usize];
+    }
 }
 
 /// Computes sibling histogram by subtraction (2x speedup).
