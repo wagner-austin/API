@@ -43,6 +43,7 @@ pub mod error;
 pub mod histogram;
 pub mod hooks;
 pub mod losses;
+pub mod narrow;
 pub mod predict;
 #[cfg(feature = "extension-module")]
 pub mod pyo3_module;
