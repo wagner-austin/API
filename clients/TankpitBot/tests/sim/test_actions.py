@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from tests.in_memory_terrain_map import InMemoryTerrainMap
-
 from tankpit_bot.physics.capacity import free_radar_radius
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.sim.actions import (
@@ -20,6 +18,7 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _world() -> SimWorldDict:

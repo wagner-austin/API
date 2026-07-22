@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import base64
 
-from tests.in_memory_terrain_map import InMemoryTerrainMap
-
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
@@ -32,6 +30,7 @@ from tankpit_bot.sniffer.xor import (
     reset_xor_state,
 )
 from tankpit_bot.state.types import SelfStateDict
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 _MAGIC = "simmagic"
 _CLIENT = 9
@@ -137,7 +136,7 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     """
     server, table = _boot()
     server.queue_command(
-        _CLIENT, ClientCommandDict(kind="shoot", command=115, x=110, y=100, target_id=0)
+        _CLIENT, ClientCommandDict(kind="shoot", command=115, x=110, y=100, target_id=0, slot=0)
     )
     _deliver(server.advance_tick(), table)
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90

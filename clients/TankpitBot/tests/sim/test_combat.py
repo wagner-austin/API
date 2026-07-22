@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from tests.in_memory_terrain_map import InMemoryTerrainMap
-
 from tankpit_bot.sim.combat import (
     SLOT_ARMOR,
     SLOT_DUAL,
@@ -16,6 +14,7 @@ from tankpit_bot.sim.combat import (
     process_shot,
 )
 from tankpit_bot.sim.world import SimMineDict, SimWorldDict, make_sim_tank, make_sim_world
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 _NOBODY: frozenset[int] = frozenset()
 

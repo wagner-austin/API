@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from tests.in_memory_terrain_map import InMemoryTerrainMap
-
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.sim.movement import MINE_WALK_COST, process_move
 from tankpit_bot.sim.world import (
@@ -13,6 +11,7 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _world_with_tank(fuel: int = 1000) -> SimWorldDict:

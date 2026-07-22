@@ -13,6 +13,7 @@ from tankpit_bot.protocol.commands import (
     CMD_PICKUP_FUEL,
     CMD_RADAR,
     CMD_SHOOT,
+    CMD_TOGGLE_EQUIPMENT,
 )
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sim.commands import decode_client_command
@@ -49,6 +50,15 @@ def test_bare_commands_decode_without_coords() -> None:
         decoded = decode_client_command(bytes([2, command]))
         assert decoded["kind"] == kind
         assert decoded["x"] == 0
+
+
+def test_toggle_equipment_decodes_the_slot_digit() -> None:
+    """The 1-5 slot key char decodes to the numeric slot."""
+    decoded = decode_client_command(bytes([0x23, CMD_TOGGLE_EQUIPMENT, ord("2")]))
+    assert decoded["kind"] == "toggle_equipment"
+    assert decoded["slot"] == 2
+    with pytest.raises(DecodeError):
+        decode_client_command(bytes([0x23, CMD_TOGGLE_EQUIPMENT]))
 
 
 def test_unknown_command_preserves_raw_byte() -> None:

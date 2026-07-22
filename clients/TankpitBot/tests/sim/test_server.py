@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
@@ -26,16 +25,17 @@ from tankpit_bot.sim.world import (
     make_sim_tank,
     make_sim_world,
 )
+from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
 def _move(x: int, y: int) -> ClientCommandDict:
     """A decoded move command to (x, y)."""
-    return ClientCommandDict(kind="move", command=112, x=x, y=y, target_id=0)
+    return ClientCommandDict(kind="move", command=112, x=x, y=y, target_id=0, slot=0)
 
 
 def _shoot(x: int, y: int) -> ClientCommandDict:
     """A decoded shoot command at (x, y)."""
-    return ClientCommandDict(kind="shoot", command=115, x=x, y=y, target_id=0)
+    return ClientCommandDict(kind="shoot", command=115, x=x, y=y, target_id=0, slot=0)
 
 
 def _server() -> SimServer:
@@ -90,7 +90,7 @@ def _snapshots(messages: list[BinaryMessage]) -> list[InventoryDict]:
 def test_unsupported_kind_and_unknown_tank_raise() -> None:
     """Out-of-scope kinds and unknown/dead tanks fail loudly at queue time."""
     server = _server()
-    unknown = ClientCommandDict(kind="other", command=90, x=0, y=0, target_id=0)
+    unknown = ClientCommandDict(kind="other", command=90, x=0, y=0, target_id=0, slot=0)
     with pytest.raises(SimError):
         server.queue_command(9, unknown)
     with pytest.raises(SimError):
@@ -221,18 +221,18 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
     """A decoded client command of the given (kind, byte) pair."""
     kind, command = kind_command
     move_kind: ClientCommandDict = ClientCommandDict(
-        kind="move", command=command, x=x, y=y, target_id=0
+        kind="move", command=command, x=x, y=y, target_id=0, slot=0
     )
     if kind == "teleport":
-        return ClientCommandDict(kind="teleport", command=command, x=x, y=y, target_id=0)
+        return ClientCommandDict(kind="teleport", command=command, x=x, y=y, target_id=0, slot=0)
     if kind == "radar":
-        return ClientCommandDict(kind="radar", command=command, x=x, y=y, target_id=0)
+        return ClientCommandDict(kind="radar", command=command, x=x, y=y, target_id=0, slot=0)
     if kind == "mine":
-        return ClientCommandDict(kind="mine", command=command, x=x, y=y, target_id=0)
+        return ClientCommandDict(kind="mine", command=command, x=x, y=y, target_id=0, slot=0)
     if kind == "map_open":
-        return ClientCommandDict(kind="map_open", command=command, x=x, y=y, target_id=0)
+        return ClientCommandDict(kind="map_open", command=command, x=x, y=y, target_id=0, slot=0)
     if kind == "pickup_fuel":
-        return ClientCommandDict(kind="pickup_fuel", command=command, x=x, y=y, target_id=0)
+        return ClientCommandDict(kind="pickup_fuel", command=command, x=x, y=y, target_id=0, slot=0)
     return move_kind
 
 
@@ -314,6 +314,26 @@ def test_mine_press_on_sealed_ground_places_nothing() -> None:
     server.queue_command(9, _command(("mine", 107)))
     assert _kinds(server.advance_tick()) == [0x2E]
     assert server.world["tanks"][9]["fuel"] == 990
+
+
+def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
+    """A toggle press flips the slot server-side and reports all five."""
+    server = _server()
+    toggle = ClientCommandDict(kind="toggle_equipment", command=114, x=0, y=0, target_id=0, slot=2)
+    server.queue_command(9, toggle)
+    messages = server.advance_tick()
+    assert _kinds(messages) == [0x74]
+    toggled = messages[0]
+    assert toggled["msg_type"] == 0x74
+    assert toggled["enabled"] == [True, False, True, True, True]
+    assert server.world["tanks"][9]["enabled"][1] is False
+    out_of_range = ClientCommandDict(
+        kind="toggle_equipment", command=114, x=0, y=0, target_id=0, slot=9
+    )
+    server.queue_command(9, out_of_range)
+    ignored = server.advance_tick()
+    assert _kinds(ignored) == [0x74]
+    assert server.world["tanks"][9]["enabled"] == [True, False, True, True, True]
 
 
 def test_map_open_tick_emits_map_data() -> None:

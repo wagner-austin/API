@@ -19,6 +19,7 @@ from tankpit_bot.protocol.commands import (
     CMD_PICKUP_FUEL,
     CMD_RADAR,
     CMD_SHOOT,
+    CMD_TOGGLE_EQUIPMENT,
 )
 from tankpit_bot.protocol.helpers import require_min_length, x16
 
@@ -31,6 +32,7 @@ ClientCommandKind = Literal[
     "map_open",
     "pickup_fuel",
     "pickup_equipment",
+    "toggle_equipment",
     "other",
 ]
 
@@ -51,8 +53,10 @@ class ClientCommandDict(TypedDict):
     """One decoded client command.
 
     ``x``/``y`` are 0 for commands without coordinates; ``target_id``
-    is the shoot command's optional entity id (0 = positional shot).
-    ``command`` preserves the raw command byte for ``other`` kinds.
+    is the shoot command's optional entity id (0 = positional shot);
+    ``slot`` is the equipment-toggle slot (1-5, 0 for every other
+    kind). ``command`` preserves the raw command byte for ``other``
+    kinds.
     """
 
     kind: ClientCommandKind
@@ -60,6 +64,7 @@ class ClientCommandDict(TypedDict):
     x: int
     y: int
     target_id: int
+    slot: int
 
 
 def decode_client_command(payload: bytes) -> ClientCommandDict:
@@ -86,6 +91,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             x=payload[2],
             y=payload[3],
             target_id=0,
+            slot=0,
         )
     if command == CMD_SHOOT:
         require_min_length(payload, 4, "ClientCommand.shoot")
@@ -96,6 +102,17 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             x=payload[2],
             y=payload[3],
             target_id=target_id,
+            slot=0,
+        )
+    if command == CMD_TOGGLE_EQUIPMENT:
+        require_min_length(payload, 3, "ClientCommand.toggle")
+        return ClientCommandDict(
+            kind="toggle_equipment",
+            command=command,
+            x=0,
+            y=0,
+            target_id=0,
+            slot=payload[2] - ord("0"),
         )
     if command in _BARE_KINDS:
         return ClientCommandDict(
@@ -104,8 +121,9 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             x=0,
             y=0,
             target_id=0,
+            slot=0,
         )
-    return ClientCommandDict(kind="other", command=command, x=0, y=0, target_id=0)
+    return ClientCommandDict(kind="other", command=command, x=0, y=0, target_id=0, slot=0)
 
 
 class SimError(Exception):

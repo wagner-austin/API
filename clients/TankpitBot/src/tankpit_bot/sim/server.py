@@ -29,6 +29,7 @@ from tankpit_bot.protocol.constants import (
 from tankpit_bot.protocol.types import (
     BinaryMessage,
     DeactivationDict,
+    EquipmentToggleDict,
     FuelGainDict,
     InventoryDict,
     MovementDict,
@@ -57,7 +58,17 @@ from tankpit_bot.sim.world import SimWorldDict
 _TELEPORT_LANDED_SUBTYPE = 0x0C
 
 _SUPPORTED_KINDS = frozenset(
-    {"move", "shoot", "teleport", "radar", "mine", "map_open", "pickup_fuel", "pickup_equipment"}
+    {
+        "move",
+        "shoot",
+        "teleport",
+        "radar",
+        "mine",
+        "map_open",
+        "pickup_fuel",
+        "pickup_equipment",
+        "toggle_equipment",
+    }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
 
@@ -499,7 +510,30 @@ class SimServer:
         if kind == "mine":
             self._emit_mine_press(tank_id, messages, fuel_changed)
             return
+        if kind == "toggle_equipment":
+            self._emit_equipment_toggle(tank_id, command["slot"], messages)
+            return
         messages.append(build_map_data(self.world))
+
+    def _emit_equipment_toggle(
+        self, tank_id: int, slot: int, messages: list[BinaryMessage]
+    ) -> None:
+        """Flip one equipment slot and answer with the 0x74 state.
+
+        The toggle is free and server-authoritative: the response
+        carries all five enabled flags (the wire's documented
+        ``t + 5 bytes`` shape).
+
+        Args:
+            tank_id: The toggling tank.
+            slot: Equipment slot, 1-5 (out-of-range presses are the
+                client's problem and are ignored like the real UI).
+            messages: This tick's outgoing batch (appended).
+        """
+        tank = self.world["tanks"][tank_id]
+        if 1 <= slot <= len(tank["enabled"]):
+            tank["enabled"][slot - 1] = not tank["enabled"][slot - 1]
+        messages.append(EquipmentToggleDict(msg_type=0x74, enabled=list(tank["enabled"])))
 
     def advance_tick(self) -> list[BinaryMessage]:
         """Process the queue and return this tick's outgoing batch.
