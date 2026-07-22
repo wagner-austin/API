@@ -10,7 +10,9 @@ use pyo3::types::PyTuple;
 
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
-use crate::pyo3_module::array_helpers::{i64_slice_to_usize_vec, i64_to_i32, i64_to_usize};
+use crate::pyo3_module::array_helpers::{
+    i64_slice_to_u32_vec, i64_slice_to_usize_vec, i64_to_i32, i64_to_usize,
+};
 use crate::split::MonotonicConstraint;
 use crate::tree::{build_tree, BuildTreeInput, Tree, TreeBuildConfig};
 use crate::types::SplitConfig;
@@ -531,7 +533,7 @@ pub(crate) fn build_tree_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyTree
             .into())
         }
     };
-    let sample_idx = match i64_slice_to_usize_vec(idx_slice, "sample_indices") {
+    let sample_idx = match i64_slice_to_u32_vec(idx_slice, "sample_indices") {
         Ok(v) => v,
         Err(e) => return Err(e.into()),
     };
@@ -554,6 +556,12 @@ pub(crate) fn build_tree_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyTree
             .into())
         }
     };
+
+    // Python numpy sends float64; the histogram hot loop consumes f32 (see
+    // `crate::narrow::score_narrow`). Narrow at the pyo3 boundary so the rest
+    // of the Rust core is a consistent f32-input world.
+    let grad_f32: Vec<f32> = grad_slice.iter().copied().map(crate::narrow::score_narrow).collect();
+    let hess_f32: Vec<f32> = hess_slice.iter().copied().map(crate::narrow::score_narrow).collect();
 
     let bins_i64 = match bins_flat.as_slice() {
         Ok(s) => s,
@@ -614,8 +622,8 @@ pub(crate) fn build_tree_from_args(args: &Bound<'_, PyTuple>) -> PyResult<PyTree
 
     let input = BuildTreeInput {
         sample_indices: &sample_idx,
-        gradients: grad_slice,
-        hessians: hess_slice,
+        gradients: &grad_f32,
+        hessians: &hess_f32,
         bins: &bins,
         n_samples: n_samples_usize,
         n_features: n_features_usize,

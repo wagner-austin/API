@@ -111,6 +111,25 @@ pub(crate) fn i64_slice_to_usize_vec(
     convert_int_slice(slice, context)
 }
 
+/// Converts a slice of `i64` values to `Vec<u32>`.
+///
+/// Used to bridge the Python-side sample_indices numpy array (int64) to the
+/// Rust-side u32 storage (`data_size_t = int32` per lightgbm-score-t-float).
+/// Halves cache-line pressure on the hottest gathered array in the histogram
+/// loop.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::IntegerConversion`] if any value is negative or
+/// exceeds `u32::MAX` (~4.29B). ML datasets above 4B samples are out of
+/// scope for a single-node histogram GBM.
+pub(crate) fn i64_slice_to_u32_vec(
+    slice: &[i64],
+    context: &str,
+) -> Result<Vec<u32>, ClearGbmError> {
+    convert_int_slice(slice, context)
+}
+
 /// Converts a slice of `i64` values to `Vec<u8>`.
 ///
 /// Used to bridge the Python histogram binding, which receives bin

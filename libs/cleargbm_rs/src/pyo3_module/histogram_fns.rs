@@ -10,7 +10,7 @@ use pyo3::types::PyTuple;
 use crate::error::ClearGbmError;
 use crate::histogram;
 use crate::pyo3_module::array_helpers::{
-    i64_slice_to_u8_vec, i64_slice_to_usize_vec, i64_to_usize, u64_slice_to_usize_vec,
+    i64_slice_to_u32_vec, i64_slice_to_u8_vec, i64_to_usize, u64_slice_to_usize_vec,
     usize_slice_to_u64_vec,
 };
 use crate::types::HistogramBuffer;
@@ -62,7 +62,7 @@ pub(crate) fn build_histogram_rs<'py>(
             .into())
         }
     };
-    let sample_idx = match i64_slice_to_usize_vec(idx_slice, "sample_indices") {
+    let sample_idx = match i64_slice_to_u32_vec(idx_slice, "sample_indices") {
         Ok(v) => v,
         Err(e) => return Err(e.into()),
     };
@@ -106,11 +106,24 @@ pub(crate) fn build_histogram_rs<'py>(
         Err(e) => return Err(e.into()),
     };
 
+    // Python numpy sends float64; the histogram hot loop consumes f32 (see
+    // `crate::narrow::score_narrow`). Narrow at the pyo3 boundary.
+    let grad_f32: Vec<f32> = grad_slice
+        .iter()
+        .copied()
+        .map(crate::narrow::score_narrow)
+        .collect();
+    let hess_f32: Vec<f32> = hess_slice
+        .iter()
+        .copied()
+        .map(crate::narrow::score_narrow)
+        .collect();
+
     // Call the Rust core function
     let result = match histogram::build_histogram(
         &sample_idx,
-        grad_slice,
-        hess_slice,
+        &grad_f32,
+        &hess_f32,
         &bins_u8,
         n_bins_usize,
     ) {
