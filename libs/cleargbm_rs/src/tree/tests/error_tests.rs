@@ -383,10 +383,18 @@ fn test_build_tree_with_large_n_regular_bins() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
-    // Test with bin values that exceed n_bins to trigger error in build_feature_histograms.
-    // With u8 bin dtype, the maximum representable bin is 255 — set that at a sample
-    // to exceed n_regular_bins + 1 = 5.
+fn test_build_tree_bins_out_of_bounds_via_validated_hook() -> Result<(), ClearGbmError> {
+    // Bin values exceeding n_bins. The DEFAULT hook uses the trusted
+    // fast path (`build_histogram_trusted`) which assumes the caller has
+    // already validated bins by construction (FeatureBins guarantees
+    // `bin <= n_regular_bins <= 255`) — an OOB bin under the trusted
+    // hook would panic during safe indexing, not return an error,
+    // because the trusted invariant was broken by the caller. To
+    // exercise the "OOB bins bubble up as an error" path we swap in the
+    // validated `build_histogram` via `Hooks::with_histogram_builder`;
+    // that mirrors how the Python binding surfaces the same class of
+    // failure (through the validated Python-facing histogram entry
+    // point).
     let sc = match SplitConfig::new(2_usize, 1_usize, 64_usize, 0.0_f64, 0.0_f64) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -416,8 +424,9 @@ fn test_build_tree_bins_out_of_bounds() -> Result<(), ClearGbmError> {
         monotonic_constraints: None,
     };
 
-    let result = build_tree(&input, &Hooks::default());
-    // This should error due to bin out of bounds
+    let validated_hooks = Hooks::with_histogram_builder(crate::histogram::build_histogram);
+    let result = build_tree(&input, &validated_hooks);
+    // Validated hook rejects OOB bins with BinIndexOutOfBounds.
     assert!(result.is_err());
     Ok(())
 }

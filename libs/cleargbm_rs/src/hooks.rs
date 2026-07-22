@@ -71,13 +71,36 @@ pub struct Hooks {
     pub finalize_nodes_error: Option<ClearGbmError>,
 }
 
+/// Trusted-path histogram builder used by [`Hooks::default`].
+///
+/// Wraps [`crate::histogram::build_histogram_trusted`] in the fallible
+/// signature that [`Hooks::BuildHistogramFn`] demands, so the production
+/// tree-building path skips the redundant O(N) validation scan on
+/// `sample_indices` and `bins`. The tree builder establishes those
+/// invariants by construction (see the docs on `build_histogram_trusted`).
+fn default_trusted_build_histogram(
+    sample_indices: &[usize],
+    gradients: &[f64],
+    hessians: &[f64],
+    bins: &[u8],
+    n_bins: usize,
+) -> Result<HistogramBuffer, ClearGbmError> {
+    Ok(crate::histogram::build_histogram_trusted(
+        sample_indices,
+        gradients,
+        hessians,
+        bins,
+        n_bins,
+    ))
+}
+
 impl Default for Hooks {
     /// Creates hooks with the default (real) implementations.
     ///
     /// This is what production code should use.
     fn default() -> Self {
         Self {
-            build_histogram: crate::histogram::build_histogram,
+            build_histogram: default_trusted_build_histogram,
             finalize_nodes_error: None,
         }
     }
@@ -114,7 +137,7 @@ impl Hooks {
     /// A new `Hooks` instance that will cause finalize_nodes to fail.
     pub fn with_finalize_nodes_error(error: ClearGbmError) -> Self {
         Self {
-            build_histogram: crate::histogram::build_histogram,
+            build_histogram: default_trusted_build_histogram,
             finalize_nodes_error: Some(error),
         }
     }

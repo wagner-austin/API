@@ -14,6 +14,13 @@ use crate::hooks::Hooks;
 use crate::split::{find_best_split_from_histogram, MonotonicConstraint, SplitResult};
 use crate::types::{HistogramBuffer, SplitConfig};
 
+/// Minimum per-feature work below which rayon dispatch is skipped for the
+/// serial path. Empirically, rayon's steal-work + join overhead is ~1-5µs on
+/// modern x86, and one histogram build over N samples takes ~N/2 nanoseconds
+/// with the unrolled tight loop. Below this threshold the dispatch overhead
+/// dominates the work; above it parallelism pays off.
+const RAYON_PER_FEATURE_MIN_SAMPLES: usize = 4096;
+
 /// Configuration for building feature histograms.
 pub(super) struct BuildHistogramConfig<'a> {
     /// Sample indices.
@@ -68,21 +75,28 @@ pub(super) fn build_feature_histograms(
         }
     }
 
-    let results: Vec<Result<HistogramBuffer, ClearGbmError>> = (0_usize..config.n_features)
-        .into_par_iter()
-        .map(|feat_idx| {
-            let feat_col_start = feat_idx * config.n_samples;
-            let feat_col_end = feat_col_start + config.n_samples;
-            let feat_bins = &config.bins[feat_col_start..feat_col_end];
-            (config.hooks.build_histogram)(
-                config.sample_indices,
-                config.gradients,
-                config.hessians,
-                feat_bins,
-                config.n_bins,
-            )
-        })
-        .collect();
+    let build_feat = |feat_idx: usize| -> Result<HistogramBuffer, ClearGbmError> {
+        let feat_col_start = feat_idx * config.n_samples;
+        let feat_col_end = feat_col_start + config.n_samples;
+        let feat_bins = &config.bins[feat_col_start..feat_col_end];
+        (config.hooks.build_histogram)(
+            config.sample_indices,
+            config.gradients,
+            config.hessians,
+            feat_bins,
+            config.n_bins,
+        )
+    };
+
+    let results: Vec<Result<HistogramBuffer, ClearGbmError>> =
+        if config.sample_indices.len() >= RAYON_PER_FEATURE_MIN_SAMPLES {
+            (0_usize..config.n_features)
+                .into_par_iter()
+                .map(build_feat)
+                .collect()
+        } else {
+            (0_usize..config.n_features).map(build_feat).collect()
+        };
 
     let mut histograms = Vec::with_capacity(config.n_features);
     for r in results {
@@ -176,10 +190,8 @@ pub(super) fn compute_child_histograms(
         config.right_indices
     };
 
-    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> = (0_usize
-        ..config.n_features)
-        .into_par_iter()
-        .map(|feat_idx| {
+    let build_pair =
+        |feat_idx: usize| -> Result<(HistogramBuffer, HistogramBuffer), ClearGbmError> {
             let feat_col_start = feat_idx * config.n_samples;
             let feat_col_end = feat_col_start + config.n_samples;
             let feat_bins = &config.bins[feat_col_start..feat_col_end];
@@ -211,8 +223,17 @@ pub(super) fn compute_child_histograms(
             };
 
             Ok((smaller_hist, larger_hist))
-        })
-        .collect();
+        };
+
+    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> =
+        if smaller_indices.len() >= RAYON_PER_FEATURE_MIN_SAMPLES {
+            (0_usize..config.n_features)
+                .into_par_iter()
+                .map(build_pair)
+                .collect()
+        } else {
+            (0_usize..config.n_features).map(build_pair).collect()
+        };
 
     let mut left_histograms = Vec::with_capacity(config.n_features);
     let mut right_histograms = Vec::with_capacity(config.n_features);
