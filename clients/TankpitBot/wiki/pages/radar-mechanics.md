@@ -1,10 +1,15 @@
 ---
 title: Radar Mechanics
 tags: [radar, scanning, equipment]
-related: [[viewport-frame]], [[equipment-system]], [[fuel-system]]
-sources: [see footnotes]
-fact_checked: 2026-07-06
+related:
+  - "[[viewport-frame]]"
+  - "[[equipment-system]]"
+  - "[[fuel-system]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-06"
 confidence: high
+hubs: [game-mechanics]
 ---
 
 # Radar Mechanics
@@ -81,7 +86,12 @@ One viewport sweep reveals ~10 containers. Live data: 32 pickups vs 9 dot hops i
 
 ## Equipment refill
 
-Extra radars come ONLY from equipment containers. No other source. See [[equipment-system]].[^5]
+Extra radars come from equipment containers — plus ONE measured
+exception (corpus-cracked 2026-07-22): a kill scored while your
+extra-radar count is ZERO grants a silent mercy bundle including
++1–2 radar (deterministic, 5/5 vs 0/254; see [[equipment-system]]).
+The pre-sweep "no other source" claim was falsified by that bundle —
+it held for every non-kill path.[^5]
 
 ## Machine-checked claims
 

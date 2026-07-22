@@ -1,10 +1,17 @@
 ---
 title: Viewport Shift Protocol
 tags: [protocol, viewport, wire, js-client]
-related: [[viewport-frame]], [[viewport-update-algorithm]], [[v-table-complete]], [[js-source-map]], [[executor-rejection-loops]]
-sources: [see footnotes]
-fact_checked: 2026-07-17
+related:
+  - "[[viewport-frame]]"
+  - "[[viewport-update-algorithm]]"
+  - "[[v-table-complete]]"
+  - "[[js-source-map]]"
+  - "[[executor-rejection-loops]]"
+source_paths:
+  - see footnotes
+fact_checked: "2026-07-17"
 confidence: high
+hubs: [protocol]
 ---
 
 # Viewport Shift Protocol
@@ -88,3 +95,15 @@ This is a **bot configuration choice, not a game limit**. Turning it back on req
 [^6]: State 13 documented in [[js-source-map]] §"State Machine (s field)". Handler at tpclient.pretty.js:1648-1662 dispatches `Rb` (line 1661) or `Sb` (line 1654) based on the pending scope Y and the `ga` flag.
 [^7]: `src/tankpit_bot/state/scan_coverage.py:29` — "the bot teleports the viewport is fixed until the next teleport"; `src/tankpit_bot/bot/ai/hunt_mode.py:52-53` — "viewport shifting is OFF, so walking to an edge reveals no new [tiles]".
 [^user]: user (Austin), 2026-07-17 — "auto shift doesnt center on bot every walk. it only shifts when the bot walks to a tile on the edge of the viewport. and then it recenters on bot btw." Reaffirmed: "when you walk to the edge, with auto scroll on, it will center the viewport on the bot."
+
+## Rest-state law (corpus-swept 2026-07-22)
+
+3,387 bot-session samples pairing every 0x5A origin with the self
+tank's wire position: **at rest the tank sits at exactly window
+offset (8, 8)** — the modal bin holds ~10× any other. The wide
+dispersion (offsets across and beyond the window) decodes as CLIENT
+ANIMATION LAG: server movement is instant, so the wire position
+leads the on-screen walk, and the camera follows the animation. The
+sim's centered-window model is therefore the rest-state truth, and
+since the bot only issues actions from rest, centered is behaviorally
+exact for bot play ([[physics-module-roadmap]]).

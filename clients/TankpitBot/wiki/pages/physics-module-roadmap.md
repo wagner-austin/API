@@ -64,7 +64,8 @@ an archaeology project.
   `bot/ai/teleport_cost.py::compute_teleport_fuel_cost` (the only
   clean physics module today), capacity/rank math, walk/radar costs
   implicit in planner arithmetic, surface rules in `ferry.py`,
-  reroute TTL (~12 s, boundary [11.0, 13.0]) only in the wiki.
+  reroute TTL only in the wiki (since corpus-swept 2026-07-22 to
+  12 920 ms, boundary [12.91, 12.93] s).
 - **Ledger** (`ledger/`): typed per-action outcomes with
   decision↔outcome correlation.
 - **Validation precedent**: the teleport validator (2,538 hops,
@@ -96,8 +97,8 @@ Contents (consolidate, don't invent):
   MINE_DETONATION_COST=45.
 - `capacity.py`: `fuel_capacity(rank) = 1000 + 100 * rank`; deposit
   floor 100.
-- `combat.py`: reroute TTL constant (current estimate 12_000 ms,
-  boundary [11.0, 13.0] s — mark estimate), consumption-equals-hit
+- `combat.py`: reroute TTL constant (12_920 ms, corpus-swept
+  boundary [12.91, 12.93] s — 2026-07-22), consumption-equals-hit
   rule helpers.
 - Terrain vocabulary stays in `state/types/constants.py` (already
   truth-named after 2026-07-20); physics may re-export.
@@ -425,7 +426,7 @@ work on them for free.
    terrain clips non-missile shots to the impact tile and still bills;
    damage 45/90/45/45 with armor absorbing at damage/45; victim billed
    instantly, shooter debit next tick; consumption-equals-hit.
-4. **Homing reroute** with the ~12 s TTL after 0x58
+4. **Homing reroute** with the ~12.9 s TTL after 0x58
    ([[shoot-event-format]], `REROUTE_TTL_MS`).
 5. **Teleport** ([[teleport-mechanics]]): cost floor(6×euclid) on the
    ACTUAL landing; ring-1 displacement preference E→N→W; enemy-mine
