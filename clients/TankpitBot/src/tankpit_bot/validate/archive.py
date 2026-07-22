@@ -16,7 +16,12 @@ from tankpit_bot.physics.costs import (
     SINGLE_SHOT_COST,
     WALK_COST_PER_TILE,
 )
-from tankpit_bot.physics.damage import DUAL_HIT_VICTIM_COST, SINGLE_HIT_VICTIM_COST
+from tankpit_bot.physics.damage import (
+    DUAL_HIT_VICTIM_COST,
+    HOMING_HIT_VICTIM_COST,
+    MISSILE_HIT_VICTIM_COST,
+    SINGLE_HIT_VICTIM_COST,
+)
 from tankpit_bot.validate.types import ClaimEvidenceDict
 from tankpit_bot.validate.windows import FuelWindowDict, _is_silent_window, _is_walk_window
 from tankpit_bot.validate.wire_timeline import WireTimelineDict
@@ -41,10 +46,14 @@ _FIRING_CLAIM_IDS: dict[int, str] = {
 _HIT_COSTS: dict[int, int] = {
     WEAPON_SINGLE: SINGLE_HIT_VICTIM_COST,
     WEAPON_DUAL: DUAL_HIT_VICTIM_COST,
+    WEAPON_MISSILE: MISSILE_HIT_VICTIM_COST,
+    WEAPON_HOMING: HOMING_HIT_VICTIM_COST,
 }
 _HIT_CLAIM_IDS: dict[int, str] = {
     WEAPON_SINGLE: "single-hit-victim-cost",
     WEAPON_DUAL: "dual-hit-victim-cost",
+    WEAPON_MISSILE: "missile-hit-victim-cost",
+    WEAPON_HOMING: "homing-hit-victim-cost",
 }
 
 
@@ -100,14 +109,15 @@ def validate_firing_costs(windows: list[FuelWindowDict]) -> list[ClaimEvidenceDi
 def validate_walk_cost(windows: list[FuelWindowDict]) -> ClaimEvidenceDict:
     """Re-derive the per-tile walk cost from walk EPISODES.
 
-    A walk drains fuel tile by tile across several sync windows, so
-    single windows cannot price it. An episode starts at a walk-only
-    window and extends through event-free windows until one of them
-    shows a zero delta — the drain is complete. Only SINGLE-ECHO
-    episodes are priced: a second 0x47 inside the episode means the
-    bot re-commanded mid-walk, and the first echo's full commanded
-    path was never fully stepped (archive probe 2026-07-21: every
-    multi-echo mismatch overcounted tiles, never fuel). The episode's
+    Server movement is instantaneous — the full path is billed at the
+    echo tick (wiki [[walk-mechanics]], 2026-07-21: 200/200 archive
+    episodes carry the whole cost in the echo window). The episode
+    still extends through event-free windows to a zero-delta close so
+    a debit landing on the window boundary is never split. Only
+    SINGLE-ECHO episodes are priced: a second 0x47 inside the episode
+    can be a route that never executed (position unchanged at the
+    next echo — the source of every tile-overcount in the 2026-07-21
+    probe), so multi-echo tile sums are unreliable. The episode's
     delta must equal the walk cost times the echo's step count.
     Episodes cut short by any foreign event are discarded, not judged.
 

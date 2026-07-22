@@ -152,7 +152,7 @@ def _is_silent_window(window: FuelWindowDict) -> bool:
 
     Returns:
         True when nothing happened between the two readings (the fuel
-        delta may still be negative — a walk draining tile by tile).
+        delta may still be nonzero — a debit can land one sync late).
     """
     return (
         window["walked_tiles"] == 0

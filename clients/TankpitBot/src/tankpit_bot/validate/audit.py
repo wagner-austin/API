@@ -54,6 +54,8 @@ STAMPED_PAGES: dict[str, frozenset[str]] = {
             "teleport-cost",
             "single-hit-victim-cost",
             "dual-hit-victim-cost",
+            "missile-hit-victim-cost",
+            "homing-hit-victim-cost",
             "fuel-capacity",
         }
     ),
