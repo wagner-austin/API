@@ -1,0 +1,234 @@
+//! Histogram building and split-finding used by [`super::builder`].
+//!
+//! Concentrates the per-node histogram construction — including the
+//! rayon-parallel cross-feature dispatch and the sibling-subtraction
+//! trick — and the split search that turns those histograms into a
+//! chosen `SplitResult`. This is the "histogram" half of the tree
+//! builder; the "structural" half lives in [`super::nodes`].
+
+use rayon::prelude::*;
+
+use crate::error::ClearGbmError;
+use crate::histogram::subtract_histogram;
+use crate::hooks::Hooks;
+use crate::split::{find_best_split_from_histogram, MonotonicConstraint, SplitResult};
+use crate::types::{HistogramBuffer, SplitConfig};
+
+/// Configuration for building feature histograms.
+pub(super) struct BuildHistogramConfig<'a> {
+    /// Sample indices.
+    pub(super) sample_indices: &'a [usize],
+    /// Gradients for all samples.
+    pub(super) gradients: &'a [f64],
+    /// Hessians for all samples.
+    pub(super) hessians: &'a [f64],
+    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
+    pub(super) bins: &'a [u8],
+    /// Sample count (row count of the original feature matrix).
+    pub(super) n_samples: usize,
+    /// Number of features.
+    pub(super) n_features: usize,
+    /// Number of bins.
+    pub(super) n_bins: usize,
+    /// Dependency injection hooks.
+    pub(super) hooks: &'a Hooks,
+    /// Cached histograms from parent's sibling subtraction (for 2x speedup).
+    pub(super) cached_histograms: Option<&'a [HistogramBuffer]>,
+}
+
+/// Builds histograms for all features.
+///
+/// Uses cached histograms from parent's sibling subtraction when available,
+/// otherwise builds histograms from scratch by dispatching to the histogram
+/// hook with a per-feature contiguous bin slice.
+///
+/// # Column-major fast path
+///
+/// The bins slice is column-major, so the per-feature bin column is
+/// `bins[feat_idx * n_samples..(feat_idx + 1) * n_samples]` — a contiguous
+/// `n_samples`-long byte slice. The full `sample_indices`, `gradients`, and
+/// `hessians` are threaded through directly; the histogram builder does the
+/// per-index gather. This eliminates the three per-(node, feature) allocations
+/// the pre-refactor row-major path required.
+///
+/// # Parallelism
+///
+/// Fresh histogram builds fan out across features via rayon's
+/// `into_par_iter`. Each feature's histogram is an independent walk over
+/// `sample_indices` gathering into its own bin column — no shared mutable
+/// state. Order is preserved by `map`+`collect`, so `histograms[feat_idx]`
+/// still indexes the right feature.
+pub(super) fn build_feature_histograms(
+    config: &BuildHistogramConfig<'_>,
+) -> Result<Vec<HistogramBuffer>, ClearGbmError> {
+    // Use cached histograms if available (from parent's sibling subtraction)
+    if let Some(cached) = config.cached_histograms {
+        if cached.len() == config.n_features {
+            return Ok(cached.to_vec());
+        }
+    }
+
+    let results: Vec<Result<HistogramBuffer, ClearGbmError>> = (0_usize..config.n_features)
+        .into_par_iter()
+        .map(|feat_idx| {
+            let feat_col_start = feat_idx * config.n_samples;
+            let feat_col_end = feat_col_start + config.n_samples;
+            let feat_bins = &config.bins[feat_col_start..feat_col_end];
+            (config.hooks.build_histogram)(
+                config.sample_indices,
+                config.gradients,
+                config.hessians,
+                feat_bins,
+                config.n_bins,
+            )
+        })
+        .collect();
+
+    let mut histograms = Vec::with_capacity(config.n_features);
+    for r in results {
+        match r {
+            Ok(h) => histograms.push(h),
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(histograms)
+}
+
+/// Finds best split across all features.
+pub(super) fn find_best_split_across_features_internal(
+    histograms: &[HistogramBuffer],
+    config: &SplitConfig,
+    n_regular_bins: usize,
+    monotonic_constraints: Option<&[MonotonicConstraint]>,
+) -> Result<Option<SplitResult>, ClearGbmError> {
+    let mut best_split: Option<SplitResult> = None;
+
+    for (feature_idx, histogram) in histograms.iter().enumerate() {
+        let constraint = monotonic_constraints
+            .and_then(|constraints| constraints.get(feature_idx).copied())
+            .unwrap_or(MonotonicConstraint::None);
+
+        let maybe_split = match find_best_split_from_histogram(
+            histogram,
+            feature_idx,
+            config,
+            n_regular_bins,
+            constraint,
+        ) {
+            Ok(s) => s,
+            Err(e) => return Err(e),
+        };
+
+        if let Some(split) = maybe_split {
+            let is_better = best_split
+                .as_ref()
+                .is_none_or(|current| split.gain() > current.gain());
+
+            if is_better {
+                best_split = Some(split);
+            }
+        }
+    }
+
+    Ok(best_split)
+}
+
+/// Configuration for computing child histograms.
+pub(super) struct ChildHistogramConfig<'a> {
+    /// Left child sample indices.
+    pub(super) left_indices: &'a [usize],
+    /// Right child sample indices.
+    pub(super) right_indices: &'a [usize],
+    /// Gradients for all samples.
+    pub(super) gradients: &'a [f64],
+    /// Hessians for all samples.
+    pub(super) hessians: &'a [f64],
+    /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
+    pub(super) bins: &'a [u8],
+    /// Sample count (row count of the original feature matrix).
+    pub(super) n_samples: usize,
+    /// Number of features.
+    pub(super) n_features: usize,
+    /// Number of bins.
+    pub(super) n_bins: usize,
+    /// Parent histograms.
+    pub(super) parent_histograms: &'a [HistogramBuffer],
+    /// Dependency injection hooks.
+    pub(super) hooks: &'a Hooks,
+}
+
+/// Computes child histograms using the sibling-subtraction trick.
+///
+/// Builds the smaller child's histogram from scratch, then derives the
+/// larger child by subtraction from the parent. The two-child work is
+/// parallelized across features via rayon.
+pub(super) fn compute_child_histograms(
+    config: &ChildHistogramConfig<'_>,
+) -> Result<(Vec<HistogramBuffer>, Vec<HistogramBuffer>), ClearGbmError> {
+    let n_left = config.left_indices.len();
+    let n_right = config.right_indices.len();
+    let left_is_smaller = n_left <= n_right;
+
+    let smaller_indices = if left_is_smaller {
+        config.left_indices
+    } else {
+        config.right_indices
+    };
+
+    let pairs: Vec<Result<(HistogramBuffer, HistogramBuffer), ClearGbmError>> = (0_usize
+        ..config.n_features)
+        .into_par_iter()
+        .map(|feat_idx| {
+            let feat_col_start = feat_idx * config.n_samples;
+            let feat_col_end = feat_col_start + config.n_samples;
+            let feat_bins = &config.bins[feat_col_start..feat_col_end];
+
+            let smaller_hist = match (config.hooks.build_histogram)(
+                smaller_indices,
+                config.gradients,
+                config.hessians,
+                feat_bins,
+                config.n_bins,
+            ) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
+
+            let parent_hist = match config.parent_histograms.get(feat_idx) {
+                Some(h) => h,
+                None => {
+                    return Err(ClearGbmError::FeatureIndexOutOfBounds {
+                        index: feat_idx,
+                        n_features: config.n_features,
+                    })
+                }
+            };
+
+            let larger_hist = match subtract_histogram(parent_hist, &smaller_hist) {
+                Ok(h) => h,
+                Err(e) => return Err(e),
+            };
+
+            Ok((smaller_hist, larger_hist))
+        })
+        .collect();
+
+    let mut left_histograms = Vec::with_capacity(config.n_features);
+    let mut right_histograms = Vec::with_capacity(config.n_features);
+    for pair in pairs {
+        let (smaller_hist, larger_hist) = match pair {
+            Ok(p) => p,
+            Err(e) => return Err(e),
+        };
+        if left_is_smaller {
+            left_histograms.push(smaller_hist);
+            right_histograms.push(larger_hist);
+        } else {
+            left_histograms.push(larger_hist);
+            right_histograms.push(smaller_hist);
+        }
+    }
+
+    Ok((left_histograms, right_histograms))
+}

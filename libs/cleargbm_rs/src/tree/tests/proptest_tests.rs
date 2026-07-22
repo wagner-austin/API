@@ -1,7 +1,8 @@
 //! Property-based tests using proptest for tree module.
 
 use crate::error::ClearGbmError;
-use crate::tree::builder::{compute_leaf_value, should_stop, split_samples, EPSILON};
+use crate::tree::builder::EPSILON;
+use crate::tree::nodes::{compute_leaf_value, should_stop, split_samples};
 use proptest::prop_assert;
 use proptest::prop_assert_eq;
 

@@ -3,7 +3,8 @@
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
-use crate::tree::builder::{compute_leaf_value, compute_sums, should_stop, split_samples, EPSILON};
+use crate::tree::builder::EPSILON;
+use crate::tree::nodes::{compute_leaf_value, compute_sums, should_stop, split_samples};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
 use crate::types::SplitConfig;
 

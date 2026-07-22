@@ -15,6 +15,8 @@
 //! 3. Return completed tree with all nodes
 
 mod builder;
+mod histograms;
+mod nodes;
 mod serde_impl;
 
 pub use builder::{build_tree, compute_leaf_value, BuildTreeInput};

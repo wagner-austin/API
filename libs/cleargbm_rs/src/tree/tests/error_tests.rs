@@ -3,11 +3,11 @@
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
-use crate::tree::builder::{
-    build_feature_histograms, compute_child_histograms, finalize_nodes,
-    find_best_split_across_features_internal, BuildHistogramConfig, BuildNode,
-    ChildHistogramConfig,
+use crate::tree::histograms::{
+    build_feature_histograms, compute_child_histograms,
+    find_best_split_across_features_internal, BuildHistogramConfig, ChildHistogramConfig,
 };
+use crate::tree::nodes::{finalize_nodes, BuildNode};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
 use crate::types::{HistogramBuffer, SplitConfig};
 
