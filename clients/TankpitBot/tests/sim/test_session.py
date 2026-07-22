@@ -14,12 +14,14 @@ import pytest
 from platform_core.json_utils import JSONObject, require_dict
 
 from tankpit_bot.action_lab.page_client_snapshot import decode_page_client_snapshot
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.protocol.commands import CMD_MAP_OPEN, build_query_command
 from tankpit_bot.protocol.helpers import EncodeError
+from tankpit_bot.protocol.types import DeactivationDict
 from tankpit_bot.sim.session import deliver_batch
 from tankpit_bot.sniffer.world_state import get_world_service
-from tests.sim.seam import SEAM_CLIENT_ID, boot_seam
+from tests.sim.seam import SEAM_CLIENT_ID, SEAM_ENEMY_ID, boot_seam
 
 _CLIENT = SEAM_CLIENT_ID
 
@@ -85,6 +87,33 @@ def test_production_command_service_reaches_the_sim_queue() -> None:
     assert bot._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open") is True
     assert link.sent_commands == ["map_open"]
     assert link.map_visible is True
+
+
+def test_own_deactivation_ends_the_session_through_the_production_exit() -> None:
+    """An own 0x41 raises the ``deactivated`` session exit next tick.
+
+    The wire has carried own-kill 0x41s since 2026-07-19; nothing
+    consumed them for self-death until the sim CLI showed a killed
+    bot ticking forever. The dispatch records the fact and the tick
+    loop converts it — a corpse has no decisions left.
+    """
+    bot, _server, link, _table = boot_seam()
+    for _ in range(2):
+        _tick_once(bot)
+        deliver_batch(bot._cdp_message_buffer, _server.advance_tick(), link)
+    death = DeactivationDict(
+        msg_type=0x41,
+        status=1,
+        victim_id=SEAM_CLIENT_ID,
+        promo_eligible=False,
+        killer_id=SEAM_ENEMY_ID,
+        is_mine_kill=False,
+    )
+    deliver_batch(bot._cdp_message_buffer, [death], link)
+    with pytest.raises(SessionExitError) as exit_info:
+        _tick_once(bot)
+    assert exit_info.value.reason == "deactivated"
+    assert get_world_service().self_deactivated is True
 
 
 def test_real_tick_loop_plays_a_session_against_the_sim() -> None:

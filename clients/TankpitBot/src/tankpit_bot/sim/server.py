@@ -301,9 +301,16 @@ class SimServer:
             tank_id: The commanding tank.
             command: Decoded client command.
 
+        A DEAD CLIENT's commands drop silently: the real connection
+        survives deactivation and the server simply ignores a
+        corpse's clicks (first real-terrain CLI run, 2026-07-22: the
+        enemy killed the bot and the production loop kept clicking —
+        real behavior, not a harness bug). Dead or unknown NON-client
+        tanks still raise, because only the harness can queue those.
+
         Raises:
-            SimError: For command kinds outside the current build stage
-                (laws 4-8 land in step d) or unknown/dead tanks.
+            SimError: For unsupported command kinds, unknown tanks, or
+                dead harness-driven tanks.
         """
         if command["kind"] not in _SUPPORTED_KINDS:
             raise SimError(
@@ -311,7 +318,11 @@ class SimServer:
                 "(laws 4-8 land in build step d)"
             )
         tank = self.world["tanks"].get(tank_id)
-        if tank is None or not tank["alive"]:
+        if tank is None:
+            raise SimError(f"no tank {tank_id} to command")
+        if not tank["alive"]:
+            if tank_id == self.client_id:
+                return
             raise SimError(f"no living tank {tank_id} to command")
         self._queue.append((tank_id, command))
 

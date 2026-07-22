@@ -100,6 +100,17 @@ def test_unsupported_kind_and_unknown_tank_raise() -> None:
         server.queue_command(11, _move(1, 1))
 
 
+def test_dead_client_commands_drop_silently() -> None:
+    """A corpse's clicks are ignored, not refused — the real connection
+    survives deactivation and the server simply drops them."""
+    server = _server()
+    server.world["tanks"][9]["alive"] = False
+    server.queue_command(9, _move(12, 10))
+    messages = server.advance_tick()
+    assert [m["msg_type"] for m in messages if m["msg_type"] == 0x47] == []
+    assert (server.world["tanks"][9]["x"], server.world["tanks"][9]["y"]) == (10, 10)
+
+
 def test_move_tick_emits_echo_then_fuel_sync() -> None:
     """One move: 0x47 echo with the route, then the cadence syncs.
 

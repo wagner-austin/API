@@ -443,6 +443,18 @@ def _tick_once(bot: Bot) -> None:
     if self_state is None:
         return
 
+    # 2a. The wire announced OUR OWN death (0x41, victim == self). A
+    # corpse has no decisions left — end the session through the
+    # standard exit path before any wait/decide logic can hang on
+    # responses that will never come (sim CLI 2026-07-22: a killed
+    # bot ticked forever "waiting for radar results").
+    if get_world_service().self_deactivated:
+        raise SessionExitError(
+            "deactivated",
+            f"own 0x41 received at ({self_state['x']},{self_state['y']}) "
+            f"fuel={self_state['fuel']} — tank deactivated",
+        )
+
     bot._update_state_from_world()
     if not _is_ready_for_decision(bot):
         return

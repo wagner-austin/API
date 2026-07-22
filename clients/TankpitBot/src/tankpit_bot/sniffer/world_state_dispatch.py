@@ -784,6 +784,21 @@ def _dispatch_tank_update(ws: WorldService, decoded: protocol.BinaryMessage) -> 
             # tank from analyze_threats; the position is preserved as
             # the death tile so the bot can still reason about the
             # geometry (mine-on-corpse, fuel-deposit-on-corpse, etc.).
+            self_state = ws.world_state["self_state"]
+            if self_state is not None and vid == self_state["tank_id"]:
+                # Our own 0x41 (fires for own kills too — falsified
+                # decoder blind spot fixed 2026-07-19). Record the
+                # fact; the tick loop owns the session-exit decision
+                # (dispatch also runs under replay/analysis, which
+                # must not throw mid-stream).
+                ws.self_deactivated = True
+                emit_diagnostic(
+                    diagnostic_kind="self_deactivated",
+                    origin="protocol_0x41",
+                    killer_id=kid,
+                )
+                log.info("SELF DEACTIVATED: killed by %d", kid)
+                return True
             mark_tank_killed(ws, vid)
             ws.world_state = deactivate_tank(ws.world_state, vid, browser.get_current_time_ms())
             emit_diagnostic(

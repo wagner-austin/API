@@ -17,6 +17,12 @@ analyzable reason. Three conditions are terminal:
   the pre-fix code the cascade would yield to HUNT under-armed and
   the bot would engage a fight it could not finish; ending the
   session cleanly is preferable to that loop.
+* ``deactivated`` -- the wire announced OUR OWN death (0x41 with
+  ``victim_id`` == self). Own-kill 0x41s have been decoded since
+  2026-07-19, but nothing consumed them for self-death until the
+  2026-07-22 sim CLI run showed a killed bot ticking forever,
+  waiting for radar results that can never come. Raised by the tick
+  loop, not a decision owner -- a corpse has no decisions left.
 
 ``run_tick_loop`` converts the request into the same graceful shutdown
 path as a tick-budget exit: scorecard emitted, summary written, index
@@ -27,7 +33,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-SessionExitReason = Literal["no_viable_targets", "out_of_fuel", "no_productive_collect"]
+SessionExitReason = Literal[
+    "no_viable_targets",
+    "out_of_fuel",
+    "no_productive_collect",
+    "deactivated",
+]
 
 
 class SessionExitError(Exception):

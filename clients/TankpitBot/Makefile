@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run
 
 help:
 	@Write-Host ""
@@ -19,6 +19,7 @@ help:
 	@Write-Host "  make lint                        guard + ruff + mypy"
 	@Write-Host "  make test                        pytest + coverage"
 	@Write-Host "  make audit                       re-derive wiki physics claims from the runs archive"
+	@Write-Host "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@Write-Host "  make install                     poetry install + playwright chromium"
 	@Write-Host ""
 	@Write-Host "Live action probes (need browser + accounts.json):" -ForegroundColor Yellow
@@ -233,6 +234,11 @@ audit:
 	@Write-Host "==> audit (re-derive wiki physics claims from the runs archive)" -ForegroundColor Cyan
 	poetry run tankpit-audit --stamp; if ($$LASTEXITCODE -ne 0) { Write-Host "[audit] a claim failed re-derivation" -ForegroundColor Red; exit $$LASTEXITCODE }
 	@Write-Host "[audit] every validated claim re-derived from the archive" -ForegroundColor Green
+
+sim-run:
+	@Write-Host ""
+	@Write-Host "==> sim-run (production bot vs the simulator on real terrain -- no server, no browser)" -ForegroundColor Cyan
+	poetry run tankpit-sim-run; if ($$LASTEXITCODE -ne 0) { Write-Host "[sim-run] session failed" -ForegroundColor Red; exit $$LASTEXITCODE }
 
 roundtrip:
 	@Write-Host ""

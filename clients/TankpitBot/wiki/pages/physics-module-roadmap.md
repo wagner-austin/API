@@ -765,6 +765,46 @@ Still out of the world model: ferries, movable blocks, the
 radar-zero emergency grant, and real enemy minds (the scripted
 opponent is a harness, not a model).
 
+### `make sim-run` as-built (2026-07-22): the free soak — real terrain, and production gap #4
+
+``tankpit-sim-run`` (``sim/run.py``) promotes the seam to a CLI: the
+real ``Bot`` plays a timed session against the sim on the REAL
+``field01_r.gif`` terrain (actual mountains and water shape the
+router, clipping, and displacement), with the scripted opponent
+returning fire. Artifacts: probe-channel log/events
+(``runs/probe/latest.sim.*`` — the live ``runs/bot`` archive stays
+reserved for real-server evidence), the recorded wire as a standard
+``CaptureSession`` under ``runs/sim/``, and the world's final state.
+No server, no browser, no fuel spent.
+
+The first real-terrain runs earned their keep immediately:
+
+1. **Six containers drowned**: the naive (100, 100) scenario region
+   is coastal on field01 — the bot starved among dots it could never
+   reach. Now a law: ``_require_seeds_passable`` rejects any
+   scenario seed on rock/water, loudly, and the shipped arena is a
+   verified fully-open 21x21 clearing at (216, 108), pinned against
+   the real GIF by a test.
+2. **Corpse clicks are real behavior**: the opponent killed the bot
+   and the production loop kept clicking — the real connection
+   survives deactivation, so a dead CLIENT's commands now drop
+   silently (dead harness tanks still raise ``SimError``).
+3. **Production gap #4 — a killed bot ticks forever**: own-kill
+   0x41s have been decoded since 2026-07-19, but nothing consumed
+   them for self-death — the deactivated bot sat "waiting for radar
+   results" until the round budget ran out. Now: the 0x41 dispatch
+   records ``self_deactivated`` when the victim is self (dispatch
+   must not throw — it also runs under replay), and the tick loop
+   raises the new ``deactivated`` session exit. The wire replaces
+   the DOM scrape as the self-death channel.
+4. **The bot fights with armor OFF by policy** (desired_equipment is
+   dual/homing/radar), so its effective HP is its fuel — and an
+   out-of-ammo opponent still lands unlimited 45-fuel singles, so
+   ammo seeding does not cap damage. The default scenario is tuned
+   winnable around both facts; the reference 150-round run: fight →
+   kill → refuel to cap → collect → ``no_viable_targets``, the
+   production HUNT owner's clean end.
+
 ### Step (e) as-built (2026-07-22): the verdict — soak, negative control, audit cross-check
 
 The Phase 3 instruments judge the sim, and the sim passes. Three

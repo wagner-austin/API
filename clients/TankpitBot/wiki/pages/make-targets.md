@@ -1,10 +1,14 @@
 ---
 title: Make Targets
 tags: [codebase, cli, tooling]
-related: [[module-map]], [[adding-a-probe]]
-sources: [Makefile inspection 2026-06-16]
-fact_checked: 2026-06-16
+related:
+  - "[[module-map]]"
+  - "[[adding-a-probe]]"
+source_paths:
+  - Makefile inspection 2026-06-16
+fact_checked: "2026-06-16"
 confidence: high
+hubs: [codebase]
 ---
 
 # Make Targets
@@ -26,6 +30,7 @@ confidence: high
 |--------|-------------|
 | `make bot` | Run the HFSM bot indefinitely (no timeout) |
 | `make run` | 5-minute timed session + scorecard (`TANKPIT_BOT_SESSION_SECONDS=300`) |
+| `make sim-run` | Production bot vs the simulator on real field01 terrain — no server, no browser, no fuel spent. Artifacts: `runs/probe/latest.sim.*` + `runs/sim/sim-<stamp>.capture_session.json` (standard CaptureSession — `tankpit-audit --runs-dir` can price it). `tankpit-sim-run --rounds N --no-opponent` for variants. See [[physics-module-roadmap]]. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
 
 ## Live probes (need browser + accounts.json, touches live server)
