@@ -805,6 +805,29 @@ The first real-terrain runs earned their keep immediately:
    kill → refuel to cap → collect → ``no_viable_targets``, the
    production HUNT owner's clean end.
 
+### Respawn as-built (2026-07-22): the world replenishes, players return
+
+Two laws close the finite-world problem (every session used to end
+when the map drained or the only enemy died):
+
+- **Container respawn** (``sim/spawn.py``): the archive-mined law —
+  population-seeking, ~1/min below the seeded equilibrium, always at
+  fresh tick-derived passable tiles, wire-silent
+  ([[game-economy]] "Container respawn dynamics" for the mining).
+  Server targets fix at init from the seeded stock.
+- **Opponent revival as a NEW tank id** (``sim/opponent.py`` +
+  ``SimServer.announce_tank``): the first revival reused the killed
+  id and the production bot — CORRECTLY — never re-engaged it: kill
+  suppression and registry liveness never forgive a dead id, and
+  they should not, because real respawns join with a NEW wire id
+  (that is exactly what ``persistent_tank_id`` exists to bridge).
+  The harness now activates a fresh id near the client (a
+  corner-of-the-map respawn fails HUNT's affordability gates),
+  announced by a mid-session 0x21 riding the next batch head. The
+  reference CLI run then shows the full cycle: kill → re-acquire the
+  respawned id → fight on → the documented radar death-spiral exit
+  as the session's old age.
+
 ### Step (e) as-built (2026-07-22): the verdict — soak, negative control, audit cross-check
 
 The Phase 3 instruments judge the sim, and the sim passes. Three

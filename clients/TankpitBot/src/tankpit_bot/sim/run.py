@@ -34,7 +34,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
-from tankpit_bot.sim.opponent import decide_opponent
+from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
 from tankpit_bot.sim.world import (
@@ -129,7 +129,7 @@ def make_default_sim_world() -> SimWorldDict:
         The seeded world.
     """
     world = make_sim_world(SIM_FIELD)
-    world["tanks"][SIM_CLIENT_ID] = make_sim_tank(SIM_CLIENT_ID, 2, 1, _ARENA_X, _ARENA_Y, 800)
+    world["tanks"][SIM_CLIENT_ID] = make_sim_tank(SIM_CLIENT_ID, 2, 1, _ARENA_X, _ARENA_Y, 1100)
     world["tanks"][SIM_CLIENT_ID]["counts"] = [25, 25, 25, 25, 25]
     # A winnable fight, not an execution. The bot FIGHTS WITH ARMOR
     # OFF by policy (desired_equipment is dual/homing/radar — the
@@ -244,13 +244,15 @@ def run_sim_session(
     exit_reason = "rounds_exhausted"
     exit_detail = ""
     played = 0
+    enemy_id = SIM_ENEMY_ID
     try:
         for _ in range(rounds):
             _tick_once(bot)
             if opponent:
-                opponent_command = decide_opponent(server.world, SIM_ENEMY_ID, SIM_CLIENT_ID)
+                enemy_id = maybe_revive_opponent(server, enemy_id, SIM_CLIENT_ID)
+                opponent_command = decide_opponent(server.world, enemy_id, SIM_CLIENT_ID)
                 if opponent_command is not None:
-                    server.queue_command(SIM_ENEMY_ID, opponent_command)
+                    server.queue_command(enemy_id, opponent_command)
             deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
             played += 1
     except SessionExitError as error:
@@ -267,7 +269,7 @@ def run_sim_session(
     _test_hooks.write_text(capture_path, dump_json_str(encode_capture_session(session)))
     _test_hooks.write_text(world_path, dump_json_str(encode_sim_world(server.world)))
     client = server.world["tanks"][SIM_CLIENT_ID]
-    enemy = server.world["tanks"][SIM_ENEMY_ID]
+    enemy = server.world["tanks"][enemy_id]
     return SimRunResultDict(
         stamp=run_stamp,
         rounds_played=played,

@@ -26,9 +26,24 @@ from __future__ import annotations
 from tankpit_bot.protocol.commands import CMD_MOVE, CMD_SHOOT
 from tankpit_bot.sim.actions import VIEWPORT_RADIUS
 from tankpit_bot.sim.commands import ClientCommandDict
-from tankpit_bot.sim.world import SimWorldDict
+from tankpit_bot.sim.server import SimServer
+from tankpit_bot.sim.spawn import find_open_tile_near
+from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 
 DODGE_PERIOD = 4
+
+REVIVE_DELAY_TICKS = 2
+"""Harness respawn cadence for the scripted opponent (~4 s).
+
+Real players respawn after deactivation, which is why real rooms
+never run out of targets — the exact respawn timing/placement law is
+unmeasured, so this is explicit harness policy, tuned fast enough
+that the production HUNT owner's ``no_viable_targets`` exit (a fresh
+map with no enemies) does not end every session at the first kill.
+"""
+
+_REVIVE_FUEL = 500
+_REVIVE_COUNTS = (0, 4, 0, 2, 3)
 
 
 def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> ClientCommandDict | None:
@@ -73,7 +88,57 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
     )
 
 
+def maybe_revive_opponent(server: SimServer, enemy_id: int, client_id: int) -> int:
+    """Reactivate a dead scripted opponent as a NEW tank near the client.
+
+    Real respawns join with a NEW wire tank id (``persistent_tank_id``
+    exists to bridge them), so the killed id stays a corpse and the
+    replacement activates fresh: a 0x21 identity broadcast, then the
+    per-tick 0x2E cadence, a map blip, and a 0x3D on viewport entry —
+    all through the server's existing laws. The placement stays
+    within a reachable ring band of the client because a
+    corner-of-the-map respawn fails the HUNT owner's affordability
+    gates and ends every session at the first kill.
+
+    Args:
+        server: The sim server (owns the world and the announcement).
+        enemy_id: The scripted tank currently driven by the harness.
+        client_id: The connected client (the ring-band anchor).
+
+    Returns:
+        The id of the tank the harness should drive from now on —
+        unchanged while the opponent lives or revival is not due,
+        else the freshly activated id.
+    """
+    world = server.world
+    enemy = world["tanks"][enemy_id]
+    if enemy["alive"] or world["tick"] % REVIVE_DELAY_TICKS != 0:
+        return enemy_id
+    client = world["tanks"][client_id]
+    position = find_open_tile_near(
+        world,
+        server.terrain,
+        client["x"],
+        client["y"],
+        world["tick"],
+        min_radius=6,
+        max_radius=24,
+    )
+    if position is None:
+        return enemy_id
+    new_id = max(world["tanks"]) + 1
+    replacement = make_sim_tank(
+        new_id, enemy["team"], enemy["rank"], position[0], position[1], _REVIVE_FUEL
+    )
+    replacement["counts"] = list(_REVIVE_COUNTS)
+    world["tanks"][new_id] = replacement
+    server.announce_tank(new_id)
+    return new_id
+
+
 __all__ = [
     "DODGE_PERIOD",
+    "REVIVE_DELAY_TICKS",
     "decide_opponent",
+    "maybe_revive_opponent",
 ]

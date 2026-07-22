@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.sim.opponent import decide_opponent
+from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -91,6 +91,47 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     )
     ghost = server.advance_tick()
     assert [m for m in ghost if m["msg_type"] == 0x52] == []
+
+
+def test_revival_activates_a_new_tank_near_the_client() -> None:
+    """A dead opponent returns as a NEW id, announced by 0x21.
+
+    Real respawns join with a fresh wire tank id (that is what
+    persistent_tank_id bridges), so the killed id stays a corpse and
+    the replacement activates within the reachable ring band.
+    """
+    world = _arena()
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    world["tanks"][11]["alive"] = False
+    world["tick"] = 2
+    new_id = maybe_revive_opponent(server, 11, 9)
+    assert new_id == 12
+    fresh = world["tanks"][12]
+    assert fresh["alive"] is True
+    assert fresh["team"] == 1
+    assert world["tanks"][11]["alive"] is False
+    reach = max(abs(fresh["x"] - 10), abs(fresh["y"] - 10))
+    assert 6 <= reach <= 24
+    batch = server.advance_tick()
+    announcement = batch[0]
+    assert announcement["msg_type"] == 0x21
+    assert announcement["tank_id"] == 12
+
+
+def test_revival_holds_while_alive_off_beat_or_sealed() -> None:
+    """No revival for the living, off the beat, or on a closed map."""
+    world = _arena()
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    world["tick"] = 2
+    assert maybe_revive_opponent(server, 11, 9) == 11
+    world["tanks"][11]["alive"] = False
+    world["tick"] = 3
+    assert maybe_revive_opponent(server, 11, 9) == 11
+    sealed = InMemoryTerrainMap(terrain_data={(x, y): "#" for x in range(256) for y in range(256)})
+    walled = SimServer(world, sealed, client_id=9)
+    world["tick"] = 4
+    assert maybe_revive_opponent(walled, 11, 9) == 11
+    assert 12 not in world["tanks"]
 
 
 def test_enemy_equipment_grant_resolves_silently() -> None:

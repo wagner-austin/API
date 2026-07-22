@@ -1,11 +1,22 @@
 ---
 title: Game Economy (Fuel, Damage, Costs)
 tags: [game, combat, fuel, economy]
-related: [[shoot-event-format]], [[mine-mechanics]], [[deactivation-format]], [[bot-behavior-contract]], [[fuel-system]]
-sources: [runs/sniff/sniff-20260620-150155 (multi-tank PvP), runs/sniff/sniff-20260620-155103 (annotated multi-pickup), runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles), user narrative cross-references 2026-06-20, tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06]
-fact_checked: 2026-07-21 (make audit: 11 claims re-derived, 22941 clean samples)
+related:
+  - "[[shoot-event-format]]"
+  - "[[mine-mechanics]]"
+  - "[[deactivation-format]]"
+  - "[[bot-behavior-contract]]"
+  - "[[fuel-system]]"
+source_paths:
+  - runs/sniff/sniff-20260620-150155 (multi-tank PvP)
+  - runs/sniff/sniff-20260620-155103 (annotated multi-pickup)
+  - runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles)
+  - user narrative cross-references 2026-06-20
+  - tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06
+fact_checked: "2026-07-21"
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
+hubs: [combat]
 ---
 
 # Game Economy
@@ -94,9 +105,36 @@ Every row matches `remaining = declared − taken` exactly.
 - Containers are **invisible by default** to non-owning players. They appear via radar reveal.
 - Bot use case: a tank at capacity can bank surplus fuel next to a defended position and reclaim it later.
 
+## Container respawn dynamics (archive-mined 2026-07-22)
+
+The world replenishes itself. Mined from 212 sessions holding 2+
+0x4C map snapshots (the 0x4C fuel-dot atlas is GLOBAL, so
+within-session diffs are true world dynamics — spawns and
+consumption by anyone):
+
+- **Steady-state population**: 569–656 fuel dots on the map
+  (mean 619); per-session spawns ≈ consumption.
+- **Spawn rate ~1.00 dots/minute below equilibrium** (605 spawns
+  over 605.7 observed minutes). A 12-minute idle session at high
+  population spawned ZERO — the rate is population-seeking, not a
+  flat timer.
+- **Spawns never reuse a consumed position**: 0/605 exact reuses;
+  587/605 appeared at entirely fresh map locations (18 merely within
+  2 tiles of a past consumption).
+- **No wire message announces a spawn** — the client discovers new
+  dots on the next map open or radar reveal.
+
+Equipment containers are invisible to the 0x4C atlas, so their
+respawn dynamics remain unmeasured. The sim ([[physics-module-roadmap]])
+implements the fuel law deterministically (seeded population as the
+target, one spawn per minute-beat at a tick-derived fresh passable
+tile, constant 300 volume as a documented assumption) and mirrors it
+for equipment on the offset beat as an assumption.
+
 ## What's still open
 
-**Nothing.** As of 2026-07-20 every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).
+Equipment-container respawn dynamics and spawn volumes (the 0x4C
+atlas carries neither). Every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).
 
 ## Machine-checked claims
 

@@ -59,6 +59,7 @@ from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.equipment import resolve_equipment_pickup
 from tankpit_bot.sim.movement import MoveOutcomeDict, process_move
+from tankpit_bot.sim.spawn import respawn_containers
 from tankpit_bot.sim.world import SimWorldDict
 
 # TeleportLanded's 1-byte body observed in production captures.
@@ -175,6 +176,13 @@ class SimServer:
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_debits: list[tuple[int, int]] = []
         self._removed_at: dict[int, int] = {}
+        self._pending_announcements: list[BinaryMessage] = []
+        # Steady-state populations for the replenishment law: the
+        # seeded world defines its own equilibrium ([[game-economy]],
+        # archive-mined 2026-07-22 — spawns replace consumption at
+        # ~1/min while below target, never above it).
+        self._fuel_target = sum(1 for c in world["containers"] if c["volume"] > 0)
+        self._equipment_target = len(world["equipment"])
         self._visible: set[int] = {
             tank_id
             for tank_id, tank in world["tanks"].items()
@@ -234,14 +242,7 @@ class SimServer:
         """
         client = self.world["tanks"][self.client_id]
         messages: list[BinaryMessage] = [
-            TankInfoDict(
-                msg_type=0x21,
-                tank_id=self.client_id,
-                team=client["team"],
-                decoration_state=bytes(4),
-                persistent_tank_id=0,
-                name=f"sim-{self.client_id}",
-            ),
+            self._identity(self.client_id),
             self._position_statement(self.client_id),
             self._viewport_update(),
             FuelGainDict(msg_type=0x44, fuel_total=client["fuel"], is_free=False, flag=1),
@@ -257,19 +258,42 @@ class SimServer:
             tank = self.world["tanks"][tank_id]
             if tank_id == self.client_id or not tank["alive"]:
                 continue
-            messages.append(
-                TankInfoDict(
-                    msg_type=0x21,
-                    tank_id=tank_id,
-                    team=tank["team"],
-                    decoration_state=bytes(4),
-                    persistent_tank_id=0,
-                    name=f"sim-{tank_id}",
-                )
-            )
+            messages.append(self._identity(tank_id))
             if tank_id in self._visible:
                 messages.append(self._position_statement(tank_id))
         return messages
+
+    def _identity(self, tank_id: int) -> TankInfoDict:
+        """Build the 0x21 identity broadcast for one tank.
+
+        Args:
+            tank_id: The announced tank.
+
+        Returns:
+            The identity message.
+        """
+        tank = self.world["tanks"][tank_id]
+        return TankInfoDict(
+            msg_type=0x21,
+            tank_id=tank_id,
+            team=tank["team"],
+            decoration_state=bytes(4),
+            persistent_tank_id=0,
+            name=f"sim-{tank_id}",
+        )
+
+    def announce_tank(self, tank_id: int) -> None:
+        """Queue a mid-session 0x21 identity broadcast (an activation).
+
+        Real respawns join with a NEW wire tank id — that is what
+        ``persistent_tank_id`` exists to bridge — and the room learns
+        the identity from the activation's 0x21. The broadcast rides
+        at the head of the next tick's batch.
+
+        Args:
+            tank_id: The newly activated tank.
+        """
+        self._pending_announcements.append(self._identity(tank_id))
 
     def _position_statement(self, tank_id: int) -> MovementResponseDict:
         """Build a 0x3D position statement for one tank.
@@ -776,7 +800,9 @@ class SimServer:
             when the client's counts changed.
         """
         self.world["tick"] += 1
-        messages: list[BinaryMessage] = []
+        respawn_containers(self.world, self.terrain, self._fuel_target, self._equipment_target)
+        messages: list[BinaryMessage] = list(self._pending_announcements)
+        self._pending_announcements = []
         ammo_changed: set[int] = set()
         self._apply_pending_debits()
         moved: set[int] = set()
