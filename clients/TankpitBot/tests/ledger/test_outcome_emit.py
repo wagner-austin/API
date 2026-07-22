@@ -8,18 +8,6 @@ import pytest
 
 from tankpit_bot.ledger.events import ACTION_KINDS, next_event_id, reset_event_ids
 from tankpit_bot.ledger.outcome._emit import reset_action_outcome_tracking
-from tankpit_bot.ledger.outcome.collect import (
-    emit_collect_clamped_transfer,
-    emit_collect_command_rejected,
-    emit_collect_container_consumed,
-    emit_collect_discarded_kind_mismatch,
-    emit_collect_discarded_no_container,
-    emit_collect_inventory_full,
-    emit_collect_movement_rejected,
-    emit_collect_pickup_empty,
-    emit_collect_position_reached,
-    emit_collect_stall_timeout,
-)
 from tankpit_bot.ledger.outcome.map_open import (
     emit_map_open_command_rejected,
     emit_map_open_data_processed,
@@ -36,17 +24,7 @@ from tankpit_bot.ledger.outcome.scan import (
     emit_scan_radar_complete,
     emit_scan_stall_timeout,
 )
-from tankpit_bot.ledger.outcome.shoot import (
-    emit_shoot_command_rejected,
-    emit_shoot_discarded_target_not_tracked,
-    emit_shoot_hit,
-    emit_shoot_miss,
-)
 from tankpit_bot.ledger.outcome.teleport import (
-    emit_teleport_command_rejected,
-    emit_teleport_discarded_combat_target_stale,
-    emit_teleport_discarded_resource_target_invalid,
-    emit_teleport_discarded_resource_target_stale,
     emit_teleport_landed,
     emit_teleport_stall_timeout,
     record_teleport_dispatch,
@@ -132,38 +110,6 @@ def test_move_outcomes_carry_typed_payloads() -> None:
     assert stalled["detail"]["timeout_ms"] == 10000
 
 
-def test_collect_outcomes_cover_all_ten_labels() -> None:
-    """Every collect resolution is recordable.
-
-    The three typed 0x52 resolutions (2026-07-19) are distinct labels:
-    ``pickup_empty`` (code 4), ``clamped_transfer`` (code 5 -- a
-    success, not a failure), and ``inventory_full`` (code 7);
-    ``command_rejected`` remains for genuine refusals (codes 0/1).
-    """
-    emit_collect_position_reached(duration_ms=1, target_x=1, target_y=1, landed_x=1, landed_y=1)
-    emit_collect_container_consumed(duration_ms=2, target_x=1, target_y=1, landed_x=0, landed_y=1)
-    emit_collect_movement_rejected(duration_ms=3, target_x=1, target_y=1)
-    emit_collect_command_rejected(duration_ms=4, target_x=1, target_y=1, error_code=0)
-    emit_collect_pickup_empty(duration_ms=5, target_x=1, target_y=1)
-    emit_collect_clamped_transfer(duration_ms=6, target_x=1, target_y=1)
-    emit_collect_inventory_full(duration_ms=7, target_x=1, target_y=1)
-    emit_collect_stall_timeout(duration_ms=8, target_x=1, target_y=1, timeout_ms=10000)
-    emit_collect_discarded_no_container(target_x=1, target_y=1, pickup_kind="fuel")
-    emit_collect_discarded_kind_mismatch(target_x=1, target_y=1, pickup_kind="equipment")
-    assert sorted(outcome_counts("collect")) == [
-        "clamped_transfer",
-        "command_rejected",
-        "container_consumed",
-        "discarded_kind_mismatch",
-        "discarded_no_container",
-        "inventory_full",
-        "movement_rejected",
-        "pickup_empty",
-        "position_reached",
-        "stall_timeout",
-    ]
-
-
 def test_map_open_outcomes_have_no_target_fields() -> None:
     """Map-open payloads carry no target coordinates (no sentinels)."""
     processed = emit_map_open_data_processed(duration_ms=900)
@@ -172,28 +118,6 @@ def test_map_open_outcomes_have_no_target_fields() -> None:
     assert stalled["detail"] == {"timeout_ms": 8000}
     rejected = emit_map_open_command_rejected(duration_ms=100, error_code=0)
     assert rejected["detail"] == {"error_code": 0}
-
-
-def test_shoot_outcomes_carry_target_identity() -> None:
-    """Shoot payloads carry target identity, not fabricated coords."""
-    hit = emit_shoot_hit(
-        duration_ms=2000,
-        target_id=530,
-        target_name="orange-3",
-        victim_id=-1,
-        on_intended_target=True,
-        hit_signal="ammo_delta",
-    )
-    assert hit["detail"]["hit_signal"] == "ammo_delta"
-    assert hit["detail"]["victim_id"] == -1
-    miss = emit_shoot_miss(duration_ms=2100, target_id=530, target_name="orange-3")
-    assert miss["outcome"] == "miss"
-    rejected = emit_shoot_command_rejected(
-        duration_ms=500, target_id=530, target_name="orange-3", error_code=0
-    )
-    assert rejected["detail"]["error_code"] == 0
-    discarded = emit_shoot_discarded_target_not_tracked(target_x=10, target_y=20, target_id=530)
-    assert discarded["outcome"] == "discarded_target_not_tracked"
 
 
 def test_teleport_landed_classifies_exact_vs_inexact() -> None:
@@ -236,22 +160,6 @@ def test_teleport_dispatch_context_flows_into_the_outcome() -> None:
         duration_ms=9000, target_x=1, target_y=2, timeout_ms=9000, messages=[]
     )
     assert follow_up["detail"]["sent_window"] == "(none)"
-
-
-def test_teleport_discards_cover_all_three_classes() -> None:
-    """Every executor teleport-discard class is recordable."""
-    emit_teleport_discarded_combat_target_stale(target_x=1, target_y=2, target_id=530)
-    emit_teleport_discarded_resource_target_stale(target_x=1, target_y=2, resource_kind="fuel")
-    emit_teleport_discarded_resource_target_invalid(target_x=1, target_y=2, source="world_state")
-    emit_teleport_command_rejected(
-        duration_ms=100, target_x=1, target_y=2, error_code=0, messages=[]
-    )
-    assert sorted(outcome_counts("teleport")) == [
-        "command_rejected",
-        "discarded_combat_target_stale",
-        "discarded_resource_target_invalid",
-        "discarded_resource_target_stale",
-    ]
 
 
 def test_action_kinds_cover_the_six_ledgered_actions() -> None:

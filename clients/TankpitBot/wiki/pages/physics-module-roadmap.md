@@ -329,9 +329,13 @@ Implemented as designed with these notes:
   increment on this foundation.
 
 
-## Parallel track (independent of phases): executor staleness audit
+## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 
-[[executor-rejection-loops]] instances #2 and #3 remain: the
+RESOLVED — see [[executor-rejection-loops]] Resolution 2026-07-21:
+all three validators deleted after unreachability proof; executor is
+pure dispatch. Original framing kept below for the record.
+
+[[executor-rejection-loops]] instances #2 and #3 remained: the
 combat-anchor position-match and the pickup-race checks guard planner
 CROSS-TICK state. End state (consistent with the mine-veto deletion):
 decision-time validation complete enough that `executor.execute` is

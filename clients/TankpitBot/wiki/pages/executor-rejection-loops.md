@@ -86,3 +86,27 @@ The structural fix is Phase 1 of [[self-observing-architecture]] — every rejec
 [^3]: `choose_combat_landing_tile` at `src/tankpit_bot/bot/ai/combat_landing.py:46-69` (line 68: `del world, self_state, terrain`); executor rejection at `src/tankpit_bot/bot/executor.py:360`; commit `4d11980b` narrowed the mine check from `world["mines"]` to `hostile_mines(world)` for same-team passability but did not consider planner-executor consistency on hostile tiles.
 [^4]: `_tracked_combat_target` at `src/tankpit_bot/bot/executor.py:371-394`, position-match at line 392; called from `_is_valid_teleport` at line 449.
 [^5]: `find_teleport_landing_tile` at `src/tankpit_bot/bot/ai/equipment_search.py:35-73`; line 62: `del start_x, start_y, blocked_mines`; five callers pass the arg (`bot/ai/movement.py:262/:391/:451/:538`, `bot/ai/equipment_search.py:146/:212/:262/:304/:380`).
+
+
+## Resolution 2026-07-21 — the class is CLOSED: executor is pure dispatch
+
+Instances #2 and #3 died the same death as #1: deletion, not feedback.
+The unreachability proof: the tick is SYNCHRONOUS (drain → decide →
+execute on one thread — `world_sync.drain_messages` is the only world
+mutation point), so nothing can change between planner-decide and
+dispatch; resource locks are normalized at `DecideCtx` construction
+with the SAME pursuability predicate selection uses (a surviving lock
+guarantees its container exists); combat releases reset the anchor to
+−1 before any veto could see it; and the teleport source check
+guarded a container source ("world_state") that no creation site can
+produce since the 0x4C map-container path was deleted. Archive
+confirmation: zero validator discards in any run since the mine fix.
+
+Deleted: `_is_valid_shoot` / `_is_valid_pickup` / `_is_valid_teleport`
+/ `_is_dispatchable` and their `_tracked_*` helpers, the six
+`emit_*_discarded_*` ledger emitters, six `discarded_*` outcome
+literals, and the ledger-audit discard analytics. Bonus mechanic
+unlocked: id-targeted shots at departed tanks now DISPATCH — the old
+shoot veto was silently blocking the reroute-TTL pursuit window
+([[shoot-event-format]]) the whole time. The AI-state persistence
+gate survives for genuine CDP dispatch failures only.

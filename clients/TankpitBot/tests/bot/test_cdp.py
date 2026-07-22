@@ -1130,11 +1130,18 @@ class TestBotEquipmentManagement:
         assert fake_cdp._sent_methods == []
         assert bot.get_state() == "IDLE"
 
-    def test_tick_once_rejected_shoot_does_not_persist_pending_shot_state(
+    def test_tick_once_untracked_shoot_dispatches_and_persists(
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """Rejected shoots do not leak speculative feedback state into AI memory."""
+        """An id-targeted shoot at an untracked tank DISPATCHES and persists.
+
+        Executor-side shoot validation was deleted 2026-07-21 (the tick
+        is synchronous, so decide-time registry truth cannot go stale
+        before dispatch) -- and id-shots at departed tanks are the
+        reroute-TTL pursuit mechanic, which the old veto silently
+        blocked. State persistence is the dispatch contract.
+        """
         import tankpit_bot.bot.ai_strategy as ai_strategy_mod
         from tankpit_bot._test_hooks import TerrainMapProtocol
         from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
@@ -1161,12 +1168,6 @@ class TestBotEquipmentManagement:
         update_inventory_from_protocol(
             get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
         )
-        # The target_id is not in the tank registry, so the executor's
-        # tank-existence race guard rejects the shoot (the tank vanished
-        # from the registry between planner-decide and dispatch). This is
-        # the only remaining executor-side shoot rejection path -- aim/tank
-        # position drift is intentional under the viewport-clamped-aim
-        # mechanic and no longer rejected.
 
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp = FakeCDPSession()
@@ -1175,7 +1176,7 @@ class TestBotEquipmentManagement:
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
         original_state = AIStateDict(**bot._ai_state)
-        rejected_state = AIStateDict(
+        dispatched_state = AIStateDict(
             **{
                 **bot._ai_state,
                 "last_shoot_ms": 12345,
@@ -1189,7 +1190,7 @@ class TestBotEquipmentManagement:
         decision = make_tick_decision(
             command=make_shoot_command(101, 100, 10),
             behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot_target", target_id=10),
-            updated_ai_state=rejected_state,
+            updated_ai_state=dispatched_state,
             desired_equipment=[],
         )
 
@@ -1222,11 +1223,120 @@ class TestBotEquipmentManagement:
         finally:
             ai_strategy_mod.decide = original_decide
 
+        _ = original_state
+        assert bot._ai_state == dispatched_state
+        assert bot._ai_state["last_shot_target_id"] == 10
+        assert bot._ai_state["combat_target_id"] == 10
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_tick_once_failed_dispatch_does_not_persist_ai_state(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """A dispatch failure (CDP-level) must not advance AI state.
+
+        Save-restore fake on executor.execute, mirroring this file's
+        ai_strategy.decide idiom: the only remaining non-dispatch path
+        is a page/CDP send failure, which has no fake knob.
+        """
+        import tankpit_bot.bot.ai_strategy as ai_strategy_mod
+        from tankpit_bot._test_hooks import TerrainMapProtocol
+        from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.combat_feedback import CombatFeedback
+        from tankpit_bot.bot.tick_loop import _tick_once
+        from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
+        from tankpit_bot.bot.types import make_shoot_command
+        from tankpit_bot.inventory import InventoryState
+        from tankpit_bot.sniffer.world_state import (
+            reset_world_state,
+            update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_protocol
+        from tankpit_bot.state.types import (
+            SelfStateDict,
+            WorldStateDict,
+        )
+        from tests.fakes import FakeCDPSession
+
+        reset_world_state()
+        update_world_state_from_position(100, 100)
+        _update_fuel_total(get_world_service(), 800)
+        update_inventory_from_protocol(
+            get_world_service(), [0, 10, 0, 0, 0], [False, True, False, False, False]
+        )
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp = FakeCDPSession()
+        bot._cdp = fake_cdp
+        bot._magic = "test_magic"
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "IDLE"
+        original_state = AIStateDict(**bot._ai_state)
+        failed_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "last_shoot_ms": 12345,
+                "last_shot_target_id": 10,
+                "last_shot_target_name": "enemy",
+                "combat_target_id": 10,
+                "combat_target_x": 101,
+                "combat_target_y": 100,
+            }
+        )
+        decision = make_tick_decision(
+            command=make_shoot_command(101, 100, 10),
+            behavior=make_behavior_score("HUNT", 800, 101, 100, "shoot_target", target_id=10),
+            updated_ai_state=failed_state,
+            desired_equipment=[],
+        )
+
+        def fake_decide(
+            world: WorldStateDict,
+            self_state: SelfStateDict,
+            ai_state: AIStateDict,
+            inventory: InventoryState,
+            timestamp_ms: int,
+            terrain: TerrainMapProtocol | None,
+            combat_feedback: CombatFeedback = "",
+            map_fuel_dots: tuple[tuple[int, int], ...] = (),
+        ) -> TickDecisionDict:
+            _ = (
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                timestamp_ms,
+                terrain,
+                combat_feedback,
+                map_fuel_dots,
+            )
+            return decision
+
+        import tankpit_bot.bot.executor as executor_mod
+        from tankpit_bot._test_hooks import BotProtocol
+
+        def failing_execute(
+            bot: BotProtocol,
+            decision: TickDecisionDict,
+            snapshot: PageClientSnapshotDict,
+        ) -> bool:
+            _ = (bot, decision, snapshot)
+            return False
+
+        original_decide = ai_strategy_mod.decide
+        original_execute = executor_mod.execute
+        try:
+            ai_strategy_mod.decide = fake_decide
+            executor_mod.execute = failing_execute
+            _tick_once(bot)
+        finally:
+            ai_strategy_mod.decide = original_decide
+            executor_mod.execute = original_execute
+
         assert bot._ai_state == original_state
         assert bot._ai_state["last_shot_target_id"] == -1
         assert bot._ai_state["combat_target_id"] == -1
-        # CDP calls: snapshot read + structure survey + shoot dispatch + overlay update.
-        assert len(fake_cdp._sent_methods) == 4
 
     def test_tick_once_dispatches_regular_radar_before_search_hop(
         self,

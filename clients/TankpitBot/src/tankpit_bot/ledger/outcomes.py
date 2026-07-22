@@ -42,9 +42,6 @@ TeleportOutcome = Literal[
     "landed_inexact",
     "command_rejected",
     "stall_timeout",
-    "discarded_combat_target_stale",
-    "discarded_resource_target_stale",
-    "discarded_resource_target_invalid",
 ]
 """Teleport resolutions. The ``discarded_*`` labels are the executor
 validation classes from the rejection-loop audit. The former
@@ -62,8 +59,6 @@ CollectOutcome = Literal[
     "clamped_transfer",
     "inventory_full",
     "stall_timeout",
-    "discarded_no_container",
-    "discarded_kind_mismatch",
 ]
 """Collect resolutions. ``discarded_no_container`` /
 ``discarded_kind_mismatch`` are the executor pickup-validation
@@ -93,7 +88,6 @@ ShootOutcome = Literal[
     "superseded",
     "miss",
     "command_rejected",
-    "discarded_target_not_tracked",
 ]
 """Shoot resolutions from the per-shot ammo-consumption ledger
 (consumption = hit, user contract 2026-07-02) plus the 0x52 rejection
@@ -109,22 +103,16 @@ ActionOutcome = Literal[
     # teleport
     "landed_exact",
     "landed_inexact",
-    "discarded_combat_target_stale",
-    "discarded_resource_target_stale",
-    "discarded_resource_target_invalid",
     # collect
     "container_consumed",
     "pickup_empty",
     "clamped_transfer",
     "inventory_full",
-    "discarded_no_container",
-    "discarded_kind_mismatch",
     # map_open
     "map_data_processed",
     # shoot
     "hit",
     "miss",
-    "discarded_target_not_tracked",
     # shared
     "command_rejected",
     "stall_timeout",

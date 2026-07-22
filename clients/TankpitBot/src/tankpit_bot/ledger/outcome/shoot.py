@@ -107,37 +107,9 @@ def emit_shoot_command_rejected(
     )
 
 
-def emit_shoot_discarded_target_not_tracked(
-    *, target_x: int, target_y: int, target_id: int
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: target id vanished from the registry.
-
-    The race guard against the tank disappearing between
-    planner-decide and dispatch -- without a tracked tank there is no
-    ``target_id`` for the server to route to.
-
-    Args:
-        target_x: Commanded aim X.
-        target_y: Commanded aim Y.
-        target_id: The untracked tank id.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="shoot",
-        outcome="discarded_target_not_tracked",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        target_id=target_id,
-    )
-
-
 __all__ = [
     "HitSignal",
     "emit_shoot_command_rejected",
-    "emit_shoot_discarded_target_not_tracked",
     "emit_shoot_hit",
     "emit_shoot_miss",
 ]

@@ -225,59 +225,10 @@ def emit_collect_stall_timeout(
     )
 
 
-def emit_collect_discarded_no_container(
-    *, target_x: int, target_y: int, pickup_kind: str
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: the target container no longer exists.
-
-    Args:
-        target_x: Requested container X.
-        target_y: Requested container Y.
-        pickup_kind: Which pickup was attempted (``fuel``/``equipment``).
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="collect",
-        outcome="discarded_no_container",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        pickup_kind=pickup_kind,
-    )
-
-
-def emit_collect_discarded_kind_mismatch(
-    *, target_x: int, target_y: int, pickup_kind: str
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: tracked container is the other kind.
-
-    Args:
-        target_x: Requested container X.
-        target_y: Requested container Y.
-        pickup_kind: Which pickup was attempted (``fuel``/``equipment``);
-            the tracked container is the opposite kind.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="collect",
-        outcome="discarded_kind_mismatch",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        pickup_kind=pickup_kind,
-    )
-
-
 __all__ = [
     "emit_collect_clamped_transfer",
     "emit_collect_command_rejected",
     "emit_collect_container_consumed",
-    "emit_collect_discarded_kind_mismatch",
-    "emit_collect_discarded_no_container",
     "emit_collect_inventory_full",
     "emit_collect_movement_rejected",
     "emit_collect_pickup_empty",

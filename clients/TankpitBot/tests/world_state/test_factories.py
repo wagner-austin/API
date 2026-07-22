@@ -169,3 +169,16 @@ class TestMakeSelfState:
         assert self_state["rank"] == 5
         assert self_state["fuel"] == 750
         assert self_state["leaderboard_position"] == 10
+
+
+def test_world_state_source_maps_to_world_state_refresh_kind() -> None:
+    """The EntitySource fallback resolves to the world_state refresh kind.
+
+    No production container path creates this source anymore (the 0x4C
+    map-container path was deleted); the mapping stays total so the
+    literal domain has no unhandled member.
+    """
+    from tankpit_bot.state.types import make_container_state
+
+    container = make_container_state(10, 20, True, 300, source="world_state")
+    assert container["refresh_kind"] == "world_state"

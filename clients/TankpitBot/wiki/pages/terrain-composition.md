@@ -149,18 +149,18 @@ navigated all of them without incident. Longest identical-decision
 run: 13 consecutive shoot commands at one target — sustained combat,
 not a stall.
 
-## What the executor still validates (open)
+## What the executor still validates (RESOLVED 2026-07-21)
 
 `_is_valid_pickup` (container gone / kind mismatch), `_is_valid_shoot`
 (target no longer tracked), `_is_valid_teleport` (stale combat or
 resource anchors). These guard the planner's **cross-tick carried
 state** (locks and anchors that can outlive their world-state
 justification), not same-snapshot physics — a different problem from
-the one this page closes. They are instances #2 and #3 of
-[[executor-rejection-loops]] and await their own audit; the intended
-end state ([[self-observing-architecture]] Phase 1 direction, restated
-2026-07-20) is decision-time validation complete enough that the
-executor is pure dispatch.
+the one this page closes. They were instances #2 and #3 of [[executor-rejection-loops]] and
+were deleted 2026-07-21 after their unreachability was proven
+(synchronous tick + decide-time lock normalization + impossible
+source value). The executor is now pure dispatch — the end state
+[[self-observing-architecture]] Phase 1 named.
 
 [^1]: Loop capture: `runs/bot/bot-20260720-165935.events.jsonl` ticks 128–150 — 23 × `hop_selected` (37,153) → `action_outcome outcome=discarded_hostile_mine duration_ms=0`, fuel and inventory unchanged throughout.
 [^2]: Verification soak: `runs/bot/bot-20260720-192320.events.jsonl` (latest.* at time of writing); analyzer output "no top-level issues detected"; discard/error/replan counts measured by direct event scan 2026-07-20.

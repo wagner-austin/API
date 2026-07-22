@@ -12,7 +12,7 @@ expected-vs-actual verdict (the ratchet rule):
   surfaced per action kind instead of buried in one diagnostic.
 * ``rejection_retry_loop`` -- the executor-rejection silent-loop class
   (wiki [[executor-rejection-loops]]): the same target rejected or
-  discarded repeatedly means replanning is not learning.
+  churning repeatedly means replanning is not learning.
 * ``tick_cadence_gap`` -- stalls the scorecard's stall counter cannot
   see (waits below the stall timeout, MAP_DATA latency spikes).
 * ``session_exit`` -- how the run ended, always surfaced.
@@ -214,33 +214,19 @@ def _classify_attempt_outcome(
 
 
 def _aggregate_findings(
-    discard_counts: dict[tuple[str, str], int],
     superseded_counts: dict[str, int],
     failures_by_target: dict[tuple[str, int, int], list[str]],
 ) -> list[FindingDict]:
     """Build the aggregate verdicts from the one-pass tallies.
 
     Args:
-        discard_counts: Executor discard counts per (kind, label).
         superseded_counts: Superseded outcome counts per kind.
         failures_by_target: Failure outcome labels per (kind, x, y).
 
     Returns:
-        Discard, churn, and retry-loop findings.
+        Churn and retry-loop findings.
     """
     findings: list[FindingDict] = []
-    for (action_kind, outcome), count in sorted(discard_counts.items()):
-        findings.append(
-            make_finding(
-                "executor_discards",
-                "warning",
-                f"executor discarded {count} {action_kind} command(s) as {outcome} "
-                "-- planner and executor disagreed about the world",
-                action_kind=action_kind,
-                outcome=outcome,
-                count=count,
-            )
-        )
     for kind, count in sorted(superseded_counts.items()):
         if count > _SUPERSEDED_CHURN_THRESHOLD:
             findings.append(
@@ -274,10 +260,9 @@ def _aggregate_findings(
 def _check_failed_attempts(
     records: list[RuntimeEventRecordDict],
 ) -> list[FindingDict]:
-    """Audit rejections, discards, stalls, and retry loops on one pass."""
+    """Audit rejections, churn, stalls, and retry loops on one pass."""
     findings: list[FindingDict] = []
     failures_by_target: dict[tuple[str, int, int], list[str]] = {}
-    discard_counts: dict[tuple[str, str], int] = {}
     superseded_counts: dict[str, int] = {}
     for record, action_kind, outcome in _outcome_rows(records):
         immediate = _classify_attempt_outcome(record, action_kind, outcome)
@@ -285,9 +270,6 @@ def _check_failed_attempts(
             findings.append(immediate)
         elif outcome == "superseded":
             superseded_counts[action_kind] = superseded_counts.get(action_kind, 0) + 1
-        elif outcome.startswith("discarded_"):
-            key = (action_kind, outcome)
-            discard_counts[key] = discard_counts.get(key, 0) + 1
         # ``clamped_transfer`` is deliberately absent: a cap-clamped
         # fuel pickup is a success (the fuel arrived), never a
         # failure signal for the retry-loop detector.
@@ -296,13 +278,13 @@ def _check_failed_attempts(
             "stall_timeout",
             "pickup_empty",
             "inventory_full",
-        ) or outcome.startswith("discarded_")
+        )
         target_x = _int_field(record, "target_x")
         target_y = _int_field(record, "target_y")
         if is_failure and target_x is not None and target_y is not None:
             target_key = (action_kind, target_x, target_y)
             failures_by_target.setdefault(target_key, []).append(outcome)
-    findings.extend(_aggregate_findings(discard_counts, superseded_counts, failures_by_target))
+    findings.extend(_aggregate_findings(superseded_counts, failures_by_target))
     return findings
 
 

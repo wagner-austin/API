@@ -16,21 +16,12 @@ from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
 from tankpit_bot.ledger.fuel_book import record_fuel_entry
 from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
-from tankpit_bot.ledger.outcome.collect import (
-    emit_collect_discarded_kind_mismatch,
-    emit_collect_discarded_no_container,
-)
-from tankpit_bot.ledger.outcome.shoot import emit_shoot_discarded_target_not_tracked
 from tankpit_bot.ledger.outcome.teleport import (
-    emit_teleport_discarded_combat_target_stale,
-    emit_teleport_discarded_resource_target_invalid,
-    emit_teleport_discarded_resource_target_stale,
     record_teleport_dispatch,
 )
 from tankpit_bot.physics.costs import RADAR_COST, teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_world_service
-from tankpit_bot.state import ContainerStateDict, TankStateDict, WorldStateDict, coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
@@ -230,183 +221,6 @@ def dispatch_command(
     return dispatched
 
 
-def _tracked_tank(world: WorldStateDict, tank_id: int) -> TankStateDict | None:
-    """Return the tracked tank for a target id when present.
-
-    Args:
-        world: Current world-state snapshot.
-        tank_id: Tank identifier from a planner command or AI state.
-
-    Returns:
-        Matching TankStateDict, or None if not tracked.
-    """
-    if tank_id <= 0:
-        return None
-    return world["tanks"].get(str(tank_id))
-
-
-def _tracked_container(
-    world: WorldStateDict,
-    x: int,
-    y: int,
-) -> ContainerStateDict | None:
-    """Return the tracked container at a coordinate when present.
-
-    Args:
-        world: Current world-state snapshot.
-        x: Container X coordinate.
-        y: Container Y coordinate.
-
-    Returns:
-        Matching ContainerStateDict, or None if absent.
-    """
-    return world["containers"].get(coord_key(x, y))
-
-
-def _is_valid_shoot(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a shoot command still has a tracked target tank.
-
-    Combat presence -- whether the target is a live tank rather than a
-    map-only afterimage -- is decided once, upstream, by the HUNT owner's
-    viewport-presence acquisition gate in :func:`analyze_threats`. The
-    executor's remaining job is a race guard against the tank vanishing
-    from the registry between planner-decide and dispatch: without a
-    tracked tank there is no ``target_id`` for the server to route to
-    and the shot would crash the wire.
-
-    ``target_id`` is the truth channel. The server picks homing from the
-    id and the seeker tracks the true target wherever it is.
-    ``target_x``/``target_y`` are a viewport-legal aim hint used by the
-    server to route to homing; under
-    :func:`~tankpit_bot.bot.ai.combat_strategy._clamp_aim_into_viewport`
-    the aim tile is deliberately clamped inside the viewport and drift
-    between the aim and the tank's current position is intentional. The
-    executor does not reject on that drift -- rejecting it silently
-    blocked every clamped homing shot in the 2026-07-06 20:47:31
-    live-run deadlock, where 26 s of client-side self-rejections
-    accumulated before the loop broke.
-
-    Args:
-        world: Current world-state snapshot.
-        command: Command selected by the planner.
-
-    Returns:
-        True when the target tank still exists in the tank registry.
-    """
-    if command["cmd_type"] != "shoot":
-        return True
-    tank = _tracked_tank(world, command["target_id"])
-    if tank is None:
-        emit_shoot_discarded_target_not_tracked(
-            target_x=command["target_x"],
-            target_y=command["target_y"],
-            target_id=command["target_id"],
-        )
-        return False
-    return True
-
-
-def _is_valid_pickup(world: WorldStateDict, command: BotCommand) -> bool:
-    """Return True when a pickup command still has a matching container.
-
-    Args:
-        world: Current world-state snapshot.
-        command: Command selected by the planner.
-
-    Returns:
-        True when the target container exists and matches the pickup kind.
-    """
-    if command["cmd_type"] == "pickup_fuel":
-        target_x = command["target_x"]
-        target_y = command["target_y"]
-        container = _tracked_container(world, target_x, target_y)
-        if container is None:
-            emit_collect_discarded_no_container(
-                target_x=target_x, target_y=target_y, pickup_kind="fuel"
-            )
-            return False
-        if not container["is_fuel"]:
-            emit_collect_discarded_kind_mismatch(
-                target_x=target_x, target_y=target_y, pickup_kind="fuel"
-            )
-            return False
-        return True
-    if command["cmd_type"] == "pickup_equipment":
-        target_x = command["target_x"]
-        target_y = command["target_y"]
-        container = _tracked_container(world, target_x, target_y)
-        if container is None:
-            emit_collect_discarded_no_container(
-                target_x=target_x, target_y=target_y, pickup_kind="equipment"
-            )
-            return False
-        if container["is_fuel"]:
-            emit_collect_discarded_kind_mismatch(
-                target_x=target_x, target_y=target_y, pickup_kind="equipment"
-            )
-            return False
-        return True
-    return True
-
-
-def _tracked_combat_target(
-    world: WorldStateDict,
-    decision: TickDecisionDict,
-) -> TankStateDict | None:
-    """Return the combat target currently locked in AI state.
-
-    Args:
-        world: Current world-state snapshot.
-        decision: Planner decision under execution.
-
-    Returns:
-        Matching tracked tank, or None if the locked combat target is absent
-        or no longer matches the AI state's coordinates.
-    """
-    ai_state = decision["updated_ai_state"]
-    target_id = ai_state["combat_target_id"]
-    if target_id == -1:
-        return None
-    tank = _tracked_tank(world, target_id)
-    if tank is None:
-        return None
-    if tank["x"] != ai_state["combat_target_x"] or tank["y"] != ai_state["combat_target_y"]:
-        return None
-    return tank
-
-
-def _tracked_resource_target(
-    world: WorldStateDict,
-    decision: TickDecisionDict,
-) -> ContainerStateDict | None:
-    """Return the resource target currently locked in AI state.
-
-    Args:
-        world: Current world-state snapshot.
-        decision: Planner decision under execution.
-
-    Returns:
-        Matching tracked container, or None if the locked target is absent or
-        does not match the locked resource kind.
-    """
-    ai_state = decision["updated_ai_state"]
-    resource_kind = ai_state["resource_target_kind"]
-    if resource_kind == "":
-        return None
-    container = _tracked_container(
-        world,
-        ai_state["resource_target_x"],
-        ai_state["resource_target_y"],
-    )
-    if container is None:
-        return None
-    if resource_kind == "fuel" and not container["is_fuel"]:
-        return None
-    if resource_kind == "equipment" and container["is_fuel"]:
-        return None
-    return container
-
-
 _TELEPORT_DRIFT_FUEL = 36
 """Displacement drift bound for the live fuel book: the server may
 displace a landing several tiles off the requested target (mines,
@@ -433,76 +247,6 @@ def _record_teleport_fuel_entry(target_x: int, target_y: int) -> None:
         kind="teleport",
         lo=-(cost + _TELEPORT_DRIFT_FUEL),
         hi=-max(cost - _TELEPORT_DRIFT_FUEL, 0),
-    )
-
-
-def _is_valid_teleport(world: WorldStateDict, decision: TickDecisionDict) -> bool:
-    """Return True when a teleport still has a trustworthy target anchor.
-
-    Combat teleports require a currently tracked combat target with a source
-    that is valid for teleporting. Resource teleports require the locked
-    resource target to still exist and still be locally trustworthy. Search
-    hops without a locked target are allowed through unchanged.
-
-    Args:
-        world: Current world-state snapshot.
-        decision: Planner decision under execution.
-
-    Returns:
-        True when the teleport remains valid against current world state.
-    """
-    command = decision["command"]
-    if command["cmd_type"] != "teleport":
-        return True
-    behavior_mode = decision["behavior"]["mode"]
-    if behavior_mode == "HUNT":
-        combat_target = _tracked_combat_target(world, decision)
-        if decision["updated_ai_state"]["combat_target_id"] == -1:
-            return True
-        if combat_target is None:
-            emit_teleport_discarded_combat_target_stale(
-                target_x=command["target_x"],
-                target_y=command["target_y"],
-                target_id=decision["updated_ai_state"]["combat_target_id"],
-            )
-            return False
-        return True
-    resource_target = _tracked_resource_target(world, decision)
-    if decision["updated_ai_state"]["resource_target_kind"] == "":
-        return True
-    if resource_target is None:
-        emit_teleport_discarded_resource_target_stale(
-            target_x=command["target_x"],
-            target_y=command["target_y"],
-            resource_kind=decision["updated_ai_state"]["resource_target_kind"],
-        )
-        return False
-    if resource_target["source"] not in ("viewport", "radar"):
-        emit_teleport_discarded_resource_target_invalid(
-            target_x=command["target_x"],
-            target_y=command["target_y"],
-            source=resource_target["source"],
-        )
-        return False
-    return True
-
-
-def _is_dispatchable(bot: BotProtocol, decision: TickDecisionDict) -> bool:
-    """Return True when a decision survives executor-side validation.
-
-    Args:
-        bot: Bot instance providing the current world-state snapshot.
-        decision: Planner decision under execution.
-
-    Returns:
-        True when the command is still valid against current world state.
-    """
-    world = bot.get_world_state()
-    command = decision["command"]
-    return (
-        _is_valid_pickup(world, command)
-        and _is_valid_shoot(world, command)
-        and _is_valid_teleport(world, decision)
     )
 
 
@@ -558,8 +302,6 @@ def execute(
             target_y=behavior["target_y"],
             target_id=behavior["target_id"],
         )
-    if not _is_dispatchable(bot, decision):
-        return False
     primary_sent = dispatch_command(bot, command, snapshot)
     if primary_sent and decision["secondary_command"] is not None:
         secondary = decision["secondary_command"]

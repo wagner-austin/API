@@ -271,81 +271,9 @@ def emit_teleport_command_rejected(
     )
 
 
-def emit_teleport_discarded_combat_target_stale(
-    *, target_x: int, target_y: int, target_id: int
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: the locked combat target went stale.
-
-    Args:
-        target_x: Requested landing X.
-        target_y: Requested landing Y.
-        target_id: The stale combat target's tank id.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="teleport",
-        outcome="discarded_combat_target_stale",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        target_id=target_id,
-    )
-
-
-def emit_teleport_discarded_resource_target_stale(
-    *, target_x: int, target_y: int, resource_kind: str
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: the locked resource target went stale.
-
-    Args:
-        target_x: Requested landing X.
-        target_y: Requested landing Y.
-        resource_kind: The locked resource kind (``fuel``/``equipment``).
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="teleport",
-        outcome="discarded_resource_target_stale",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        resource_kind=resource_kind,
-    )
-
-
-def emit_teleport_discarded_resource_target_invalid(
-    *, target_x: int, target_y: int, source: str
-) -> ActionOutcomeRecordDict:
-    """Record an executor discard: resource target's source is untrusted.
-
-    Args:
-        target_x: Requested landing X.
-        target_y: Requested landing Y.
-        source: The container's entity source that failed the trust check.
-
-    Returns:
-        The recorded outcome.
-    """
-    return emit_action_outcome(
-        action_kind="teleport",
-        outcome="discarded_resource_target_invalid",
-        duration_ms=0,
-        target_x=target_x,
-        target_y=target_y,
-        source=source,
-    )
-
-
 __all__ = [
     "TeleportDispatchContract",
     "emit_teleport_command_rejected",
-    "emit_teleport_discarded_combat_target_stale",
-    "emit_teleport_discarded_resource_target_invalid",
-    "emit_teleport_discarded_resource_target_stale",
     "emit_teleport_landed",
     "emit_teleport_stall_timeout",
     "record_teleport_dispatch",
