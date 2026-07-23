@@ -30,10 +30,14 @@ TEAM_PURPLE = 1
 TEAM_BLUE = 2
 TEAM_ORANGE = 3
 
-DAMAGE_FULL = 0
-DAMAGE_LIGHT = 1
-DAMAGE_MEDIUM = 2
-DAMAGE_CRITICAL = 3
+# Wire damage tier = fuel quartile (corpus-fitted 2026-07-23, 19,658
+# samples, zero exceptions; [[deactivation-format]]): tier 3 is the
+# TOP quartile (healthy, lightest shade), tier 0 the bottom (near
+# death). Tanks do not heal — fuel IS the health pool.
+DAMAGE_CRITICAL = 0
+DAMAGE_MEDIUM = 1
+DAMAGE_LIGHT = 2
+DAMAGE_FULL = 3
 
 DIRECTION_DEAD_THRESHOLD = 32
 

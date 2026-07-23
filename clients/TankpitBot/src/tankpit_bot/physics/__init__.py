@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from tankpit_bot.physics.capacity import (
     DEPOSIT_FLOOR,
+    damage_tier,
     free_radar_radius,
     fuel_capacity,
     inventory_capacity,
@@ -63,6 +64,7 @@ __all__ = [
     "SINGLE_HIT_VICTIM_COST",
     "SINGLE_SHOT_COST",
     "WALK_COST_PER_TILE",
+    "damage_tier",
     "free_radar_radius",
     "fuel_capacity",
     "inventory_capacity",

@@ -49,11 +49,11 @@ class TestConstants:
         assert TEAM_ORANGE == 3
 
     def test_damage_constants(self) -> None:
-        """Verify damage state constants."""
-        assert DAMAGE_FULL == 0
-        assert DAMAGE_LIGHT == 1
-        assert DAMAGE_MEDIUM == 2
-        assert DAMAGE_CRITICAL == 3
+        """The tier is the fuel quartile: 0 = near death, 3 = full."""
+        assert DAMAGE_CRITICAL == 0
+        assert DAMAGE_MEDIUM == 1
+        assert DAMAGE_LIGHT == 2
+        assert DAMAGE_FULL == 3
 
     def test_ascii_constants(self) -> None:
         """Verify ASCII character constants."""

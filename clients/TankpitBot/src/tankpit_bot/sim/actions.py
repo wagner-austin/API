@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
-from tankpit_bot.physics.capacity import free_radar_radius
+from tankpit_bot.physics.capacity import damage_tier, free_radar_radius
 from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
 from tankpit_bot.sim.blocks import blocks_at
@@ -242,7 +242,7 @@ def build_map_data(world: SimWorldDict) -> MapDataDict:
             y=tank["y"],
             tank_id=tank["tank_id"],
             rank=tank["rank"],
-            damage=tank["damage_state"],
+            damage=damage_tier(tank["fuel"], tank["rank"]),
             team=tank["team"],
         )
         for tank_id, tank in sorted(world["tanks"].items())

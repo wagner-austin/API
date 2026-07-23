@@ -177,19 +177,23 @@ def analyze_threats(
 def _finish_priority(damage_state: int) -> int:
     """Rank a damage tier for finish-off preference, most damaged first.
 
-    The tier COUNTS DOWN toward deactivation (live run 20260610-231x:
-    every fight ran 0 -> 3 -> 2 -> 1 and all five kills with tier data
-    died from tier 1), so tier 1 is the closest to dead and tier 0
-    (full or never synced) is the least attractive.
+    The tier is the tank's FUEL QUARTILE (corpus-fitted 2026-07-23,
+    19,658 sync samples, zero exceptions — [[deactivation-format]]):
+    tier 0 is the bottom quartile (near death), tier 3 the top
+    (healthy). The June "counts down 0 -> 3 -> 2 -> 1" reading was an
+    artifact of watching fresh tanks (briefly unsynced at 0) drain
+    through 3 -> 2 -> 1; victims "died from tier 1" because the
+    killing hit took fuel below zero before a tier-0 sync could ride
+    the wire. Unknown tanks default to ``DAMAGE_FULL`` (= 3, assume
+    healthy), so the ascending tier IS the finish-off order.
 
     Args:
-        damage_state: Wire damage tier (0 = full/unsynced, 3 = light,
-            2 = medium, 1 = critical).
+        damage_state: Wire damage tier (0 = near death .. 3 = full).
 
     Returns:
         Ascending rank where the most damaged enemy ranks first.
     """
-    return 4 if damage_state == 0 else damage_state
+    return damage_state
 
 
 def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int]:

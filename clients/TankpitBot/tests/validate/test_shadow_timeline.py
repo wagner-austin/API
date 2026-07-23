@@ -42,7 +42,15 @@ def test_extracts_every_event_family() -> None:
     )
     timeline = extract_shadow_timeline(session)
     assert timeline["self_id"] == SELF_ID
-    assert timeline["syncs"] == [{"timestamp_ms": 1000, "tank_id": ENEMY_ID}]
+    assert timeline["syncs"] == [
+        {
+            "timestamp_ms": 1000,
+            "tank_id": ENEMY_ID,
+            "damage_state": 0,
+            "rank": 3,
+            "fuel": 400,
+        }
+    ]
     assert timeline["kills"] == [
         {
             "timestamp_ms": 2000,

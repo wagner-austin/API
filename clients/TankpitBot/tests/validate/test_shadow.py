@@ -33,7 +33,7 @@ def _write_capture(path: Path, session: CaptureSession) -> None:
 
 def _lawful_session() -> CaptureSession:
     messages = [identity_message(0, SELF_ID)]
-    messages.extend(sync_message(index * TICK_MS, ENEMY_ID, 3, 400) for index in range(8))
+    messages.extend(sync_message(index * TICK_MS, ENEMY_ID, 3, 400, damage=1) for index in range(8))
     messages.append(equipment_gain_message(20_000, [0, 7, 0, 0, 0], True))
     messages.append(inventory_message(20_100, [5, 12, 5, 5, 3]))
     messages.append(inventory_message(30_000, [5, 12, 5, 5, 3]))
@@ -66,6 +66,7 @@ def test_lawful_archive_passes_every_law(tmp_path: Path) -> None:
     evidence = collect_shadow_evidence(runs_root)
     by_id = {record["claim_id"]: record for record in evidence}
     assert by_id["sync-cadence"]["exact"] == 1
+    assert by_id["damage-tier"]["exact"] == 8
     assert by_id["grant-invariants"]["exact"] == 1
     assert by_id["kill-mercy-bundle"]["exact"] == 1
     assert by_id["corpse-window"]["exact"] == 1
@@ -77,7 +78,7 @@ def test_lawless_archive_fails_every_law(tmp_path: Path) -> None:
     runs_root = _make_runs(tmp_path, _lawless_session())
     evidence = collect_shadow_evidence(runs_root)
     for record in evidence:
-        assert record["mismatches"] == 1, record["claim_id"]
+        assert record["mismatches"] >= 1, record["claim_id"]
     assert run_shadow(runs_root) == 1
 
 

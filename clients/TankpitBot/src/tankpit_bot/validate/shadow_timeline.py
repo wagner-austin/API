@@ -32,10 +32,18 @@ same families arriving top-level."""
 
 
 class TankSyncEventDict(TypedDict):
-    """One per-tank 0x2E TankStatusSync (any tank, any form)."""
+    """One per-tank 0x2E TankStatusSync (any tank, any form).
+
+    ``fuel`` is None for the short form; long-form syncs carry the
+    absolute fuel alongside the damage tier — the supervised pairs
+    the damage-tier shadow law judges.
+    """
 
     timestamp_ms: int
     tank_id: int
+    damage_state: int
+    rank: int
+    fuel: int | None
 
 
 class KillEventDict(TypedDict):
@@ -145,7 +153,13 @@ def _ingest_tank_events(
         return True
     if message["msg_type"] == 0x2E:
         timeline["syncs"].append(
-            TankSyncEventDict(timestamp_ms=timestamp_ms, tank_id=message["tank_id"])
+            TankSyncEventDict(
+                timestamp_ms=timestamp_ms,
+                tank_id=message["tank_id"],
+                damage_state=message["damage_state"],
+                rank=message["rank"],
+                fuel=message["fuel"],
+            )
         )
         return True
     if message["msg_type"] == 0x58:

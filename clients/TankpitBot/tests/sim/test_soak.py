@@ -21,6 +21,7 @@ from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_d
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.types import TankStatusSyncDict
 from tankpit_bot.runtime_logging import configure_bot_runtime_logging
 from tankpit_bot.sim.opponent import decide_opponent
@@ -166,7 +167,7 @@ def test_detector_fires_on_corrupted_fuel_sync(fake_fs: FakeFileSystem) -> None:
             msg_type=0x2E,
             subtype=truth["team"],
             tank_id=SEAM_CLIENT_ID,
-            damage_state=truth["damage_state"],
+            damage_state=damage_tier(truth["fuel"], truth["rank"]),
             rank=truth["rank"],
             lb_score=0,
             promo_state=0,

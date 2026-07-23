@@ -110,7 +110,8 @@ class TankStateDict(TypedDict):
         y: Y coordinate (0-255).
         team: Team ID (0=red, 1=purple, 2=blue, 3=orange).
         rank: Military rank (0-7).
-        damage_state: Health state (0=full, 1=light, 2=medium, 3=critical).
+        damage_state: Fuel-quartile health tier (0=near death ..
+            3=full; corpus-fitted 2026-07-23, [[deactivation-format]]).
         direction: Sprite direction byte. Low nibble (0-15) = facing
             heading, high nibble carries state flags. Bit 5 (value 32)
             is the DEAD flag -- the game client sets direction to 32 or
@@ -219,7 +220,7 @@ def make_tank_state(
         y: Y coordinate (0-255).
         team: Team ID (0-3).
         rank: Military rank (0-7).
-        damage_state: Health state (0-3).
+        damage_state: Fuel-quartile health tier (0=near death .. 3=full).
         name: Player name.
         is_bot: Whether this is a bot.
         is_self: Whether this is the player's tank.

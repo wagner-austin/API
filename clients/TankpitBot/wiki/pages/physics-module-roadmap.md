@@ -1037,6 +1037,28 @@ kill and removal disqualifies the pair as slot reuse, and quits
 disqualify via 0x29), and all 17 survivors sit inside ±1 s of
 22.0 s. Gate at close: 4,852 tests, 100 % stmt+branch.
 
+### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
+
+The "healing ladder" gap died to a user correction ("tanks dont heal…
+fuel IS the health pool; mouse-over shade = HP") and a same-day
+corpus fit: **19,658/19,658** long-form 0x2E syncs obey
+``damage_tier = min(3, 4 * fuel // fuel_capacity(rank))`` — zero
+exceptions, boundaries exactly at capacity quartiles
+([[deactivation-format]], claim block + `physics/capacity.py`).
+Consequences swept through the stack in one build:
+
+- **Sim**: the hit-driven ``_DAMAGE_PROGRESSION`` state machine was
+  the WRONG model — deleted; ``SimTankDict`` no longer stores a tier
+  at all; every emission point derives it from fuel.
+- **Bot**: the ``DAMAGE_*`` constants and finish-off ordering in
+  ``bot/ai/threats.py`` were INVERTED (June's "counts down 0→3→2→1"
+  misreading) — tier 0 is now correctly the kill-shot target, and an
+  unknown tank defaults to tier 3 (assume healthy), not "full = 0".
+- **Shadow**: fifth law ``damage-tier`` re-derives the quartile fit
+  on every ``make shadow`` (19,658/19,658 on the archive).
+- The controlled live "healing measurement" session is CANCELLED —
+  nothing to measure.
+
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 
 RESOLVED — see [[executor-rejection-loops]] Resolution 2026-07-21:

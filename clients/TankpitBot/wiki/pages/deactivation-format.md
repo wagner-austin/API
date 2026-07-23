@@ -65,16 +65,65 @@ implements it as ``CORPSE_WINDOW_TICKS = 11`` at the 2 s cadence
 ([[physics-module-roadmap]]); the corpse 0x58 does NOT start the
 law-4 reroute clock — rerouting only follows LIVING departures.
 
-## Damage healing: measured but unresolved (2026-07-22)
+## SOLVED (2026-07-23): there is no healing — the damage tier IS the fuel quartile
 
-The same sweep mined every tank's damage timeline off the 2 s 0x2E
-cadence. Healing is real and starts after a quiet dwell (~6–10 s
-median at tiers 1–2 with no shots in flight), but the transitions
-jump MULTIPLE tiers per sync window (quiet heals: 1→3 ×257,
-2→3 ×199, 1→0 ×143, 2→0 ×44, single-step 1→2 only ×32) and
-full-heals from tier 3 are strangely rare (×7). The tier ladder's
-wire semantics have a subtlety (tier-0 doubles as full/unsynced)
-that the archive alone does not resolve — the healing RATE law
-needs a controlled live measurement before the sim models repair.
-The sim currently does not heal damage tiers; documented as a named
-gap.
+The 2026-07-22 "healing measured but unresolved" section below-the-fold
+was a MISREADING, corrected by the user the next day: **tanks do not
+heal over time. Fuel is the health pool**, recovered only by fuel
+pickups, and the rendered damage shade (mouse-over: lighter = more
+HP) is a pure fuel indicator.[^3]
+
+Corpus fit, same day: every 0x2E sync carrying BOTH the damage tier
+and the absolute fuel (the long form) is a supervised pair — 19,658
+samples across 246 sessions, **zero exceptions**:
+
+| tier | fuel range (rank 1, cap 1100) | meaning |
+|---|---|---|
+| 3 | 825–1100 | top quartile — healthy, lightest shade |
+| 2 | 550–824 | |
+| 1 | 275–549 | |
+| 0 | 0–274 | bottom quartile — near death, darkest |
+
+The law: ``damage_tier = min(3, 4 * fuel // fuel_capacity(rank))``
+(`physics/capacity.py:damage_tier`, claim block below; the sim
+derives the tier from fuel at every emission point and stores no
+tier state; the shadow comparator re-derives the law on every
+``make shadow``).
+
+This retro-explains every confusion in the old reading: the "quiet
+heals" (1→3 ×257, 2→3 ×199) were fuel pickups jumping quartiles;
+the "~6–10 s dwell before repair" was time-to-drive-to-a-container;
+"1→0 ×143" was fuel LOSS, not healing; June's "tiers count down
+0→3→2→1 and kills die from tier 1" was a fresh (briefly unsynced)
+tank draining 3→2→1, dying from tier 1 because the killing hit took
+fuel below zero before a tier-0 sync could broadcast. The bot-side
+consequences are real: ``DAMAGE_*`` constants and the finish-off
+ordering in ``bot/ai/threats.py`` were inverted and are now fixed —
+tier 0 is the kill-shot target, and an unknown tank defaults to
+tier 3 (assume healthy), not "full = 0".
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "damage-tier",
+      "code": "tankpit_bot.physics.capacity:damage_tier",
+      "formula": "min(3, 4 * fuel // fuel_capacity(rank))",
+      "probes": [
+        {"args": [0, 1], "expect": 0},
+        {"args": [274, 1], "expect": 0},
+        {"args": [275, 1], "expect": 1},
+        {"args": [549, 1], "expect": 1},
+        {"args": [550, 1], "expect": 2},
+        {"args": [824, 1], "expect": 2},
+        {"args": [825, 1], "expect": 3},
+        {"args": [1100, 1], "expect": 3},
+        {"args": [440, 8], "expect": 0},
+        {"args": [450, 8], "expect": 1}
+      ]
+    }
+  ]
+}
+```
+
+[^3]: user (Austin), 2026-07-23 — "tanks dont heal. they only can recover health/fuel from picking up fuel containers... when i mouse over a tank on the map, it shows them lighter more hp or darker lower hp". Corpus fit same day: 19,658 tier+fuel pairs, boundaries exactly 275/550/825 = capacity quartiles at rank 1, zero exceptions.

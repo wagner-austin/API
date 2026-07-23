@@ -77,7 +77,9 @@ def identity_message(timestamp_ms: int, tank_id: int) -> CapturedMessage:
     return frame_message(timestamp_ms, xor_encode_body(0x21, payload), "received")
 
 
-def sync_message(timestamp_ms: int, tank_id: int, rank: int, fuel: int) -> CapturedMessage:
+def sync_message(
+    timestamp_ms: int, tank_id: int, rank: int, fuel: int, damage: int = 0
+) -> CapturedMessage:
     """Build a long-form 0x2E TankStatusSync carrying an absolute fuel.
 
     Tunnel shape: the 0x2E container body repeats the 0x2E subtype
@@ -90,7 +92,7 @@ def sync_message(timestamp_ms: int, tank_id: int, rank: int, fuel: int) -> Captu
             TEAM_SELF,
             tank_id & 0xFF,
             tank_id >> 8,
-            0,
+            damage,
             rank,
             0,
             0,

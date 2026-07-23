@@ -50,6 +50,29 @@ def fuel_capacity(rank: int) -> int:
     return 1000 + 100 * rank
 
 
+def damage_tier(fuel: int, rank: int) -> int:
+    """Return the wire damage tier for a tank's fuel at the given rank.
+
+    Tanks do NOT heal over time (user correction 2026-07-23): fuel IS
+    the health pool, recovered only by pickups, and the rendered
+    damage shade is a pure fuel-quartile indicator. Corpus-fitted the
+    same day over every 0x2E sync carrying both fields (19,658
+    samples, 246 sessions, zero exceptions; all fuel-carrying syncs
+    are rank 1, boundaries exactly 275/550/825 = capacity quartiles):
+    tier 3 is the top quartile (healthy, lightest shade), tier 0 the
+    bottom (near death, darkest). Wiki: [[deactivation-format]].
+
+    Args:
+        fuel: Absolute wire fuel reading (0 through capacity).
+        rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
+
+    Returns:
+        Damage tier ``min(3, 4 * fuel // capacity)``: quartile index
+        of the fuel level, clamped so full fuel stays at tier 3.
+    """
+    return min(3, 4 * fuel // fuel_capacity(rank))
+
+
 def free_radar_radius(rank: int) -> int:
     """Return the chebyshev radius of the built-in radar at the given rank.
 
@@ -91,6 +114,7 @@ def inventory_capacity(rank: int) -> int:
 
 __all__ = [
     "DEPOSIT_FLOOR",
+    "damage_tier",
     "free_radar_radius",
     "fuel_capacity",
     "inventory_capacity",

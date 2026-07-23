@@ -21,6 +21,7 @@ from tankpit_bot.container.types import (
     MinePlacementDict,
     TeleportLandedDict,
 )
+from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_DO,
@@ -132,7 +133,7 @@ def _movement_echo(world: SimWorldDict, outcome: MoveOutcomeDict) -> MovementDic
         start_x=outcome["start_x"],
         start_y=outcome["start_y"],
         direction=0,
-        damage_state=tank["damage_state"],
+        damage_state=damage_tier(tank["fuel"], tank["rank"]),
         lb_score=0,
         rank=tank["rank"],
         flag=1,
@@ -165,7 +166,7 @@ def _status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankS
         msg_type=0x2E,
         subtype=tank["team"],
         tank_id=tank_id,
-        damage_state=tank["damage_state"],
+        damage_state=damage_tier(tank["fuel"], tank["rank"]),
         rank=tank["rank"],
         lb_score=0,
         promo_state=0,
@@ -381,7 +382,7 @@ class SimServer:
             x=tank["x"],
             y=tank["y"],
             direction=0,
-            damage_state=tank["damage_state"],
+            damage_state=damage_tier(tank["fuel"], tank["rank"]),
             rank=tank["rank"],
             lb_score=0,
             carrying=0,

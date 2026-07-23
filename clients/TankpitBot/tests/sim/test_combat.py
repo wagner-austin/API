@@ -88,7 +88,6 @@ def test_stationary_enemy_takes_a_dual_when_duals_ready() -> None:
     outcome = process_shot(world, InMemoryTerrainMap(), 9, 15, 10, _NOBODY, 0, None)
     assert outcome["weapon"] == WEAPON_DUAL
     assert world["tanks"][11]["fuel"] == 500 - 90
-    assert world["tanks"][11]["damage_state"] == 3
     assert world["tanks"][9]["counts"][SLOT_DUAL] == 4
 
 
@@ -121,29 +120,19 @@ def test_armor_fully_absorbs_at_one_shield_per_45() -> None:
     assert outcome["shields_consumed"] == 2
     assert world["tanks"][11]["counts"][SLOT_ARMOR] == 3
     assert world["tanks"][11]["fuel"] == 500
-    assert world["tanks"][11]["damage_state"] == 0
 
 
-def test_damage_progression_and_deactivation() -> None:
-    """Tiers run 0->3->2->1 and the tank dies at zero fuel."""
+def test_deactivation_at_zero_fuel() -> None:
+    """Fuel is the health pool: the tank dies when it reaches zero."""
     world = _arena()
     world["tanks"][11]["fuel"] = 90
     first = process_shot(world, InMemoryTerrainMap(), 9, 15, 10, _NOBODY, 0, None)
     assert first["victim_deactivated"] is False
-    assert world["tanks"][11]["damage_state"] == 3
+    assert world["tanks"][11]["fuel"] == 45
     second = process_shot(world, InMemoryTerrainMap(), 9, 15, 10, _NOBODY, 0, None)
     assert second["victim_deactivated"] is True
     assert world["tanks"][11]["alive"] is False
     assert world["tanks"][11]["fuel"] == 0
-    assert world["tanks"][11]["damage_state"] == 2
-
-
-def test_critical_tier_stays_critical() -> None:
-    """Tier 1 does not wrap; further hits keep the tank at 1."""
-    world = _arena()
-    world["tanks"][11]["damage_state"] = 1
-    process_shot(world, InMemoryTerrainMap(), 9, 15, 10, _NOBODY, 0, None)
-    assert world["tanks"][11]["damage_state"] == 1
 
 
 def test_shooting_a_mine_cascades_two_packets() -> None:

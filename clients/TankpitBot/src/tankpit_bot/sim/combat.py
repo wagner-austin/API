@@ -71,10 +71,6 @@ _AMMO_SLOT: dict[int, int] = {
     WEAPON_HOMING: SLOT_HOMING,
 }
 
-# Wire damage_state counts DOWN toward deactivation: 0 (full) -> 3 ->
-# 2 -> 1 (critical). Every observed kill died from tier 1.
-_DAMAGE_PROGRESSION: dict[int, int] = {0: 3, 3: 2, 2: 1, 1: 1}
-
 
 class ShotOutcomeDict(TypedDict):
     """Everything one processed shot changed.
@@ -246,8 +242,10 @@ def _apply_hit(victim: SimTankDict, weapon: int, outcome: ShotOutcomeDict) -> No
 
     Armor fully absorbs damage at one shield per 45 while shields are
     enabled and available; otherwise the victim's fuel drops by the
-    weapon's victim cost, the damage tier advances, and the tank
-    deactivates at zero fuel.
+    weapon's victim cost and the tank deactivates at zero fuel. The
+    damage tier is NOT stored state — it is the fuel quartile
+    (``physics.damage_tier``, corpus-fitted 2026-07-23), derived at
+    every emission point.
 
     Args:
         victim: The tank on the impact tile (mutated).
@@ -261,7 +259,6 @@ def _apply_hit(victim: SimTankDict, weapon: int, outcome: ShotOutcomeDict) -> No
         outcome["shields_consumed"] = shields_needed
         return
     victim["fuel"] = max(0, victim["fuel"] - damage)
-    victim["damage_state"] = _DAMAGE_PROGRESSION[victim["damage_state"]]
     if victim["fuel"] == 0:
         victim["alive"] = False
         outcome["victim_deactivated"] = True

@@ -28,8 +28,10 @@ class SimTankDict(TypedDict):
 
     ``counts``/``enabled`` mirror the five 0x49 equipment slots
     (armor, dual, missile, homing, radar). ``fuel`` is the tank's
-    absolute fuel; ``damage_state`` follows the wire convention
-    (0 = full, then 3 -> 2 -> 1 counting down toward deactivation).
+    absolute fuel — it IS the health pool; the wire damage tier is
+    not stored state but the fuel quartile, derived at emission via
+    ``physics.damage_tier`` (corpus-fitted 2026-07-23,
+    [[deactivation-format]]).
     """
 
     tank_id: int
@@ -38,7 +40,6 @@ class SimTankDict(TypedDict):
     x: int
     y: int
     fuel: int
-    damage_state: int
     counts: list[int]
     enabled: list[bool]
     alive: bool
@@ -134,7 +135,7 @@ def make_sim_tank(
         fuel: Starting fuel (clamped to capacity).
 
     Returns:
-        A live tank at full damage state.
+        A live tank.
     """
     return SimTankDict(
         tank_id=tank_id,
@@ -143,7 +144,6 @@ def make_sim_tank(
         x=x,
         y=y,
         fuel=min(fuel, fuel_capacity(rank)),
-        damage_state=0,
         counts=[0] * EQUIPMENT_SLOTS,
         enabled=[True] * EQUIPMENT_SLOTS,
         alive=True,
@@ -189,7 +189,6 @@ def encode_sim_tank(tank: SimTankDict) -> JSONObject:
         "x": tank["x"],
         "y": tank["y"],
         "fuel": tank["fuel"],
-        "damage_state": tank["damage_state"],
         "counts": list(tank["counts"]),
         "enabled": list(tank["enabled"]),
         "alive": tank["alive"],
@@ -268,7 +267,6 @@ def decode_sim_tank(data: JSONObject) -> SimTankDict:
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         fuel=require_int(data, "fuel"),
-        damage_state=require_int(data, "damage_state"),
         counts=_require_int_list(data, "counts", EQUIPMENT_SLOTS),
         enabled=_require_bool_list(data, "enabled", EQUIPMENT_SLOTS),
         alive=require_bool(data, "alive"),

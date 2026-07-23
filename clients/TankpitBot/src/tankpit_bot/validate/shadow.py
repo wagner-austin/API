@@ -27,6 +27,7 @@ from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.audit import EXACTNESS_FLOOR
 from tankpit_bot.validate.shadow_laws import (
     shadow_corpse_window,
+    shadow_damage_tier,
     shadow_grant_invariants,
     shadow_mercy_bundle,
     shadow_sync_cadence,
@@ -72,6 +73,7 @@ def collect_shadow_evidence(runs_root: Path) -> list[ClaimEvidenceDict]:
     timelines = _load_shadow_timelines(runs_root)
     return [
         shadow_sync_cadence(timelines),
+        shadow_damage_tier(timelines),
         shadow_grant_invariants(timelines),
         shadow_mercy_bundle(timelines),
         shadow_corpse_window(timelines),

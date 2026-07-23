@@ -20,6 +20,9 @@ Laws shadowed (v1):
   with amounts inside ``MERCY_BUNDLE_ROLLS``.
 - ``corpse-window``: a killed tank's 0x58 TankRemove arrives
   ``CORPSE_WINDOW_TICKS`` ticks after its 0x41.
+- ``damage-tier``: every long-form 0x2E's damage tier equals the
+  fuel quartile ``physics.damage_tier(fuel, rank)`` — tanks do not
+  heal; fuel IS the health pool (user correction 2026-07-23).
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from __future__ import annotations
 from itertools import pairwise
 from statistics import median
 
+from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.sim.equipment import (
     EQUIPMENT_CAP,
     MERCY_BUNDLE_ROLLS,
@@ -104,6 +108,39 @@ def shadow_sync_cadence(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDic
         exact=exact,
         mismatches=samples - exact,
         detail=f"per-tank median 0x2E gap within {SYNC_TOLERANCE_MS}ms of TICK_MS",
+    )
+
+
+def shadow_damage_tier(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDict:
+    """Judge every fuel-carrying sync against the fuel-quartile law.
+
+    One sample per long-form 0x2E (damage tier and absolute fuel in
+    the SAME message — perfect supervised pairs); exact when the wire
+    tier equals ``physics.damage_tier(fuel, rank)``. Corpus-fitted
+    2026-07-23: 19,658/19,658 exact, boundaries at capacity quartiles.
+
+    Args:
+        timelines: Extracted shadow timelines.
+
+    Returns:
+        Evidence for the ``damage-tier`` claim.
+    """
+    samples = 0
+    exact = 0
+    for timeline in timelines:
+        for sync in timeline["syncs"]:
+            fuel = sync["fuel"]
+            if fuel is None:
+                continue
+            samples += 1
+            if sync["damage_state"] == damage_tier(fuel, sync["rank"]):
+                exact += 1
+    return ClaimEvidenceDict(
+        claim_id="damage-tier",
+        samples=samples,
+        exact=exact,
+        mismatches=samples - exact,
+        detail="0x2E tier == fuel quartile min(3, 4*fuel // capacity(rank))",
     )
 
 
@@ -365,6 +402,7 @@ __all__ = [
     "SYNC_MIN_GAPS",
     "SYNC_TOLERANCE_MS",
     "shadow_corpse_window",
+    "shadow_damage_tier",
     "shadow_grant_invariants",
     "shadow_mercy_bundle",
     "shadow_sync_cadence",

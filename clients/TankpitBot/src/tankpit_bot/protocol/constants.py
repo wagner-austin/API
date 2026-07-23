@@ -57,7 +57,9 @@ RANK_NAMES: tuple[str, ...] = (
 # toward deactivation: live run 20260610-231x recorded every fight as
 # 0 -> 3 -> 2 -> 1 under sustained fire, and all five kills with tier
 # data died from tier 1.
-DAMAGE_NAMES: tuple[str, ...] = ("full", "critical", "medium", "light")
+# Indexed by wire damage tier = fuel quartile (corpus-fitted
+# 2026-07-23): 0 = bottom quartile (near death) .. 3 = top (healthy).
+DAMAGE_NAMES: tuple[str, ...] = ("critical", "medium", "light", "full")
 
 
 class Team(IntEnum):

@@ -11,6 +11,7 @@ from tankpit_bot.sim.equipment import MERCY_BUNDLE
 from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
 from tankpit_bot.validate.shadow_laws import (
     shadow_corpse_window,
+    shadow_damage_tier,
     shadow_grant_invariants,
     shadow_mercy_bundle,
     shadow_sync_cadence,
@@ -52,11 +53,24 @@ def _timeline(
     )
 
 
+def _sync(
+    timestamp_ms: int,
+    tank_id: int,
+    damage_state: int = 3,
+    rank: int = 1,
+    fuel: int | None = None,
+) -> TankSyncEventDict:
+    return TankSyncEventDict(
+        timestamp_ms=timestamp_ms,
+        tank_id=tank_id,
+        damage_state=damage_state,
+        rank=rank,
+        fuel=fuel,
+    )
+
+
 def _syncs(tank_id: int, start: int, gap: int, count: int) -> list[TankSyncEventDict]:
-    return [
-        TankSyncEventDict(timestamp_ms=start + index * gap, tank_id=tank_id)
-        for index in range(count)
-    ]
+    return [_sync(start + index * gap, tank_id) for index in range(count)]
 
 
 def _kill(timestamp_ms: int, victim_id: int = VICTIM_ID, killer_id: int = SELF_ID) -> KillEventDict:
@@ -309,7 +323,7 @@ class TestCorpseWindow:
         timeline = _timeline(
             kills=[_kill(10_000)],
             removals=[TankRemoveEventDict(timestamp_ms=10_000 + CORPSE_MS, tank_id=VICTIM_ID)],
-            syncs=[TankSyncEventDict(timestamp_ms=20_000, tank_id=VICTIM_ID)],
+            syncs=[_sync(20_000, VICTIM_ID)],
         )
         evidence = shadow_corpse_window([timeline])
         assert evidence["samples"] == 0
@@ -318,7 +332,37 @@ class TestCorpseWindow:
         timeline = _timeline(
             kills=[_kill(10_000)],
             removals=[TankRemoveEventDict(timestamp_ms=10_000 + CORPSE_MS, tank_id=VICTIM_ID)],
-            syncs=[TankSyncEventDict(timestamp_ms=20_000, tank_id=ENEMY_ID)],
+            syncs=[_sync(20_000, ENEMY_ID)],
         )
         evidence = shadow_corpse_window([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+
+class TestDamageTier:
+    def test_quartile_boundaries_are_exact(self) -> None:
+        timeline = _timeline(
+            syncs=[
+                _sync(0, ENEMY_ID, damage_state=0, fuel=274),
+                _sync(1000, ENEMY_ID, damage_state=1, fuel=275),
+                _sync(2000, ENEMY_ID, damage_state=2, fuel=550),
+                _sync(3000, ENEMY_ID, damage_state=3, fuel=825),
+                _sync(4000, ENEMY_ID, damage_state=3, fuel=1100),
+            ]
+        )
+        evidence = shadow_damage_tier([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (5, 5)
+
+    def test_wrong_tier_is_a_mismatch(self) -> None:
+        timeline = _timeline(syncs=[_sync(0, ENEMY_ID, damage_state=3, fuel=100)])
+        evidence = shadow_damage_tier([timeline])
+        assert evidence["mismatches"] == 1
+
+    def test_short_form_sync_is_skipped(self) -> None:
+        timeline = _timeline(syncs=[_sync(0, ENEMY_ID, damage_state=0, fuel=None)])
+        evidence = shadow_damage_tier([timeline])
+        assert evidence["samples"] == 0
+
+    def test_capacity_is_rank_derived(self) -> None:
+        timeline = _timeline(syncs=[_sync(0, ENEMY_ID, damage_state=0, rank=8, fuel=440)])
+        evidence = shadow_damage_tier([timeline])
         assert (evidence["samples"], evidence["exact"]) == (1, 1)

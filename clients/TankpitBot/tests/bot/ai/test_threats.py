@@ -198,9 +198,10 @@ class TestAnalyzeThreats:
         )
         threats = analyze_threats(world, _self_at(), now_ms=0)
         assert len(threats) == 2
-        # Both at distance 10, but tank 20 has damage_state=2 (sorted first)
-        assert threats[0]["tank_id"] == 20
-        assert threats[1]["tank_id"] == 10
+        # Both at distance 10; tank 10 is tier 0 (bottom fuel quartile,
+        # near death) so it is the finish-off target and sorts first.
+        assert threats[0]["tank_id"] == 10
+        assert threats[1]["tank_id"] == 20
 
     def test_threat_fields_populated(self) -> None:
         """All EnemyThreatDict fields are populated from tank state."""

@@ -16,6 +16,7 @@ import base64
 from tankpit_bot.bot.ai.types import make_initial_ai_state
 from tankpit_bot.bot.ai_strategy import decide
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.commands import build_move_command
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.commands import ClientCommandDict
@@ -142,7 +143,7 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90
     world = get_world_service().world_state
     assert _established_self()["fuel"] == 800
-    assert world["tanks"][str(_ENEMY)]["damage_state"] == 3
+    assert world["tanks"][str(_ENEMY)]["damage_state"] == damage_tier(500 - 90, 1)
 
 
 def test_real_planner_decides_on_sim_fed_state() -> None:

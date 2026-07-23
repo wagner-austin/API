@@ -186,7 +186,7 @@ class EnemyThreatDict(TypedDict):
         x: Enemy X coordinate.
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
-        damage_state: Health state (0=full, 1=light, 2=medium, 3=critical).
+        damage_state: Fuel-quartile health tier (0=near death .. 3=full).
         rank: Military rank (0-7). Lower rank = weaker.
         team: Enemy team id (0-3).
         name: Enemy player name.
@@ -253,7 +253,7 @@ def make_enemy_threat(
         x: Enemy X coordinate.
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
-        damage_state: Health state (0-3).
+        damage_state: Fuel-quartile health tier (0=near death .. 3=full).
         rank: Military rank (0-7).
         team: Team id (0-3).
         name: Player name.

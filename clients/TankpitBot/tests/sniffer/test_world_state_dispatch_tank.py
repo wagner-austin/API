@@ -519,7 +519,10 @@ class TestDispatchTankMessages:
             "diagnostic_kind": "tank_damage_changed",
             "tank_id": 300,
             "tank_name": "",
-            "previous_damage_state": 0,
+            # The 0x28 entry's damage byte is the dual-purpose init
+            # field and is deliberately dropped; an unobserved tier
+            # defaults to DAMAGE_FULL = 3 (assume healthy).
+            "previous_damage_state": 3,
             "damage_state": 2,
         }
 
