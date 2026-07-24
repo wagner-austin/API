@@ -9,8 +9,12 @@ archive is wrong, and both demand investigation, not softening.
 
 With ``--stamp``, rewrites the ``fact_checked:`` frontmatter line of
 each wiki page whose validated claims all passed — the stamp is
-computed from validator output, never hand-typed
-(``wiki/pages/physics-module-roadmap.md`` Phase 2).
+earned from validator output, never hand-typed
+(``wiki/pages/physics-module-roadmap.md`` Phase 2). The value is a
+bare quoted date: the wiki-check page schema rejects anything longer
+(discovered 2026-07-24 — a verbose "(make audit: ...)" suffix made
+the page fail to load); the evidence numbers live in the audit's
+stdout table and the page's footnotes instead.
 
 Era note: capture-based validators sweep ALL eras — their windows
 exclude pickups, which is where the pre-2026-06-24 double-count bug
@@ -160,7 +164,7 @@ def stamp_fact_checked(page_path: Path, stamp: str) -> bool:
     lines = page_path.read_text(encoding="utf-8").splitlines(keepends=True)
     for index, line in enumerate(lines):
         if line.startswith("fact_checked:"):
-            lines[index] = f"fact_checked: {stamp}\n"
+            lines[index] = f'fact_checked: "{stamp}"\n'
             page_path.write_text("".join(lines), encoding="utf-8")
             return True
     return False
@@ -185,12 +189,7 @@ def _stamp_pages(
         records = [by_id[claim_id] for claim_id in sorted(claim_ids) if claim_id in by_id]
         if len(records) != len(claim_ids) or not all(_passed(r) for r in records):
             continue
-        total_samples = sum(r["samples"] for r in records)
-        stamp = (
-            f"{date.today().isoformat()} "
-            f"(make audit: {len(records)} claims re-derived, {total_samples} clean samples)"
-        )
-        if stamp_fact_checked(wiki_pages_dir / page_name, stamp):
+        if stamp_fact_checked(wiki_pages_dir / page_name, date.today().isoformat()):
             stamped.append(page_name)
     return stamped
 

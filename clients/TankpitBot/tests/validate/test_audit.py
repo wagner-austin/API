@@ -124,10 +124,7 @@ def test_green_tree_passes_and_stamps(tmp_path: Path, capsys: pytest.CaptureFixt
     assert "FAIL" not in out
     assert "stamped fact_checked: game-economy.md" in out
     page_text = (wiki_dir / "game-economy.md").read_text(encoding="utf-8")
-    expected = (
-        f"fact_checked: {date.today().isoformat()} "
-        "(make audit: 12 claims re-derived, 24 clean samples)"
-    )
+    expected = f'fact_checked: "{date.today().isoformat()}"'
     assert expected in page_text
 
 
