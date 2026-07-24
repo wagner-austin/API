@@ -91,7 +91,7 @@ map programmatically and never key-closed it).[^3]
 | 0x3F | `?` | 2 | Jb | **Heartbeat/ping** (sent on game join) | `[2, '?']` |
 | 0x2E | `.` | 2 | Kb | **Ping** (latency check, sent via F6 key) | `[2, '.']` |
 | 0x21 | `!` | 2 | dc | **Keep-alive** (sent every 30s idle) | `[2, '!']` |
-| 0x72 | `r` | 3 | cc | **Hotkey action** (equipment toggle) | `[3, 'r', key_code]` — codes 49-53 for equip slots 1-5 |
+| 0x72 | `r` | 3 | cc | **Hotkey action** (equipment toggle) | `[3, 'r', key_code]` — codes 49-53 (ASCII '1'-'5') toggle slots in inventory order: 1 armor, 2 dual, 3 missile, 4 homing, 5 radar (user contract + JS trace 2026-07-24; the server holds the enabled state — a scan with extras disabled consumes nothing) |
 
 ## Connection/Settings Commands (va subclasses)
 

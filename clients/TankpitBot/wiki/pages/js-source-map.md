@@ -85,6 +85,20 @@ behavior lives in the map component's own handler, not this dispatcher.
 The bot codebase's key comments in `protocol/commands.py` ('s' radar,
 'f' map, 'e' nearest-enemy) were correct all along.[^1]
 
+Two more chains traced 2026-07-24 (user contract, verbatim: *"r uses
+the radar, "5" enables and disables it. 1 enables and disables
+armor shields, 2 dual shots, 3 missiles, 4 homing shots."*):
+**Digit1–5 → input cases 17–21 → `b-17+49` → `new cc(49..53)`** — the
+wire `'r'` hotkey command carrying the ASCII digit; slots toggle in
+inventory order (1 armor, 2 dual, 3 missile, 4 homing, 5 radar),
+confirming the user contract exactly. **KeyR → input case 4 →
+`fe(this,0)` → `new $b(0)`** — in THIS build's default map R sends
+the red-team Top-10 request (R/P/B/O → `$b(0..3)`), not a radar
+scan; the user's "r uses the radar" matches the classic binding
+(and `nh()` is only the default table — the live keymap `this.l.j`
+may be rebound), while the pinned client's default radar key is
+S.[^1]
+
 ### Game Constants (lines 31-33)
 
 ```
