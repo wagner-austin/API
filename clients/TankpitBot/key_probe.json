@@ -1,0 +1,133 @@
+{
+  "session_id": "81d1ac42-c4f3-4112-b835-170513df47e4",
+  "start_timestamp_ms": 1784935158247,
+  "end_timestamp_ms": 1784935196367,
+  "base_url": "https://tankpit.com/play",
+  "spawn_x": 131,
+  "spawn_y": 126,
+  "capture_session_path": "key_probe.capture_session.json",
+  "initial_sync_timeout_ms": 10000,
+  "startup_timing": {
+    "game_ready_timestamp_ms": 1784935167273,
+    "intel_ready_timestamp_ms": 1784935167307,
+    "initial_sync_started_ms": 1784935167307,
+    "initial_world_timestamp_ms": 1784935168954,
+    "command_ready_timestamp_ms": 1784935168957,
+    "first_attempt_started_ms": 1784935168957,
+    "game_ready_to_intel_ready_ms": 34,
+    "intel_ready_to_initial_world_ms": 1647,
+    "initial_world_to_command_ready_ms": 3,
+    "command_ready_to_first_attempt_ms": 0
+  },
+  "inter_key_delay_ms": 1500,
+  "presses": [
+    {
+      "key": "t",
+      "pressed_at_ms": 1784935168957,
+      "message_start_index": 32,
+      "message_end_index": 55
+    },
+    {
+      "key": "r",
+      "pressed_at_ms": 1784935170547,
+      "message_start_index": 55,
+      "message_end_index": 60
+    },
+    {
+      "key": "p",
+      "pressed_at_ms": 1784935172071,
+      "message_start_index": 60,
+      "message_end_index": 60
+    },
+    {
+      "key": "b",
+      "pressed_at_ms": 1784935173591,
+      "message_start_index": 60,
+      "message_end_index": 60
+    },
+    {
+      "key": "o",
+      "pressed_at_ms": 1784935175112,
+      "message_start_index": 60,
+      "message_end_index": 60
+    },
+    {
+      "key": "s",
+      "pressed_at_ms": 1784935176631,
+      "message_start_index": 60,
+      "message_end_index": 60
+    },
+    {
+      "key": "e",
+      "pressed_at_ms": 1784935178149,
+      "message_start_index": 60,
+      "message_end_index": 62
+    },
+    {
+      "key": "i",
+      "pressed_at_ms": 1784935179668,
+      "message_start_index": 62,
+      "message_end_index": 64
+    },
+    {
+      "key": "c",
+      "pressed_at_ms": 1784935181200,
+      "message_start_index": 64,
+      "message_end_index": 66
+    },
+    {
+      "key": "x",
+      "pressed_at_ms": 1784935182720,
+      "message_start_index": 66,
+      "message_end_index": 68
+    },
+    {
+      "key": "/",
+      "pressed_at_ms": 1784935184237,
+      "message_start_index": 68,
+      "message_end_index": 70
+    },
+    {
+      "key": "l",
+      "pressed_at_ms": 1784935185753,
+      "message_start_index": 70,
+      "message_end_index": 71
+    },
+    {
+      "key": "n",
+      "pressed_at_ms": 1784935187270,
+      "message_start_index": 71,
+      "message_end_index": 71
+    },
+    {
+      "key": "h",
+      "pressed_at_ms": 1784935188789,
+      "message_start_index": 71,
+      "message_end_index": 71
+    },
+    {
+      "key": "z",
+      "pressed_at_ms": 1784935190307,
+      "message_start_index": 71,
+      "message_end_index": 73
+    },
+    {
+      "key": "a",
+      "pressed_at_ms": 1784935191822,
+      "message_start_index": 73,
+      "message_end_index": 75
+    },
+    {
+      "key": "f",
+      "pressed_at_ms": 1784935193336,
+      "message_start_index": 75,
+      "message_end_index": 76
+    },
+    {
+      "key": "m",
+      "pressed_at_ms": 1784935194852,
+      "message_start_index": 76,
+      "message_end_index": 77
+    }
+  ]
+}

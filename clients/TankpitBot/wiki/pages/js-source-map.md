@@ -67,37 +67,35 @@ Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minifie
 | cc | `r` | 3 | Hotkey action: key byte |
 | dc | `!` | 2 | Keep-alive heartbeat |
 
-### Default keymap `nh()` — keys are NOT the wire chars (re-trace 2026-07-24)
+### Key bindings — EMPIRICAL table (live key probe, 2026-07-24)
 
-The June trace's Mb/Nb swap came from assuming letter-key ↔ command-char
-identity. The real chain has an arbitrary keymap in between: `nh()`
-returns `{Space:2, KeyT:3, KeyR:4, KeyP:5, KeyB:6, KeyO:7, Slash:8,
-KeyC:9, KeyI:10, KeyQ:11, KeyH:12, KeyE:13, KeyF:14, KeyX:15, KeyL:16,
-Digit1-5/Numpad1-5:17-21, KeyM:22, KeyZ:23, KeyN:24, KeyA:25, KeyS:26,
-KeyD:27, Arrows:29-32, ...}` (keydown handler passes `event.code` into
-`m.$a`, which looks the index up in this map). Verified chains: **S**
-→ 26 → `P(this,4)` → `new Mb` → wire `'f'` (radar); **F** → 14 →
-`P(this,8)` → `new Nb` → wire `'l'` (map open / zoom-out); **E** → 13
-→ `P(this,9)` → `new Xb` → wire `'h'` (nearest enemy). **KeyL is the
-sound toggle** (case 16) and never reaches the wire; **KeyM in this
-build is the tips toggle** (case 22) — the user-contract map-close 'm'
-behavior lives in the map component's own handler, not this dispatcher.
-The bot codebase's key comments in `protocol/commands.py` ('s' radar,
-'f' map, 'e' nearest-enemy) were correct all along.[^1]
+The morning's static trace of `nh()` + the minified `$a` dispatchers
+produced a WRONG map (it claimed S fires radar and R sends Top-10);
+the live key probe (`make key-probe`, one `page.keyboard.press` per
+key with per-press capture windows) falsified it the same day — the
+user's contract and the site help panel were right. Static reads of
+minified dispatch code are hypotheses, not truth; keys are resolved
+by pressing them. The measured table (sent cmd bytes decoded from
+the capture; XOR mask verified against six known commands):[^15]
 
-Two more chains traced 2026-07-24 (user contract, verbatim: *"r uses
-the radar, "5" enables and disables it. 1 enables and disables
-armor shields, 2 dual shots, 3 missiles, 4 homing shots."*):
-**Digit1–5 → input cases 17–21 → `b-17+49` → `new cc(49..53)`** — the
-wire `'r'` hotkey command carrying the ASCII digit; slots toggle in
-inventory order (1 armor, 2 dual, 3 missile, 4 homing, 5 radar),
-confirming the user contract exactly. **KeyR → input case 4 →
-`fe(this,0)` → `new $b(0)`** — in THIS build's default map R sends
-the red-team Top-10 request (R/P/B/O → `$b(0..3)`), not a radar
-scan; the user's "r uses the radar" matches the classic binding
-(and `nh()` is only the default table — the live keymap `this.l.j`
-may be rebound), while the pinned client's default radar key is
-S.[^1]
+| Key | Wire effect |
+|---|---|
+| r | sends `'f'` — RADAR scan (consumed an extra + 10 fuel) |
+| f | sends `'l'` — map open (MapData follows) |
+| e | sends `'h'` — nearest enemy |
+| i | sends `'i'` — inventory |
+| c | sends `'v'` — statistics |
+| x | sends `'*'` — active forces |
+| / | sends `'/'` — active players |
+| l | sends plaintext `V…` — sound/volume sync |
+| z | sends plaintext `C{flag}` — chat toggle (server acks with the 1-byte 0x43 chat-ack) |
+| a | sends plaintext `A{flag}` — autoscroll toggle (server acks with the short 0x41 autoscroll-ack) |
+| t, p, b, o | nothing on the wire (Top-10 prints locally on practice fields) |
+| s, n, h, m | nothing on the wire (m's map-close is client-side, per the [[client-commands]] contract) |
+
+Digit1–5 slot toggles (`cc(49..53)`, inventory order) remain as
+traced — that chain was verified against the user contract and the
+wire-visible toggle state.[^1]
 
 ### Game Constants (lines 31-33)
 
@@ -374,3 +372,4 @@ IIFE that initializes everything:[^1]
 6. **The toolbar at y=256-304** has 18 clickable regions (xc function, line 33) for map/radar/mine/scope/equipment/experience.
 
 [^1]: JS truth: `tpclient.js` on disk (blob-pinned in frontmatter) with `tpclient.pretty.js` as the readable companion — every table row and claim above carries its (class, line) locator inline, from the complete 329-line manual walk of 2026-06-19 (frontmatter `verified:` field); re-checkable by grep against the pinned file.
+[^15]: live key-probe capture `key_probe.capture_session.json` + session `key_probe.json` (2026-07-24, `make key-probe`): one press per key, per-press message windows; sent cmd bytes decoded with the session XOR mask cross-checked against six independently-known commands (radar/map/nearest/inventory/statistics/active-players). Re-run `make key-probe` to re-derive.

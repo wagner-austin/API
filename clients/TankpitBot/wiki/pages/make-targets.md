@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "1939dad607fb8cf8f5d23220d2dac67bf4a6b6a8"
+  "Makefile": "aedfc640f9a40ee1c96977eda404b56ac8e9d8bb"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]
