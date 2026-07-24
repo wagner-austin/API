@@ -132,6 +132,26 @@ and the mid-fight **teleport-off displacement modes at 16–31 tiles**
 (84/131 jumps), i.e. just past the viewport; the sim's escape band
 now matches that measured mode.[^8]
 
+**Reactivation LIVE-WITNESSED (2026-07-24, first `make respawn-watch`
+session):** the probe killed purple-2 (id 510) itself — engage at
+~11 s, return-fire singles while the tier fell 3→2→1, 0x58 removal at
+t+23.3 s, then the 0x41 kill (victim 510, killer = the probe, promo
+eligible) at t+25.3 s, one tick AFTER the removal. Eleven consecutive
+2 s map polls then show id 510 absent (corpses are not rendered in
+0x4C map data), until t+47.3 s: the SAME id reappears at (154, 216) —
+**death→respawn 22.0 s measured from the 0x41** (bounded 20.1–22.0 s
+by the poll cadence), displacement from the corpse (132,139) of 77
+tiles Chebyshev, then stationary in every subsequent poll. Every
+element of the archive-mined law — same-id reuse, the 22 s corpse
+window, ≥24-tile displacement, post-respawn idleness — confirmed
+live in one witnessed cycle.[^10]
+
+[^10]: live capture `respawn_watch_probe.capture_session.json`
+(2026-07-24, `make respawn-watch`, tank "Artax" id 1301): 0x53 bot
+return fire at 13.3–21.3 s; 0x2E tier syncs 2→1; 0x58 (id 510) at
+23.3 s; 0x41 victim=510 killer=1301 at 25.3 s; 0x4C entries for 510
+absent 25.3–45.4 s, present at (154,216) from 47.3 s onward.
+
 **First continuous undisturbed observation (2026-07-24, decisive
 watch run): ten minutes adjacent to purple-2 — the bot emitted
 NOTHING.** Zero 0x2E syncs, zero 0x47 movements, zero refuels, zero
