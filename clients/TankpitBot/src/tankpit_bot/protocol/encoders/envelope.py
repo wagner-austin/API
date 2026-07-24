@@ -132,6 +132,8 @@ def _pair_world(message: BinaryMessage) -> tuple[int, bytes] | None:
         return 0x40, encode_overlay_update(message)
     if message["msg_type"] == 0x43:
         return 0x43, encode_cache_update(message)
+    if message["msg_type"] == "chat_ack":
+        return 0x43, bytes([1 if message["enabled"] else 0])
     if message["msg_type"] == 0x4A:
         return 0x4A, encode_terrain_update(message)
     if message["msg_type"] == 0x52:

@@ -212,8 +212,16 @@ def test_cache_update_roundtrip_with_equipment_sentinel() -> None:
     """0x43 CacheUpdate restores 0xFFFF for the -1 equipment sentinel."""
     payload = bytes([10, 20]) + pack16(120) + bytes([11, 21, 0xFF, 0xFF])
     message = decode_cache_update(payload)
+    assert message["msg_type"] == 0x43
     assert message["updates"][1][2] == -1
     assert encode_message_payload(message) == payload
+
+
+def test_chat_ack_roundtrip() -> None:
+    """The 1-byte 0x43 chat-ack re-encodes its flag byte."""
+    message = decode_cache_update(bytes([1]))
+    assert message["msg_type"] == "chat_ack"
+    assert encode_message_payload(message) == bytes([1])
 
 
 def test_overlay_and_terrain_update_roundtrip() -> None:

@@ -667,3 +667,9 @@ class TestDecode0x2eMessage:
         assert result["drop_x"] == 198
         assert result["drop_y"] == 118
         assert result["obstacle_type"] == 2
+
+
+def test_cache_update_one_byte_is_the_chat_toggle_ack() -> None:
+    """The overloaded 0x43: a single flag byte is the chat-ack, not tiles."""
+    assert decode_cache_update(bytes([1])) == {"msg_type": "chat_ack", "enabled": True}
+    assert decode_cache_update(bytes([0])) == {"msg_type": "chat_ack", "enabled": False}

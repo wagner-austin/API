@@ -617,6 +617,21 @@ class CacheUpdateDict(TypedDict):
     updates: list[tuple[int, int, int]]
 
 
+class ChatAckDict(TypedDict):
+    """Chat-toggle acknowledgment (1-byte 0x43 'C' message).
+
+    The 0x43 type byte is overloaded: cache patches are 4-byte
+    entries, while the server answers a client chat toggle (Ka,
+    "C{enabled}") with a single flag byte. Discovered live
+    2026-07-24 when the key probe's Z press crashed the decode
+    pipeline; the official client's $g handler reads 4-byte entries
+    without length validation and silently mis-parses this frame.
+    """
+
+    msg_type: Literal["chat_ack"]
+    enabled: bool
+
+
 class OverlayUpdateDict(TypedDict):
     """Overlay-only tile patch (0x40 '@' message)."""
 
@@ -832,6 +847,7 @@ __all__ = [
     "BinaryMessage",
     "BuildPickupDict",
     "CacheUpdateDict",
+    "ChatAckDict",
     "ChatMessageDict",
     "ConnectionLostDict",
     "DeactivationDict",
@@ -899,6 +915,7 @@ BinaryMessage = (
     | MovementResponseDict
     | SyncDict
     | CacheUpdateDict
+    | ChatAckDict
     | OverlayUpdateDict
     | TankEntryDict
     | TankExitDict
