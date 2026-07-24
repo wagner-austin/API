@@ -16,23 +16,23 @@ hubs: [architecture]
 
 # Self-Observing Bot Architecture
 
-The tank_pit bot has been organically built one action at a time. Each action grew its own diagnostic channel: `wire_complete` for scan/move/teleport/collect/map_open, `teleport_attempt` for teleports, `combat_feedback` for shots. Three parallel diagnostic fabrics with no shared contract, and one class of failure — client-side executor discards — that no channel covered at all. The 2026-07-06 20:47:31 live deadlock exposed the gap: 26 seconds of silent self-rejection because a bare `emit_ai("rejecting shoot at ...")` log line looked identical to a legitimate server rejection and no structured event correlated the discard to the planner's decision.
+The tank_pit bot has been organically built one action at a time. Each action grew its own diagnostic channel: `wire_complete` for scan/move/teleport/collect/map_open, `teleport_attempt` for teleports, `combat_feedback` for shots. Three parallel diagnostic fabrics with no shared contract, and one class of failure — client-side executor discards — that no channel covered at all. The 2026-07-06 20:47:31 live deadlock exposed the gap: 26 seconds of silent self-rejection because a bare `emit_ai("rejecting shoot at ...")` log line looked identical to a legitimate server rejection and no structured event correlated the discard to the planner's decision.[^3]
 
-The corrected architecture treats the bot as a self-observing decision system with four layers, one cross-cutting contracts framework, and one philosophical principle: **fail hard on state entry, not soft on state observation.**
+The corrected architecture treats the bot as a self-observing decision system with four layers, one cross-cutting contracts framework, and one philosophical principle: **fail hard on state entry, not soft on state observation.**[^1]
 
 ## Foundational principle
 
-**The bot cannot enter a wrong state.** State transitions have contracts. Contract violations raise on the transition, not after N observations of the consequences.
+**The bot cannot enter a wrong state.** State transitions have contracts. Contract violations raise on the transition, not after N observations of the consequences.[^1]
 
 - No repeated-failure detection. No "wait until N tries then complain."
 - No anomaly thresholds over consequences. Anomalies are just late notifications of contract violations that should have raised earlier.
 - Races vs bugs are structurally distinguished: if the planner had the evidence and used it correctly, a same-tick external change is a race → replan gracefully. If the planner should have checked but didn't → contract violation, raise.
 
-The 20:47:31 deadlock under this architecture: at tick 1, the executor sees the tank position is not in the registry, raises `ShootTargetNotTrackedError`, session exits with a specific error naming the planner-generated command. The human fixes the planner. No retry counter. No anomaly detector. No 26-second wait.
+The 20:47:31 deadlock under this architecture: at tick 1, the executor sees the tank position is not in the registry, raises `ShootTargetNotTrackedError`, session exits with a specific error naming the planner-generated command. The human fixes the planner. No retry counter. No anomaly detector. No 26-second wait.[^3]
 
 ## What the bot is missing today — the fifteen
 
-Each item has the same shape: **missing** state / what it looks like **present** / what we have **today**.
+Each item has the same shape: **missing** state / what it looks like **present** / what we have **today**.[^1]
 
 ### 1. Standardized WHAT (action outcomes) — ✅ Phase 2 (2026-07-18)
 
@@ -162,11 +162,11 @@ Each item has the same shape: **missing** state / what it looks like **present**
                      WIRE + LOGS
 ```
 
-**Cross-cutting: `contracts/`** — `ContractError` base + `@enforce_contract` decorator + guard rule scanning for public mutations that skip enforcement.
+**Cross-cutting: `contracts/`** — `ContractError` base + `@enforce_contract` decorator + guard rule scanning for public mutations that skip enforcement.[^2]
 
 ## Phase roadmap
 
-The full architecture is a multi-phase multi-session commitment. Each phase leaves the tree green and shippable.
+The full architecture is a multi-phase multi-session commitment. Each phase leaves the tree green and shippable.[^1]
 
 | Phase | Deliverable | LoC | Sessions |
 |---|---|---|---|
@@ -182,53 +182,53 @@ The full architecture is a multi-phase multi-session commitment. Each phase leav
 | 4 | `memory/` (per-entity + persistence + session start/end) | 2500 | 3-5 |
 | 5 | Aggregation (self-model + baselines + experiments) | 1500 | 2-3 |
 
-Total: ~9000 LoC production + ~13500 LoC tests + wiki. 14-21 sessions of focused work.
+Total: ~9000 LoC production + ~13500 LoC tests + wiki. 14-21 sessions of focused work.[^1]
 
-Detailed phase specs live in `docs/handoffs/self-observing-bot-architecture.md`.
+Detailed phase specs live in `docs/handoffs/self-observing-bot-architecture.md`.[^1]
 
 ### Phase 1a implementation notes (2026-07-18)
 
-`src/tankpit_bot/contracts/` — `ContractError` hierarchy (`base.py`: `NoUnsourcedFactError`, `ConfidenceOutOfBoundsError`, `ProvenanceRootednessError`, each self-naming via `contract_name`), `require(condition, error, **details)` helper recording the caller's `file:line` (via `traceback.extract_stack` — the monorepo guard bans `import inspect`), and `@enforce_contract(contract)` decorator (`enforcement.py`). The `Contract` protocol is generic over a `ParamSpec`: a contract's `check` carries the same typed signature as the function it guards, so enforcement adds no type erasure (the guard also bans `object` in annotations, which rules out the untyped-kwargs-mapping design).
+`src/tankpit_bot/contracts/` — `ContractError` hierarchy (`base.py`: `NoUnsourcedFactError`, `ConfidenceOutOfBoundsError`, `ProvenanceRootednessError`, each self-naming via `contract_name`), `require(condition, error, **details)` helper recording the caller's `file:line` (via `traceback.extract_stack` — the monorepo guard bans `import inspect`), and `@enforce_contract(contract)` decorator (`enforcement.py`). The `Contract` protocol is generic over a `ParamSpec`: a contract's `check` carries the same typed signature as the function it guards, so enforcement adds no type erasure (the guard also bans `object` in annotations, which rules out the untyped-kwargs-mapping design).[^2]
 
-`src/tankpit_bot/facts/` — generic `Fact[T]` TypedDict (value + source + observed_ms + confidence + provenance), the 11-value `FactSource` literal, `SourceRefDict`/`ProvenanceChainDict` with encode/decode, and confidence ops (`combine_independent` noisy-OR, `combine_weighted`, `decay_by_age`). `make_fact`/`decode_fact` enforce all three contracts — a stored fact violating a contract fails at load.
+`src/tankpit_bot/facts/` — generic `Fact[T]` TypedDict (value + source + observed_ms + confidence + provenance), the 11-value `FactSource` literal, `SourceRefDict`/`ProvenanceChainDict` with encode/decode, and confidence ops (`combine_independent` noisy-OR, `combine_weighted`, `decay_by_age`). `make_fact`/`decode_fact` enforce all three contracts — a stored fact violating a contract fails at load.[^2]
 
-Guard rule `scripts/contract_rules.py` (wired into `scripts/guard.py`, runs in `make lint`): public `apply_*`/`record_*`/`mutate_*`/`set_*`/`update_*` functions in `facts/`, `ledger/`, `memory/` must carry `@enforce_contract`.
+Guard rule `scripts/contract_rules.py` (wired into `scripts/guard.py`, runs in `make lint`): public `apply_*`/`record_*`/`mutate_*`/`set_*`/`update_*` functions in `facts/`, `ledger/`, `memory/` must carry `@enforce_contract`.[^2]
 
-Three documented deviations from the handoff spec: (1) `dom_registry_scrape` counts as an observation origin (the DOM is a second wire, not a derivation) — only `client_side_inference` requires provenance citations (`game_log_scrape` was also a source until 2026-07-19, when capture replay proved every game-log line is the client's rendering of an already-decoded wire message and the channel was retired to witness-only); (2) `make_fact` invokes its contract explicitly instead of via the decorator, because decorating a generic function erases its type variable under mypy — the decorator is the mechanism for the non-generic mutations of Phases 1b+; (3) the spec's field-presence and source-membership runtime checks are structural under the typed keyword-only constructor (and re-validated by `require_fact_source` on decode), so the runtime contract checks are the ones typing cannot express: `observed_ms >= 0`, confidence bounds, provenance rootedness, and source/origin coherence.
+Three documented deviations from the handoff spec (each verifiable against the pinned spec on one side and the code on the other):[^2] (1) `dom_registry_scrape` counts as an observation origin (the DOM is a second wire, not a derivation) — only `client_side_inference` requires provenance citations (`game_log_scrape` was also a source until 2026-07-19, when capture replay proved every game-log line is the client's rendering of an already-decoded wire message and the channel was retired to witness-only); (2) `make_fact` invokes its contract explicitly instead of via the decorator, because decorating a generic function erases its type variable under mypy — the decorator is the mechanism for the non-generic mutations of Phases 1b+; (3) the spec's field-presence and source-membership runtime checks are structural under the typed keyword-only constructor (and re-validated by `require_fact_source` on decode), so the runtime contract checks are the ones typing cannot express: `observed_ms >= 0`, confidence bounds, provenance rootedness, and source/origin coherence.[^2]
 
 ### Phase 1b/1c implementation notes (2026-07-18)
 
-**Flat-carry retrofit (deviation from spec's nested `Fact[ContainerValueDict]`):** `ContainerStateDict` and `TankStateDict` keep their flat shape and gain the two missing Fact fields (`confidence: float`, `provenance: ProvenanceChainDict`); `facts/container_facts.py` and `facts/tank_facts.py` provide the true `Fact[T]` projections for Fact-consuming layers. Rationale: nesting the value under `["value"]` would touch ~200 construction sites and ~300 access sites across 68 files for zero information gain — the flat dict already carries every Fact field.
+**Flat-carry retrofit (deviation from spec's nested `Fact[ContainerValueDict]`):** `ContainerStateDict` and `TankStateDict` keep their flat shape and gain the two missing Fact fields (`confidence: float`, `provenance: ProvenanceChainDict`); `facts/container_facts.py` and `facts/tank_facts.py` provide the true `Fact[T]` projections for Fact-consuming layers. Rationale: nesting the value under `["value"]` would touch ~200 construction sites and ~300 access sites across 68 files for zero information gain — the flat dict already carries every Fact field.[^2]
 
-**Provenance sources are message-granular:** `FactSource` grew from the spec's 11 to 18 channels (added 0x21 TankInfo, 0x28 TankEntry, 0x3E TankStatus, 0x42 BuildPickup, 0x47 Movement, 0x48 EnemyDetect, `dom_registry_scrape`; renamed 0x2E to `wire_0x2E_tank_status_sync`) because the spec's list missed the channels that actually update the tank registry. Container origin derives mechanically from `refresh_kind` (`container_fact_source`); tank origin is passed explicitly by every dispatch site via the new `TankObservation.fact_source` field (0x53 shoot / 0x42 build-pickup / 0x47 movement pass through the parameterized `_update_tank_position`).
+**Provenance sources are message-granular:** `FactSource` grew from the spec's 11 to 18 channels (added 0x21 TankInfo, 0x28 TankEntry, 0x3E TankStatus, 0x42 BuildPickup, 0x47 Movement, 0x48 EnemyDetect, `dom_registry_scrape`; renamed 0x2E to `wire_0x2E_tank_status_sync`) because the spec's list missed the channels that actually update the tank registry. Container origin derives mechanically from `refresh_kind` (`container_fact_source`); tank origin is passed explicitly by every dispatch site via the new `TankObservation.fact_source` field (0x53 shoot / 0x42 build-pickup / 0x47 movement pass through the parameterized `_update_tank_position`).[^2]
 
-**Convergent decode defaults:** pre-1b/1c snapshots lacking the new keys decode to exactly what a contemporary encoder writes (confidence 1.0, provenance derived from refresh_kind / coarse source) — the same `_optional_int` precedent tank.py already used, no divergent state possible. Synthetic default fact-sources (`tank_default_fact_source`) exist only for direct constructor calls in tests; the production observation pipeline always supplies the true channel.
+**Convergent decode defaults:** pre-1b/1c snapshots lacking the new keys decode to exactly what a contemporary encoder writes (confidence 1.0, provenance derived from refresh_kind / coarse source) — the same `_optional_int` precedent tank.py already used, no divergent state possible. Synthetic default fact-sources (`tank_default_fact_source`) exist only for direct constructor calls in tests; the production observation pipeline always supplies the true channel.[^2]
 
 ### Phase 1d implementation notes (2026-07-18)
 
 Same flat-carry pattern as 1b/1c, completing the world-state coverage. Channel-threading highlights: self-position updates flow through `update_self_position(…, fact_source)` — the 0x47 waypoint path and 0x3D movement path each pass their own channel; fuel totals thread per dispatch arm (0x2E sync / 0x44 fuel gain / 0x64 fuel total); rank stamps `wire_0x2B_promotion`; a witnessed mine placement stamps `wire_0x4B_mine_placement` while radar/viewport/map mine sightings derive from their coarse source; terrain distinguishes 0x5A patch grids (default) from 0x4A terrain updates; the viewport's origin is constitutionally `wire_0x5A_viewport_patch` (the only message that sets it — see [[viewport-shift-protocol]]). `ViewportStateDict` construction now goes through `make_viewport_state` (previously raw dict literals). Self/viewport/terrain gained `observed_ms` (they had no timestamp at all); mines already had one.
 
-Phase 1 is COMPLETE.
+Phase 1 is COMPLETE.[^2]
 
 ### Phase 2 implementation notes (2026-07-18)
 
-**Correlation via pending-pairing, not parameter threading.** The bot's own invariant (at most one in-flight action per kind) is the pairing rule: `record_decision` (executor entry, every dispatchable command) registers the decision as its kind's pending causal parent; `emit_action_outcome` — the single low-level emission path — consumes it into `caused_by`. A re-dispatch of the same kind closes the unresolved predecessor with an explicit `superseded` outcome, so **every recorded decision resolves to exactly one outcome** except the ≤6 pending at shutdown. `verify_outcome_invariant()` (session end, `_emit_session_scorecard`) raises `LedgerInvariantError` on any decision that is neither resolved nor pending — possible only if a code path bypassed the fabric.
+**Correlation via pending-pairing, not parameter threading.** The bot's own invariant (at most one in-flight action per kind) is the pairing rule: `record_decision` (executor entry, every dispatchable command) registers the decision as its kind's pending causal parent; `emit_action_outcome` — the single low-level emission path — consumes it into `caused_by`. A re-dispatch of the same kind closes the unresolved predecessor with an explicit `superseded` outcome, so **every recorded decision resolves to exactly one outcome** except the ≤6 pending at shutdown. `verify_outcome_invariant()` (session end, `_emit_session_scorecard`) raises `LedgerInvariantError` on any decision that is neither resolved nor pending — possible only if a code path bypassed the fabric.[^2]
 
-**Two more guard-enforced contracts:** `DecisionRecordContract` (score band, non-empty reason) on `record_decision`; `TeleportDispatchContract` on `record_teleport_dispatch`.
+**Two more guard-enforced contracts:** `DecisionRecordContract` (score band, non-empty reason) on `record_decision`; `TeleportDispatchContract` on `record_teleport_dispatch`.[^2]
 
-**Mode transitions** (blind spot #11): every mode flip at the tick-loop persist point emits a `mode_transition` event with the driving decision's `reason_kind` and `caused_by` (0 for the non-dispatching manual-hold path).
+**Mode transitions** (blind spot #11): every mode flip at the tick-loop persist point emits a `mode_transition` event with the driving decision's `reason_kind` and `caused_by` (0 for the non-dispatching manual-hold path).[^2]
 
-**Session end** now emits `session_outcome_counts` per action kind (from the rings) and `session_unresolved_decisions`, and the scorecard/issue report carry `action_outcome_counts` (`"kind:outcome"` tallies) — the per-outcome counters replacing ad-hoc hit/miss/reject views.
+**Session end** now emits `session_outcome_counts` per action kind (from the rings) and `session_unresolved_decisions`, and the scorecard/issue report carry `action_outcome_counts` (`"kind:outcome"` tallies) — the per-outcome counters replacing ad-hoc hit/miss/reject views.[^2]
 
-**Deferred to Phase 3 (consumers don't exist yet, and dead API is banned):** the rich causal-chain traversal (`trace_backward`/`trace_forward`) and `DecideCtx` ledger views — the primitives are in place (`decision_record(id)` lookup, `caused_by` on every outcome and transition, `recent_outcomes`/`outcome_counts` ring queries).
+**Deferred to Phase 3 (consumers don't exist yet, and dead API is banned):** the rich causal-chain traversal (`trace_backward`/`trace_forward`) and `DecideCtx` ledger views — the primitives are in place (`decision_record(id)` lookup, `caused_by` on every outcome and transition, `recent_outcomes`/`outcome_counts` ring queries).[^2]
 
-Next: Phase 3 (Decision enrichment — predictions, alternatives, confidence, time budgets).
+Next: Phase 3 (Decision enrichment — predictions, alternatives, confidence, time budgets).[^1]
 
 ## Why we're building this
 
-The 20:47:31 deadlock is one instance of a class. The class is "decisions and outcomes live in disjoint observability channels." Every future bug of that class hides the same way. Fixing the specific bug closes one instance; installing the architecture closes the class.
+The 20:47:31 deadlock is one instance of a class. The class is "decisions and outcomes live in disjoint observability channels." Every future bug of that class hides the same way. Fixing the specific bug closes one instance; installing the architecture closes the class.[^3]
 
-The 15 items above are not features — they are the shape of what "a bot that can learn from itself" requires. Each item names a specific blind spot the bot has today. The 20:47:31 deadlock hit at least four of them (1, 3, 10, 12) simultaneously. Any single item, present, would have surfaced the bug within seconds instead of hiding it for 26 seconds.
+The 15 items above are not features — they are the shape of what "a bot that can learn from itself" requires. Each item names a specific blind spot the bot has today. The 20:47:31 deadlock hit at least four of them (1, 3, 10, 12) simultaneously. Any single item, present, would have surfaced the bug within seconds instead of hiding it for 26 seconds.[^1]
 
 ## Related pages
 
@@ -239,4 +239,8 @@ The 15 items above are not features — they are the shape of what "a bot that c
 
 ## Provenance
 
-Design conversation: 2026-07-06 session, driven by user's observation "we were missing standardized WHY, and WHAT — what else are we missing?" Full architectural spec in `docs/handoffs/self-observing-bot-architecture.md`.
+Design conversation: 2026-07-06 session, driven by user's observation "we were missing standardized WHY, and WHAT — what else are we missing?" Full architectural spec in `docs/handoffs/self-observing-bot-architecture.md`.[^1]
+
+[^1]: design source on disk and blob-pinned in frontmatter: `docs/handoffs/self-observing-bot-architecture.md` — the 15-blind-spot inventory, four-layer diagram, phase table, and LoC estimates all transcribe from it; design session recorded in the wiki-log entry "[2026-07-06] design | Self-observing bot architecture (multi-phase; handoff written; NO code landed)", which carries the user's quoted prompt.
+[^2]: code truth on disk for every landed phase: `src/tankpit_bot/contracts/`, `src/tankpit_bot/facts/`, `src/tankpit_bot/ledger/`, guard rule `scripts/contract_rules.py` (runs in `make lint`) — all symbols named in these notes are greppable; landed via the 2026-07-18/19 commits in git history and the wiki-log entries "[2026-07-18] code | Phase 2 outcome fabric", "[2026-07-18] code | Phase 2 typed decisions", "[2026-07-18] code | Phase 2 COMPLETE", and "[2026-07-19] tooling | Deterministic run audit". The run audit itself is a standing instrument (`make analyze`).
+[^3]: the 2026-07-06 20:47:31 deadlock: 26 s of `_is_valid_shoot` self-rejection during that evening's `make run`, recorded in the "[2026-07-06] design" wiki-log entry (motivation section); Phase 0 deleted the veto the same week, and the whole validator family followed 2026-07-21 ([[executor-rejection-loops]]).

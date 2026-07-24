@@ -52,7 +52,7 @@ ONE executable physics module mirroring the wiki rule-for-rule,
 machine-checked bindings between wiki claims and code symbols,
 re-runnable validators against the capture archive, and live runs
 that count physics divergences. Drift becomes a red `make check`, not
-an archaeology project.
+an archaeology project.[^2]
 
 ## What already exists (do not rebuild)
 
@@ -106,11 +106,11 @@ Contents (consolidate, don't invent):
   boundary [12.91, 12.93] s — 2026-07-22), consumption-equals-hit
   rule helpers.
 - Terrain vocabulary stays in `state/types/constants.py` (already
-  truth-named after 2026-07-20); physics may re-export.
+  truth-named after 2026-07-20); physics may re-export.[^2]
 
 **Claim binding**: each physics wiki page (game-economy,
 teleport-mechanics, ferry-mechanics, weapon-selection,
-movable-blocks) gets a fenced machine-readable claim block:
+movable-blocks) gets a fenced machine-readable claim block:[^2]
 ```yaml
 claims:
   - id: teleport-cost
@@ -124,15 +124,15 @@ A new guard stage (`make check`) parses claim blocks, imports each
 `code` address, and verifies computationally (constants compared
 directly; formulas evaluated on a probe grid). Reverse direction:
 every public symbol in `physics/` must be referenced by exactly one
-claim. Drift in either direction = red gate.
+claim. Drift in either direction = red gate.[^2]
 
 **Definition of done**: all economy/damage/capacity constants live in
 `physics/`, zero magic game-numbers left in `bot/ai/` (guard-greppable),
-claim checker wired into `make check`, 100 % coverage held.
+claim checker wired into `make check`, 100 % coverage held.[^2]
 
 ### Phase 1 as-built (2026-07-20)
 
-Implemented exactly as designed with these recorded deviations:
+Implemented exactly as designed with these recorded deviations:[^2]
 
 - **Claim blocks are fenced JSON, not YAML** (` ```json claims ` …
   ` ``` ` in the page source). No YAML parser exists in the
@@ -187,19 +187,19 @@ per claim family, each re-deriving its claim from
   only own 0x53 echoes of one weapon — log entry "per-weapon firing
   costs closed")
 - `validate_walk_cost.py`, `validate_capacity.py`,
-  `validate_hit_damage.py` (same window technique)
+  `validate_hit_damage.py` (same window technique)[^2]
 
 Claim blocks gain `validator:` and `evidence:` fields. `make audit`
 runs every validator, reports per-claim sample counts, and rewrites
 each page's `fact_checked:` from validator output — computed, not
 hand-typed. A claim whose validator fails or whose evidence files
-vanished is flagged like a stale hash (mcps wiki-check analogy).
+vanished is flagged like a stale hash (mcps wiki-check analogy).[^2]
 
 ### Phase 2 as-built (2026-07-21)
 
 Implemented as `src/tankpit_bot/validate/` (not `tools/validate/` —
 `src` is where mypy/ruff/coverage/guard already apply; follows the
-`diagnostics/` precedent, CLI `tankpit-audit`, `make audit` target):
+`diagnostics/` precedent, CLI `tankpit-audit`, `make audit` target):[^2]
 
 - **`wire_timeline.py`** — one typed extraction per capture session
   using the production decode recipe (frame split → XOR →
@@ -267,7 +267,7 @@ claim (new fact or bug). Includes double-entry fuel/ammo bookkeeping
 in the ledger: every delta must be explained by a known action or
 flagged. (This is what would have auto-decomposed the −45/−10
 combat-tick mystery months earlier.) Touches the tick loop and
-ledger; do it last, after Phases 1–2 make predictions cheap.
+ledger; do it last, after Phases 1–2 make predictions cheap.[^2]
 
 ### Phase 3 design (locked 2026-07-21, pre-implementation)
 
@@ -276,7 +276,7 @@ ledger; do it last, after Phases 1–2 make predictions cheap.
 Between two absolute wire fuel readings the book accumulates ENTRIES
 — each a predicted delta with a feasibility range, because live
 windows contain events whose exact fuel effect is legitimately
-unknowable at prediction time:
+unknowable at prediction time:[^2]
 
 - exact debits: own shots by weapon (homing carries a −5/−10 split
   tolerance), radar 10, mine press 10, teleport floor(6*euclid) on
@@ -284,7 +284,7 @@ unknowable at prediction time:
 - ranged debits: own 0x47 walk echo = [0, path_tiles] (paths truncate
   on collision — Phase 2 finding); optional enemy hits = {0, −45} or
   {0, −90} per lone echo; own-mine detonation −45 optional;
-- open credits: container pickups = [0, capacity − fuel].
+- open credits: container pickups = [0, capacity − fuel].[^2]
 
 **Reconciliation** happens at the single wire choke point
 `update_world_state_from_fuel_total` (all of 0x2E sync / 0x44 gain /
@@ -292,7 +292,7 @@ unknowable at prediction time:
 the entries' feasible interval; outside = a `physics_divergence`
 diagnostic event carrying the residual and the window's entry list.
 Strict windows (exact entries only) demand equality — the live
-equivalent of the audit's clean windows.
+equivalent of the audit's clean windows.[^2]
 
 **Entry sources**: wire-echo entries recorded in the
 world_state_dispatch handlers (0x53 own/enemy, self 0x47, 0x43
@@ -300,17 +300,17 @@ pickup, 0x45 detonation); dispatch-side entries (radar, mine press,
 teleport-landed with pre-position) recorded from the executor/ledger
 outcome path. Ammo book v1: 0x49 snapshots must never exceed the
 previous snapshot plus pickups nor undercut it by more than shots
-fired — the consumption-equals-hit cross-check, live.
+fired — the consumption-equals-hit cross-check, live.[^2]
 
 **Surfacing**: scorecard line `physics divergences: N` (counted from
 events.jsonl by session_scorecard); `make analyze` lists each
 divergence with its window as a candidate wiki claim. Verification:
 gate + a soak whose only behavioral change is the new scorecard line;
-divergences on a healthy run should be ~0.
+divergences on a healthy run should be ~0.[^2]
 
 ### Phase 3 as-built (2026-07-21, core loop)
 
-Implemented as designed with these notes:
+Implemented as designed with these notes:[^2]
 
 - **`ledger/fuel_book.py`** — the interval double-entry book, pure
   functions over a typed dict, contract-enforced mutations
@@ -353,7 +353,7 @@ Implemented as designed with these notes:
   a full combat run (38 hits, 27 radars).
 - **Deferred within Phase 3**: divergence-to-candidate-claim
   extraction in `make analyze` beyond the issue line — the next
-  increment on this foundation.
+  increment on this foundation.[^2]
 
 
 ## Phase 4 — the simulator (wiki-derived fake server) — SPEC 2026-07-21, not started
@@ -363,12 +363,12 @@ whose every rule cites a wiki claim. Planner changes get graded on
 thousands of simulated sessions before one live run; any live
 sim-vs-wire disagreement is automatically a candidate claim (Phase 3
 divergence machinery grades the sim with the same instruments it
-grades the real server).
+grades the real server).[^2]
 
 ### Architecture decision: wire-level fake server
 
 The sim speaks REAL BYTES — framing, XOR, 0x2E tunneling — behind the
-seams the codebase already has:
+seams the codebase already has:[^2]
 
 - **Inbound to bot**: the received-message buffer
   (`Bot._on_message_captured`, `CapturedMessage` dicts) — the same
@@ -379,13 +379,13 @@ seams the codebase already has:
   commands leave the bot as production-encoded frames; the sim decodes
   them with the PRODUCTION decode path (frame split → XOR →
   `decode_message`), advances the world one law at a time, and answers
-  with encoded server frames.
+  with encoded server frames.[^2]
 
 Why wire-level and not a state-level stub: the bot's decoders,
 dispatch, world-state, books, and planner all run untouched, so a sim
 bug and a decoder bug stay distinguishable; and sim sessions are
 CAPTURES in the standard format — `make audit` and the replay engine
-work on them for free.
+work on them for free.[^2]
 
 ### New code
 
@@ -412,7 +412,7 @@ work on them for free.
   - `policy.py` — `SimPolicy` protocol (world view → commands) for
     opponents. v1 policies: stationary dummy, scripted walker,
     capture-replay ghost. Enemy MINDS are not physics — the sim never
-    hardcodes "realistic" enemies; it takes policies as plugins.
+    hardcodes "realistic" enemies; it takes policies as plugins.[^2]
 
 ### The laws (every rule carries its wiki anchor)
 
@@ -449,7 +449,7 @@ work on them for free.
 Documented sim assumptions (revisit when measured): max single-click
 walk distance (23 wire-confirmed; sim accepts any in-viewport click),
 displacement south-preference/beyond-ring-1, container respawn (v1:
-static seeded world, no respawn).
+static seeded world, no respawn).[^2]
 
 ### Verification ladder (definition of done)
 
@@ -464,14 +464,14 @@ static seeded world, no respawn).
    re-derives every archive-validatable claim exactly.
 4. **Fidelity statement** on this page: 1:1 for every measured law;
    explicitly NOT 1:1 for spawn distributions (until cracked), enemy
-   minds (by design), and the listed assumptions.
+   minds (by design), and the listed assumptions.[^2]
 
 ### Build order (one commit each, gate green throughout)
 
 (a) encoders + round-trip corpus tests; (b) `sim/world.py` +
 `server.py` with laws 1–3; (c) `transport.py` + bot-vs-sim smoke
 session; (d) laws 4–8; (e) divergence-zero soak + audit cross-check +
-fidelity statement.
+fidelity statement.[^2]
 
 ### Step (a) as-built (2026-07-21): encoders — 72,916/72,916 corpus messages byte-identical
 
@@ -509,13 +509,13 @@ fidelity statement.
   outer `+`/`=` frames the old census counted as undecodable are
   plaintext room listings and profile rows, not binary messages.
 - Gate green (4,639 tests, 100% stmt+branch); `make audit` unchanged
-  at 11/11 claims.
+  at 11/11 claims.[^2]
 
 ### Step (b) as-built (2026-07-21/22): `sim/` — laws 1–3 live
 
 New package `src/tankpit_bot/sim/`, layered and DI'd
 (`TerrainMapProtocol` from `_test_hooks`, so tests drive the sim on
-in-memory terrain):
+in-memory terrain):[^2]
 
 - **`world.py`** — `SimWorldDict` (tanks / containers / mines / tick)
   with full encode/decode codecs and require_* validation; worlds
@@ -547,7 +547,7 @@ in-memory terrain):
   transport to encode.
 - 55 sim tests; gate green at 100% stmt+branch (4,690 tests).
   Radar/map/teleport/mine placement raise `SimError` until step (d)
-  — explicit refusal, not silent stubs.
+  — explicit refusal, not silent stubs.[^2]
 
 ### Step (c) wire integration (2026-07-22): the production bot consumes sim bytes
 
@@ -558,7 +558,7 @@ exactly as `process_received_message` ingests), and
 `decode_client_payload` turns the bot's real `!`-command frames back
 into typed commands. `SimServer.handshake()` emits the join burst
 (own 0x3D/0x44/0x49, then 0x21+0x3D per living tank — the scenario
-harness's `place_self`/`place_enemy` choreography, on the wire).
+harness's `place_self`/`place_enemy` choreography, on the wire).[^2]
 
 `tests/sim/test_integration.py` is the standing proof, all through
 PRODUCTION code paths: the handshake establishes `self_state` and the
@@ -567,7 +567,7 @@ enemy registry via `sniffer.decoders.process_received_message`; a
 transmits it) drives the sim and the bot's believed position/fuel
 equal sim ground truth after the tick — pickup included; and the real
 planner `decide()` produces a HUNT/COLLECT decision from sim-fed
-beliefs.
+beliefs.[^2]
 
 **Bugs the wiring caught that typed-dict testing could not:**
 1. The sim long-form-synced EVERY fuel-changed tank; the production
@@ -577,13 +577,13 @@ beliefs.
    short form otherwise — and a regression test pins it.
 2. A 0x21 with an empty decoration field shifts the whole wire
    layout; the handshake must emit the full 4-byte field. Direct
-   typed ingestion (the scenario harness) can never catch either.
+   typed ingestion (the scenario harness) can never catch either.[^2]
 
 ### Step (c) completed (2026-07-22): the real bot plays the sim
 
 `sim/session.py` closes the seam. `SimCDPSession` implements the same
 `CDPSessionProtocol` the production tick loop talks to, answering
-every `Runtime.evaluate` from SIM WORLD TRUTH — no canned values:
+every `Runtime.evaluate` from SIM WORLD TRUTH — no canned values:[^2]
 
 - the page-client snapshot query answers with a truthfully-built
   `PageClientSnapshotDict` (`client_present=True` and
@@ -593,20 +593,20 @@ every `Runtime.evaluate` from SIM WORLD TRUTH — no canned values:
   form, which the alignment samplers already treat as absent);
 - the injected websocket send (`atob('<b64>')`) decodes through the
   sim transport into typed commands and queues on the server;
-- unmodeled expressions RAISE `EncodeError` — loud, never best-effort.
+- unmodeled expressions RAISE `EncodeError` — loud, never best-effort.[^2]
 
 Wiring recipe (pinned by `tests/sim/test_session.py`): construct
 `Bot(url, headless=True)` (no browser), `bot._on_magic_captured(magic)`
 builds the command XOR table from the shared static key,
 `bot._cdp = SimCDPSession(server, table)`, and sim batches are
 delivered as base64 payloads into `bot._cdp_message_buffer` — the
-exact shape `world_sync.drain_messages` consumes.
+exact shape `world_sync.drain_messages` consumes.[^2]
 
 **The smoke test**: 12 rounds of the PRODUCTION `_tick_once` against
 a seeded world. The bot toggled its equipment, radared, collected the
 container, hunted, and fought the rank-8 enemy — and its believed
 position and fuel equalled sim ground truth at the end. Two findings
-from wiring the real loop:
+from wiring the real loop:[^2]
 
 1. The bot's actual opening move is **equipment toggling (cmd 114)**,
    which the sim didn't model — law added: the toggle flips the slot
@@ -616,11 +616,11 @@ from wiring the real loop:
    COLLECT owner raised the real `SessionExitError`
    (`no_productive_collect`). Sim worlds must be seeded sustainably —
    and equipment containers are still absent from the world model, so
-   the sim bot can restock fuel but never ammo.
+   the sim bot can restock fuel but never ammo.[^2]
 
 ### Step (d) as-built (2026-07-22): laws 5–8 — the full bot command set processes
 
-`sim/actions.py` + tick-processor wiring:
+`sim/actions.py` + tick-processor wiring:[^2]
 
 - **Teleport (law 5)**: cost `floor(6 × euclid)` to the ACTUAL
   landing; ring-1 displacement E→N→W (S as the documented last-resort
@@ -644,17 +644,17 @@ from wiring the real loop:
 - Pickup-fuel/equipment clicks route through the move law (they are
   destination clicks on the wire). Only unknown command bytes still
   raise `SimError`.
-- Gate: 4,719 tests, 100% stmt+branch; 84 sim tests.
+- Gate: 4,719 tests, 100% stmt+branch; 84 sim tests.[^2]
 
 ~~Not yet implemented from the law list: **law 4** (homing reroute +
 TTL) — the sim has no departure semantics yet~~ — RESOLVED 2026-07-22,
 see the law-4 as-built below. Equipment containers / ferries /
-movable blocks remain out of the world model.
+movable blocks remain out of the world model.[^2]
 
 ### Law 4 as-built (2026-07-22): the viewport model, 0x58 departure, and the reroute TTL
 
 The reroute law needed a real trigger for 0x58, which forced the
-per-client viewport model the step-(d) assumptions listed as missing:
+per-client viewport model the step-(d) assumptions listed as missing:[^2]
 
 - **Viewport**: Chebyshev radius 8 around the client — the SAME
   constant the extra-radar scan already used (`VIEWPORT_RADIUS`,
@@ -685,12 +685,12 @@ per-client viewport model the step-(d) assumptions listed as missing:
 Behavior check that fell out for free: with positions
 viewport-scoped, the seam's seeded enemy (Chebyshev 10 from spawn)
 is position-dark at join — and the production bot still finds and
-engages it through map blips + teleport, the real gameplay loop.
+engages it through map blips + teleport, the real gameplay loop.[^2]
 
 ### Equipment containers as-built (2026-07-22): the archive-mined grant law — and the bug it flushed out
 
 The last world-model gap ("the sim bot can restock fuel but never
-ammo") closed in four pieces, each forced by the previous:
+ammo") closed in four pieces, each forced by the previous:[^2]
 
 1. **The grant law was archive-mined, not trusted** (crack-before-
    code): 1,154 ``0x67 -> next 0x49`` exact-pre pairs across 246
@@ -731,7 +731,7 @@ End-to-end proof (`tests/sim/test_equipment.py`): the production bot,
 seeded at 8 extra radars, radar-reveals the seeded equipment
 (0x4F ``0xFFFF -> -1`` cache marker), walks both containers, takes
 two grants over the real wire, eats the code-4 on each re-click,
-deletes the beliefs, and returns to fuel collection.
+deletes the beliefs, and returns to fuel collection.[^2]
 
 ### Scripted opponent as-built (2026-07-22): return fire — and the dead wiring it exposed
 
@@ -740,7 +740,7 @@ the world tick: dodge / shoot / hold / shoot on a 4-beat, acting only
 while the client is inside its own viewport radius). It is NOT a
 model of enemy minds — those stay uncertified — it exists to run the
 client-side channels a passive world never touches. Wiring it forced
-two fixes:
+two fixes:[^2]
 
 1. **Per-recipient sweep**: 0x52 supervisor rejections, 0x67 gains,
    and the inventory-full error are PER-CONNECTION on the real wire.
@@ -759,20 +759,20 @@ two fixes:
    could never catch it (they call the function directly); the
    fighting soak's positive control (``enemy_shots > 0``) failed
    instantly. Now wired at the 0x53 dispatch point next to the
-   fuel book's enemy-hit entry.
+   fuel book's enemy-hit entry.[^2]
 
 The fighting soak (`tests/sim/test_soak.py`): 24 production rounds
 under return fire — the enemy lands real duals, the client's fuel
 pays real 90s, the fuel book absorbs them as enemy-hit feasibility
 entries — and both books still judge ZERO divergences, with zero
-``physics_divergence`` events in the captured stream.
+``physics_divergence`` events in the captured stream.[^2]
 
 Still out of the world model: the radar-zero emergency grant and
 real enemy minds (the scripted opponent is a harness, not a model).
 Ferries and movable blocks both landed 2026-07-22 — see their
 as-builts below. With blocks in, the world model holds EVERY
 documented entity class: tanks, fuel containers, equipment, mines,
-ferries, and blocks.
+ferries, and blocks.[^2]
 
 ### Movable blocks as-built (2026-07-22): law 6b — the full pickup/drop cycle
 
@@ -799,7 +799,7 @@ The wire-cracked block contract ([[movable-blocks]]) is executable:
   refinement); block ops are FREE.
 - **Seam proof**: the production ingestion composes sim block tiles
   into wire terrain (obstacle class) from real wire bytes, and the
-  real command service round-trips the block press.
+  real command service round-trips the block press.[^2]
 
 Assumptions documented in ``sim/blocks.py``: cardinal-adjacency
 reach, refusal codes for unmeasured rejects, and the untowed
@@ -817,9 +817,9 @@ returning fire. Artifacts: probe-channel log/events
 (``runs/probe/latest.sim.*`` — the live ``runs/bot`` archive stays
 reserved for real-server evidence), the recorded wire as a standard
 ``CaptureSession`` under ``runs/sim/``, and the world's final state.
-No server, no browser, no fuel spent.
+No server, no browser, no fuel spent.[^2]
 
-The first real-terrain runs earned their keep immediately:
+The first real-terrain runs earned their keep immediately:[^2]
 
 1. **Six containers drowned**: the naive (100, 100) scenario region
    is coastal on field01 — the bot starved among dots it could never
@@ -845,7 +845,7 @@ The first real-terrain runs earned their keep immediately:
    ammo seeding does not cap damage. The default scenario is tuned
    winnable around both facts; the reference 150-round run: fight →
    kill → refuel to cap → collect → ``no_viable_targets``, the
-   production HUNT owner's clean end.
+   production HUNT owner's clean end.[^2]
 
 ### Ferries as-built (2026-07-22): law 2b — surface routing over live wire terrain
 
@@ -874,17 +874,17 @@ verbatim 2026-07-19) is now executable end to end:
 - **Proof over the seam**: the production ingestion
   (``update_viewport_entities`` → ``FerryAwareTerrain``) learns the
   sim's ferry tile through real wire bytes
-  (``tests/sim/test_ferry.py``).
+  (``tests/sim/test_ferry.py``).[^2]
 
 Not modeled: ``TERRAIN_FERRY_ROCK`` (7), multi-tile ferries (the sim
 ferry is one tile), teleport landings on ferry tiles (still blocked
 by static water), and ferry fuel costs beyond the standard walk
-tile rate (assumption — unmeasured).
+tile rate (assumption — unmeasured).[^2]
 
 ### Respawn as-built (2026-07-22): the world replenishes, players return
 
 Two laws close the finite-world problem (every session used to end
-when the map drained or the only enemy died):
+when the map drained or the only enemy died):[^2]
 
 - **Container respawn** (``sim/spawn.py``): the archive-mined law —
   population-seeking, ~1/min below the seeded equilibrium, always at
@@ -909,7 +909,7 @@ when the map drained or the only enemy died):
 The Phase 3 instruments judge the sim, and the sim passes. Three
 tests close the phase (`tests/sim/test_soak.py`,
 `tests/sim/test_audit_crosscheck.py`, shared boot in
-`tests/sim/seam.py`):
+`tests/sim/seam.py`):[^2]
 
 - **Divergence-zero soak**: 30 rounds of the production `_tick_once`
   under a stepped `SeamClock` (the scenarios-harness clock
@@ -934,9 +934,9 @@ tests close the phase (`tests/sim/test_soak.py`,
   "mismatch" is the measured charge latency splitting a burst's first
   echo and its debit across a window boundary — the same
   positive-signed noise shape the real archive shows, which is
-  fidelity evidence in itself.
+  fidelity evidence in itself.[^2]
 
-The instruments forced three catches before they went green:
+The instruments forced three catches before they went green:[^2]
 
 1. **Sync cadence**: the sim emitted 0x2E syncs only when fuel
    changed; the measured wire broadcasts one per living tank every
@@ -959,7 +959,7 @@ The instruments forced three catches before they went green:
 Behavior finding worth recording: over 40 rounds the production bot
 NEVER walks — its collect style is 100 % teleport locomotion
 (fuel-dot hops), so the walk-cost positive control needed one
-scripted walk driven through the real command service.
+scripted walk driven through the real command service.[^2]
 
 **Fidelity statement.** The sim is certified by the same instruments
 that watch the real server: (1) encoders byte-identical on
@@ -996,7 +996,7 @@ The inverse instrument of the seam soaks, closing the certification
 loop from the other side: the soaks prove the BOT cannot tell the sim
 from the real server; the shadow proves the SIM cannot be told apart
 from the archive. `tankpit_bot/validate/shadow*.py`, CLI
-`tankpit-shadow`, target `make shadow`.
+`tankpit-shadow`, target `make shadow`.[^2]
 
 Design rule: every validator imports its predictor FROM THE SIM
 SOURCE — the same constants and predicates `SimServer` executes —
@@ -1006,9 +1006,9 @@ demanding investigation (same non-softening posture as `make audit`,
 whose `EXACTNESS_FLOOR` gates the table). This graduates the one-off
 2026-07-22 mining sweeps into a standing instrument: every future
 live run lands in `runs/` and is automatically re-judged against the
-sim's laws.
+sim's laws.[^2]
 
-First full-archive run (245 decodable sessions):
+First full-archive run (245 decodable sessions):[^2]
 
 | law | samples | exact | verdict |
 |---|---|---|---|
@@ -1021,7 +1021,7 @@ The measured roll ranges moved into sim source as part of this build
 (`sim/equipment.py`: `WEAPON_STACK_ROLL`, `RADAR_STACK_ROLL`,
 `MERCY_BUNDLE_ROLLS`, `kill_grants_mercy()` — the deterministic sim
 stacks are now DERIVED midpoints of the measured ranges, and the
-server's mercy branch calls the shared predicate).
+server's mercy branch calls the shared predicate).[^2]
 
 **Calibration discovery — the self-sync cadence anomaly.** The first
 calibration sweep judged all tanks and failed 31 of 346; outlier
@@ -1040,7 +1040,7 @@ Corpse-window note: 17 clean samples vs the mining sweep's 37 —
 the shadow's filters are stricter (any victim-id 0x2E sync between
 kill and removal disqualifies the pair as slot reuse, and quits
 disqualify via 0x29), and all 17 survivors sit inside ±1 s of
-22.0 s. Gate at close: 4,852 tests, 100 % stmt+branch.
+22.0 s. Gate at close: 4,852 tests, 100 % stmt+branch.[^2]
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
@@ -1062,7 +1062,7 @@ Consequences swept through the stack in one build:
 - **Shadow**: fifth law ``damage-tier`` re-derives the quartile fit
   on every ``make shadow`` (19,658/19,658 on the archive).
 - The controlled live "healing measurement" session is CANCELLED —
-  nothing to measure.
+  nothing to measure.[^2]
 
 ## Parallel track (independent of phases): executor staleness audit — DONE 2026-07-21
 
@@ -1084,7 +1084,7 @@ No Any/cast/type-ignore/noqa; no mocks — `_test_hooks` save-restore
 DI only; 100 % coverage; guard rules enforced; files < 400 lines;
 no back-compat shims (move symbols, update all imports, delete the
 old home); wiki updated + log entry with every phase; verbatim user
-contracts preserved wherever quoted.
+contracts preserved wherever quoted.[^2]
 
 ## Verification per phase
 
@@ -1092,6 +1092,7 @@ contracts preserved wherever quoted.
 then a 5-minute `make run` soak analyzed for behavior neutrality
 (Phases 1–2 must be behavior-neutral; Phase 3 adds scorecard lines
 only). Commit per phase with the soak evidence in the message —
-follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).
+follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).[^2]
 
 [^1]: Design conversation 2026-07-20: user framing "wiki as the source of truth... with 3 consumers" (code, archived wire evidence, live wire) and "no handwaving, no half assing it at all. the full complete process verified. quality." Phase ordering user-approved; Phase 1 explicitly agreed as the starting point.
+[^2]: receipts for every design and as-built claim above, three-fold: (1) CODE — the blob-pinned trees in frontmatter (`src/tankpit_bot/physics`, `src/tankpit_bot/sim`, `src/tankpit_bot/validate`) plus `protocol/encoders/`, `ledger/fuel_book.py`/`ammo_book.py`, `scripts/physics_claims.py`, and the named `tests/sim/*` files — every symbol, constant, and law named above is greppable on disk, and design paragraphs describe the plan those trees implement (deviations recorded inline); (2) INSTRUMENTS — `make check` (gate/coverage), `make audit` (per-claim sample counts), `make roundtrip` (72,916-message corpus), `make shadow` (law table), `make sim-run` re-derive every number quoted above on demand; (3) HISTORY — the dated 2026-07-20/21/22 commits in git history and their wiki-log entries, plus soak artifacts under `runs/`.
