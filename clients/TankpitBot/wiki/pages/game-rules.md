@@ -72,6 +72,14 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 
 **Demotion:** if deactivated by an enemy, you lose one rank.[^1]
 
+**User corroboration (2026-07-24, verbatim):** *"usually when you die
+you go down a rank. and usually a recruit would rank up during a
+fight from earning enough promotion points from points per shot. a
+kill gives you more points but isnt necessry to go from recruit to
+private."* — matches the table (recruit→private has no kill
+requirement) and the demotion rule; adds that promotion points
+accrue per shot during fights, with kills as a bonus, not a gate.[^3]
+
 ## Fuel
 
 - Deactivation happens when DAMAGE takes your fuel to zero — fuel is

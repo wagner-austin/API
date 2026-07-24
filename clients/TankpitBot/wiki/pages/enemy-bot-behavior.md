@@ -96,6 +96,11 @@ archive-wide sweep bears it out and pins the policy numerically:[^8]
    the archive is consistent with the user's reading (zero
    corporal+ bots in 8,856 rank observations). Any sim bot-policy
    is certified for ranks 0–1, which may simply be all that exists.
+   Where bot ranks COME from (user, verbatim, 2026-07-24, hedged):
+   *"they are allocated by the game config i think to have certain
+   ranks, as far as i know"* — allocation, not promotion; consistent
+   with bots never earning kills and with the recruit/private split
+   being roughly stable across the archive.
 
 **Anomaly SOLVED (same day) — the "unexplained refuels" are
 REACTIVATIONS**: drilling the 64 tier-up events decomposed them
@@ -161,11 +166,21 @@ against the player) **and 81 ASSIST shots** (at an enemy-team bot,
 the player's side), with only 3 unexplained. Shooter→target Chebyshev
 distances: assist 3–8, gang-up 2–8 (one stale-position 12) — both
 mechanisms operate within the ~8-tile viewport radius, i.e. exactly
-"can see". Full model: a hit on any bot ignites team-level aggro
-within sight — victim returns fire at its attacker, the victim's
-teammates gang up on the attacker, the attacker's bot teammates pile
-onto the victim. (`sim/bot_policy.py` models only personal return
-fire so far; team aggro is an open sim-law candidate.)[^11]
+"can see". Full model — SHOT-FOR-SHOT, no aggro state (user contract,
+verbatim, 2026-07-24: *"bots are just 1:1. so you shoot them once,
+they shoot back. if you stop they stop. they dont chase or keep
+attacking. its shot for shot with the bots."*): every hit on a bot
+draws at most one return that tick — from the victim, and from
+same-team bots within sight in the gang-up case — and the response
+stops the moment the hits stop. Archive verification: 3,031 hits on
+bots drew 2,201 returns; the per-engagement fired/taken ratio NEVER
+exceeds ~1 (mode 0.75–1.0 over 366 engagements — the deficit is the
+one-shot-per-tick cap plus flee/death truncation); and in 99.2% of
+397 engagements the bot's last shot lands within one tick of the
+last hit it took — zero chasing, zero continued fire.
+(`sim/bot_policy.py` models only personal return fire so far;
+sight-radius gang-up/assist under the same per-hit rule is the open
+sim-law candidate.)[^11][^12]
 
 **The live witness of the assist side:** the fight
 had a third combatant — **blue-7 (id 524, the probe's own team)**
@@ -196,6 +211,11 @@ singles at purple-2 13.3–21.3 s; 0x58 (id 510) at 23.3 s; probe
 homings (weapon=3) aimed (166,143) at 23.3/25.3 s; 0x41 victim=510
 killer=1301 at 25.3 s; 0x4C entries for 510 absent 25.3–45.4 s,
 present at (154,216) from 47.3 s onward.
+[^12]: shot-for-shot sweep 2026-07-24:
+`analysis_scripts/mine_shot_for_shot.py` — per-bot hits-taken vs
+shots-fired per session (ratio buckets) and last-shot-minus-last-hit
+gap distribution (0–2 s in 291/397, negative i.e. stopped-before-
+last-hit in 103, >2 s in only 3). Re-run to re-derive.
 [^11]: archive sweeps 2026-07-24:
 `analysis_scripts/mine_bot_assist.py` (bot-shooter 0x53 frames vs
 last-known tank positions: 2,166 at player tiles, 81 at enemy-team
