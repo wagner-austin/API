@@ -20,6 +20,7 @@ from tests.conftest import FakeFileSystem
 
 from tankpit_bot import _test_hooks as core_hooks
 from tankpit_bot._test_hooks import (
+    BufferedMessageSourceProtocol,
     PageProtocol,
     TerrainMapProtocol,
 )
@@ -621,13 +622,23 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
 
 def test_settle_dwell_heartbeat_walk_shuffles_in_place() -> None:
     """A positive heartbeat splits the dwell into interval steps, each
-    led by a 1-tile walk shuffle (east, back west, east...) — query
-    heartbeats were falsified 2026-07-24: the broadcast stream mutes
-    for any non-PLAYING client, so the dwell must genuinely play."""
+    led by a drain plus a 1-tile walk shuffle (east, back west, ...) —
+    the 2026-07-24 decisive run confirmed real actions hold the push
+    stream open, and the per-beat drain keeps the shuffle origin at
+    the tank's true position instead of the frozen landing tile."""
     probe = _ProbeHarness()
+    drains = 0
+
+    def _counting_drain(provider: BufferedMessageSourceProtocol) -> int:
+        nonlocal drains
+        drains += 1
+        return 0
+
+    action_hooks.drain_buffered_messages = _counting_drain
     probe._settle_dwell(probe._fake_page, 4000, 1500)
     assert probe.inventory_calls == 0
     assert probe.move_calls == [(101, 100), (99, 100), (101, 100)]
+    assert drains == 3
     assert probe._fake_page.waits[-3:] == [1500.0, 1500.0, 1000.0]
 
 

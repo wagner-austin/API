@@ -215,8 +215,12 @@ class EnemyTeleportProbe(ProbeBase):
         With a positive heartbeat interval, one heartbeat action fires
         at the start of the dwell and every interval after — the
         broadcast stream mutes for non-playing clients (wiki log
-        2026-07-24), so a silent dwell observes nothing. Zero interval
-        preserves the historical silent-settle behavior.
+        2026-07-24), so a silent dwell observes nothing. Each beat
+        drains the CDP buffer first so the shuffle tracks the tank's
+        true position: the 2026-07-24 decisive run walked against a
+        frozen landing position and half its moves were supervisor-
+        rejected (154 CANT_GO into the watched bot's tile). Zero
+        interval preserves the historical silent-settle behavior.
 
         Args:
             page: Playwright page driving the wait.
@@ -231,6 +235,7 @@ class EnemyTeleportProbe(ProbeBase):
         remaining = settle_delay_ms
         beat = 0
         while remaining > 0:
+            action_hooks.drain_buffered_messages(self)
             self._heartbeat_action(beat)
             beat += 1
             step = min(heartbeat_interval_ms, remaining)
