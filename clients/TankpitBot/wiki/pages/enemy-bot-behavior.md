@@ -93,13 +93,23 @@ archive-wide sweep bears it out and pins the policy numerically:[^8]
    "significantly smarter at sergeant" regime is completely
    uncaptured — any sim bot-policy is certified for ranks 0–1 only.
 
-**Open anomaly — unexplained refuels**: 64 bot tier-up events, but
-only 3 within 5 s of an observed walk and 1 within 5 s of a detected
-teleport. 60/64 have no observed movement to explain the fuel gain.
-Either bot position channels are gappier than assumed (0x47/0x3D
-viewport scoping) or an unmodeled mechanic exists. Needs a targeted
-capture watching one bot continuously before the sim policy claims
-the refuel channel.[^8]
+**Anomaly SOLVED (same day) — the "unexplained refuels" are
+REACTIVATIONS**: drilling the 64 tier-up events decomposed them
+completely. 56/64 land at exactly tier 3 (full fuel) — not a pickup
+signature but a reset; 27 of them provably follow that same bot id's
+own 0x41 death, with the death→tier-3 gap moded at **exactly 22 s**
+(17/27; spread 21–38 s) — the corpse window ([[deactivation-format]]
+§corpse window). The law: **practice bots reactivate in place with
+the SAME id at full fuel when their corpse clears** (the fixed
+36-slot roster reuses its ids — unlike human respawns, which join as
+new ids). The remaining 8 partial jumps (0→1, 1→2, 0→2) are genuine
+accidental pickups — the user's 2026-07-19 story, at its true low
+rate. Viewport-restriction cross-check: of the 60 no-movement
+tier-ups, 50 had stale positions (visibility gap as suspected), and
+all 7 in-viewport cases were 0→3 reactivations of bots that died in
+view. NOT yet in the sim: same-id practice-bot reactivation (the
+harness revives as new ids — correct for humans, documented gap for
+practice bots).[^8]
 
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)

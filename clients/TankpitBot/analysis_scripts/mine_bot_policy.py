@@ -23,7 +23,7 @@ from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.wire_timeline import _split_frame_bodies
 
 BOT_NAME = re.compile(r"^(red|purple|blue|orange)-\d+$")
-TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x53, 0x58}
+TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x53, 0x58, 0x5A}
 
 
 def narrow(obj: object) -> dict:
@@ -49,6 +49,8 @@ def scan_session(path: Path, agg: dict) -> None:
     hits_since_jump: dict[int, int] = {}
     last_move_ts: dict[int, int] = {}  # last 0x47 walk echo per tank
     last_jump_ts: dict[int, int] = {}  # last detected teleport per tank
+    viewport: list[int | None] = [None, None]  # own viewport origin
+    last_killed_ts: dict[int, int] = {}  # 0x41 victim -> ts
     last_tier: dict[int, tuple[int, int]] = {}  # id -> (ts, tier)
     max_rank: dict[int, int] = {}
     session_bot_shots = 0
@@ -67,6 +69,42 @@ def scan_session(path: Path, agg: dict) -> None:
             agg["bot_tier_up_after_move_5s"] += 1 if moved_recently else 0
             jumped_recently = tid in last_jump_ts and ts - last_jump_ts[tid] <= 5000
             agg["bot_tier_up_after_teleport_5s"] += 1 if jumped_recently else 0
+            agg["tier_up_jumps"][f"{prev[1]}->{tier}"] += 1
+            killed_recently = tid in last_killed_ts and ts - last_killed_ts[tid] <= 40000
+            agg["bot_tier_up_after_death_40s"] += 1 if killed_recently else 0
+            if killed_recently:
+                gap_s = (ts - last_killed_ts[tid]) // 1000
+                agg["reactivation_gap_s"][gap_s] += 1
+            if not moved_recently and not jumped_recently:
+                pos = last_pos.get(tid)
+                if pos is None or viewport[0] is None:
+                    agg["tier_up_unexplained_unknown"] += 1
+                else:
+                    stale = ts - pos[0] > 10000
+                    inside = (
+                        viewport[0] <= pos[1] <= viewport[0] + 15
+                        and viewport[1] is not None
+                        and viewport[1] <= pos[2] <= viewport[1] + 15
+                    )
+                    if stale:
+                        agg["tier_up_unexplained_stale_pos"] += 1
+                    elif inside:
+                        agg["tier_up_unexplained_in_viewport"] += 1
+                        agg["in_viewport_cases"].append(
+                            {
+                                "session": session["session_id"],
+                                "bot": names.get(tid, ""),
+                                "ts": ts,
+                                "tier": f"{prev[1]}->{tier}",
+                                "pos": [pos[1], pos[2]],
+                                "pos_age_ms": ts - pos[0],
+                                "last_move_age_ms": (
+                                    ts - last_move_ts[tid] if tid in last_move_ts else None
+                                ),
+                            }
+                        )
+                    else:
+                        agg["tier_up_unexplained_off_viewport"] += 1
         last_tier[tid] = (ts, tier)
 
     def note_pos(tid: int, ts: int, x: int, y: int, via_walk: bool) -> None:
@@ -162,6 +200,7 @@ def scan_session(path: Path, agg: dict) -> None:
                         else:
                             agg["bot_shot_over_10s"] += 1
             elif k == 0x41:
+                last_killed_ts[m["victim_id"]] = ts
                 if is_bot(m["victim_id"]):
                     agg["bot_deaths"] += 1
                 if not m["is_mine_kill"] and is_bot(m["killer_id"]):
@@ -169,6 +208,9 @@ def scan_session(path: Path, agg: dict) -> None:
             elif k == 0x4B:
                 if is_bot(m["tank_id"]):
                     agg["bot_mine_placements"] += 1
+            elif k == 0x5A:
+                viewport[0] = m["viewport_left"]
+                viewport[1] = m["viewport_top"]
 
     bots = sorted({names[t] for t in names if BOT_NAME.match(names[t])})
     agg["sessions"] += 1
@@ -209,6 +251,14 @@ def main() -> None:
         "bot_tier_up_events": 0,
         "bot_tier_up_after_move_5s": 0,
         "bot_tier_up_after_teleport_5s": 0,
+        "tier_up_unexplained_in_viewport": 0,
+        "tier_up_unexplained_off_viewport": 0,
+        "tier_up_unexplained_stale_pos": 0,
+        "tier_up_unexplained_unknown": 0,
+        "in_viewport_cases": [],
+        "tier_up_jumps": Counter(),
+        "bot_tier_up_after_death_40s": 0,
+        "reactivation_gap_s": Counter(),
         "bot_small_drift_no_walk": 0,
         "bot_pos_stationary_syncs": 0,
         "bot_deaths": 0,
