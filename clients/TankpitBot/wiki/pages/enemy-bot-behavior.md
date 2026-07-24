@@ -120,8 +120,13 @@ the roster is exactly **36 fixed bots** (9 per team, red/purple/
 blue/orange 1–9, all observed in the archive), each reusing its id.
 The sim law (`sim/bot_policy.py::reactivate_practice_bot`, judged by
 the `bot-reactivation` shadow law — first archive run 39 samples /
-35 exact, PASS) respawns at a deterministic distant scatter point;
-the real placement distribution stays a documented assumption.[^8]
+35 exact, PASS) respawns at a deterministic distant scatter point.
+Follow-up measurements (same day): the respawn placement is
+**uniform across the map** — the 102 pairs cover all sixteen 64×64
+quadrants (3–9 each) with the mean at the map center (127, 131) —
+and the mid-fight **teleport-off displacement modes at 16–31 tiles**
+(84/131 jumps), i.e. just past the viewport; the sim's escape band
+now matches that measured mode.[^8]
 
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)

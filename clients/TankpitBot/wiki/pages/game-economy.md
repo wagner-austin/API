@@ -132,6 +132,21 @@ target, one spawn per minute-beat at a tick-derived fresh passable
 tile, constant 300 volume as a documented assumption) and mirrors it
 for equipment on the offset beat as an assumption.
 
+**First equipment measurements (radar-reveal mining, 2026-07-24):**
+since equipment never appears on the map, the mining works from
+partial visibility — every 0x4F radar entry and 0x5A patch tile is
+tracked per-tile, and a tile observed empty then later observed
+holding equipment is one witnessed spawn. Archive-wide: **45
+witnessed spawns over 9,040 empty-tile-minutes of re-scan exposure**
+(≈ 0.5% chance per empty tile per minute in the active play area);
+5,440 first-reveals ≈ 22 distinct equipment tiles seen per session.
+Consumption attribution is weak by construction (the re-scan lags
+the pickup, so only 21/141 equipment→empty transitions land near an
+own 0x67 within 5 s — a timing artifact, not evidence of another
+consumer; bots demonstrably never collect, [[enemy-bot-behavior]]).
+Placement distribution and true map-wide population remain open —
+they need wider radar coverage than bot sessions produce.[^4]
+
 ## What's still open
 
 Equipment-container respawn dynamics and spawn volumes (the 0x4C

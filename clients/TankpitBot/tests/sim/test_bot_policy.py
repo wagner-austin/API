@@ -66,7 +66,7 @@ def test_threshold_reached_teleports_off_and_resets() -> None:
         raise AssertionError("a bot over threshold must teleport off")
     assert command["kind"] == "teleport"
     distance = max(abs(command["x"] - 100), abs(command["y"] - 100))
-    assert distance >= 12
+    assert distance >= 16
     assert (state["hits_taken"], state["has_pending_return"]) == (0, False)
 
 

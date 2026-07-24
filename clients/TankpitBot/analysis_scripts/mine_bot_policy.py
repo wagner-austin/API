@@ -23,7 +23,7 @@ from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.wire_timeline import _split_frame_bodies
 
 BOT_NAME = re.compile(r"^(red|purple|blue|orange)-\d+$")
-TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x4C, 0x53, 0x58, 0x5A}
+TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x4C, 0x4F, 0x53, 0x58, 0x5A, 0x67}
 
 
 def narrow(obj: object) -> dict:
@@ -52,6 +52,27 @@ def scan_session(path: Path, agg: dict) -> None:
     viewport: list[int | None] = [None, None]  # own viewport origin
     last_killed_ts: dict[int, int] = {}  # 0x41 victim -> ts
     death_watch: dict[int, tuple[int, int, int]] = {}  # tid -> (death_ts, corpse_x, corpse_y)
+    tile_state: dict[tuple[int, int], tuple[int, str]] = {}  # (x,y) -> (ts, state)
+    gain_ts: list[int] = []  # own 0x67 timestamps
+
+    def note_tile(ts: int, x: int, y: int, value: int) -> None:
+        """Track a tile's container layer: -1 equipment, 0 empty, >0 fuel."""
+        state = "equipment" if value == -1 else ("empty" if value == 0 else "fuel")
+        prev = tile_state.get((x, y))
+        if prev is not None and prev[1] != state:
+            dt = ts - prev[0]
+            if prev[1] == "empty" and state == "equipment":
+                agg["equipment_spawn_transitions"] += 1
+                agg["equipment_spawn_gap_min"][min(int(dt // 60000), 10)] += 1
+            elif prev[1] == "equipment" and state == "empty":
+                agg["equipment_consumed_transitions"] += 1
+                near_gain = any(abs(g - ts) <= 5000 for g in gain_ts[-6:])
+                agg["equipment_consumed_near_own_gain_5s"] += 1 if near_gain else 0
+        if prev is not None and prev[1] == "empty":
+            agg["equipment_exposure_min"] += (ts - prev[0]) / 60000.0
+        if prev is None and state == "equipment":
+            agg["equipment_first_reveals"] += 1
+        tile_state[(x, y)] = (ts, state)
 
     def note_any_pos(tid: int, ts: int, x: int, y: int) -> None:
         watch = death_watch.get(tid)
@@ -133,6 +154,7 @@ def scan_session(path: Path, agg: dict) -> None:
             walked = via_walk or (tid in last_move_ts and last_move_ts[tid] >= prev[0])
             if dist > 3 and not walked:
                 agg["bot_teleports"] += 1
+                agg["bot_teleport_displacement"][min(dist // 8, 12)] += 1
                 last_jump_ts[tid] = ts
                 rank = max_rank.get(tid, 0)
                 agg["hits_before_teleport"].append((rank, hits_since_jump.get(tid, 0)))
@@ -233,9 +255,19 @@ def scan_session(path: Path, agg: dict) -> None:
             elif k == 0x5A:
                 viewport[0] = m["viewport_left"]
                 viewport[1] = m["viewport_top"]
+                for ent in m["entities"]:
+                    ex = m["viewport_left"] + ent["col"] - 1
+                    ey = m["viewport_top"] + ent["row"] - 1
+                    if 0 <= ex < 256 and 0 <= ey < 256:
+                        note_tile(ts, ex, ey, ent["cache_value"])
             elif k == 0x4C:
                 for entry in m["tanks"]:
                     note_any_pos(entry["tank_id"], ts, entry["x"], entry["y"])
+            elif k == 0x4F:
+                for cont in m["containers"]:
+                    note_tile(ts, cont["x"], cont["y"], cont["volume"])
+            elif k == 0x67:
+                gain_ts.append(ts)
 
     bots = sorted({names[t] for t in names if BOT_NAME.match(names[t])})
     agg["sessions"] += 1
@@ -286,6 +318,13 @@ def main() -> None:
         "reactivation_gap_s": Counter(),
         "respawn_displacement": Counter(),
         "respawn_pairs": [],
+        "bot_teleport_displacement": Counter(),
+        "equipment_first_reveals": 0,
+        "equipment_spawn_transitions": 0,
+        "equipment_spawn_gap_min": Counter(),
+        "equipment_consumed_transitions": 0,
+        "equipment_consumed_near_own_gain_5s": 0,
+        "equipment_exposure_min": 0.0,
         "bot_small_drift_no_walk": 0,
         "bot_pos_stationary_syncs": 0,
         "bot_deaths": 0,

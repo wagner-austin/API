@@ -1660,6 +1660,27 @@
    "gap_ms": 58043
   }
  ],
+ "bot_teleport_displacement": {
+  "11": 3,
+  "1": 18,
+  "3": 33,
+  "12": 9,
+  "7": 3,
+  "4": 9,
+  "5": 1,
+  "2": 51,
+  "9": 1,
+  "6": 2,
+  "10": 1
+ },
+ "equipment_first_reveals": 5440,
+ "equipment_spawn_transitions": 45,
+ "equipment_spawn_gap_min": {
+  "0": 45
+ },
+ "equipment_consumed_transitions": 141,
+ "equipment_consumed_near_own_gain_5s": 21,
+ "equipment_exposure_min": 9040.345883333111,
  "bot_small_drift_no_walk": 0,
  "bot_pos_stationary_syncs": 842,
  "bot_deaths": 285,

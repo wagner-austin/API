@@ -20,9 +20,10 @@ archive contains):
   — Sigma's table, wire-corroborated), the bot teleports off.
 
 Sim assumptions documented here, not certified: the teleport-off
-DESTINATION is unmined (the sim uses a deterministic ring band
-beyond the viewport radius), and the corporal threshold (9) is
-guide-sourced only — no corporal+ bot exists in the archive.
+exact placement is unmined (its DISPLACEMENT is measured — mode
+16-31 tiles, 84/131 archive jumps — and the sim's ring band matches
+it), and the corporal threshold (9) is guide-sourced only — no
+corporal+ bot exists in the archive.
 """
 
 from __future__ import annotations
@@ -50,8 +51,11 @@ archive-corroborated modes (20/49 and 37/82 samples); rank 2 is
 guide-sourced only (Sigma v3.4) — no corporal bot exists in the
 archive."""
 
-_ESCAPE_MIN_RADIUS = VIEWPORT_RADIUS + 4
-_ESCAPE_MAX_RADIUS = VIEWPORT_RADIUS + 16
+_ESCAPE_MIN_RADIUS = VIEWPORT_RADIUS * 2
+_ESCAPE_MAX_RADIUS = VIEWPORT_RADIUS * 2 + 15
+"""Escape band 16-31 tiles: the measured teleport-off displacement
+mode (84/131 archive bot jumps land 16-31 tiles out — just past the
+viewport; 2026-07-24 sweep)."""
 
 
 class PracticeBotStateDict(TypedDict):
@@ -188,10 +192,12 @@ def reactivate_practice_bot(world: SimWorldDict, terrain: TerrainMapProtocol, ta
     exactly the 22 s corpse window — at a DISTANT map location
     (102/102 measured pairs ≥ 24 tiles from the corpse). Fuel resets
     to the rank's capacity, so every derived emission (tier, map
-    shade) is full-health without stored state. Sim assumption: the
-    scatter point is tick/id-derived (deterministic), not the real
-    server's placement distribution; a fully sealed scatter area
-    falls back to reactivating in place.
+    shade) is full-health without stored state. The measured
+    placement distribution is UNIFORM across the map (the 102 pairs
+    cover all sixteen 64x64 quadrants at 3-9 each, mean at the map
+    center) — the deterministic tick/id-derived scatter approximates
+    it while staying replayable; a fully sealed scatter area falls
+    back to reactivating in place.
 
     Args:
         world: Simulated world (mutated).
