@@ -6,7 +6,7 @@ related:
   - "[[client-commands]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js lines 49-71 ($d.pb and state transitions)
+  - "tpclient.js:49"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every state transition traced through JS)

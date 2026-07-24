@@ -6,11 +6,9 @@ related:
   - "[[combat-chase-bug]]"
   - "[[shoot-event-format]]"
 source_paths:
-  - src/tankpit_bot/state/types/tank.py
-  - src/tankpit_bot/state/types/tank_observation.py
-  - src/tankpit_bot/state/mutations.py
-  - runs/bot/bot-20260619-050303 stale-position miss loop
-  - runs/bot/bot-20260620-191622 target-block loop
+  - "runs/bot/bot-20260619-050303.capture_session.json"
+  - "runs/bot/bot-20260620-191622.capture_session.json"
+  - "src/tankpit_bot/state"
 fact_checked: "2026-06-20"
 confidence: high
 hubs: [architecture]
@@ -192,4 +190,5 @@ Every rule above is pinned by a test in
 The combat-strategy regression test for the kill-shot gate lives in
 `tests/bot/ai/test_combat_strategy.py::TestWirePresenceGate::test_position_stale_adjacent_target_is_blocked_not_shot`.
 Removing or weakening any of these tests is a deliberate contract
-change and must come with a docstring + this wiki page update.
+change and must come with a docstring and an update to
+[[tank-freshness-model]] itself.

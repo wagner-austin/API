@@ -7,9 +7,10 @@ related:
   - "[[game-rules]]"
   - "[[tournament-strategy]]"
 source_paths:
-  - tpclient.js lines 207 (Jf class)
-  - line 217 (mode parsing)
-  - lines 265-266 (tournament guide); docs/sources/sigmas-tankpit-guide-v3.4.pdf for the tournament capacity ladder
+  - "tpclient.js:207"
+  - "tpclient.js:217"
+  - "tpclient.js:265"
+  - "docs/sources/sigmas-tankpit-guide-v3.4.pdf"
 fact_checked: "2026-07-06"
 confidence: high
 verified: 2026-06-19 (mode encoding/values traced from JS lobby handler); tournament capacity ladder guide-sourced, not verified against a tournament capture

@@ -5,7 +5,8 @@ related:
   - "[[services]]"
   - "[[coding-standards]]"
 source_paths:
-  - codebase inspection 2026-06-16
+  - "tests"
+  - "scripts/guard.py"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

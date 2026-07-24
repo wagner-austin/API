@@ -5,7 +5,7 @@ related:
   - "[[js-source-map]]"
   - "[[client-commands]]"
 source_paths:
-  - tpclient.js lines 16-17 (qb table generation, za function)
+  - "tpclient.js:16"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (cipher implementation traced through JS)

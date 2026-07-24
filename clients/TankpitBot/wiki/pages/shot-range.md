@@ -6,7 +6,7 @@ related:
   - "[[tank-registry]]"
   - "[[combat-chase-bug]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-07-03"
 confidence: high
 hubs: [combat]

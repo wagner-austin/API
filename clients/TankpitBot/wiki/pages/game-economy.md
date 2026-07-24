@@ -8,11 +8,10 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[fuel-system]]"
 source_paths:
-  - runs/sniff/sniff-20260620-150155 (multi-tank PvP)
-  - runs/sniff/sniff-20260620-155103 (annotated multi-pickup)
-  - runs/sniff/sniff-20260620-173727 (ghost-observation 5 kill cycles)
-  - user narrative cross-references 2026-06-20
-  - tpclient.js Gc/Wb/ce functions + user deposit measurements at 4 ranks 2026-07-06
+  - "runs/sniff/sniff-20260620-150155.capture_session.json"
+  - "runs/sniff/sniff-20260620-155103.capture_session.json"
+  - "runs/sniff/sniff-20260620-173727.capture_session.json"
+  - "tpclient.js"
 fact_checked: "2026-07-21"
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)

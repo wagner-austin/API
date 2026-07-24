@@ -5,7 +5,7 @@ related:
   - "[[module-map]]"
   - "[[adding-a-probe]]"
 source_paths:
-  - Makefile inspection 2026-06-16
+  - "Makefile"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

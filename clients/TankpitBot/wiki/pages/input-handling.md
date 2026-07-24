@@ -5,8 +5,8 @@ related:
   - "[[client-state-machine]]"
   - "[[toolbar-layout]]"
 source_paths:
-  - tpclient.js lines 79-91 (mouse/touch handlers)
-  - lines 107-108 (Bd touch class)
+  - "tpclient.js:79"
+  - "tpclient.js:107"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (all input paths traced from JS event handlers)

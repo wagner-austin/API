@@ -6,7 +6,7 @@ related:
   - "[[rendering-pipeline]]"
   - "[[viewport-frame]]"
 source_paths:
-  - tpclient.js lines 145-155 (terrain encoding, sg/ug functions)
+  - "tpclient.js:145"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (terrain byte encoding fully traced through JS)

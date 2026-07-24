@@ -6,9 +6,8 @@ related:
   - "[[decode-coverage]]"
   - "[[js-source-map]]"
 source_paths:
-  - tpclient.js line 127 (Xc.u field)
-  - lines 158-161 (all handlers setting b.u)
-  - 2026-06-19 JS trace
+  - "tpclient.js:127"
+  - "tpclient.js:158"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (traced b.u assignment across all 5 V-table handlers)

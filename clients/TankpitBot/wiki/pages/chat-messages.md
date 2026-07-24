@@ -5,8 +5,8 @@ related:
   - "[[client-commands]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js lines 243-255 (E[] table)
-  - line 24 (Bb chat controller)
+  - "tpclient.js:243"
+  - "tpclient.js:24"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (all 65 entries traced from JS E[] object)

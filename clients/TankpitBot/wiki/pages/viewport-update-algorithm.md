@@ -6,7 +6,7 @@ related:
   - "[[terrain-system]]"
   - "[[viewport-frame]]"
 source_paths:
-  - tpclient.js lines 187-190 (V.Z / Vg handler)
+  - "tpclient.js:187"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete parse and render algorithm traced from JS)

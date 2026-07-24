@@ -7,7 +7,8 @@ related:
   - "[[tank-registry]]"
   - "[[map-data-algorithm]]"
 source_paths:
-  - see footnotes
+  - "tpclient.js"
+  - "runs/bot"
 fact_checked: "2026-06-13"
 confidence: high
 hubs: [protocol]

@@ -8,7 +8,8 @@ related:
   - "[[js-source-map]]"
   - "[[executor-rejection-loops]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
+  - "runs/sniff"
 fact_checked: "2026-07-17"
 confidence: high
 hubs: [protocol]

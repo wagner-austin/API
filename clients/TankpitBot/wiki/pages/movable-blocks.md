@@ -8,7 +8,9 @@ related:
   - "[[weapon-selection]]"
   - "[[js-source-map]]"
 source_paths:
-  - user (Austin) 2026-07-20 contract + manual captures sniff-20260720-214839 (mixed session, 7 pick/drop pairs, 3 refused teleports) and sniff-20260720-215930 (12 labeled drops incl. mines, containers, same-tile re-place)
+  - "runs/sniff/sniff-20260720-214839.capture_session.json"
+  - "runs/sniff/sniff-20260720-215930.capture_session.json"
+  - "src/tankpit_bot/sim/blocks.py"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [combat, game-mechanics]

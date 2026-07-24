@@ -3,7 +3,7 @@ title: "Bot Service Architecture"
 tags: []
 fact_checked: "1970-01-01"
 confidence: low
-hubs: []
+hubs: [architecture]
 ---
 
 # Bot Service Architecture

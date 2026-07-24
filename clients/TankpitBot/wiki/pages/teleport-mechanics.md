@@ -6,7 +6,8 @@ related:
   - "[[fuel-system]]"
   - "[[map-mechanics]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
+  - "src/tankpit_bot/physics/costs.py"
 fact_checked: "2026-06-12"
 confidence: high
 hubs: [game-mechanics]

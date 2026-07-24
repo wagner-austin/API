@@ -6,8 +6,8 @@ related:
   - "[[v-table-complete]]"
   - "[[decode-coverage]]"
 source_paths:
-  - tpclient.js lines 25-31 (K subclasses)
-  - lines 6-10 (va subclasses)
+  - "tpclient.js:25"
+  - "tpclient.js:6"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every command class traced through JS source)

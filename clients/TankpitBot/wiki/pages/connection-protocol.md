@@ -6,8 +6,8 @@ related:
   - "[[xor-cipher]]"
   - "[[client-commands]]"
 source_paths:
-  - tpclient.js lines 214-224 (bootstrap IIFE)
-  - lines 11-14 (WebSocket transport)
+  - "tpclient.js:214"
+  - "tpclient.js:11"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (full connection flow traced through JS)

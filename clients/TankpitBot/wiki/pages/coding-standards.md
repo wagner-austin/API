@@ -4,7 +4,8 @@ tags: [architecture, testing, quality]
 related:
   - "[[inheritance-chain]]"
 source_paths:
-  - see footnotes
+  - "src/tankpit_bot"
+  - "tests"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [architecture]

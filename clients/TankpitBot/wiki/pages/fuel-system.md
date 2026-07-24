@@ -6,7 +6,8 @@ related:
   - "[[radar-mechanics]]"
   - "[[map-data-decode]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
+  - "src/tankpit_bot/physics"
 fact_checked: "2026-07-03"
 confidence: high
 hubs: [game-mechanics]

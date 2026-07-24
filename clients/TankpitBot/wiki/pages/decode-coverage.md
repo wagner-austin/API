@@ -9,9 +9,8 @@ related:
   - "[[js-source-map]]"
   - "[[tank-freshness-model]]"
 source_paths:
-  - tpclient.js V table
-  - runs/bot/bot-20260619-053210 capture
-  - 2026-06-19 unification audit
+  - "tpclient.js"
+  - "runs/bot/bot-20260619-053210.capture_session.json"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (unified dispatcher + JS source + production captures)

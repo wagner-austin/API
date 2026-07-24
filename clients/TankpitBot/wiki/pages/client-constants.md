@@ -6,10 +6,10 @@ related:
   - "[[game-rules]]"
   - "[[equipment-system]]"
 source_paths:
-  - tpclient.js lines 15-16
-  - 31-33
-  - 205
-  - 261-266
+  - "tpclient.js:15"
+  - "tpclient.js:31"
+  - "tpclient.js:205"
+  - "tpclient.js:261"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (extracted directly from JS source)

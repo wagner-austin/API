@@ -7,7 +7,7 @@ related:
   - "[[radar-mechanics]]"
   - "[[teleport-mechanics]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-07-01"
 confidence: high
 hubs: [combat]

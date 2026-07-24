@@ -13,8 +13,9 @@ related:
   - "[[mine-mechanics]]"
   - "[[teleport-mechanics]]"
 source_paths:
-  - design session 2026-07-20 (user + AI)
-  - user-approved direction; mcps-workspace precedent PLAN_WIKI_AUDIT_SEARCH_MCP_REFACTOR.md
+  - "src/tankpit_bot/physics"
+  - "src/tankpit_bot/sim"
+  - "src/tankpit_bot/validate"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [architecture]

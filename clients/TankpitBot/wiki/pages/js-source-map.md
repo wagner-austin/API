@@ -6,8 +6,8 @@ related:
   - "[[client-commands]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js lines 1-329
-  - Closure Compiler output patterns
+  - "tpclient.js"
+  - "tpclient.pretty.js"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete manual walk of all 329 lines)

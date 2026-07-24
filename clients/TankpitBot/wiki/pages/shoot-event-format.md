@@ -6,9 +6,9 @@ related:
   - "[[weapon-log-markers]]"
   - "[[shot-range]]"
 source_paths:
-  - tpclient.js Gg.h / V.S
-  - runs/bot/bot-20260619-050303 capture t+25.47s
-  - see footnotes
+  - "tpclient.js"
+  - "runs/bot/bot-20260619-050303.capture_session.json"
+  - "src/tankpit_bot/physics/combat.py"
 fact_checked: "2026-06-19"
 confidence: high
 hubs: [protocol]

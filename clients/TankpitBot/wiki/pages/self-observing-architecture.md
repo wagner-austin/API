@@ -6,7 +6,7 @@ related:
   - "[[coding-standards]]"
   - "[[combat-chase-bug]]"
 source_paths:
-  - docs/handoffs/self-observing-bot-architecture.md; live incident 2026-07-06 20:47:31
+  - "docs/handoffs/self-observing-bot-architecture.md"
 fact_checked: "2026-07-18"
 confidence: high
 hubs: [architecture]

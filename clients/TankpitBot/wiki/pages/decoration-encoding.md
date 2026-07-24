@@ -5,8 +5,8 @@ related:
   - "[[v-table-complete]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js line 204 (yg function)
-  - line 128 (ed/Ff rendering)
+  - "tpclient.js:204"
+  - "tpclient.js:128"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (encoding and rendering traced from JS)

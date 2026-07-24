@@ -6,7 +6,7 @@ related:
   - "[[combat-chase-bug]]"
   - "[[tournament-strategy]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-07-06"
 confidence: high
 hubs: [combat]

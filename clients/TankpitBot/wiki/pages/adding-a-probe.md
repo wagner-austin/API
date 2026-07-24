@@ -7,7 +7,7 @@ related:
   - "[[testing-patterns]]"
   - "[[make-targets]]"
 source_paths:
-  - codebase inspection 2026-06-16
+  - "src/tankpit_bot/action_lab"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

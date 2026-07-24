@@ -5,7 +5,8 @@ related:
   - "[[shoot-event-format]]"
   - "[[shot-range]]"
 source_paths:
-  - see footnotes
+  - "src/tankpit_bot/state"
+  - "runs/bot"
 fact_checked: "2026-06-11"
 confidence: high
 hubs: [protocol]

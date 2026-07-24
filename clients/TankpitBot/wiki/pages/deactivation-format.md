@@ -5,9 +5,10 @@ related:
   - "[[shoot-event-format]]"
   - "[[weapon-log-markers]]"
 source_paths:
-  - tpclient.js Pg.h / V.A
-  - capture replay 2026-07-19
-  - see footnotes
+  - "tpclient.js"
+  - "src/tankpit_bot/physics/capacity.py"
+  - "runs/bot"
+  - "runs/sniff"
 fact_checked: "2026-07-19"
 confidence: high
 hubs: [protocol]

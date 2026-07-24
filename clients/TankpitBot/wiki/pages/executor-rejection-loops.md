@@ -7,7 +7,8 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[mine-mechanics]]"
 source_paths:
-  - see footnotes
+  - "src/tankpit_bot/bot"
+  - "runs/bot"
 fact_checked: "2026-07-17"
 confidence: high
 hubs: [architecture]

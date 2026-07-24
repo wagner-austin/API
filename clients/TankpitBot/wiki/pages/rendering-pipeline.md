@@ -5,9 +5,9 @@ related:
   - "[[js-source-map]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js lines 4-5 (canvas)
-  - 108-127 (animations)
-  - 142-155 (tile grid)
+  - "tpclient.js:4"
+  - "tpclient.js:108"
+  - "tpclient.js:142"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (rendering system traced through JS)

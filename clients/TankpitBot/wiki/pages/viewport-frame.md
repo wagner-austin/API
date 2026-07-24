@@ -6,7 +6,8 @@ related:
   - "[[teleport-mechanics]]"
   - "[[viewport-shift-protocol]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
+  - "tpclient.js"
 fact_checked: "2026-07-17"
 confidence: high
 hubs: [game-mechanics]

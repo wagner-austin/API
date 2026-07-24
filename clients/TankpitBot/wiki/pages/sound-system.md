@@ -5,7 +5,7 @@ related:
   - "[[js-source-map]]"
   - "[[client-constants]]"
 source_paths:
-  - tpclient.js lines 135-140 (Sc/Zf classes, vd load function)
+  - "tpclient.js:135"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (all 18 audio buffers and their triggers traced from JS)

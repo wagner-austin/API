@@ -8,7 +8,8 @@ related:
   - "[[teleport-mechanics]]"
   - "[[ferry-mechanics]]"
 source_paths:
-  - see footnotes
+  - "docs/sources/sigmas-tankpit-guide-v3.4.pdf"
+  - "tpclient.js"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [game-mechanics]

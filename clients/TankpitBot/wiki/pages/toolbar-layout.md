@@ -5,7 +5,7 @@ related:
   - "[[js-source-map]]"
   - "[[client-commands]]"
 source_paths:
-  - tpclient.js lines 33-34 (pc/qc/rc/sc arrays, xc function)
+  - "tpclient.js:33"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (all 18 hitbox regions traced from JS arrays)

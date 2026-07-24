@@ -7,7 +7,7 @@ related:
   - "[[teleport-mechanics]]"
   - "[[tank-freshness-model]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [combat]

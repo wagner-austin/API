@@ -4,7 +4,7 @@ tags: [architecture, di, composition]
 related:
   - "[[coding-standards]]"
 source_paths:
-  - see footnotes
+  - "src/tankpit_bot"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [architecture]

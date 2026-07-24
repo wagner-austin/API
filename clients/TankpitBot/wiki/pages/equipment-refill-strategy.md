@@ -5,7 +5,7 @@ related:
   - "[[radar-mechanics]]"
   - "[[equipment-system]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [combat]

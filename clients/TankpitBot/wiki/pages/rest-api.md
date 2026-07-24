@@ -4,8 +4,7 @@ tags: [api, rest, endpoints]
 related:
   - "[[connection-protocol]]"
 source_paths:
-  - https://tankpit.com/api (official docs)
-  - 2026-06-19 live endpoint testing
+  - "https://tankpit.com"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (every endpoint hit and response structure confirmed)

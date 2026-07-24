@@ -6,9 +6,9 @@ related:
   - "[[client-commands]]"
   - "[[v-table-complete]]"
 source_paths:
-  - tpclient.js lines 66-68 (state 7 handler)
-  - lines 173-176 (V.B handler)
-  - line 70 (be function)
+  - "tpclient.js:66"
+  - "tpclient.js:173"
+  - "tpclient.js:70"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (traced through JS state machine and V.B handler)

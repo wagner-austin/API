@@ -9,7 +9,8 @@ related:
   - "[[self-observing-architecture]]"
   - "[[bot-behavior-contract]]"
 source_paths:
-  - see footnotes
+  - "src/tankpit_bot/terrain.py"
+  - "tpclient.js"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [architecture]

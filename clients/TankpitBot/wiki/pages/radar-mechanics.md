@@ -6,7 +6,9 @@ related:
   - "[[equipment-system]]"
   - "[[fuel-system]]"
 source_paths:
-  - see footnotes
+  - "tpclient.js"
+  - "runs/bot"
+  - "runs/sniff"
 fact_checked: "2026-07-06"
 confidence: high
 hubs: [game-mechanics]

@@ -5,7 +5,7 @@ related:
   - "[[teleport-mechanics]]"
   - "[[map-data-decode]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
 fact_checked: "2026-06-12"
 confidence: high
 hubs: [game-mechanics]

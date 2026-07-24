@@ -7,9 +7,8 @@ related:
   - "[[bot-behavior-contract]]"
   - "[[gameplay-loop]]"
 source_paths:
-  - user 2026-06-20 (game-mechanic interview)
-  - runs/sniff/sniff-20260620-150155.capture_session.json (Artax vs Yuppler PvP)
-  - tpclient.js Dg (V.K MinePlacement) and dh (V.E MineDetonation)
+  - "runs/sniff/sniff-20260620-150155.capture_session.json"
+  - "tpclient.js"
 fact_checked: "2026-06-20"
 confidence: high
 verified: 2026-07-21 (cascade re-confirmed in manual capture sniff-20260721-212348; original 2026-06-20 real-combat capture matched the documented mechanic byte-for-byte)

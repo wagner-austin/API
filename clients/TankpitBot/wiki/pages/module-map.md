@@ -5,7 +5,7 @@ related:
   - "[[services]]"
   - "[[inheritance-chain]]"
 source_paths:
-  - codebase inspection 2026-06-16
+  - "src/tankpit_bot"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

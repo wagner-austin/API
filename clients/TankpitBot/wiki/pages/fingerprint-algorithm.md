@@ -5,7 +5,7 @@ related:
   - "[[connection-protocol]]"
   - "[[xor-cipher]]"
 source_paths:
-  - tpclient.js lines 17-21 (sb class, MurmurHash3)
+  - "tpclient.js:17"
 fact_checked: "2026-06-19"
 confidence: high
 verified: 2026-06-19 (complete fingerprint + hash algorithm traced from JS)

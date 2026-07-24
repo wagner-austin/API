@@ -7,9 +7,9 @@ related:
   - "[[tank-freshness-model]]"
   - "[[gameplay-loop]]"
 source_paths:
-  - tankpit_bot/bot/
-  - tankpit_bot/sniffer/
-  - runs/bot/latest.events.jsonl format
+  - "src/tankpit_bot/bot"
+  - "src/tankpit_bot/sniffer"
+  - "runs/bot/latest.events.jsonl"
 fact_checked: "2026-07-03"
 confidence: high
 verified: 2026-06-20 (anchored to specific code paths + integration tests)

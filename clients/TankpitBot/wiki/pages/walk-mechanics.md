@@ -8,8 +8,8 @@ related:
   - "[[mine-mechanics]]"
   - "[[physics-module-roadmap]]"
 source_paths:
-  - runs/sniff/sniff-20260721-212348.capture_session.json (manual walk-timing + mine session)
-  - bot archive probes 2026-07-21 (200 single-echo episodes; 1755 consecutive-echo pairs)
+  - "runs/sniff/sniff-20260721-212348.capture_session.json"
+  - "src/tankpit_bot/validate/archive.py"
 fact_checked: "2026-07-21"
 confidence: high
 verified: 2026-07-21 (manual capture + two full-archive probes agree)

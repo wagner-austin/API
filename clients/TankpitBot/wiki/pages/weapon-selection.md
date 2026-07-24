@@ -6,7 +6,8 @@ related:
   - "[[weapon-log-markers]]"
   - "[[shot-range]]"
 source_paths:
-  - see footnotes
+  - "runs/bot"
+  - "src/tankpit_bot/sim/combat.py"
 fact_checked: "2026-07-02"
 confidence: high
 hubs: [combat, protocol]

@@ -6,7 +6,8 @@ related:
   - "[[teleport-mechanics]]"
   - "[[fuel-system]]"
 source_paths:
-  - see footnotes
+  - "runs/sniff"
+  - "src/tankpit_bot/sim/movement.py"
 fact_checked: "2026-06-12"
 confidence: high
 hubs: [game-mechanics]
