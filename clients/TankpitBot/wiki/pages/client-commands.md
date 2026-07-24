@@ -53,13 +53,33 @@ These are sent during active gameplay. Each starts with a length byte, then the 
 
 | Code | Char | Bytes | Class | Description | Byte Layout |
 |------|------|-------|-------|-------------|-------------|
-| 0x6C | `l` | 2 | Nb | **Open radar scan** | `[2, 'l']` |
-| 0x66 | `f` | 2 | Mb | **Open map** | `[2, 'f']` |
+| 0x6C | `l` | 2 | Nb | **Open map** (CORRECTED 2026-07-24 — was listed as radar) | `[2, 'l']` |
+| 0x66 | `f` | 2 | Mb | **Radar scan** (CORRECTED 2026-07-24 — was listed as map) | `[2, 'f']` |
 | 0x69 | `i` | 2 | Yb | **Request inventory** | `[2, 'i']` |
 | 0x76 | `v` | 2 | bc | **Request statistics** | `[2, 'v']` |
 | 0x2A | `*` | 2 | Zb | **Active forces** | `[2, '*']` |
 | 0x2F | `/` | 2 | ac | **Active players** | `[2, '/']` |
 | 0x31 | `1` | 3 | $b | **Top 10 request** | `[3, '1', team_filter]` — 255=all, 0-3=team |
+
+**Correction (2026-07-24) — the `l`/`f` rows above were swapped in
+the original JS trace** (minified name reuse across scopes is the
+likely culprit). The live wire is unambiguous and re-proven every
+session: the bot's `CMD_MAP_OPEN = 0x6C ('l')` is followed by 0x4C
+MapData on every `map_open → map_data_processed` completion in the
+entire archive, and `CMD_RADAR = 0x66 ('f')` is followed by 0x4F
+radar results in every collect-cascade scan. The 0x66/0x6C class
+assignment in [[js-source-map]] should be re-traced when that page
+is next revisited.
+
+**Map open/close semantics** (user contract, 2026-07-24, verbatim):
+*"the programmatic map open command doesnt close the map. so you can
+programmatically open the map, but closing the map usually
+necessitates an 'm' key press to close the map. teleporting of
+course closes the map as well."* — i.e. the open command is NOT a
+toggle; the close paths are the client-side keypress or a teleport.
+First surfaced by the 2026-07-24 bot-watch run (the probe opened the
+map programmatically and never key-closed it; see the wiki-log
+anomaly entries of that date).
 
 ### Misc
 

@@ -46,8 +46,8 @@ Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minifie
 | Jb | `?` | 2 | Heartbeat/ping |
 | Kb | `.` | 2 | Ping request |
 | Lb | `s` | 6 | **Shoot**: x, y, target_id(LE u16) |
-| Mb | `f` | 2 | Open map |
-| Nb | `l` | 2 | Scan radar |
+| Mb | `f` | 2 | Radar scan (CORRECTED 2026-07-24 — live wire: 0x66 'f' → 0x4F; the original trace swapped this row with Nb) |
+| Nb | `l` | 2 | Open map (CORRECTED 2026-07-24 — live wire: 0x6C 'l' → 0x4C; see [[client-commands]] correction) |
 | Ob | `t` | 4 | **Teleport**: x, y |
 | Pb | `p` | 4 | **Move**: x, y |
 | Qb | `k` | 2 | Deactivate/exit |
