@@ -38,10 +38,15 @@ is not enough:[^1]
   `last_wire_seen_ms` but carries no position. Shadow-measured
   (2026-07-22, `make shadow` over 245 sessions): OTHER-tank median
   inter-sync gaps sit at 1981-2010 ms — dead on the 2 s tick — but
-  the SELF tank drifts to 3-4 s+ medians in ~10% of sessions (23 of
-  ~220), a mode other tanks never show. Your own truth also rides
+  the SELF tank drifts to 3-4 s+ medians in ~8% of sessions (17 of
+  219), a mode other tanks never show. Your own truth also rides
   0x44/0x64/0x49, so the self 0x2E cadence is evidently not
-  load-bearing; the cause of the drift is an open question.[^3]
+  load-bearing. Narrowed 2026-07-24: the drift is
+  ACTIVITY-CORRELATED — 8/21 human sniff sessions are sparse (38%)
+  vs 9/198 bot sessions (4.5%), and sparse sessions average half
+  the command rate (16 vs 29 cmds/min). Candidate mechanism: the
+  self long-form sync rides self activity rather than a fixed
+  broadcast; the exact trigger remains open.[^3]
 - **0x3D MovementResponse** / **0x47 Movement** / **0x28 TankEntry** /
   container TankUpdate* carry `(x, y)`. Refresh all three timestamps.
 - **0x4C MapData** (map snapshot) carries positions for every tank on

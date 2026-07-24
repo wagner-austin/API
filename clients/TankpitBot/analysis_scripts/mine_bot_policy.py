@@ -15,8 +15,11 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from statistics import median
+
 from platform_core.json_utils import load_json_str
 from tankpit_bot.protocol import decode_message
+from tankpit_bot.protocol.commands import CMD_RADAR, COMMAND_PREFIX
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import decode_capture_session
@@ -54,6 +57,10 @@ def scan_session(path: Path, agg: dict) -> None:
     death_watch: dict[int, tuple[int, int, int]] = {}  # tid -> (death_ts, corpse_x, corpse_y)
     tile_state: dict[tuple[int, int], tuple[int, str]] = {}  # (x,y) -> (ts, state)
     gain_ts: list[int] = []  # own 0x67 timestamps
+    self_fuel: list[tuple[int, int]] = []  # (ts, fuel) own absolute readings
+    sent_cmds: list[tuple[int, int]] = []  # (ts, command byte)
+    contaminations: list[int] = []  # ts of shots/pickups/detonations
+    self_sync_ts: list[int] = []  # own 0x2E timestamps
 
     def note_tile(ts: int, x: int, y: int, value: int) -> None:
         """Track a tile's container layer: -1 equipment, 0 empty, >0 fuel."""
@@ -169,9 +176,14 @@ def scan_session(path: Path, agg: dict) -> None:
     t0 = ordered[0]["timestamp_ms"] if ordered else 0
     t1 = ordered[-1]["timestamp_ms"] if ordered else 0
     for msg in ordered:
-        if msg["direction"] == "sent":
-            continue
         ts = msg["timestamp_ms"]
+        if msg["direction"] == "sent":
+            for body in _split_frame_bodies(msg["payload"]):
+                if body and body[0] == COMMAND_PREFIX:
+                    decoded = xor_decode(body)
+                    if len(decoded) >= 2:
+                        sent_cmds.append((ts, decoded[1]))
+            continue
         for body in _split_frame_bodies(msg["payload"]):
             mt = body[0]
             if mt not in TRACKED:
@@ -196,6 +208,15 @@ def scan_session(path: Path, agg: dict) -> None:
             elif k == 0x2E:
                 note_rank(m["tank_id"], m["rank"])
                 note_tier(m["tank_id"], ts, m["damage_state"])
+                if self_id is not None and m["tank_id"] == self_id:
+                    self_sync_ts.append(ts)
+                    if m["fuel"] is not None:
+                        self_fuel.append((ts, m["fuel"]))
+            elif k == 0x44 or k == 0x64:
+                self_fuel.append((ts, m["fuel_total"]))
+                contaminations.append(ts)
+            elif k == "container_pickup" or k == 0x45:
+                contaminations.append(ts)
             elif k == 0x3D:
                 note_rank(m["tank_id"], m["rank"])
                 note_tier(m["tank_id"], ts, m["damage_state"])
@@ -211,6 +232,7 @@ def scan_session(path: Path, agg: dict) -> None:
                 end = m["waypoints"][-1] if m["waypoints"] else (m["start_x"], m["start_y"])
                 note_pos(tid, ts, end[0], end[1], via_walk=True)
             elif k == 0x53:
+                contaminations.append(ts)
                 sid = m["shooter_id"]
                 # register the hit on whoever stands at the impact tile
                 for tid, (_pts, px, py) in list(last_pos.items()):
@@ -269,6 +291,34 @@ def scan_session(path: Path, agg: dict) -> None:
             elif k == 0x67:
                 gain_ts.append(ts)
 
+    # radar-cost isolation: fuel windows containing exactly one sent
+    # radar, no other sent commands, and no contamination (3 s guard
+    # before the window absorbs charge latency)
+    for (ta, fa), (tb, fb) in zip(self_fuel, self_fuel[1:]):
+        radars = [c for c in sent_cmds if ta < c[0] <= tb and c[1] == CMD_RADAR]
+        others = [c for c in sent_cmds if ta < c[0] <= tb and c[1] != CMD_RADAR]
+        dirty = [c for c in contaminations if ta - 3000 < c <= tb]
+        if len(radars) == 1 and not others and not dirty:
+            agg["radar_window_deltas"][max(min(fb - fa, 5), -30)] += 1
+
+    # self-sync cadence classification
+    gaps = [b - a for a, b in zip(self_sync_ts, self_sync_ts[1:])]
+    if len(gaps) >= 6:
+        med = median(gaps)
+        kind = "bot" if "bot" in path.parent.name else "sniff"
+        stamp = re.search(r"(\d{8})-", path.name)
+        agg["self_cadence_rows"].append(
+            {
+                "session": session["session_id"],
+                "kind": kind,
+                "date": stamp.group(1) if stamp else "",
+                "median_gap_ms": int(med),
+                "sparse": med > 2500,
+                "cmds_per_min": round(len(sent_cmds) / max((t1 - t0) / 60000.0, 0.01), 1),
+                "sync_count": len(self_sync_ts),
+            }
+        )
+
     bots = sorted({names[t] for t in names if BOT_NAME.match(names[t])})
     agg["sessions"] += 1
     agg["sessions_with_bots"] += 1 if bots else 0
@@ -325,6 +375,8 @@ def main() -> None:
         "equipment_consumed_transitions": 0,
         "equipment_consumed_near_own_gain_5s": 0,
         "equipment_exposure_min": 0.0,
+        "radar_window_deltas": Counter(),
+        "self_cadence_rows": [],
         "bot_small_drift_no_walk": 0,
         "bot_pos_stationary_syncs": 0,
         "bot_deaths": 0,
