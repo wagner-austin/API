@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import dump_json_str
 
+from tankpit_bot.protocol.commands import CMD_RADAR
 from tankpit_bot.types import CaptureSession, encode_capture_session
 from tankpit_bot.validate.audit import (
     STAMPED_PAGES,
@@ -30,6 +31,7 @@ from tests.validate.builders import (
     identity_message,
     make_session,
     move_message,
+    sent_command_message,
     shot_message,
     sync_message,
 )
@@ -72,6 +74,9 @@ def _green_capture() -> CaptureSession:
         fuel_gain_message(10000, 782),
         shot_message(10500, ENEMY_ID, 3),
         fuel_gain_message(11000, 737),
+        sync_message(15000, SELF_ID, 1, 737),
+        sent_command_message(15500, CMD_RADAR),
+        sync_message(16000, SELF_ID, 1, 727),
     ]
     return make_session(messages)
 
@@ -121,7 +126,7 @@ def test_green_tree_passes_and_stamps(tmp_path: Path, capsys: pytest.CaptureFixt
     page_text = (wiki_dir / "game-economy.md").read_text(encoding="utf-8")
     expected = (
         f"fact_checked: {date.today().isoformat()} "
-        "(make audit: 11 claims re-derived, 21 clean samples)"
+        "(make audit: 12 claims re-derived, 24 clean samples)"
     )
     assert expected in page_text
 

@@ -35,10 +35,17 @@ arrive only 0x2E-tunneled and surface through the 0x2E branch."""
 
 
 class FuelReadingDict(TypedDict):
-    """One absolute fuel reading for the player's own tank."""
+    """One absolute fuel reading for the player's own tank.
+
+    ``from_event`` marks readings carried by explicit fuel-change
+    events (0x44/0x64) rather than the periodic 0x2E sync — the
+    radar-cost validator treats those as contamination, exactly as
+    the 2026-07-24 mining sweep did.
+    """
 
     timestamp_ms: int
     fuel: int
+    from_event: bool
 
 
 class ShotEchoDict(TypedDict):
@@ -168,17 +175,17 @@ def _ingest_fuel_and_hazards(
             fuel = message["fuel"]
             if fuel is not None:
                 timeline["fuel_readings"].append(
-                    FuelReadingDict(timestamp_ms=timestamp_ms, fuel=fuel)
+                    FuelReadingDict(timestamp_ms=timestamp_ms, fuel=fuel, from_event=False)
                 )
         return True
     if message["msg_type"] == 0x44:
         timeline["fuel_readings"].append(
-            FuelReadingDict(timestamp_ms=timestamp_ms, fuel=message["fuel_total"])
+            FuelReadingDict(timestamp_ms=timestamp_ms, fuel=message["fuel_total"], from_event=True)
         )
         return True
     if message["msg_type"] == 0x64:
         timeline["fuel_readings"].append(
-            FuelReadingDict(timestamp_ms=timestamp_ms, fuel=message["fuel_total"])
+            FuelReadingDict(timestamp_ms=timestamp_ms, fuel=message["fuel_total"], from_event=True)
         )
         return True
     if message["msg_type"] == "container_pickup":

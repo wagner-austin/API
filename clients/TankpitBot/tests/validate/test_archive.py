@@ -7,6 +7,7 @@ from tankpit_bot.validate.archive import (
     validate_firing_costs,
     validate_fuel_capacity,
     validate_hit_damage,
+    validate_radar_cost,
     validate_walk_cost,
 )
 from tankpit_bot.validate.windows import FuelWindowDict, build_fuel_windows
@@ -108,8 +109,8 @@ class TestBuildFuelWindows:
         """Events at the closing reading timestamp count; at the opening they do not."""
         timeline = _timeline(
             fuel_readings=[
-                FuelReadingDict(timestamp_ms=10, fuel=500),
-                FuelReadingDict(timestamp_ms=20, fuel=490),
+                FuelReadingDict(timestamp_ms=10, fuel=500, from_event=False),
+                FuelReadingDict(timestamp_ms=20, fuel=490, from_event=False),
             ],
             own_shots=[
                 ShotEchoDict(timestamp_ms=10, weapon=1),
@@ -142,7 +143,8 @@ class TestBuildFuelWindows:
 
     def test_fewer_than_two_readings_yield_no_windows(self) -> None:
         """One reading cannot form a delta."""
-        timeline = _timeline(fuel_readings=[FuelReadingDict(timestamp_ms=1, fuel=500)])
+        reading = FuelReadingDict(timestamp_ms=1, fuel=500, from_event=False)
+        timeline = _timeline(fuel_readings=[reading])
         assert build_fuel_windows(timeline) == []
 
 
@@ -231,13 +233,16 @@ class TestFuelCapacity:
         timelines = [
             _timeline(
                 fuel_readings=[
-                    FuelReadingDict(timestamp_ms=1, fuel=900),
-                    FuelReadingDict(timestamp_ms=2, fuel=1100),
-                    FuelReadingDict(timestamp_ms=3, fuel=1101),
+                    FuelReadingDict(timestamp_ms=1, fuel=900, from_event=False),
+                    FuelReadingDict(timestamp_ms=2, fuel=1100, from_event=False),
+                    FuelReadingDict(timestamp_ms=3, fuel=1101, from_event=False),
                 ],
                 rank=1,
             ),
-            _timeline(fuel_readings=[FuelReadingDict(timestamp_ms=1, fuel=9000)], rank=None),
+            _timeline(
+                fuel_readings=[FuelReadingDict(timestamp_ms=1, fuel=9000, from_event=False)],
+                rank=None,
+            ),
         ]
         evidence = validate_fuel_capacity(timelines)
         assert evidence["claim_id"] == "fuel-capacity"
@@ -310,4 +315,111 @@ class TestWalkEpisodes:
             _window(delta=0),
         ]
         evidence = validate_walk_cost(windows)
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+
+class TestRadarCost:
+    """The lone-radar window recipe from the 2026-07-24 mining sweep."""
+
+    @staticmethod
+    def _radar_timeline(
+        *,
+        sent_actions: list[SentActionDict],
+        readings: list[FuelReadingDict] | None = None,
+        own_shots: list[ShotEchoDict] | None = None,
+        pickups: list[int] | None = None,
+    ) -> WireTimelineDict:
+        """Build a two-reading timeline around one candidate window.
+
+        Args:
+            sent_actions: Sent commands for the session.
+            readings: Fuel readings (defaults to a clean -10 window).
+            own_shots: Own shot echoes.
+            pickups: Pickup timestamps.
+
+        Returns:
+            Timeline with one window from t=10000 to t=12000.
+        """
+        return _timeline(
+            fuel_readings=readings
+            if readings is not None
+            else [
+                FuelReadingDict(timestamp_ms=10000, fuel=500, from_event=False),
+                FuelReadingDict(timestamp_ms=12000, fuel=490, from_event=False),
+            ],
+            sent_actions=sent_actions,
+            own_shots=own_shots,
+            pickups=pickups,
+        )
+
+    def test_lone_radar_window_is_exact(self) -> None:
+        """One radar, nothing else, delta -10: a clean exact sample."""
+        timeline = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (1, 1, 0)
+
+    def test_wrong_delta_is_a_mismatch(self) -> None:
+        """A lone-radar window whose delta is not -10 counts against the claim."""
+        timeline = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            readings=[
+                FuelReadingDict(timestamp_ms=10000, fuel=500, from_event=False),
+                FuelReadingDict(timestamp_ms=12000, fuel=497, from_event=False),
+            ],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (1, 0, 1)
+
+    def test_other_sent_command_excludes_the_window(self) -> None:
+        """Any non-radar send in the window disqualifies it."""
+        timeline = self._radar_timeline(
+            sent_actions=[
+                SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0),
+                SentActionDict(timestamp_ms=11500, command=115, x=0, y=0),
+            ],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+    def test_two_radars_exclude_the_window(self) -> None:
+        """Two radar sends in one window cannot price a single scan."""
+        timeline = self._radar_timeline(
+            sent_actions=[
+                SentActionDict(timestamp_ms=10500, command=CMD_RADAR, x=0, y=0),
+                SentActionDict(timestamp_ms=11500, command=CMD_RADAR, x=0, y=0),
+            ],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+    def test_contamination_inside_the_window_excludes_it(self) -> None:
+        """A shot echo inside the window dirties it."""
+        timeline = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            own_shots=[ShotEchoDict(timestamp_ms=11500, weapon=0)],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+    def test_contamination_in_the_backward_guard_excludes_it(self) -> None:
+        """A pickup within 3 s BEFORE the window dirties it (late debit)."""
+        timeline = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            pickups=[9000],
+        )
+        evidence = validate_radar_cost([timeline])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+    def test_event_carried_reading_is_contamination(self) -> None:
+        """A 0x44/0x64-sourced reading closing the window dirties it."""
+        timeline = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            readings=[
+                FuelReadingDict(timestamp_ms=10000, fuel=500, from_event=False),
+                FuelReadingDict(timestamp_ms=12000, fuel=490, from_event=True),
+            ],
+        )
+        evidence = validate_radar_cost([timeline])
         assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)

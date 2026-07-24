@@ -8,11 +8,14 @@ lives in ``windows``.
 
 from __future__ import annotations
 
+from bisect import bisect_right
+
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
     HOMING_SHOT_COST,
     MISSILE_SHOT_COST,
+    RADAR_COST,
     SINGLE_SHOT_COST,
     WALK_COST_PER_TILE,
 )
@@ -22,6 +25,7 @@ from tankpit_bot.physics.damage import (
     MISSILE_HIT_VICTIM_COST,
     SINGLE_HIT_VICTIM_COST,
 )
+from tankpit_bot.protocol.commands import CMD_RADAR
 from tankpit_bot.validate.types import ClaimEvidenceDict
 from tankpit_bot.validate.windows import FuelWindowDict, _is_silent_window, _is_walk_window
 from tankpit_bot.validate.wire_timeline import WireTimelineDict
@@ -255,9 +259,87 @@ def validate_fuel_capacity(timelines: list[WireTimelineDict]) -> ClaimEvidenceDi
     )
 
 
+RADAR_CHARGE_GUARD_MS = 3000
+"""Backward contamination guard for radar isolation windows.
+
+A prior action's debit can land up to one radar-charge (~3 s) late,
+so a window is dirty when any contamination event sits within this
+span BEFORE it as well as inside it (wiki/log.md 2026-07-24, "radar
+cost archive-isolated": 1,293/1,311 windows exactly -10)."""
+
+
+def validate_radar_cost(timelines: list[WireTimelineDict]) -> ClaimEvidenceDict:
+    """Re-derive the extra-radar scan cost from isolated fuel windows.
+
+    The exact 2026-07-24 mining recipe: a window between consecutive
+    fuel readings samples the claim when it contains exactly one sent
+    ``CMD_RADAR``, no other sent command of any kind, and no
+    contamination — shots either way, pickups, detonations, or
+    event-carried fuel readings (0x44/0x64) — inside the window or in
+    the :data:`RADAR_CHARGE_GUARD_MS` before it. The window's delta
+    must then be exactly ``-RADAR_COST``.
+
+    Args:
+        timelines: All extracted session timelines.
+
+    Returns:
+        Evidence for the radar-cost claim.
+    """
+    samples = 0
+    exact = 0
+    mismatches = 0
+    for timeline in timelines:
+        radar_times = sorted(
+            action["timestamp_ms"]
+            for action in timeline["sent_actions"]
+            if action["command"] == CMD_RADAR
+        )
+        other_times = sorted(
+            action["timestamp_ms"]
+            for action in timeline["sent_actions"]
+            if action["command"] != CMD_RADAR
+        )
+        contamination_times = sorted(
+            [shot["timestamp_ms"] for shot in timeline["own_shots"]]
+            + [shot["timestamp_ms"] for shot in timeline["enemy_shots"]]
+            + timeline["pickup_timestamps"]
+            + timeline["detonation_timestamps"]
+            + [
+                reading["timestamp_ms"]
+                for reading in timeline["fuel_readings"]
+                if reading["from_event"]
+            ]
+        )
+        readings = timeline["fuel_readings"]
+        for index in range(1, len(readings)):
+            start_ms = readings[index - 1]["timestamp_ms"]
+            end_ms = readings[index]["timestamp_ms"]
+            radars = bisect_right(radar_times, end_ms) - bisect_right(radar_times, start_ms)
+            others = bisect_right(other_times, end_ms) - bisect_right(other_times, start_ms)
+            dirty = bisect_right(contamination_times, end_ms) - bisect_right(
+                contamination_times, start_ms - RADAR_CHARGE_GUARD_MS
+            )
+            if radars != 1 or others or dirty:
+                continue
+            samples += 1
+            if readings[index]["fuel"] - readings[index - 1]["fuel"] == -RADAR_COST:
+                exact += 1
+            else:
+                mismatches += 1
+    return ClaimEvidenceDict(
+        claim_id="radar-cost",
+        samples=samples,
+        exact=exact,
+        mismatches=mismatches,
+        detail="lone-radar fuel windows, 3 s backward guard, -10 per extra scan",
+    )
+
+
 __all__ = [
+    "RADAR_CHARGE_GUARD_MS",
     "validate_firing_costs",
     "validate_fuel_capacity",
     "validate_hit_damage",
+    "validate_radar_cost",
     "validate_walk_cost",
 ]

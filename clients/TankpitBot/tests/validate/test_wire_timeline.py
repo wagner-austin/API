@@ -52,9 +52,9 @@ def test_full_session_extraction() -> None:
     assert timeline["self_id"] == SELF_ID
     assert timeline["rank"] == 1
     assert timeline["fuel_readings"] == [
-        {"timestamp_ms": 2000, "fuel": 1000},
-        {"timestamp_ms": 7000, "fuel": 950},
-        {"timestamp_ms": 8000, "fuel": 900},
+        {"timestamp_ms": 2000, "fuel": 1000, "from_event": False},
+        {"timestamp_ms": 7000, "fuel": 950, "from_event": True},
+        {"timestamp_ms": 8000, "fuel": 900, "from_event": False},
     ]
     assert timeline["own_shots"] == [{"timestamp_ms": 3000, "weapon": 1}]
     assert timeline["enemy_shots"] == [{"timestamp_ms": 3500, "weapon": 0}]
@@ -179,7 +179,7 @@ def test_deposit_and_detonation_are_tracked() -> None:
         ]
     )
     timeline = extract_wire_timeline(session)
-    assert timeline["fuel_readings"] == [{"timestamp_ms": 200, "fuel": 400}]
+    assert timeline["fuel_readings"] == [{"timestamp_ms": 200, "fuel": 400, "from_event": True}]
     assert timeline["detonation_timestamps"] == [300]
 
 

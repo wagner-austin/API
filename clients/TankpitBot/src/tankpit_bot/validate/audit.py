@@ -34,6 +34,7 @@ from tankpit_bot.validate.archive import (
     validate_firing_costs,
     validate_fuel_capacity,
     validate_hit_damage,
+    validate_radar_cost,
     validate_walk_cost,
 )
 from tankpit_bot.validate.events_validators import validate_teleport_cost
@@ -57,6 +58,7 @@ STAMPED_PAGES: dict[str, frozenset[str]] = {
             "missile-hit-victim-cost",
             "homing-hit-victim-cost",
             "fuel-capacity",
+            "radar-cost",
         }
     ),
 }
@@ -115,6 +117,7 @@ def collect_evidence(runs_root: Path) -> list[ClaimEvidenceDict]:
     evidence.extend(validate_firing_costs(windows))
     evidence.extend(validate_hit_damage(windows))
     evidence.append(validate_fuel_capacity(timelines))
+    evidence.append(validate_radar_cost(timelines))
     evidence.append(validate_teleport_cost(runs_root / "bot"))
     return evidence
 
