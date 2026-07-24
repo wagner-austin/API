@@ -25,6 +25,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.audit import EXACTNESS_FLOOR
+from tankpit_bot.validate.shadow_bot_laws import shadow_bot_return_fire
 from tankpit_bot.validate.shadow_laws import (
     shadow_corpse_window,
     shadow_damage_tier,
@@ -77,6 +78,7 @@ def collect_shadow_evidence(runs_root: Path) -> list[ClaimEvidenceDict]:
         shadow_grant_invariants(timelines),
         shadow_mercy_bundle(timelines),
         shadow_corpse_window(timelines),
+        shadow_bot_return_fire(timelines),
     ]
 
 

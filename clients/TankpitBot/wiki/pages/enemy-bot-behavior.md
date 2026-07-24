@@ -106,7 +106,11 @@ the refuel channel.[^8]
 over every `runs/**/capture_session.json`; results snapshot
 `analysis_scripts/bot_policy_sweep_2026-07-24.json` (246 sessions,
 750 session-minutes, 0 decode errors). Re-run the script to re-derive
-every number in this section.
+every number in this section. STANDING instrument since the same day:
+the policy is executable in `sim/bot_policy.py` and the
+`bot-return-fire` law of `make shadow` re-judges every archived and
+future session against it (first full-archive run: 2,247 samples,
+2,125 exact, PASS — [[physics-module-roadmap]] Bot policy as-built).
 
 [^1]: user (Austin), 2026-06-16 — "tank bots stand ground and fight, only move when low HP, then move every time hit; don't collect fuel or equipment; just run until you chase and finish them or use homing"
 [^2]: user (Austin), 2026-06-11 — practice bots never fight each other; retracted a prior theory

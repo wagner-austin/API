@@ -1042,6 +1042,24 @@ kill and removal disqualifies the pair as slot reuse, and quits
 disqualify via 0x29), and all 17 survivors sit inside ±1 s of
 22.0 s. Gate at close: 4,852 tests, 100 % stmt+branch.[^2]
 
+### Bot policy as-built (2026-07-24): the sixth shadow law — enemy minds start becoming physics
+
+The practice-room twin's last uncertified layer (enemy minds) began
+closing with the archive-mined bot policy ([[enemy-bot-behavior]]
+§Corpus-mined policy): ``sim/bot_policy.py`` implements the mined
+laws (stationary default; one next-tick ``weapon=0`` single at the
+attacker's tile; teleport-off at 7/8 hits by rank) as a certified
+MODEL — distinct from ``sim/opponent.py``, which stays a harness —
+and ``validate/shadow_bot_laws.py`` adds ``bot-return-fire`` as the
+sixth ``make shadow`` law, importing its constants from the sim
+source. First full-archive run: 2,247 samples, 2,125 exact (94.6%),
+PASS — and the sample count equals the independent mining script's
+bot-shot population exactly. The shadow timeline gained names /
+shots / positions extraction to feed it. Still uncertified: the
+teleport-off destination (unmined), ranks ≥ 2 (no such bot in the
+archive), and the 60/64 unexplained bot refuels (open anomaly,
+blocks the sim policy's refuel channel).[^2]
+
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
 The "healing ladder" gap died to a user correction ("tanks dont heal…

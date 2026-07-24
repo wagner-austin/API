@@ -25,10 +25,10 @@ from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CapturedMessage, CaptureSession
 
-_TRACKED_TYPES = frozenset({0x21, 0x29, 0x2E, 0x41, 0x49, 0x58, 0x67})
+_TRACKED_TYPES = frozenset({0x21, 0x28, 0x29, 0x2E, 0x3D, 0x41, 0x47, 0x49, 0x53, 0x58, 0x67})
 """Top-level frame types the extraction decodes. The 0x2E envelope
-route unwraps tunneled kills/gains/removals/syncs; the rest cover the
-same families arriving top-level."""
+route unwraps tunneled kills/gains/removals/syncs/shots/moves; the
+rest cover the same families arriving top-level."""
 
 
 class TankSyncEventDict(TypedDict):
@@ -84,17 +84,41 @@ class InventoryEventDict(TypedDict):
     counts: list[int]
 
 
+class ShotEventDict(TypedDict):
+    """One 0x53 ShootEvent (any shooter)."""
+
+    timestamp_ms: int
+    shooter_id: int
+    source_x: int
+    source_y: int
+    target_x: int
+    target_y: int
+    weapon: int
+
+
+class PositionEventDict(TypedDict):
+    """One position statement for a tank (0x3D / 0x28 / 0x47 end)."""
+
+    timestamp_ms: int
+    tank_id: int
+    x: int
+    y: int
+
+
 class ShadowTimelineDict(TypedDict):
     """Everything the shadow-law validators need from one session."""
 
     session_id: str
     self_id: int | None
+    names: dict[int, str]
     syncs: list[TankSyncEventDict]
     kills: list[KillEventDict]
     gains: list[EquipmentGainEventDict]
     removals: list[TankRemoveEventDict]
     exits: list[TankExitEventDict]
     inventories: list[InventoryEventDict]
+    shots: list[ShotEventDict]
+    positions: list[PositionEventDict]
 
 
 def _message_timestamp(msg: CapturedMessage) -> int:
@@ -150,6 +174,40 @@ def _ingest_tank_events(
     if message["msg_type"] == 0x21:
         if timeline["self_id"] is None:
             timeline["self_id"] = message["tank_id"]
+        timeline["names"][message["tank_id"]] = message["name"]
+        return True
+    if message["msg_type"] == 0x3D:
+        timeline["positions"].append(
+            PositionEventDict(
+                timestamp_ms=timestamp_ms,
+                tank_id=message["tank_id"],
+                x=message["x"],
+                y=message["y"],
+            )
+        )
+        return True
+    if message["msg_type"] == 0x28:
+        timeline["positions"].append(
+            PositionEventDict(
+                timestamp_ms=timestamp_ms,
+                tank_id=message["tank_id"],
+                x=message["x"],
+                y=message["y"],
+            )
+        )
+        return True
+    if message["msg_type"] == 0x47:
+        end = message["waypoints"][-1] if message["waypoints"] else None
+        end_x = end[0] if end is not None else message["start_x"]
+        end_y = end[1] if end is not None else message["start_y"]
+        timeline["positions"].append(
+            PositionEventDict(
+                timestamp_ms=timestamp_ms,
+                tank_id=message["tank_id"],
+                x=end_x,
+                y=end_y,
+            )
+        )
         return True
     if message["msg_type"] == 0x2E:
         timeline["syncs"].append(
@@ -208,6 +266,19 @@ def _ingest_combat_events(
         timeline["inventories"].append(
             InventoryEventDict(timestamp_ms=timestamp_ms, counts=list(message["counts"]))
         )
+        return
+    if message["msg_type"] == 0x53:
+        timeline["shots"].append(
+            ShotEventDict(
+                timestamp_ms=timestamp_ms,
+                shooter_id=message["shooter_id"],
+                source_x=message["source_x"],
+                source_y=message["source_y"],
+                target_x=message["target_x"],
+                target_y=message["target_y"],
+                weapon=message["weapon"],
+            )
+        )
 
 
 def _ingest_received(timeline: ShadowTimelineDict, timestamp_ms: int, body: bytes) -> None:
@@ -254,12 +325,15 @@ def extract_shadow_timeline(session: CaptureSession) -> ShadowTimelineDict:
     timeline = ShadowTimelineDict(
         session_id=session["session_id"],
         self_id=None,
+        names={},
         syncs=[],
         kills=[],
         gains=[],
         removals=[],
         exits=[],
         inventories=[],
+        shots=[],
+        positions=[],
     )
     ordered = sorted(session["messages"], key=_message_timestamp)
     for msg in ordered:
@@ -274,7 +348,9 @@ __all__ = [
     "EquipmentGainEventDict",
     "InventoryEventDict",
     "KillEventDict",
+    "PositionEventDict",
     "ShadowTimelineDict",
+    "ShotEventDict",
     "TankExitEventDict",
     "TankRemoveEventDict",
     "TankSyncEventDict",

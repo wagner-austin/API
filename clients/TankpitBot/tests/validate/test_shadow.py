@@ -14,16 +14,20 @@ from tankpit_bot.validate.shadow import collect_shadow_evidence, main, run_shado
 from tests.validate.builders import (
     ENEMY_ID,
     SELF_ID,
+    aimed_shot_message,
     deactivation_message,
     equipment_gain_message,
     identity_message,
     inventory_message,
     make_session,
+    movement_response_message,
+    named_identity_message,
     sync_message,
     tank_remove_message,
 )
 
 VICTIM_ID = 12
+BOT_ID = 21
 CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_MS
 
 
@@ -39,6 +43,11 @@ def _lawful_session() -> CaptureSession:
     messages.append(inventory_message(30_000, [5, 12, 5, 5, 3]))
     messages.append(deactivation_message(40_000, VICTIM_ID, SELF_ID))
     messages.append(tank_remove_message(40_000 + CORPSE_MS, VICTIM_ID))
+    messages.append(named_identity_message(90_000, BOT_ID, "orange-3"))
+    messages.append(movement_response_message(90_100, SELF_ID, 10, 10))
+    messages.append(movement_response_message(90_200, BOT_ID, 11, 10))
+    messages.append(aimed_shot_message(91_000, SELF_ID, (10, 10), (11, 10), 1))
+    messages.append(aimed_shot_message(93_000, BOT_ID, (11, 10), (10, 10), 0))
     return make_session(messages)
 
 
@@ -50,6 +59,8 @@ def _lawless_session() -> CaptureSession:
     messages.append(inventory_message(30_000, [5, 7, 5, 6, 0]))
     messages.append(deactivation_message(40_000, VICTIM_ID, SELF_ID))
     messages.append(tank_remove_message(48_000, VICTIM_ID))
+    messages.append(named_identity_message(90_000, BOT_ID, "orange-3"))
+    messages.append(aimed_shot_message(91_000, BOT_ID, (11, 10), (10, 10), 0))
     return make_session(messages)
 
 
@@ -70,6 +81,7 @@ def test_lawful_archive_passes_every_law(tmp_path: Path) -> None:
     assert by_id["grant-invariants"]["exact"] == 1
     assert by_id["kill-mercy-bundle"]["exact"] == 1
     assert by_id["corpse-window"]["exact"] == 1
+    assert by_id["bot-return-fire"]["exact"] == 1
     assert all(record["mismatches"] == 0 for record in evidence)
     assert run_shadow(runs_root) == 0
 

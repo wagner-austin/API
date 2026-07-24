@@ -44,12 +44,15 @@ def _timeline(
     return ShadowTimelineDict(
         session_id="shadow-test",
         self_id=SELF_ID,
+        names={},
         syncs=syncs if syncs is not None else [],
         kills=kills if kills is not None else [],
         gains=gains if gains is not None else [],
         removals=removals if removals is not None else [],
         exits=exits if exits is not None else [],
         inventories=inventories if inventories is not None else [],
+        shots=[],
+        positions=[],
     )
 
 

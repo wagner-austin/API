@@ -77,6 +77,52 @@ def identity_message(timestamp_ms: int, tank_id: int) -> CapturedMessage:
     return frame_message(timestamp_ms, xor_encode_body(0x21, payload), "received")
 
 
+def named_identity_message(timestamp_ms: int, tank_id: int, name: str) -> CapturedMessage:
+    """Build a 0x21 TankIdentity carrying the tank's name."""
+    payload = bytes([TEAM_SELF, tank_id & 0xFF, tank_id >> 8]) + bytes(7)
+    payload += name.encode("ascii")
+    return frame_message(timestamp_ms, xor_encode_body(0x21, payload), "received")
+
+
+def movement_response_message(timestamp_ms: int, tank_id: int, x: int, y: int) -> CapturedMessage:
+    """Build a 0x3D MovementResponse stating the tank's position."""
+    payload = bytes([TEAM_SELF, tank_id & 0xFF, tank_id >> 8, x, y, 0, 0, 1, 0, 0, 0, 0])
+    return frame_message(timestamp_ms, xor_encode_body(0x3D, payload), "received")
+
+
+def tank_entry_message(timestamp_ms: int, tank_id: int, x: int, y: int) -> CapturedMessage:
+    """Build a 0x28 TankEntry stating the tank's position."""
+    payload = bytes([255, tank_id & 0xFF, tank_id >> 8, 16, 0, 0, 0, x, y, 0])
+    return frame_message(timestamp_ms, xor_encode_body(0x28, payload), "received")
+
+
+def aimed_shot_message(
+    timestamp_ms: int,
+    shooter_id: int,
+    source: tuple[int, int],
+    target: tuple[int, int],
+    weapon: int,
+) -> CapturedMessage:
+    """Build a 0x53 ShootEvent with explicit source/target tiles."""
+    payload = bytes(
+        [
+            TEAM_SELF,
+            shooter_id & 0xFF,
+            shooter_id >> 8,
+            source[0],
+            source[1],
+            target[0],
+            target[1],
+            target[0],
+            target[1],
+            weapon,
+            0,
+            0,
+        ]
+    )
+    return frame_message(timestamp_ms, xor_encode_body(0x53, payload), "received")
+
+
 def sync_message(
     timestamp_ms: int, tank_id: int, rank: int, fuel: int, damage: int = 0
 ) -> CapturedMessage:
@@ -207,6 +253,7 @@ __all__ = [
     "ENEMY_ID",
     "MAGIC",
     "SELF_ID",
+    "aimed_shot_message",
     "deactivation_message",
     "deposit_message",
     "detonation_message",
@@ -217,11 +264,14 @@ __all__ = [
     "inventory_message",
     "make_session",
     "move_message",
+    "movement_response_message",
+    "named_identity_message",
     "pickup_message",
     "sent_command_message",
     "short_sync_message",
     "shot_message",
     "sync_message",
+    "tank_entry_message",
     "tank_exit_message",
     "tank_remove_message",
     "xor_encode_body",

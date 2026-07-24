@@ -11,6 +11,7 @@ from tankpit_bot.validate.shadow_timeline import extract_shadow_timeline
 from tests.validate.builders import (
     ENEMY_ID,
     SELF_ID,
+    aimed_shot_message,
     deactivation_message,
     deposit_message,
     equipment_gain_message,
@@ -18,9 +19,12 @@ from tests.validate.builders import (
     identity_message,
     inventory_message,
     make_session,
+    move_message,
+    movement_response_message,
+    named_identity_message,
     sent_command_message,
-    shot_message,
     sync_message,
+    tank_entry_message,
     tank_exit_message,
     tank_remove_message,
     xor_encode_body,
@@ -81,16 +85,51 @@ def test_requires_magic() -> None:
 
 
 def test_ignores_sent_frames_and_untracked_types() -> None:
+    untracked_radar_ack = frame_message(1000, xor_encode_body(0x46, bytes([1, 1])), "received")
     session = make_session(
         [
             sent_command_message(0, 0x74, 5, 5),
-            shot_message(1000, SELF_ID, 27),
+            untracked_radar_ack,
         ]
     )
     timeline = extract_shadow_timeline(session)
     assert timeline["self_id"] is None
     assert timeline["syncs"] == []
     assert timeline["kills"] == []
+    assert timeline["shots"] == []
+
+
+def test_extracts_names_shots_and_positions() -> None:
+    session = make_session(
+        [
+            named_identity_message(0, SELF_ID, "Artax"),
+            named_identity_message(100, ENEMY_ID, "orange-3"),
+            movement_response_message(200, ENEMY_ID, 30, 31),
+            tank_entry_message(300, SELF_ID, 10, 11),
+            move_message(400, SELF_ID, "ee"),
+            move_message(500, ENEMY_ID, ""),
+            aimed_shot_message(600, ENEMY_ID, (30, 31), (10, 11), 0),
+        ]
+    )
+    timeline = extract_shadow_timeline(session)
+    assert timeline["names"] == {SELF_ID: "Artax", ENEMY_ID: "orange-3"}
+    assert timeline["positions"] == [
+        {"timestamp_ms": 200, "tank_id": ENEMY_ID, "x": 30, "y": 31},
+        {"timestamp_ms": 300, "tank_id": SELF_ID, "x": 10, "y": 11},
+        {"timestamp_ms": 400, "tank_id": SELF_ID, "x": 7, "y": 5},
+        {"timestamp_ms": 500, "tank_id": ENEMY_ID, "x": 5, "y": 5},
+    ]
+    assert timeline["shots"] == [
+        {
+            "timestamp_ms": 600,
+            "shooter_id": ENEMY_ID,
+            "source_x": 30,
+            "source_y": 31,
+            "target_x": 10,
+            "target_y": 11,
+            "weapon": 0,
+        }
+    ]
 
 
 def test_tunneled_inner_type_outside_families_is_skipped() -> None:
