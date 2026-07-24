@@ -50,3 +50,14 @@ def test_pickup_equipment_dispatches_command() -> None:
     assert len(probe._dispatched) == 1
     _, label = probe._dispatched[0]
     assert label == "pickup_equipment"
+
+
+def test_request_inventory_dispatches_command() -> None:
+    """The watch-dwell heartbeat command, framed as ``[len]['!'][2]['i']``."""
+    probe = _CommandRecorder()
+    result = probe.request_inventory()
+    assert result is True
+    assert len(probe._dispatched) == 1
+    data, label = probe._dispatched[0]
+    assert label == "inventory"
+    assert data.endswith(b"\x02i")

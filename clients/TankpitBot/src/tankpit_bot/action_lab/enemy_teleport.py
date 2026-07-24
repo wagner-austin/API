@@ -183,6 +183,38 @@ def format_enemy_teleport_probe_summary(session: EnemyTeleportProbeSessionDict) 
 class EnemyTeleportProbe(ProbeBase):
     """Live enemy-directed teleport probe for combat acquisition timing."""
 
+    def _settle_dwell(
+        self,
+        page: action_session.WaitPageProtocol,
+        settle_delay_ms: int,
+        heartbeat_interval_ms: int,
+    ) -> None:
+        """Wait out the settle window, optionally holding the stream open.
+
+        With a positive heartbeat interval, the free inventory request
+        (2 bytes, no world effect) fires at the start of the dwell and
+        every interval after — the push-on-activity stream dies ~2 s
+        after the client's last action (wiki log 2026-07-24), so a
+        silent dwell observes nothing. Zero interval preserves the
+        historical silent-settle behavior.
+
+        Args:
+            page: Playwright page driving the wait.
+            settle_delay_ms: Total dwell duration.
+            heartbeat_interval_ms: Heartbeat period (0 = no heartbeat).
+        """
+        if settle_delay_ms <= 0:
+            return
+        if heartbeat_interval_ms <= 0:
+            page.wait_for_timeout(float(settle_delay_ms))
+            return
+        remaining = settle_delay_ms
+        while remaining > 0:
+            self.request_inventory()
+            step = min(heartbeat_interval_ms, remaining)
+            page.wait_for_timeout(float(step))
+            remaining -= step
+
     def _send_enemy_acquisition(
         self,
         acquisition_strategy: Literal["map_open", "nearest_enemy"],
@@ -207,6 +239,7 @@ class EnemyTeleportProbe(ProbeBase):
         landing_target: TeleportTargetDict | None,
         message_start_index: int,
         settle_delay_ms: int,
+        heartbeat_interval_ms: int,
         snapshot_before: PageClientSnapshotDict,
     ) -> EnemyTeleportAttemptResultDict:
         """Build and finalize a non-teleport terminal attempt.
@@ -240,8 +273,7 @@ class EnemyTeleportProbe(ProbeBase):
             snapshot_before=snapshot_before,
             snapshot_after=snapshot_after,
         )
-        if settle_delay_ms > 0:
-            page.wait_for_timeout(float(settle_delay_ms))
+        self._settle_dwell(page, settle_delay_ms, heartbeat_interval_ms)
         return result
 
     def _probe_single_enemy_attempt(
@@ -251,6 +283,7 @@ class EnemyTeleportProbe(ProbeBase):
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
         settle_delay_ms: int,
+        heartbeat_interval_ms: int,
         excluded_tank_ids: frozenset[int],
     ) -> EnemyTeleportAttemptResultDict:
         """Run one enemy-directed teleport attempt against the live server.
@@ -305,6 +338,7 @@ class EnemyTeleportProbe(ProbeBase):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                heartbeat_interval_ms=heartbeat_interval_ms,
                 snapshot_before=snapshot_before,
             )
 
@@ -323,6 +357,7 @@ class EnemyTeleportProbe(ProbeBase):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                heartbeat_interval_ms=heartbeat_interval_ms,
                 snapshot_before=snapshot_before,
             )
 
@@ -346,6 +381,7 @@ class EnemyTeleportProbe(ProbeBase):
                 landing_target=None,
                 message_start_index=message_start_index,
                 settle_delay_ms=settle_delay_ms,
+                heartbeat_interval_ms=heartbeat_interval_ms,
                 snapshot_before=snapshot_before,
             )
 
@@ -439,6 +475,7 @@ class EnemyTeleportProbe(ProbeBase):
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
         settle_delay_ms: int,
+        heartbeat_interval_ms: int,
     ) -> EnemyTeleportProbeSessionDict:
         """Run the live enemy-directed teleport probe session."""
         if max_attempts <= 0:
@@ -455,6 +492,7 @@ class EnemyTeleportProbe(ProbeBase):
                     acquisition_timeout_ms=acquisition_timeout_ms,
                     teleport_timeout_ms=teleport_timeout_ms,
                     settle_delay_ms=settle_delay_ms,
+                    heartbeat_interval_ms=heartbeat_interval_ms,
                     excluded_tank_ids=frozenset(targeted_enemy_ids),
                 )
                 attempts.append(attempt)
@@ -482,6 +520,7 @@ class EnemyTeleportProbe(ProbeBase):
                 acquisition_timeout_ms=acquisition_timeout_ms,
                 teleport_timeout_ms=teleport_timeout_ms,
                 settle_delay_ms=settle_delay_ms,
+                heartbeat_interval_ms=heartbeat_interval_ms,
                 attempts=attempts,
             )
 
@@ -523,6 +562,7 @@ def run_enemy_teleport_probe(
     acquisition_timeout_ms: int = 3000,
     teleport_timeout_ms: int = 10000,
     settle_delay_ms: int = 500,
+    heartbeat_interval_ms: int = 0,
 ) -> EnemyTeleportProbeSessionDict:
     """Run a live enemy teleport probe and save the session JSON."""
 
@@ -534,6 +574,7 @@ def run_enemy_teleport_probe(
             acquisition_timeout_ms=acquisition_timeout_ms,
             teleport_timeout_ms=teleport_timeout_ms,
             settle_delay_ms=settle_delay_ms,
+            heartbeat_interval_ms=heartbeat_interval_ms,
         )
 
     return run_and_save_standard_probe_session(

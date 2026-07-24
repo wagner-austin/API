@@ -66,6 +66,7 @@ def _session() -> EnemyTeleportProbeSessionDict:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=500,
+        heartbeat_interval_ms=0,
         attempts=[],
     )
 
@@ -192,6 +193,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
         acquisition_timeout_ms: int = 3000,
         teleport_timeout_ms: int = 10000,
         settle_delay_ms: int = 500,
+        heartbeat_interval_ms: int = 0,
     ) -> EnemyTeleportProbeSessionDict:
         captured.extend(
             [
@@ -205,6 +207,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
                 acquisition_timeout_ms,
                 teleport_timeout_ms,
                 settle_delay_ms,
+                heartbeat_interval_ms,
             ]
         )
         return _session()
@@ -225,6 +228,7 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
         3000,
         10000,
         500,
+        0,
     ]
     assert callable(core_hooks.sync_playwright)
 
@@ -244,6 +248,7 @@ def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
         "TANKPIT_ENEMY_TELEPORT_ACQUISITION_TIMEOUT_MS": "4100",
         "TANKPIT_ENEMY_TELEPORT_TIMEOUT_MS": "11000",
         "TANKPIT_ENEMY_TELEPORT_SETTLE_MS": "750",
+        "TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS": "1500",
     }
     core_hooks.get_env = lambda key: env.get(key)
     core_hooks.get_argv = lambda: [
@@ -269,6 +274,7 @@ def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
         acquisition_timeout_ms: int = 3000,
         teleport_timeout_ms: int = 10000,
         settle_delay_ms: int = 500,
+        heartbeat_interval_ms: int = 0,
     ) -> EnemyTeleportProbeSessionDict:
         recorded.extend(
             [
@@ -282,6 +288,7 @@ def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
                 acquisition_timeout_ms,
                 teleport_timeout_ms,
                 settle_delay_ms,
+                heartbeat_interval_ms,
             ]
         )
         return _session()
@@ -300,6 +307,7 @@ def test_main_uses_env_and_cli_overrides(_restore_script_hooks: None) -> None:
         4100,
         11000,
         750,
+        1500,
     ]
 
 

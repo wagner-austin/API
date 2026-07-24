@@ -233,6 +233,20 @@ class DispatchMixin(CompletionsMixin):
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
+    def request_inventory(self) -> bool:
+        """Send CMD_INVENTORY to request the inventory snapshot.
+
+        The cheapest game action on the wire (2 bytes, free, no world
+        effect) — used as the watch-probe heartbeat to hold the
+        push-on-activity stream open (wiki log 2026-07-24).
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_INVENTORY, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_INVENTORY), "inventory")
+
     # =========================================================================
     # Equipment Management
     # =========================================================================

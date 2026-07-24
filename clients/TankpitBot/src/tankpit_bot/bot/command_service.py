@@ -28,6 +28,7 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.protocol.commands import (
     CMD_ENTER_GAME,
+    CMD_INVENTORY,
     CMD_MAP_OPEN,
     CMD_NEAREST_ENEMY,
     CMD_RADAR,
@@ -191,6 +192,18 @@ class CommandService:
             True if command was sent.
         """
         return self.send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
+
+    def request_inventory(self) -> bool:
+        """Send CMD_INVENTORY ('i') to request the inventory snapshot.
+
+        The cheapest game action on the wire (2 bytes, free, no world
+        effect) — the watch-probe heartbeat uses it to hold the
+        push-on-activity stream open (wiki log 2026-07-24).
+
+        Returns:
+            True if command was sent.
+        """
+        return self.send_bytes(build_query_command(CMD_INVENTORY), "inventory")
 
     def toggle_equipment(self, slot: int) -> bool:
         """Toggle equipment slot on/off.

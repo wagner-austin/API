@@ -161,8 +161,8 @@ enemy-teleport-probe-nearest: install
 # analysis_scripts/mine_bot_policy.py and `make shadow`.
 bot-watch: install
 	@Write-Host ""
-	@Write-Host "==> bot-watch (1 enemy teleport + 10 min idle dwell)" -ForegroundColor Cyan
-	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
+	@Write-Host "==> bot-watch (1 enemy teleport + 10 min heartbeat dwell)" -ForegroundColor Cyan
+	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS = "1500"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
 
 fuel-probe: install
 	@Write-Host ""

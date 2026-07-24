@@ -217,6 +217,7 @@ class _ProbeHarness(EnemyTeleportProbe):
         self.teleport_result = True
         self.open_map_calls = 0
         self.request_enemy_calls = 0
+        self.inventory_calls = 0
         self.teleport_calls: list[tuple[int, int]] = []
 
     def _require_page(self) -> PageProtocol:
@@ -235,6 +236,10 @@ class _ProbeHarness(EnemyTeleportProbe):
     def request_nearest_enemy(self) -> bool:
         self.request_enemy_calls += 1
         return self.request_enemy_result
+
+    def request_inventory(self) -> bool:
+        self.inventory_calls += 1
+        return True
 
     def teleport_to(self, x: int, y: int) -> bool:
         self.teleport_calls.append((x, y))
@@ -259,9 +264,10 @@ class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, EnemyTelep
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
         settle_delay_ms: int,
+        heartbeat_interval_ms: int,
         excluded_tank_ids: frozenset[int],
     ) -> EnemyTeleportAttemptResultDict:
-        _ = (acquisition_timeout_ms, teleport_timeout_ms, settle_delay_ms)
+        _ = (acquisition_timeout_ms, teleport_timeout_ms, settle_delay_ms, heartbeat_interval_ms)
         self.acquisition_strategies.append(acquisition_strategy)
         self.excluded_tank_ids.append(excluded_tank_ids)
         return self.results[len(self.acquisition_strategies) - 1]
@@ -294,6 +300,7 @@ class _FakeEnemyTeleportProbe(EnemyTeleportProbe):
         acquisition_timeout_ms: int,
         teleport_timeout_ms: int,
         settle_delay_ms: int,
+        heartbeat_interval_ms: int,
     ) -> EnemyTeleportProbeSessionDict:
         return EnemyTeleportProbeSessionDict(
             session_id="enemy-session",
@@ -321,6 +328,7 @@ class _FakeEnemyTeleportProbe(EnemyTeleportProbe):
             acquisition_timeout_ms=acquisition_timeout_ms,
             teleport_timeout_ms=teleport_timeout_ms,
             settle_delay_ms=settle_delay_ms,
+            heartbeat_interval_ms=0,
             attempts=[],
         )
 
@@ -549,6 +557,7 @@ def test_format_enemy_helpers_cover_terminal_result_and_summary() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=500,
+        heartbeat_interval_ms=0,
         attempts=[
             EnemyTeleportAttemptResultDict(**{**result, "status": "landed_adjacent"}),
             EnemyTeleportAttemptResultDict(**{**result, "status": "landed_not_adjacent"}),
@@ -594,6 +603,7 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
         landing_target=None,
         message_start_index=4,
         settle_delay_ms=250,
+        heartbeat_interval_ms=0,
         snapshot_before=_snapshot(900),
     )
 
@@ -602,6 +612,32 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
     assert result["message_end_index"] == 0
     assert probe.get_state() == "IDLE"
     assert probe._fake_page.waits[-1] == 250.0
+
+
+def test_settle_dwell_heartbeat_holds_the_stream_open() -> None:
+    """A positive heartbeat splits the dwell into interval steps with
+    one inventory request leading each — the push-on-activity stream
+    dies ~2 s after the last action (wiki log 2026-07-24), so the
+    dwell must keep acting to keep observing."""
+    probe = _ProbeHarness()
+    probe._settle_dwell(probe._fake_page, 4000, 1500)
+    assert probe.inventory_calls == 3
+    assert probe._fake_page.waits[-3:] == [1500.0, 1500.0, 1000.0]
+
+
+def test_settle_dwell_without_heartbeat_is_one_silent_wait() -> None:
+    probe = _ProbeHarness()
+    probe._settle_dwell(probe._fake_page, 4000, 0)
+    assert probe.inventory_calls == 0
+    assert probe._fake_page.waits[-1] == 4000.0
+
+
+def test_settle_dwell_zero_settle_is_a_no_op() -> None:
+    probe = _ProbeHarness()
+    baseline_waits = len(probe._fake_page.waits)
+    probe._settle_dwell(probe._fake_page, 0, 1500)
+    assert probe.inventory_calls == 0
+    assert len(probe._fake_page.waits) == baseline_waits
 
 
 def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
@@ -614,6 +650,7 @@ def test_probe_single_enemy_attempt_returns_acquisition_timeout() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=0,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -642,6 +679,7 @@ def test_probe_single_enemy_attempt_returns_no_enemy() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=0,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -678,6 +716,7 @@ def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=0,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -717,6 +756,7 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
             acquisition_timeout_ms=3000,
             teleport_timeout_ms=10000,
             settle_delay_ms=0,
+            heartbeat_interval_ms=0,
             excluded_tank_ids=frozenset(),
         )
 
@@ -810,6 +850,7 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=0,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -916,6 +957,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=250,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -1032,6 +1074,7 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=0,
+        heartbeat_interval_ms=0,
         excluded_tank_ids=frozenset(),
     )
 
@@ -1052,6 +1095,7 @@ def test_execute_probe_raises_for_invalid_max_attempts() -> None:
             acquisition_timeout_ms=3000,
             teleport_timeout_ms=10000,
             settle_delay_ms=500,
+            heartbeat_interval_ms=0,
         )
 
 
@@ -1068,6 +1112,7 @@ def test_execute_probe_raises_when_playwright_is_missing() -> None:
                 acquisition_timeout_ms=3000,
                 teleport_timeout_ms=10000,
                 settle_delay_ms=500,
+                heartbeat_interval_ms=0,
             )
     finally:
         core_hooks.sync_playwright = original_sync_playwright
@@ -1165,6 +1210,7 @@ def test_execute_probe_collects_attempts() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=500,
+        heartbeat_interval_ms=0,
     )
 
     assert len(session["attempts"]) == 2
@@ -1267,6 +1313,7 @@ def test_execute_probe_does_not_exclude_when_attempt_has_no_enemy() -> None:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=500,
+        heartbeat_interval_ms=0,
     )
 
     assert len(session["attempts"]) == 2

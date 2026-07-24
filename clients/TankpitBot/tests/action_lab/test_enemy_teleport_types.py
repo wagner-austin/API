@@ -115,6 +115,7 @@ def _session() -> EnemyTeleportProbeSessionDict:
         acquisition_timeout_ms=3000,
         teleport_timeout_ms=10000,
         settle_delay_ms=500,
+        heartbeat_interval_ms=0,
         attempts=[_attempt()],
     )
 

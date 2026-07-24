@@ -194,6 +194,14 @@ class TestBotCommandsWithoutCDP:
         result = bot.request_nearest_enemy()
         assert result is False
 
+    def test_request_inventory_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
+        """Test Bot.request_inventory returns False when CDP not available."""
+        from tankpit_bot.bot.base import Bot
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        result = bot.request_inventory()
+        assert result is False
+
     def test_open_map_returns_false_without_cdp(self, fake_env: FakeEnv) -> None:
         """Test Bot.open_map returns False when CDP not available."""
         from tankpit_bot.bot.base import Bot

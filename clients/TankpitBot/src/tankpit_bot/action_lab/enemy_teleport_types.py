@@ -94,6 +94,7 @@ class EnemyTeleportProbeSessionDict(TypedDict):
     acquisition_timeout_ms: int
     teleport_timeout_ms: int
     settle_delay_ms: int
+    heartbeat_interval_ms: int
     attempts: list[EnemyTeleportAttemptResultDict]
 
 
@@ -406,6 +407,7 @@ def encode_enemy_teleport_probe_session(session: EnemyTeleportProbeSessionDict) 
         "acquisition_timeout_ms": session["acquisition_timeout_ms"],
         "teleport_timeout_ms": session["teleport_timeout_ms"],
         "settle_delay_ms": session["settle_delay_ms"],
+        "heartbeat_interval_ms": session["heartbeat_interval_ms"],
         "attempts": encoded_attempts,
     }
 
@@ -457,6 +459,7 @@ def decode_enemy_teleport_probe_session(data: JSONObject) -> EnemyTeleportProbeS
         acquisition_timeout_ms=require_int(data, "acquisition_timeout_ms"),
         teleport_timeout_ms=require_int(data, "teleport_timeout_ms"),
         settle_delay_ms=require_int(data, "settle_delay_ms"),
+        heartbeat_interval_ms=require_int(data, "heartbeat_interval_ms"),
         attempts=_decode_attempts(data.get("attempts")),
     )
 

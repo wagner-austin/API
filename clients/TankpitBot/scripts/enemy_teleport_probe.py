@@ -94,6 +94,7 @@ def main() -> int:
     )
     teleport_timeout_ms = int(_test_hooks.get_env("TANKPIT_ENEMY_TELEPORT_TIMEOUT_MS") or "10000")
     settle_delay_ms = int(_test_hooks.get_env("TANKPIT_ENEMY_TELEPORT_SETTLE_MS") or "500")
+    heartbeat_interval_ms = int(_test_hooks.get_env("TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS") or "0")
 
     session: EnemyTeleportProbeSessionDict = run_enemy_teleport_probe(
         target_url,
@@ -110,6 +111,7 @@ def main() -> int:
         acquisition_timeout_ms=acquisition_timeout_ms,
         teleport_timeout_ms=teleport_timeout_ms,
         settle_delay_ms=settle_delay_ms,
+        heartbeat_interval_ms=heartbeat_interval_ms,
     )
     log.info(format_enemy_teleport_probe_summary(session))
     log.info(_format_saved_path(output_path))

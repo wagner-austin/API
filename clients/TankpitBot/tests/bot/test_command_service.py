@@ -86,6 +86,10 @@ class TestCommandService:
         assert self.svc.request_nearest_enemy() is True
         assert self._sent[0][0] == "nearest_enemy"
 
+    def test_request_inventory(self) -> None:
+        assert self.svc.request_inventory() is True
+        assert self._sent[0][0] == "inventory"
+
     def test_toggle_equipment_valid(self) -> None:
         assert self.svc.toggle_equipment(2) is True
         assert "toggle_dual" in self._sent[0][0]

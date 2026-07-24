@@ -149,6 +149,20 @@ class ProbeBase(SessionBase):
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
+    def request_inventory(self) -> bool:
+        """Send the inventory request — the cheapest game action.
+
+        Two bytes, free, no world effect: the watch-dwell heartbeat
+        uses it to hold the push-on-activity stream open (wiki log
+        2026-07-24).
+
+        Returns:
+            True if command was sent.
+        """
+        from tankpit_bot.protocol.commands import CMD_INVENTORY, build_query_command
+
+        return self._send_bytes(build_query_command(CMD_INVENTORY), "inventory")
+
     def shoot(self, x: int, y: int, target_id: int = 0) -> bool:
         """Send shoot command.
 

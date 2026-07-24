@@ -124,6 +124,7 @@ def replay_enemy_teleport_attempt(
             acquisition_timeout_ms=acquisition_timeout_ms,
             teleport_timeout_ms=teleport_timeout_ms,
             settle_delay_ms=settle_delay_ms,
+            heartbeat_interval_ms=0,
             excluded_tank_ids=excluded_tank_ids,
         )
     finally:
