@@ -124,6 +124,17 @@ consumption by anyone):[^4]
   2 tiles of a past consumption).
 - **No wire message announces a spawn** — the client discovers new
   dots on the next map open or radar reveal.[^4]
+- **Independent replication + extensions (2026-07-24 re-sweep,
+  standing script):** 3,883 snapshots re-derive the same law
+  (population median 614, p10 600 / p90 650; 600 appearances over
+  526 gap-minutes ≈ 1.14/min) and add two facts: (1) **snapshot
+  completeness is proven** — 1,141 of 1,381 back-to-back map opens
+  (≤5 s apart) show a zero diff and 236 show exactly one (a real
+  event between opens), so atlas diffs are true world events, not
+  reveal artifacts; (2) **spawn placement is roughly uniform** —
+  the 600 appearances cover all sixteen 64×64 quadrants (20–56
+  each, mild east lean), matching the never-reuse fresh-location
+  rule.[^7]
 
 Equipment containers are invisible to the 0x4C atlas, so their
 respawn dynamics remain unmeasured. The sim ([[physics-module-roadmap]])
@@ -291,5 +302,10 @@ Each value above is matched 1:1 between a user-declared action and a measurable 
 [^2]: client gauge math: `Gc` in `tpclient.js` (blob-pinned in frontmatter); rank-table verifications 2026-07-06 (user deposits at ranks 1/3/6/7, recorded per-row in the table above and in the frontmatter `verified:` field); formula machine-checked by the `fuel-capacity` claim below.
 [^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
 [^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots).
+[^7]: re-sweep 2026-07-24: `analysis_scripts/mine_fuel_spawns.py`
+over every `runs/**/capture_session.json` — per-session consecutive
+0x4C `fuel_dots` set diffs, back-to-back (≤5 s) consistency buckets,
+gap-bucketed appearance counts, 64×64-quadrant appearance histogram.
+Re-run to re-derive.
 [^5]: dedicated manual captures on disk: `runs/sniff/sniff-20260720-213208.capture_session.json` (missiles) and `sniff-20260720-214329` (mine presses); the full cost set is machine-checked in the claim block below.
 [^6]: radar isolation sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py` (sent-command-keyed fuel windows) over the full archive; results snapshot `analysis_scripts/bot_policy_sweep_2026-07-24.json`; wiki-log entry "[2026-07-24] mining | Radar cost isolated, self-sync drift is activity-correlated". STANDING instrument since the same day: `validate_radar_cost` in `src/tankpit_bot/validate/archive.py` re-derives this claim on every `make audit` (`radar-cost` row; first run replicated the sweep digit-for-digit — 1,311 samples, 1,293 exact, PASS).
