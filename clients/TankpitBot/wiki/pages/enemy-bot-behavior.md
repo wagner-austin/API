@@ -99,7 +99,7 @@ teleport. 60/64 have no observed movement to explain the fuel gain.
 Either bot position channels are gappier than assumed (0x47/0x3D
 viewport scoping) or an unmodeled mechanic exists. Needs a targeted
 capture watching one bot continuously before the sim policy claims
-the refuel channel.
+the refuel channel.[^8]
 
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)
