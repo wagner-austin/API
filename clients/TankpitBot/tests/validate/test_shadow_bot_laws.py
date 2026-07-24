@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from tankpit_bot.sim.bot_policy import BOT_RETURN_WINDOW_MS
-from tankpit_bot.validate.shadow_bot_laws import shadow_bot_return_fire
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.validate.shadow_bot_laws import (
+    shadow_bot_reactivation,
+    shadow_bot_return_fire,
+)
 from tankpit_bot.validate.shadow_timeline import (
+    KillEventDict,
     PositionEventDict,
     ShadowTimelineDict,
     ShotEventDict,
+    TankSyncEventDict,
 )
+
+CORPSE_MS = CORPSE_WINDOW_TICKS * TICK_MS
 
 HUMAN_ID = 7
 BOT_ID = 21
@@ -17,21 +25,42 @@ OTHER_BOT_ID = 22
 
 def _timeline(
     names: dict[int, str],
-    shots: list[ShotEventDict],
-    positions: list[PositionEventDict],
+    shots: list[ShotEventDict] | None = None,
+    positions: list[PositionEventDict] | None = None,
+    kills: list[KillEventDict] | None = None,
+    syncs: list[TankSyncEventDict] | None = None,
 ) -> ShadowTimelineDict:
     return ShadowTimelineDict(
         session_id="bot-law-test",
         self_id=HUMAN_ID,
         names=names,
-        syncs=[],
-        kills=[],
+        syncs=syncs if syncs is not None else [],
+        kills=kills if kills is not None else [],
         gains=[],
         removals=[],
         exits=[],
         inventories=[],
-        shots=shots,
-        positions=positions,
+        shots=shots if shots is not None else [],
+        positions=positions if positions is not None else [],
+    )
+
+
+def _kill(timestamp_ms: int, victim_id: int) -> KillEventDict:
+    return KillEventDict(
+        timestamp_ms=timestamp_ms,
+        victim_id=victim_id,
+        killer_id=HUMAN_ID,
+        is_mine_kill=False,
+    )
+
+
+def _sync(timestamp_ms: int, tank_id: int, damage_state: int, rank: int = 0) -> TankSyncEventDict:
+    return TankSyncEventDict(
+        timestamp_ms=timestamp_ms,
+        tank_id=tank_id,
+        damage_state=damage_state,
+        rank=rank,
+        fuel=None,
     )
 
 
@@ -168,3 +197,58 @@ class TestBotReturnFire:
         )
         evidence = shadow_bot_return_fire([timeline])
         assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+
+class TestBotReactivation:
+    def test_full_tier_sync_after_the_corpse_window_is_exact(self) -> None:
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, BOT_ID)],
+            syncs=[_sync(1000 + CORPSE_MS, BOT_ID, 3)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+    def test_early_sync_is_a_mismatch(self) -> None:
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, BOT_ID)],
+            syncs=[_sync(5000, BOT_ID, 3)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
+
+    def test_partial_fuel_return_is_a_mismatch(self) -> None:
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, BOT_ID)],
+            syncs=[_sync(1000 + CORPSE_MS, BOT_ID, 1)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
+
+    def test_death_with_no_later_sync_is_skipped(self) -> None:
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, BOT_ID)],
+            syncs=[_sync(500, BOT_ID, 2)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert evidence["samples"] == 0
+
+    def test_non_bot_victims_are_not_samples(self) -> None:
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, HUMAN_ID)],
+            syncs=[_sync(1000 + CORPSE_MS, HUMAN_ID, 3)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert evidence["samples"] == 0
+
+    def test_sessions_without_bots_are_skipped(self) -> None:
+        timeline = _timeline(
+            {HUMAN_ID: "Artax"},
+            kills=[_kill(1000, HUMAN_ID)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert evidence["samples"] == 0

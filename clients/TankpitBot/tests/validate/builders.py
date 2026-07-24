@@ -152,9 +152,11 @@ def sync_message(
     return frame_message(timestamp_ms, xor_encode_body(0x2E, payload), "received")
 
 
-def short_sync_message(timestamp_ms: int, tank_id: int, rank: int) -> CapturedMessage:
+def short_sync_message(
+    timestamp_ms: int, tank_id: int, rank: int, damage: int = 0
+) -> CapturedMessage:
     """Build a short-form 0x2E TankStatusSync (rank/promo, no fuel)."""
-    payload = bytes([0x2E, TEAM_SELF, tank_id & 0xFF, tank_id >> 8, 0, rank, 0, 0, 0, 2])
+    payload = bytes([0x2E, TEAM_SELF, tank_id & 0xFF, tank_id >> 8, damage, rank, 0, 0, 0, 2])
     return frame_message(timestamp_ms, xor_encode_body(0x2E, payload), "received")
 
 

@@ -22,6 +22,7 @@ from tests.validate.builders import (
     make_session,
     movement_response_message,
     named_identity_message,
+    short_sync_message,
     sync_message,
     tank_remove_message,
 )
@@ -48,6 +49,8 @@ def _lawful_session() -> CaptureSession:
     messages.append(movement_response_message(90_200, BOT_ID, 11, 10))
     messages.append(aimed_shot_message(91_000, SELF_ID, (10, 10), (11, 10), 1))
     messages.append(aimed_shot_message(93_000, BOT_ID, (11, 10), (10, 10), 0))
+    messages.append(deactivation_message(94_000, BOT_ID, ENEMY_ID))
+    messages.append(short_sync_message(94_000 + CORPSE_MS, BOT_ID, 0, damage=3))
     return make_session(messages)
 
 
@@ -61,6 +64,8 @@ def _lawless_session() -> CaptureSession:
     messages.append(tank_remove_message(48_000, VICTIM_ID))
     messages.append(named_identity_message(90_000, BOT_ID, "orange-3"))
     messages.append(aimed_shot_message(91_000, BOT_ID, (11, 10), (10, 10), 0))
+    messages.append(deactivation_message(94_000, BOT_ID, ENEMY_ID))
+    messages.append(short_sync_message(96_000, BOT_ID, 0, damage=0))
     return make_session(messages)
 
 
@@ -82,6 +87,7 @@ def test_lawful_archive_passes_every_law(tmp_path: Path) -> None:
     assert by_id["kill-mercy-bundle"]["exact"] == 1
     assert by_id["corpse-window"]["exact"] == 1
     assert by_id["bot-return-fire"]["exact"] == 1
+    assert by_id["bot-reactivation"]["exact"] == 1
     assert all(record["mismatches"] == 0 for record in evidence)
     assert run_shadow(runs_root) == 0
 

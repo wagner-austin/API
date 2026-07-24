@@ -61,6 +61,7 @@ from tankpit_bot.sim.actions import (
     process_teleport,
 )
 from tankpit_bot.sim.blocks import block_tile_value, process_block_press
+from tankpit_bot.sim.bot_policy import reactivate_practice_bot
 from tankpit_bot.sim.combat import process_shot
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.equipment import (
@@ -182,7 +183,13 @@ class SimServer:
     tanks' commands are queued by the opponent policies directly.
     """
 
-    def __init__(self, world: SimWorldDict, terrain: TerrainMapProtocol, client_id: int) -> None:
+    def __init__(
+        self,
+        world: SimWorldDict,
+        terrain: TerrainMapProtocol,
+        client_id: int,
+        roster_ids: frozenset[int] = frozenset(),
+    ) -> None:
         """Bind the server to a world, its terrain, and the client tank.
 
         Viewport membership is computed at construction: other living
@@ -195,10 +202,15 @@ class SimServer:
             world: Simulated world (owned and mutated by the server).
             terrain: Static terrain for the world's field.
             client_id: The connected client's tank id.
+            roster_ids: Practice-roster tanks that REACTIVATE in place
+                with the same id at full fuel when their corpse clears
+                (archive-mined 2026-07-24, [[enemy-bot-behavior]]).
+                Empty for worlds without roster bots.
         """
         self.world = world
         self.terrain = terrain
         self.client_id = client_id
+        self._roster_ids = roster_ids
         self._queue: list[tuple[int, ClientCommandDict]] = []
         self._pending_debits: list[tuple[int, int]] = []
         self._removed_at: dict[int, int] = {}
@@ -1016,6 +1028,13 @@ class SimServer:
                 # law-4 reroute clock only runs for living exits.
                 messages.append(TankRemoveDict(msg_type=0x58, tank_id=tank_id))
                 del self._died_at[tank_id]
+                if tank_id in self._roster_ids:
+                    # Roster bots come back the same tick their corpse
+                    # clears: same id, full fuel, respawned FAR from
+                    # the corpse — the viewport diff below announces
+                    # them if the landing is in view, and the sync
+                    # loop resumes their tier-3 cadence either way.
+                    reactivate_practice_bot(self.world, self.terrain, tank_id)
         self._emit_viewport_transitions(messages)
         for tank_id in sorted(self.world["tanks"]):
             if self.world["tanks"][tank_id]["alive"]:

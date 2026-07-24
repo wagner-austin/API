@@ -219,6 +219,1447 @@
   "24": 1,
   "21": 2
  },
+ "respawn_displacement": {
+  "12": 70,
+  "7": 2,
+  "9": 6,
+  "6": 3,
+  "3": 3,
+  "10": 6,
+  "5": 3,
+  "8": 4,
+  "11": 5
+ },
+ "respawn_pairs": [
+  {
+   "session": "c81a3024-24c3-4097-b54c-59f5f56f14c6",
+   "bot": "purple-8",
+   "corpse": [
+    117,
+    200
+   ],
+   "next_seen": [
+    38,
+    61
+   ],
+   "dist": 139,
+   "gap_ms": 24037
+  },
+  {
+   "session": "7d08d437-cdaa-45a1-987d-021ca42a68fa",
+   "bot": "purple-9",
+   "corpse": [
+    163,
+    154
+   ],
+   "next_seen": [
+    45,
+    176
+   ],
+   "dist": 118,
+   "gap_ms": 22017
+  },
+  {
+   "session": "a7f67ca0-4ec9-4eb5-aec5-95e42ec62c48",
+   "bot": "orange-8",
+   "corpse": [
+    214,
+    208
+   ],
+   "next_seen": [
+    37,
+    240
+   ],
+   "dist": 177,
+   "gap_ms": 30023
+  },
+  {
+   "session": "05732c30-0246-4a66-831c-a34e5cd4234c",
+   "bot": "red-1",
+   "corpse": [
+    94,
+    84
+   ],
+   "next_seen": [
+    204,
+    163
+   ],
+   "dist": 110,
+   "gap_ms": 24037
+  },
+  {
+   "session": "05732c30-0246-4a66-831c-a34e5cd4234c",
+   "bot": "orange-3",
+   "corpse": [
+    28,
+    79
+   ],
+   "next_seen": [
+    212,
+    76
+   ],
+   "dist": 184,
+   "gap_ms": 24025
+  },
+  {
+   "session": "05732c30-0246-4a66-831c-a34e5cd4234c",
+   "bot": "red-8",
+   "corpse": [
+    1,
+    254
+   ],
+   "next_seen": [
+    160,
+    80
+   ],
+   "dist": 174,
+   "gap_ms": 24045
+  },
+  {
+   "session": "1d4c0db7-7e5a-4204-975c-621b8ef3d5ed",
+   "bot": "purple-4",
+   "corpse": [
+    218,
+    68
+   ],
+   "next_seen": [
+    111,
+    68
+   ],
+   "dist": 107,
+   "gap_ms": 22033
+  },
+  {
+   "session": "1d4c0db7-7e5a-4204-975c-621b8ef3d5ed",
+   "bot": "purple-2",
+   "corpse": [
+    210,
+    67
+   ],
+   "next_seen": [
+    154,
+    115
+   ],
+   "dist": 56,
+   "gap_ms": 24022
+  },
+  {
+   "session": "1d4c0db7-7e5a-4204-975c-621b8ef3d5ed",
+   "bot": "orange-5",
+   "corpse": [
+    208,
+    112
+   ],
+   "next_seen": [
+    164,
+    249
+   ],
+   "dist": 137,
+   "gap_ms": 32012
+  },
+  {
+   "session": "f0710536-187e-43e5-9e70-4ed5b99d4009",
+   "bot": "red-1",
+   "corpse": [
+    149,
+    189
+   ],
+   "next_seen": [
+    147,
+    28
+   ],
+   "dist": 161,
+   "gap_ms": 42029
+  },
+  {
+   "session": "91faaa26-75dd-459d-afa8-7f34b14346ad",
+   "bot": "red-5",
+   "corpse": [
+    100,
+    102
+   ],
+   "next_seen": [
+    35,
+    219
+   ],
+   "dist": 117,
+   "gap_ms": 26022
+  },
+  {
+   "session": "ceee5c5d-0dd7-48b8-9a38-6b192114c469",
+   "bot": "orange-6",
+   "corpse": [
+    204,
+    197
+   ],
+   "next_seen": [
+    74,
+    104
+   ],
+   "dist": 130,
+   "gap_ms": 28029
+  },
+  {
+   "session": "0aececae-6c10-420e-ab25-96f685d8719e",
+   "bot": "red-6",
+   "corpse": [
+    224,
+    243
+   ],
+   "next_seen": [
+    234,
+    59
+   ],
+   "dist": 184,
+   "gap_ms": 24023
+  },
+  {
+   "session": "0aececae-6c10-420e-ab25-96f685d8719e",
+   "bot": "red-2",
+   "corpse": [
+    254,
+    61
+   ],
+   "next_seen": [
+    136,
+    31
+   ],
+   "dist": 118,
+   "gap_ms": 36036
+  },
+  {
+   "session": "129aed1d-e289-44fb-9713-61d4841cfb19",
+   "bot": "purple-7",
+   "corpse": [
+    237,
+    124
+   ],
+   "next_seen": [
+    124,
+    80
+   ],
+   "dist": 113,
+   "gap_ms": 32019
+  },
+  {
+   "session": "129aed1d-e289-44fb-9713-61d4841cfb19",
+   "bot": "purple-3",
+   "corpse": [
+    246,
+    128
+   ],
+   "next_seen": [
+    143,
+    77
+   ],
+   "dist": 103,
+   "gap_ms": 26036
+  },
+  {
+   "session": "5adfa337-d917-47b9-bc0f-1c53e2111438",
+   "bot": "orange-8",
+   "corpse": [
+    215,
+    106
+   ],
+   "next_seen": [
+    164,
+    185
+   ],
+   "dist": 79,
+   "gap_ms": 28022
+  },
+  {
+   "session": "7b2611cc-6859-4185-b2bc-3d356700d1d0",
+   "bot": "orange-7",
+   "corpse": [
+    115,
+    75
+   ],
+   "next_seen": [
+    250,
+    148
+   ],
+   "dist": 135,
+   "gap_ms": 30016
+  },
+  {
+   "session": "7b2611cc-6859-4185-b2bc-3d356700d1d0",
+   "bot": "purple-3",
+   "corpse": [
+    143,
+    96
+   ],
+   "next_seen": [
+    219,
+    163
+   ],
+   "dist": 76,
+   "gap_ms": 28073
+  },
+  {
+   "session": "8727c31c-8a84-45a2-8ea7-a58190ea3ce9",
+   "bot": "purple-2",
+   "corpse": [
+    169,
+    66
+   ],
+   "next_seen": [
+    211,
+    177
+   ],
+   "dist": 111,
+   "gap_ms": 22028
+  },
+  {
+   "session": "3821bf5f-f5f2-461e-bcb0-aae4a7da756d",
+   "bot": "purple-1",
+   "corpse": [
+    188,
+    101
+   ],
+   "next_seen": [
+    205,
+    2
+   ],
+   "dist": 99,
+   "gap_ms": 22010
+  },
+  {
+   "session": "3821bf5f-f5f2-461e-bcb0-aae4a7da756d",
+   "bot": "orange-2",
+   "corpse": [
+    200,
+    39
+   ],
+   "next_seen": [
+    20,
+    77
+   ],
+   "dist": 180,
+   "gap_ms": 32028
+  },
+  {
+   "session": "2da878cc-f2b2-4bb1-a44f-7ef0d84ddfb1",
+   "bot": "orange-5",
+   "corpse": [
+    164,
+    249
+   ],
+   "next_seen": [
+    224,
+    128
+   ],
+   "dist": 121,
+   "gap_ms": 24025
+  },
+  {
+   "session": "22564723-3779-4919-99de-897306fdda4a",
+   "bot": "purple-8",
+   "corpse": [
+    238,
+    221
+   ],
+   "next_seen": [
+    56,
+    181
+   ],
+   "dist": 182,
+   "gap_ms": 34029
+  },
+  {
+   "session": "c8ef0bcd-b1e0-4e91-a783-9831332b8112",
+   "bot": "orange-1",
+   "corpse": [
+    202,
+    253
+   ],
+   "next_seen": [
+    21,
+    71
+   ],
+   "dist": 182,
+   "gap_ms": 38026
+  },
+  {
+   "session": "ee2a5f1d-93e5-45bc-96f1-4bc54a39632b",
+   "bot": "orange-6",
+   "corpse": [
+    113,
+    187
+   ],
+   "next_seen": [
+    212,
+    158
+   ],
+   "dist": 99,
+   "gap_ms": 22031
+  },
+  {
+   "session": "7a82a84a-38fe-4152-abc6-4679ac61d9ee",
+   "bot": "orange-6",
+   "corpse": [
+    200,
+    172
+   ],
+   "next_seen": [
+    208,
+    1
+   ],
+   "dist": 171,
+   "gap_ms": 38034
+  },
+  {
+   "session": "7a82a84a-38fe-4152-abc6-4679ac61d9ee",
+   "bot": "purple-3",
+   "corpse": [
+    222,
+    179
+   ],
+   "next_seen": [
+    174,
+    197
+   ],
+   "dist": 48,
+   "gap_ms": 26023
+  },
+  {
+   "session": "6a0f4571-0a33-4ea5-affa-bea0fc9fd4b1",
+   "bot": "orange-5",
+   "corpse": [
+    253,
+    142
+   ],
+   "next_seen": [
+    106,
+    190
+   ],
+   "dist": 147,
+   "gap_ms": 28022
+  },
+  {
+   "session": "6a0f4571-0a33-4ea5-affa-bea0fc9fd4b1",
+   "bot": "purple-2",
+   "corpse": [
+    196,
+    199
+   ],
+   "next_seen": [
+    37,
+    169
+   ],
+   "dist": 159,
+   "gap_ms": 32035
+  },
+  {
+   "session": "eadf04d4-1fa6-4e3c-84f6-eed26bf856ee",
+   "bot": "red-1",
+   "corpse": [
+    250,
+    111
+   ],
+   "next_seen": [
+    6,
+    224
+   ],
+   "dist": 244,
+   "gap_ms": 26052
+  },
+  {
+   "session": "392eb649-99d3-4600-b1e3-141db7584867",
+   "bot": "purple-7",
+   "corpse": [
+    150,
+    181
+   ],
+   "next_seen": [
+    123,
+    194
+   ],
+   "dist": 27,
+   "gap_ms": 30021
+  },
+  {
+   "session": "392eb649-99d3-4600-b1e3-141db7584867",
+   "bot": "orange-7",
+   "corpse": [
+    239,
+    226
+   ],
+   "next_seen": [
+    131,
+    145
+   ],
+   "dist": 108,
+   "gap_ms": 24038
+  },
+  {
+   "session": "7570ec3a-2f8d-46fb-bf6f-31e25488f2e3",
+   "bot": "purple-3",
+   "corpse": [
+    174,
+    197
+   ],
+   "next_seen": [
+    12,
+    22
+   ],
+   "dist": 175,
+   "gap_ms": 24025
+  },
+  {
+   "session": "a70aee4a-a5ef-4dc2-907b-46c947f582f7",
+   "bot": "orange-7",
+   "corpse": [
+    150,
+    146
+   ],
+   "next_seen": [
+    142,
+    230
+   ],
+   "dist": 84,
+   "gap_ms": 30022
+  },
+  {
+   "session": "bf88628e-455e-45d2-a244-eeda2407108f",
+   "bot": "red-9",
+   "corpse": [
+    48,
+    18
+   ],
+   "next_seen": [
+    103,
+    80
+   ],
+   "dist": 62,
+   "gap_ms": 40023
+  },
+  {
+   "session": "30d628b7-12d9-4ebb-baed-60fd06b882aa",
+   "bot": "red-2",
+   "corpse": [
+    175,
+    119
+   ],
+   "next_seen": [
+    167,
+    215
+   ],
+   "dist": 96,
+   "gap_ms": 28036
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "red-9",
+   "corpse": [
+    126,
+    97
+   ],
+   "next_seen": [
+    82,
+    130
+   ],
+   "dist": 44,
+   "gap_ms": 34019
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "orange-9",
+   "corpse": [
+    138,
+    127
+   ],
+   "next_seen": [
+    206,
+    68
+   ],
+   "dist": 68,
+   "gap_ms": 22024
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "red-5",
+   "corpse": [
+    143,
+    56
+   ],
+   "next_seen": [
+    94,
+    65
+   ],
+   "dist": 49,
+   "gap_ms": 32035
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "orange-4",
+   "corpse": [
+    97,
+    44
+   ],
+   "next_seen": [
+    203,
+    233
+   ],
+   "dist": 189,
+   "gap_ms": 42039
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "red-6",
+   "corpse": [
+    10,
+    133
+   ],
+   "next_seen": [
+    151,
+    69
+   ],
+   "dist": 141,
+   "gap_ms": 28026
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "purple-2",
+   "corpse": [
+    33,
+    126
+   ],
+   "next_seen": [
+    217,
+    147
+   ],
+   "dist": 184,
+   "gap_ms": 22021
+  },
+  {
+   "session": "3eebc60f-eff8-4bef-a883-6d77d888ab0b",
+   "bot": "purple-8",
+   "corpse": [
+    85,
+    173
+   ],
+   "next_seen": [
+    69,
+    248
+   ],
+   "dist": 75,
+   "gap_ms": 24031
+  },
+  {
+   "session": "414ed66d-0404-44a7-82c0-5b89f1aae601",
+   "bot": "orange-2",
+   "corpse": [
+    205,
+    19
+   ],
+   "next_seen": [
+    90,
+    48
+   ],
+   "dist": 115,
+   "gap_ms": 26016
+  },
+  {
+   "session": "b671cfdf-c242-4e28-85b0-5b033011b194",
+   "bot": "red-9",
+   "corpse": [
+    60,
+    149
+   ],
+   "next_seen": [
+    41,
+    250
+   ],
+   "dist": 101,
+   "gap_ms": 22028
+  },
+  {
+   "session": "b671cfdf-c242-4e28-85b0-5b033011b194",
+   "bot": "purple-7",
+   "corpse": [
+    126,
+    178
+   ],
+   "next_seen": [
+    7,
+    221
+   ],
+   "dist": 119,
+   "gap_ms": 22028
+  },
+  {
+   "session": "c4a30535-af16-46c1-ad46-e62a9c31ff92",
+   "bot": "purple-2",
+   "corpse": [
+    213,
+    148
+   ],
+   "next_seen": [
+    229,
+    234
+   ],
+   "dist": 86,
+   "gap_ms": 32037
+  },
+  {
+   "session": "c4a30535-af16-46c1-ad46-e62a9c31ff92",
+   "bot": "orange-3",
+   "corpse": [
+    210,
+    155
+   ],
+   "next_seen": [
+    253,
+    134
+   ],
+   "dist": 43,
+   "gap_ms": 22025
+  },
+  {
+   "session": "b80c3413-5c61-48bf-a14f-91427be7966c",
+   "bot": "purple-9",
+   "corpse": [
+    4,
+    93
+   ],
+   "next_seen": [
+    211,
+    176
+   ],
+   "dist": 207,
+   "gap_ms": 24008
+  },
+  {
+   "session": "3d70a637-3b5c-45f1-b06f-626d5e414ebd",
+   "bot": "orange-8",
+   "corpse": [
+    167,
+    169
+   ],
+   "next_seen": [
+    63,
+    159
+   ],
+   "dist": 104,
+   "gap_ms": 22020
+  },
+  {
+   "session": "37cbed9a-843b-4c81-8abc-b02f1b1bd0bf",
+   "bot": "orange-8",
+   "corpse": [
+    52,
+    136
+   ],
+   "next_seen": [
+    122,
+    233
+   ],
+   "dist": 97,
+   "gap_ms": 22031
+  },
+  {
+   "session": "c6d003ca-4768-4df5-ae97-2e071cc4beef",
+   "bot": "purple-5",
+   "corpse": [
+    103,
+    241
+   ],
+   "next_seen": [
+    74,
+    37
+   ],
+   "dist": 204,
+   "gap_ms": 24013
+  },
+  {
+   "session": "a6ee0464-7c3a-494c-ba7e-08a9d8936888",
+   "bot": "orange-9",
+   "corpse": [
+    233,
+    130
+   ],
+   "next_seen": [
+    117,
+    163
+   ],
+   "dist": 116,
+   "gap_ms": 24035
+  },
+  {
+   "session": "d2f33c0b-5060-4bde-9f8b-abfa16effe98",
+   "bot": "red-5",
+   "corpse": [
+    129,
+    25
+   ],
+   "next_seen": [
+    86,
+    228
+   ],
+   "dist": 203,
+   "gap_ms": 26068
+  },
+  {
+   "session": "96fdbfbf-da22-4e88-aa32-986681f81df3",
+   "bot": "orange-9",
+   "corpse": [
+    109,
+    187
+   ],
+   "next_seen": [
+    196,
+    94
+   ],
+   "dist": 93,
+   "gap_ms": 22022
+  },
+  {
+   "session": "96fdbfbf-da22-4e88-aa32-986681f81df3",
+   "bot": "red-5",
+   "corpse": [
+    86,
+    201
+   ],
+   "next_seen": [
+    92,
+    79
+   ],
+   "dist": 122,
+   "gap_ms": 28044
+  },
+  {
+   "session": "3e555119-7d21-444c-851b-08322ef2eb51",
+   "bot": "red-5",
+   "corpse": [
+    95,
+    95
+   ],
+   "next_seen": [
+    208,
+    125
+   ],
+   "dist": 113,
+   "gap_ms": 24032
+  },
+  {
+   "session": "3e555119-7d21-444c-851b-08322ef2eb51",
+   "bot": "orange-1",
+   "corpse": [
+    9,
+    44
+   ],
+   "next_seen": [
+    83,
+    84
+   ],
+   "dist": 74,
+   "gap_ms": 24051
+  },
+  {
+   "session": "b4377398-fe05-4885-aeec-b0d6ec2f3649",
+   "bot": "orange-1",
+   "corpse": [
+    73,
+    110
+   ],
+   "next_seen": [
+    142,
+    213
+   ],
+   "dist": 103,
+   "gap_ms": 22021
+  },
+  {
+   "session": "699db4d7-1e71-4368-9f8f-df2a42b66ee5",
+   "bot": "orange-2",
+   "corpse": [
+    203,
+    140
+   ],
+   "next_seen": [
+    238,
+    246
+   ],
+   "dist": 106,
+   "gap_ms": 22024
+  },
+  {
+   "session": "a0b4ae7c-d622-472c-9b61-ab76fe762a91",
+   "bot": "orange-7",
+   "corpse": [
+    194,
+    254
+   ],
+   "next_seen": [
+    3,
+    220
+   ],
+   "dist": 191,
+   "gap_ms": 24020
+  },
+  {
+   "session": "552641a8-a97e-4eb3-97ad-d8a85e9fbfef",
+   "bot": "red-5",
+   "corpse": [
+    225,
+    105
+   ],
+   "next_seen": [
+    132,
+    74
+   ],
+   "dist": 93,
+   "gap_ms": 36023
+  },
+  {
+   "session": "552641a8-a97e-4eb3-97ad-d8a85e9fbfef",
+   "bot": "red-2",
+   "corpse": [
+    254,
+    67
+   ],
+   "next_seen": [
+    119,
+    50
+   ],
+   "dist": 135,
+   "gap_ms": 26030
+  },
+  {
+   "session": "552641a8-a97e-4eb3-97ad-d8a85e9fbfef",
+   "bot": "red-7",
+   "corpse": [
+    225,
+    40
+   ],
+   "next_seen": [
+    160,
+    69
+   ],
+   "dist": 65,
+   "gap_ms": 24009
+  },
+  {
+   "session": "515c9dac-a197-441e-a8c3-a118b06caee2",
+   "bot": "orange-1",
+   "corpse": [
+    146,
+    194
+   ],
+   "next_seen": [
+    69,
+    105
+   ],
+   "dist": 89,
+   "gap_ms": 28011
+  },
+  {
+   "session": "71cfe441-6a6b-406c-aadb-b2e3548495b6",
+   "bot": "red-5",
+   "corpse": [
+    154,
+    52
+   ],
+   "next_seen": [
+    206,
+    105
+   ],
+   "dist": 53,
+   "gap_ms": 30038
+  },
+  {
+   "session": "1734b3f4-d79d-48d1-a9ad-021e06709af7",
+   "bot": "orange-9",
+   "corpse": [
+    5,
+    34
+   ],
+   "next_seen": [
+    194,
+    29
+   ],
+   "dist": 189,
+   "gap_ms": 26014
+  },
+  {
+   "session": "e5c9420e-74ad-41d7-8b53-718eb71f6384",
+   "bot": "red-5",
+   "corpse": [
+    190,
+    90
+   ],
+   "next_seen": [
+    79,
+    212
+   ],
+   "dist": 122,
+   "gap_ms": 36019
+  },
+  {
+   "session": "b4a74991-fb5b-4c8a-bd24-65f21930f0c7",
+   "bot": "orange-6",
+   "corpse": [
+    186,
+    12
+   ],
+   "next_seen": [
+    66,
+    29
+   ],
+   "dist": 120,
+   "gap_ms": 28027
+  },
+  {
+   "session": "91f2e326-8058-4d97-9353-9d57b8ec1e74",
+   "bot": "orange-9",
+   "corpse": [
+    152,
+    101
+   ],
+   "next_seen": [
+    130,
+    21
+   ],
+   "dist": 80,
+   "gap_ms": 22017
+  },
+  {
+   "session": "80fde4cb-2d4b-4536-b4df-351849b19b89",
+   "bot": "purple-1",
+   "corpse": [
+    188,
+    111
+   ],
+   "next_seen": [
+    21,
+    67
+   ],
+   "dist": 167,
+   "gap_ms": 30017
+  },
+  {
+   "session": "80fde4cb-2d4b-4536-b4df-351849b19b89",
+   "bot": "orange-4",
+   "corpse": [
+    207,
+    169
+   ],
+   "next_seen": [
+    124,
+    155
+   ],
+   "dist": 83,
+   "gap_ms": 28023
+  },
+  {
+   "session": "79cb3287-fc45-49f6-a1dc-62db112ff756",
+   "bot": "purple-8",
+   "corpse": [
+    188,
+    89
+   ],
+   "next_seen": [
+    204,
+    113
+   ],
+   "dist": 24,
+   "gap_ms": 22025
+  },
+  {
+   "session": "fbad6e99-d18e-460b-b361-80f7bb25c733",
+   "bot": "purple-9",
+   "corpse": [
+    126,
+    165
+   ],
+   "next_seen": [
+    26,
+    36
+   ],
+   "dist": 129,
+   "gap_ms": 22028
+  },
+  {
+   "session": "1261232e-731c-4697-8302-8c059caa25ed",
+   "bot": "orange-1",
+   "corpse": [
+    51,
+    85
+   ],
+   "next_seen": [
+    221,
+    90
+   ],
+   "dist": 170,
+   "gap_ms": 26026
+  },
+  {
+   "session": "5217dbe1-e556-4e2c-ba17-5cbcb69bfd39",
+   "bot": "purple-1",
+   "corpse": [
+    3,
+    52
+   ],
+   "next_seen": [
+    87,
+    198
+   ],
+   "dist": 146,
+   "gap_ms": 22018
+  },
+  {
+   "session": "c60de382-2b5e-4dc3-a483-2d38b90bae66",
+   "bot": "purple-9",
+   "corpse": [
+    192,
+    188
+   ],
+   "next_seen": [
+    202,
+    2
+   ],
+   "dist": 186,
+   "gap_ms": 28026
+  },
+  {
+   "session": "0c8d5ff4-6c6a-44f3-ad80-bca26be45eec",
+   "bot": "orange-8",
+   "corpse": [
+    99,
+    254
+   ],
+   "next_seen": [
+    170,
+    234
+   ],
+   "dist": 71,
+   "gap_ms": 30022
+  },
+  {
+   "session": "69fddcf0-0445-4470-9440-4b378377cd3a",
+   "bot": "orange-9",
+   "corpse": [
+    166,
+    234
+   ],
+   "next_seen": [
+    213,
+    194
+   ],
+   "dist": 47,
+   "gap_ms": 22019
+  },
+  {
+   "session": "69fddcf0-0445-4470-9440-4b378377cd3a",
+   "bot": "orange-4",
+   "corpse": [
+    125,
+    230
+   ],
+   "next_seen": [
+    139,
+    54
+   ],
+   "dist": 176,
+   "gap_ms": 32030
+  },
+  {
+   "session": "47077a94-8d8d-4e18-9d33-eabab8ba8eaf",
+   "bot": "red-6",
+   "corpse": [
+    57,
+    250
+   ],
+   "next_seen": [
+    219,
+    39
+   ],
+   "dist": 211,
+   "gap_ms": 32037
+  },
+  {
+   "session": "d4d1b8d6-9b53-4a18-bb74-dad68f427d8d",
+   "bot": "purple-1",
+   "corpse": [
+    100,
+    74
+   ],
+   "next_seen": [
+    108,
+    233
+   ],
+   "dist": 159,
+   "gap_ms": 24043
+  },
+  {
+   "session": "d4d1b8d6-9b53-4a18-bb74-dad68f427d8d",
+   "bot": "orange-6",
+   "corpse": [
+    88,
+    9
+   ],
+   "next_seen": [
+    32,
+    86
+   ],
+   "dist": 77,
+   "gap_ms": 22063
+  },
+  {
+   "session": "d4d1b8d6-9b53-4a18-bb74-dad68f427d8d",
+   "bot": "orange-4",
+   "corpse": [
+    121,
+    32
+   ],
+   "next_seen": [
+    145,
+    222
+   ],
+   "dist": 190,
+   "gap_ms": 30082
+  },
+  {
+   "session": "d4d1b8d6-9b53-4a18-bb74-dad68f427d8d",
+   "bot": "purple-8",
+   "corpse": [
+    68,
+    44
+   ],
+   "next_seen": [
+    127,
+    157
+   ],
+   "dist": 113,
+   "gap_ms": 24028
+  },
+  {
+   "session": "18106a2a-cdbd-43a3-8378-665e01e84386",
+   "bot": "orange-8",
+   "corpse": [
+    138,
+    128
+   ],
+   "next_seen": [
+    155,
+    155
+   ],
+   "dist": 27,
+   "gap_ms": 50030
+  },
+  {
+   "session": "fb881b7c-a9ff-4ecb-8c76-10f079f0caf6",
+   "bot": "purple-8",
+   "corpse": [
+    178,
+    126
+   ],
+   "next_seen": [
+    42,
+    136
+   ],
+   "dist": 136,
+   "gap_ms": 30029
+  },
+  {
+   "session": "d5ddd682-5cca-41c2-a561-c312e16458f2",
+   "bot": "orange-9",
+   "corpse": [
+    65,
+    132
+   ],
+   "next_seen": [
+    23,
+    226
+   ],
+   "dist": 94,
+   "gap_ms": 28024
+  },
+  {
+   "session": "97a2100e-4ebb-4a16-92e4-5946d6179159",
+   "bot": "red-6",
+   "corpse": [
+    181,
+    54
+   ],
+   "next_seen": [
+    92,
+    56
+   ],
+   "dist": 89,
+   "gap_ms": 22022
+  },
+  {
+   "session": "97a2100e-4ebb-4a16-92e4-5946d6179159",
+   "bot": "orange-1",
+   "corpse": [
+    231,
+    139
+   ],
+   "next_seen": [
+    60,
+    187
+   ],
+   "dist": 171,
+   "gap_ms": 26047
+  },
+  {
+   "session": "eec32832-aba4-4c91-8dd6-91f0a2ab7d2d",
+   "bot": "orange-2",
+   "corpse": [
+    60,
+    92
+   ],
+   "next_seen": [
+    190,
+    42
+   ],
+   "dist": 130,
+   "gap_ms": 46034
+  },
+  {
+   "session": "c65623e1-5335-43d4-ba38-53714ee2cedb",
+   "bot": "orange-4",
+   "corpse": [
+    92,
+    141
+   ],
+   "next_seen": [
+    23,
+    166
+   ],
+   "dist": 69,
+   "gap_ms": 22029
+  },
+  {
+   "session": "61acdb5b-0c98-4ce3-ae10-38b1ab8c914a",
+   "bot": "purple-8",
+   "corpse": [
+    230,
+    29
+   ],
+   "next_seen": [
+    12,
+    218
+   ],
+   "dist": 218,
+   "gap_ms": 54046
+  },
+  {
+   "session": "1e75f87c-9215-417b-8536-58a08e0335e9",
+   "bot": "purple-5",
+   "corpse": [
+    191,
+    59
+   ],
+   "next_seen": [
+    46,
+    39
+   ],
+   "dist": 145,
+   "gap_ms": 50034
+  },
+  {
+   "session": "96bc7567-f64f-4ca6-99f0-fcb6aa969254",
+   "bot": "red-9",
+   "corpse": [
+    58,
+    27
+   ],
+   "next_seen": [
+    119,
+    100
+   ],
+   "dist": 73,
+   "gap_ms": 26029
+  },
+  {
+   "session": "f7fdd32f-0aed-4b86-a7bd-45780ca075a6",
+   "bot": "purple-8",
+   "corpse": [
+    61,
+    106
+   ],
+   "next_seen": [
+    192,
+    20
+   ],
+   "dist": 131,
+   "gap_ms": 50355
+  },
+  {
+   "session": "f7fdd32f-0aed-4b86-a7bd-45780ca075a6",
+   "bot": "purple-8",
+   "corpse": [
+    61,
+    106
+   ],
+   "next_seen": [
+    192,
+    20
+   ],
+   "dist": 131,
+   "gap_ms": 50355
+  },
+  {
+   "session": "b06ef951-6901-48ee-815b-cfc16f079e7d",
+   "bot": "orange-5",
+   "corpse": [
+    203,
+    66
+   ],
+   "next_seen": [
+    97,
+    218
+   ],
+   "dist": 152,
+   "gap_ms": 22012
+  },
+  {
+   "session": "b06ef951-6901-48ee-815b-cfc16f079e7d",
+   "bot": "orange-5",
+   "corpse": [
+    203,
+    66
+   ],
+   "next_seen": [
+    97,
+    218
+   ],
+   "dist": 152,
+   "gap_ms": 22012
+  },
+  {
+   "session": "15969d5d-fb82-4401-8a39-87bb4a5b5d62",
+   "bot": "red-8",
+   "corpse": [
+    252,
+    167
+   ],
+   "next_seen": [
+    214,
+    87
+   ],
+   "dist": 80,
+   "gap_ms": 34025
+  },
+  {
+   "session": "15969d5d-fb82-4401-8a39-87bb4a5b5d62",
+   "bot": "orange-4",
+   "corpse": [
+    217,
+    200
+   ],
+   "next_seen": [
+    137,
+    210
+   ],
+   "dist": 80,
+   "gap_ms": 58043
+  }
+ ],
  "bot_small_drift_no_walk": 0,
  "bot_pos_stationary_syncs": 842,
  "bot_deaths": 285,

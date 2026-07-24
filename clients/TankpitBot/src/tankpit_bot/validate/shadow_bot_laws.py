@@ -20,9 +20,20 @@ from __future__ import annotations
 
 import re
 
+from tankpit_bot.physics.capacity import damage_tier, fuel_capacity
 from tankpit_bot.sim.bot_policy import BOT_RETURN_WEAPON, BOT_RETURN_WINDOW_MS
-from tankpit_bot.validate.shadow_timeline import ShadowTimelineDict, ShotEventDict
+from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
+from tankpit_bot.validate.shadow_timeline import (
+    ShadowTimelineDict,
+    ShotEventDict,
+    TankSyncEventDict,
+)
 from tankpit_bot.validate.types import ClaimEvidenceDict
+
+REACTIVATION_TOLERANCE_MS = 1000
+"""Allowed early arrival of the reactivation sync before the corpse
+boundary (frame timing jitter — the same tolerance the corpse-window
+law uses)."""
 
 BOT_NAME_PATTERN = re.compile(r"^(red|purple|blue|orange)-\d+$")
 """Practice-bot naming from the JS ``sd()`` initializer: team-N."""
@@ -124,7 +135,76 @@ def shadow_bot_return_fire(timelines: list[ShadowTimelineDict]) -> ClaimEvidence
     )
 
 
+def _first_sync_after(
+    syncs: list[TankSyncEventDict], tank_id: int, timestamp_ms: int
+) -> TankSyncEventDict | None:
+    """Find a tank's first status sync after a moment.
+
+    Args:
+        syncs: The session's 0x2E events, in wire order.
+        tank_id: The tank whose sync is sought.
+        timestamp_ms: The death's frame timestamp (exclusive).
+
+    Returns:
+        The first later sync, or None when the wire carried none
+        (session ended, or the bot stayed dark).
+    """
+    for sync in syncs:
+        if sync["tank_id"] == tank_id and sync["timestamp_ms"] > timestamp_ms:
+            return sync
+    return None
+
+
+def shadow_bot_reactivation(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDict:
+    """Judge every bot death against the same-id reactivation law.
+
+    The sim's law (:func:`tankpit_bot.sim.bot_policy.reactivate_practice_bot`):
+    a killed roster bot stays sync-dark through the corpse window,
+    then returns under the SAME id at full fuel. One sample per
+    practice-bot 0x41 whose id syncs again later in the session;
+    exact when that first post-death sync arrives no earlier than the
+    corpse boundary (minus jitter tolerance) and carries the
+    full-fuel tier. Deaths with no later sync are skipped, not
+    judged — the observation window ended, not the law.
+
+    Args:
+        timelines: Extracted shadow timelines.
+
+    Returns:
+        Evidence for the ``bot-reactivation`` claim.
+    """
+    corpse_ms = CORPSE_WINDOW_TICKS * TICK_MS
+    samples = 0
+    exact = 0
+    for timeline in timelines:
+        bots = _bot_ids(timeline)
+        if not bots:
+            continue
+        for kill in timeline["kills"]:
+            if kill["victim_id"] not in bots:
+                continue
+            sync = _first_sync_after(timeline["syncs"], kill["victim_id"], kill["timestamp_ms"])
+            if sync is None:
+                continue
+            samples += 1
+            gap_ok = (
+                sync["timestamp_ms"] - kill["timestamp_ms"] >= corpse_ms - REACTIVATION_TOLERANCE_MS
+            )
+            full_tier = damage_tier(fuel_capacity(sync["rank"]), sync["rank"])
+            if gap_ok and sync["damage_state"] == full_tier:
+                exact += 1
+    return ClaimEvidenceDict(
+        claim_id="bot-reactivation",
+        samples=samples,
+        exact=exact,
+        mismatches=samples - exact,
+        detail="dead bot syncs again same-id at full fuel after the corpse window",
+    )
+
+
 __all__ = [
     "BOT_NAME_PATTERN",
+    "REACTIVATION_TOLERANCE_MS",
+    "shadow_bot_reactivation",
     "shadow_bot_return_fire",
 ]

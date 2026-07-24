@@ -1055,10 +1055,16 @@ sixth ``make shadow`` law, importing its constants from the sim
 source. First full-archive run: 2,247 samples, 2,125 exact (94.6%),
 PASS — and the sample count equals the independent mining script's
 bot-shot population exactly. The shadow timeline gained names /
-shots / positions extraction to feed it. Still uncertified: the
-teleport-off destination (unmined), ranks ≥ 2 (no such bot in the
-archive), and the 60/64 unexplained bot refuels (open anomaly,
-blocks the sim policy's refuel channel).[^2]
+shots / positions extraction to feed it. Same day, the "refuel
+anomaly" resolved into the SEVENTH law: practice bots REACTIVATE —
+same id (fixed 36-slot roster), full fuel, at the 22 s corpse
+boundary, respawned FAR from the corpse (user correction + 102
+measured pairs all ≥ 24 tiles; 70/102 > 96). `SimServer` takes
+`roster_ids` and runs `reactivate_practice_bot` when a roster corpse
+clears; the `bot-reactivation` shadow law prices it at 39 samples /
+35 exact, PASS. Still uncertified: the teleport-off destination and
+the respawn placement DISTRIBUTION (both modeled as deterministic
+scatter, documented), and ranks ≥ 2 (no such bot in the archive).[^2]
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 

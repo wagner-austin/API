@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import TypedDict
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.commands import CMD_MAP_TELEPORT, CMD_SHOOT
 from tankpit_bot.sim.actions import VIEWPORT_RADIUS
 from tankpit_bot.sim.commands import ClientCommandDict
@@ -169,13 +170,64 @@ def decide_practice_bot(
     return None
 
 
+MIN_RESPAWN_DISPLACEMENT = 24
+"""Measured floor of the respawn displacement: every one of the 102
+archive death→next-seen pairs sits at least this far (Chebyshev) from
+the corpse; 70/102 exceed 96 tiles. Bots respawn far away, never in
+place (user contract 2026-07-24 + archive sweep)."""
+
+_MAP_SPAN = 256
+
+
+def reactivate_practice_bot(world: SimWorldDict, terrain: TerrainMapProtocol, tank_id: int) -> None:
+    """Reactivate a dead roster bot: same id, full fuel, FAR away.
+
+    The archive-mined reactivation law (2026-07-24,
+    [[enemy-bot-behavior]]): a killed practice bot returns when its
+    corpse clears — 27 measured death→full-fuel pairs, gap moded at
+    exactly the 22 s corpse window — at a DISTANT map location
+    (102/102 measured pairs ≥ 24 tiles from the corpse). Fuel resets
+    to the rank's capacity, so every derived emission (tier, map
+    shade) is full-health without stored state. Sim assumption: the
+    scatter point is tick/id-derived (deterministic), not the real
+    server's placement distribution; a fully sealed scatter area
+    falls back to reactivating in place.
+
+    Args:
+        world: Simulated world (mutated).
+        terrain: Static terrain for the respawn-tile search.
+        tank_id: The roster bot's fixed id.
+    """
+    tank = world["tanks"][tank_id]
+    scatter_x = (tank_id * 73 + world["tick"] * 37) % _MAP_SPAN
+    scatter_y = (tank_id * 151 + world["tick"] * 91) % _MAP_SPAN
+    if max(abs(scatter_x - tank["x"]), abs(scatter_y - tank["y"])) < MIN_RESPAWN_DISPLACEMENT:
+        scatter_x = (scatter_x + _MAP_SPAN // 2) % _MAP_SPAN
+    landing = find_open_tile_near(
+        world,
+        terrain,
+        scatter_x,
+        scatter_y,
+        world["tick"],
+        min_radius=0,
+        max_radius=24,
+    )
+    tank["alive"] = True
+    tank["fuel"] = fuel_capacity(tank["rank"])
+    if landing is not None:
+        tank["x"] = landing[0]
+        tank["y"] = landing[1]
+
+
 __all__ = [
     "BOT_RETURN_WEAPON",
     "BOT_RETURN_WINDOW_MS",
     "BOT_TELEPORT_OFF_HITS",
+    "MIN_RESPAWN_DISPLACEMENT",
     "PracticeBotStateDict",
     "decide_practice_bot",
     "make_practice_bot_state",
     "note_hit_on_bot",
+    "reactivate_practice_bot",
     "teleport_off_threshold",
 ]

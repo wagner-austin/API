@@ -23,7 +23,7 @@ from tankpit_bot.types import decode_capture_session
 from tankpit_bot.validate.wire_timeline import _split_frame_bodies
 
 BOT_NAME = re.compile(r"^(red|purple|blue|orange)-\d+$")
-TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x53, 0x58, 0x5A}
+TRACKED = {0x21, 0x28, 0x2E, 0x3D, 0x41, 0x47, 0x4C, 0x53, 0x58, 0x5A}
 
 
 def narrow(obj: object) -> dict:
@@ -51,6 +51,24 @@ def scan_session(path: Path, agg: dict) -> None:
     last_jump_ts: dict[int, int] = {}  # last detected teleport per tank
     viewport: list[int | None] = [None, None]  # own viewport origin
     last_killed_ts: dict[int, int] = {}  # 0x41 victim -> ts
+    death_watch: dict[int, tuple[int, int, int]] = {}  # tid -> (death_ts, corpse_x, corpse_y)
+
+    def note_any_pos(tid: int, ts: int, x: int, y: int) -> None:
+        watch = death_watch.get(tid)
+        if watch is not None and ts >= watch[0] + 21000:
+            dist = max(abs(x - watch[1]), abs(y - watch[2]))
+            agg["respawn_displacement"][min(dist // 8, 12)] += 1
+            agg["respawn_pairs"].append(
+                {
+                    "session": session["session_id"],
+                    "bot": names.get(tid, ""),
+                    "corpse": [watch[1], watch[2]],
+                    "next_seen": [x, y],
+                    "dist": dist,
+                    "gap_ms": ts - watch[0],
+                }
+            )
+            del death_watch[tid]
     last_tier: dict[int, tuple[int, int]] = {}  # id -> (ts, tier)
     max_rank: dict[int, int] = {}
     session_bot_shots = 0
@@ -108,6 +126,7 @@ def scan_session(path: Path, agg: dict) -> None:
         last_tier[tid] = (ts, tier)
 
     def note_pos(tid: int, ts: int, x: int, y: int, via_walk: bool) -> None:
+        note_any_pos(tid, ts, x, y)
         prev = last_pos.get(tid)
         if prev is not None and is_bot(tid):
             dist = max(abs(x - prev[1]), abs(y - prev[2]))
@@ -203,6 +222,9 @@ def scan_session(path: Path, agg: dict) -> None:
                 last_killed_ts[m["victim_id"]] = ts
                 if is_bot(m["victim_id"]):
                     agg["bot_deaths"] += 1
+                    corpse = last_pos.get(m["victim_id"])
+                    if corpse is not None and ts - corpse[0] <= 10000:
+                        death_watch[m["victim_id"]] = (ts, corpse[1], corpse[2])
                 if not m["is_mine_kill"] and is_bot(m["killer_id"]):
                     agg["bot_kills"] += 1
             elif k == 0x4B:
@@ -211,6 +233,9 @@ def scan_session(path: Path, agg: dict) -> None:
             elif k == 0x5A:
                 viewport[0] = m["viewport_left"]
                 viewport[1] = m["viewport_top"]
+            elif k == 0x4C:
+                for entry in m["tanks"]:
+                    note_any_pos(entry["tank_id"], ts, entry["x"], entry["y"])
 
     bots = sorted({names[t] for t in names if BOT_NAME.match(names[t])})
     agg["sessions"] += 1
@@ -259,6 +284,8 @@ def main() -> None:
         "tier_up_jumps": Counter(),
         "bot_tier_up_after_death_40s": 0,
         "reactivation_gap_s": Counter(),
+        "respawn_displacement": Counter(),
+        "respawn_pairs": [],
         "bot_small_drift_no_walk": 0,
         "bot_pos_stationary_syncs": 0,
         "bot_deaths": 0,

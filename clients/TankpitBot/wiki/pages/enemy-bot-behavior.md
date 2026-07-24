@@ -107,9 +107,21 @@ accidental pickups — the user's 2026-07-19 story, at its true low
 rate. Viewport-restriction cross-check: of the 60 no-movement
 tier-ups, 50 had stale positions (visibility gap as suspected), and
 all 7 in-viewport cases were 0→3 reactivations of bots that died in
-view. NOT yet in the sim: same-id practice-bot reactivation (the
-harness revives as new ids — correct for humans, documented gap for
-practice bots).[^8]
+view.[^8]
+
+**Correction (same day): reactivation is NOT in place.** The first
+write-up of this law said bots reactivate "in place" — the user
+corrected it (verbatim: *"dont the bots respawn in a different
+location, not at their corpse, in game"*) and the archive agrees
+emphatically: 102 death→next-seen pairs measured, **every one ≥ 24
+tiles from the corpse (Chebyshev), 70/102 beyond 96 tiles** — bots
+respawn far away, effectively anywhere on the map. Also confirmed:
+the roster is exactly **36 fixed bots** (9 per team, red/purple/
+blue/orange 1–9, all observed in the archive), each reusing its id.
+The sim law (`sim/bot_policy.py::reactivate_practice_bot`, judged by
+the `bot-reactivation` shadow law — first archive run 39 samples /
+35 exact, PASS) respawns at a deterministic distant scatter point;
+the real placement distribution stays a documented assumption.[^8]
 
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)
