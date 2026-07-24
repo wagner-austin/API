@@ -15,7 +15,7 @@ hubs: [js-client]
 
 # MAP_DATA Algorithm
 
-The exact algorithm used by the JS client to parse the 0x4C (`L`) MAP_DATA message. This is the full fuel dot atlas + tank positions blob.
+The exact algorithm used by the JS client to parse the 0x4C (`L`) MAP_DATA message. This is the full fuel dot atlas + tank positions blob.[^1]
 
 ## Parse Function (Ig.h, line 172)
 
@@ -69,7 +69,7 @@ Ig.h = function(a) {
 
 ## Fuel Dot Skip-RLE Encoding
 
-The fuel dot section uses a skip-RLE (run-length encoding) where each byte represents a horizontal skip distance:
+The fuel dot section uses a skip-RLE (run-length encoding) where each byte represents a horizontal skip distance:[^1]
 
 1. Start at position (1, 1)
 2. Read byte `h`
@@ -89,17 +89,17 @@ The fuel dot section uses a skip-RLE (run-length encoding) where each byte repre
 
 ### Example
 
-Bytes: `[3, 10, 255, 2]`
+Bytes: `[3, 10, 255, 2]`[^1]
 
 Starting at (1, 1):
 1. h=3: x=1+3=4, y=1, h≠255 → dot at (4, 1)
 2. h=10: x=4+10=14, y=1, h≠255 → dot at (14, 1)
 3. h=255: x=14+255=269, 269>255 → y=2, x=269%256=13, h=255 → skip (no dot)
-4. h=2: x=13+2=15, y=2, h≠255 → dot at (15, 2)
+4. h=2: x=13+2=15, y=2, h≠255 → dot at (15, 2)[^1]
 
 ## Tank Entry Format
 
-After the fuel dot section, each tank is encoded as 5 bytes:
+After the fuel dot section, each tank is encoded as 5 bytes:[^1]
 
 ```
 [0] = x position (0-255)
@@ -114,7 +114,7 @@ After the fuel dot section, each tank is encoded as 5 bytes:
 
 ## Handler (Ig.prototype.h, line 173)
 
-After parsing, the handler:
+After parsing, the handler:[^1]
 
 1. Logs "Zoom in" message
 2. If active game session ($d): resets state to 0, clears teleport flag
@@ -124,14 +124,16 @@ After parsing, the handler:
 6. Sets map state flags: `h=true` (open), `u=true` (needs redraw)
 7. Calls `Ne(b, true)` to center and render the map
 
-The map position hash uses `(x << 8) + y` as the key — packing both coordinates into a single 16-bit integer.
+The map position hash uses `(x << 8) + y` as the key — packing both coordinates into a single 16-bit integer.[^1]
 
 ## Map Canvas Rendering
 
-The map renders at 3:2 pixel ratio (3 pixels per tile-x, 2 pixels per tile-y):
+The map renders at 3:2 pixel ratio (3 pixels per tile-x, 2 pixels per tile-y):[^1]
 
 - Fuel dots: 1×1 pixel in the map's fuel color (`pa` field)
 - Tank dots: 3×2 pixels in the tank's team color (`Y[team]`)
 - Own position: 3×2 pixel flashing cursor cycling through 4 colors at 200ms intervals
 
-Map scrolling uses 64-tile increments across a 128-pixel viewport window. Total map: 256×256 tiles = 768×512 pixels at 3:2, but only a 128×128 section visible at once (384×256 when scaled to canvas).
+Map scrolling uses 64-tile increments across a 128-pixel viewport window. Total map: 256×256 tiles = 768×512 pixels at 3:2, but only a 128×128 section visible at once (384×256 when scaled to canvas).[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:171`) — parse function `Ig.h` (line 172, quoted verbatim in the code fence above) and handler `Ig.prototype.h` (line 173); traced line-by-line 2026-06-19 (frontmatter `verified:` field), re-checkable by grep; the worked example is arithmetic derived from the quoted parse loop, and the bot's own 0x4C decoder mirrors it.

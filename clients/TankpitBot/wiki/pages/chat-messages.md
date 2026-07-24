@@ -15,11 +15,11 @@ hubs: [js-client]
 
 # Chat Messages
 
-The game has exactly 65 predefined chat messages (E[0] through E[64]). There is no free-text chat — only these preset messages can be sent. Each message has targeting rules and voice recognition keywords.
+The game has exactly 65 predefined chat messages (E[0] through E[64]). There is no free-text chat — only these preset messages can be sent. Each message has targeting rules and voice recognition keywords.[^1]
 
 ## Message Properties
 
-Each message is a `J(id, text, team_filter, has_position, is_visible, has_voice, voice_keywords)`:
+Each message is a `J(id, text, team_filter, has_position, is_visible, has_voice, voice_keywords)`:[^1]
 
 - **team_filter (h)**: 0=same team only, 1=allies in zone, 2=zone-wide, 3=all players
 - **has_position (l)**: true=includes sender's coordinates in the message
@@ -122,11 +122,11 @@ Each message is a `J(id, text, team_filter, has_position, is_visible, has_voice,
 | 63 | "I'm playing TankPit, mom." | **no** | yes |
 | 64 | "I'm playing TankPit, dad." | **no** | yes |
 
-These exist in the E[] table but don't appear in the chat selector list (`m=false`).
+These exist in the E[] table but don't appear in the chat selector list (`m=false`).[^1]
 
 ## Chat Display Order
 
-The `li` array (line 243) defines the display order in the selector, NOT the ID order:
+The `li` array (line 243) defines the display order in the selector, NOT the ID order:[^1]
 
 ```
 [0,1,2,3,12,40,27,25,18,42,60,16,35,46,47,52,13,9,14,17,8,31,32,61,41,4,6,30,55,53,54,59,7,48,57,43,22,39,23,15,24,51,37,49,50,11,34,19,26,56,21,20,33,10,38,44,28,45,58,36,62]
@@ -144,18 +144,18 @@ The `li` array (line 243) defines the display order in the selector, NOT the ID 
 
 ## Chat Wire Format
 
-Sent via Hb command (code `m`, 4-6 bytes):
+Sent via Hb command (code `m`, 4-6 bytes):[^1]
 ```
 [6, 'm', message_id, x, y, use_position]
 or
 [4, 'm', message_id, use_position]
 ```
 
-Position-bearing messages use the 6-byte format with sender's current coordinates.
+Position-bearing messages use the 6-byte format with sender's current coordinates.[^1]
 
 ## Position-Bearing Messages
 
-These messages include the sender's world coordinates when sent:
+These messages include the sender's world coordinates when sent:[^1]
 - **4** "HELP - Enemy!" 
 - **6** "HELP - Fuel low!"
 - **8** "Fuel detected here"
@@ -166,3 +166,5 @@ These messages include the sender's world coordinates when sent:
 - **15** "Meet me"
 - **53** "I need equipment!"
 - **54** "I need fuel!"
+
+[^1]: JS truth: `tpclient.js` on disk — the `E[]` message table (line 24, frontmatter-pinned), the `li` display-order array (line 243, frontmatter-pinned), and the `Hb` send / `Bb` controller classes; all 65 entries traced 2026-06-19 (frontmatter `verified:` field) and re-checkable by grep against the file.

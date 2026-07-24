@@ -14,7 +14,7 @@ hubs: [js-client]
 
 # Sound System
 
-The game uses Web Audio API (AudioContext) with 18 sound effects, loaded from base64-encoded globals.
+The game uses Web Audio API (AudioContext) with 18 sound effects, loaded from base64-encoded globals.[^1]
 
 ## Audio Architecture (Sc class, line 135)
 
@@ -32,11 +32,11 @@ Sc.volume   = volume level (0-100)
 Three playback channels:
 1. **One-shot** (`source`): plays a sound once, stops previous one-shot
 2. **Loop 1** (`m`): ambient loop (e.g., fuel deposit music)
-3. **Loop 2** (`i`): movement loop (drive or ferry sound)
+3. **Loop 2** (`i`): movement loop (drive or ferry sound)[^1]
 
 ## Audio Buffers (Zf class)
 
-All buffers loaded from global base64 variables via `AudioContext.decodeAudioData()`:
+All buffers loaded from global base64 variables via `AudioContext.decodeAudioData()`:[^1]
 
 | Field | Global Variable | Trigger | Type |
 |-------|----------------|---------|------|
@@ -61,7 +61,7 @@ All buffers loaded from global base64 variables via `AudioContext.decodeAudioDat
 
 ## Ferry Sound Variants
 
-The ferry sound has per-field variants:
+The ferry sound has per-field variants:[^1]
 
 ```javascript
 // Line 136:
@@ -69,7 +69,7 @@ The ferry sound has per-field variants:
 a.j.decodeAudioData(q(window.atob(audio_ferry[b])).buffer, ...);
 ```
 
-The `audio_ferry` global is an array indexed by some field property. Falls back to index 0 if the variant doesn't exist.
+The `audio_ferry` global is an array indexed by some field property. Falls back to index 0 if the variant doesn't exist.[^1]
 
 ## Sound Playback Functions
 
@@ -131,26 +131,28 @@ Same as Zd but for the second loop channel (drive/ferry).
 
 ## Volume Control
 
-Volume is controlled via a GainNode:
+Volume is controlled via a GainNode:[^1]
 ```javascript
 a.o.gain.value = a.volume / 100;
 ```
 
-Range: 0 (mute) to 100 (full). Changed via Ha command (code `V`) sent to server for persistence.
+Range: 0 (mute) to 100 (full). Changed via Ha command (code `V`) sent to server for persistence.[^1]
 
 ## Sound Toggle
 
 Sound on/off state is tracked by `this.l` flag. When toggled:
 - Off: stops all three channels (one-shot, loop 1, loop 2)
-- On: resumes stored loops (`s` for loop 1, `P` for loop 2)
+- On: resumes stored loops (`s` for loop 1, `P` for loop 2)[^1]
 
-Toggled via Ka command (code `C`).
+Toggled via Ka command (code `C`).[^1]
 
 ## Unsupported Browsers
 
-If `AudioContext` is undefined or `window.atob` is missing:
+If `AudioContext` is undefined or `window.atob` is missing:[^1]
 ```javascript
 this.u = true;  // "unsupported" flag
 ```
 
-All playback functions check `!a.u` before playing — silently no-ops on unsupported browsers.
+All playback functions check `!a.u` before playing — silently no-ops on unsupported browsers.[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:135`) — `Sc` audio class (line 135), `Zf` buffers, play functions `N`/`Zd`/`Ve` (lines 139-140), ferry-variant fallback (line 136), all quoted verbatim in the fences above; all 18 buffers and triggers traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.

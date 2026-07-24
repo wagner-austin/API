@@ -15,11 +15,11 @@ hubs: [js-client]
 
 # Playback System
 
-The game has a built-in recording/playback system. Recordings can be loaded from files or URLs for replay. Extracted from the `If` (recording), `Kf` (playback controller), and `re` (playback session) classes.
+The game has a built-in recording/playback system. Recordings can be loaded from files or URLs for replay. Extracted from the `If` (recording), `Kf` (playback controller), and `re` (playback session) classes.[^1]
 
 ## Recording Format (If class, line 132)
 
-Recordings are binary blobs with this structure:
+Recordings are binary blobs with this structure:[^1]
 
 ### Header
 ```
@@ -36,7 +36,7 @@ if (e.hasOwnProperty("version"))
   this.version = e.version;
 ```
 
-If no "version" key, it's the game info:
+If no "version" key, it's the game info:[^1]
 ```javascript
 var c = JSON.parse(d);
 var d_field = c[0];    // field_id
@@ -58,7 +58,7 @@ if (this.U.version > 0)
   Lf /= 1000;             // version > 0: timestamp in milliseconds/1000
 ```
 
-Version 0 timestamps are raw; version 1+ divide by 1000 to get seconds.
+Version 0 timestamps are raw; version 1+ divide by 1000 to get seconds.[^1]
 
 ## Playback Controller (Kf class, line 133)
 
@@ -124,7 +124,7 @@ case "ArrowRight":
   break;
 ```
 
-Speed also scales the L timing constants:
+Speed also scales the L timing constants:[^1]
 ```javascript
 for (c in L)
   L.hasOwnProperty(c) && (L[c] = oc[c] * this.W);
@@ -149,7 +149,7 @@ case 4:
 
 ## Timeline UI (Nf class, line 257)
 
-The timeline is a horizontal strip of colored spans, one per message:
+The timeline is a horizontal strip of colored spans, one per message:[^1]
 
 ```javascript
 function Of(a, b, c) {
@@ -178,11 +178,11 @@ Timeline entries are color-coded:
 - **zone**: viewport change (clickable — jumps to that point)
 - **death**: own deactivation
 - **kill**: own kill of another tank
-- **promote**: rank promotion
+- **promote**: rank promotion[^1]
 
 ## Playback Session (re class, line 92)
 
-The playback session (`re`) inherits from `Oc` (base session) and overrides:
+The playback session (`re`) inherits from `Oc` (base session) and overrides:[^1]
 
 - `ya()` — starts playback instead of joining game
 - `qb()` — checks if playback is finished
@@ -192,16 +192,16 @@ The playback session (`re`) inherits from `Oc` (base session) and overrides:
 
 ## Loading Recordings
 
-Recordings can be loaded from:
+Recordings can be loaded from:[^1]
 
 1. **File upload** — `<input type="file">` in the playback selector
-2. **URL** — `tankpit.playback_url` global → XHR download
+2. **URL** — `tankpit.playback_url` global → XHR download[^1]
 
-Both paths read the blob as `ArrayBuffer`, convert to `Uint8Array`, and pass to `O(l)` which creates the `If` instance and starts playback.
+Both paths read the blob as `ArrayBuffer`, convert to `Uint8Array`, and pass to `O(l)` which creates the `If` instance and starts playback.[^1]
 
 ## Message Filtering
 
-During fast-forward (seeking via timeline click), the playback pre-dispatches certain message types:
+During fast-forward (seeking via timeline click), the playback pre-dispatches certain message types:[^1]
 
 ```javascript
 // Kf.W callback (line 133):
@@ -223,4 +223,6 @@ These are state-critical messages that must be processed during seek:
 - Vf: TankExit
 - Wf: EquipmentGain
 - Xf: Inventory
-- Yf: EquipmentToggle
+- Yf: EquipmentToggle[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:92` and `:132`) — `If` (line 132), `Kf` (line 133), `re` (line 92), timeline `Nf` (line 257), all quoted verbatim in the fences above; recording format and playback logic traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.

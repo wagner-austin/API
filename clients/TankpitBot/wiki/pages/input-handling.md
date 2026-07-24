@@ -15,11 +15,11 @@ hubs: [js-client]
 
 # Input Handling
 
-How the JS client processes mouse, keyboard, and touch input. Extracted from the event handlers in the $d (game session) and Rc (game canvas) classes.
+How the JS client processes mouse, keyboard, and touch input. Extracted from the event handlers in the $d (game session) and Rc (game canvas) classes.[^1]
 
 ## Mouse Events
 
-Three mouse handlers on the game canvas (`Rc` class, line 233):
+Three mouse handlers on the game canvas (`Rc` class, line 233):[^1]
 
 ### mousemove → Sh (line 233)
 Updates the Pc (mouse state) object and calls Kd() for hover effects:
@@ -41,7 +41,7 @@ function Th(a) {
 }
 ```
 
-$d.ab (line 79): Records start time, position, and calculates tile (col, row):
+$d.ab (line 79): Records start time, position, and calculates tile (col, row):[^1]
 ```javascript
 d.v = Math.floor(a / 24) + 1;   // start tile col (1-indexed)
 d.P = Math.floor(b / 16) + 1;   // start tile row (1-indexed)
@@ -61,7 +61,7 @@ The mouseup handler determines what to do based on:
 1. Where the click started vs. where it ended
 2. How long the click was held
 3. Whether it was a single, double, or long click
-4. What's at the target tile
+4. What's at the target tile[^1]
 
 ### Game Area Clicks (Ld = true)
 
@@ -127,11 +127,11 @@ function Wh(a) {
 }
 ```
 
-Keyboard processing is in $d.$a (lines 73-78). Each key code is mapped through `this.l.j` (hotkey map) to an action number, then dispatched via a switch statement.
+Keyboard processing is in $d.$a (lines 73-78). Each key code is mapped through `this.l.j` (hotkey map) to an action number, then dispatched via a switch statement.[^1]
 
 ## Touch Events
 
-Touch handling uses a multi-touch tracking system with the `Bd` class.
+Touch handling uses a multi-touch tracking system with the `Bd` class.[^1]
 
 ### Touch State (Bd class, line 107)
 
@@ -185,7 +185,7 @@ function pe(a, b) {
 }
 ```
 
-Returns direction 0-8 or -1 (no gesture). Mapped to scope directions via `qe()`.
+Returns direction 0-8 or -1 (no gesture). Mapped to scope directions via `qe()`.[^1]
 
 ### Touch Handlers
 
@@ -199,16 +199,16 @@ Returns direction 0-8 or -1 (no gesture). Mapped to scope directions via `qe()`.
 
 ### Multi-Touch
 
-The `touches` dictionary tracks all active touches by identifier. The "most recent" touch (`qa`) gets hover feedback. The "active" touch (`U`) determines pointer state.
+The `touches` dictionary tracks all active touches by identifier. The "most recent" touch (`qa`) gets hover feedback. The "active" touch (`U`) determines pointer state.[^1]
 
-When a new touch starts at the same tile as an existing active touch, the old touch is force-ended:
+When a new touch starts at the same tile as an existing active touch, the old touch is force-ended:[^1]
 ```javascript
 null !== this.U && this.U.h === d.h && this.U.j === d.j && this.U.end(true);
 ```
 
 ## Coordinate Conversion
 
-All pixel coordinates are converted from screen space to game space:
+All pixel coordinates are converted from screen space to game space:[^1]
 
 ```javascript
 function ne(a, b, c, d) {
@@ -219,16 +219,18 @@ function ne(a, b, c, d) {
 }
 ```
 
-Where `c` is `getBoundingClientRect()` and `d` is the game scale factor.
+Where `c` is `getBoundingClientRect()` and `d` is the game scale factor.[^1]
 
-Game coordinates to tile (1-indexed):
+Game coordinates to tile (1-indexed):[^1]
 ```javascript
 col = Math.floor(x / 24) + 1;  // x pixels → column (1-16 actionable)
 row = Math.floor(y / 16) + 1;  // y pixels → row (1-16 actionable)
 ```
 
-Game coordinates to world:
+Game coordinates to world:[^1]
 ```javascript
 world_x = col + viewport_left - 1;
 world_y = row + viewport_top - 1;
 ```
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:79` and `:107`) — canvas handlers on `Rc` (line 233), click dispatch `ab`/`bb` (lines 79-84), keyboard `$d.$a` (lines 73-78), touch `Bd`/`pe` (lines 107-108), conversion `ne`, all quoted verbatim in the fences above; every input path traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.

@@ -14,7 +14,7 @@ hubs: [js-client]
 
 # XOR Cipher
 
-The game uses a simple XOR cipher for binary messages. The key table is derived from a hardcoded string XORed with a per-session `tankpit.magic` value.
+The game uses a simple XOR cipher for binary messages. The key table is derived from a hardcoded string XORed with a per-session `tankpit.magic` value.[^1]
 
 ## Key Table Generation (line 16)
 
@@ -25,14 +25,14 @@ for (var rb = 0; 1000 > rb; rb++)
   qb[rb] = "<hardcoded 1000-char string>".charCodeAt(rb) ^ pb.charCodeAt(rb % pb.length);
 ```
 
-The hardcoded string is a fixed 1000-character sequence embedded in tpclient.js:
+The hardcoded string is a fixed 1000-character sequence embedded in tpclient.js:[^1]
 ```
 "Y1DcZyIAudY},fSP$:|[xH~r!U&^z?1V<sg%8*^cn*QAXf^:CE61[n*<+vGEhet'/R~e&AC8YH~Xqi!|}L.io{=jV..."
 ```
 
-Each byte of `qb` = `hardcoded_char[i] XOR magic_char[i % magic.length]`.
+Each byte of `qb` = `hardcoded_char[i] XOR magic_char[i % magic.length]`.[^1]
 
-The `magic` value changes per page load — it's injected server-side into the HTML as `tankpit.magic`.
+The `magic` value changes per page load — it's injected server-side into the HTML as `tankpit.magic`.[^1]
 
 ## Encode/Decode Function (za, line 17)
 
@@ -56,7 +56,7 @@ function za(a, b) {
 
 ### Server→Client (inbound)
 
-The binary message dispatch (line 217, case 46 in main switch):
+The binary message dispatch (line 217, case 46 in main switch):[^1]
 ```javascript
 case 46:  // 0x2E = '.' — binary game message container
   if (Fa) {  // only when in-game
@@ -67,11 +67,11 @@ case 46:  // 0x2E = '.' — binary game message container
   }
 ```
 
-All binary game messages arrive inside a type-46 (0x2E) container and are XOR-decoded before parsing.
+All binary game messages arrive inside a type-46 (0x2E) container and are XOR-decoded before parsing.[^1]
 
 ### Client→Server (outbound)
 
-In `I(a, b)` (line 26 — the main command send function):
+In `I(a, b)` (line 26 — the main command send function):[^1]
 ```javascript
 function I(a, b) {
   if (a.h) {
@@ -82,11 +82,11 @@ function I(a, b) {
 }
 ```
 
-The XOR uses `b[0]` (the length prefix byte) as the encode length. So only the first `length` bytes are XORed, not the trailing padding.
+The XOR uses `b[0]` (the length prefix byte) as the encode length. So only the first `length` bytes are XORed, not the trailing padding.[^1]
 
 ### Exceptions — Text Messages (NOT XOR encoded)
 
-These bypass XOR entirely, sent as raw text:
+These bypass XOR entirely, sent as raw text:[^1]
 - `%` AUTH
 - `*` Game select
 - `+` Join game
@@ -95,6 +95,8 @@ These bypass XOR entirely, sent as raw text:
 - `` ` `` Ping
 - `R` Supervisor responses
 
-Server→client text messages also bypass XOR — they arrive on different container codes (43=`+`, 45=`-`, etc.) in the main dispatch switch.
+Server→client text messages also bypass XOR — they arrive on different container codes (43=`+`, 45=`-`, etc.) in the main dispatch switch.[^1]
 
-The hardcoded string in tpclient.js is fixed (baked into the compiled JS). Only `tankpit.magic` changes per session — it's injected server-side into the HTML.
+The hardcoded string in tpclient.js is fixed (baked into the compiled JS). Only `tankpit.magic` changes per session — it's injected server-side into the HTML.[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:16`) — key-table loop, `za` at line 17, send path `I` at line 26, dispatch case 46 at line 217, all quoted verbatim in the fences above; traced 2026-06-19 (frontmatter `verified:` field). Strongest ongoing receipt: the bot's own sniffer implements this exact cipher and decodes every live capture in `runs/` with it — a wrong cipher would produce garbage on every session.

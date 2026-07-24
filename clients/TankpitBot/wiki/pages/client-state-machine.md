@@ -15,7 +15,7 @@ hubs: [js-client]
 
 # Client State Machine
 
-The game client uses a numeric state field (`this.s`) to track what the player is currently doing. This controls which commands can be sent and how input is processed.
+The game client uses a numeric state field (`this.s`) to track what the player is currently doing. This controls which commands can be sent and how input is processed.[^1]
 
 ## States
 
@@ -36,13 +36,13 @@ The game client uses a numeric state field (`this.s`) to track what the player i
 | 12 | MINE_PLACE | Mine placement queued | → 0 on send |
 | 13 | SCOPE_CHANGE | Viewport scope change queued | → 0 on send |
 
-Note: State 11 is skipped in the code.
+Note: State 11 is skipped in the code.[^1]
 
 ## State Transitions
 
 ### From IDLE (1)
 
-The IDLE state is where most input is processed. Entry points:
+The IDLE state is where most input is processed. Entry points:[^1]
 
 - **Click on tile** → state 2 (MOVE) or state 3 (FIRE) depending on what's there
 - **Double-click** → state 3 (FIRE) always
@@ -52,7 +52,7 @@ The IDLE state is where most input is processed. Entry points:
 
 ### Move vs. Fire Decision (state 2)
 
-When a tile is clicked from IDLE, the code checks (line 66-67):
+When a tile is clicked from IDLE, the code checks (line 66-67):[^1]
 
 1. If tile has enemy tank (different team) OR has mine from another team:
    → FIRE (state 3)
@@ -63,15 +63,15 @@ When a tile is clicked from IDLE, the code checks (line 66-67):
 4. If fuel > 100 and tile has a rock/obstacle:
    → PICK UP OBSTACLE (state 7)
 5. Otherwise:
-   → MOVE (state 2 via `p` command)
+   → MOVE (state 2 via `p` command)[^1]
 
 ### Fuel Check (line 71)
 
-Before certain actions, `ce(a)` checks if fuel > 100. If not, logs "Insufficient fuel" and returns to IDLE. Applies to: ENEMY_DETECT (9), MINE (12), FUEL_DEPOSIT (10).
+Before certain actions, `ce(a)` checks if fuel > 100. If not, logs "Insufficient fuel" and returns to IDLE. Applies to: ENEMY_DETECT (9), MINE (12), FUEL_DEPOSIT (10).[^1]
 
 ## Tick Loop (pb function, lines 49-51)
 
-The main game loop runs at variable tick rate:
+The main game loop runs at variable tick rate:[^1]
 
 ```
 1. If animations playing:
@@ -94,7 +94,7 @@ The main game loop runs at variable tick rate:
 
 ## Action Queue (vb class)
 
-The action queue (`this.h.j`) holds animation objects (Re for drive, yf for shoot, uf for radar, lf for explosion). Each animation:
+The action queue (`this.h.j`) holds animation objects (Re for drive, yf for shoot, uf for radar, lf for explosion). Each animation:[^1]
 
 1. `.start()` — initialize (play sound, set up state)
 2. `.Na()` — advance one frame
@@ -105,7 +105,7 @@ The action queue (`this.h.j`) holds animation objects (Re for drive, yf for shoo
 
 ## Command Processing (Ha=true gate)
 
-The `Ha` flag gates whether the state machine processes the next queued action:
+The `Ha` flag gates whether the state machine processes the next queued action:[^1]
 
 ```javascript
 // Set to true when:
@@ -130,7 +130,7 @@ The `Ha` flag gates whether the state machine processes the next queued action:
 
 ## Deactivation Flow
 
-When deactivated (ob function, line 61):
+When deactivated (ob function, line 61):[^1]
 1. State → 0
 2. Play death sound
 3. Close map if open
@@ -140,4 +140,6 @@ When deactivated (ob function, line 61):
 7. Set tick rate to 100ms (Mb)
 8. Enter repair wait (timer bar fills over 20 seconds)
 9. On reactivate: reset state, reload equipment, resume IDLE
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:49`) — tick loop `pb` (lines 49-51), click dispatch (lines 66-67), fuel gate `ce` (line 71), deactivation `ob` (line 61), action queue `vb`, gate flag `Ha`; every claim above carries its function/line locator inline; every state transition traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.
 

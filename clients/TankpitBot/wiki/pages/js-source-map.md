@@ -18,7 +18,7 @@ hubs: [js-client]
 
 # JS Source Map
 
-Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minified Closure Compiler output). Every class, function, and data structure identified and mapped.
+Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minified Closure Compiler output). Every class, function, and data structure identified and mapped.[^1]
 
 ## File Structure Overview
 
@@ -101,7 +101,7 @@ L = {
 }
 ```
 
-**Key finding**: IDLE is 200ms (5 Hz). The game ticks at 5 Hz when nothing is animating. Drive animation runs at ~30 Hz (33ms).
+**Key finding**: IDLE is 200ms (5 Hz). The game ticks at 5 Hz when nothing is animating. Drive animation runs at ~30 Hz (33ms).[^1]
 
 **Dual-purpose field**: The tank entity field `b.u` (Xc.u) is initialized as `rank_category` (from packed byte bits 2-3 in TankEntry/sd()), but during gameplay it is overwritten with `damage_state` by Movement, MovementResponse, and TankStatusSync. Capture data confirms gameplay values track damage progression (0→3→2→1). See [[rank-category-bug]] for the full analysis.
 
@@ -118,11 +118,11 @@ Rank 6 (Major→Colonel):       40,000 points
 Rank 7 (Colonel→General):     50,000 points
 ```
 
-Promotion from Sergeant+ also requires deactivating an enemy of the previous rank or higher (line 60, Vd function).
+Promotion from Sergeant+ also requires deactivating an enemy of the previous rank or higher (line 60, Vd function).[^1]
 
 ## Lines 34-71: Game Session ($d class)
 
-The main game session class. Inherits from Oc (base session).
+The main game session class. Inherits from Oc (base session).[^1]
 
 ### State Machine (s field)
 
@@ -152,7 +152,7 @@ m.Fb = function() {
 };
 ```
 
-30-second keep-alive interval. Our bot should match this.
+30-second keep-alive interval. Our bot should match this.[^1]
 
 ### Action Priority in pb() tick (lines 49-51)
 
@@ -163,7 +163,7 @@ m.Fb = function() {
 
 ## Lines 95-98: Asset Loading (Yc class)
 
-Sprite sheet loader. 7 sprite categories loaded per game:
+Sprite sheet loader. 7 sprite categories loaded per game:[^1]
 - `[0]` Tiles
 - `[1]` Dust
 - `[2]` Splash
@@ -172,7 +172,7 @@ Sprite sheet loader. 7 sprite categories loaded per game:
 - `[5]` Tanks
 - `[6]` Awards
 
-Custom sprite support via localStorage `custom_sprites` key.
+Custom sprite support via localStorage `custom_sprites` key.[^1]
 
 ## Lines 100-107: Map System (Tc class)
 
@@ -243,7 +243,7 @@ bits 4-6: base terrain type:
 dg = [0,1,2] — terrain classification (ground, rock, water)
 ```
 
-Edge tiles (0/17) are border fringe — not actionable.
+Edge tiles (0/17) are border fringe — not actionable.[^1]
 
 ## Lines 155-203: V Table — Message Handlers
 
@@ -305,7 +305,7 @@ The complete server→client message dispatch table. See [[v-table-complete]] fo
 
 ## Lines 214-224: Main Application Bootstrap
 
-IIFE that initializes everything:
+IIFE that initializes everything:[^1]
 1. Creates WebSocket connection (`ab` instance)
 2. Creates settings (`mh` → Ga)
 3. Creates UI (`zh` → A) with lobby, settings, guide panels
@@ -323,7 +323,7 @@ IIFE that initializes everything:
 - **Eh** — How To Play guide (6 pages: basics, controls, equipment, ranks, awards, tournaments)
 - **gi** — Log/history panel
 - **hi** — Status bar (tank info, coordinates, hover tooltips)
-- **ii** — Chat message selector (63 predefined messages)
+- **ii** — Chat message selector (61 of the 65 predefined messages; 4 hidden — [[chat-messages]])
 - **Nf** — Playback timeline for recorded games
 - **Oh** — HSV color picker for map customization
 
@@ -335,8 +335,10 @@ IIFE that initializes everything:
 
 3. **Direction encoding uses 16 values (0-15)** plus high bits for dead/corpse state. Bits 4-7 carry the "walking from" direction for the trailing tile overlay.
 
-4. **The game has exactly 63 chat messages** (E[0] through E[64], some gaps). Each has voice recognition keywords for microphone input.
+4. **The game has exactly 65 chat messages** (E[0] through E[64], no gaps — the earlier "63, some gaps" figure here was a miscount; all 65 are traced in [[chat-messages]]). 61 appear in the selector (4 are hidden: ids 5, 29, 63, 64). Most have voice recognition keywords for microphone input.
 
 5. **Tank IDs ≥ 500 are registered accounts** — shown as profile links. Below 500 are bots or unregistered.
 
 6. **The toolbar at y=256-304** has 18 clickable regions (xc function, line 33) for map/radar/mine/scope/equipment/experience.
+
+[^1]: JS truth: `tpclient.js` on disk (blob-pinned in frontmatter) with `tpclient.pretty.js` as the readable companion — every table row and claim above carries its (class, line) locator inline, from the complete 329-line manual walk of 2026-06-19 (frontmatter `verified:` field); re-checkable by grep against the pinned file.
