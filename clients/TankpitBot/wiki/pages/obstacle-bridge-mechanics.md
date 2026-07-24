@@ -17,21 +17,21 @@ hubs: [js-client]
 
 # Obstacle & Bridge Mechanics
 
-How obstacle pickup, drop, and bridge building work in the JS client. Extracted from the state machine (state 7), the `be()` decision function, and the V.B (BuildPickup) message handler.
+How obstacle pickup, drop, and bridge building work in the JS client. Extracted from the state machine (state 7), the `be()` decision function, and the V.B (BuildPickup) message handler.[^1]
 
 ## Carrying State
 
-The tank has two carrying-related fields:
+The tank has two carrying-related fields:[^1]
 - `this.la` — boolean, true when carrying an obstacle
 - `this.h.Y` (Xc.Y) — carrying flag on the tank entity (affects rendering)
 
 The `la` flag is toggled when:
 - V.B (BuildPickup) response received: `a.la = !a.la`
-- V["="] (MovementResponse): `a.la = 0 !== this.j` (carrying_flag from server)
+- V["="] (MovementResponse): `a.la = 0 !== this.j` (carrying_flag from server)[^1]
 
 ## Decision Logic (be function, line 70)
 
-When a player holds click on a tile, `be()` determines the action:
+When a player holds click on a tile, `be()` determines the action:[^1]
 
 ```javascript
 function be(a, b) {
@@ -68,35 +68,35 @@ function be(a, b) {
 
 ## Pickup Rules
 
-An obstacle can be picked up when:
+An obstacle can be picked up when:[^1]
 1. Tank has fuel > 100 (`ce()` check)
 2. Tile has rock type B (j=2), rock type AB (j=3), or ferry rock (j=7)
 3. Tile has mountain terrain (bit pattern 64 in terrain byte)
 4. Tank is NOT already carrying
 
-Pickup is sent as the `b` command (Tb class): `[4, 'b', x, y]`
+Pickup is sent as the `b` command (Tb class): `[4, 'b', x, y]`[^1]
 
 ## Drop Rules
 
-An obstacle can be dropped when:
+An obstacle can be dropped when:[^1]
 1. Tank IS carrying (`la = true`)
 2. Target tile is ground or has compatible terrain
 3. Target tile has NO rock already (j=0)
 
-Drop is also sent as the `b` command: same opcode, server determines action from tank's carrying state.
+Drop is also sent as the `b` command: same opcode, server determines action from tank's carrying state.[^1]
 
 ## Bridge Building
 
-A bridge can be built when:
+A bridge can be built when:[^1]
 1. Tank IS carrying
 2. Target tile is water: `32 === (b.i & 112)` (terrain bits 4-6 = 010)
 3. Target tile has no rock: `0 === b.j`
 
-The bridge command uses the same `b` opcode. The server response (V.B) comes back with `rock_type = 1` for a bridge module.
+The bridge command uses the same `b` opcode. The server response (V.B) comes back with `rock_type = 1` for a bridge module.[^1]
 
 ### Bridge Verification (state 2, line 66)
 
-In the move-decision logic, bridge building is also checked:
+In the move-decision logic, bridge building is also checked:[^1]
 ```javascript
 if (this.la)
   if (32 === (c.i & 112) && 0 === c.j)
@@ -105,11 +105,11 @@ if (this.la)
     5 !== this.h.h[this.i.i][this.i.j].j && (b = 98, a = "BUILD BRIDGE");
 ```
 
-The source tile must NOT be a ferry (j=5) — can't build bridges from ferry tiles.
+The source tile must NOT be a ferry (j=5) — can't build bridges from ferry tiles.[^1]
 
 ## V.B Handler (BuildPickup, Jg class, line 173-176)
 
-Parse:
+Parse:[^1]
 ```
 a[0] = tank_id_lo
 a[1] = tank_id_hi    → X(a[0],a[1])
@@ -122,7 +122,7 @@ a[7] = rock_type      — new rock value at target tile (0=removed, 1=placed, et
 a[8] = was_mine_there — if a mine was under the obstacle
 ```
 
-Handler effects:
+Handler effects:[^1]
 1. Updates carry direction: `We(a.P, b, this.m)`
 2. Sets rock at target tile: `a.h.h[d][c].j = this.j`
 3. Toggles carry state: `a.la = !a.la`
@@ -132,7 +132,7 @@ Handler effects:
 
 ## Carry Direction
 
-When a tank is carrying an obstacle, the `W` field on the tank entity stores which direction the obstacle is "behind" the tank:
+When a tank is carrying an obstacle, the `W` field on the tank entity stores which direction the obstacle is "behind" the tank:[^1]
 
 | Value | Direction | ASCII |
 |-------|-----------|-------|
@@ -142,16 +142,16 @@ When a tank is carrying an obstacle, the `W` field on the tank entity stores whi
 | 115 | South | 's' |
 | 119 | West | 'w' |
 
-The trailing tile (one tile behind the tank in the carry direction) has its `o` (occupied-behind) flag set to true, which suppresses rock rendering at that position.
+The trailing tile (one tile behind the tank in the carry direction) has its `o` (occupied-behind) flag set to true, which suppresses rock rendering at that position.[^1]
 
 ## Obstacle in Movement
 
-During drive animation (Re class), when `this.h.Y` (carrying) is true:
+During drive animation (Re class), when `this.h.Y` (carrying) is true:[^1]
 - Source tile's rock value is cleared: `b.j = 0; b.l = true`
 - At destination, if tile is water or has non-ground terrain, the obstacle is dropped automatically: `this.h.Y = false`
 - At destination, if tile is ground: rock type +5 is added to destination tile
 
-The JS code in Re.Na() (line 110-112):
+The JS code in Re.Na() (line 110-112):[^1]
 ```javascript
 if (Se(this)) {
   var e = this.ja[this.o][this.l];
@@ -164,12 +164,14 @@ if (Se(this)) {
 }
 ```
 
-Wait — re-reading: `b.j += 5` adds to the SOURCE tile, and `this.h.Y = false` drops carrying. This is the auto-drop: when you walk onto a tile where the obstacle can't follow (water, existing rock), the obstacle stays at the previous tile.
+Reading the branch carefully: `b.j += 5` adds to the SOURCE tile, and `this.h.Y = false` drops carrying. This is the auto-drop: when you walk onto a tile where the obstacle can't follow (water, existing rock), the obstacle stays at the previous tile.[^1]
 
 ## Ferry Interaction
 
-Ferry tiles (rock type 5) have special rules:
+Ferry tiles (rock type 5) have special rules:[^1]
 - Cannot pick up a ferry boarding point
 - Cannot build a bridge on a ferry tile
 - Moving onto ferry is free water movement
 - Moving off ferry back to land costs the normal queue slot
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned lines 66/173/70) — `be` decision (line 70), state-2 bridge check (line 66), V.B handler `Jg` (lines 173-176), drive auto-drop `Re.Na` (lines 110-112), all quoted verbatim in the fences above; traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. The command/response encoding and the pickup/drop/bridge enums were wire-verified live 2026-07-20 in [[movable-blocks]].

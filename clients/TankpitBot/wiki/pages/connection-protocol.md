@@ -16,7 +16,7 @@ hubs: [js-client]
 
 # Connection Protocol
 
-The complete connection handshake from page load to active gameplay, extracted from the bootstrap IIFE (lines 214-224) and WebSocket transport (lines 11-14).
+The complete connection handshake from page load to active gameplay, extracted from the bootstrap IIFE (lines 214-224) and WebSocket transport (lines 11-14).[^1]
 
 ## Connection URL
 
@@ -27,9 +27,9 @@ var ib = (fb ? "wss://" : "ws://") + hb +
          ("undefined" === typeof tankpit.connect_url ? "/ws/" : tankpit.connect_url);
 ```
 
-Default: `wss://dorothy.tankpit.com/ws/` (HTTPS) or `ws://dorothy.tankpit.com/ws/` (HTTP).
+Default: `wss://dorothy.tankpit.com/ws/` (HTTPS) or `ws://dorothy.tankpit.com/ws/` (HTTP).[^1]
 
-The `tankpit` global object is injected server-side in the HTML and contains:
+The `tankpit` global object is injected server-side in the HTML and contains:[^1]
 - `connect_server` — WebSocket host
 - `connect_url` — WebSocket path
 - `user_id` — authenticated user ID
@@ -49,13 +49,13 @@ The `tankpit` global object is injected server-side in the HTML and contains:
 
 ## WebSocket Framing
 
-All messages (both directions) use a 2-byte LE length prefix:
+All messages (both directions) use a 2-byte LE length prefix:[^1]
 
 ```
 [length_lo, length_hi, ...payload]
 ```
 
-The `Va` handler (line 12) splits received blobs:
+The `Va` handler (line 12) splits received blobs:[^1]
 ```javascript
 function Va(a) {
   var b = new Uint8Array(a.result);
@@ -72,7 +72,7 @@ function Va(a) {
 }
 ```
 
-Multiple messages can arrive in a single WebSocket frame (batched by server).
+Multiple messages can arrive in a single WebSocket frame (batched by server).[^1]
 
 ## Handshake Sequence
 
@@ -83,7 +83,7 @@ Client: Opens WebSocket to wss://dorothy.tankpit.com/ws/
 Server: Sends connection acknowledgment
 ```
 
-On successful WebSocket open, the `Pa` function fires → sets status=1 → calls `this.l()` (onConnect callback).
+On successful WebSocket open, the `Pa` function fires → sets status=1 → calls `this.l()` (onConnect callback).[^1]
 
 ### Phase 2: Authenticate
 
@@ -91,17 +91,17 @@ On successful WebSocket open, the `Pa` function fires → sets status=1 → call
 Client → Server: %AUTH !be {user_id}|{fingerprint} {magic}
 ```
 
-The AUTH message (wa class) is sent as plain text (no XOR):
+The AUTH message (wa class) is sent as plain text (no XOR):[^1]
 - Version: `"be"` (hardcoded)
 - user_id: from `tankpit.user_id`
 - fingerprint: MurmurHash3 of browser properties (sb class)
 - magic: from `tankpit.magic`
 
-If there's a pending error report (Ng), it's sent immediately after AUTH.
+If there's a pending error report (Ng), it's sent immediately after AUTH.[^1]
 
 ### Phase 3: Game List
 
-Server responds with game list messages:
+Server responds with game list messages:[^1]
 
 ```
 Server → Client: code 43 (+) for each available game
@@ -109,12 +109,12 @@ Server → Client: code 43 (+) for each available game
   Parsed into Jf(id, name, field_id, flags, team, mode, year) objects
 ```
 
-Game modes (parsed from the mode string):
+Game modes (parsed from the mode string):[^1]
 - `"e"` or `"t"` → mode 5 (tournament)
 - `"p"` → mode 6 (practice)
 - `"n"` → mode 7 (normal)
 
-Games are added to the lobby select list. Server can also:
+Games are added to the lobby select list. Server can also:[^1]
 - code 47 (`/`): remove a game from the list
 - code 37 (`%`): rename a game
 
@@ -124,7 +124,7 @@ Games are added to the lobby select list. Server can also:
 Client → Server: *{game_id}
 ```
 
-Sent when user clicks a game in the lobby. Plain text, no XOR.
+Sent when user clicks a game in the lobby. Plain text, no XOR.[^1]
 
 ### Phase 5: Game Info
 
@@ -133,7 +133,7 @@ Server → Client: code 61 (=)
   Format: ={game_id}|{start_date}|{name}|{rank}|{orange_count}|{purple_count}|{blue_count}|{red_count}|{max_rank}
 ```
 
-Updates the lobby statistics panel with game details.
+Updates the lobby statistics panel with game details.[^1]
 
 ### Phase 6: Join Game
 
@@ -152,7 +152,7 @@ Server → Client: code 36 ($)
   Format: ${game_id}|{??? }|{team}
 ```
 
-On receiving this:
+On receiving this:[^1]
 1. Set `Fa = true` (in-game flag)
 2. Create `$d` game session instance
 3. If immediate start (`l` flag): start after 0ms, else wait 2000ms
@@ -160,14 +160,14 @@ On receiving this:
 
 ### Phase 8: Game Start
 
-After assets load:
+After assets load:[^1]
 1. Send heartbeat: `?` (Jb command)
 2. Wait for server messages in queue
 3. Call `start()` → set state to 0, begin tick loop
 
 ### Phase 9: Active Gameplay
 
-All binary messages now flow through:
+All binary messages now flow through:[^1]
 - **Inbound**: code 46 (0x2E container) → XOR decode → V table dispatch
 - **Outbound**: K subclass → `.h()` serialize → `za()` XOR encode → `Aa` wrapper → `Xa()` send
 
@@ -178,7 +178,7 @@ Server → Client: code 45 (-)
   Triggers: Fa=false, session cleanup, return to lobby
 ```
 
-Or client-initiated:
+Or client-initiated:[^1]
 ```
 Client → Server: - (Ba command, plain text)
 ```
@@ -189,14 +189,14 @@ Client → Server: - (Ba command, plain text)
 - **Connection error**: WebSocket error → show "Try Again" dialog
 - **Game error**: Ca (code `&`) or Ea (code `^`) → send error report to server with XOR-encoded stack trace
 
-Error report format (Ca class):
+Error report format (Ca class):[^1]
 ```
 &{length}{69}{error_code}{xor_encoded_error_string_with_stack}
 ```
 
 ## Reconnection
 
-On disconnect:
+On disconnect:[^1]
 1. Show "Connection lost" message
 2. User clicks "Reconnect" button
 3. New WebSocket created after 1000ms delay
@@ -210,3 +210,5 @@ On disconnect:
 - Join delay: 2000ms after server confirms (splash screen), or 1000ms for fast join
 - Keep-alive interval: 30,000ms (dc command)
 
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned lines 214/11) — bootstrap IIFE (lines 214-224), transport `Pa`/`ab`/`Va` (lines 11-14), AUTH `wa` (line 6), quoted verbatim in the fences above; full flow traced 2026-06-19 (frontmatter `verified:` field). Standing receipt: the bot performs this exact handshake at the start of every run in `runs/` — a wrong sequence would fail login.

@@ -13,13 +13,13 @@ hubs: [js-client]
 
 # REST API
 
-TankPit has an official public REST API at `tankpit.com/api`. Rate limited to 1 request/second (HTTP 503 on exceeded).
+TankPit has an official public REST API at `tankpit.com/api`. Rate limited to 1 request/second (HTTP 503 on exceeded).[^1]
 
 ## Endpoints
 
 ### GET /api/active_games
 
-Returns array of currently active game sessions.
+Returns array of currently active game sessions.[^1]
 
 ```json
 [
@@ -49,11 +49,11 @@ Returns array of currently active game sessions.
 ]
 ```
 
-The `playing_tanks` array is present only when `playing_tanks_count > 0`. Awards array is 9 elements (decoration slots 0-8, values 0-3).
+The `playing_tanks` array is present only when `playing_tanks_count > 0`. Awards array is 9 elements (decoration slots 0-8, values 0-3).[^1]
 
 ### GET /api/tank?tank_id={id}
 
-Returns tank profile.
+Returns tank profile.[^1]
 
 ```json
 {
@@ -70,11 +70,11 @@ Returns tank profile.
 }
 ```
 
-`bf_tank_name` / `bf_tank_color` are the player's original Battlefield (bonus.com) tank from the 1997 game.
+`bf_tank_name` / `bf_tank_color` are the player's original Battlefield (bonus.com) tank from the 1997 game.[^1]
 
 ### GET /api/find_tank?name={name}
 
-Search tanks by name. Returns array of matches.
+Search tanks by name. Returns array of matches.[^1]
 
 ```json
 [
@@ -89,7 +89,7 @@ Search tanks by name. Returns array of matches.
 
 ### GET /api/leaderboards
 
-Returns array of available leaderboard identifiers.
+Returns array of available leaderboard identifiers.[^1]
 
 ```json
 ["2026","2025","2024","2023","2022","2021","2020","2019","2018","2017","2013-2016","2012","overall"]
@@ -97,7 +97,7 @@ Returns array of available leaderboard identifiers.
 
 ### GET /api/leaderboards?leaderboard={id}&page={page}
 
-Paginated leaderboard results. Optional filters: `color`, `rank`, `search`.
+Paginated leaderboard results. Optional filters: `color`, `rank`, `search`.[^1]
 
 ```json
 {
@@ -119,11 +119,11 @@ Paginated leaderboard results. Optional filters: `color`, `rank`, `search`.
 
 ### GET /api/upcoming_tournaments
 
-Returns array of upcoming tournaments. Empty if none scheduled.
+Returns array of upcoming tournaments. Empty if none scheduled.[^1]
 
 ### GET /api/finished_tournaments
 
-Returns array of finished tournaments.
+Returns array of finished tournaments.[^1]
 
 ```json
 [
@@ -138,19 +138,19 @@ Returns array of finished tournaments.
 
 ### GET /api/last_finished_tournament
 
-Returns the most recently finished tournament. Empty if none.
+Returns the most recently finished tournament. Empty if none.[^1]
 
 ### GET /api/tournament_results?tournament_id={id}
 
-Returns results for a specific tournament.
+Returns results for a specific tournament.[^1]
 
 ### GET /api/bb?year={year}&month={month}&day={day}
 
-Returns bulletin board posts for a specific date.
+Returns bulletin board posts for a specific date.[^1]
 
 ### GET /api/bb/post?post_id={id}
 
-Returns a single bulletin board post.
+Returns a single bulletin board post.[^1]
 
 ```json
 {
@@ -165,7 +165,7 @@ Returns a single bulletin board post.
 }
 ```
 
-Tank mentions use `{tank:id}` format in message text.
+Tank mentions use `{tank:id}` format in message text.[^1]
 
 ## Web Resources
 
@@ -197,7 +197,7 @@ Tank mentions use `{tank:id}` format in message text.
 
 ### Authentication
 
-Login uses a CAPTCHA-protected form with:
+Login uses a CAPTCHA-protected form with:[^1]
 - `captcha_code` — per-page-load CAPTCHA token (`window.captcha_code`)
 - `token` — CSRF token
 - `redirect` — post-login redirect path
@@ -210,3 +210,5 @@ Login uses a CAPTCHA-protected form with:
 - **Anti-cheat on promotions**: Kills between related accounts/IPs don't count for promotions (tournaments only currently).
 - **Ping**: "A great ping is under 100ms while a poor ping is over 300ms."
 - **Game origin**: Remake of "Battlefield" from bonus.com (1997), moved to playbattlefield.com, shut down 2008. TankPit started 2012.
+
+[^1]: live-API verification 2026-06-19 (frontmatter `verified:` field) — every endpoint above was hit and every JSON sample is the actual response body received; re-checkable at any time with a curl against `tankpit.com/api` (mind the 1 req/s limit). The awards-array semantics cross-check against [[decoration-encoding]].

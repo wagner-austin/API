@@ -21,15 +21,15 @@ hubs: [protocol]
 
 # Wire Decode Coverage Map
 
-Complete mapping of every message type in the game client (`tpclient.js` V table) against our decode pipeline.
+Complete mapping of every message type in the game client (`tpclient.js` V table) against our decode pipeline.[^1]
 
 ## Architecture (post-2026-06-19)
 
-Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`. The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x42, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4C, 0x4F, 0x52, 0x53, 0x54, 0x56, 0x58, 0x5A, 0x64, 0x67, 0x74). A length=9 shortcut routes any other 9-byte 0x2E body to Og.h short form. The remainder falls through to `container.decoders.decode_container_message` for the four container-only subtypes (0x43 ContainerPickup, 0x45 MineDetonation, 0x4B MinePlacement) plus 1-byte TeleportLanded. No more dual paths, no length-based "blob" fallbacks.
+Every wire byte has **exactly one decoder**, reachable from `protocol.decode_message(msg_type, body)`.[^1] The 0x2E container envelope is handled by `protocol.decoders.tank.decode_0x2e_message` — a subtype-first dispatcher that routes to protocol decoders for tunneled subtypes (0x21, 0x28, 0x2E, 0x3D, 0x3E, 0x3F, 0x41, 0x42, 0x44, 0x46, 0x47, 0x49, 0x4A, 0x4C, 0x4F, 0x52, 0x53, 0x54, 0x56, 0x58, 0x5A, 0x64, 0x67, 0x74). A length=9 shortcut routes any other 9-byte 0x2E body to Og.h short form. The remainder falls through to `container.decoders.decode_container_message` for the four container-only subtypes (0x43 ContainerPickup, 0x45 MineDetonation, 0x4B MinePlacement) plus 1-byte TeleportLanded. No more dual paths, no length-based "blob" fallbacks.
 
 ## Coverage Table
 
-Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** = some fields intentionally dropped. **NONE** = not decoded. **WRONG** = decoded with incorrect field semantics.
+Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** = some fields intentionally dropped. **NONE** = not decoded. **WRONG** = decoded with incorrect field semantics.[^1]
 
 | Msg | Char | JS Handler | Description | Our Status | Gap |
 |-----|------|-----------|-------------|-----------|-----|
@@ -72,7 +72,7 @@ Status legend: **FULL** = all known fields decoded and dispatched. **PARTIAL** =
 
 ## Container Subtypes (inside 0x2E envelope)
 
-After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`. Subtype-first dispatch covers protocol-tunneled types in the table above; the subtypes below have no protocol counterpart and are dispatched by the container path.
+After 2026-06-19 unification, every 0x2E body goes through `decode_0x2e_message`. Subtype-first dispatch covers protocol-tunneled types in the table above; the subtypes below have no protocol counterpart and are dispatched by the container path.[^1]
 
 | Subtype | Bytes | Type | Status | Notes |
 |---------|-------|------|--------|-------|
@@ -89,37 +89,37 @@ sessions / 48,304 0x2E bodies proved zero production fires. The
 corresponding protocol subtypes (0x3D MovementResponse, 0x41
 Deactivation, 0x21 TankInfo, 0x58 TankRemove, 0x44 FuelGain, 0x47
 Movement) cover every body that used to flow into those length-based
-container fallbacks.
+container fallbacks.[^13]
 
 The 3-byte 0x24 (tasks #88, "room-join confirmation?") and 1-byte 0x41
 (task #89, "action ack?") candidates were also closed 2026-06-20: 0
 corpus samples for either across the same 156-session sweep. Both were
-speculative -- the wire paths don't exist in production.
+speculative -- the wire paths don't exist in production.[^13]
 
 The 9-byte "TankStatusShort -> Og.h" shortcut (the prior fallback that
 routed any 9-byte 0x2E body to ``decode_tank_status_sync``) was
 removed 2026-06-20. The "74/74 sane samples" it was built for were
 all 0x43-prefixed two-record ContainerPickups; the subtype-first
-multi-record dispatch above now claims them at their real semantics.
+multi-record dispatch above now claims them at their real semantics.[^13]
 
 ## Critical Gaps (ordered by impact)
 
 (none open at end of 2026-06-19 -- see ``analysis_scripts/crack_tank_update.py`` for the audit
 that closed the last "TankUpdate*" gap by tracing the misclassified bodies back to tunneled
-0x56 Statistics, 0x42 BuildPickup, and 0x47 Movement handlers.)
+0x56 Statistics, 0x42 BuildPickup, and 0x47 Movement handlers.)[^13]
 
 ## Tunneling cross-check (2026-06-19 corpus, 150 sessions)
 
 The length-based container fallback that used to label bodies as
 ``tank_update_compact/extended/full`` is mostly residual: when the
 subtype-first dispatch is run on the same 150 capture sessions, the
-populations classified as "TankUpdate*" collapse from 597 to 1.
+populations classified as "TankUpdate*" collapse from 597 to 1.[^13]
 
 - **0x56 / Wg Statistics**: 239/239 ex-``TankUpdateFull`` samples now
   route via tunneled Statistics. All 239 decode to sane minutes/seconds
   bounds and the playtime/destroyed/score series is monotonic across
   the session -- ground-truth via
-  ``analysis_scripts/crack_tank_update.py``.
+  ``analysis_scripts/crack_tank_update.py``.[^13]
 - **0x47 / Lg Movement**: every 14-byte 0x2E body in the corpus is a
   tunneled Movement carrying 1-2 waypoint chars. Long obstacle-rich
   paths can stretch this much further; ``inner >= 12`` is the only
@@ -148,7 +148,7 @@ populations classified as "TankUpdate*" collapse from 597 to 1.
 
 ### 0x3D MovementResponse (V["="] / Mg.h)
 
-Verified against production capture `runs/bot/bot-20260619-053210` and JS source.
+Verified against production capture `runs/bot/bot-20260619-053210` and JS source.[^1]
 
 ```
 [0]    flags (team in bits 0-1)
@@ -162,11 +162,11 @@ Verified against production capture `runs/bot/bot-20260619-053210` and JS source
 [11]   carrying (obstacle-carry flag, per JS `a.la = 0 !== this.j`)
 ```
 
-Tunneled inside 0x2E: outer subtype is `0x3D`, inner is 11 bytes (carrying optional — defaults to 0 when absent in trimmed test fixtures).
+Tunneled inside 0x2E: outer subtype is `0x3D`, inner is 11 bytes (carrying optional — defaults to 0 when absent in trimmed test fixtures).[^1]
 
 ### 0x2E TankStatusSync (V["."] / Og.h)
 
-Verified against production capture and JS source. Same decoder handles both the 9-byte short form and the 13-byte form with fuel at the tail.
+Verified against production capture and JS source. Same decoder handles both the 9-byte short form and the 13-byte form with fuel at the tail.[^1]
 
 ```
 [0]    subtype/team
@@ -181,7 +181,7 @@ Verified against production capture and JS source. Same decoder handles both the
 
 ### 0x53 ShootEvent (V.S / Gg.h)
 
-Verified against production capture `runs/bot/bot-20260619-050303` msg t+25.47s and JS source.
+Verified against production capture `runs/bot/bot-20260619-050303` msg t+25.47s and JS source.[^1]
 
 ```
 [0]    team (flags byte, bits 0-1)
@@ -197,7 +197,7 @@ Verified against production capture `runs/bot/bot-20260619-050303` msg t+25.47s 
 
 ### 0x41 Deactivation (V.A / Pg.h)
 
-Verified against JS source.
+Verified against JS source.[^1]
 
 ```
 [0]    status
@@ -206,7 +206,7 @@ Verified against JS source.
 [4:6]  killer_id_raw (LE u16)
 ```
 
-Post-processing: if `killer_id_raw >= 65530`, the kill was a mine — `killer_id = killer_id_raw - 65530` is the mine team and `is_mine_kill = True`.
+Post-processing: if `killer_id_raw >= 65530`, the kill was a mine — `killer_id = killer_id_raw - 65530` is the mine team and `is_mine_kill = True`.[^1]
 
 See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] for shot-feedback behavior.
 
@@ -230,6 +230,8 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
      128+ = custom text (remaining bytes)
 ```
 
+[^1]: three-way cross-check, all on disk: `tpclient.js` (blob-pinned in frontmatter) is the JS side; the bot's decoder tree `src/tankpit_bot/protocol/` + `src/tankpit_bot/container/` is our side; production capture `runs/bot/bot-20260619-053210.capture_session.json` (frontmatter-pinned) plus `bot-20260619-050303` are the wire side. Standing receipt: every live session decodes through this exact pipeline — a wrong mapping surfaces as decode garbage immediately.
+[^13]: corpus-sweep ground truth: `analysis_scripts/crack_tank_update.py` and `analysis_scripts/crack_tank_status_short.py` (both on disk, verified 2026-07-23) re-derive the 597→1 collapse and the per-type sample counts from the `runs/` capture corpus; the deletions themselves are 2026-06-20 commits in git history.
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed
 [^11]: 42 corpse messages (direction>=32) found across 18 tanks in all captures; JS `Pg.prototype.h` sets `d.direction = (d.direction & 240) !== 0 ? 33 : 32` on deactivation
 [^12]: fuel = byte[10] + byte[11]*256 (inner offsets, after subtype byte stripped); 98/152 exact match with FuelGain at same ms; mismatches from pre/post-update timing within same tick; 8/15 sessions start at 1100 (Private fuel)

@@ -15,9 +15,9 @@ hubs: [js-client]
 
 # V Table Complete
 
-Every server→client message handler from tpclient.js, with exact byte-level parse logic extracted from the `.h()` static methods. This is the authoritative JS-side truth for how every message is parsed.
+Every server→client message handler from tpclient.js, with exact byte-level parse logic extracted from the `.h()` static methods. This is the authoritative JS-side truth for how every message is parsed.[^1]
 
-All byte indices are AFTER the message type byte has been stripped (the V table dispatcher does `a.subarray(1)`).
+All byte indices are AFTER the message type byte has been stripped (the V table dispatcher does `a.subarray(1)`).[^1]
 
 ## Combat Messages
 
@@ -36,7 +36,7 @@ a[8]  = weapon_type              — equipment slot (0=armor,1=dual,2=missile,3=
 a[9]  = ammo_count               — remaining ammo after this shot
 ```
 
-Handler logic: Determines visibility context (shooter in view? target in view? is self?) to format log messages. Triggers shoot animation with projectile path. Resets own action state if we were the shooter.
+Handler logic: Determines visibility context (shooter in view? target in view? is self?) to format log messages. Triggers shoot animation with projectile path. Resets own action state if we were the shooter.[^1]
 
 ### V.A — Deactivation (0x41, Pg)
 
@@ -53,7 +53,7 @@ If killer_id >= 65530:
   actual mine team = killer_id
 ```
 
-Handler: Sets victim's direction to 32/33 (corpse sprite). Stops victim's drive direction. Triggers deactivation sound + log message. If victim is self: enters deactivated state.
+Handler: Sets victim's direction to 32/33 (corpse sprite). Stops victim's drive direction. Triggers deactivation sound + log message. If victim is self: enters deactivated state.[^1]
 
 ### V.K — MinePlacement (0x4B, Dg)
 
@@ -71,7 +71,7 @@ a[4..] = pairs of (x, y) for each mine position
 pairs of (x, y) — all mine positions that detonated
 ```
 
-Handler: Sets overlay to 255 (clear mine) at each position, spawns explosion animation.
+Handler: Sets overlay to 255 (clear mine) at each position, spawns explosion animation.[^1]
 
 ## Movement Messages
 
@@ -177,7 +177,7 @@ a[12] = persistent_tank_id byte 2 → 256*(256*a[10]+a[11])+a[12]  (sets b.aa, �
 a[13..] = name                   → p(a.subarray(13))
 ```
 
-This is the **own tank** identity message. Sent once on game join. Sets tank.id, rank, team, decorations, name.
+This is the **own tank** identity message. Sent once on game join. Sets tank.id, rank, team, decorations, name.[^1]
 
 ### V["."] — TankStatusSync (0x2E, Og)
 
@@ -198,7 +198,7 @@ If length > 8:
   a[11] = fuel_hi                → X(a[10],a[11]) = LE u16 fuel
 ```
 
-Short form (8 bytes) = status update for other tanks. Long form (12 bytes) = self status with promo + fuel.
+Short form (8 bytes) = status update for other tanks. Long form (12 bytes) = self status with promo + fuel.[^1]
 
 ## Resource Messages
 
@@ -261,7 +261,7 @@ a[4]  = tank_id_lo
 a[5]  = tank_id_hi               → X(a[4],a[5])
 ```
 
-Handler: Calculates compass direction (N/NE/E/SE/S/SW/W/NW) from own position using ratio comparison.
+Handler: Calculates compass direction (N/NE/E/SE/S/SW/W/NW) from own position using ratio comparison.[^1]
 
 ### V.L — MapData (0x4C, Ig)
 
@@ -322,7 +322,7 @@ a[0]  = new_rank                 — 0-8
 a[1]  = was_promoted             — 1=actual promotion, 0=rank sync
 ```
 
-Handler: Updates own rank, resets promo bar, shows promotion message.
+Handler: Updates own rank, resets promo bar, shows promotion message.[^1]
 
 ### V.N — Decoration (0x4E, Sf)
 
@@ -369,19 +369,19 @@ a[7]  = rock_type                — 0=none, 1=type_a, 2=type_b, etc.
 a[8]  = was_mine_there           — affects explosion type on pickup
 ```
 
-Handler: Updates obstacle at target tile, toggles tank carrying state, plays build/hoist sound.
+Handler: Updates obstacle at target tile, toggles tank carrying state, plays build/hoist sound.[^1]
 
 ## Scoring Messages
 
 ### V.V — Statistics (0x56, Wg)
 
-Trace-verified from beautified JS (line 4617-4630). Two formats based on `a.length > 12`:
+Trace-verified from beautified JS (line 4617-4630). Two formats based on `a.length > 12`:[^1]
 
-Constructor: `this.i=hours, this.l=minutes, this.s=seconds, this.m=destroyed, this.j=deactivated, this.o=promo_points`
+Constructor: `this.i=hours, this.l=minutes, this.s=seconds, this.m=destroyed, this.j=deactivated, this.o=promo_points`[^1]
 
-Execute confirms via log output: `"Play time: "+this.i+":"+this.l+":"+this.s`, `"Destroyed enemies: "+this.m`, `"Deactivated: "+this.j`, `"Promotion points: "+this.o`
+Execute confirms via log output: `"Play time: "+this.i+":"+this.l+":"+this.s`, `"Destroyed enemies: "+this.m`, `"Deactivated: "+this.j`, `"Promotion points: "+this.o`[^1]
 
-Long format (a.length > 12):
+Long format (a.length > 12):[^1]
 ```
 a[0:2]  = playtime_hours          → X(a[0],a[1]) = LE u16 → this.i
 a[2]    = minutes                  → this.l
@@ -391,7 +391,7 @@ a[8:10] = deactivated              → X(a[8],a[9]) = LE u16 → this.j
 a[10:14] = promo_points            → 256*(256*(256*a[10]+a[11])+a[12])+a[13] = 32-bit BE → this.o
 ```
 
-Short format (a.length ≤ 12):
+Short format (a.length ≤ 12):[^1]
 ```
 a[0:2]  = playtime_hours          → X(a[0],a[1]) = LE u16
 a[2]    = minutes
@@ -499,7 +499,7 @@ a[0]  = tank_id_lo
 a[1]  = tank_id_hi               → X(a[0],a[1])
 ```
 
-Handler: Removes tank from tile grid and drawing list.
+Handler: Removes tank from tile grid and drawing list.[^1]
 
 ### V.M — Chat (0x4D, Qg)
 ```
@@ -509,3 +509,5 @@ a[2]  = message_type             — index into E[] chat message table
 a[3]  = x (optional)
 a[4]  = y (optional)
 ```
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:155`) — the V dispatch table and every `.h()` parser (lines 155-203; Statistics from `tpclient.pretty.js` lines 4617-4630); every field walk above is the transcription of its handler body, traced line by line 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. Standing receipt: the bot's decoders mirror these layouts and decode every live capture in `runs/` — layout drift would surface as decode garbage in [[decode-coverage]].
