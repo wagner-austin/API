@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
 
 help:
 	@Write-Host ""
@@ -30,6 +30,7 @@ help:
 	@Write-Host "  make enemy-teleport-probe-map    3 enemy teleports via map open"
 	@Write-Host "  make enemy-teleport-probe-nearest 3 enemy teleports via nearest"
 	@Write-Host "  make bot-watch                   teleport to a bot, sit idle 10 min, capture"
+	@Write-Host "  make respawn-watch               engage bots + map-poll their same-id reactivation"
 	@Write-Host "  make fuel-probe                  3 fuel pickups via 9 attempts"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
@@ -163,6 +164,11 @@ bot-watch: install
 	@Write-Host ""
 	@Write-Host "==> bot-watch (1 enemy teleport + 10 min heartbeat dwell)" -ForegroundColor Cyan
 	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS = "1500"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
+
+respawn-watch: install
+	@Write-Host ""
+	@Write-Host "==> respawn-watch (engage adjacent bots, map-poll for same-id reactivation)" -ForegroundColor Cyan
+	poetry run tankpit-respawn-watch-probe
 
 fuel-probe: install
 	@Write-Host ""

@@ -489,8 +489,31 @@ class EnemyTeleportProbe(ProbeBase):
             snapshot_after=snapshot_after,
         )
         self._reset_probe_state_to_idle()
-        self._settle_dwell(page, settle_delay_ms, heartbeat_interval_ms)
+        self._post_landing_phase(page, enemy, settle_delay_ms, heartbeat_interval_ms)
         return result
+
+    def _post_landing_phase(
+        self,
+        page: action_session.WaitPageProtocol,
+        enemy: EnemyThreatDict,
+        settle_delay_ms: int,
+        heartbeat_interval_ms: int,
+    ) -> None:
+        """Hold the post-landing observation phase.
+
+        The base probe dwells (optionally walking a heartbeat, see
+        ``_settle_dwell``). Subclasses override this to act on the
+        landed-adjacent enemy — the respawn-watch probe replaces the
+        dwell with an engage-then-map-poll choreography.
+
+        Args:
+            page: Playwright page driving the wait.
+            enemy: The enemy this attempt teleported to.
+            settle_delay_ms: Total dwell duration.
+            heartbeat_interval_ms: Heartbeat period (0 = no heartbeat).
+        """
+        del enemy
+        self._settle_dwell(page, settle_delay_ms, heartbeat_interval_ms)
 
     def execute_probe(
         self,
