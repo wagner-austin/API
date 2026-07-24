@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "197d13a490e261f247c132b2ef373f8ae5b5d160"
+  "Makefile": "546fb80fe22403cd65f69c184df2e37f563e40b9"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]
@@ -47,6 +47,7 @@ hubs: [codebase]
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
 | `make queue-probe` | Test multi-command batching against server |
+| `make bot-watch` | Teleport adjacent to a practice bot, then sit 10 min capturing (added 2026-07-24 — the run that discovered the push-on-activity stream mute; a silent dwell observes ~nothing, so pair with the heartbeat option once it lands). See the 2026-07-24 wiki-log entries. |
 
 ## Offline analysis (safe, reads capture files)
 

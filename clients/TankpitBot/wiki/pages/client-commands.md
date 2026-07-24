@@ -78,8 +78,7 @@ necessitates an 'm' key press to close the map. teleporting of
 course closes the map as well."* — i.e. the open command is NOT a
 toggle; the close paths are the client-side keypress or a teleport.
 First surfaced by the 2026-07-24 bot-watch run (the probe opened the
-map programmatically and never key-closed it; see the wiki-log
-anomaly entries of that date).
+map programmatically and never key-closed it).[^3]
 
 ### Misc
 
@@ -154,3 +153,4 @@ The last 2 bytes (target_id) are set to the tank's `.id` if a tank is at the tar
 
 [^1]: tpclient.js lines 25-31 (K subclasses) and 6-10 (va subclasses) — every command class traced 2026-06-19; file pinned via `source_paths` line anchors
 [^2]: tpclient.js Lb class + Cb dispatch + toolbar click handler — same 2026-06-19 trace; target_id semantics wire-confirmed via the id-targeted reroute law ([[shoot-event-format]])
+[^3]: user (Austin), 2026-07-24 — quoted verbatim above; corroborating captures on disk: `bot_watch_probe.capture_session.json` and companions at repo root (the three designed watch runs), recorded in the wiki-log entries of 2026-07-24 ("bot-watch run 1" through "push-on-activity stream discovered")
