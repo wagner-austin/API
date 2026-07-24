@@ -7,6 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot/state"
   - "runs/bot"
+source_git_blobs:
+  "src/tankpit_bot/state": "24ad188b2628a7874caeb73168d1a64e2225e4a4"
 fact_checked: "2026-06-11"
 confidence: high
 hubs: [protocol]

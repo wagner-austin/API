@@ -9,6 +9,9 @@ source_paths:
   - "src/tankpit_bot/physics/capacity.py"
   - "runs/bot"
   - "runs/sniff"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+  "src/tankpit_bot/physics/capacity.py": "4c71de91bcfffc5968770a91368f7096460eda5d"
 fact_checked: "2026-07-19"
 confidence: high
 hubs: [protocol]

@@ -8,6 +8,8 @@ related:
   - "[[equipment-refill-strategy]]"
 source_paths:
   - docs/sources/sigmas-tankpit-guide-v3.4.pdf
+source_git_blobs:
+  "docs/sources/sigmas-tankpit-guide-v3.4.pdf": "6ec5665374ed38b2dfc8fda94aad35c4b99c1256"
 fact_checked: "2026-07-06"
 confidence: medium
 hubs: [combat]

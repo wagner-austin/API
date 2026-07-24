@@ -8,6 +8,8 @@ source_paths:
   - "runs/bot"
   - "runs/sniff"
   - "src/tankpit_bot/sim/equipment.py"
+source_git_blobs:
+  "src/tankpit_bot/sim/equipment.py": "17815a7fde8141fe2b21bfdf88552ec578c97f41"
 fact_checked: "2026-06-21"
 confidence: high
 hubs: [game-mechanics]

@@ -8,6 +8,8 @@ related:
 source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
+source_git_blobs:
+  "src/tankpit_bot/sim/movement.py": "68140659bb8121973c8bb3227f9ef1635ed7ccf6"
 fact_checked: "2026-06-12"
 confidence: high
 hubs: [game-mechanics]

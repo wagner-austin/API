@@ -8,6 +8,8 @@ related:
 source_paths:
   - "runs/bot"
   - "src/tankpit_bot/physics"
+source_git_blobs:
+  "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
 fact_checked: "2026-07-03"
 confidence: high
 hubs: [game-mechanics]

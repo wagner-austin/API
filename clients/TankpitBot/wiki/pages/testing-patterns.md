@@ -7,6 +7,9 @@ related:
 source_paths:
   - "tests"
   - "scripts/guard.py"
+source_git_blobs:
+  "tests": "324eb394febbddc93a79b51ba843268eb5da1593"
+  "scripts/guard.py": "508e6328c73be452a042fd00162168a921d7b1b9"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

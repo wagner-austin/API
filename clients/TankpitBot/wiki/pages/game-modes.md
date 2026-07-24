@@ -11,6 +11,8 @@ source_paths:
   - "tpclient.js:217"
   - "tpclient.js:265"
   - "docs/sources/sigmas-tankpit-guide-v3.4.pdf"
+source_git_blobs:
+  "docs/sources/sigmas-tankpit-guide-v3.4.pdf": "6ec5665374ed38b2dfc8fda94aad35c4b99c1256"
 fact_checked: "2026-07-06"
 confidence: high
 verified: 2026-06-19 (mode encoding/values traced from JS lobby handler); tournament capacity ladder guide-sourced, not verified against a tournament capture

@@ -8,6 +8,8 @@ related:
 source_paths:
   - "runs/bot"
   - "src/tankpit_bot/sim/combat.py"
+source_git_blobs:
+  "src/tankpit_bot/sim/combat.py": "5efd5cffbd5da642572539b483c42f628d95bb69"
 fact_checked: "2026-07-02"
 confidence: high
 hubs: [combat, protocol]

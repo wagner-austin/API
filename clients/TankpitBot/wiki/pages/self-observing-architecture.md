@@ -7,6 +7,8 @@ related:
   - "[[combat-chase-bug]]"
 source_paths:
   - "docs/handoffs/self-observing-bot-architecture.md"
+source_git_blobs:
+  "docs/handoffs/self-observing-bot-architecture.md": "e56a608cef109009be41d9c149a67068fba4d7f1"
 fact_checked: "2026-07-18"
 confidence: high
 hubs: [architecture]

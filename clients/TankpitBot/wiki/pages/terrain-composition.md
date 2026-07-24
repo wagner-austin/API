@@ -11,6 +11,9 @@ related:
 source_paths:
   - "src/tankpit_bot/terrain.py"
   - "tpclient.js"
+source_git_blobs:
+  "src/tankpit_bot/terrain.py": "6409365748dcb373cb02e13f32efd247e9385011"
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [architecture]

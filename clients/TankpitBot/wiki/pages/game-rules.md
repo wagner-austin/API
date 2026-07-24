@@ -10,6 +10,9 @@ related:
 source_paths:
   - "docs/sources/sigmas-tankpit-guide-v3.4.pdf"
   - "tpclient.js"
+source_git_blobs:
+  "docs/sources/sigmas-tankpit-guide-v3.4.pdf": "6ec5665374ed38b2dfc8fda94aad35c4b99c1256"
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [game-mechanics]

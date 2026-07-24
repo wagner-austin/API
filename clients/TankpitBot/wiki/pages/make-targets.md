@@ -6,6 +6,8 @@ related:
   - "[[adding-a-probe]]"
 source_paths:
   - "Makefile"
+source_git_blobs:
+  "Makefile": "197d13a490e261f247c132b2ef373f8ae5b5d160"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]

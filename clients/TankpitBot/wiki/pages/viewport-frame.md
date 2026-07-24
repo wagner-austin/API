@@ -8,6 +8,8 @@ related:
 source_paths:
   - "runs/bot"
   - "tpclient.js"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-07-17"
 confidence: high
 hubs: [game-mechanics]

@@ -12,6 +12,8 @@ source_paths:
   - "runs/sniff/sniff-20260620-155103.capture_session.json"
   - "runs/sniff/sniff-20260620-173727.capture_session.json"
   - "tpclient.js"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-07-21"
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)

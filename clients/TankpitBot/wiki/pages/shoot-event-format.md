@@ -9,6 +9,9 @@ source_paths:
   - "tpclient.js"
   - "runs/bot/bot-20260619-050303.capture_session.json"
   - "src/tankpit_bot/physics/combat.py"
+source_git_blobs:
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
+  "src/tankpit_bot/physics/combat.py": "53f2ebde2f09db86d29f122a53589f5445f24e4c"
 fact_checked: "2026-06-19"
 confidence: high
 hubs: [protocol]
