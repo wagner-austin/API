@@ -20,7 +20,7 @@ Three injectable services, composed via constructor kwargs on `SessionBase`. No 
 
 ## CDPService (`browser/cdp_service.py`)
 
-Owns CDP (Chrome DevTools Protocol) event handling and message capture.
+Owns CDP (Chrome DevTools Protocol) event handling and message capture.[^1]
 
 - Buffers received WebSocket messages (`_cdp_message_buffer`)
 - Builds XOR key table from magic bytes (`_on_magic_captured`)
@@ -31,7 +31,7 @@ Created by `CDPService()` (no args). Injected as `cdp_service=` kwarg on Session
 
 ## CommandService (`bot/command_service.py`)
 
-Owns XOR encoding and command dispatch to the game server.
+Owns XOR encoding and command dispatch to the game server.[^1]
 
 - `send_bytes(data)` — XOR-encodes and sends via the WebSocket
 - Holds reference to the `send_ws_bytes` callback (the actual WebSocket write)
@@ -41,7 +41,7 @@ Created by `CommandService(send_ws_bytes=callback)`. The callback comes from the
 
 ## WorldService (`sniffer/world_service.py`)
 
-Owns the mutable world state — tanks, containers, viewport, inventory.
+Owns the mutable world state — tanks, containers, viewport, inventory.[^1]
 
 - Injectable singleton: one instance shared across all consumers in a session
 - 60+ files migrated to use it instead of direct state mutation
@@ -51,7 +51,7 @@ Owns the mutable world state — tanks, containers, viewport, inventory.
 
 **Bot**: `Bot.__init__` accepts `cdp_service` and `command_service` kwargs, passed through the inheritance chain to `SessionBase`.[^2]
 
-**Probes**: `create_probe(probe_class, url)` in `action_lab/probe_factory.py` creates both services and injects them:
+**Probes**: `create_probe(probe_class, url)` in `action_lab/probe_factory.py` creates both services and injects them:[^3]
 ```
 cdp_service = CDPService()
 commands = CommandService(send_ws_bytes=send_websocket_bytes)

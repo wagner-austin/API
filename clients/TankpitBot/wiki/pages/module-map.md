@@ -15,7 +15,7 @@ hubs: [codebase]
 
 # Module Map
 
-All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tests/`. Standalone scripts live in `scripts/`.
+All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tests/`. Standalone scripts live in `scripts/` — layout conventions in [[coding-standards]].
 
 ## Core packages
 

@@ -41,7 +41,7 @@ Production code declares protocol interfaces in `tankpit_bot/_test_hooks/`. 8 su
 3. **Inject it** via the production code's constructor or function parameter
 4. **Assert on concrete values** — no `assert len(x) >= 0` or `assert x is not None` (the guard rejects weak assertions)[^3]
 
-Example pattern:
+Example pattern (this shape recurs throughout `tests/` — enforced by the guard, [[coding-standards]]):
 ```python
 class FakeBot:
     """Protocol-matching test implementation."""

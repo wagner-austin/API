@@ -28,7 +28,7 @@ consumer — A* pathfinding, viewport reachability, hop selectors,
 surface clamps, the pickup routing gate, stall-clearing — reads the
 same `is_passable`. No consumer receives walkability facts through any
 other channel. This page records why that rule exists, what it
-replaced, and the invariants that keep it true.
+replaced, and the invariants that keep it true.[^3]
 
 ## The composed view, layer by layer
 
@@ -83,7 +83,7 @@ remembered. Reachability remembered. The dot-hop selector
 (`_pick_fresh_dot_hop`) did not — it consulted `terrain.is_passable`
 only. The executor compensated with a pre-dispatch veto
 (`_is_valid_move_destination`, added 2026-04-10) that discarded any
-move/teleport whose destination carried a hostile mine.
+move/teleport whose destination carried a hostile mine.[^3]
 
 That fork produced the fixed-point loop of run bot-20260720-165935
 (17:16): planner proposes the mined dot (its rules pass), executor
@@ -94,7 +94,7 @@ days earlier ("if a container ever ended up on a mine tile the
 executor's mine rejection would silently loop the pickup pursuit").
 
 The user's ruling set the fix scope: *"no no no. not anti loop, but
-something that addresses the root of the issue."* Feedback wiring
+something that addresses the root of the issue."*[^5] Feedback wiring
 (attempt marks, discard-marks-failed) would have made the loop short;
 only removing the second owner makes it impossible.
 
@@ -128,7 +128,7 @@ only removing the second owner makes it impossible.
    mined enemy tile, which the veto would have looped in exactly the
    same way.
 
-Net diff: 26 files, +358/−318 — the system got smaller.
+Net diff: 26 files, +358/−318 — the system got smaller.[^3]
 
 ## Invariants (and where they are pinned)
 
@@ -159,7 +159,7 @@ detected" — first clean analyzer verdict in three soaks). 77 mine
 tiles appeared in viewport renders during the session; the bot
 navigated all of them without incident. Longest identical-decision
 run: 13 consecutive shoot commands at one target — sustained combat,
-not a stall.
+not a stall.[^2]
 
 ## What the executor still validates (RESOLVED 2026-07-21)
 
@@ -178,3 +178,4 @@ source value). The executor is now pure dispatch — the end state
 [^2]: Verification soak: `runs/bot/bot-20260720-192320.events.jsonl` (latest.* at time of writing); analyzer output "no top-level issues detected"; discard/error/replan counts measured by direct event scan 2026-07-20.
 [^3]: Executor veto origin: commit dc696282 (2026-04-10) "Add executor-side command validation against current world state". Mine-veto deletion + composition: commit 6d2afdbe (2026-07-20). Ferry composition precedent: 2026-06-12, run 131003 ("marooned island" that was a ferry).
 [^4]: Displacement physics: user (Austin) 2026-06-16 — "you get moved off if there are mines, or if there is terrain in the way"; documented in [[teleport-mechanics]] Placement.
+[^5]: user (Austin), 2026-07-20 — root-cause ruling on the fixed-point loop, quoted verbatim above.

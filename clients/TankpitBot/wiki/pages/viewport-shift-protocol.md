@@ -17,7 +17,7 @@ hubs: [protocol]
 
 # Viewport Shift Protocol
 
-The complete client↔server contract for changing the visible viewport. Documents the three client-initiated commands that request a shift, the server response, and how the current bot's world-model relates to what the game actually supports.
+The complete client↔server contract for changing the visible viewport. Documents the three client-initiated commands that request a shift, the server response, and how the current bot's world-model relates to what the game actually supports.[^1]
 
 ## Three shift triggers
 
@@ -52,13 +52,13 @@ Direction byte is a menu index 0-8: `0=Center, 1=W, 2=E, 3=S, 4=N, 5=NE, 6=SE, 7
 
 ### `Sb` — Scope move (binary, 4 bytes)
 
-Client-initiated shift to a specific tile.
+Client-initiated shift to a specific tile.[^1]
 
 ```
 [len=4, 'z'=0x7A, x:1, y:1]
 ```
 
-Lowercase `z` — different code from `Rb`.
+Lowercase `z` — different code from `Rb`.[^1]
 
 ## Client state machine
 
@@ -66,7 +66,7 @@ State 13 = "Scope change pending".[^6] Entered when the client sends `Rb` or `Sb
 
 ## Empirical validation
 
-Corpus: `runs/sniff/latest.capture_session.json` (2026-07-10, 421.8 s human-driven session).
+Corpus: `runs/sniff/latest.capture_session.json` (2026-07-10, 421.8 s human-driven session).[^5]
 
 | Event | Count |
 |---|---|
@@ -76,7 +76,7 @@ Corpus: `runs/sniff/latest.capture_session.json` (2026-07-10, 421.8 s human-driv
 | Sent teleport | 4 |
 | Game log "Extend view {direction}" | 8 |
 
-Every "Extend view" game-log line is followed by a `0x5A` 0–2 s later — proving `Rb → 0x5A` round-trip. The 22 − 4 − 8 = ~10 remaining `0x5A` messages coincide with walk broadcasts, evidencing server-side auto-shift under autoscroll=on. Note that `0x5A` count (22) is far less than `0x47` walk-broadcast count (42) — most walks do not trigger a shift, only edge-arriving walks do, consistent with the "auto-shift on edge-tile arrival" rule above.
+Every "Extend view" game-log line is followed by a `0x5A` 0–2 s later — proving `Rb → 0x5A` round-trip.[^5] The 22 − 4 − 8 = ~10 remaining `0x5A` messages coincide with walk broadcasts, evidencing server-side auto-shift under autoscroll=on. Note that `0x5A` count (22) is far less than `0x47` walk-broadcast count (42) — most walks do not trigger a shift, only edge-arriving walks do, consistent with the "auto-shift on edge-tile arrival" rule above.
 
 ## Bot's current state and the gap
 
@@ -86,7 +86,7 @@ This is a **bot configuration choice, not a game limit**. Turning it back on req
 
 ## Latent doc bug (fixed 2026-07-18)
 
-`src/tankpit_bot/protocol/commands.py:95-96` labelled `PLAIN_AUTOSCROLL_ON = b"A0"` and `PLAIN_AUTOSCROLL_OFF = b"A1"` — inverted from the JS truth (`Number(true) == 1`). Same inversion in `docs/protocol-discovery.md:435-436`. Constants were unused in `src/` (grep 2026-07-17), so no live misfire occurred. Both sites corrected 2026-07-18: `"A1"` = ON, `"A0"` = OFF.
+`src/tankpit_bot/protocol/commands.py:95-96` labelled `PLAIN_AUTOSCROLL_ON = b"A0"` and `PLAIN_AUTOSCROLL_OFF = b"A1"` — inverted from the JS truth (`Number(true) == 1`, see [^2]). Same inversion in `docs/protocol-discovery.md:435-436`. Constants were unused in `src/` (grep 2026-07-17), so no live misfire occurred. Both sites corrected 2026-07-18: `"A1"` = ON, `"A0"` = OFF.
 
 [^1]: `Ia` inherits from `va` at tpclient.pretty.js:240; `Rb` and `Sb` inherit from `K` at tpclient.pretty.js:766/780. Both send paths are traced in [[js-source-map]] §"Client Command Classes".
 [^2]: `Ia.prototype.toString = function() { return this.code + Number(this.h) };` at tpclient.pretty.js:241-243. `this.h` is the bool. `ke(a, b)` at line 5124 sends `new Ia(b)` when the setting toggles.

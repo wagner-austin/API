@@ -70,20 +70,22 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 
 **Higher rank tanks hold more fuel, equipment, and have a larger radar.** All three scalings are now quantified: fuel capacity = 1000 + 100·rank ([[game-economy]]), equipment = 20 + 5·rank (below), built-in radar radius = 2 + floor(rank/3) ([[radar-mechanics]]).[^2]
 
-**Demotion:** if deactivated by an enemy, you lose one rank.
+**Demotion:** if deactivated by an enemy, you lose one rank.[^1]
 
 ## Fuel
 
 - Deactivation happens when DAMAGE takes your fuel to zero — fuel is
-  the life pool and hits/mines drain it
+  the life pool and hits/mines drain it ([[deactivation-format]],
+  [[game-economy]])
 - **You cannot deactivate yourself** (user contract 2026-07-20,
   verbatim: "you cant kill yourself in game its impossible... you
   cant die from walking, even at zero fuel it stops debiting. you can
   use radar. you cant teleport if theres insufficient fuel, but you
-  wont die"). Self-spending clamps at zero: walking becomes free at 0
+  wont die").[^3] Self-spending clamps at zero: walking becomes free at 0
   fuel, radar stays usable, teleports refuse on insufficient fuel.
   The How-To-Play "run out of fuel = deactivated" line describes
   being drained BY ENEMY DAMAGE, not by your own spending
 
 [^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
+[^3]: user (Austin), 2026-07-20 — self-deactivation-impossibility contract, quoted verbatim above
 [^2]: "Higher rank tanks... have a larger radar" — official text; resolved 2026-07-06 with exact formulas via client mining (tpclient.js Gc gauge draw) + user measurements at ranks 1/3/4/6/7 — see [[game-economy]] and [[radar-mechanics]]

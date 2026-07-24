@@ -18,7 +18,7 @@ hubs: [js-client]
 
 # Client Constants
 
-Every hardcoded constant in tpclient.js, organized by category.
+Every hardcoded constant in tpclient.js, organized by category.[^1]
 
 ## Team & Rank
 
@@ -294,7 +294,7 @@ KeyK: Toggle Microphone (41)
 
 ## Chat Messages
 
-63 predefined messages (E[0] through E[64], with gaps). Each has:
+63 predefined messages (E[0] through E[64], with gaps) — full table in [[chat-messages]].[^1] Each has:
 - `id`: message number
 - `text`: display text
 - `h`: team filter (0=same team only, 1=allies+team, 2=zone, 3=all)
@@ -303,4 +303,6 @@ KeyK: Toggle Microphone (41)
 - `i`: has voice recognition
 - `j`: voice recognition keyword arrays
 
-Key messages for bot: 4="HELP - Enemy!", 6="HELP - Fuel low!", 8="Fuel detected here", 9="Equipment detected here", 53="I need equipment!", 54="I need fuel!"
+Key messages for bot: 4="HELP - Enemy!", 6="HELP - Fuel low!", 8="Fuel detected here", 9="Equipment detected here", 53="I need equipment!", 54="I need fuel!"[^1]
+
+[^1]: tpclient.js — every constant above carries its `(array/function, line N)` locator inline; file pinned by `source_paths` + `source_git_blobs` (traced 2026-06-19; fuel/action-dispatch facts re-mined 2026-07-06).

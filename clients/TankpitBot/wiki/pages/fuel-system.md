@@ -53,7 +53,7 @@ hubs: [game-mechanics]
 ## Fuel data flow (single source of truth)
 
 `self_state["fuel"]` is updated **only** from the wire's absolute-fuel
-messages, in `sniffer/world_state_dispatch._dispatch_resource_update`:
+messages, in `sniffer/world_state_dispatch._dispatch_resource_update`:[^6]
 
 - `0x2E TankStatusSync` — periodic fuel cadence.
 - `0x44 FuelGain` — fuel pickup completion (and free-pickup events).
@@ -62,7 +62,7 @@ messages, in `sniffer/world_state_dispatch._dispatch_resource_update`:
 All three flow through
 `sniffer/world_state_containers.update_world_state_from_fuel_total`
 → `state.mutations.set_self_fuel`, which writes the absolute fuel and
-emits the `"Fuel: A -> B (+delta)"` world-log line.
+emits the `"Fuel: A -> B (+delta)"` world-log line.[^6]
 
 `state/container_mutations.pickup_container` is **strictly registry
 maintenance** — it removes the picked-up container (or shrinks its
@@ -80,8 +80,8 @@ single source of truth.[^6]
 
 When `fuel <= fuel_low_threshold` the bot enters the unified `COLLECT`
 mode (the historical `RECOVER_FUEL` / `RECOVER_EQUIPMENT` split was
-collapsed 2026-06-24). The owner runs a single cascade per tick (see
-[[bot-behavior-contract#3.4]]):
+collapsed 2026-06-24[^5]). The owner runs a single cascade per tick
+(see [[bot-behavior-contract]] §3.4):
 
 1. **Lock continuation** — continue a held equipment or fuel target
    from a previous tick when it is still executable and no markedly
@@ -116,7 +116,7 @@ collapsed 2026-06-24). The owner runs a single cascade per tick (see
    2026-07-02; previously an uncaught ``ValueError`` crash) rather
    than idle silently. (Dot hop replaced the blind 16-candidate
    compass-ring hop 2026-07-03; that in turn replaced the
-   first-qualifying-direction hop 2026-07-01.)
+   first-qualifying-direction hop 2026-07-01.)[^7]
 
 The fuel-dot atlas was restored 2026-07-03 (stripped 2026-06-22):
 `decode_map_data` materialises the skip-RLE dot coordinates and
@@ -149,4 +149,5 @@ all decline the COLLECT owner ends the session with exit reason
 [^3]: Fuel-dot history: stripped 2026-06-22 (planner, state, protocol decoder all stopped surfacing dot coordinates), restored 2026-07-03 per user contract ("switch blind viewport hopping to yellow-dot hopping"; "use yellow dot teleporting while en route to the opponent"). Dot freshness ~40% and dot-held volumes >= 762 wire-verified 2026-06-11 (fuel dot probe, 6/6 dots held fuel).
 [^4]: Run 131003 2026-06-12 — marooned at 87 fuel on one-tile island (actually a ferry; see [[ferry-mechanics]]). Reserve-bypass escape removed 2026-06-22.
 [^5]: AIConfigDict 2026-06-22 — `fuel_critical_threshold` field removed; the COLLECT entry predicate (`should_enter_collect`) and the in-cascade fuel-pickup branch now consume `fuel_low_threshold` directly. The unused `try_collect_critical_fuel` / `try_collect_fuel` non-owner helpers and the `_plan_fuel_recovery` wrapper were deleted at the same time. The fuel-mode and equipment-mode owners themselves were then merged into one `decide_collect_mode` 2026-06-24.
-[^6]: Live observation 2026-06-23 00:35:57 in `runs/bot/latest.log`: worldstate logged `Fuel: 195 -> 633 (+438)` from the 0x44 FuelGain, then the next AI decision read `ctx.fuel = 1071` (633 + 438). The 438 ghost was the container's volume being added a second time by `pickup_container`'s local fuel-delta branch on top of the wire's already-correct absolute fuel. Removed in `state/container_mutations.pickup_container` 2026-06-23; the function now only mutates the container registry.
+[^6]: Live observation 2026-06-23 00:35:57 in `runs/bot/latest.log`: worldstate logged `Fuel: 195 -> 633 (+438)` from the 0x44 FuelGain, then the next AI decision read `ctx.fuel = 1071` (633 + 438). The 438 ghost was the container's volume being added a second time by `pickup_container`'s local fuel-delta branch on top of the wire's already-correct absolute fuel. Removed in `state/container_mutations.pickup_container` 2026-06-23; the function now only mutates the container registry. Wire-truth flow sites: `sniffer/world_state_dispatch.py` + `sniffer/world_state_containers.py` + `state/mutations.py`.
+[^7]: cascade owner `decide_collect_mode` (merged 2026-06-24, see [^5]); step order + hop policy per user contracts 2026-06-26 (walk-only pickups) and 2026-07-03 (quoted in step 5); exit-instead-of-idle per `SessionExitError` change 2026-07-02.

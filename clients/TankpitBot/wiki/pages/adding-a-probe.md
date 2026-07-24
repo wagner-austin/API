@@ -17,11 +17,11 @@ hubs: [codebase]
 
 # Adding a New Probe
 
-Action lab probes are isolated experiments against the live game server. Each probe tests one mechanic (teleport, fuel pickup, movement, etc.) without the full bot HFSM.
+Action lab probes are isolated experiments against the live game server. Each probe tests one mechanic (teleport, fuel pickup, movement, etc.) without the full bot HFSM.[^1]
 
 ## Step 1: Create the probe class
 
-In `src/tankpit_bot/action_lab/`, create `my_probe.py`:
+In `src/tankpit_bot/action_lab/`, create `my_probe.py` (every existing probe follows this shape[^1]):
 
 ```python
 class MyProbe(ProbeBase):
@@ -41,7 +41,7 @@ If the probe produces structured results, create `my_probe_types.py` with TypedD
 
 ## Step 3: Create the script entry point
 
-In `scripts/my_probe.py`:
+In `scripts/my_probe.py` (mirrors the six existing probe scripts[^3]):
 
 ```python
 from tankpit_bot.action_lab.probe_factory import create_probe
@@ -56,7 +56,7 @@ def main() -> None:
 
 ## Step 4: Register the CLI entry point
 
-In `pyproject.toml` under `[tool.poetry.scripts]`:
+In `pyproject.toml` under `[tool.poetry.scripts]` — the existing `tankpit-*-probe` entries are the template ([[make-targets]]):
 
 ```toml
 tankpit-my-probe = "scripts.my_probe:main"

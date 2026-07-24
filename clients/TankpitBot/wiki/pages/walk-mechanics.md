@@ -20,7 +20,7 @@ hubs: [game-mechanics]
 
 # Walk Mechanics
 
-Server-side movement is **instantaneous**. A `CMD_MOVE` click is processed at
+Server-side movement is **instantaneous**.[^1] A `CMD_MOVE` click is processed at
 the next server tick, and at that single tick the server:
 
 1. pathfinds the route ([[teleport-mechanics]] documents the tick; the
@@ -31,11 +31,11 @@ the next server tick, and at that single tick the server:
 5. resolves destination-tile pickups —
 
 all in the same wire flush. The walking you see on screen is a client-side
-animation; the server has already teleported you.
+animation; the server has already teleported you.[^1]
 
 ## Evidence
 
-- **Manual capture** `sniff-20260721-212348`: every single-click walk shows
+- **Manual capture** `sniff-20260721-212348`:[^1] every single-click walk shows
   echo + full billing + pickup + refill at one timestamp. Example, t+63.81:
   fuel 595→587 (−8, the full 8-tile path), `0x47` echo `sswwwwww`, and the
   pickup at the destination `(3,220)` — one tick. A 12-tile walk commanded at
@@ -58,7 +58,7 @@ early designs) was **wrong**. The gradual-looking drain in bot sessions came
 from the bot issuing many separate move commands over time, each billed
 instantly at its own tick. The multi-echo tile overcounts (2026-07-21 probe)
 came from echoed routes that never executed (position unchanged at next
-echo), not from partially-walked paths.
+echo), not from partially-walked paths.[^2]
 
 ## The client animation
 
@@ -67,11 +67,11 @@ the animation**; a key spammed mid-walk registers at the first tick after the
 animation ends. Three repeated 23-tile manual walks bounded the animation at
 **≤181 ms/tile** (tick quantization leaves the lower bound open at ~87
 ms/tile). The exact rate is cosmetic — it is NOT server physics and no longer
-blocks the simulator.
+blocks the simulator.[^3]
 
 ## Implications
 
-- **Humans are input-locked while animating**: after a long click, a human
+- **Humans are input-locked while animating**:[^3] after a long click, a human
   cannot radar, open the map, or lay mines until the animation finishes
   (~0.1–0.18 s per tile). A long move is a window of enemy unresponsiveness.
 - **The bot is not animation-gated**: it writes commands to the socket
@@ -81,3 +81,7 @@ blocks the simulator.
   routes around enemy mines and terrain on its own.
 - **Simulator**: model movement as instant relocation at the processing tick
   with per-tile billing; no walk-speed constant exists server-side.
+
+[^1]: runs/sniff/sniff-20260721-212348.capture_session.json (user-piloted walk-timing session; frontmatter-pinned) — instantaneous echo+billing+pickup at one timestamp, all examples above re-derivable from the file
+[^2]: 2026-07-21 archive probes (billing: 200/200 single-echo episodes carry the full cost in the echo window; geometry: 1755 consecutive echo pairs, 0 interior-position starts) — method + numbers in wiki log 2026-07-21; the billing law is re-derived on every `make audit` (walk-cost validator, `src/tankpit_bot/validate/archive.py`)
+[^3]: same capture, three repeated 23-tile manual walks with user narration (input-lock observed live; timing bounds from the wire timestamps)

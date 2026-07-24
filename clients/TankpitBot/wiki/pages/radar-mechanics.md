@@ -31,21 +31,21 @@ hubs: [game-mechanics]
 | sergeant(3), lieutenant(4), captain(5) | 3 | 7x7 | sergeant: (128,120)→(128,123); lieutenant: (111,129)→(111,126) |
 | major(6), colonel(7), general(8) | 4 | 9x9 | major: (234,5)→(238,5); colonel: (165,125)→(165,129) |
 
-The step boundaries are pinned by the sergeant and major measurements (a rival fit with steps at lieutenant/colonel predicted sergeant=2 and major=3; both falsified 2026-07-06). This resolves the official guide's "higher rank tanks have a larger radar" claim with exact numbers. **Code implication**: `REGULAR_RADAR_RADIUS = 2` in `state/viewport_geometry.py` is only correct for ranks 0-2 and must become rank-derived (rank is on the wire in `self_state`).
+The step boundaries are pinned by the sergeant and major measurements (a rival fit with steps at lieutenant/colonel predicted sergeant=2 and major=3; both falsified 2026-07-06).[^14] This resolves the official guide's "higher rank tanks have a larger radar" claim with exact numbers. **Code implication**: `REGULAR_RADAR_RADIUS = 2` in `state/viewport_geometry.py` is only correct for ranks 0-2 and must become rank-derived (rank is on the wire in `self_state`).
 
 ## Both scans are clamped to viewport bounds
 
 Neither radar reveals tiles outside the visible viewport. At a viewport edge or corner the built-in radar reveals only the intersection of `(tank±radius)` with the viewport bounds -- a rank 0-2 tank pressed into the top-left of its viewport sees a ~3x3 instead of a 5x5.[^7] Coverage tracking that pretends a free scan always reveals 25 tiles over-claims and lets the forager skip ground that was never actually scanned.
 
-The implication for the bot: track scanned tiles by the actual revealed region (intersection of scan footprint with viewport bounds), not by a fixed-size block centered on the tank.
+The implication for the bot: track scanned tiles by the actual revealed region (intersection of scan footprint with viewport bounds), not by a fixed-size block centered on the tank.[^7]
 
 ## What radar reveals (and what it does NOT)
 
 Radar reveals **fuel containers, equipment containers, and mines** -- entities that are hidden by default on spawn and become visible only after a scan.[^8] Both radar types reveal: extra (paid) covers the full viewport in one shot; built-in (free) reveals tiles within chebyshev radius 2+floor(rank/3) of the tank, clipped to viewport bounds.
 
-Radar does **NOT** reveal enemies. Enemy tanks are always visible to the bot when they enter the viewport via the normal wire stream (0x3D MovementResponse, 0x28 TankEntry, etc.). Firing radar to "search for enemies" is a category error -- any radar dispatched while in HUNT mode is wasted unless it is acquiring nearby mines / containers around a combat tile.
+Radar does **NOT** reveal enemies. Enemy tanks are always visible to the bot when they enter the viewport via the normal wire stream (0x3D MovementResponse, 0x28 TankEntry, etc.). Firing radar to "search for enemies" is a category error -- any radar dispatched while in HUNT mode is wasted unless it is acquiring nearby mines / containers around a combat tile.[^8]
 
-This deletes a class of bot mistakes: HUNT mode must use map-open or viewport-edge walking to find enemies, never radar.
+This deletes a class of bot mistakes: HUNT mode must use map-open or viewport-edge walking to find enemies, never radar.[^8]
 
 ## The radar response is a delta sync (reveals + corrections, unchanged omitted)
 
@@ -55,13 +55,13 @@ The wire response to a radar scan (0x4F, JS handler `ch` -- a batch of per-tile 
 - **Corrections** arrive as explicit removals: a cache entry with value 0 means "this tile is now empty" (247 of 2093 cache entries across the 199-session corpus, scan 2026-07-03), and an overlay entry >= 8 (255 canonical) means "no mine here". The client applies every entry as a raw tile write; the rendered dot and the mouse-hover fuel value both read the same per-tile cache slot.
 - **Unchanged already-visible entities are NOT re-sent** (live run 2026-07-01 20:20:10: the teleport landing's 0x5A registered 7 visible containers; the scan-on-landing extra radar's response listed only the 2 hidden ones).
 
-Implication for state tracking: the radar response must never be treated as the complete container set for the viewport, but its explicit entries ARE authoritative -- including the removals (`update_container_from_radar` deletes on volume 0; overlay clears route to `remove_mine`). The omission-prune (`reconcile_radar_viewport_resources`) is scoped to radar-sourced registry entries only; visible-layer entries are owned by 0x5A/0x43. Before the 2026-07-01 fix the whole-envelope reconcile deleted every visible container on each scan -- the bot would land amid 7 containers, radar, and instantly forget 5 of them (the "picked up only 2 of 7" bug the user observed live). The earlier "lists ONLY newly revealed" wording (2026-07-01) was too strong -- it missed the correction entries the corpus proves the server sends.
+Implication for state tracking: the radar response must never be treated as the complete container set for the viewport, but its explicit entries ARE authoritative -- including the removals (`update_container_from_radar` deletes on volume 0; overlay clears route to `remove_mine`).[^13] The omission-prune (`reconcile_radar_viewport_resources`) is scoped to radar-sourced registry entries only; visible-layer entries are owned by 0x5A/0x43. Before the 2026-07-01 fix the whole-envelope reconcile deleted every visible container on each scan -- the bot would land amid 7 containers, radar, and instantly forget 5 of them (the "picked up only 2 of 7" bug the user observed live). The earlier "lists ONLY newly revealed" wording (2026-07-01) was too strong -- it missed the correction entries the corpus proves the server sends.
 
 ## Walking does NOT reveal containers
 
 **Walking is not a reveal action.** Stepping onto a tile that holds a hidden fuel or equipment container does NOT make the container appear -- the bot does not learn about a container by walking on it.[^10] Only radar reveals. This matters because the natural intuition ("explore the viewport on foot to discover what's there") is wrong: a tank can spend its entire fuel budget walking every viewport tile and never see a single container that wasn't already radar-revealed.
 
-What walking IS useful for is **repositioning the tank so the next free radar covers fresh tiles**. When extras = 0, the free radar reveals (2·radius+1)² tiles at most (25 at ranks 0-2) (fewer at viewport edges -- see [Both scans are clamped to viewport bounds](#both-scans-are-clamped-to-viewport-bounds)). A second free radar from the same tile reveals nothing new. The bot's foraging loop when out of extras is:
+What walking IS useful for is **repositioning the tank so the next free radar covers fresh tiles**.[^10] When extras = 0, the free radar reveals (2·radius+1)² tiles at most (25 at ranks 0-2) (fewer at viewport edges -- see [Both scans are clamped to viewport bounds](#both-scans-are-clamped-to-viewport-bounds)). A second free radar from the same tile reveals nothing new. The bot's foraging loop when out of extras is:
 
 1. Free radar (radius square around current position, clipped to viewport).
 2. Walk roughly one footprint-width (2·radius+1 tiles) in some direction -- no overlap, no gaps.

@@ -63,7 +63,7 @@ Server tick rate is 2000ms. Commands sent faster are queued by the server. Conse
 ## Displacement preference order (measured 2026-07-21)
 
 User-piloted probe sniff-20260721-200527, 11 wire-verified
-displacements (sent teleport target vs 0x3D landing fix):
+displacements (sent teleport target vs 0x3D landing fix):[^9]
 
 - **The server tries the target's neighbors in a fixed ABSOLUTE
   order: EAST first, then NORTH, then WEST** — independent of
@@ -97,3 +97,5 @@ displacements (sent teleport target vs 0x3D landing fix):
 - Bonus re-confirmation: every probe hop's fuel delta matched
   floor(6 x euclid) to the ACTUAL landing (e.g. (12,56)->(18,63):
   55 fuel, wire 1100->1045).
+
+[^9]: runs/sniff/sniff-20260721-200527.capture_session.json — user-piloted displacement probe (11 hops); corpus extension 2026-07-22: 2,861 sent-teleport/0x3D pairs across all 246 archive sessions

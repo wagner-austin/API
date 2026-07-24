@@ -16,11 +16,11 @@ hubs: [js-client]
 
 # Client Commands
 
-Every command the TankPit client can send to the server, extracted from tpclient.js K-subclass hierarchy (binary game commands) and va-subclass hierarchy (connection/settings commands).
+Every command the TankPit client can send to the server, extracted from tpclient.js K-subclass hierarchy (binary game commands) and va-subclass hierarchy (connection/settings commands).[^1]
 
 ## Binary Game Commands (K subclasses)
 
-These are sent during active gameplay. Each starts with a length byte, then the command character byte, then payload.
+These are sent during active gameplay. Each starts with a length byte, then the command character byte, then payload.[^1]
 
 ### Movement & Positioning
 
@@ -72,7 +72,7 @@ These are sent during active gameplay. Each starts with a length byte, then the 
 
 ## Connection/Settings Commands (va subclasses)
 
-These are sent as text strings (not binary), during connection and lobby.
+These are sent as text strings (not binary), during connection and lobby.[^1]
 
 | Code | Char | Class | Description | Format |
 |------|------|-------|-------------|--------|
@@ -111,7 +111,7 @@ These are sent as text strings (not binary), during connection and lobby.
 
 ## Action Types (Hb.i field)
 
-From the toolbar click handler and Cb function:
+From the toolbar click handler and Cb function:[^2]
 
 | Value | Meaning | Target Check |
 |-------|---------|--------------|
@@ -125,9 +125,12 @@ From the toolbar click handler and Cb function:
 
 ## Shoot Command Details
 
-The shoot command (Lb, code 's') is only sent when:
+The shoot command (Lb, code 's') is only sent when:[^2]
 1. Target tile has an enemy tank (`h.h !== this.i.h` — different team), OR
 2. Target tile has a mine from another team (overlay 255 !== own team), OR
 3. Forced fire from double-click
 
-The last 2 bytes (target_id) are set to the tank's `.id` if a tank is at the target tile, or 0 for empty ground fire. This matters because the server uses this for homing shot targeting.
+The last 2 bytes (target_id) are set to the tank's `.id` if a tank is at the target tile, or 0 for empty ground fire. This matters because the server uses this for homing shot targeting ([[weapon-selection]], [[shoot-event-format]]).[^2]
+
+[^1]: tpclient.js lines 25-31 (K subclasses) and 6-10 (va subclasses) — every command class traced 2026-06-19; file pinned via `source_paths` line anchors
+[^2]: tpclient.js Lb class + Cb dispatch + toolbar click handler — same 2026-06-19 trace; target_id semantics wire-confirmed via the id-targeted reroute law ([[shoot-event-format]])

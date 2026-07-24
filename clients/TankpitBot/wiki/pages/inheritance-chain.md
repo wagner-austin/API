@@ -16,7 +16,9 @@ hubs: [architecture]
 
 ## Linear chain
 
-`Bot → DispatchMixin → CompletionsMixin → SessionBase`
+```
+Bot → DispatchMixin → CompletionsMixin → SessionBase
+```
 
 | Module | Lines | Concern |
 |--------|-------|---------|

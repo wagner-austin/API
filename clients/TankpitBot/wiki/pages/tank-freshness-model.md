@@ -19,8 +19,8 @@ hubs: [architecture]
 # Tank Registry Freshness Model
 
 Every tank in `world_state.tanks` carries **three independent freshness
-timestamps**. Each gates a different decision tier; conflating them
-caused the historical stale-registry combat bug.
+timestamps**.[^1] Each gates a different decision tier; conflating them
+caused the historical stale-registry combat bug.[^2]
 
 ## The three timestamps
 
@@ -31,7 +31,7 @@ caused the historical stale-registry combat bug.
 | `last_position_update_ms` | Observations with `position_is_authoritative=True` AND non-null `position` | Kill-shot |
 
 Production cadences differ by message kind, which is why one timestamp
-is not enough:
+is not enough:[^1]
 
 - **0x2E TankStatusSync** (status + fuel) broadcasts globally every ~2 s
   for every active tank, regardless of viewport. Refreshes
@@ -41,7 +41,7 @@ is not enough:
   the SELF tank drifts to 3-4 s+ medians in ~10% of sessions (23 of
   ~220), a mode other tanks never show. Your own truth also rides
   0x44/0x64/0x49, so the self 0x2E cadence is evidently not
-  load-bearing; the cause of the drift is an open question.
+  load-bearing; the cause of the drift is an open question.[^3]
 - **0x3D MovementResponse** / **0x47 Movement** / **0x28 TankEntry** /
   container TankUpdate* carry `(x, y)`. Refresh all three timestamps.
 - **0x4C MapData** (map snapshot) carries positions for every tank on
@@ -52,7 +52,7 @@ is not enough:
 
 Every tank-state mutation flows through
 `apply_tank_observation(state, obs)` in `state/mutations.py`. The
-observation -- a `TankObservation` TypedDict -- declares:
+observation -- a `TankObservation` TypedDict -- declares:[^1]
 
 ```
 is_wire_sourced: bool              # True for wire; drives last_wire_seen_ms
@@ -72,9 +72,9 @@ EnemyDetect and DOM-scraped client-registry refinements set both
 flags False: they are tile-coarse or out-of-band estimates that must
 not gate a kill shot. `position_is_authoritative` defaults to
 `is_wire_sourced` when omitted, so existing wire call sites compose
-the historical semantics for free.
+the historical semantics for free.[^1]
 
-The mutator enforces the freshness rules in code:
+The mutator enforces the freshness rules in code:[^1]
 
 ```python
 if obs["is_wire_sourced"]:
@@ -85,12 +85,12 @@ if obs["position_is_authoritative"] and obs["position"] is not None:
 
 Field aspects merge cleanly: present overwrites, `None` preserves. A
 non-existent tank is created on first observation; `is_self` is set
-from the registry self-tank id.
+from the registry self-tank id.[^1]
 
 ## Gates
 
 - **`is_wire_present(last_wire_seen_ms, now_ms)`** -- TTL 7000 ms (two
-  fight-cadence periods). Acquisition / HUNT candidate selection.
+  fight-cadence periods). Acquisition / HUNT candidate selection.[^1]
 - **`is_position_fresh(last_position_update_ms, now_ms)`** -- TTL
   7000 ms (matched to wire-presence TTL after the 2026-06-20
   target-block loop). **Kill-shot gate.** A wire-fresh but
@@ -98,7 +98,7 @@ from the registry self-tank id.
 
 Both gates live in `bot/ai/threats.py`. Combat strategy reads them in
 order: first `is_wire_present` (ghost gate), then `is_position_fresh`
-(stale-position gate), then the miss-on-moved-target re-aim path.
+(stale-position gate), then the miss-on-moved-target re-aim path.[^1]
 
 ## How the historical bug manifested
 
@@ -107,22 +107,22 @@ Before 2026-06-19, `update_tank_damage` (now deleted) advanced
 teleported out of viewport stopped producing position-bearing messages,
 but the global status broadcast kept the wire-presence stamp fresh.
 The kill-shot gate -- which had only `last_wire_seen_ms` to check --
-never tripped, and the bot kept firing at the stale registry tile.
+never tripped, and the bot kept firing at the stale registry tile.[^2]
 
 Run `bot-20260619-050303` recorded **25 combat_miss events on the same
 target (orange-8) at the same tile (155,155) over ~100 seconds**, all
 marked `target_moved=false` because the registry kept agreeing with
-the bot's stale belief about the target's location.
+the bot's stale belief about the target's location.[^2]
 
 The three-timestamp model + the `apply_tank_observation` chokepoint
 + the kill-shot position-freshness gate make this class of bug
 impossible to reintroduce without breaking a locked invariant test in
-`tests/world_state/test_tank_observation.py`.
+`tests/world_state/test_tank_observation.py`.[^1]
 
 ## Per-message contract
 
 For each wire message kind, the dispatcher in
-`sniffer/world_state_tanks.py` builds a `TankObservation` with:
+`sniffer/world_state_tanks.py` builds a `TankObservation` with:[^1]
 
 | Message | is_wire_sourced | position_is_authoritative | position | advances |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@ For each wire message kind, the dispatcher in
 tile-coarse radar estimate that may not match the target's actual wire
 position by the next tick; the second is a DOM scrape with no server
 proof. The kill-shot gate requires the server's own statement of
-position -- wire-with-position or MAP_DATA snapshot.
+position -- wire-with-position or MAP_DATA snapshot.[^1]
 
 ## Registry lifecycle: 0x58 TankRemove is a no-op (changed 2026-06-22)
 
@@ -155,7 +155,7 @@ the kill cooldown elapses. **`0x58 TankRemove` is a no-op** -- the entry
 stays put. Earlier behaviour deleted the entry; that caused the bot to
 abandon pursuit of locked targets that merely teleported out of viewport
 (live capture 2026-06-22: bot fired exactly one homing then dropped the
-lock because `0x58` fired in the next tick).
+lock because `0x58` fired in the next tick).[^4]
 
 Rationale: `0x58` carries no information that the freshness gates above
 can't already derive. A tank that has truly left the world stops
@@ -163,7 +163,7 @@ broadcasting `0x2E TankStatusSync`; `timestamp_ms` ages out naturally.
 A tank that simply teleported keeps broadcasting -- pursuit fires
 homing toward it, server picks homing weapon, homing tracks.
 The only authoritative death signal is `0x41`, and the lifecycle is now
-gated entirely by `liveness`.
+gated entirely by `liveness` ([[deactivation-format]]).[^1]
 
 **Correction (2026-07-03):** the original rationale claimed off-viewport
 tanks stop producing position-bearing messages, so the registry would
@@ -181,7 +181,7 @@ keeps the truth.
 ## Tests that lock the contract
 
 Every rule above is pinned by a test in
-`tests/world_state/test_tank_observation.py`:
+`tests/world_state/test_tank_observation.py`:[^1]
 
 - `TestInvariantTimestampAlwaysAdvances` -- rule 1.
 - `TestInvariantWireSeenRequiresWire` -- rule 2.
@@ -194,3 +194,8 @@ The combat-strategy regression test for the kill-shot gate lives in
 Removing or weakening any of these tests is a deliberate contract
 change and must come with a docstring and an update to
 [[tank-freshness-model]] itself.
+
+[^1]: code truth: `state/mutations.py` (`apply_tank_observation`) + `state/types/tank_observation.py` + `bot/ai/threats.py` gates + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by `tests/world_state/test_tank_observation.py` and `tests/bot/ai/test_combat_strategy.py`
+[^2]: runs/bot/bot-20260619-050303.capture_session.json (frontmatter-pinned) — the 25-miss stale-registry loop; three-timestamp fix landed 2026-06-19/20
+[^3]: `make shadow` sync-cadence law (`src/tankpit_bot/validate/shadow_laws.py`), calibration sweep 2026-07-22 over 245 archive sessions
+[^4]: live capture 2026-06-22 — one-homing lock-drop incident that motivated the 0x58 no-op change

@@ -20,7 +20,7 @@ hubs: [protocol]
 
 The 0x14 MAP_DATA blob's first section (historically misnamed "terrain deltas") is the map's **yellow fuel-pixel layer** — a skip-RLE fuel-container atlas.[^1]
 
-**Decode status:** the dot coordinates are materialised by `decode_map_data` (`MapDataDict.fuel_dots`) and stored on `WorldService.map_fuel_dots`, overwritten on every map open. Restored 2026-07-03 for dot-hop restocking and dot-relay travel; between 2026-06-22 and then the decoder skipped the RLE region for length validation only.
+**Decode status:** the dot coordinates are materialised by `decode_map_data` (`MapDataDict.fuel_dots`) and stored on `WorldService.map_fuel_dots`, overwritten on every map open. Restored 2026-07-03 for dot-hop restocking and dot-relay travel; between 2026-06-22 and then the decoder skipped the RLE region for length validation only.[^6]
 
 ## Decode algorithm
 
@@ -47,7 +47,7 @@ The layer is server-cached — byte-identical across all map opens in one sessio
 
 ## Tank entries
 
-MAP_DATA also carries tank position entries. Full format (from JS Ig.h, verified 2026-06-19):
+MAP_DATA also carries tank position entries. Full format (from JS Ig.h, verified 2026-06-19):[^1]
 
 ```
 Per tank (5 bytes):
@@ -72,3 +72,4 @@ Viewport entity IDs are NOT tank IDs. They use a separate system: `entity_id == 
 [^3]: fuel dot probe 2026-06-11 — 6/6 nearest dots held fuel, volumes 762/807/880/1042/1189
 [^4]: client JS stores `(packed>>2)&3` as tank `.u` on the map object; identified as rank_category (2026-06-19 JS walk)
 [^5]: viewport entity decode — entity_id field mapping; tanks tracked separately via 0x4F and other messages
+[^6]: `protocol/decoders/map_data.py` (`decode_map_data`) + `sniffer/world_service.py` (`map_fuel_dots`) — decode/storage sites; restoration recorded in wiki log 2026-07-03

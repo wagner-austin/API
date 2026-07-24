@@ -26,7 +26,7 @@ When extra radars are low, do NOT burn them on equipment search. Use the built-i
 3. Scan again
 4. Repeat, covering fresh ground each scan
 
-The key: **move exactly ~5 tiles between scans** so the 5x5 blocks are adjacent, not overlapping. Walking is free, scanning is free — this costs zero resources.
+The key: **move exactly ~5 tiles between scans** so the 5x5 blocks are adjacent, not overlapping ([[radar-mechanics]] — footprint is rank-derived, 5x5 at ranks 0-2). Walking costs 1 fuel/tile and the built-in scan is free ([[game-economy]]).
 
 ## Extra radar conservation
 

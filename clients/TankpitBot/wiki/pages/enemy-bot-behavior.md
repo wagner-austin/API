@@ -43,15 +43,15 @@ Two independent counts from Sigma's guide (2015): the raw shot count and a shade
 | Private | 8 | last shade + 2 more |
 | Corporal | 9 | last shade + 2 more |
 
-"Last shade" = the darkest of the four `damage_state` tiers (state 3). The shade shortcut lets the bot fire freely for the first 6-7 shots without counting, then switch to shot-counting only once the target reaches state 3. Our own `damage_state` decoder already exposes the value we'd need to gate on.
+"Last shade" = the darkest of the four `damage_state` tiers (state 3).[^6] The shade shortcut lets the bot fire freely for the first 6-7 shots without counting, then switch to shot-counting only once the target reaches state 3. Our own `damage_state` decoder already exposes the value we'd need to gate on ([[decode-coverage]]).
 
-**Verification status:** guide-sourced (2015 human observation), not yet wire-verified in this project. The next multi-tank capture with bot targets should count `You hit N/N` events against `damage_state` transitions to confirm.
+**Verification status:** guide-sourced (2015 human observation), not yet wire-verified in this project.[^6] The next multi-tank capture with bot targets should count `You hit N/N` events against `damage_state` transitions to confirm.
 
 ## Same-color bots respond to chat commands
 
 Same-color bots can be directed via chat with commands like **"use the radar"** and **"move out of the way"**, so a nearby friendly bot can be used as a supplemental radar source during equipment filling.[^6] Sigma credits sean/987 for the technique. Not currently exploited by our bot; if verified, this changes the practice-room fill economics because a same-color bot acts as a free extra-radar dispenser at zero fuel cost to us.
 
-**Verification status:** guide-sourced, not yet wire-verified. Test on Practice Map by messaging a same-color bot and watching for a subsequent radar-response frame (0x4F) from that bot's tank_id.
+**Verification status:** guide-sourced, not yet wire-verified.[^6] Test on Practice Map by messaging a same-color bot and watching for a subsequent radar-response frame (0x4F) from that bot's tank_id.
 
 ## Implications for combat strategy
 
