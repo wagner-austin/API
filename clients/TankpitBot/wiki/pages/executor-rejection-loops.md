@@ -24,12 +24,12 @@ Executor client-side validation rejects a planner-produced command every tick wi
 
 ## Structural cause
 
-Two independent mechanisms combine to make executor rejections invisible to the planner:
+Two independent mechanisms combine to make executor rejections invisible to the planner:[^1][^2]
 
 1. **AI state rolls back on rejection.** `tick_loop.py:490-491` persists `bot._ai_state` only when `command_sent` is True. When `execute` returns False, the updated AI state (including `blocked_combat_targets`, `resource_target_kind`, `last_shot_target_id`) is thrown away. Next tick's planner runs against the same base state and re-produces the same or similar command.[^1]
 2. **Rejections are not wired to the block/replan machinery.** `mark_move_target_failed` is called from `tick_loop_actions.py` (walk failures and wire 0x52 code-0/1 rejections; the `game_log_feedback.py` DOM call site was deleted 2026-07-19 when the channel went witness-only) and `completions.py:232` (completion timeouts), but never from any of the executor's nine `emit_ai("rejecting ...")` sites. The `is_move_target_failed` guard at `combat_strategy.py:440` that would route into `block_combat_target_and_replan` is unreachable from executor rejections.[^2]
 
-Together: rejection → no state persisted → no tile marked failed → same tick next iteration → same rejection. The loop breaks only when world state itself changes (target moves, mine detonates, container regenerates).
+Together: rejection → no state persisted → no tile marked failed → same tick next iteration → same rejection. The loop breaks only when world state itself changes (target moves, mine detonates, container regenerates).[^1][^2]
 
 ## Resolution (2026-07-20): the mine class is dead by construction
 
@@ -38,7 +38,9 @@ predicted — the dot-hop selector proposed a mined fuel dot at
 (37,153) and `_is_valid_move_destination` discarded the teleport 23
 consecutive ticks until session end. The fix was neither A nor B
 (feedback wiring) but a root cut, per the user's ruling ("not anti
-loop, but something that addresses the root of the issue"):
+loop, but something that addresses the root of the issue" — quoted
+with its receipt in [[terrain-composition]], which documents the
+loop capture, the cut, and the verification soak):
 
 - **Hostile mines are composed into the decision terrain**
   (`compose_decision_terrain` → `FerryAwareTerrain.hostile_mine_keys`),
@@ -60,7 +62,8 @@ loop, but something that addresses the root of the issue"):
 
 Side effect: `tick_loop_actions`' stall-clearing reachability checks
 now use the composed view too — they were previously raw static
-terrain, neither ferry- nor mine-aware.
+terrain, neither ferry- nor mine-aware ([[terrain-composition]] §The
+cut, item 4).
 
 ## Known live instances (as of 2026-07-17)
 
@@ -74,7 +77,7 @@ terrain, neither ferry- nor mine-aware.
 
 ### 3. Container pickup race
 
-`_is_valid_pickup` rejections at `executor.py:307/:314/:326/:333` fire when the world-state container view disagrees between planner and executor (container consumed, kind mismatch). Same silent-loop shape as #1 if the disagreement persists across ticks — e.g., a stale planner cache or a wire-order race where the pickup response arrives after the planner already re-picked the same container.
+`_is_valid_pickup` rejections at `executor.py:307/:314/:326/:333` fire when the world-state container view disagrees between planner and executor (container consumed, kind mismatch). Same silent-loop shape as #1 if the disagreement persists across ticks — e.g., a stale planner cache or a wire-order race where the pickup response arrives after the planner already re-picked the same container.[^6]
 
 ## Latent (not a loop today but same shape)
 
@@ -95,6 +98,8 @@ The structural fix is Phase 1 of [[self-observing-architecture]] — every rejec
 [^3]: `choose_combat_landing_tile` at `src/tankpit_bot/bot/ai/combat_landing.py:46-69` (line 68: `del world, self_state, terrain`); executor rejection at `src/tankpit_bot/bot/executor.py:360`; commit `4d11980b` narrowed the mine check from `world["mines"]` to `hostile_mines(world)` for same-team passability but did not consider planner-executor consistency on hostile tiles.
 [^4]: `_tracked_combat_target` at `src/tankpit_bot/bot/executor.py:371-394`, position-match at line 392; called from `_is_valid_teleport` at line 449.
 [^5]: `find_teleport_landing_tile` at `src/tankpit_bot/bot/ai/equipment_search.py:35-73`; line 62: `del start_x, start_y, blocked_mines`; five callers pass the arg (`bot/ai/movement.py:262/:391/:451/:538`, `bot/ai/equipment_search.py:146/:212/:262/:304/:380`).
+[^6]: rejection sites verified by direct read of `executor.py` at fact-check 2026-07-17 (line refs in the paragraph); the whole validator family was deleted 2026-07-21 by commit `59fce8e1` ("bot: executor is pure dispatch"), so these line refs are historical — the deletion diff in git history is the current receipt.
+[^7]: commit `59fce8e1` (2026-07-21) — the deletion diff carries every symbol named here; zero-discard archive confirmation re-derivable by scanning `runs/bot/*.events.jsonl` for `discarded_` outcomes after 2026-07-20; deletion recorded in the wiki-log entry "[2026-07-21] refactor | Executor is pure dispatch"; erratum recorded in "[2026-07-21] erratum + finding | The pursuit volley already exists — and has been firing all along".
 
 
 ## Resolution 2026-07-21 — the class is CLOSED: executor is pure dispatch
@@ -109,13 +114,13 @@ guarantees its container exists); combat releases reset the anchor to
 −1 before any veto could see it; and the teleport source check
 guarded a container source ("world_state") that no creation site can
 produce since the 0x4C map-container path was deleted. Archive
-confirmation: zero validator discards in any run since the mine fix.
+confirmation: zero validator discards in any run since the mine fix.[^7]
 
 Deleted: `_is_valid_shoot` / `_is_valid_pickup` / `_is_valid_teleport`
 / `_is_dispatchable` and their `_tracked_*` helpers, the six
 `emit_*_discarded_*` ledger emitters, six `discarded_*` outcome
 literals, and the ledger-audit discard analytics. The AI-state
-persistence gate survives for genuine CDP dispatch failures only.
+persistence gate survives for genuine CDP dispatch failures only.[^7]
 
 ERRATUM (same day): the first version of this entry (and commit
 59fce8e1's message) claimed the shoot veto had been "silently

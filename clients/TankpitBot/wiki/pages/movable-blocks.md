@@ -25,7 +25,7 @@ cracked** (2026-07-20, two manual captures) — the 0x42 / 0x4A
 decoders existed from the JS reverse-engineering but had never once
 fired in 204 bot sessions until the user's manual sessions. The BOT
 still has no state tracking or planner awareness of blocks (open
-work below).
+work below).[^1]
 
 ## Wire encoding (verified 2026-07-20)
 
@@ -62,13 +62,13 @@ work below).
 - **Containers under blocks survive** (verified on fuel and equipment
   containers; a fuel container in water became a bridge tile with
   the container intact — and its volume stays visible in 0x5A
-  `cache_value`, draining as it is picked: 730→257→0 observed).
+  `cache_value`, draining as it is picked: 730→257→0 observed).[^1]
 
 ## Arrival encoding — how resting blocks reach a fresh client (verified 2026-07-20)
 
 Capture sniff-20260720-221239 (user-narrated: known block coords,
 map open/close ×2, radars at stated positions, viewport scrolled away
-and back, bridge-only equipment pickup):
+and back, bridge-only equipment pickup):[^2]
 
 - **Resting blocks arrive via ordinary 0x5A viewport patches as
   `terrain_type` values** (with the known +1/+1 entity-alignment
@@ -94,7 +94,7 @@ and back, bridge-only equipment pickup):
   mountains, indistinguishable from land blocks by value alone (and
   equally impassable, so the ambiguity is harmless on land). The
   zero-occurrence claim stands precisely for: 0x42 events, 0x4A
-  block values, and rock-family tiles over static water.
+  block values, and rock-family tiles over static water.[^2]
 
 ## Placement rules
 
@@ -107,7 +107,7 @@ and back, bridge-only equipment pickup):
 - **On land, placement destroys any enemy mines on that exact tile**
   — "not adjacent mines."
 - **Can be placed on top of fuel or equipment containers** — "they
-  are not destroyed."
+  are not destroyed."[^1]
 
 ## Moving them
 
@@ -115,7 +115,7 @@ and back, bridge-only equipment pickup):
 - Long-press on a point to drop it at that x,y.
 - "you cant turn in place while pulling it. it will autopath if you
   click somewhere, but you need to go up and over and down to turn
-  around, while pulling it."
+  around, while pulling it."[^1]
 
 ## Combat interaction
 
@@ -132,18 +132,18 @@ The first sweep looked only for 0x42 manipulation events and 0x4A
 block values (zero in 204 sessions) and concluded blocks were absent.
 The user pushed back ("why not add blocks to the terrain tho?") and a
 deeper check — every wire rock-family tile in 228 room-1 captures
-tested against the static practice map — flipped the verdict:
+tested against the static practice map — flipped the verdict:[^3]
 
 - **value 1: 4,352 sightings, ALL over static water** (bridges — a
   persistent bridge complex sits around (130–135, 145–155))
 - **value 2: 2,396 sightings, ALL over static GROUND** (land blocks —
   invisible obstacles to the old model, live in real sessions)
-- **value 3: 250 sightings, ALL over static water** (stacks)
+- **value 3: 250 sightings, ALL over static water** (stacks)[^3]
 
 Resting blocks are common map furniture where the bot plays; only
 *manipulation* near the bot is unobserved. The perfect value/background
 separation also means the wire value alone determines walkability —
-no static-background disambiguation needed.
+no static-background disambiguation needed.[^3]
 
 Wired 2026-07-20: constants renamed to truth (`TERRAIN_BLOCK_BRIDGE`
 / `_LAND` / `_STACKED`, formerly misnamed ROCK_A/B/AB),
@@ -159,7 +159,7 @@ projection; the world renderer draws bridges as `=`. Pinned by
 ## Implications for the bot (remaining open work)
 
 1. ~~Terrain model~~ DONE 2026-07-20 — composed into the decision
-   terrain (see revised decision above).
+   terrain (see revised decision above and [[terrain-composition]]).
 2. **Mine registry hygiene**: a 0x42 land drop (obstacle_type=2) on a
    tracked mine tile must delete that mine from world state — the
    destruction is wire-silent, so nothing else will. (Dormant: 0x42
@@ -171,4 +171,6 @@ projection; the world renderer draws bridges as `=`. Pinned by
    chokepoint. Towing constraints: normal walk cost, no teleporting,
    no turning in place.
 
-[^1]: user (Austin), 2026-07-20 — verbatim contract above, delivered alongside the missile trigger rule; wire-verified the same day via sniff-20260720-214839 (7 pick/drop pairs, DOM-aligned: pickup=dir-letter, drop=dir 0; 3 towing teleports refused 0x52 code=0) and sniff-20260720-215930 (12 labeled drops: all land contexts → obstacle_type 2 including mines and containers; water → 1; stack → 3 from the prior session; blue/red/purple mines destroyed silently; stationary re-place pairs at zero fuel).
+[^1]: user (Austin), 2026-07-20 — verbatim contract above, delivered alongside the missile trigger rule; wire-verified the same day via sniff-20260720-214839 (7 pick/drop pairs, DOM-aligned: pickup=dir-letter, drop=dir 0; 3 towing teleports refused 0x52 code=0) and sniff-20260720-215930 (12 labeled drops: all land contexts → obstacle_type 2 including mines and containers; water → 1; stack → 3 from the prior session; blue/red/purple mines destroyed silently; stationary re-place pairs at zero fuel). Both captures frontmatter-pinned and on disk under `runs/sniff/`.
+[^2]: arrival-encoding capture on disk: `runs/sniff/sniff-20260720-221239.capture_session.json` (user-narrated block coords give the ground truth); findings recorded in the wiki-log entry "[2026-07-20] decode | Block arrival encoding cracked — one terrain enum across 0x42/0x4A/0x5A; radar and map are block-blind".
+[^3]: wiki-log entry "[2026-07-20] fix + decode | Blocks wired into the composed terrain — the 'absent' mechanic was map furniture all along" records the sweep and its counts; the 4,352 / 2,396 / 250 sightings are re-derivable by re-running the rock-family-vs-static-map scan over the `runs/` room-1 capture corpus; composition pinned by `test_ferry.py::test_block_tiles_compose_by_walkability`.

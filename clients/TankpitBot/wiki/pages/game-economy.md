@@ -22,11 +22,11 @@ hubs: [combat]
 
 # Game Economy
 
-Empirically measured fuel costs, damage values, and capacity limits — derived from three controlled captures on 2026-06-20 where the user reported every action and I matched it against the wire bytes (0x2E TankStatusSync fuel-field deltas).
+Empirically measured fuel costs, damage values, and capacity limits — derived from three controlled captures on 2026-06-20 where the user reported every action and I matched it against the wire bytes (0x2E TankStatusSync fuel-field deltas).[^1]
 
 ## Tank capacity
 
-**Fuel capacity = 1000 + 100 × rank** (2026-07-06). Not sent on the wire — the client derives it from rank in the fuel-gauge draw (`Gc` in tpclient.js: fill width `7·fuel/100` px against a capacity region of `7·(10+rank)` px, equal iff `fuel = 100·(10+rank)`). Rank IS on the wire (`self_state["rank"]`), so the bot can compute capacity at tick 1 with no probe pickup.
+**Fuel capacity = 1000 + 100 × rank** (2026-07-06). Not sent on the wire — the client derives it from rank in the fuel-gauge draw (`Gc` in tpclient.js: fill width `7·fuel/100` px against a capacity region of `7·(10+rank)` px, equal iff `fuel = 100·(10+rank)`). Rank IS on the wire (`self_state["rank"]`), so the bot can compute capacity at tick 1 with no probe pickup.[^2]
 
 | Rank | Capacity | Verified |
 |---|---|---|
@@ -40,9 +40,9 @@ Empirically measured fuel costs, damage values, and capacity limits — derived 
 | **colonel (7)** | **1700** | max deposit 1598 = 1700−100−~2 walk (user, 2026-07-06) |
 | general (8) | 1800 | formula only |
 
-The cap is enforced by the server on pickup — if the picker's tank can only hold `N` more fuel before hitting capacity, only `N` is transferred from the container and the rest remains. This is why `container_pickup.remaining_volume` is often non-zero.
+The cap is enforced by the server on pickup — if the picker's tank can only hold `N` more fuel before hitting capacity, only `N` is transferred from the container and the rest remains. This is why `container_pickup.remaining_volume` is often non-zero.[^1]
 
-The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specific: all 2026-06-20 measurements were taken on a private. A 2026-06-11 learned-watermark of 2010 exceeds even a general's 1800 and was a polluted scrape read (the same run tank-full'd at 1100), not evidence against the formula.
+The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specific: all 2026-06-20 measurements were taken on a private. A 2026-06-11 learned-watermark of 2010 exceeds even a general's 1800 and was a polluted scrape read (the same run tank-full'd at 1100), not evidence against the formula.[^2]
 
 ## Cost per player action
 
@@ -69,9 +69,9 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 | Walking into an enemy mine | **45** | Verified at t+373.35s of the multi-pickup capture: 1-tile walk into mine at (92, 185) → −45 fuel |
 | Mine cascade damage (your own mine detonating you) | not observed | Bot tests where player blew up their own mines didn't show a fuel delta on the placer |
 
-Damage manifests as a fuel decrement — the game's "health" is essentially "fuel reserve" for combat purposes. When you take damage your fuel drops; when fuel hits zero the tank is deactivated.
+Damage manifests as a fuel decrement — the game's "health" is essentially "fuel reserve" for combat purposes. When you take damage your fuel drops; when fuel hits zero the tank is deactivated. This is now a corpus-fitted law: the rendered damage tier IS the fuel quartile ([[deactivation-format]] §SOLVED, 19,658/19,658).
 
-**Armor shields (measured 2026-07-21, 16 incoming hits, fuel untouched):** with shields enabled, damage is FULLY absorbed and shields are consumed at damage/45 per hit — singles/missiles/homings eat 1 shield, duals eat 2. Victim-side timing note from the same session: incoming-hit fuel debits land the SAME INSTANT as the 0x53 echo (no tick lag, unlike shooter-side charges).
+**Armor shields (measured 2026-07-21, 16 incoming hits, fuel untouched):** with shields enabled, damage is FULLY absorbed and shields are consumed at damage/45 per hit — singles/missiles/homings eat 1 shield, duals eat 2. Victim-side timing note from the same session: incoming-hit fuel debits land the SAME INSTANT as the 0x53 echo (no tick lag, unlike shooter-side charges).[^3]
 
 ## Container pickup mechanics
 
@@ -84,7 +84,7 @@ See [[fuel-system]] and the ``ContainerPickupDict`` decoder doc for the full wir
 - **Multi-record bodies**: a single 0x43 message can carry 1, 2, 3 (or more) pickup records, fired when a tank's movement causes multiple container tiles to update in one server tick. Corpus distribution (156 sessions, 2026-06-20): 2653 single-record, 80 two-record, 2 three-record.
 - **Duplicate broadcasts**: the server broadcasts each pickup twice within ~200 ms (one to the picker, one to the world view) -- empirical 43.9% duplicate rate. The dispatcher de-duplicates by `(x, y, remaining_volume)` signature within a 500 ms window so metrics and logs see each pickup once; the world-state mutation is idempotent regardless.
 
-Verified breakdown from the multi-pickup capture:
+Verified breakdown from the multi-pickup capture:[^1]
 
 | Container known volume | Picker tank before | Picker took | Container remaining (wire) |
 |---:|---:|---:|---:|
@@ -94,7 +94,7 @@ Verified breakdown from the multi-pickup capture:
 | 100 | 1096 | 4 | 96 ✓ |
 | 571 (full bucket) | 456 | 571 | 0 ✓ |
 
-Every row matches `remaining = declared − taken` exactly.
+Every row matches `remaining = declared − taken` exactly.[^1]
 
 ## Fuel deposit (your own tank donating fuel)
 
@@ -111,7 +111,7 @@ Every row matches `remaining = declared − taken` exactly.
 The world replenishes itself. Mined from 212 sessions holding 2+
 0x4C map snapshots (the 0x4C fuel-dot atlas is GLOBAL, so
 within-session diffs are true world dynamics — spawns and
-consumption by anyone):
+consumption by anyone):[^4]
 
 - **Steady-state population**: 569–656 fuel dots on the map
   (mean 619); per-session spawns ≈ consumption.
@@ -123,7 +123,7 @@ consumption by anyone):
   587/605 appeared at entirely fresh map locations (18 merely within
   2 tiles of a past consumption).
 - **No wire message announces a spawn** — the client discovers new
-  dots on the next map open or radar reveal.
+  dots on the next map open or radar reveal.[^4]
 
 Equipment containers are invisible to the 0x4C atlas, so their
 respawn dynamics remain unmeasured. The sim ([[physics-module-roadmap]])
@@ -135,7 +135,7 @@ for equipment on the offset beat as an assumption.
 ## What's still open
 
 Equipment-container respawn dynamics and spawn volumes (the 0x4C
-atlas carries neither). Every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).
+atlas carries neither). Every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).[^5]
 
 ## Machine-checked claims
 
@@ -264,10 +264,16 @@ to follow (and vice versa).
 
 ## How this was discovered
 
-Three sequential captures on 2026-06-20:
+Three sequential captures on 2026-06-20:[^1]
 
 1. **PvP capture** (Artax vs Yuppler combat) gave us: enemy-shot damage values, weapon byte semantics, mine cascade, mine-on-mine destruction (see [[mine-mechanics]]).
 2. **Multi-pickup capture** (Yuppler deposits 300, 400, 100; Artax picks up each in isolation) gave us: container_pickup.remaining_volume semantic, max fuel cap, walking cost, radar cost.
 3. **Ghost-observation capture** (Artax killed orange-5 twice) gave us: the corrected `0x58 ≠ death` finding that drove the [[bot-behavior-contract]] 2-state liveness rewrite.
 
-Each value above is matched 1:1 between a user-declared action and a measurable wire delta. No inferences without direct evidence.
+Each value above is matched 1:1 between a user-declared action and a measurable wire delta. No inferences without direct evidence.[^1]
+
+[^1]: the three frontmatter-pinned 2026-06-20 captures on disk: `runs/sniff/sniff-20260620-150155.capture_session.json` (PvP), `sniff-20260620-155103` (multi-pickup), `sniff-20260620-173727` (ghost-observation); every cost in the tables is also machine-checked against `tankpit_bot.physics` via the claim block (the `physics_claims` stage of `make check`) and re-derived from the archive by `make audit`.
+[^2]: client gauge math: `Gc` in `tpclient.js` (blob-pinned in frontmatter); rank-table verifications 2026-07-06 (user deposits at ranks 1/3/6/7, recorded per-row in the table above and in the frontmatter `verified:` field); formula machine-checked by the `fuel-capacity` claim below.
+[^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
+[^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots).
+[^5]: dedicated manual captures on disk: `runs/sniff/sniff-20260720-213208.capture_session.json` (missiles) and `sniff-20260720-214329` (mine presses); the full cost set is machine-checked in the claim block below.

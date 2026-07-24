@@ -21,11 +21,11 @@ hubs: [architecture]
 
 # Bot Behavior Contract
 
-The single source of truth for *what the bot must do* and *how each behavior is verified*. When proposing a fix, consult this page first to know what else might break.
+The single source of truth for *what the bot must do* and *how each behavior is verified*. When proposing a fix, consult this page first to know what else might break.[^1]
 
 This contract complements [[client-state-machine]] (the JS client's state machine) and [[tank-freshness-model]] (our wire-presence semantic). The state machine describes the *server protocol*; this page describes *our bot's obligations*.
 
-Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verified by" names the smoke assertion and integration test that locks the behavior in. If a behavior is not yet verified, that's flagged explicitly — every claim here must eventually point to a test.
+Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verified by" names the smoke assertion and integration test that locks the behavior in. If a behavior is not yet verified, that's flagged explicitly — every claim here must eventually point to a test. The test idioms those rows name (and the DI rules they follow) are in [[testing-patterns]].
 
 ## 1. Lifecycle
 
@@ -182,7 +182,7 @@ Format: each row in each section has **MUST / MUST NOT / Verified by**. "Verifie
 
 ## 5. Anti-patterns (must never re-emerge)
 
-These are the historical bug-shapes the bot has suffered. Every fix in `combat_strategy.py`, `world_state_dispatch.py`, or `tick_loop_actions.py` should be checked against this list.
+These are the historical bug-shapes the bot has suffered. Every fix in `combat_strategy.py`, `world_state_dispatch.py`, or `tick_loop_actions.py` should be checked against this list. The two fully-diagnosed instances are documented end-to-end in [[combat-chase-bug]] and [[executor-rejection-loops]].
 
 | Anti-pattern | What it looks like | Prevented by |
 |---|---|---|
@@ -198,27 +198,31 @@ These are the historical bug-shapes the bot has suffered. Every fix in `combat_s
 
 ## 6. What is NOT in this contract (yet)
 
-These behaviors exist in the code but lack a verified contract entry. Adding them is Tier 2 integration test work.
+These behaviors exist in the code but lack a verified contract entry (one exception noted inline). Adding them is Tier 2 integration test work.[^2]
 
 - Inventory restock thresholds and timing
 - Patrol waypoint cycling
 - Combat target switching when a higher-value enemy enters range
-- Bridge-build vs obstacle-drop decision (carrying state)
+- Bridge-build vs obstacle-drop decision (carrying state) — correction 2026-07-23: NOT in code at all; the bot has no block state tracking or planner awareness ([[movable-blocks]] open work)
 - Teleport-target selection (heuristic)
 - Self-rank promotion handling (0x2B reception)
 
-When you add tests for these, also add a contract row here. The contract grows with the test suite.
+When you add tests for these, also add a contract row here. The contract grows with the test suite, under the coverage and no-mocks discipline in [[coding-standards]].
 
 ## 7. How to use this page
 
-**Before proposing a bot-behavior fix:** read the relevant section. If the change affects a MUST/MUST NOT, list which one and what test will be updated. If the change affects an anti-pattern's prevention mechanism, confirm the test still passes.
+**Before proposing a bot-behavior fix:** read the relevant section. If the change affects a MUST/MUST NOT, list which one and what test will be updated. If the change affects an anti-pattern's prevention mechanism, confirm the test still passes.[^1]
 
-**When `make smoke` fails:** the failing assertion maps to a section here (`smoke[N]` references). Open that section to know what the bot was supposed to be doing and which other behaviors might be entangled.
+**When `make smoke` fails:** the failing assertion maps to a section here (`smoke[N]` references). Open that section to know what the bot was supposed to be doing and which other behaviors might be entangled.[^3]
 
-**When `make check` integration tests fail:** the test name maps to a row here. The contract row tells you the broader behavior that test guards.
+**When `make check` integration tests fail:** the test name maps to a row here. The contract row tells you the broader behavior that test guards.[^3]
 
-**When you add a new behavior:** add a row here first (MUST / MUST NOT / Verified by), then write the test, then implement. Contract-first prevents drift.
+**When you add a new behavior:** add a row here first (MUST / MUST NOT / Verified by), then write the test, then implement. Contract-first prevents drift ([[coding-standards]]).
 
 ## Open items tracked elsewhere
 
 None at end of 2026-06-20. The last decoder gap (#72 13-byte 0x43) was a 3-record multi-pickup CacheUpdate; see [[decode-coverage]] for the corrected wire format and the ContainerPickup multi-record dispatch.
+
+[^1]: project instruction file `CLAUDE.md` (repo root, on disk): "The wiki is the single source of truth for game mechanics, wire protocol, combat strategy, and architecture decisions" — this page is the bot-obligations slice of that policy.
+[^2]: presence checked 2026-07-23 against the blob-pinned `src/tankpit_bot/bot` tree (frontmatter): patrol/waypoint types in `bot/ai/types.py`/`types_codecs.py`, 0x2B rank handling in `sniffer/world_state_dispatch.py` and `state/mutations.py`; the block-decision item was the exception and is corrected inline.
+[^3]: standing instruments on disk: `Makefile` targets `check:` (line 88) and `smoke:` (line 102), verified 2026-07-23; the `smoke[N]` indices map to assertions in the smoke script the target runs.

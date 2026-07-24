@@ -19,7 +19,7 @@ hubs: [combat]
 
 # Mine Mechanics
 
-The complete server-side rules for the 3x3 mine placement primitive (`0x4B` MinePlacement / JS `Dg`) and the chain-detonation primitive (`0x45` MineDetonation / JS `dh`), grounded in the user's 2026-06-20 PvP capture and the user-supplied mechanic spec.
+The complete server-side rules for the 3x3 mine placement primitive (`0x4B` MinePlacement / JS `Dg`) and the chain-detonation primitive (`0x45` MineDetonation / JS `dh`), grounded in the user's 2026-06-20 PvP capture and the user-supplied mechanic spec.[^1]
 
 ## Placement primitive
 
@@ -35,19 +35,19 @@ A player or bot issues one mine command. Mines are **not an inventory item** —
 | Clear ground | Place your mine. Server includes the tile in the `0x4B` MinePlacement payload. |
 | Equipment / fuel container | Place your mine. Containers can coexist with mines on the same tile. |
 
-Total tiles covered by the placement = (placed via `0x4B`) + (detonated via same-tick `0x45`) = up to 9. Anything missing from both is water / terrain / tank.
+Total tiles covered by the placement = (placed via `0x4B`) + (detonated via same-tick `0x45`) = up to 9. Anything missing from both is water / terrain / tank.[^1]
 
-Per the user's domain knowledge: **the detonated tiles are not re-filled by the original command** -- if the player wants to fill the gaps where enemy mines were destroyed, they must issue a second placement command at the same center.
+Per the user's domain knowledge: **the detonated tiles are not re-filled by the original command** -- if the player wants to fill the gaps where enemy mines were destroyed, they must issue a second placement command at the same center.[^2]
 
 ### Wire layout
 
-`0x4B` MinePlacement (tunneled inside 0x2E):
+`0x4B` MinePlacement (tunneled inside 0x2E):[^3]
 
 ```
 [subtype:1=0x4B] [mine_type:1] [tank_id:2 LE] [count:1] [positions: count*2]
 ```
 
-Total length is `5 + count * 2` bytes; `count` varies from 1 (only one of the 9 tiles was clear) to 9 (entirely clear 3x3). Real-combat samples logged in `tests/container/test_mines.py`:
+Total length is `5 + count * 2` bytes; `count` varies from 1 (only one of the 9 tiles was clear) to 9 (entirely clear 3x3). Real-combat samples logged in `tests/container/test_mines.py`:[^3]
 
 | Bytes | Count | Source |
 |------|-------|--------|
@@ -57,16 +57,16 @@ Total length is `5 + count * 2` bytes; `count` varies from 1 (only one of the 9 
 | 19 B | 7    | `MINE_PLACEMENT_19`, Artax's placement at `(133, 124)` in the same PvP capture |
 | 23 B | 9    | Theoretical maximum (clear 3x3) -- no corpus sample yet |
 
-The prior decoder hardcoded `len == 15`; every other length silently dropped to `unknown_container`. Fixed 2026-06-20 via task #79.
+The prior decoder hardcoded `len == 15`; every other length silently dropped to `unknown_container`. Fixed 2026-06-20 via task #79.[^4]
 
 ## Cascade detonation
 
-When a mine is hit by any source (a shot, an adjacent placement, another mine's blast), the server detonates that mine **and every directly-adjacent mine in the same wire tick**. The cascade is broadcast as up to two `0x45` MineDetonation packets:
+When a mine is hit by any source (a shot, an adjacent placement, another mine's blast), the server detonates that mine **and every directly-adjacent mine in the same wire tick**. The cascade is broadcast as up to two `0x45` MineDetonation packets:[^5]
 
 1. First packet: the directly-triggered mine.
 2. Second packet (if any neighbours existed): every adjacent mine destroyed by the chain.
 
-Real-combat sample (practice-vs-real-20260620-150138, t+62.15s, Artax shot `(134, 126)`):
+Real-combat sample (practice-vs-real-20260620-150138, t+62.15s, Artax shot `(134, 126)`):[^5]
 
 ```
 0x53 Shoot tid=1301 src=(131,122) tgt=(134,126) weapon=0
@@ -79,20 +79,26 @@ Re-confirmed 2026-07-21 (manual capture sniff-20260721-212348, t+173.91): a
 single shot at `(54,170)` produced `0x45 [(54,170)]` plus a same-tick second
 packet `0x45 [(55,170),(54,171),(55,171)]` — 4 mines destroyed by one shot,
 matching the user's on-screen count exactly. `0x45` IS the mine-removal wire
-signal; there is no separate removal message.
+signal; there is no separate removal message.[^5]
 
-Both packets arrive within the same WebSocket frame. The bot's world-state must apply each `0x45` independently -- iterating its positions and removing any mine at that tile regardless of team -- and tolerate consecutive packets without double-counting. This is the existing semantics of `_dispatch_mine_detonation`; the cascade tests in `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` lock it in.
+Both packets arrive within the same WebSocket frame. The bot's world-state must apply each `0x45` independently -- iterating its positions and removing any mine at that tile regardless of team -- and tolerate consecutive packets without double-counting. This is the existing semantics of `_dispatch_mine_detonation`; the cascade tests in `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` lock it in.[^5]
 
 ## Mine-on-mine destruction
 
-A special case of cascade: when your placement lands a mine **adjacent to an enemy mine**, the enemy mine detonates without any shot. The server emits the same-tick pairing of `0x4B` + `0x45`:
+A special case of cascade: when your placement lands a mine **adjacent to an enemy mine**, the enemy mine detonates without any shot. The server emits the same-tick pairing of `0x4B` + `0x45`:[^2]
 
 ```
 0x4B MinePlacement type=2 tid=1301 positions=[7 of 9 clear tiles]
 0x45 MineDetonation positions=[2 enemy-mine tiles destroyed]
 ```
 
-The detonation removes the enemy mines; the placement does not re-add friendly mines at those tiles. Locked in by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_on_mine_destruction_real_capture`.
+The detonation removes the enemy mines; the placement does not re-add friendly mines at those tiles. Locked in by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_on_mine_destruction_real_capture`.[^2]
+
+[^1]: captures on disk: `runs/bot/practice-vs-real-20260620-150138.capture_session.json` (the 2026-06-20 PvP session; also the fixture source for six test modules) and `runs/sniff/sniff-20260620-150155.capture_session.json` (frontmatter-pinned); user mechanic spec delivered 2026-06-20 alongside the capture — every spec claim in the placement table is wire-checked against these files.
+[^2]: user (Austin) 2026-06-20 mechanic spec (the "user-supplied mechanic spec" this page is grounded in); the non-refill is wire-visible in the same-tick `0x4B`+`0x45` pair — detonated tiles are absent from the placement payload — locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_on_mine_destruction_real_capture` (line 264, verified 2026-07-23).
+[^3]: decoder truth on disk: `src/tankpit_bot/container/decoders/mines.py` (`decode_mine_placement`); byte-length fixtures `MINE_PLACEMENT_15`/`MINE_PLACEMENT_19` exercised in `tests/container/test_mines.py:37/:56`; JS sender `Dg` in `tpclient.js` (blob-pinned in frontmatter).
+[^4]: commit `59a097e1` (2026-06-20, "Multi-record ContainerPickup + dispatch-layer pickup dedup") introduced the variable-length `MINE_PLACEMENT_19` fixture and the count-driven decode — the `len == 15` hardcode and its removal are both visible in that commit's diff in git history. "Task #79" was the session-internal tracker id, kept as a historical label only.
+[^5]: cascade wire samples on disk: `runs/bot/practice-vs-real-20260620-150138.capture_session.json` t+62.15s (1+6 two-packet chain) and `runs/sniff/sniff-20260721-212348.capture_session.json` t+173.91 (1+3 chain, user-counted on screen — the frontmatter `verified:` field records this re-confirmation); dispatch semantics locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` (line 350, verified 2026-07-23).
 
 ## Strategic implications for the bot
 

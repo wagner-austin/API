@@ -23,7 +23,7 @@ ShootEvent is sent by the server for **every shot** — hits, misses, corpses, m
 
 ## Wire layout
 
-JS handler `Gg.h` (V.S), verified against three independent witnesses on 2026-06-19: enemy source tracking, homing target tile, and damage transitions on the target.
+JS handler `Gg.h` (V.S), verified against three independent witnesses on 2026-06-19: enemy source tracking, homing target tile, and damage transitions on the target.[^5]
 
 ```
 [0]    team (flags byte, bits 0-1)
@@ -37,11 +37,11 @@ JS handler `Gg.h` (V.S), verified against three independent witnesses on 2026-06
 [9]    weapon (0=single, 1=dual, 2=missile, 3=homing)
 ```
 
-Top-level 0x53 message: body is 10 bytes (above) after the message-type byte. Tunneled inside 0x2E: outer subtype is `0x53`, inner is 10 bytes — same layout.
+Top-level 0x53 message: body is 10 bytes (above) after the message-type byte. Tunneled inside 0x2E: outer subtype is `0x53`, inner is 10 bytes — same layout.[^5]
 
-**History:** before 2026-06-19, the decoder had wrong field names — it reported `source_x` as `target_x` and treated `target_x` as `projectile_x`. The byte offsets were correct; the semantic labels were swapped. Three independent verifications (own-tank firing position, homing-shot impact tile, enemy damage-state transitions on target tiles) forced the rename.
+**History:** before 2026-06-19, the decoder had wrong field names — it reported `source_x` as `target_x` and treated `target_x` as `projectile_x`. The byte offsets were correct; the semantic labels were swapped. Three independent verifications (own-tank firing position, homing-shot impact tile, enemy damage-state transitions on target tiles) forced the rename.[^6]
 
-**2026-06-20:** `a[7]`/`a[8]` promoted from `unk1`/`unk2` to `aim_x`/`aim_y` after JS proof: `Gg.h` passes them to the projectile-animation constructor `yf` as `z` and `O`; inside `yf`, `this.qa = 24 * z + 12` and `this.ta = 16 * O + 8` compute the PIXEL CENTRE of the aim tile, and `yf.start()` uses `atan2(this.h - this.qa, this.ta - this.i)` to set the tank's facing direction. For straight shots aim == target; for missile/homing weapons the aim is the initial barrel direction and the target is the impact tile.
+**2026-06-20:** `a[7]`/`a[8]` promoted from `unk1`/`unk2` to `aim_x`/`aim_y` after JS proof: `Gg.h` passes them to the projectile-animation constructor `yf` as `z` and `O`; inside `yf`, `this.qa = 24 * z + 12` and `this.ta = 16 * O + 8` compute the PIXEL CENTRE of the aim tile, and `yf.start()` uses `atan2(this.h - this.qa, this.ta - this.i)` to set the tank's facing direction. For straight shots aim == target; for missile/homing weapons the aim is the initial barrel direction and the target is the impact tile.[^5]
 
 ## Terrain clipping: target is the RESOLVED impact tile (2026-07-21)
 
@@ -59,7 +59,7 @@ user contract 2026-07-21).
 
 ## Hit vs miss
 
-ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:
+ShootEvent fires regardless of outcome. To detect hit vs miss, correlate with:[^1]
 
 - **TankStatusSync (0x2E) damage_state transitions** on the target tank — a `damage_state` decrement that occurs within ~200ms of a ShootEvent at the target's tile is a confirmed hit.
 - **Deactivation (0x41)** for ALL kills including the bot's own — arrives 0x2E-tunneled; the earlier "does not fire for own kills" claim was a decoder blind spot falsified 2026-07-19 (see [[deactivation-format]]).
@@ -85,9 +85,9 @@ hit — homing shots never miss. normally, you need to click on an
 enemy and then if they teleport away, no matter how far, your homing
 shot will follow. however, human players can only send one, cuz it
 requires a click on the enemy tank. but we can programmatically send
-the 'shoot at enemy' command and then it gets rerouted to the enemy."
+the 'shoot at enemy' command and then it gets rerouted to the enemy."[^7]
 
-Mechanics this encodes:
+Mechanics this encodes:[^7]
 - All actions process through a **global server queue**; a shot
   resolves against the target's position at processing time, not
   click time. Homing converts every would-be queue-race miss into a
@@ -147,26 +147,37 @@ free-single miss past it) — see the law-4 as-built in
 }
 ```
 
-## Damage tiers (from correlated TankStatusSync / MovementResponse)
+## Damage tiers (CORRECTED 2026-07-23 — the tier is the fuel quartile)
 
-`damage_state` counts **down** toward deactivation:
+`damage_state` is not an independent health track: it is the **fuel
+quartile**, re-derived from fuel at every emission —
+`damage_tier = min(3, 4 * fuel // fuel_capacity(rank))`, corpus-fitted
+19,658/19,658 with zero exceptions. Law, machine-checked claim block,
+and receipts live in [[deactivation-format]] §SOLVED:
 
-- `0` = full / unsynced
-- `3` = light
-- `2` = medium
-- `1` = critical
+- `3` = top quartile — healthy (lightest map shade)
+- `2`, `1` = middle quartiles
+- `0` = bottom quartile — near death (darkest)
 
-Every observed kill died from tier 1.[^3]
-
-The original assumption (1=light, 3=critical) was inverted — the bot preferred the **healthiest** equal-distance enemy for finish-off. Fixed in `_finish_priority` in `bot/ai/threats.py`.[^3]
-
-Damage tiers **repair over time**. Purple-3 healed `1→0→3` after disengagement. Finish damaged targets; disengaging forfeits progress.[^4]
+Tiers fall as fuel drains and jump back up on fuel pickups. **Tanks do
+not heal over time** — the June observation "purple-3 healed 1→0→3
+after disengagement"[^4] was a fuel pickup jumping quartiles, and
+"every observed kill died from tier 1"[^3] decodes as the killing hit
+taking fuel below zero before a tier-0 sync could broadcast. This
+page's original tier table (0=full, 1=critical) and the "tiers repair
+over time" rule were both artifacts of that misreading; the bot-side
+inversion they caused (`_finish_priority` preferring the healthiest
+enemy) is fixed in `bot/ai/threats.py` — tier 0 is the kill-shot
+target.
 
 ## What NOT to use ShootEvent for
 
-Don't use ShootEvent's `target_x` / `target_y` alone to decide hit/miss. Use TankStatusSync `damage_state` transitions or DOM scraping. ShootEvent tells you where the shot went and what weapon was used — not whether it landed.
+Don't use ShootEvent's `target_x` / `target_y` alone to decide hit/miss. Correlate with TankStatusSync fuel/tier transitions on the target, and take kill truth from 0x41 — the single kill source since the 2026-07-19 game-log teardown ([[deactivation-format]] §Own kills; the earlier "use DOM scraping" advice here predates that teardown). ShootEvent tells you where the shot went and what weapon was used — not whether it landed.
 
 [^1]: protocol analysis with make sniff, 2026-06-10 — server emits 0x53 for every shot fired; final byte is weapon type, not hit/miss
 [^2]: user (Austin), 2026-06-16 — "shields don't return miss, they return a positive hit. a corpse returns a positive hit. that's why we have to use the DOM scrape to determine when a bot is deactivated"
-[^3]: run 20260610-231x — every fight ran 0→3→2→1; all 5 kills died from tier 1
-[^4]: run 20260611-004505 — purple-3 healed 1→0→3 after bot disengaged; 19/19 damage_state changes matched registry `u` field
+[^3]: run 20260610-231x — every fight ran 0→3→2→1; all 5 kills died from tier 1 (historical observation; interpretation corrected 2026-07-23, see the tier section above)
+[^4]: run 20260611-004505 — purple-3 healed 1→0→3 after bot disengaged; 19/19 damage_state changes matched registry `u` field (historical observation; the "heal" was a fuel pickup — corrected 2026-07-23)
+[^5]: JS truth: `Gg.h` handler and the `yf` projectile constructor in `tpclient.js` (blob-pinned in frontmatter) — byte walk, tunneling, and the aim-tile pixel math all read directly from the handler bodies; decode mirrored in `src/tankpit_bot/protocol/decoders/combat.py`.
+[^6]: rename history in git: the 2026-06-19 unification-audit commits to `src/tankpit_bot/protocol/decoders/combat.py`; the three witnesses were checked against `runs/bot/bot-20260619-050303.capture_session.json` (frontmatter-pinned).
+[^7]: user (Austin), 2026-07-19 — quoted verbatim above; wiki-log entry "[2026-07-19] discovery + contract + instrumentation | The ~12 s shoot-at-id TTL after 0x58 TankRemove"; TTL corpus sweep 2026-07-22 (704 hits / 137 misses across 246 sessions) machine-checked via the `physics_claims` block below.
