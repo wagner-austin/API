@@ -322,7 +322,8 @@ def validate_radar_cost(timelines: list[WireTimelineDict]) -> ClaimEvidenceDict:
             if radars != 1 or others or dirty:
                 continue
             samples += 1
-            if readings[index]["fuel"] - readings[index - 1]["fuel"] == -RADAR_COST:
+            expected = -min(RADAR_COST, readings[index - 1]["fuel"])
+            if readings[index]["fuel"] - readings[index - 1]["fuel"] == expected:
                 exact += 1
             else:
                 mismatches += 1
@@ -331,7 +332,7 @@ def validate_radar_cost(timelines: list[WireTimelineDict]) -> ClaimEvidenceDict:
         samples=samples,
         exact=exact,
         mismatches=mismatches,
-        detail="lone-radar fuel windows, 3 s backward guard, -10 per extra scan",
+        detail="lone-radar fuel windows, 3 s backward guard, -min(10, fuel) per scan",
     )
 
 

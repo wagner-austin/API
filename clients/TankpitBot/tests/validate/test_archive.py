@@ -423,3 +423,22 @@ class TestRadarCost:
         )
         evidence = validate_radar_cost([timeline])
         assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (0, 0, 0)
+
+    def test_low_fuel_scan_clamps_to_remaining_fuel(self) -> None:
+        """The radar debit is min(10, fuel): fuel 6 pays 6, fuel 0 pays 0."""
+        clamp = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            readings=[
+                FuelReadingDict(timestamp_ms=10000, fuel=6, from_event=False),
+                FuelReadingDict(timestamp_ms=12000, fuel=0, from_event=False),
+            ],
+        )
+        free = self._radar_timeline(
+            sent_actions=[SentActionDict(timestamp_ms=11000, command=CMD_RADAR, x=0, y=0)],
+            readings=[
+                FuelReadingDict(timestamp_ms=10000, fuel=0, from_event=False),
+                FuelReadingDict(timestamp_ms=12000, fuel=0, from_event=False),
+            ],
+        )
+        evidence = validate_radar_cost([clamp, free])
+        assert (evidence["samples"], evidence["exact"], evidence["mismatches"]) == (2, 2, 0)
