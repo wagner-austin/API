@@ -148,7 +148,26 @@ the archive-mined law — same-id reuse, the 22 s corpse window,
 ≥24-tile displacement, post-respawn idleness — confirmed live in one
 witnessed cycle.[^10]
 
-**Cross-team assist fire (same session + archive sweep):** the fight
+**Team aggro — assist AND gang-up (user contracts + archive sweep,
+2026-07-24):** two user contracts (verbatim): *"if you fight another
+bot, like an orange one, and there is a blue bot that can see that
+orange bot. it'll help you out"* and *"if you teleport into 3 orange
+bots. and hit one, the other two orange bots will start hitting
+you"*. The archive confirms both sides and measures the visibility
+condition: classifying every bot-shooter 0x53 in the corpus gives
+**2,115 personal return-fire shots, 48 GANG-UP shots** (the shooter
+was never hit but a same-team bot was — enemy teammates joining
+against the player) **and 81 ASSIST shots** (at an enemy-team bot,
+the player's side), with only 3 unexplained. Shooter→target Chebyshev
+distances: assist 3–8, gang-up 2–8 (one stale-position 12) — both
+mechanisms operate within the ~8-tile viewport radius, i.e. exactly
+"can see". Full model: a hit on any bot ignites team-level aggro
+within sight — victim returns fire at its attacker, the victim's
+teammates gang up on the attacker, the attacker's bot teammates pile
+onto the victim. (`sim/bot_policy.py` models only personal return
+fire so far; team aggro is an open sim-law candidate.)[^11]
+
+**The live witness of the assist side:** the fight
 had a third combatant — **blue-7 (id 524, the probe's own team)**
 opened fire on purple-2 exactly one bot-reaction tick after the
 probe's first dual, and purple-2's return fire then switched to
@@ -177,12 +196,15 @@ singles at purple-2 13.3–21.3 s; 0x58 (id 510) at 23.3 s; probe
 homings (weapon=3) aimed (166,143) at 23.3/25.3 s; 0x41 victim=510
 killer=1301 at 25.3 s; 0x4C entries for 510 absent 25.3–45.4 s,
 present at (154,216) from 47.3 s onward.
-[^11]: archive sweep 2026-07-24:
-`analysis_scripts/mine_bot_assist.py` over every
-`runs/**/capture_session.json` — bot-shooter 0x53 frames resolved
-against last-known tank positions: 2,166 at player tiles, 81 at
-enemy-team bot tiles, 0 at same-team bot tiles, 78/81 within 10 s of
-a player shot. Re-run the script to re-derive.
+[^11]: archive sweeps 2026-07-24:
+`analysis_scripts/mine_bot_assist.py` (bot-shooter 0x53 frames vs
+last-known tank positions: 2,166 at player tiles, 81 at enemy-team
+bot tiles, 0 at same-team bot tiles, 78/81 within 10 s of a player
+shot) and `analysis_scripts/mine_bot_aggro.py` (same frames
+classified by whether the shooter or a same-team bot was hit within
+10 s: 2,115 return-fire / 48 gang-up / 81 assist / 3 unexplained,
+with the shooter→target distance tables). Re-run either script to
+re-derive.
 
 **First continuous undisturbed observation (2026-07-24, decisive
 watch run): ten minutes adjacent to purple-2 — the bot emitted
