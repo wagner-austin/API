@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
 
 help:
 	@Write-Host ""
@@ -29,6 +29,7 @@ help:
 	@Write-Host "  make teleport-probe              both safe + aggressive"
 	@Write-Host "  make enemy-teleport-probe-map    3 enemy teleports via map open"
 	@Write-Host "  make enemy-teleport-probe-nearest 3 enemy teleports via nearest"
+	@Write-Host "  make bot-watch                   teleport to a bot, sit idle 10 min, capture"
 	@Write-Host "  make fuel-probe                  3 fuel pickups via 9 attempts"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
@@ -151,6 +152,17 @@ enemy-teleport-probe-nearest: install
 	@Write-Host ""
 	@Write-Host "==> enemy-teleport-probe (strategy: nearest_enemy)" -ForegroundColor Cyan
 	poetry run tankpit-enemy-teleport-probe --max-attempts 3 --acquisition-strategy nearest_enemy
+
+# The bot-watch capture: one teleport to the nearest practice bot,
+# then sit IDLE next to it for 10 minutes while the wire records.
+# One session feeds three open questions at once: the idle self-sync
+# trigger, fine-grained in-viewport bot behavior, and whether an
+# untouched bot's fuel ever moves. Analyze afterwards with
+# analysis_scripts/mine_bot_policy.py and `make shadow`.
+bot-watch: install
+	@Write-Host ""
+	@Write-Host "==> bot-watch (1 enemy teleport + 10 min idle dwell)" -ForegroundColor Cyan
+	$$env:TANKPIT_ENEMY_TELEPORT_SETTLE_MS = "600000"; $$env:TANKPIT_ENEMY_TELEPORT_PROBE_OUTPUT = "bot_watch_probe.json"; poetry run tankpit-enemy-teleport-probe --max-attempts 1 --acquisition-strategy map_open
 
 fuel-probe: install
 	@Write-Host ""
