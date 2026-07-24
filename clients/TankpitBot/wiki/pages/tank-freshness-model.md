@@ -5,6 +5,7 @@ related:
   - "[[decode-coverage]]"
   - "[[combat-chase-bug]]"
   - "[[shoot-event-format]]"
+  - "[[server-push-gating]]"
 source_paths:
   - "runs/bot/bot-20260619-050303.capture_session.json"
   - "runs/bot/bot-20260620-191622.capture_session.json"
@@ -33,20 +34,25 @@ caused the historical stale-registry combat bug.[^2]
 Production cadences differ by message kind, which is why one timestamp
 is not enough:[^1]
 
-- **0x2E TankStatusSync** (status + fuel) broadcasts globally every ~2 s
-  for every active tank, regardless of viewport. Refreshes
-  `last_wire_seen_ms` but carries no position. Shadow-measured
-  (2026-07-22, `make shadow` over 245 sessions): OTHER-tank median
-  inter-sync gaps sit at 1981-2010 ms — dead on the 2 s tick — but
-  the SELF tank drifts to 3-4 s+ medians in ~8% of sessions (17 of
-  219), a mode other tanks never show. Your own truth also rides
-  0x44/0x64/0x49, so the self 0x2E cadence is evidently not
-  load-bearing. Narrowed 2026-07-24: the drift is
+- **0x2E TankStatusSync** (status + fuel) syncs every ~2 s per ACTING
+  tank, regardless of viewport — the "global broadcast" reading was
+  revised 2026-07-24: a playing observer adjacent to an undisturbed
+  bot received ZERO 0x2E for that bot in ten minutes, so the cadence
+  is per-tank activity-conditional (the archive measured it during
+  combat, where every tank acts; see [[server-push-gating]]).[^8]
+  Refreshes `last_wire_seen_ms` but carries no position.
+  Shadow-measured (2026-07-22, `make shadow` over 245 sessions):
+  OTHER-tank median inter-sync gaps sit at 1981-2010 ms — dead on
+  the 2 s tick — but the SELF tank drifts to 3-4 s+ medians in ~8%
+  of sessions (17 of 219), a mode other tanks never show. Your own
+  truth also rides 0x44/0x64/0x49, so the self 0x2E cadence is
+  evidently not load-bearing. Narrowed 2026-07-24: the drift is
   ACTIVITY-CORRELATED — 8/21 human sniff sessions are sparse (38%)
   vs 9/198 bot sessions (4.5%), and sparse sessions average half
-  the command rate (16 vs 29 cmds/min). Candidate mechanism: the
-  self long-form sync rides self activity rather than a fixed
-  broadcast; the exact trigger remains open.[^3]
+  the command rate (16 vs 29 cmds/min). Mechanism now confirmed at
+  the stream level: periodic push traffic flows only around real
+  gameplay actions (the walking observer's own 0x2E arrived every
+  ~3 s against its 1.5 s action beat).[^3][^8]
 - **0x3D MovementResponse** / **0x47 Movement** / **0x28 TankEntry** /
   container TankUpdate* carry `(x, y)`. Refresh all three timestamps.
 - **0x4C MapData** (map snapshot) carries positions for every tank on
@@ -203,4 +209,5 @@ change and must come with a docstring and an update to
 [^1]: code truth: `state/mutations.py` (`apply_tank_observation`) + `state/types/tank_observation.py` + `bot/ai/threats.py` gates + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by `tests/world_state/test_tank_observation.py` and `tests/bot/ai/test_combat_strategy.py`
 [^2]: runs/bot/bot-20260619-050303.capture_session.json (frontmatter-pinned) — the 25-miss stale-registry loop; three-timestamp fix landed 2026-06-19/20
 [^3]: `make shadow` sync-cadence law (`src/tankpit_bot/validate/shadow_laws.py`), calibration sweep 2026-07-22 over 245 archive sessions
+[^8]: decisive watch capture `bot_watch_probe.capture_session.json` (2026-07-24): 617 s adjacent to purple-2; received t>60 s = 188 self 0x2E, 0 other-tank 0x2E; see [[server-push-gating]] for the seven-run proof
 [^4]: live capture 2026-06-22 — one-homing lock-drop incident that motivated the 0x58 no-op change

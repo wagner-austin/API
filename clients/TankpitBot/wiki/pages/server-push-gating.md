@@ -1,0 +1,94 @@
+---
+title: Server Push Gating (Play-to-Receive)
+tags: [protocol, wire, server-behavior, observation]
+related:
+  - "[[tank-freshness-model]]"
+  - "[[enemy-bot-behavior]]"
+  - "[[connection-protocol]]"
+  - "[[client-commands]]"
+  - "[[make-targets]]"
+source_paths:
+  - "bot_watch_probe.capture_session.json"
+  - "src/tankpit_bot/action_lab/enemy_teleport.py"
+source_git_blobs:
+  "bot_watch_probe.capture_session.json": "694fa343cbc2c92ad1fb30b4c7fb30d2bcbf58f6"
+  "src/tankpit_bot/action_lab/enemy_teleport.py": "7063bafc96ab10b6a2eebfcafdf62f1a70d43c27"
+fact_checked: "2026-07-24"
+confidence: high
+hubs: [protocol]
+---
+
+# Server Push Gating (Play-to-Receive)
+
+The server streams its periodic push traffic — 0x2E tank status syncs,
+the empty 0x3F `MSG_SYNC` tick, 0x47 movement broadcasts — **only to
+clients that are taking real gameplay actions**. Direct
+request→responses are never muted. Queries (`'i'` inventory, `'h'`
+nearest-enemy, `'l'` map open) and socket keep-alives do not count as
+gameplay and do not hold the stream open.[^1]
+
+## The seven-run discrimination (all 2026-07-24)
+
+One variable per run; every run is a live `make bot-watch`-family
+session with the full CDP capture on disk.[^1]
+
+| Run | Design | Push stream |
+|---|---|---|
+| 1 | map + teleport, silent 10-min dwell | dead ~9 s after landing |
+| 2 | idle at spawn, no map, silent | stragglers to 158 s, then dead |
+| 3 | 3× map opens, 3-min idle dwells | each request answered; dead ~2 s after each |
+| 4 | (landed-path bug: dwell silent) | dead ~8 s |
+| 5 | teleport + 1.5 s inventory-query heartbeat | 366 responses, zero push traffic |
+| 6 | no map, no teleport, query heartbeat | same — queries never count |
+| 7 | teleport + 1.5 s **walk** heartbeat | **open for the full 617 s** |
+
+Run 7 is the confirmation: a client walking one tile every 1.5 s
+received self 0x2E syncs every ~3 s (188), 0x3F ticks every ~6 s (104),
+and its own 0x47 movement echoes (205) for the entire ten-minute dwell,
+where designs 1–6 all went silent inside a minute.[^1]
+
+## What still counts as "playing"
+
+Server-rejected actions hold the stream open. Run 7's dwell never
+drained its message buffer, so the shuffle aimed from the frozen
+landing position: the west-bound half of its walks targeted the watched
+bot's occupied tile and drew 154× `CANT_GO` plus 45× `ALREADY_THERE`
+supervisor (0x52) rejections — and the push stream stayed open
+regardless. Rejected walks also cost no fuel: total spend 788→505
+matches the ~205 accepted 1-tile walks plus activity drift.[^1]
+
+## What a playing observer actually receives
+
+A held-open stream is **self-telemetry plus events, not a world
+snapshot**. Ten minutes adjacent to an undisturbed bot produced zero
+0x2E syncs, zero movements, and zero refuels for that bot — other tanks
+enter the stream only when *they* act ([[enemy-bot-behavior]]:
+undisturbed bots do nothing). Consequences:[^1]
+
+- The "global ~2 s 0x2E broadcast" premise in [[tank-freshness-model]]
+  is per-tank activity-conditional: the archive measured it during
+  combat, where every bot was acting.
+- Passively reading an idle tank's fuel is impossible; only its
+  join-time 0x21 roster entry and its own future actions reveal state.
+- 0x21 identity announcements arrive as a join-time roster dump (self +
+  the 36-bot roster), not as mute-piercing events.
+
+## Bot-side impact
+
+The production bot acts every tick, so it never experiences the mute.
+Observation probes must genuinely play: the watch dwell walks a 1-tile
+shuffle per beat (`TANKPIT_ENEMY_TELEPORT_HEARTBEAT_MS`, ~40 fuel/min),
+draining the CDP buffer each beat so the shuffle tracks the tank's true
+position instead of repeating run 7's frozen-origin rejections.[^2]
+
+[^1]: decisive capture `bot_watch_probe.capture_session.json`
+    (2026-07-24, tank "Artax" id 1301, 1,198 messages, 617 s): 401
+    five-byte walk frames t+7.2→615.8 s; received t>60 s = 188× 0x2E
+    (all self), 188× 0x47, 199× 0x52 (154 code 1 `CANT_GO`, 45 code 6
+    `ALREADY_THERE`), 104× 0x3F, 38× 0x21 (join roster). Runs 1–6:
+    wiki/log.md entries of 2026-07-24 (anomaly → falsifications →
+    law), captures `bot_watch_nomap_probe`, `bot_watch_wake_probe`,
+    `bot_watch_nomap_hb_probe` at repo root.
+[^2]: `src/tankpit_bot/action_lab/enemy_teleport.py` —
+    `_heartbeat_action` / `_settle_dwell` (per-beat drain + shuffle);
+    `make bot-watch` in [[make-targets]].

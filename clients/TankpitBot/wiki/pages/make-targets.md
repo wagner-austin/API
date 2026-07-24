@@ -47,7 +47,7 @@ hubs: [codebase]
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
 | `make queue-probe` | Test multi-command batching against server |
-| `make bot-watch` | Teleport adjacent to a practice bot, then dwell 10 min at a 1.5 s inventory-request heartbeat (added 2026-07-24 — the silent first run discovered the push-on-activity stream mute; the heartbeat holds the feed open so the dwell actually observes). See the 2026-07-24 wiki-log entries. |
+| `make bot-watch` | Teleport adjacent to a practice bot, then dwell 10 min at a 1.5 s walk-shuffle heartbeat (2026-07-24: query heartbeats were falsified — only real gameplay actions hold the push stream open, ~40 fuel/min; each beat drains the CDP buffer then walks 1 tile). See [[server-push-gating]] for the law and the seven-run proof. |
 
 ## Offline analysis (safe, reads capture files)
 

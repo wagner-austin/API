@@ -132,6 +132,27 @@ and the mid-fight **teleport-off displacement modes at 16–31 tiles**
 (84/131 jumps), i.e. just past the viewport; the sim's escape band
 now matches that measured mode.[^8]
 
+**First continuous undisturbed observation (2026-07-24, decisive
+watch run): ten minutes adjacent to purple-2 — the bot emitted
+NOTHING.** Zero 0x2E syncs, zero 0x47 movements, zero refuels, zero
+shots across the full 617 s dwell, one tile away. This deepens the
+near-stationary corpus row (which could only sample activity windows)
+to continuous-observation depth: an unprovoked bot takes no actions at
+all. Corollary from [[server-push-gating]]: since tanks appear in the
+push stream only when they act, an idle bot's fuel cannot be read
+passively — its state surfaces only via the join-time roster dump, map
+snapshots, or its own next action. The dwell also confirmed **bots
+block movement**: every walk targeting purple-2's tile drew the
+`CANT_GO` supervisor rejection (154/154), so tank tiles are
+impassable-occupied, not walk-through.[^9]
+
+[^9]: decisive watch capture `bot_watch_probe.capture_session.json`
+(2026-07-24, 1,198 messages, 617 s, landed (133,139) adjacent to
+purple-2 at (132,139)): received t>60 s contains 0x2E only for self
+(188/188 id 1301); supervisor codes 154× `CANT_GO` (code 1) on the
+west-bound shuffle into the bot's tile, 45× `ALREADY_THERE` (code 6).
+See [[server-push-gating]] for the run design.
+
 [^8]: archive sweep 2026-07-24: `analysis_scripts/mine_bot_policy.py`
 (production decode recipe — frame split → XOR → `decode_message`)
 over every `runs/**/capture_session.json`; results snapshot
