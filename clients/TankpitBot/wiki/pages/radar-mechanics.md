@@ -74,7 +74,7 @@ Walking costs **1 fuel per tile**.[^11] So a single free-radar cycle (walk 5 + r
 
 In the current game configuration viewport shifting is **OFF**. The viewport never moves when the tank walks; the only way to change which 16x16 region the bot can see is to teleport. Once the bot has scanned every tile inside the current viewport the only forward action is a teleport to a new viewport.[^9]
 
-Each scan with extras available auto-consumes one (count decrements by 1). The bot cannot choose per-scan.[^3]
+Each scan with extras available auto-consumes one (count decrements by 1). The bot cannot choose per-scan.[^3] **Starting stock is 25 extras** (user, 2026-07-24: "we only have 25 of those"; archive: 46 sessions open with exactly 25 in inventory slot 4 — the modal first 0x49 snapshot). **Fuel can never block a scan**: the debit clamps to min(10, remaining fuel) and scans keep working at fuel 0 ([[game-economy]] radar row, 2026-07-24).[^15]
 
 ## Policy: always use extra radar
 
@@ -137,3 +137,4 @@ by the `physics_claims` guard stage on every `make check`.
 [^12]: live run 2026-07-01 20:20:10 — landing 0x5A registered 7 visible containers, scan-on-landing radar listed only the 2 hidden ones; entity_alignment samples tick 5 vs tick 6
 [^13]: corpus scan 2026-07-03 (199 sessions, 1817 0x4F bodies): 2093 cache entries — 247 removals (value 0), 1074 equipment (0xFFFF), 772 fuel; 545 overlay entries all team values 0/1/3; 0 top-level (untunneled) 0x4F. JS ch handler tpclient.pretty.js:4800-4813.
 [^14]: user (Austin), 2026-07-06 — four manual axial measurements on own tanks: lieutenant (111,129)→(111,126)=3; colonel (165,125)→(165,129)=4; sergeant (128,120)→(128,123)=3; major (234,5)→(238,5)=4. Sergeant/major chosen specifically to discriminate the two candidate step formulas.
+[^15]: archive sweep 2026-07-24: `analysis_scripts/mine_radar_floor.py` — first-inventory histogram (46 sessions at exactly 25) and isolated-radar-window deltas by fuel bucket (fuel<50: 11 full debits, 2 clamped −6, 1 clamped −3, 14 zero-debit at fuel 0). Re-run to re-derive.
