@@ -111,6 +111,7 @@ class TestDecodeDeactivation:
         lo = 65532 & 0xFF
         data = bytes([0x00, 0x02, 0x01, 0x00, lo, hi])
         result = decode_deactivation(data)
+        assert result["msg_type"] == 0x41
         assert result["is_mine_kill"] is True
         assert result["killer_id"] == 2
 
@@ -118,6 +119,7 @@ class TestDecodeDeactivation:
         """Decodes deactivation ignoring trailing bytes."""
         data = bytes([0x00, 0x02, 0x01, 0x00, 0x04, 0x03, 0xFF, 0xFF])
         result = decode_deactivation(data)
+        assert result["msg_type"] == 0x41
         assert result["victim_id"] == 0x0102
         assert result["killer_id"] == 0x0304
 

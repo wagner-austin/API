@@ -632,6 +632,19 @@ class ChatAckDict(TypedDict):
     enabled: bool
 
 
+class AutoscrollAckDict(TypedDict):
+    """Autoscroll-toggle acknowledgment (short 0x41 'A' message).
+
+    The 0x41 type byte is overloaded like 0x43: deactivations carry
+    six bytes, while the server echoes a client autoscroll toggle
+    (Ia, "A{enabled}") with a short flag frame. Discovered live by
+    the 2026-07-24 key probe ('a' press).
+    """
+
+    msg_type: Literal["autoscroll_ack"]
+    enabled: bool
+
+
 class OverlayUpdateDict(TypedDict):
     """Overlay-only tile patch (0x40 '@' message)."""
 
@@ -844,6 +857,7 @@ __all__ = [
     "ActiveForcesDict",
     "ActivePlayerEntry",
     "ActivePlayersDict",
+    "AutoscrollAckDict",
     "BinaryMessage",
     "BuildPickupDict",
     "CacheUpdateDict",
@@ -916,6 +930,7 @@ BinaryMessage = (
     | SyncDict
     | CacheUpdateDict
     | ChatAckDict
+    | AutoscrollAckDict
     | OverlayUpdateDict
     | TankEntryDict
     | TankExitDict

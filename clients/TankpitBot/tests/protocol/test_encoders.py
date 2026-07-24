@@ -200,7 +200,9 @@ def test_deactivation_roundtrip_mine_and_tank_killer() -> None:
     for payload in (tank_kill, mine_kill):
         message = decode_deactivation(payload)
         assert encode_message_payload(message) == payload
-    assert decode_deactivation(mine_kill)["is_mine_kill"] is True
+    mine_message = decode_deactivation(mine_kill)
+    assert mine_message["msg_type"] == 0x41
+    assert mine_message["is_mine_kill"] is True
 
 
 def test_sync_roundtrip() -> None:
@@ -407,3 +409,11 @@ def test_encode_message_payload_rejects_container_only_messages() -> None:
     message = decode_0x2e_message(bytes([0x0C]))
     with pytest.raises(EncodeError):
         encode_message_payload(message)
+
+
+def test_autoscroll_ack_roundtrip() -> None:
+    """The short 0x41 autoscroll-ack re-encodes its flag byte."""
+    message = decode_deactivation(bytes([1]))
+    assert message["msg_type"] == "autoscroll_ack"
+    assert message["enabled"] is True
+    assert encode_message_payload(message) == bytes([1])

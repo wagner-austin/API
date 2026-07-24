@@ -13,6 +13,7 @@ from tankpit_bot.protocol.helpers import (
     x16,
 )
 from tankpit_bot.protocol.types import (
+    AutoscrollAckDict,
     DeactivationDict,
     ShootEventDict,
 )
@@ -67,18 +68,24 @@ def decode_shoot_event(data: bytes) -> ShootEventDict:
     )
 
 
-def decode_deactivation(data: bytes) -> DeactivationDict:
-    """Decode deactivation event from XOR-decoded data.
+def decode_deactivation(data: bytes) -> DeactivationDict | AutoscrollAckDict:
+    """Decode a 0x41 frame: deactivation OR autoscroll-toggle ack.
+
+    The 0x41 type byte is overloaded: deactivations carry six bytes,
+    and the server echoes a client autoscroll toggle with a short
+    flag frame (live key-probe discovery, 2026-07-24).
 
     Args:
         data: XOR-decoded message body (without 0x41 prefix).
 
     Returns:
-        Decoded deactivation.
+        Decoded deactivation, or the autoscroll-toggle ack.
 
     Raises:
         DecodeError: If decoding fails.
     """
+    if len(data) < 3:
+        return AutoscrollAckDict(msg_type="autoscroll_ack", enabled=bool(data) and data[0] == 1)
     require_min_length(data, 6, "Deactivation")
     # Layout from tpclient.js Pg.h (V.A):
     # [status:1] [victim_id:2 LE] [promo_eligible:1] [killer_id:2 LE]
