@@ -19,7 +19,7 @@ hubs: [combat]
 - **Stand ground and fight**: enemy tank bots do not move while fighting. They hold position and return fire.[^1]
 - **Flee at low HP**: once a damage threshold triggers (appears to be after taking several hits), bots begin moving away from the attacker. They move **every time they are hit** after this gate triggers.[^1]
 - **Roam viewport-to-viewport; no deliberate fuel-seeking, but accidental pickups happen** (user, 2026-07-19: "the bots teleport or walk to the next viewport usually. they dont seek fuel, but sometimes they may teleport away and happen to land or step on a fuel tank"). Landing on a container auto-picks it, so a fleeing bot can accidentally refuel — observed: orange-2 (id 528) fled our engagement at damage_state=1 (critical, 22:29:54), teleported away (0x58 at 22:30:00), and reappeared on the next map open at damage_state=2 (medium) — a REAL recovery (sync-vs-map damage encodings agree 17/17 on overlapping observations), explained by an accidental fuel landing. Fuel is the life pool; damage tiers recover when it refills.[^7] (Corpus note 2026-07-24: on the wire, roaming is RARE — see §Corpus-mined policy below; the accidental-refuel mechanism stands but most observed bot time is stationary.)
-- **Never fight each other**: practice bots do not engage each other. Only we make corpses.[^2]
+- **Never fight each other unprovoked** — but a player's fight can ignite cross-team bot-vs-bot return-fire loops (81 archive samples, 0 same-team, live-witnessed 2026-07-24; see §Cross-team assist fire). Only we make corpses — zero archive kills are credited to bots.[^2][^11]
 
 ## Chase behavior
 
@@ -133,24 +133,56 @@ and the mid-fight **teleport-off displacement modes at 16–31 tiles**
 now matches that measured mode.[^8]
 
 **Reactivation LIVE-WITNESSED (2026-07-24, first `make respawn-watch`
-session):** the probe killed purple-2 (id 510) itself — engage at
-~11 s, return-fire singles while the tier fell 3→2→1, 0x58 removal at
-t+23.3 s, then the 0x41 kill (victim 510, killer = the probe, promo
-eligible) at t+25.3 s, one tick AFTER the removal. Eleven consecutive
-2 s map polls then show id 510 absent (corpses are not rendered in
-0x4C map data), until t+47.3 s: the SAME id reappears at (154, 216) —
-**death→respawn 22.0 s measured from the 0x41** (bounded 20.1–22.0 s
-by the poll cadence), displacement from the corpse (132,139) of 77
-tiles Chebyshev, then stationary in every subsequent poll. Every
-element of the archive-mined law — same-id reuse, the 22 s corpse
-window, ≥24-tile displacement, post-respawn idleness — confirmed
-live in one witnessed cycle.[^10]
+session):** the probe killed purple-2 (id 510) via the classic
+chase — duals while adjacent (tier 3→2→1), the bot **teleported off**
+at t+23.3 s (the 0x58) after ~11 accumulated hits from two attackers,
+and the probe's server-selected **homing** tracked it to (166,143)
+and killed it there (0x41 victim 510, killer = the probe, promo
+eligible) at t+25.3 s. Eleven consecutive 2 s map polls then show id
+510 absent (corpses are not rendered in 0x4C map data), until
+t+47.3 s: the SAME id reappears at (154, 216) — **death→respawn
+22.0 s measured from the 0x41** (bounded 20.1–22.0 s by the poll
+cadence), displacement from the true corpse (166,143) of 73 tiles
+Chebyshev, then stationary in every subsequent poll. Every element of
+the archive-mined law — same-id reuse, the 22 s corpse window,
+≥24-tile displacement, post-respawn idleness — confirmed live in one
+witnessed cycle.[^10]
+
+**Cross-team assist fire (same session + archive sweep):** the fight
+had a third combatant — **blue-7 (id 524, the probe's own team)**
+opened fire on purple-2 exactly one bot-reaction tick after the
+probe's first dual, and purple-2's return fire then switched to
+blue-7's tile (every shot aimed at a real attacker's exact tile;
+user contract (verbatim, 2026-07-24): *"you shoot the bot. we are
+standing still. it hits us. the bots never miss."* — the
+earlier "off-tile aim" reading of this capture was wrong). Archive
+discrimination: **81 bot→bot shots exist corpus-wide** (vs 2,166 at
+players), **zero ever target a same-team bot**, and 78/81 fall
+within 10 s of a player shot — mutual return-fire loops between
+enemy-team bots ignited by a player engagement. The "never fight
+each other" law refines to: bots never SEEK each other unprovoked,
+but a player's fight can ignite cross-team bot-vs-bot return-fire
+loops; they still never produce corpses (zero archive kills credited
+to bots). This mechanism also explains most of the corpus's 1.3%
+"aimed off the attacker's tile" residual (attacker switching in
+multi-combatant fights) and part of its hits-before-teleport spread
+(purple-2 jumped after ~11 total hits, not 7 of ours).[^10][^11]
 
 [^10]: live capture `respawn_watch_probe.capture_session.json`
-(2026-07-24, `make respawn-watch`, tank "Artax" id 1301): 0x53 bot
-return fire at 13.3–21.3 s; 0x2E tier syncs 2→1; 0x58 (id 510) at
-23.3 s; 0x41 victim=510 killer=1301 at 25.3 s; 0x4C entries for 510
-absent 25.3–45.4 s, present at (154,216) from 47.3 s onward.
+(2026-07-24, `make respawn-watch`, tank "Artax" id 1301): probe duals
+(weapon=1, −10 fuel each) at 11.3–21.3 s; purple-2 returns weapon=0
+at the probe's tile (13.3 s, −45 fuel to the probe) then at blue-7's
+tile (126,138) 15.3–21.3 s; blue-7 (id 524, team 2, persistent 25)
+singles at purple-2 13.3–21.3 s; 0x58 (id 510) at 23.3 s; probe
+homings (weapon=3) aimed (166,143) at 23.3/25.3 s; 0x41 victim=510
+killer=1301 at 25.3 s; 0x4C entries for 510 absent 25.3–45.4 s,
+present at (154,216) from 47.3 s onward.
+[^11]: archive sweep 2026-07-24:
+`analysis_scripts/mine_bot_assist.py` over every
+`runs/**/capture_session.json` — bot-shooter 0x53 frames resolved
+against last-known tank positions: 2,166 at player tiles, 81 at
+enemy-team bot tiles, 0 at same-team bot tiles, 78/81 within 10 s of
+a player shot. Re-run the script to re-derive.
 
 **First continuous undisturbed observation (2026-07-24, decisive
 watch run): ten minutes adjacent to purple-2 — the bot emitted
