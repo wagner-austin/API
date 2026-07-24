@@ -964,6 +964,23 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
     assert result["status"] == "landed_adjacent"
     assert probe._fake_page.waits[-1] == 250.0
 
+    # The LANDED-path settle must heartbeat too — the first heartbeat
+    # watch run went silent because only the non-teleport path dwelled
+    # (live catch, 2026-07-24): a successful watch is exactly the
+    # landed path, so pin it here.
+    probe.inventory_calls = 0
+    heartbeat_result = probe._probe_single_enemy_attempt(
+        acquisition_strategy="nearest_enemy",
+        acquisition_timeout_ms=3000,
+        teleport_timeout_ms=10000,
+        settle_delay_ms=3000,
+        heartbeat_interval_ms=1500,
+        excluded_tank_ids=frozenset(),
+    )
+    assert heartbeat_result["status"] == "landed_adjacent"
+    assert probe.inventory_calls == 2
+    assert probe._fake_page.waits[-2:] == [1500.0, 1500.0]
+
 
 @pytest.mark.parametrize(
     ("enemy_after", "expected_status"),

@@ -462,8 +462,7 @@ class EnemyTeleportProbe(ProbeBase):
             snapshot_after=snapshot_after,
         )
         self._reset_probe_state_to_idle()
-        if settle_delay_ms > 0:
-            page.wait_for_timeout(float(settle_delay_ms))
+        self._settle_dwell(page, settle_delay_ms, heartbeat_interval_ms)
         return result
 
     def execute_probe(
