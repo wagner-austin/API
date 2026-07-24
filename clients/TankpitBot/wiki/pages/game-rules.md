@@ -68,6 +68,8 @@ Transcribed from the five in-game "How To Play" screens.[^1]
 | Colonel | 40,000 | deactivate a captain or higher |
 | General | 50,000 | deactivate a colonel or higher |
 
+**Equipment inventory starts at zero and persists across logins** (user contract, verbatim, 2026-07-24: *"a new recruit starts with 0 all then they can stop up to 20 each item... if you rank up, there an increase in the equipment cap. and if you use them all. log out and log back in. teyre still empty"*). Archive: cross-session inventory carry-over is exact (120/260 consecutive pairs, with depletion chains like radar 8→7→6→5→4→3 spanning six logins) and 0/261 sessions exceed the 20+5·rank cap.[^3]
+
 **Higher rank tanks hold more fuel, equipment, and have a larger radar.** All three scalings are now quantified: fuel capacity = 1000 + 100·rank ([[game-economy]]), equipment = 20 + 5·rank (below), built-in radar radius = 2 + floor(rank/3) ([[radar-mechanics]]).[^2]
 
 **Demotion:** if deactivated by an enemy, you lose one rank.[^1]
