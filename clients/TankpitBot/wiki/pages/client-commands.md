@@ -67,9 +67,13 @@ likely culprit). The live wire is unambiguous and re-proven every
 session: the bot's `CMD_MAP_OPEN = 0x6C ('l')` is followed by 0x4C
 MapData on every `map_open → map_data_processed` completion in the
 entire archive, and `CMD_RADAR = 0x66 ('f')` is followed by 0x4F
-radar results in every collect-cascade scan. The 0x66/0x6C class
-assignment in [[js-source-map]] should be re-traced when that page
-is next revisited.
+radar results in every collect-cascade scan. RE-TRACE COMPLETE
+(2026-07-24): [[js-source-map]] §Default keymap — `Mb.code="f"` /
+`Nb.code="l"` in the source, and the June swap came from assuming
+the keyboard key equals the wire char (the real keymap sends 'f'
+from the S key and 'l' from the F key; KeyL is the sound toggle).
+Wire, JS source, and the bot's `protocol/commands.py` comments now
+agree three ways.
 
 **Map open/close semantics** (user contract, 2026-07-24, verbatim):
 *"the programmatic map open command doesnt close the map. so you can

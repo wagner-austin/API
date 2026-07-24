@@ -9,7 +9,7 @@ related:
 source_paths:
   - "src/tankpit_bot/action_lab"
 source_git_blobs:
-  "src/tankpit_bot/action_lab": "930c27483243ed045b35cb6f57117446ae25520e"
+  "src/tankpit_bot/action_lab": "9635fa8b4d0f7c9048e2a1a72b90c21ad4aa967f"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]
@@ -81,12 +81,13 @@ make check          # lint + test + coverage
 make my-probe       # live run
 ```
 
-## Existing probes (6 types)
+## Existing probes (7 types)
 
 | Probe | File | What it tests |
 |-------|------|--------------|
 | Teleport | `teleport.py` | Teleport landing accuracy, timing strategies |
 | Enemy Teleport | `enemy_teleport.py` | Teleporting near enemies |
+| Respawn Watch | `respawn_watch.py` | Engaging adjacent bots + map-polling their same-id reactivation (subclasses EnemyTeleportProbe via the `_post_landing_phase` hook) |
 | Fuel | `fuel_probe.py` | Fuel container pickup |
 | Equipment | `equipment_probe.py` | Equipment container pickup |
 | Movement | `movement_probe.py` | Walking to targets |

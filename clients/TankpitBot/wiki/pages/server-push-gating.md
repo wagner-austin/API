@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/action_lab/enemy_teleport.py"
 source_git_blobs:
   "bot_watch_probe.capture_session.json": "694fa343cbc2c92ad1fb30b4c7fb30d2bcbf58f6"
-  "src/tankpit_bot/action_lab/enemy_teleport.py": "7063bafc96ab10b6a2eebfcafdf62f1a70d43c27"
+  "src/tankpit_bot/action_lab/enemy_teleport.py": "f2d95297743937c055fd0a89b36edafe6f9dad67"
 fact_checked: "2026-07-24"
 confidence: high
 hubs: [protocol]
@@ -46,6 +46,16 @@ Run 7 is the confirmation: a client walking one tile every 1.5 s
 received self 0x2E syncs every ~3 s (188), 0x3F ticks every ~6 s (104),
 and its own 0x47 movement echoes (205) for the entire ten-minute dwell,
 where designs 1–6 all went silent inside a minute.[^1]
+
+## The window is one server tick (precision run, n=101)
+
+Run 8 slowed the heartbeat to 6 s so each action's window stands
+alone: 101 walk beats, and every single beat produced exactly two
+push messages whose last arrival landed at median 1.21 s / p90
+1.86 s / **max 2.06 s** after the walk — then silence until the next
+beat. The post-action push window is one ~2 s server tick; a 1.5 s
+action cadence merely re-opens it before it closes, which is why run
+7 looked continuous.[^3]
 
 ## What still counts as "playing"
 
@@ -92,3 +102,9 @@ position instead of repeating run 7's frozen-origin rejections.[^2]
 [^2]: `src/tankpit_bot/action_lab/enemy_teleport.py` —
     `_heartbeat_action` / `_settle_dwell` (per-beat drain + shuffle);
     `make bot-watch` in [[make-targets]].
+[^3]: precision capture `bot_watch_pw6_probe.capture_session.json`
+    (2026-07-24, 6 s walk heartbeat, same design as the decisive run
+    otherwise): 101 five-byte walk frames at 6.0 s modal gap; per-beat
+    push count exactly 2 for 101/101 beats; last-push offsets median
+    1.21 s, p90 1.86 s, max 2.06 s; dwell kinds 92× each of
+    0x2E/0x47/0x3F.

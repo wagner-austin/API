@@ -46,8 +46,8 @@ Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minifie
 | Jb | `?` | 2 | Heartbeat/ping |
 | Kb | `.` | 2 | Ping request |
 | Lb | `s` | 6 | **Shoot**: x, y, target_id(LE u16) |
-| Mb | `f` | 2 | Radar scan (CORRECTED 2026-07-24 — live wire: 0x66 'f' → 0x4F; the original trace swapped this row with Nb) |
-| Nb | `l` | 2 | Open map (CORRECTED 2026-07-24 — live wire: 0x6C 'l' → 0x4C; see [[client-commands]] correction) |
+| Mb | `f` | 2 | Radar scan — RE-TRACED 2026-07-24 end to end: `function Mb(){this.code="f"}`; keymap `nh()` `KeyS:26` → input case 26 → `P(this,4)` → action case 4 `new Mb`. The **S key** fires radar |
+| Nb | `l` | 2 | Open map — RE-TRACED 2026-07-24 end to end: `function Nb(){this.code="l"}`; keymap `KeyF:14` → input case 14 → `P(this,8)` → action case 8 `new Nb` (zoom-out when the map is already open). The **F key** opens the map |
 | Ob | `t` | 4 | **Teleport**: x, y |
 | Pb | `p` | 4 | **Move**: x, y |
 | Qb | `k` | 2 | Deactivate/exit |
@@ -66,6 +66,24 @@ Complete annotated structure of `tpclient.js` (329 lines, ~82k tokens of minifie
 | bc | `v` | 2 | Statistics request |
 | cc | `r` | 3 | Hotkey action: key byte |
 | dc | `!` | 2 | Keep-alive heartbeat |
+
+### Default keymap `nh()` — keys are NOT the wire chars (re-trace 2026-07-24)
+
+The June trace's Mb/Nb swap came from assuming letter-key ↔ command-char
+identity. The real chain has an arbitrary keymap in between: `nh()`
+returns `{Space:2, KeyT:3, KeyR:4, KeyP:5, KeyB:6, KeyO:7, Slash:8,
+KeyC:9, KeyI:10, KeyQ:11, KeyH:12, KeyE:13, KeyF:14, KeyX:15, KeyL:16,
+Digit1-5/Numpad1-5:17-21, KeyM:22, KeyZ:23, KeyN:24, KeyA:25, KeyS:26,
+KeyD:27, Arrows:29-32, ...}` (keydown handler passes `event.code` into
+`m.$a`, which looks the index up in this map). Verified chains: **S**
+→ 26 → `P(this,4)` → `new Mb` → wire `'f'` (radar); **F** → 14 →
+`P(this,8)` → `new Nb` → wire `'l'` (map open / zoom-out); **E** → 13
+→ `P(this,9)` → `new Xb` → wire `'h'` (nearest enemy). **KeyL is the
+sound toggle** (case 16) and never reaches the wire; **KeyM in this
+build is the tips toggle** (case 22) — the user-contract map-close 'm'
+behavior lives in the map component's own handler, not this dispatcher.
+The bot codebase's key comments in `protocol/commands.py` ('s' radar,
+'f' map, 'e' nearest-enemy) were correct all along.[^1]
 
 ### Game Constants (lines 31-33)
 

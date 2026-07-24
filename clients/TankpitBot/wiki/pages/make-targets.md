@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "df0a3085701f7991967deaf1c1e1b275e6fee98b"
+  "Makefile": "1939dad607fb8cf8f5d23220d2dac67bf4a6b6a8"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]
@@ -47,6 +47,7 @@ hubs: [codebase]
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
 | `make queue-probe` | Test multi-command batching against server |
+| `make respawn-watch` | Teleport adjacent to a bot, fire a single at its registry position every 2 s for up to 30 s (kills already-damaged bots; full-fuel ones teleport off at 7-8 hits either way), then map-poll every 2 s for 60 s so the 0x4C snapshots pin the same-id reactivation tick and tile. Up to 4 targets per session. Analysis is offline from the capture (0x41 kill vs 0x58 flee). Knobs: `TANKPIT_RESPAWN_WATCH_*`. |
 | `make bot-watch` | Teleport adjacent to a practice bot, then dwell 10 min at a 1.5 s walk-shuffle heartbeat (2026-07-24: query heartbeats were falsified — only real gameplay actions hold the push stream open, ~40 fuel/min; each beat drains the CDP buffer then walks 1 tile). See [[server-push-gating]] for the law and the seven-run proof. |
 
 ## Offline analysis (safe, reads capture files)
