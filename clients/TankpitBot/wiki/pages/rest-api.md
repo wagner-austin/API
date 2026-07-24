@@ -204,7 +204,7 @@ Login uses a CAPTCHA-protected form with:[^1]
 
 ## FAQ Game Facts (from /help)
 
-- **Bots rank up to Sergeant**: "We thought it would be interesting to allow the in game bots (eg. orange-1) to be promoted up to the rank of sergeant. If the bots reach the rank of sergeant, they become significantly smarter and harder to deactivate."
+- **Bots rank up to Sergeant**: "We thought it would be interesting to allow the in game bots (eg. orange-1) to be promoted up to the rank of sergeant. If the bots reach the rank of sergeant, they become significantly smarter and harder to deactivate." (Likely stale: user contract 2026-07-24 says sergeant bots were removed, and zero corporal+ bots appear in 8,856 archive rank observations — [[enemy-bot-behavior]] §Corpus-mined policy.)
 - **Disconnect protection**: Disconnected tanks become "uncontrollable" for 1 minute (can't be attacked). After that, armor shields enable and enemies can resume attacking.
 - **Auto-mine under obstacles**: "The game automatically plants a mine under an obstacle you move if it detects that you might be inside a base."
 - **Anti-cheat on promotions**: Kills between related accounts/IPs don't count for promotions (tournaments only currently).

@@ -89,9 +89,13 @@ archive-wide sweep bears it out and pins the policy numerically:[^8]
    (37/82) — Sigma's table, on the wire. The spread around the modes
    is attribution noise (multi-attacker fights, stale positions).
 6. **Rank ceiling in evidence**: 8,459 bot-session observations at
-   recruit, 397 at private, none higher. The FAQ's
-   "significantly smarter at sergeant" regime is completely
-   uncaptured — any sim bot-policy is certified for ranks 0–1 only.
+   recruit, 397 at private, none higher. User contract (2026-07-24,
+   verbatim): *"there's no seargent bots in the map. i think they
+   got rid of them"* — the site FAQ's "bots can be promoted up to
+   the rank of sergeant" ([[rest-api]] FAQ facts) is likely stale;
+   the archive is consistent with the user's reading (zero
+   corporal+ bots in 8,856 rank observations). Any sim bot-policy
+   is certified for ranks 0–1, which may simply be all that exists.
 
 **Anomaly SOLVED (same day) — the "unexplained refuels" are
 REACTIVATIONS**: drilling the 64 tier-up events decomposed them
