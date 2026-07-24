@@ -15,7 +15,7 @@ hubs: [js-client]
 
 # Viewport Update Algorithm
 
-The exact algorithm used by the JS client to parse and apply the 0x5A (`Z`) ViewportUpdate message. This is the primary world state message — sent whenever the viewport changes (movement, teleport, respawn).
+The exact algorithm used by the JS client to parse and apply the 0x5A (`Z`) ViewportUpdate message. This is the primary world state message — sent whenever the viewport changes (movement, teleport, respawn).[^1]
 
 ## Parse Function (Vg.h, line 188)
 
@@ -72,7 +72,7 @@ Vg.h = function(a) {
 
 ## Position Encoding
 
-Entity positions use a single-byte step encoding:
+Entity positions use a single-byte step encoding:[^1]
 
 - **step byte** encodes both column and row advance:
   - `column_advance = step % 18`
@@ -81,27 +81,27 @@ Entity positions use a single-byte step encoding:
 - **step = 255** means "skip" — advance position but no entity data follows
 - Non-skip steps are followed by 3 data bytes
 
-The grid is 18×18 (indices 0-17), matching the viewport fringe tiles.
+The grid is 18×18 (indices 0-17), matching the viewport fringe tiles.[^1]
 
 ### Example
 
-Starting at (col=0, row=0):
-- step=5: col=5, row=0 → entity at (5, 0) with 3 data bytes
-- step=20: col=5+20%18=7, row=0+1=1 → entity at (7, 1) (20/18=1 row advance, 20%18=2 col advance... wait: 5+2=7)
-- step=255: advance by 255%18=3 col, 255/18=14 rows → skip, no data
+The column and row cursors are cumulative with wrapping — each step is
+relative to the previous position (delta-encoded):[^1]
 
-Actually re-reading: the column and row cursors are cumulative with wrapping:
 ```
 k += v % 18;       // k starts at 0, accumulates
 r += Math.floor(v / 18);
 while (18 <= k) { r++; k -= 18; }
 ```
 
-So positions are delta-encoded. Each step is relative to the previous position.
+Starting at (col=0, row=0):
+- step=5: col=0+5=5, row=0 → entity at (5, 0), 3 data bytes follow
+- step=20: col=5+(20%18)=7, row=0+floor(20/18)=1 → entity at (7, 1)
+- step=255: col advances by 255%18=3 (wrapping applies), row by floor(255/18)=14 → pure skip, no data bytes[^1]
 
 ## Entity Data Packing (24-bit BE)
 
-The 3 bytes after each non-skip step encode:
+The 3 bytes after each non-skip step encode:[^1]
 
 ```
 Byte layout: [high, mid, low]
@@ -121,7 +121,7 @@ Bit extraction:
 
 ## Handler (Vg.prototype.h, line 189)
 
-After parsing, the handler:
+After parsing, the handler:[^1]
 
 ### 1. Update viewport position
 ```javascript
@@ -142,7 +142,7 @@ rg(a.h.i);         // reset all tile data
 sg(a.h.i, a.h.x - 1, a.h.y - 1, a.map.$);
 ```
 
-The `sg()` function reads the map image at the viewport position and classifies each pixel into terrain types (ground/rock/water). This is the source of the terrain byte for each tile.
+The `sg()` function reads the map image at the viewport position and classifies each pixel into terrain types (ground/rock/water). This is the source of the terrain byte for each tile.[^1]
 
 ### 4. Scroll optimization
 ```javascript
@@ -164,7 +164,7 @@ else {
 }
 ```
 
-If viewport shift < 16 tiles: blit the existing canvas content shifted, redraw only new edge tiles. If shift >= 16: full redraw of everything.
+If viewport shift < 16 tiles: blit the existing canvas content shifted, redraw only new edge tiles. If shift >= 16: full redraw of everything.[^1]
 
 ### 5. Apply entity data
 ```javascript
@@ -185,24 +185,26 @@ a.za && a.tb();                // if deactivated, handle reactivation
 
 ## Fringe Tiles
 
-The 18×18 grid includes a 1-tile fringe border (row/col 0 and 17). These tiles:
+The 18×18 grid includes a 1-tile fringe border (row/col 0 and 17). These tiles:[^1]
 - Are visible in the game area
 - Have terrain determined from the map image
 - But are NOT actionable (can't click on them to move/shoot)
 - The `ae(a,b)` function returns false for indices 0 and 17
 
-Fringe tiles can show terrain, tanks (visible but not targetable), and containers (visible but not collectible without moving).
+Fringe tiles can show terrain, tanks (visible but not targetable), and containers (visible but not collectible without moving).[^1]
 
 ## Empty Viewport
 
-On death or before first spawn, `a.h.x = -255` (sentinel value). Several handler functions check for this:
+On death or before first spawn, `a.h.x = -255` (sentinel value). Several handler functions check for this:[^1]
 ```javascript
 -255 !== a.h.x && ...  // only process if viewport is valid
 ```
 
 ## Viewport Change Detection
 
-The game detects viewport changes by comparing old and new x/y:
+The game detects viewport changes by comparing old and new x/y:[^1]
 - Same position (viewport didn't move): only entity data changes
 - Small shift (1-15 tiles): scroll optimization
 - Large shift (≥16 tiles): full redraw (teleport)
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:187`) — parse `Vg.h` (line 188) and handler `Vg.prototype.h` (line 189), both quoted verbatim in the fences above; `sg` terrain classification, `ae` fringe check; traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. Ongoing receipt: the bot's own 0x5A decoder implements this exact algorithm and reconciles every live viewport patch against it.

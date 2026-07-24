@@ -14,11 +14,11 @@ hubs: [js-client]
 
 # Fingerprint Algorithm
 
-The game client generates a browser fingerprint during authentication using a MurmurHash3-based algorithm. This fingerprint is sent in the AUTH message.
+The game client generates a browser fingerprint during authentication using a MurmurHash3-based algorithm. This fingerprint is sent in the AUTH message.[^1]
 
 ## Data Collection (sb.get, line 18-21)
 
-The fingerprint collects these browser properties in order:
+The fingerprint collects these browser properties in order:[^1]
 
 1. `navigator.userAgent`
 2. `navigator.language`
@@ -36,7 +36,7 @@ The fingerprint collects these browser properties in order:
 14. Plugin string (see below)
 15. Canvas fingerprint (see below)
 
-All values are joined with `"###"` separator into a single string.
+All values are joined with `"###"` separator into a single string.[^1]
 
 ## Plugin Enumeration (ub function, line 22)
 
@@ -51,11 +51,11 @@ function ub(a) {
 }
 ```
 
-Format: `name::description::type1~suffix1,type2~suffix2;name2::...`
+Format: `name::description::type1~suffix1,type2~suffix2;name2::...`[^1]
 
 ## Canvas Fingerprint (lines 19-21)
 
-Only generated if canvas 2D context is available:
+Only generated if canvas 2D context is available:[^1]
 
 ```javascript
 var c = document.createElement("canvas");
@@ -72,11 +72,11 @@ d.fillText("http://valve.github.io", 4, 17);
 c = c.toDataURL();
 ```
 
-The canvas data URL is appended to the fingerprint array.
+The canvas data URL is appended to the fingerprint array.[^1]
 
 ## MurmurHash3 (lines 20-21)
 
-The final fingerprint string is hashed using MurmurHash3 (32-bit):
+The final fingerprint string is hashed using MurmurHash3 (32-bit):[^1]
 
 ```javascript
 // Input: concatenated string "a"
@@ -123,13 +123,13 @@ Constants:
 - Seed: 31
 - c1: 0xCC9E2D51 (3432918353)
 - c2: 0x1B873593 (461845907)
-- Finalization mix: 0x85EBCA6B (2246822507), 0xC2B2AE35 (3266489909)
+- Finalization mix: 0x85EBCA6B (2246822507), 0xC2B2AE35 (3266489909)[^1]
 
-These are standard MurmurHash3 constants.
+These are standard MurmurHash3 constants.[^1]
 
 ## AUTH Message Format
 
-The fingerprint is sent in the AUTH command (wa class, line 6):
+The fingerprint is sent in the AUTH command (wa class, line 6):[^1]
 
 ```javascript
 wa.prototype.toString = function() {
@@ -146,20 +146,22 @@ wa.prototype.toString = function() {
 
 ## Error Report Fingerprinting
 
-If there's a pending error (Ng variable), it's also sent after AUTH:
+If there's a pending error (Ng variable), it's also sent after AUTH:[^1]
 
 ```javascript
 // Line 214:
 Ng && Xa(oa, Da(new Ca(10, Ng)));
 ```
 
-This sends any captured error as a Ca (error report) message with error code 10.
+This sends any captured error as a Ca (error report) message with error code 10.[^1]
 
 ## Canvas Fingerprint Flag
 
-The fingerprint class has a toggle:
+The fingerprint class has a toggle:[^1]
 ```javascript
 function sb() { this.h = true; }  // canvas fingerprinting enabled by default
 ```
 
-`this.h` controls whether the canvas fingerprint step is included. Always true in the shipped code.
+`this.h` controls whether the canvas fingerprint step is included. Always true in the shipped code.[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:17`) — `sb` fingerprint class (lines 17-21), `ub` plugin enumerator (line 22), AUTH `wa` (line 6), error send (line 214), all quoted verbatim in the fences above; traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. The MurmurHash3 constants match the published reference constants, which is itself a checkable claim.

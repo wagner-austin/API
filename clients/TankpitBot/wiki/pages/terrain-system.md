@@ -15,11 +15,11 @@ hubs: [js-client]
 
 # Terrain System
 
-How TankPit encodes terrain types, determines tile adjacency, and renders the ground. Extracted from the tile engine in tpclient.js.
+How TankPit encodes terrain types, determines tile adjacency, and renders the ground. Extracted from the tile engine in tpclient.js.[^1]
 
 ## Terrain Classification
 
-The game has exactly 3 base terrain types (dg array, line 145):
+The game has exactly 3 base terrain types (dg array, line 145):[^1]
 
 | Value | Type | Walkable | Description |
 |-------|------|----------|-------------|
@@ -27,7 +27,7 @@ The game has exactly 3 base terrain types (dg array, line 145):
 | 1 | Rock/Mountain | No | Impassable terrain |
 | 2 | Water | No* | Water tiles (*walkable with ferry) |
 
-Terrain is determined by pixel-sampling the map image at the viewport position (sg function, line 152). The function reads `getImageData()` from the map canvas and classifies each pixel's blue channel:
+Terrain is determined by pixel-sampling the map image at the viewport position (sg function, line 152). The function reads `getImageData()` from the map canvas and classifies each pixel's blue channel:[^1]
 
 ```javascript
 function e(z) {
@@ -40,11 +40,11 @@ function e(z) {
 }
 ```
 
-The three reference colors (`k.m`, `k.l`, `k.o`) are calibrated per-map from the most common blue-channel values in the image.
+The three reference colors (`k.m`, `k.l`, `k.o`) are calibrated per-map from the most common blue-channel values in the image.[^1]
 
 ## Terrain Byte Encoding
 
-Each tile has a terrain byte (`cg.i` field) that encodes both the base type AND adjacency information.
+Each tile has a terrain byte (`cg.i` field) that encodes both the base type AND adjacency information.[^1]
 
 ### Bit Layout
 
@@ -67,7 +67,7 @@ Bit 7: Sub-variant (for Z-order deterministic pseudo-random)
 
 ### Adjacency Lookup (ug function, line 155)
 
-The `ug` function builds a 5-element adjacency signature `[center, N, E, S, W]` for each tile, then matches it against the 32-entry `gg` table (line 145) to determine the exact sprite tile index.
+The `ug` function builds a 5-element adjacency signature `[center, N, E, S, W]` for each tile, then matches it against the 32-entry `gg` table (line 145) to determine the exact sprite tile index.[^1]
 
 ```javascript
 // s[0..4] = [center_type, N_same?, E_same?, S_same?, W_same?]
@@ -76,14 +76,14 @@ for (c = 0; c < gg.length; c++)
   if (Fb(a.s, gg[c])) { b = hg[c]; break; }
 ```
 
-The `hg` array maps each adjacency pattern to a sprite tile index:
+The `hg` array maps each adjacency pattern to a sprite tile index:[^1]
 ```javascript
 hg = [32,33,34,35,...,79]  // water tiles and mountain tiles
 ```
 
 ### Pseudo-Random Variant (ng function, line 148)
 
-For visual variety, some tiles get a pseudo-random variant based on their world coordinates:
+For visual variety, some tiles get a pseudo-random variant based on their world coordinates:[^1]
 
 ```javascript
 function ng(a, b) {
@@ -100,14 +100,14 @@ function ng(a, b) {
 }
 ```
 
-This generates a deterministic "random" byte from tile (x,y) world coordinates. Used for:
+This generates a deterministic "random" byte from tile (x,y) world coordinates. Used for:[^1]
 - Water tiles: bit 0 → add 16 to sprite index (alternate water pattern)
 - Ground tiles: `a % 8` → select from 8 ground variants (`jg = [0,1,2,3,4,5,6,7]`)
 - Rock tiles: `(a >> 2) % 4` → select from 4 rock variants (`ig = [71,79,87,95]`)
 
 ## Edge/Border Tiles
 
-When `sg()` encounters black (0) pixels at the viewport edge, it sets an edge flag and draws special border tiles:
+When `sg()` encounters black (0) pixels at the viewport edge, it sets an edge flag and draws special border tiles:[^1]
 
 ```
 Tile 16: horizontal border (top/bottom edge)
@@ -122,7 +122,7 @@ Tile 23: vertical border variant (every 3rd row)
 
 ## Overlay Tiles
 
-Drawn on top of base terrain:
+Drawn on top of base terrain:[^1]
 
 | Index | Overlay Type |
 |-------|-------------|
@@ -138,7 +138,7 @@ Drawn on top of base terrain:
 
 ## Water Corner Overlays
 
-When a water tile (32) is adjacent to non-water:
+When a water tile (32) is adjacent to non-water:[^1]
 
 ```javascript
 if (32 === (t & 112)) {
@@ -154,11 +154,11 @@ if (32 === (t & 112)) {
 }
 ```
 
-Mountain corners work the same way (tiles 56-63), with an extra variant layer (tiles 60-63 for non-pure-mountain neighbors).
+Mountain corners work the same way (tiles 56-63), with an extra variant layer (tiles 60-63 for non-pure-mountain neighbors).[^1]
 
 ## Rock Types
 
-Rocks are separate from terrain — they're entities placed ON terrain tiles:
+Rocks are separate from terrain — they're entities placed ON terrain tiles:[^1]
 
 | cg.j Value | Meaning |
 |------------|---------|
@@ -169,11 +169,11 @@ Rocks are separate from terrain — they're entities placed ON terrain tiles:
 | 5 | Ferry boarding point |
 | 7 | Ferry + rock combined |
 
-Rock type B (j=2) can be picked up/placed by players. Rock type A (j=1) is permanent terrain. When `cg.o` (occupied-behind) is true, the rock sprite is NOT drawn (tank is driving away from this tile and the trailing overlay covers it).
+Rock type B (j=2) can be picked up/placed by players. Rock type A (j=1) is permanent terrain. When `cg.o` (occupied-behind) is true, the rock sprite is NOT drawn (tank is driving away from this tile and the trailing overlay covers it).[^1]
 
 ## Tile Sheet Layout
 
-The Tiles sprite sheet (Ie, 192×192) is organized as an 8×12 grid of 24×16 pixel tiles:
+The Tiles sprite sheet (Ie, 192×192) is organized as an 8×12 grid of 24×16 pixel tiles:[^1]
 
 ```
 Row 0 (y=0):   ground tiles 0-7 (8 variants)
@@ -190,6 +190,8 @@ Row 10 (y=160): obstacle sprites 80-87 (rocks, bridges, ferries)
 Row 11 (y=176): tank trailing-tile overlays 88-95
 ```
 
-Each tile: `sprite_x = (index % 8) * 24, sprite_y = floor(index / 8) * 16`
+Each tile: `sprite_x = (index % 8) * 24, sprite_y = floor(index / 8) * 16`[^1]
 
-The ViewportUpdate (V.Z) sends terrain as the low 4 bits of each entity's packed 24-bit value.
+The ViewportUpdate (V.Z) sends terrain as the low 4 bits of each entity's packed 24-bit value.[^1]
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:145`) — `dg`/`gg`/`hg` tables (line 145), classifier `sg` (line 152), adjacency `ug` (line 155), variant `ng` (line 148), all quoted verbatim in the fences above; terrain byte encoding fully traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. The rock-family walkability semantics are wire-confirmed in [[movable-blocks]] and composed into the bot's terrain in [[terrain-composition]].

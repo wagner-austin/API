@@ -15,11 +15,11 @@ hubs: [js-client]
 
 # Decoration Encoding
 
-How tank decorations (awards) are packed into 4 bytes and rendered. Extracted from the `yg()` decode function and the decoration rendering in `ed()`.
+How tank decorations (awards) are packed into 4 bytes and rendered. Extracted from the `yg()` decode function and the decoration rendering in `ed()`.[^1]
 
 ## Wire Format
 
-Decorations are transmitted as 4 bytes in TankInfo (0x21), TankEntry (0x28), and TankStatusFull (0x3E) messages:
+Decorations are transmitted as 4 bytes in TankInfo (0x21), TankEntry (0x28), and TankStatusFull (0x3E) messages:[^1]
 
 ```
 a[3], a[4], a[5], a[6]  — 4 decoration bytes
@@ -38,7 +38,7 @@ function yg(a, b, c, d) {
 }
 ```
 
-This unpacks a 32-bit integer into 9 decoration slots, each 2 bits wide:
+This unpacks a 32-bit integer into 9 decoration slots, each 2 bits wide:[^1]
 
 ```
 Bits 0-1:   slot 0 (Stars: Single/Double/Triple)
@@ -56,20 +56,20 @@ Each slot value:
 - 0 = no award in this category
 - 1 = bronze / level 1
 - 2 = silver / level 2
-- 3 = gold / level 3
+- 3 = gold / level 3[^1]
 
-The remaining bits (18-31) are unused (14 bits). Since `9 × 2 = 18 bits`, only 18 of 32 bits are used.
+The remaining bits (18-31) are unused (14 bits). Since `9 × 2 = 18 bits`, only 18 of 32 bits are used.[^1]
 
 ## Storage
 
-Decorations are stored on the tank entity (Xc class) as a Uint8Array(9):
+Decorations are stored on the tank entity (Xc class) as a Uint8Array(9):[^1]
 
 ```javascript
 // Line 127:
 this.v = new Uint8Array([0,0,0,0,0,0,0,0,0]);
 ```
 
-Updated when TankInfo, TankEntry, or Decoration messages arrive:
+Updated when TankInfo, TankEntry, or Decoration messages arrive:[^1]
 ```javascript
 // V["!"] handler (line 157):
 a.v = this.j;  // set full decoration state
@@ -80,7 +80,7 @@ b.v[this.i] = this.j;  // set single slot: i=slot, j=level
 
 ## Decoration Names
 
-Names are indexed as `nb[3 * slot + level - 1]` from the nb array:
+Names are indexed as `nb[3 * slot + level - 1]` from the nb array:[^1]
 
 | Slot | Level 1 | Level 2 | Level 3 |
 |------|---------|---------|---------|
@@ -123,13 +123,13 @@ function ed(a) {
 }
 ```
 
-Award sprite widths per slot (yb array): `[15, 31, 11, 11, 13, 15, 11, 12, 16, 9]`
+Award sprite widths per slot (yb array): `[15, 31, 11, 11, 13, 15, 11, 12, 16, 9]`[^1]
 
-Note: The loop runs to `10 > d` and `10 > e`, but there are only 9 decoration slots (0-8). The 10th position (index 9) exists in yb but v[] only has 9 elements. This means slot 9 (width=9) is an unused/phantom slot that's never drawn because `a[9]` is always 0 (Uint8Array initialized with 9 elements, indexed 0-8).
+Note: The loop runs to `10 > d` and `10 > e`, but there are only 9 decoration slots (0-8). The 10th position (index 9) exists in yb but v[] only has 9 elements. This means slot 9 (width=9) is an unused/phantom slot that's never drawn because `a[9]` is always 0 (Uint8Array initialized with 9 elements, indexed 0-8).[^1]
 
 ## Display Function (Ff, line 128)
 
-Generates a text description of a tank's decorations:
+Generates a text description of a tank's decorations:[^1]
 
 ```javascript
 function Ff(a) {
@@ -141,11 +141,11 @@ function Ff(a) {
 }
 ```
 
-Returns empty string if no decorations, otherwise newline-separated award names.
+Returns empty string if no decorations, otherwise newline-separated award names.[^1]
 
 ## V.N — Decoration Event (0x4E, Sf class, line 163)
 
-When a tank earns a new decoration:
+When a tank earns a new decoration:[^1]
 
 ```javascript
 Sf.h = function(a) {
@@ -162,7 +162,7 @@ Handler:
 2. Formats: "You have been decorated with the {NAME}" or "{tank} has been decorated..."
 3. Updates `b.v[slot] = level`
 4. Re-renders decoration bar (`ed(b)`)
-5. If map is open, defers the redraw to after map closes
+5. If map is open, defers the redraw to after map closes[^1]
 
 ## How Awards Are Earned (from guide, line 262)
 
@@ -177,3 +177,5 @@ Handler:
 | 6 | Purple Heart | Create quality content | (PH contests) | — |
 | 7 | War Correspondent | Promote TankPit | — | — |
 | 8 | Lightbulb | Brilliant ideas | — | — |
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:204` and `:128`) — decode `yg` (line 204), storage on `Xc` (line 127), render `ed` and display `Ff` (line 128), decoration event `Sf` (line 163), award criteria from the in-client guide (line 262), all quoted verbatim in the fences above; traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.

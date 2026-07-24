@@ -14,7 +14,7 @@ hubs: [js-client]
 
 # Toolbar Layout
 
-The toolbar is a 384×48 pixel strip at y=256-304 (below the game area). It contains 18 clickable regions defined by position/size arrays.
+The toolbar is a 384×48 pixel strip at y=256-304 (below the game area). It contains 18 clickable regions defined by position/size arrays.[^1]
 
 ## Hitbox Arrays
 
@@ -25,7 +25,7 @@ The toolbar is a 384×48 pixel strip at y=256-304 (below the game area). It cont
 // Heights (sc):      [44,44,44,14,14,14,15,15,15,15,15,15,26,26,26,26,26,30]
 ```
 
-Note: Y positions are offset by +3 in the xc() function: `b += 3` before comparison.
+Note: Y positions are offset by +3 in the xc() function: `b += 3` before comparison.[^1]
 
 ## Region Map
 
@@ -65,11 +65,11 @@ function xc(a, b) {
 }
 ```
 
-Returns -1 if click is outside all regions, otherwise the region index 0-17.
+Returns -1 if click is outside all regions, otherwise the region index 0-17.[^1]
 
 ## Click Handler Mapping
 
-When a toolbar region is clicked (from bb/La handlers):
+When a toolbar region is clicked (from bb/La handlers):[^1]
 
 | Index | State Machine Action |
 |-------|---------------------|
@@ -90,7 +90,7 @@ When a toolbar region is clicked (from bb/La handlers):
 
 ## Scope Direction Mapping
 
-The scope buttons use a direction remapping (qe function, line 204):
+The scope buttons use a direction remapping (qe function, line 204):[^1]
 
 ```javascript
 function qe(a) {
@@ -108,7 +108,7 @@ function qe(a) {
 }
 ```
 
-And the map scroll directions in le() (line 103):
+And the map scroll directions in le() (line 103):[^1]
 - 0=N: y-=64
 - 1=NE: y-=64, x+=64
 - 2=E: x+=64
@@ -121,7 +121,7 @@ And the map scroll directions in le() (line 103):
 
 ## Equipment Count Display
 
-Equipment slots (indices 12-16) display the current count. On hover (Kd function, line 56):
+Equipment slots (indices 12-16) display the current count. On hover (Kd function, line 56):[^1]
 
 ```javascript
 case 12: case 13: case 14: case 15: case 16:
@@ -130,33 +130,35 @@ case 12: case 13: case 14: case 15: case 16:
   Qd(a.o, b, a.oa[b]);             // show "equipment_name ( count )"
 ```
 
-The `oa[]` array tracks local equipment counts, decremented on shoot (when weapon type matches) and updated from server messages.
+The `oa[]` array tracks local equipment counts, decremented on shoot (when weapon type matches) and updated from server messages.[^1]
 
 ## Menu Sprite System
 
-The toolbar uses 4 sprite variants:
+The toolbar uses 4 sprite variants:[^1]
 - `tc` — normal state
 - `uc` — pressed/highlighted state
 - `vc` — autoscroll normal
 - `wc` — autoscroll pressed
 
-Loaded from `/images/menu/0.png`, `0_down.png`, `0_autoscroll.png`, `0_autoscroll_down.png`.
+Loaded from `/images/menu/0.png`, `0_down.png`, `0_autoscroll.png`, `0_autoscroll_down.png`.[^1]
 
-The active button is highlighted by redrawing its region with the pressed sprite variant (Ec function, line 35).
+The active button is highlighted by redrawing its region with the pressed sprite variant (Ec function, line 35).[^1]
 
 ## Fuel Bar
 
-The experience/health bar at index 17 is a composite:
+The experience/health bar at index 17 is a composite:[^1]
 
 1. Background bar (gray): 127×2 pixels at position (233, 40)
 2. Damage bar (black): overlaid proportional to tank level
 3. Fuel bar (team color): `Math.floor(7 * fuel / 100)` pixels wide
 
-The fuel bar value comes from `this.v.j` (fuel percentage 0-10000 mapped to 0-700 pixels).
+The fuel bar value comes from `this.v.j` (fuel percentage 0-10000 mapped to 0-700 pixels).[^1]
 
 ## Promo State Bar
 
-Below the fuel bar, a small vertical bar at position (366, 10):
+Below the fuel bar, a small vertical bar at position (366, 10):[^1]
 - Height: `22 - 2 * promo_level`
 - Green (`rgb(188, 207, 32)`) when promo-eligible (`this.o` flag)
 - Dark red (`rgb(128, 0, 0)`) when not eligible
+
+[^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:33`) — hitbox arrays `pc`/`qc`/`rc`/`sc` and detector `xc` (line 33), remap `qe` (line 204), scroll `le` (line 103), hover `Kd` (line 56), highlight `Ec` (line 35), all quoted verbatim in the fences above; all 18 regions traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep.
