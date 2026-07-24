@@ -218,6 +218,7 @@ class _ProbeHarness(EnemyTeleportProbe):
         self.open_map_calls = 0
         self.request_enemy_calls = 0
         self.inventory_calls = 0
+        self.move_calls: list[tuple[int, int]] = []
         self.teleport_calls: list[tuple[int, int]] = []
 
     def _require_page(self) -> PageProtocol:
@@ -239,6 +240,10 @@ class _ProbeHarness(EnemyTeleportProbe):
 
     def request_inventory(self) -> bool:
         self.inventory_calls += 1
+        return True
+
+    def move_to(self, x: int, y: int) -> bool:
+        self.move_calls.append((x, y))
         return True
 
     def teleport_to(self, x: int, y: int) -> bool:
@@ -614,15 +619,25 @@ def test_finish_non_teleport_attempt_resets_state_and_settles() -> None:
     assert probe._fake_page.waits[-1] == 250.0
 
 
-def test_settle_dwell_heartbeat_holds_the_stream_open() -> None:
-    """A positive heartbeat splits the dwell into interval steps with
-    one inventory request leading each — the push-on-activity stream
-    dies ~2 s after the last action (wiki log 2026-07-24), so the
-    dwell must keep acting to keep observing."""
+def test_settle_dwell_heartbeat_walk_shuffles_in_place() -> None:
+    """A positive heartbeat splits the dwell into interval steps, each
+    led by a 1-tile walk shuffle (east, back west, east...) — query
+    heartbeats were falsified 2026-07-24: the broadcast stream mutes
+    for any non-PLAYING client, so the dwell must genuinely play."""
     probe = _ProbeHarness()
     probe._settle_dwell(probe._fake_page, 4000, 1500)
-    assert probe.inventory_calls == 3
+    assert probe.inventory_calls == 0
+    assert probe.move_calls == [(101, 100), (99, 100), (101, 100)]
     assert probe._fake_page.waits[-3:] == [1500.0, 1500.0, 1000.0]
+
+
+def test_settle_dwell_heartbeat_falls_back_to_inventory_without_self_state() -> None:
+    """No self position -> the walk cannot aim; the query fallback fires."""
+    probe = _ProbeHarness()
+    probe._self_state = None
+    probe._settle_dwell(probe._fake_page, 3000, 1500)
+    assert probe.move_calls == []
+    assert probe.inventory_calls == 2
 
 
 def test_settle_dwell_without_heartbeat_is_one_silent_wait() -> None:
@@ -968,7 +983,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
     # watch run went silent because only the non-teleport path dwelled
     # (live catch, 2026-07-24): a successful watch is exactly the
     # landed path, so pin it here.
-    probe.inventory_calls = 0
+    probe.move_calls = []
     heartbeat_result = probe._probe_single_enemy_attempt(
         acquisition_strategy="nearest_enemy",
         acquisition_timeout_ms=3000,
@@ -978,7 +993,7 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         excluded_tank_ids=frozenset(),
     )
     assert heartbeat_result["status"] == "landed_adjacent"
-    assert probe.inventory_calls == 2
+    assert len(probe.move_calls) == 2
     assert probe._fake_page.waits[-2:] == [1500.0, 1500.0]
 
 

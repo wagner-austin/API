@@ -183,6 +183,27 @@ def format_enemy_teleport_probe_summary(session: EnemyTeleportProbeSessionDict) 
 class EnemyTeleportProbe(ProbeBase):
     """Live enemy-directed teleport probe for combat acquisition timing."""
 
+    def _heartbeat_action(self, beat: int) -> None:
+        """Fire one dwell heartbeat: a 1-tile walk shuffle.
+
+        Query heartbeats were falsified 2026-07-24 (366 inventory
+        requests held only their own responses; the broadcast stream
+        mutes for any non-PLAYING client), so the heartbeat is a real
+        gameplay action: alternate one tile east / back west (1 fuel
+        per beat). Falls back to the inventory query when self state
+        is unknown (cannot aim a walk).
+
+        Args:
+            beat: Zero-based heartbeat counter (parity picks the
+                shuffle direction).
+        """
+        self_state = self.get_self_state()
+        if self_state is None:
+            self.request_inventory()
+            return
+        step = 1 if beat % 2 == 0 else -1
+        self.move_to(self_state["x"] + step, self_state["y"])
+
     def _settle_dwell(
         self,
         page: action_session.WaitPageProtocol,
@@ -191,12 +212,11 @@ class EnemyTeleportProbe(ProbeBase):
     ) -> None:
         """Wait out the settle window, optionally holding the stream open.
 
-        With a positive heartbeat interval, the free inventory request
-        (2 bytes, no world effect) fires at the start of the dwell and
-        every interval after — the push-on-activity stream dies ~2 s
-        after the client's last action (wiki log 2026-07-24), so a
-        silent dwell observes nothing. Zero interval preserves the
-        historical silent-settle behavior.
+        With a positive heartbeat interval, one heartbeat action fires
+        at the start of the dwell and every interval after — the
+        broadcast stream mutes for non-playing clients (wiki log
+        2026-07-24), so a silent dwell observes nothing. Zero interval
+        preserves the historical silent-settle behavior.
 
         Args:
             page: Playwright page driving the wait.
@@ -209,8 +229,10 @@ class EnemyTeleportProbe(ProbeBase):
             page.wait_for_timeout(float(settle_delay_ms))
             return
         remaining = settle_delay_ms
+        beat = 0
         while remaining > 0:
-            self.request_inventory()
+            self._heartbeat_action(beat)
+            beat += 1
             step = min(heartbeat_interval_ms, remaining)
             page.wait_for_timeout(float(step))
             remaining -= step
