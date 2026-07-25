@@ -117,9 +117,14 @@ class TestRadarRestockTrigger:
         assert should_exit_collect(_ctx(radars=0)) is False
         assert should_exit_collect(_ctx(radars=3)) is False
 
-    def test_restock_releases_once_the_buffer_is_full(self) -> None:
-        """At the resume buffer the bot leaves restock and may hunt again."""
-        assert should_exit_collect(_ctx(radars=20)) is True
+    def test_restock_releases_once_radars_reach_the_cap_floor(self) -> None:
+        """Radars within 5 of cap release restock (contract 2026-07-25).
+
+        At rank 2 the cap is 30, so the release floor is 25 -- the old
+        resume buffer (20) no longer releases the mode.
+        """
+        assert should_exit_collect(_ctx(radars=20, dual=30, homing=30)) is False
+        assert should_exit_collect(_ctx(radars=25, dual=30, homing=30)) is True
 
     def test_restock_ignores_visible_threats(self) -> None:
         """Rebuilding the kit outranks chasing a wanderer it cannot beat.

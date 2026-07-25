@@ -171,6 +171,22 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
                 ctx.ai_state["combat_target_id"],
             )
             return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
+        return_cost = teleport_cost(
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            pursuit["x"],
+            pursuit["y"],
+        )
+        engagement_floor = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        if ctx.fuel < return_cost + engagement_floor:
+            emit_ai(
+                "cannot fund return to locked target %s (fuel=%d, needs ~%d) - "
+                "releasing and re-acquiring fresh",
+                pursuit["name"],
+                ctx.fuel,
+                return_cost + engagement_floor,
+            )
+            return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
         if not target_position_is_fresh(ctx, pursuit):
             emit_ai(
                 "returning to locked target %s - refreshing stale position via map",

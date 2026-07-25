@@ -471,11 +471,14 @@ def test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable() -
 
 
 def test_hunt_acquire_releases_stale_lock_when_target_unaffordable() -> None:
-    """ACQUIRE drops an off-viewport lock whose re-engagement is unaffordable.
+    """ACQUIRE drops an off-viewport lock whose return is unaffordable.
 
-    The stale lock is released and the unaffordable enemy is rejected
-    by acquisition (teleport cost + kill budget + reserve exceeds
-    fuel), so the bot falls through to a map refresh with no lock --
+    The 2026-07-25 resume contract returns to a locked target after a
+    mode interrupt -- but only when the return teleport plus the kill
+    budget plus the fuel-low reserve fits the tank (never pick a
+    fight you cannot pay for, user contract 2026-07-02). Here the
+    return needs ~424 + 650 fuel against 800, so the lock is released
+    and the bot falls through to a map refresh with no lock --
     instead of firing at a target it cannot legally hit (live run
     2026-07-01 20:48: eleven server-rejected shots at a target 92
     tiles away).
@@ -500,6 +503,84 @@ def test_hunt_acquire_releases_stale_lock_when_target_unaffordable() -> None:
 
     assert decision["command"]["cmd_type"] == "map_open"
     assert decision["updated_ai_state"]["combat_target_id"] == -1
+
+
+def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> None:
+    """ACQUIRE teleports back to an affordable off-viewport lock.
+
+    User contract (2026-07-25): the restock cycle does not abandon
+    the target -- damage persists, so a bot resuming HUNT at full
+    stock returns to the same tank it was fighting. The pursuit
+    position is fresh and the return (cost ~120 + 650 reserve) fits
+    the 1200-fuel tank, so the decision is a teleport at the locked
+    target with the lock retained.
+    """
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=120, y=100)}
+    world, self_state = make_world(fuel=1200, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 120,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["target_x"] == 120
+    assert decision["behavior"]["target_y"] == 100
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+
+
+def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
+    """A resumed lock with a stale position opens the map, keeping the lock.
+
+    The pursuit target's last observation predates the map-open
+    cooldown window, so teleporting at those coordinates would commit
+    fuel to a tile the enemy may have left. The resume path refreshes
+    via map_open first; the lock survives for the post-refresh tick.
+    """
+    stale = make_tank_state(
+        tank_id=50,
+        x=120,
+        y=100,
+        team=2,
+        rank=1,
+        name="Runner",
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=90000,
+        last_wire_seen_ms=90000,
+        last_position_update_ms=90000,
+        last_viewport_observation_ms=80000,
+    )
+    world, self_state = make_world(fuel=1200, tanks={"50": stale})
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 120,
+            "combat_target_y": 100,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:

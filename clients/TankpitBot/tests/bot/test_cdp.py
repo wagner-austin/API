@@ -516,7 +516,7 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
+        _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
@@ -546,7 +546,7 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
+        _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
 
         # Add a close, damaged enemy to trigger HUNT mode
@@ -602,7 +602,7 @@ class TestBotAIIntegration:
 
         reset_world_state()
         update_world_state_from_position(100, 100)
-        _update_fuel_total(get_world_service(), 800)
+        _update_fuel_total(get_world_service(), 1200)
         update_inventory_from_protocol(get_world_service(), [30, 30, 30, 30, 30], [True] * 5)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()

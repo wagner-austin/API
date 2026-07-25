@@ -93,6 +93,7 @@ class SeamClock:
 def boot_seam(
     *,
     enemy_fuel: int = 1800,
+    client_fuel: int = 800,
     containers: tuple[tuple[int, int, int], ...] = DEFAULT_CONTAINERS,
     counts: tuple[int, int, int, int, int] = (25, 25, 25, 25, 25),
     equipment: tuple[tuple[int, int], ...] = (),
@@ -105,6 +106,9 @@ def boot_seam(
     Args:
         enemy_fuel: Starting fuel for the seeded enemy (rank 8, so a
             damage tier survives long enough for real fights).
+        client_fuel: Starting fuel for the client tank (rank 1,
+            capacity 1100). Fighting soaks boot at 1100 so the
+            hunt-only-when-full contract lets combat start at tick 0.
         containers: Fuel-container seeding as (x, y, volume) triples.
         counts: The client's starting 0x49 slot counts.
         equipment: Equipment-container seeding as (x, y) pairs.
@@ -127,7 +131,7 @@ def boot_seam(
     if table is None:
         raise RuntimeError("XOR static key unavailable — cannot boot the seam")
     world = make_sim_world("field01_r.gif")
-    world["tanks"][SEAM_CLIENT_ID] = make_sim_tank(SEAM_CLIENT_ID, 2, 1, 100, 100, 800)
+    world["tanks"][SEAM_CLIENT_ID] = make_sim_tank(SEAM_CLIENT_ID, 2, 1, 100, 100, client_fuel)
     world["tanks"][SEAM_CLIENT_ID]["counts"] = list(counts)
     world["tanks"][SEAM_ENEMY_ID] = make_sim_tank(SEAM_ENEMY_ID, 1, 8, 110, 100, enemy_fuel)
     world["tanks"][SEAM_ENEMY_ID]["counts"] = list(enemy_counts)

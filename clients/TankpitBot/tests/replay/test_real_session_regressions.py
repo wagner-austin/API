@@ -127,16 +127,18 @@ def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
         replay_session(session)
 
 
-def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> None:
-    """Replay reproduces the visible-enemy shoot/reject loop from live play.
+def test_viewport_enemy_shoot_rejection_loop_replays_as_a_restock() -> None:
+    """Replay routes the under-stocked live session into COLLECT.
 
-    Post-2026-06-20 fix: ``target_position_is_fresh`` keys off
-    ``timestamp_ms`` (advances on MAP_DATA) instead of
-    ``last_position_update_ms`` (wire-only), so a wire-visible enemy
-    that is already in the registry no longer triggers a map_open
-    refresh before the first shoot. The replay now starts with a
-    direct ENGAGE shoot at orange-1 -- one fewer map_open, one extra
-    shoot in the trace.
+    Historical trace: the 2026-06-18 live bot fought orange-1 for 9
+    ticks here (the shoot/reject loop this fixture was captured to
+    pin). Under the 2026-07-25 hunt-only-when-full contract the same
+    wire input decides differently: the captured session's fuel and
+    inventory are below full stock, so every tick now belongs to
+    COLLECT -- a landing scan then forage radars, no shot, no lock.
+    The fixture keeps guarding decision-routing determinism on real
+    wire input; the expected route changed with the policy, not the
+    replay machinery.
     """
     session = load_capture_fixture("viewport_enemy_shoot_rejection_loop.capture_session.json")
 
@@ -144,23 +146,16 @@ def test_viewport_enemy_shoot_rejection_loop_replays_known_bad_behavior() -> Non
     traces = result["traces"]
     behavior_counts = Counter(trace["behavior_mode"] for trace in traces)
     command_counts = Counter(trace["command_type"] for trace in traces)
-    shoot_traces = [trace for trace in traces if trace["command_type"] == "shoot"]
 
     assert result["session_id"] == "96f3427c-12c2-4c65-a8d6-ec9dc3dc7972"
     assert result["total_ticks"] == 9
     assert result["total_messages"] == 59
-    assert behavior_counts == Counter({"HUNT": 9})
-    assert command_counts.get("map_open", 0) == 0
-    assert command_counts["shoot"] == 7
-    assert traces[0]["behavior_reason"] == "teleport_target(target_name=orange-1)"
-    assert traces[0]["command_type"] == "teleport"
-    assert traces[0]["ai_mode"] == "HUNT"
-    assert all(
-        trace["behavior_reason"] == "shoot_target(target_name=orange-1)" for trace in shoot_traces
-    )
-    assert all(trace["combat_target_id"] == 527 for trace in shoot_traces)
-    assert all(trace["ai_mode"] == "HUNT" for trace in traces)
-    assert all(trace["ai_mode_state"] == "ENGAGE" for trace in shoot_traces)
+    assert behavior_counts == Counter({"COLLECT": 9})
+    assert command_counts == Counter({"radar": 9})
+    assert traces[0]["behavior_reason"] == "scan_on_landing"
+    assert all(trace["ai_mode"] == "COLLECT" for trace in traces)
+    assert all(trace["ai_mode_state"] == "SENSE" for trace in traces)
+    assert all(trace["combat_target_id"] == -1 for trace in traces)
 
 
 def test_combat_to_fuel_stale_lock_loop_replays_recovery_then_reengage() -> None:

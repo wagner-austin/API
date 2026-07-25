@@ -7,7 +7,7 @@ from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand, make_hold_command
-from tankpit_bot.physics.capacity import inventory_capacity
+from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 
 
 def clear_ai_mode(ai_state: AIStateDict) -> AIStateDict:
@@ -230,20 +230,20 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
 
     Entry triggers across fuel and equipment:
 
-    * **Fuel low** -- at or below the fuel-low threshold.
-    * **Insufficient engagement budget** -- no active combat target AND
-      fuel cannot cover ``fuel_low_threshold + engagement_fuel_budget``.
-      Refusing the engagement up front beats committing to a kill the
-      bot will drop mid-fight (live run 2026-06-26 19:55: spawned at
-      400 fuel, engaged adjacent enemy, dropped LOW_FUEL at 152, lost
-      both the kill and the survival hop).
+    * **Fuel low** -- at or below the fuel-low threshold. Interrupts
+      even an active combat target (user contract 2026-07-25: the
+      2026-07-13 cardinal override let a fight outrank this break and
+      the bot died trading at 84 fuel in the practice-room gang-up).
     * **Weapon emergency** -- any weapon reserve below its break
-      threshold, or extra radars at or below the radar break threshold.
+      threshold, or extra radars below the radar break threshold.
       Interrupts even an active combat target.
-    * **Between kills** -- any weapon reserve below its resume
-      threshold, or extra radars below the resume buffer, AND no active
-      combat target. Finishes the current kill first, then restocks
-      before the next hunt.
+    * **Between kills** -- no active combat target AND anything short
+      of a genuinely full tank: fuel below the rank capacity or
+      inventory below the rank caps (user contract 2026-07-25: "never
+      hunt if it is not full on everything except -5 max radar"; caps
+      are rank-derived, replacing the fixed resume thresholds that
+      under-restocked high ranks). Finishes the current kill first,
+      then restocks fully before the next hunt.
 
     Args:
         ctx: Decision context.
@@ -253,10 +253,6 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
     """
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         return True
-    if ctx.ai_state["combat_target_id"] == -1:
-        engagement_floor = ctx.config["fuel_low_threshold"] + ctx.config["engagement_fuel_budget"]
-        if ctx.fuel < engagement_floor:
-            return True
     if (
         ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
         or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
@@ -265,18 +261,32 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
         return True
     if ctx.ai_state["combat_target_id"] != -1:
         return False
-    return (
-        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_resume_threshold"]
-        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_resume_threshold"]
-        or ctx.inventory["extra_radars"]["count"] < ctx.config["radar_resume_threshold"]
-    )
+    return ctx.fuel < hunt_fuel_floor(ctx) or not hunt_entry_permitted(ctx)
+
+
+def hunt_fuel_floor(ctx: DecideCtx) -> int:
+    """Return the fuel level that counts as a full tank for HUNT entry.
+
+    The rank's actual fuel capacity (user ruling 2026-07-25: "just
+    determine max fuel based on the tank rank") -- 1000 at recruit
+    through 1800 at general. The collect cascade's pickup ceiling is
+    the same physics number, so "stop collecting fuel" and "may hunt"
+    can never disagree and deadlock the owner selection.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        ``fuel_capacity(rank)`` for the bot's current rank.
+    """
+    return fuel_capacity(ctx.self_state["rank"])
 
 
 def should_exit_collect(ctx: DecideCtx) -> bool:
     """Return True when COLLECT can release control.
 
-    The mode holds until the bot is FULLY restocked: fuel back above
-    the full threshold AND the inventory combat-ready
+    The mode holds until the bot is FULLY restocked: fuel at the
+    rank-clamped full floor AND the inventory combat-ready
     (:func:`hunt_entry_permitted` -- duals and homings at cap, extra
     radars within 5 of cap; user contract 2026-07-25: "never hunt if
     it is not full on everything except -5 max radar"). The
@@ -290,7 +300,7 @@ def should_exit_collect(ctx: DecideCtx) -> bool:
     Returns:
         True when fuel and inventory are fully restored.
     """
-    if ctx.fuel < ctx.config["fuel_full_threshold"]:
+    if ctx.fuel < hunt_fuel_floor(ctx):
         return False
     return hunt_entry_permitted(ctx)
 
@@ -299,10 +309,10 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     """Return True when HUNT is the valid top-level owner.
 
     HUNT is a privilege of a full tank (user contract 2026-07-25):
-    fuel at the full threshold, duals and homings at cap, extra
-    radars within 5 of cap, and no COLLECT trigger pending. Starting
-    a fight below full stock leads to abandoned kills when the break
-    threshold pulls the bot away mid-fight.
+    fuel at the rank-clamped full floor, duals and homings at cap,
+    extra radars within 5 of cap, and no COLLECT trigger pending.
+    Starting a fight below full stock leads to abandoned kills when
+    the break threshold pulls the bot away mid-fight.
 
     Args:
         ctx: Decision context.
@@ -312,7 +322,7 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     """
     if should_enter_collect(ctx):
         return False
-    return ctx.fuel >= ctx.config["fuel_full_threshold"] and hunt_entry_permitted(ctx)
+    return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
 
 
 def combat_radar_min(rank: int) -> int:
@@ -451,6 +461,7 @@ __all__ = [
     "derive_collect_mode_state",
     "derive_hunt_mode_state",
     "hunt_entry_permitted",
+    "hunt_fuel_floor",
     "make_hold_decision",
     "resolve_owner_from_manual",
     "set_ai_mode",

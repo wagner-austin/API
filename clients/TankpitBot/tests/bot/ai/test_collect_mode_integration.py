@@ -753,7 +753,7 @@ class TestRecoverEquipmentSearch:
             "50": _enemy(name="DeadEnemy", timestamp_ms=100000),
             "60": _enemy(tank_id=60, x=104, y=103, name="LiveEnemy", timestamp_ms=100000),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),

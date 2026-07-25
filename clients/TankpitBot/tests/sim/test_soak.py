@@ -106,9 +106,15 @@ def test_fighting_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
     client-side channels a passive world never touches actually run:
     incoming 0x53 echoes, armor absorption on the ammo book, and the
     fuel book's enemy-hit feasibility entries. Positive controls
-    demand the fight happened (the enemy fired, the client's shields
-    or fuel actually paid); the verdict is still zero divergences in
-    both books and zero ``physics_divergence`` events.
+    demand the fight happened via durable server truth — the enemy's
+    dual count fell (it fired and landed) and both tanks paid fuel —
+    because the ammo book's ``enemy_shots`` window resets on every
+    0x49 snapshot, and under the 2026-07-25 hunt-only-when-full
+    contract the bot ends this soak disengaged in COLLECT, several
+    quiet snapshots past the fight. The client boots at its full
+    1100 (rank-1 capacity) so hunt entry is legal at tick 0. The
+    verdict is still zero divergences in both books and zero
+    ``physics_divergence`` events.
     """
     artifacts = configure_bot_runtime_logging("20260722-000003")
     clock = SeamClock(100_000)
@@ -117,6 +123,7 @@ def test_fighting_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
     try:
         bot, server, link, _table = boot_seam(
             enemy_fuel=6000,
+            client_fuel=1100,
             containers=RICH_CONTAINERS,
             enemy_counts=(5, 25, 0, 25, 5),
         )
@@ -133,7 +140,9 @@ def test_fighting_soak_is_divergence_free(fake_fs: FakeFileSystem) -> None:
         _test_hooks.get_current_time_ms = original_clock
     ws = get_world_service()
     truth = server.world["tanks"][SEAM_CLIENT_ID]
-    assert ws.ammo_book["enemy_shots"] > 0
+    enemy_truth = server.world["tanks"][SEAM_ENEMY_ID]
+    assert enemy_truth["counts"][1] < 25
+    assert enemy_truth["fuel"] < 6000
     assert truth["counts"][0] <= start_shields
     assert ws.fuel_book["windows"] >= 1
     assert ws.fuel_book["divergences"] == 0

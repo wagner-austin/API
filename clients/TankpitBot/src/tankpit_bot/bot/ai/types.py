@@ -341,7 +341,6 @@ class AIConfigDict(TypedDict):
             into this single value 2026-06-22; the two-tier "polite low
             vs. emergency critical" distinction was dead because both
             thresholds had drifted to the same number.)
-        fuel_full_threshold: Above this level, fuel collection score drops to zero.
         hunt_min_fuel: Operating reserve for search/recovery teleport hops.
         combat_range: Maximum Manhattan distance to engage an enemy.
         scan_cooldown_ms: Minimum milliseconds between radar scans.
@@ -355,15 +354,13 @@ class AIConfigDict(TypedDict):
             extra radar has its own thresholds (radars are a search
             resource whose recovery SPENDS radars, so they were split
             out after the live run 20260611-232301 death spiral).
-        dual_resume_threshold: Minimum healthy weapon reserve to leave
-            emergency restock. Applies to dual and homing shots only.
         radar_break_threshold: Extra-radar count at or below which the
             bot enters equipment restock to rebuild radars before
             hunting. The grid-sweep forager handles the zero case.
-        radar_resume_threshold: Extra-radar count to rebuild to before
-            leaving restock and returning to the hunt. Radars find
-            enemies and equipment, so a healthy buffer is rebuilt
-            first; below it the bot restocks instead of fighting.
+            (Restock-EXIT levels are not configured: the 2026-07-25
+            hunt-only-when-full contract derives them from the rank
+            caps -- ``inventory_capacity(rank)`` for weapons, cap-5
+            for radars, ``fuel_capacity(rank)`` for fuel.)
         engagement_fuel_budget: Estimated fuel a typical kill consumes
             once adjacent (shot sequence + per-tick position cost; the
             approach teleport is priced separately per candidate in
@@ -385,7 +382,6 @@ class AIConfigDict(TypedDict):
     """
 
     fuel_low_threshold: int
-    fuel_full_threshold: int
     hunt_min_fuel: int
     combat_range: int
     scan_cooldown_ms: int
@@ -395,9 +391,7 @@ class AIConfigDict(TypedDict):
     map_open_cooldown_ms: int
     patrol_waypoints: list[tuple[int, int]]
     dual_break_threshold: int
-    dual_resume_threshold: int
     radar_break_threshold: int
-    radar_resume_threshold: int
     engagement_fuel_budget: int
 
 
@@ -409,7 +403,6 @@ def make_default_ai_config() -> AIConfigDict:
     """
     return AIConfigDict(
         fuel_low_threshold=200,
-        fuel_full_threshold=1100,
         hunt_min_fuel=100,
         combat_range=20,
         scan_cooldown_ms=5000,
@@ -419,9 +412,7 @@ def make_default_ai_config() -> AIConfigDict:
         map_open_cooldown_ms=5000,
         patrol_waypoints=[(64, 64), (192, 64), (192, 192), (64, 192)],
         dual_break_threshold=4,
-        dual_resume_threshold=25,
         radar_break_threshold=5,
-        radar_resume_threshold=20,
         engagement_fuel_budget=450,
     )
 

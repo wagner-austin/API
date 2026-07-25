@@ -238,7 +238,6 @@ class TestAIConfig:
         """Default config has sensible values."""
         config = make_default_ai_config()
         assert config["fuel_low_threshold"] == 200
-        assert config["fuel_full_threshold"] == 1100
         assert config["hunt_min_fuel"] == 100
         assert config["combat_range"] == 20
         assert config["scan_cooldown_ms"] == 5000
@@ -247,7 +246,6 @@ class TestAIConfig:
         assert "teleport_fuel_cost" not in config
         assert len(config["patrol_waypoints"]) == 4
         assert config["dual_break_threshold"] == 4
-        assert config["dual_resume_threshold"] == 25
         assert config["engagement_fuel_budget"] == 450
 
     def test_encode_decode_roundtrip(self) -> None:
@@ -261,7 +259,6 @@ class TestAIConfig:
         """Decode rejects non-list patrol_waypoints."""
         data: JSONObject = {
             "fuel_low_threshold": 200,
-            "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
@@ -270,7 +267,6 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 25,
             "patrol_waypoints": "not_a_list",
         }
         with pytest.raises(ValueError, match="must be a list"):
@@ -280,7 +276,6 @@ class TestAIConfig:
         """Decode rejects waypoints that are not [x, y] pairs."""
         data: JSONObject = {
             "fuel_low_threshold": 200,
-            "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
@@ -289,7 +284,6 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 25,
             "patrol_waypoints": [[1, 2, 3]],
         }
         with pytest.raises(ValueError, match="must be"):
@@ -299,7 +293,6 @@ class TestAIConfig:
         """Decode rejects waypoints with non-int coordinates."""
         data: JSONObject = {
             "fuel_low_threshold": 200,
-            "fuel_full_threshold": 1200,
             "hunt_min_fuel": 400,
             "combat_range": 20,
             "scan_cooldown_ms": 5000,
@@ -308,7 +301,6 @@ class TestAIConfig:
             "kill_cooldown_ms": 20000,
             "map_open_cooldown_ms": 5000,
             "dual_break_threshold": 4,
-            "dual_resume_threshold": 25,
             "patrol_waypoints": [["a", "b"]],
         }
         with pytest.raises(ValueError, match="must be int"):
@@ -350,7 +342,6 @@ class TestAIState:
         config = make_default_ai_config()
         custom = AIConfigDict(
             fuel_low_threshold=400,
-            fuel_full_threshold=config["fuel_full_threshold"],
             hunt_min_fuel=config["hunt_min_fuel"],
             combat_range=config["combat_range"],
             scan_cooldown_ms=config["scan_cooldown_ms"],
@@ -359,9 +350,7 @@ class TestAIState:
             kill_cooldown_ms=config["kill_cooldown_ms"],
             map_open_cooldown_ms=config["map_open_cooldown_ms"],
             dual_break_threshold=config["dual_break_threshold"],
-            dual_resume_threshold=config["dual_resume_threshold"],
             radar_break_threshold=config["radar_break_threshold"],
-            radar_resume_threshold=config["radar_resume_threshold"],
             engagement_fuel_budget=config["engagement_fuel_budget"],
             patrol_waypoints=config["patrol_waypoints"],
         )

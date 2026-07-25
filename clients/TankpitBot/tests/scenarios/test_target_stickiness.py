@@ -36,7 +36,7 @@ def test_bot_acquires_the_closer_of_two_visible_enemies() -> None:
     stickiness tests below would be measuring the wrong thing.
     """
     scenario = BotScenario()
-    scenario.place_self(x=100, y=100, fuel=800)
+    scenario.place_self(x=100, y=100, fuel=1200)
     # Closer enemy 1 tile west of self.
     scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="closer")
     # Rival enemy 3 tiles south-east of self.
@@ -59,7 +59,7 @@ def test_bot_stays_on_target_after_one_shot_when_target_is_still_alive() -> None
     live engaged target.
     """
     scenario = BotScenario()
-    scenario.place_self(x=100, y=100, fuel=800)
+    scenario.place_self(x=100, y=100, fuel=1200)
     scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="locked")
     scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="rival")
 
@@ -107,7 +107,7 @@ def test_bot_holds_lock_when_target_drops_off_threat_list() -> None:
     target, firing pursuit homing.
     """
     scenario = BotScenario()
-    scenario.place_self(x=100, y=100, fuel=800)
+    scenario.place_self(x=100, y=100, fuel=1200)
     scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="locked")
     scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="rival")
 

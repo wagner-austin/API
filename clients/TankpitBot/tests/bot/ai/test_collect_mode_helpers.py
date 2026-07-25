@@ -416,7 +416,7 @@ class TestRecoveryHelpers:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=800,
+            fuel=1200,
             containers=containers,
             tanks={"50": _enemy(x=120, y=100)},
         )
@@ -451,7 +451,7 @@ class TestRecoveryHelpers:
         world, self_state = make_world(
             self_x=100,
             self_y=100,
-            fuel=800,
+            fuel=1200,
             containers=containers,
             tanks={"50": _enemy(x=103, y=100, timestamp_ms=100000)},
         )
@@ -485,7 +485,7 @@ class TestRecoveryHelpers:
         world, self_state = make_world(
             self_x=138,
             self_y=192,
-            fuel=800,
+            fuel=1200,
             containers=containers,
             tanks={"50": _enemy(x=120, y=100)},
         )

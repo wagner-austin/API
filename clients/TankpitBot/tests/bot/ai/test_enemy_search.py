@@ -24,7 +24,7 @@ class TestDecideMapOpen:
 
     def test_map_open_when_no_enemies(self) -> None:
         """decide() triggers map open when no live enemies are visible."""
-        world, self_state = make_world(fuel=800)
+        world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
@@ -77,7 +77,7 @@ class TestDecideMapOpen:
         dispatches a refresh (see
         ``test_hunt_search_dispatches_map_open_not_radar_during_acquire``).
         """
-        world, self_state = make_world(fuel=800, scanned=False)
+        world, self_state = make_world(fuel=1200, scanned=False)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),

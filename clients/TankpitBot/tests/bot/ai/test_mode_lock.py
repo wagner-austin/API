@@ -23,7 +23,7 @@ def test_unset_mode_enters_hunt_after_hunt_decision() -> None:
 
 def test_hunt_mode_owns_tick_without_running_recovery_chain() -> None:
     """Active HUNT mode persists across ticks and keeps its original start time."""
-    world, self_state = make_world(fuel=800)
+    world, self_state = make_world(fuel=1200)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -286,7 +286,7 @@ def test_collect_mode_owns_tick_below_full_threshold() -> None:
 
 def test_collect_mode_switches_to_hunt_after_full_recovery() -> None:
     """Fuel recovery hands control directly to HUNT after full recovery."""
-    world, self_state = make_world(fuel=1100)
+    world, self_state = make_world(fuel=1200)
     ai_state = AIStateDict(
         **{
             **make_initial_ai_state(),

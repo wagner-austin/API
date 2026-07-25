@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.mode_controller import (
     clear_mode_on_decision,
     derive_collect_mode_state,
     derive_hunt_mode_state,
+    hunt_fuel_floor,
     make_hold_decision,
     resolve_owner_from_manual,
     set_ai_mode,
@@ -165,24 +166,30 @@ def test_apply_mode_to_decision_sets_durable_mode() -> None:
     assert updated["updated_ai_state"]["mode_started_ms"] == 9000
 
 
-def test_should_enter_collect_uses_low_threshold() -> None:
-    """Fuel recovery entry uses the low threshold plus the engagement floor.
+def test_should_enter_collect_fires_below_full_between_kills() -> None:
+    """With no combat lock, anything short of a full tank collects.
 
-    With no active combat lock, entry fires below
-    ``fuel_low_threshold + engagement_fuel_budget`` (200 + 450 = 650)
-    so the bot restocks before a fight it could not finish (user
-    contract 2026-07-02).
+    User contract 2026-07-25: hunting is a privilege of a full tank,
+    so between kills the entry bar is the rank capacity (1200 at
+    rank 2) -- the old ``fuel_low + engagement_budget`` floor (650)
+    is subsumed. The low threshold itself still fires regardless.
     """
     assert should_enter_collect(_make_ctx(fuel=150)) is True
     assert should_enter_collect(_make_ctx(fuel=200)) is True
-    assert should_enter_collect(_make_ctx(fuel=649)) is True
-    assert should_enter_collect(_make_ctx(fuel=650)) is False
-    assert should_enter_collect(_make_ctx(fuel=700)) is False
+    assert should_enter_collect(_make_ctx(fuel=650)) is True
+    assert should_enter_collect(_make_ctx(fuel=1199)) is True
+    assert should_enter_collect(_make_ctx(fuel=1200)) is False
 
 
-def test_should_exit_collect_uses_full_threshold() -> None:
-    """Fuel recovery exit uses the configured full threshold."""
-    assert should_exit_collect(_make_ctx(fuel=1100)) is True
+def test_should_exit_collect_requires_rank_capacity_fuel() -> None:
+    """Fuel recovery exit demands the rank's actual full tank.
+
+    User ruling 2026-07-25: "just determine max fuel based on the
+    tank rank" -- at rank 2 the capacity is 1200, so 1100 no longer
+    releases the mode.
+    """
+    assert should_exit_collect(_make_ctx(fuel=1200)) is True
+    assert should_exit_collect(_make_ctx(fuel=1100)) is False
     assert should_exit_collect(_make_ctx(fuel=800)) is False
 
 
@@ -216,20 +223,17 @@ def test_radar_at_break_enters_recover_equipment_to_restock() -> None:
     assert should_enter_collect(_make_ctx(dual_count=30, radar_count=5)) is True
 
 
-def test_radars_below_resume_threshold_trigger_restock() -> None:
-    """Any radar count below the resume threshold (20) re-enters recovery.
+def test_radars_below_the_cap_floor_trigger_restock_between_kills() -> None:
+    """Radar counts below cap-5 re-enter recovery between kills.
 
-    Changed 2026-06-22: per the user-defined gameplay loop, the bot
-    restocks to a full kit (duals=25, homings=25, radars=20) before
-    every engagement cycle. The earlier break/resume hysteresis was
-    too permissive -- it let the bot fight with low ammo down to
-    break, abandoning kills mid-fight when the emergency threshold
-    finally pulled it away. Symmetric thresholds eliminate that
-    failure mode entirely.
+    User contract 2026-07-25: the between-kills bar is the rank cap
+    (30 at rank 2, radar floor 25) -- the old fixed resume threshold
+    (20) under-restocked high ranks. The bot rebuilds a genuinely
+    full kit before every engagement cycle.
     """
     assert should_enter_collect(_make_ctx(dual_count=30, radar_count=6)) is True
-    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=19)) is True
-    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=20)) is False
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=24)) is True
+    assert should_enter_collect(_make_ctx(dual_count=30, radar_count=25)) is False
 
 
 def test_exit_recover_equipment_requires_radars_within_five_of_cap() -> None:
@@ -245,12 +249,27 @@ def test_exit_recover_equipment_requires_radars_within_five_of_cap() -> None:
     assert should_exit_collect(_make_ctx(dual_count=30, radar_count=25)) is True
 
 
+def test_hunt_fuel_floor_is_the_rank_fuel_capacity() -> None:
+    """The full-fuel floor is exactly what the rank's tank holds.
+
+    User ruling 2026-07-25: "just determine max fuel based on the
+    tank rank". A recruit is hunt-ready at their genuine full tank
+    of 1000; rank 2 needs its full 1200. An unreachable fixed floor
+    would trap low ranks in COLLECT forever.
+    """
+    recruit_ctx = _make_ctx(fuel=1000)
+    recruit_ctx.self_state["rank"] = 0
+    assert hunt_fuel_floor(recruit_ctx) == 1000
+    assert should_enter_hunt(recruit_ctx) is True
+    assert hunt_fuel_floor(_make_ctx(fuel=1200)) == 1200
+
+
 def test_should_enter_hunt_requires_full_fuel_and_full_stock() -> None:
     """HUNT entry is a privilege of a full tank (contract 2026-07-25).
 
-    Fuel below the full threshold (1100) refuses entry even with a
-    perfect inventory; a full tank with weapons below cap refuses
-    too.
+    Fuel below the rank's capacity (1200 at rank 2) refuses entry
+    even with a perfect inventory; a full tank with weapons below
+    cap refuses too.
     """
     assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=30, radar_count=30)) is True
     assert should_enter_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is False
@@ -259,8 +278,13 @@ def test_should_enter_hunt_requires_full_fuel_and_full_stock() -> None:
 
 
 def test_should_exit_hunt_when_recovery_takes_priority() -> None:
-    """HUNT exits when recovery conditions become active."""
-    assert should_exit_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is False
+    """HUNT exits when a COLLECT trigger fires.
+
+    Between kills (no lock) a non-full tank releases the hunt for a
+    restock; a full tank holds it.
+    """
+    assert should_exit_hunt(_make_ctx(fuel=1200, dual_count=30, radar_count=30)) is False
+    assert should_exit_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is True
     assert should_exit_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is True
 
 

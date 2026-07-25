@@ -263,7 +263,6 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
     waypoints: list[JSONValue] = [[x, y] for x, y in config["patrol_waypoints"]]
     return {
         "fuel_low_threshold": config["fuel_low_threshold"],
-        "fuel_full_threshold": config["fuel_full_threshold"],
         "hunt_min_fuel": config["hunt_min_fuel"],
         "combat_range": config["combat_range"],
         "scan_cooldown_ms": config["scan_cooldown_ms"],
@@ -273,9 +272,7 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "map_open_cooldown_ms": config["map_open_cooldown_ms"],
         "patrol_waypoints": waypoints,
         "dual_break_threshold": config["dual_break_threshold"],
-        "dual_resume_threshold": config["dual_resume_threshold"],
         "radar_break_threshold": config["radar_break_threshold"],
-        "radar_resume_threshold": config["radar_resume_threshold"],
         "engagement_fuel_budget": config["engagement_fuel_budget"],
     }
 
@@ -322,7 +319,6 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
     """
     return AIConfigDict(
         fuel_low_threshold=require_int(data, "fuel_low_threshold"),
-        fuel_full_threshold=require_int(data, "fuel_full_threshold"),
         hunt_min_fuel=require_int(data, "hunt_min_fuel"),
         combat_range=require_int(data, "combat_range"),
         scan_cooldown_ms=require_int(data, "scan_cooldown_ms"),
@@ -332,9 +328,7 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         map_open_cooldown_ms=require_int(data, "map_open_cooldown_ms"),
         patrol_waypoints=_decode_patrol_waypoints(data),
         dual_break_threshold=require_int(data, "dual_break_threshold"),
-        dual_resume_threshold=require_int(data, "dual_resume_threshold"),
         radar_break_threshold=require_int(data, "radar_break_threshold"),
-        radar_resume_threshold=require_int(data, "radar_resume_threshold"),
         engagement_fuel_budget=require_int(data, "engagement_fuel_budget"),
     )
 
