@@ -1108,6 +1108,17 @@ rounds, kills on 510 + 511 + the scripted opponent, bot alive —
 session ends only when the sim world runs out of collectible
 equipment.[^2]
 
+**Sim world model lost its supply law (2026-07-25):** the 1/min
+population-seeking container replenishment in `sim/spawn.py` was
+built on the 2026-07-22 "spawn" mining, which is now FALSIFIED —
+all 605 "spawns" were our own exposures of pre-existing ≥500-volume
+containers ([[game-economy]], [[map-data-decode]]). OPEN sim work:
+replace the spawner with the honest world model — a large
+mostly-hidden container population (hidden until radar/viewport
+reveal, sub-500 fuel never on the map) with an exposure-driven dot
+atlas. The practice-room `no_productive_collect` starvation at
+round 86 was this model poverty, not a bot defect.[^2]
+
 **Round-resolution order wired in (2026-07-25):** the same-day
 measurement (`analysis_scripts/mine_round_order.py` — 1,820/1,825
 archive multi-shooter bursts fire in ascending shooter id; the only

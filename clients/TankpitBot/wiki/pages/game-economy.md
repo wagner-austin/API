@@ -106,42 +106,54 @@ Every row matches `remaining = declared − taken` exactly.[^1]
 - Containers are **invisible by default** to non-owning players. They appear via radar reveal.
 - Bot use case: a tank at capacity can bank surplus fuel next to a defended position and reclaim it later.
 
-## Container respawn dynamics (archive-mined 2026-07-22)
+## Fuel-dot atlas dynamics are EXPOSURE, not spawning (user correction + archive proof 2026-07-25)
 
-The world replenishes itself. Mined from 212 sessions holding 2+
-0x4C map snapshots (the 0x4C fuel-dot atlas is GLOBAL, so
-within-session diffs are true world dynamics — spawns and
-consumption by anyone):[^4]
+**The 2026-07-22 "container respawn law" (~1 dot/min,
+population-seeking) is FALSIFIED.** The user supplied the true model
+("the yellow fuel dots are just large containers that someone on our
+same team or us priorly exposed... theres also tons still hidden
+until you radar and low fuel containers which dont show on the map")
+and the archive confirms it exactly
+(`analysis_scripts/mine_map_dot_semantics.py` +
+`mine_dot_appearances.py`, standing):[^4]
 
-- **Steady-state population**: 569–656 fuel dots on the map
-  (mean 619); per-session spawns ≈ consumption.
-- **Spawn rate ~1.00 dots/minute below equilibrium** (605 spawns
-  over 605.7 observed minutes). A 12-minute idle session at high
-  population spawned ZERO — the rate is population-seeking, not a
-  flat timer.
-- **Spawns never reuse a consumed position**: 0/605 exact reuses;
-  587/605 appeared at entirely fresh map locations (18 merely within
-  2 tiles of a past consumption).
-- **No wire message announces a spawn** — the client discovers new
-  dots on the next map open or radar reveal.[^4]
-- **Independent replication + extensions (2026-07-24 re-sweep,
-  standing script):** 3,883 snapshots re-derive the same law
-  (population median 614, p10 600 / p90 650; 600 appearances over
-  526 gap-minutes ≈ 1.14/min) and add two facts: (1) **snapshot
-  completeness is proven** — 1,141 of 1,381 back-to-back map opens
-  (≤5 s apart) show a zero diff and 236 show exactly one (a real
-  event between opens), so atlas diffs are true world events, not
-  reveal artifacts; (2) **spawn placement is roughly uniform** —
-  the 600 appearances cover all sixteen 64×64 quadrants (20–56
-  each, mild east lean), matching the never-reuse fresh-location
-  rule.[^7]
+- **Every within-session dot appearance was our own exposure**:
+  605/605 atlas additions across 223 sessions were preceded, in the
+  same session, by our own reveal (0x4F radar or 0x5A viewport) of a
+  fuel container **with volume ≥ 500 at that exact coordinate**.
+  Zero unpreceded appearances — no true spawn was ever witnessed in
+  the atlas data. The 2026-07-22/24 minings counted these same
+  events as "spawns"; "~1/min below equilibrium" was the bot's own
+  radar-exposure rate, and "population-seeking" was coverage
+  saturation.[^9]
+- **The dot threshold is exactly volume ≥ 500**: 0 of 163 sub-500
+  fuel reveals ever joined the atlas (bands probed down to 500–509,
+  which joins); 605 of 834 ≥500 reveals joined a later same-session
+  atlas (the remainder: consumed first, or no later map open).
+  Matches the old spot checks (every verified dot ≥ 762; off-dot
+  fuel 34/57).
+- **Equipment never dots**: 1,400 equipment reveals, 0 on dot
+  coordinates.
+- **Most large fuel is hidden**: at reveal time only ~7% of ≥500
+  containers were already on the map — the field carries far more
+  fuel than the ~619-dot census, plus the sub-500 population that
+  can never appear on it.
+- **Dots are exposure HISTORY, not live volume**: 53 sub-500 reveals
+  sat ON dot coordinates — containers drained below 500 (or partly
+  consumed) whose dots persist. This is the mechanism behind "~40%
+  of dots still hold fuel when visited."
+- The steady 569–656 cross-session census is server-persisted
+  exposure memory (user: shared with the team; our solo captures
+  cannot discriminate team-scope from account-scope — no unpreceded
+  in-session appearance ever showed another player's exposure).
+  Dot *disappearances* still track consumption.
 
-Equipment containers are invisible to the 0x4C atlas, so their
-respawn dynamics remain unmeasured. The sim ([[physics-module-roadmap]])
-implements the fuel law deterministically (seeded population as the
-target, one spawn per minute-beat at a tick-derived fresh passable
-tile, constant 300 volume as a documented assumption) and mirrors it
-for equipment on the offset beat as an assumption.
+**The true container spawn law is now fully OPEN** — nothing in 223
+sessions ever witnessed one. The sim ([[physics-module-roadmap]])
+still implements the falsified 1/min replenishment
+(`sim/spawn.py`); its empirical basis is gone and the honest world
+model is a large mostly-hidden container population with an
+exposure-driven atlas — flagged as open sim work.
 
 **First equipment measurements (radar-reveal mining, 2026-07-24):**
 since equipment never appears on the map, the mining works from
@@ -312,7 +324,8 @@ Each value above is matched 1:1 between a user-declared action and a measurable 
 [^1]: the three frontmatter-pinned 2026-06-20 captures on disk: `runs/sniff/sniff-20260620-150155.capture_session.json` (PvP), `sniff-20260620-155103` (multi-pickup), `sniff-20260620-173727` (ghost-observation); every cost in the tables is also machine-checked against `tankpit_bot.physics` via the claim block (the `physics_claims` stage of `make check`) and re-derived from the archive by `make audit`.
 [^2]: client gauge math: `Gc` in `tpclient.js` (blob-pinned in frontmatter); rank-table verifications 2026-07-06 (user deposits at ranks 1/3/6/7, recorded per-row in the table above and in the frontmatter `verified:` field); formula machine-checked by the `fuel-capacity` claim below.
 [^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
-[^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots).
+[^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots). SUPERSEDED 2026-07-25: the diffs were exposure events, see [^9].
+[^9]: `analysis_scripts/mine_map_dot_semantics.py` + `analysis_scripts/mine_dot_appearances.py` (standing, 2026-07-25) over 223 archive sessions; wiki-log entry "[2026-07-25] LAW FALSIFIED + LAW MEASURED | Map dots are team-exposure memory of >=500-volume fuel".
 [^8]: live watches: `radar_watch_probe.capture_session.json`,
 `radar_watch_nomap_probe.capture_session.json`,
 `radar_watch_fast_probe.capture_session.json` (0 reveals each; the

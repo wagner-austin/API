@@ -101,14 +101,16 @@ collapsed 2026-06-24[^5]). The owner runs a single cascade per tick
    free radar covers a 5×5 around the tank, clipped to viewport
    bounds). When radar is unaffordable, walk toward an unscanned
    tile so the next free radar covers fresh ground.
-5. **Hop** — teleport to the **nearest fuel dot with a 100% clean
-   viewport** (user contract 2026-07-03: "hop to nearest yellow dot
-   with a 100% clean viewport"). Candidates come from the 0x4C
-   MapData fuel-dot atlas; a dot qualifies when its landing tile is
-   passable, the teleport is fuel-affordable, the landing viewport is
-   unscanned, and the landing viewport is fully walkable ground on
-   the static terrain map. Qualifiers are taken nearest-first, and
-   the landing auto-pickup makes each hop partially self-funding.
+5. **Hop** — teleport to the **best-value fuel dot**. Candidates
+   come from the 0x4C MapData fuel-dot atlas; hard gates are physics
+   only (landing tile passable, teleport fuel-affordable, landing
+   viewport not freshly scanned), and qualifiers are RANKED by
+   ``dots_in_landing_viewport × walkable_fraction ÷ cost`` (user
+   ruling 2026-07-18: "more dots, more walkable area. but not a 100%
+   rule" — the original 2026-07-03 "100% clean viewport" contract was
+   mis-implemented as a 100%-walkable hard filter that rejected 428
+   of 622 dots and starved the cascade). The landing auto-pickup
+   makes each hop partially self-funding.
    With an empty atlas (no map open yet this session) the hop
    dispatches ``map_open`` first, guarded by ``map_open_cooldown_ms``
    so a dotless map cannot loop. When no dot qualifies the owner ends

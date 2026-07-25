@@ -11,7 +11,7 @@ source_paths:
   - "runs/bot"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
-fact_checked: "2026-06-13"
+fact_checked: "2026-07-25"
 confidence: high
 hubs: [protocol]
 ---
@@ -39,11 +39,11 @@ byte 255 = pure skip (no dot)
 
 ## What dots represent
 
-Client draws dots as 1x1 pixels in theme color index 7 (yellow). Yellow = fuel containers. Every verified dot held high-volume fuel (>= 762). Off-dot fuel is low volume (34, 57).[^3]
+Client draws dots as 1x1 pixels in theme color index 7 (yellow). A dot marks a fuel container **with volume ≥ 500 that has been EXPOSED** (user model 2026-07-25, archive-proven: 605/605 within-session dot appearances were preceded by our own 0x4F/0x5A reveal of a ≥500 container at that coordinate; 0/163 sub-500 reveals ever joined; 0/1,400 equipment reveals ever dotted — `analysis_scripts/mine_map_dot_semantics.py` + `mine_dot_appearances.py`). Most large fuel is hidden: only ~7% of ≥500 reveals were already dotted. The old spot checks fit (every verified dot held ≥ 762; off-dot fuel 34/57).[^3]
 
 ## Cache semantics
 
-The layer is server-cached — byte-identical across all map opens in one session even while containers are consumed. Drifts a few dots between sessions. Treat as an atlas (where fuel spawns/was), not live feed. ~40% of dots still hold fuel when visited minutes later.[^2]
+The layer is server-persisted **exposure memory**, not a live feed and not a spawn record. It GROWS within a session when you expose a new ≥500 container (the 2026-06-11 "byte-identical across 32 opens" run simply exposed none); it persists across sessions (569–656 dots standing census — per the user, shared with the team; solo captures cannot discriminate team- from account-scope); dot disappearances track consumption. Dots outlive their volume: a container drained below 500 keeps its dot, which is why only ~40% of dots still hold fuel when visited.[^2]
 
 ## Tank entries
 
