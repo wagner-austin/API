@@ -8,12 +8,16 @@ mechanics: the toggle command is ``build_toggle_equipment_command(5)``
 (0x74 push + 0x49 bit-7 flags, both decoded), and with extras off the
 scan debit clamps to ``min(10, fuel)`` — free once fuel reaches zero.
 
-The watch itself: sit still, one radar scan per ``scan_interval_ms``
-and one free map open per ``map_poll_interval_ms``. 0x4F responses
-are DIFFS (unchanged already-visible entities are never re-sent), so
-after baseline coverage every reveal IS a fresh event; the map polls
-give the global fuel baseline for the near-player-clustering
-cross-check. Analysis is offline from the capture.
+The watch itself: one radar scan per ``scan_interval_ms``, one free
+map open per ``map_poll_interval_ms``, and a 1-tile walk shuffle per
+beat — the first session proved a never-playing client is
+DISCONNECTED ~12 minutes after join (wiki log 2026-07-24), so the
+watch must genuinely play, exactly like the bot-watch dwell. 0x4F
+responses are DIFFS (unchanged already-visible entities are never
+re-sent), so after baseline coverage every reveal IS a fresh event;
+the map polls give the global fuel baseline for the
+near-player-clustering cross-check. Analysis is offline from the
+capture.
 """
 
 from __future__ import annotations
@@ -57,6 +61,7 @@ class RadarWatchSessionDict(TypedDict):
     duration_ms: int
     scan_interval_ms: int
     map_poll_interval_ms: int
+    walks_sent: int
     extras_before: int
     extras_enabled_at_start: bool
     toggles_sent: int
@@ -87,6 +92,7 @@ def encode_radar_watch_session(session: RadarWatchSessionDict) -> JSONObject:
         "duration_ms": session["duration_ms"],
         "scan_interval_ms": session["scan_interval_ms"],
         "map_poll_interval_ms": session["map_poll_interval_ms"],
+        "walks_sent": session["walks_sent"],
         "extras_before": session["extras_before"],
         "extras_enabled_at_start": session["extras_enabled_at_start"],
         "toggles_sent": session["toggles_sent"],
@@ -107,7 +113,8 @@ def format_radar_watch_summary(session: RadarWatchSessionDict) -> str:
     """
     return (
         f"Radar watch complete: scans={session['scans_sent']} "
-        f"map_polls={session['map_polls_sent']} toggles={session['toggles_sent']} "
+        f"map_polls={session['map_polls_sent']} walks={session['walks_sent']} "
+        f"toggles={session['toggles_sent']} "
         f"extras {session['extras_before']}->{session['extras_after']} "
         f"duration_ms={session['duration_ms']}"
     )
@@ -171,8 +178,12 @@ class RadarWatchProbe(ProbeBase):
         duration_ms: int,
         scan_interval_ms: int,
         map_poll_interval_ms: int,
-    ) -> tuple[int, int]:
-        """Scan and map-poll in place until the duration elapses.
+    ) -> tuple[int, int, int]:
+        """Scan, map-poll, and walk-shuffle until the duration elapses.
+
+        Each beat walks one tile (east/west alternating) BEFORE the
+        scan — a never-playing client is disconnected ~12 minutes
+        after join, so the watch must take real actions to survive.
 
         Args:
             duration_ms: Total watch duration.
@@ -180,7 +191,7 @@ class RadarWatchProbe(ProbeBase):
             map_poll_interval_ms: Time between free map opens.
 
         Returns:
-            Pair of (scans sent, map polls sent).
+            Tuple of (scans sent, map polls sent, walks sent).
         """
         from tankpit_bot.action_lab import _test_hooks as action_hooks
 
@@ -189,17 +200,25 @@ class RadarWatchProbe(ProbeBase):
         next_map_poll_ms = started_ms
         scans = 0
         map_polls = 0
+        walks = 0
+        beat = 0
         while action_hooks.get_current_time_ms() - started_ms < duration_ms:
             now_ms = action_hooks.get_current_time_ms()
             if now_ms >= next_map_poll_ms:
                 self.open_map()
                 map_polls += 1
                 next_map_poll_ms = now_ms + map_poll_interval_ms
+            self_state = self.get_self_state()
+            if self_state is not None:
+                step = 1 if beat % 2 == 0 else -1
+                self.move_to(self_state["x"] + step, self_state["y"])
+                walks += 1
+            beat += 1
             self.use_radar()
             scans += 1
             page.wait_for_timeout(float(scan_interval_ms))
             action_hooks.drain_buffered_messages(self)
-        return scans, map_polls
+        return scans, map_polls, walks
 
     def execute_probe(
         self,
@@ -220,7 +239,7 @@ class RadarWatchProbe(ProbeBase):
 
             extras_before, was_enabled, toggles = self._ensure_extras_disabled()
             watch_started_ms = action_hooks.get_current_time_ms()
-            scans, map_polls = self._watch_loop(
+            scans, map_polls, walks = self._watch_loop(
                 duration_ms,
                 scan_interval_ms,
                 map_poll_interval_ms,
@@ -244,6 +263,7 @@ class RadarWatchProbe(ProbeBase):
                 duration_ms=duration_ms,
                 scan_interval_ms=scan_interval_ms,
                 map_poll_interval_ms=map_poll_interval_ms,
+                walks_sent=walks,
                 extras_before=extras_before,
                 extras_enabled_at_start=was_enabled,
                 toggles_sent=toggles,

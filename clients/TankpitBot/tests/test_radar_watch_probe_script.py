@@ -55,6 +55,7 @@ def _session() -> RadarWatchSessionDict:
         duration_ms=1800000,
         scan_interval_ms=15000,
         map_poll_interval_ms=30000,
+        walks_sent=118,
         extras_before=22,
         extras_enabled_at_start=True,
         toggles_sent=1,

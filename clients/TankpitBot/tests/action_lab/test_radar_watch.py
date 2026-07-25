@@ -79,6 +79,16 @@ class _WatchHarness(RadarWatchProbe):
         self.map_calls = 0
         self.sent_toggles: list[int] = []
         self.inventory_script: list[InventoryState] = []
+        self.move_calls: list[tuple[int, int]] = []
+        self._self_state: SelfStateDict | None = make_self_state(
+            tank_id=1,
+            x=100,
+            y=100,
+            team=2,
+            rank=1,
+            fuel=900,
+            leaderboard_position=1,
+        )
 
     def request_inventory(self) -> bool:
         if self.inventory_script:
@@ -96,6 +106,13 @@ class _WatchHarness(RadarWatchProbe):
 
     def toggle_equipment_slot(self, slot: int) -> bool:
         self.sent_toggles.append(slot)
+        return True
+
+    def get_self_state(self) -> SelfStateDict | None:
+        return self._self_state
+
+    def move_to(self, x: int, y: int) -> bool:
+        self.move_calls.append((x, y))
         return True
 
 
@@ -148,11 +165,26 @@ def test_watch_loop_scans_and_map_polls_on_schedule() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
-    scans, map_polls = probe._watch_loop(60000, 15000, 30000)
+    scans, map_polls, walks = probe._watch_loop(60000, 15000, 30000)
     assert scans == 4
     assert probe.radar_calls == 4
     assert map_polls == 2
     assert probe.map_calls == 2
+    assert walks == 4
+    assert probe.move_calls == [(101, 100), (99, 100), (101, 100), (99, 100)]
+
+
+def test_watch_loop_skips_walks_without_self_state() -> None:
+    probe = _WatchHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe._self_state = None
+
+    scans, map_polls, walks = probe._watch_loop(30000, 15000, 30000)
+    assert scans == 2
+    assert map_polls == 1
+    assert walks == 0
+    assert probe.move_calls == []
 
 
 def test_execute_probe_rejects_bad_intervals() -> None:
@@ -198,6 +230,7 @@ def _session() -> RadarWatchSessionDict:
         duration_ms=1800000,
         scan_interval_ms=15000,
         map_poll_interval_ms=30000,
+        walks_sent=118,
         extras_before=22,
         extras_enabled_at_start=True,
         toggles_sent=1,
@@ -214,7 +247,8 @@ def test_encode_and_summary() -> None:
     assert encoded["extras_after"] == 22
     assert encoded["toggles_sent"] == 1
     assert format_radar_watch_summary(session) == (
-        "Radar watch complete: scans=120 map_polls=60 toggles=1 extras 22->22 duration_ms=1800000"
+        "Radar watch complete: scans=120 map_polls=60 walks=118 toggles=1 "
+        "extras 22->22 duration_ms=1800000"
     )
 
 
@@ -287,9 +321,9 @@ class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, RadarWatch
         duration_ms: int,
         scan_interval_ms: int,
         map_poll_interval_ms: int,
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, int]:
         self.phases.append(f"watch:{duration_ms}:{scan_interval_ms}:{map_poll_interval_ms}")
-        return 4, 2
+        return 4, 2, 4
 
     def _read_extras(self) -> tuple[int, bool]:
         self.phases.append("read")
@@ -341,6 +375,7 @@ def test_execute_probe_builds_session_envelope() -> None:
     assert session["toggles_sent"] == 1
     assert session["scans_sent"] == 4
     assert session["map_polls_sent"] == 2
+    assert session["walks_sent"] == 4
     assert session["extras_after"] == 22
     assert session["capture_session_path"] == ""
 
