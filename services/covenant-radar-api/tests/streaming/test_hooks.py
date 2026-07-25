@@ -17,6 +17,7 @@ from covenant_radar_api.streaming._test_hooks import (
     RealKafkaConsumer,
     RealKafkaProducer,
     TopicPartitionOffset,
+    _connection_config,
     _get_confluent_kafka,
     _real_consumer_factory,
     _real_producer_factory,
@@ -40,6 +41,57 @@ def _require(value: _T | None) -> _T:
         msg = "Expected non-None value"
         raise AssertionError(msg)
     return value
+
+
+class TestConnectionConfig:
+    """Tests for the connection keys shared by the producer and consumer.
+
+    librdkafka validates sasl.* against the selected protocol, so the keys are
+    omitted under PLAINTEXT rather than sent empty. Sending an empty
+    sasl.username with a SASL protocol is rejected at construction time.
+    """
+
+    def _config(self, protocol: str) -> ConfluentConfig:
+        """Build a ConfluentConfig for the given protocol."""
+        if protocol == "PLAINTEXT":
+            return ConfluentConfig(
+                bootstrap_servers="localhost:9092",
+                api_key="",
+                api_secret="",
+                security_protocol="PLAINTEXT",
+                sasl_mechanism="PLAIN",
+            )
+        return ConfluentConfig(
+            bootstrap_servers="pkc.confluent.cloud:9092",
+            api_key="key",
+            api_secret="secret",
+            security_protocol="SASL_SSL",
+            sasl_mechanism="PLAIN",
+        )
+
+    def test_sasl_ssl_carries_credentials(self) -> None:
+        """Under SASL_SSL the credentials are passed through to librdkafka."""
+        config = _connection_config(self._config("SASL_SSL"))
+
+        assert config["security.protocol"] == "SASL_SSL"
+        assert config["sasl.mechanisms"] == "PLAIN"
+        assert config["sasl.username"] == "key"
+        assert config["sasl.password"] == "secret"
+
+    def test_plaintext_omits_sasl_keys(self) -> None:
+        """Under PLAINTEXT no sasl.* key is sent at all."""
+        config = _connection_config(self._config("PLAINTEXT"))
+
+        assert config["security.protocol"] == "PLAINTEXT"
+        assert "sasl.mechanisms" not in config
+        assert "sasl.username" not in config
+        assert "sasl.password" not in config
+
+    def test_bootstrap_servers_always_present(self) -> None:
+        """The endpoint is carried regardless of protocol."""
+        assert (
+            _connection_config(self._config("PLAINTEXT"))["bootstrap.servers"] == "localhost:9092"
+        )
 
 
 class TestFakeConsumedMessage:

@@ -401,6 +401,31 @@ class ConsumerFactoryProtocol(Protocol):
 # =============================================================================
 
 
+def _connection_config(confluent_config: ConfluentConfig) -> KafkaConfigDict:
+    """Build the connection and authentication keys shared by both clients.
+
+    Under PLAINTEXT the sasl.* keys are omitted entirely rather than sent
+    empty. librdkafka validates them against the selected protocol, so an
+    empty sasl.username with a SASL protocol is rejected at construction, and
+    sending SASL credentials to an unauthenticated broker is meaningless.
+
+    Args:
+        confluent_config: Kafka connection settings.
+
+    Returns:
+        Config keys common to the producer and consumer.
+    """
+    config: KafkaConfigDict = {
+        "bootstrap.servers": confluent_config["bootstrap_servers"],
+        "security.protocol": confluent_config["security_protocol"],
+    }
+    if confluent_config["security_protocol"] == "SASL_SSL":
+        config["sasl.mechanisms"] = confluent_config["sasl_mechanism"]
+        config["sasl.username"] = confluent_config["api_key"]
+        config["sasl.password"] = confluent_config["api_secret"]
+    return config
+
+
 class RealKafkaProducer:
     """Real Kafka producer using confluent-kafka.
 
@@ -418,18 +443,12 @@ class RealKafkaProducer:
             confluent_config: Confluent Cloud connection settings.
             producer_config: Producer-specific settings.
         """
-        config: KafkaConfigDict = {
-            "bootstrap.servers": confluent_config["bootstrap_servers"],
-            "security.protocol": confluent_config["security_protocol"],
-            "sasl.mechanisms": confluent_config["sasl_mechanism"],
-            "sasl.username": confluent_config["api_key"],
-            "sasl.password": confluent_config["api_secret"],
-            "acks": producer_config["acks"],
-            "retries": producer_config["retries"],
-            "linger.ms": producer_config["linger_ms"],
-            "batch.size": producer_config["batch_size"],
-            "compression.type": producer_config["compression_type"],
-        }
+        config: KafkaConfigDict = _connection_config(confluent_config)
+        config["acks"] = producer_config["acks"]
+        config["retries"] = producer_config["retries"]
+        config["linger.ms"] = producer_config["linger_ms"]
+        config["batch.size"] = producer_config["batch_size"]
+        config["compression.type"] = producer_config["compression_type"]
 
         confluent_kafka = _get_confluent_kafka()
         producer_constructor: RawProducerConstructor = confluent_kafka.Producer
@@ -533,19 +552,13 @@ class RealKafkaConsumer:
             confluent_config: Confluent Cloud connection settings.
             consumer_config: Consumer-specific settings.
         """
-        config: KafkaConfigDict = {
-            "bootstrap.servers": confluent_config["bootstrap_servers"],
-            "security.protocol": confluent_config["security_protocol"],
-            "sasl.mechanisms": confluent_config["sasl_mechanism"],
-            "sasl.username": confluent_config["api_key"],
-            "sasl.password": confluent_config["api_secret"],
-            "group.id": consumer_config["group_id"],
-            "auto.offset.reset": consumer_config["auto_offset_reset"],
-            "enable.auto.commit": consumer_config["enable_auto_commit"],
-            "fetch.min.bytes": consumer_config["fetch_min_bytes"],
-            "session.timeout.ms": consumer_config["session_timeout_ms"],
-            "heartbeat.interval.ms": consumer_config["heartbeat_interval_ms"],
-        }
+        config: KafkaConfigDict = _connection_config(confluent_config)
+        config["group.id"] = consumer_config["group_id"]
+        config["auto.offset.reset"] = consumer_config["auto_offset_reset"]
+        config["enable.auto.commit"] = consumer_config["enable_auto_commit"]
+        config["fetch.min.bytes"] = consumer_config["fetch_min_bytes"]
+        config["session.timeout.ms"] = consumer_config["session_timeout_ms"]
+        config["heartbeat.interval.ms"] = consumer_config["heartbeat_interval_ms"]
 
         confluent_kafka = _get_confluent_kafka()
         consumer_constructor: RawConsumerConstructor = confluent_kafka.Consumer

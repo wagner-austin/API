@@ -18,23 +18,28 @@ from platform_core.config._utils import _parse_bool, _parse_int, _parse_str
 
 
 class ConfluentConfig(TypedDict):
-    """Confluent Cloud Kafka connection configuration.
+    """Kafka connection configuration.
 
-    All fields are required for production Kafka connectivity via Confluent Cloud.
-    Authentication uses SASL/PLAIN with API key and secret.
+    Confluent Cloud authenticates with SASL/PLAIN over TLS, which is the
+    default. PLAINTEXT is also accepted so the streaming stack can be pointed
+    at an unauthenticated broker -- a local container, or one stood up in CI.
+    Pinning the protocol to SASL_SSL made the consumer and producer impossible
+    to exercise anywhere except Confluent Cloud, which left every offset,
+    commit and dead-letter path testable only against fakes.
 
     Fields:
-        bootstrap_servers: Confluent Cloud bootstrap server endpoint.
-        api_key: SASL username for authentication.
-        api_secret: SASL password for authentication.
-        security_protocol: Security protocol (always SASL_SSL for Confluent Cloud).
-        sasl_mechanism: SASL mechanism (always PLAIN for Confluent Cloud).
+        bootstrap_servers: Bootstrap server endpoint.
+        api_key: SASL username. Required under SASL_SSL, unused under PLAINTEXT.
+        api_secret: SASL password. Required under SASL_SSL, unused under PLAINTEXT.
+        security_protocol: SASL_SSL for Confluent Cloud, PLAINTEXT for a local
+            or CI broker with no authentication.
+        sasl_mechanism: SASL mechanism (always PLAIN; ignored under PLAINTEXT).
     """
 
     bootstrap_servers: str
     api_key: str
     api_secret: str
-    security_protocol: Literal["SASL_SSL"]
+    security_protocol: Literal["SASL_SSL", "PLAINTEXT"]
     sasl_mechanism: Literal["PLAIN"]
 
 
@@ -176,6 +181,25 @@ def _parse_auto_offset_reset(value: str) -> Literal["earliest", "latest"]:
     raise ValueError(f"Invalid auto_offset_reset: '{value}', must be 'earliest' or 'latest'")
 
 
+def _parse_security_protocol(value: str) -> Literal["SASL_SSL", "PLAINTEXT"]:
+    """Parse the Kafka security protocol.
+
+    Args:
+        value: Raw string value.
+
+    Returns:
+        Validated Literal type.
+
+    Raises:
+        ValueError: If value is not a supported protocol.
+    """
+    if value == "SASL_SSL":
+        return "SASL_SSL"
+    if value == "PLAINTEXT":
+        return "PLAINTEXT"
+    raise ValueError(f"Invalid security_protocol: '{value}', must be 'SASL_SSL' or 'PLAINTEXT'")
+
+
 def _parse_acks(value: str) -> Literal["all", "0", "1"]:
     """Parse producer acks value.
 
@@ -253,12 +277,16 @@ def load_streaming_config() -> StreamingConfig:
     Returns:
         Complete StreamingConfig with all settings.
     """
-    # Parse Confluent Cloud config
+    # Parse Kafka connection config. The protocol defaults to SASL_SSL, so an
+    # unset environment still targets Confluent Cloud exactly as before.
+    security_protocol = _parse_security_protocol(
+        _parse_str("CONFLUENT__SECURITY_PROTOCOL", "SASL_SSL")
+    )
     confluent: ConfluentConfig = {
         "bootstrap_servers": _parse_str("CONFLUENT__BOOTSTRAP_SERVERS", ""),
         "api_key": _parse_str("CONFLUENT__API_KEY", ""),
         "api_secret": _parse_str("CONFLUENT__API_SECRET", ""),
-        "security_protocol": "SASL_SSL",
+        "security_protocol": security_protocol,
         "sasl_mechanism": "PLAIN",
     }
 

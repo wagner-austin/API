@@ -14,6 +14,7 @@ from covenant_radar_api.streaming.config import (
     _parse_acks,
     _parse_auto_offset_reset,
     _parse_compression_type,
+    _parse_security_protocol,
     load_streaming_config,
 )
 
@@ -63,6 +64,28 @@ class TestParseAutoOffsetReset:
             _parse_auto_offset_reset("invalid")
 
 
+class TestParseSecurityProtocol:
+    """Tests for _parse_security_protocol.
+
+    The protocol used to be pinned to SASL_SSL, which meant the consumer and
+    producer could only ever be pointed at Confluent Cloud. Every offset,
+    commit and dead-letter path was therefore reachable only through fakes.
+    """
+
+    def test_sasl_ssl(self) -> None:
+        """SASL_SSL is accepted, and remains the Confluent Cloud default."""
+        assert _parse_security_protocol("SASL_SSL") == "SASL_SSL"
+
+    def test_plaintext(self) -> None:
+        """PLAINTEXT is accepted, for a local or CI broker with no auth."""
+        assert _parse_security_protocol("PLAINTEXT") == "PLAINTEXT"
+
+    def test_invalid_raises(self) -> None:
+        """An unsupported protocol fails loudly rather than reaching Kafka."""
+        with pytest.raises(ValueError, match="Invalid security_protocol"):
+            _parse_security_protocol("SSL")
+
+
 class TestParseAcks:
     """Tests for _parse_acks."""
 
@@ -85,6 +108,27 @@ class TestParseAcks:
         """Invalid value raises ValueError."""
         with pytest.raises(ValueError, match="Invalid acks"):
             _parse_acks("invalid")
+
+
+class TestSecurityProtocolFromEnv:
+    """The protocol is read from the environment, defaulting to SASL_SSL."""
+
+    def test_plaintext_from_env(self) -> None:
+        """CONFLUENT__SECURITY_PROTOCOL selects an unauthenticated broker."""
+        fake_env: dict[str, str] = {"CONFLUENT__SECURITY_PROTOCOL": "PLAINTEXT"}
+        env_hooks.get_env = lambda key: fake_env.get(key)
+
+        config = load_streaming_config()
+
+        assert config["confluent"]["security_protocol"] == "PLAINTEXT"
+
+    def test_invalid_from_env_raises(self) -> None:
+        """A bad protocol fails at config load, not at first poll."""
+        fake_env: dict[str, str] = {"CONFLUENT__SECURITY_PROTOCOL": "nope"}
+        env_hooks.get_env = lambda key: fake_env.get(key)
+
+        with pytest.raises(ValueError, match="Invalid security_protocol"):
+            load_streaming_config()
 
 
 class TestParseCompressionType:
