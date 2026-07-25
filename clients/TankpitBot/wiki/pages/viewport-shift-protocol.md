@@ -25,7 +25,7 @@ The server sends a fresh `0x5A ViewportUpdate` (see [[viewport-update-algorithm]
 
 1. **Teleport landing** — `0x74`-family teleport command lands the tank, server recenters the viewport on the new position and sends `0x5A`.
 2. **Client scope command** — client sends `Rb` (`"Z"`) or `Sb` (`"z"`) requesting a shift; server confirms with `0x5A`.
-3. **Server-side auto-shift** — when autoscroll is enabled (via `Ia` text control), the server sends `0x5A` **only when the tank walks onto a viewport-edge tile** (not on every walk step). The shift then **recenters the viewport on the tank** — the tank's post-shift position is at (or near) the center of the new 16×16 frame.[^user] Behaviour paired 1:1 with `0x3D MovementResponse` in the corpus.[^5]
+3. **Server-side auto-shift** — when autoscroll is enabled (via `Ia` text control), the server sends `0x5A` **only when the tank walks onto a viewport-edge tile** (not on every walk step). The shift then **recenters the viewport on the tank** — the tank's post-shift position is at (or near) the center of the new 16×16 frame.[^user] Behaviour paired 1:1 with `0x3D MovementResponse` in the corpus.[^5] User corroboration (verbatim, 2026-07-24): *"autoscroll makes it so that when you get to the edge of the viewport it re centers on you. otherwise the viewport is fixed and only centers on teleport."* **The setting is SERVER-PERSISTED per account** — the 2026-07-24 key probe's 'a' press sent `A0` and the account's autoscroll stayed off in later sessions (restore = one more 'a' press sending `A1`), the same cross-session persistence the equipment toggles showed (a radar-watch session opened with slot 5 already disabled from the previous session's toggle).
 
 ## The three client-side commands
 
