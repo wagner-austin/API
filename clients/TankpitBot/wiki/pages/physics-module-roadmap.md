@@ -18,7 +18,7 @@ source_paths:
   - "src/tankpit_bot/validate"
 source_git_blobs:
   "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
-  "src/tankpit_bot/sim": "6ebbc818b3a08a6a543d39d707a7557eba361879"
+  "src/tankpit_bot/sim": "0555379f06f3e3d1e53a0a590646a93c6296492f"
   "src/tankpit_bot/validate": "d7f5c60b9d2048cab60968f95214be039f70e599"
 fact_checked: "2026-07-20"
 confidence: high
@@ -1075,9 +1075,15 @@ reflex classes: archive exactness rose 94.6% → **97.6%
 (2,192/2,247)** as the former residual was recognized as lawful
 aggro. The law-test round also fixed a self-justification bug in
 the event walk (judgment now precedes hit recording). The model is
-NOT yet the live sim-run opponent — `sim/opponent.py` remains the
-deterministic soak harness by design; wiring roster bots driven by
-`decide_practice_bot` into sim sessions is the next as-built step.[^2]
+wired into sim sessions the same day: `make sim-run-practice`
+(`sim/practice_room.py`) seeds a four-bot certified roster (gang-up
+cluster + ally) driven by `decide_practice_bot`, with hits noted
+from 0x53 emissions and corpse-window reactivation active. First
+soak: the production bot deactivated in 21 rounds under gang-up
+fire — the sim now reproduces the live multi-bot failure mode the
+scripted harness could not. `sim/opponent.py` remains the default
+`make sim-run` (deterministic kill path); practice mode is the
+fidelity soak.[^2]
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
