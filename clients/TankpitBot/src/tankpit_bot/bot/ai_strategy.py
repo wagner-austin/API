@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
-from tankpit_bot.bot.ai.combat_strategy import has_cardinal_combat_shot
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
@@ -21,12 +20,11 @@ from tankpit_bot.bot.ai.mode_controller import (
     derive_hunt_mode_state,
     make_hold_decision,
     resolve_owner_from_manual,
-    should_enter_collect,
+    should_enter_hunt,
     should_exit_collect,
     should_exit_hunt,
 )
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
-from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
@@ -143,49 +141,36 @@ def _normalize_ai_state(ai_state: AIStateDict) -> AIStateDict:
 def _select_owner_mode(ctx: DecideCtx) -> AIMode:
     """Select the durable owner for this tick.
 
+    HUNT is a privilege of a full tank (user contract 2026-07-25:
+    "it should never hunt when its low on fuel or equipment. it
+    should never hunt if it is not full on everything except -5 max
+    radar"). Entry into HUNT requires full readiness
+    (:func:`should_enter_hunt`); a held HUNT releases only when a
+    COLLECT trigger fires (:func:`should_exit_hunt`), so fighting
+    down from cap does not thrash ownership. Everything that is not
+    ready-to-hunt collects.
+
+    The 2026-07-13 cardinal-adjacent override ("an enemy one tile
+    away flips the tick to HUNT regardless of reserves") is deleted:
+    it silently outranked the low-fuel break and produced the
+    2026-07-25 practice-room fight-to-death. Ignoring an adjacent
+    bot while collecting is safe -- bots never initiate, they only
+    return fire ([[enemy-bot-behavior]]).
+
     Args:
         ctx: Decision context.
 
     Returns:
-        Durable top-level owner for the current tick. A cardinal-adjacent
-        live wire-fresh enemy overrides every other selector: HUNT wins
-        the tick regardless of the current durable mode, inventory
-        reserves, or COLLECT candidates. A cardinal shot is a free kill
-        and skipping it for a fuel pickup was the 2026-07-06 22:37 loop
-        (bot teleported adjacent to orange-8 at (46,159) five times,
-        each time dispatching a fuel pickup instead of firing).
+        Durable top-level owner for the current tick.
     """
-    if _has_any_cardinal_combat_shot(ctx):
-        return "HUNT"
     current_mode = ctx.mode
     if current_mode == "COLLECT" and not should_exit_collect(ctx):
         return "COLLECT"
     if current_mode == "HUNT" and not should_exit_hunt(ctx):
         return "HUNT"
-    if should_enter_collect(ctx):
-        return "COLLECT"
-    return "HUNT"
-
-
-def _has_any_cardinal_combat_shot(ctx: DecideCtx) -> bool:
-    """Return True when a live wire-fresh enemy sits cardinally adjacent.
-
-    Cardinal adjacency (Manhattan distance 1) guarantees a hit at
-    point-blank: aim is viewport-legal by construction, the server
-    picks the enabled weapon, and the shot lands the same tick. The
-    check runs over :func:`analyze_threats`, which already gates for
-    liveness and viewport-freshness -- so ``True`` means "there is at
-    this instant an enemy the bot could shoot for free."
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if any live viewport-fresh enemy is at Manhattan distance
-        1 from the bot.
-    """
-    threats = analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
-    return any(has_cardinal_combat_shot(ctx.self_state, threat) for threat in threats)
+    if should_enter_hunt(ctx):
+        return "HUNT"
+    return "COLLECT"
 
 
 def _migrate_unset_combat_state(ai_state: AIStateDict) -> AIStateDict:

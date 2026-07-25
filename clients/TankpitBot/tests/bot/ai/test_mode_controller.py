@@ -192,9 +192,16 @@ def test_should_enter_collect_uses_break_threshold() -> None:
     assert should_enter_collect(_make_ctx(dual_count=30, radar_count=30)) is False
 
 
-def test_should_exit_collect_uses_resume_threshold() -> None:
-    """Equipment recovery exit uses the configured resume threshold."""
-    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=25)) is True
+def test_should_exit_collect_requires_a_full_stock() -> None:
+    """COLLECT releases only at a genuinely full stock.
+
+    User contract (2026-07-25): "never hunt if it is not full on
+    everything except -5 max radar." At rank 2 the cap is 30, so
+    duals below 30 hold the mode even though the old resume
+    threshold (25) is satisfied.
+    """
+    assert should_exit_collect(_make_ctx(dual_count=30, radar_count=30)) is True
+    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=25)) is False
     assert should_exit_collect(_make_ctx(dual_count=5, radar_count=5)) is False
 
 
@@ -225,21 +232,29 @@ def test_radars_below_resume_threshold_trigger_restock() -> None:
     assert should_enter_collect(_make_ctx(dual_count=30, radar_count=20)) is False
 
 
-def test_exit_recover_equipment_requires_radar_resume() -> None:
-    """Restored weapons do NOT release recovery while radars stay low.
+def test_exit_recover_equipment_requires_radars_within_five_of_cap() -> None:
+    """Full weapons do NOT release recovery while radars stay low.
 
-    The mode holds until radars are rebuilt to the resume buffer, so
-    the bot reaches a healthy stock before returning to the hunt
-    instead of leaving at the first radar it scrapes together.
+    The mode holds until extra radars are within 5 of the rank cap
+    (cap 30 at rank 2, so the floor is 25), so the bot reaches a
+    genuinely full kit before returning to the hunt instead of
+    leaving at the first radar it scrapes together.
     """
-    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=5)) is False
-    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=19)) is False
-    assert should_exit_collect(_make_ctx(dual_count=25, radar_count=20)) is True
+    assert should_exit_collect(_make_ctx(dual_count=30, radar_count=5)) is False
+    assert should_exit_collect(_make_ctx(dual_count=30, radar_count=24)) is False
+    assert should_exit_collect(_make_ctx(dual_count=30, radar_count=25)) is True
 
 
-def test_should_enter_hunt_when_no_recovery_mode_has_priority() -> None:
-    """HUNT owns the tick only when no recovery mode has stronger entry rules."""
-    assert should_enter_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is True
+def test_should_enter_hunt_requires_full_fuel_and_full_stock() -> None:
+    """HUNT entry is a privilege of a full tank (contract 2026-07-25).
+
+    Fuel below the full threshold (1100) refuses entry even with a
+    perfect inventory; a full tank with weapons below cap refuses
+    too.
+    """
+    assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=30, radar_count=30)) is True
+    assert should_enter_hunt(_make_ctx(fuel=700, dual_count=30, radar_count=30)) is False
+    assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=25, radar_count=30)) is False
     assert should_enter_hunt(_make_ctx(fuel=150, dual_count=30, radar_count=30)) is False
 
 

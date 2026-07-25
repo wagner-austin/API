@@ -18,11 +18,11 @@ from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_wo
 def test_manual_none_runs_auto_arbitration() -> None:
     """The default ``manual_mode = None`` runs auto-arbitration.
 
-    Healthy fuel with a fully stocked inventory: auto selects HUNT.
+    Full fuel with a fully stocked inventory: auto selects HUNT.
     The initial AI state has ``manual_mode = None`` — confirming the
     override never fires and the decision is derived from HUNT.
     """
-    world, self_state = make_world(fuel=800)
+    world, self_state = make_world(fuel=1200)
     ai_state = make_scanned_ai_state()
     assert ai_state["manual_mode"] is None
     inventory = make_inventory()

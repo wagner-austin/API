@@ -282,26 +282,6 @@ def compute_equipment(fuel: int, inventory: InventoryState) -> list[int]:
     return sorted(desired)
 
 
-def combat_reserve_restored(ctx: DecideCtx) -> bool:
-    """Check if the WEAPON reserves are back above the resume threshold.
-
-    The recovery-exit counterpart of :func:`needs_emergency_equipment`:
-    radars are deliberately excluded so a session that entered recovery
-    for weapons cannot be held hostage by the radars it spent while
-    searching.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True if the dual and homing counts are above the resume threshold.
-    """
-    return (
-        ctx.inventory["dual_shots"]["count"] >= ctx.config["dual_resume_threshold"]
-        and ctx.inventory["homing_shots"]["count"] >= ctx.config["dual_resume_threshold"]
-    )
-
-
 # =============================================================================
 # Kill and combat helpers
 # =============================================================================

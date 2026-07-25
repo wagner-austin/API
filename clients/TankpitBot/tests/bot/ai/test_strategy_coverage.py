@@ -673,16 +673,17 @@ class TestFuelSearchFallbacks:
             decide(world, self_state, ai_state, inventory, 100000, terrain)
 
 
-class TestCardinalShotOverride:
-    """Tests for the KillPriorityContract mode-selector override.
+class TestHuntOnlyWhenFull:
+    """Tests for the hunt-only-when-full mode-selector contract.
 
-    The 2026-07-06 22:37 live run teleported the bot adjacent to
-    orange-8 at (46,159) five separate times; each landing COLLECT
-    dispatched a fuel pickup instead of firing the free cardinal
-    dual. The mode selector's first check is now "is there a live
-    wire-fresh enemy at Manhattan distance 1?" -- yes overrides the
-    durable mode into HUNT regardless of inventory reserves or
-    COLLECT candidates.
+    User contract (2026-07-25): "it should never hunt when its low on
+    fuel or equipment. it should never hunt if it is not full on
+    everything except -5 max radar." The 2026-07-13 cardinal-adjacent
+    override that outranked every reserve check is deleted -- it
+    produced the practice-room fight-to-death (bot traded down from
+    384 fuel to 0 against a gang-up because an enemy was always one
+    tile away). Ignoring an adjacent enemy while collecting is safe:
+    bots never initiate, they only return fire.
     """
 
     def setup_method(self) -> None:
@@ -738,55 +739,16 @@ class TestCardinalShotOverride:
             ),
         }
 
-    def test_has_any_cardinal_combat_shot_true_with_cardinal_enemy(self) -> None:
-        """The check returns True when a viewport-fresh enemy is Manhattan 1 away."""
-        from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
+    def test_cardinal_enemy_cannot_divert_an_understocked_collect_tick(self) -> None:
+        """An adjacent enemy never flips an under-stocked COLLECT tick.
 
-        world, self_state = _make_world(fuel=800, tanks=self._make_cardinal_enemy())
-        ai_state = _scanned_ai_state()
-        inventory = _make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-        assert _has_any_cardinal_combat_shot(ctx) is True
-
-    def test_has_any_cardinal_combat_shot_false_with_distant_enemy(self) -> None:
-        """The check returns False when the only enemy is beyond Manhattan 1."""
-        from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
-
-        world, self_state = _make_world(fuel=800, tanks=self._make_distant_enemy())
-        ai_state = _scanned_ai_state()
-        inventory = _make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-        assert _has_any_cardinal_combat_shot(ctx) is False
-
-    def test_has_any_cardinal_combat_shot_false_with_no_enemies(self) -> None:
-        """The check returns False when the world holds no live enemy tanks."""
-        from tankpit_bot.bot.ai.context import DecideCtx
-        from tankpit_bot.bot.ai_strategy import _has_any_cardinal_combat_shot
-
-        world, self_state = _make_world(fuel=800)
-        ai_state = _scanned_ai_state()
-        inventory = _make_inventory()
-        ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
-
-        assert _has_any_cardinal_combat_shot(ctx) is False
-
-    def test_cardinal_enemy_overrides_collect_lock_into_hunt(self) -> None:
-        """A cardinal enemy diverts a COLLECT-locked tick into a HUNT tick.
-
-        Bot durably in COLLECT with a fuel target lock on (105,105).
-        Under the pre-fix mode selector the lock keeps ownership and
-        COLLECT dispatches a fuel pickup even with an enemy at
-        (101,100). Post-fix the mode selector's cardinal-shot check
-        fires first and HUNT wins the tick. HUNT's own cascade may
-        teleport-then-shoot in the next tick (the fresh-acquire path
-        does not fire on cardinal targets yet -- follow-up work),
-        so this test only guarantees the mode-selector reversal:
-        HUNT owns the tick, and the command is not the fuel pickup
-        the pre-fix mode selector would have dispatched.
+        Bot durably in COLLECT with a fuel target lock on (105,105),
+        fuel 800 (below the 1100 full threshold), and an enemy one
+        tile away at (101,100). Under the deleted 2026-07-13 override
+        this tick became HUNT and the bot opened a fight it could not
+        fund; under the 2026-07-25 contract COLLECT keeps ownership
+        and dispatches the fuel pickup. The adjacent bot is no danger:
+        bots never initiate, they only return fire.
         """
         containers = {"105,105": _c(105, 105, 400, True)}
         world, self_state = _make_world(
@@ -807,5 +769,31 @@ class TestCardinalShotOverride:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
+        assert decision["behavior"]["mode"] == "COLLECT"
+        assert decision["command"]["cmd_type"] == "pickup_fuel"
+
+    def test_full_stock_with_adjacent_enemy_hunts(self) -> None:
+        """A fully stocked bot (fuel full, weapons at cap) hunts the
+        adjacent enemy through the ordinary selector path -- no
+        override needed once readiness is genuine."""
+        world, self_state = _make_world(fuel=1100, tanks=self._make_cardinal_enemy())
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory()
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["command"]["cmd_type"] != "pickup_fuel"
+
+    def test_understocked_weapons_never_hunt_even_at_full_fuel(self) -> None:
+        """Full fuel with duals below cap stays COLLECT -- "never hunt
+        if it is not full on everything except -5 max radar"."""
+        containers = {"105,105": _c(105, 105, 0, False)}
+        world, self_state = _make_world(
+            fuel=1100, containers=containers, tanks=self._make_cardinal_enemy()
+        )
+        ai_state = _scanned_ai_state()
+        inventory = _make_inventory(dual_count=3)
+
+        decision = decide(world, self_state, ai_state, inventory, 100000, None)
+
+        assert decision["behavior"]["mode"] == "COLLECT"

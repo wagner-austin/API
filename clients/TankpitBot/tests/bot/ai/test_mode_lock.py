@@ -10,7 +10,7 @@ from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_wo
 
 def test_unset_mode_enters_hunt_after_hunt_decision() -> None:
     """A legacy HUNT decision seeds durable HUNT ownership for later ticks."""
-    world, self_state = make_world(fuel=800)
+    world, self_state = make_world(fuel=1200)
     ai_state = make_scanned_ai_state()
     inventory = make_inventory()
 
@@ -75,7 +75,7 @@ def test_hunt_mode_switches_to_recover_fuel_when_recovery_takes_priority() -> No
 
 def test_invalid_mode_state_is_ignored_and_reselected() -> None:
     """Invalid durable mode state does not crash; owner selection re-evaluates cleanly."""
-    world, self_state = make_world(fuel=800)
+    world, self_state = make_world(fuel=1200)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -343,8 +343,13 @@ def test_collect_mode_owns_tick_below_resume_threshold() -> None:
     assert decision["updated_ai_state"]["mode_started_ms"] == 90000
 
 
-def test_collect_mode_switches_to_hunt_after_reserve_restored() -> None:
-    """COLLECT hands control to HUNT after fuel and combat reserves recover."""
+def test_collect_mode_switches_to_hunt_after_full_restock() -> None:
+    """COLLECT hands control to HUNT once the stock is genuinely full.
+
+    Contract 2026-07-25: weapons at the rank cap (30 at rank 2) and
+    radars within 5 of cap -- the old resume thresholds (25) no
+    longer release the mode.
+    """
     world, self_state = make_world(fuel=1200)
     ai_state = AIStateDict(
         **{
@@ -356,8 +361,8 @@ def test_collect_mode_switches_to_hunt_after_reserve_restored() -> None:
         }
     )
     inventory = make_inventory(default_count=30)
-    inventory["dual_shots"]["count"] = 25
-    inventory["homing_shots"]["count"] = 25
+    inventory["dual_shots"]["count"] = 30
+    inventory["homing_shots"]["count"] = 30
     inventory["extra_radars"]["count"] = 25
 
     decision = decide(world, self_state, ai_state, inventory, 100000, None)

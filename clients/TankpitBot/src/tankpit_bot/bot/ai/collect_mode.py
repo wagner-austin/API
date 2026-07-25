@@ -150,11 +150,14 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     4. Pick up the best fuel in the current viewport (skipped at cap).
     5. Forage: radar when the viewport has unscanned tiles, or walk
        toward an unscanned tile so the next free radar covers it.
-    6. Hop: teleport to the nearest fuel dot whose landing viewport
-       is unscanned and 100% walkable when nothing actionable remains
-       here (landing auto-pickup makes the hop partially
-       self-funding). With an empty dot atlas the hop opens the map
-       first.
+    6. Hop: teleport to the best-value fuel dot when nothing
+       actionable remains here -- candidates are RANKED by
+       ``dots_in_landing_viewport * walkable_fraction / cost``, hard
+       gates are physics only (landing passable, affordable, not
+       freshly scanned; the 2026-07-03 100%-walkable hard filter was
+       replaced 2026-07-18 -- it starved the cascade). Landing
+       auto-pickup makes the hop partially self-funding. With an
+       empty dot atlas the hop opens the map first.
 
     Args:
         ctx: Decision context.

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.context import (
-    DecideCtx,
-    combat_reserve_restored,
-)
+from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
@@ -228,26 +225,6 @@ def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecision
     )
 
 
-def needs_radar_restock(ctx: DecideCtx) -> bool:
-    """Return True while extra radars sit below the healthy buffer.
-
-    Radars find both enemies and equipment, so the bot rebuilds a
-    healthy stock before returning to the hunt rather than fighting
-    blind at one or two. This is the exit-side (resume) predicate; it
-    deliberately ignores visible threats, because rebuilding the kit
-    outranks chasing wanderers the bot cannot find or beat without
-    radar (live run 20260613-011044: looped 0->3->2->1, never built a
-    buffer, because it ran off to fight at the first radar).
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        True when the extra-radar count is below the resume threshold.
-    """
-    return ctx.inventory["extra_radars"]["count"] < ctx.config["radar_resume_threshold"]
-
-
 def should_enter_collect(ctx: DecideCtx) -> bool:
     """Return True when the unified COLLECT mode should own planning.
 
@@ -298,40 +275,44 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
 def should_exit_collect(ctx: DecideCtx) -> bool:
     """Return True when COLLECT can release control.
 
-    The mode holds until BOTH reserves are healthy: fuel back above the
-    full threshold AND weapons + radars back above their resume buffers.
-    The break/resume gap gives hysteresis -- entry at the low break,
-    exit only at the higher resume -- so the bot rebuilds to a full
-    stock instead of leaving the moment it scrapes together one radar.
+    The mode holds until the bot is FULLY restocked: fuel back above
+    the full threshold AND the inventory combat-ready
+    (:func:`hunt_entry_permitted` -- duals and homings at cap, extra
+    radars within 5 of cap; user contract 2026-07-25: "never hunt if
+    it is not full on everything except -5 max radar"). The
+    entry-at-break / exit-at-full gap gives hysteresis, so the bot
+    rebuilds a full stock instead of leaving the moment it scrapes
+    together one radar.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when fuel and combat reserves are restored.
+        True when fuel and inventory are fully restored.
     """
     if ctx.fuel < ctx.config["fuel_full_threshold"]:
         return False
-    return combat_reserve_restored(ctx) and not needs_radar_restock(ctx)
+    return hunt_entry_permitted(ctx)
 
 
 def should_enter_hunt(ctx: DecideCtx) -> bool:
     """Return True when HUNT is the valid top-level owner.
 
-    The bot only hunts when properly stocked — weapon reserves above the
-    resume threshold and no fuel/equipment recovery needed. Starting a
-    fight with low ammo leads to abandoned kills when the break
+    HUNT is a privilege of a full tank (user contract 2026-07-25):
+    fuel at the full threshold, duals and homings at cap, extra
+    radars within 5 of cap, and no COLLECT trigger pending. Starting
+    a fight below full stock leads to abandoned kills when the break
     threshold pulls the bot away mid-fight.
 
     Args:
         ctx: Decision context.
 
     Returns:
-        True when combat-ready and COLLECT has no stronger entry condition.
+        True when fully stocked and COLLECT has no entry condition.
     """
     if should_enter_collect(ctx):
         return False
-    return combat_reserve_restored(ctx)
+    return ctx.fuel >= ctx.config["fuel_full_threshold"] and hunt_entry_permitted(ctx)
 
 
 def combat_radar_min(rank: int) -> int:
@@ -368,12 +349,11 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
     at every yield-to-hunt gesture: COLLECT never releases the tick
     unless the bot could take the fight to completion.
 
-    The gate is inventory-only. Fuel readiness lives in
-    :func:`combat_reserve_restored` and the fuel-cascade already
-    guards it. The cardinal-shot override in
-    :mod:`tankpit_bot.bot.ai_strategy` (Bug 0.5) intentionally
-    bypasses this predicate for a free adjacent kill; even a single
-    dual advances the kill and is worth taking under-armed.
+    The gate is inventory-only; fuel readiness is enforced alongside
+    it in :func:`should_enter_hunt` and :func:`should_exit_collect`.
+    Nothing bypasses this predicate: the 2026-07-13 cardinal-shot
+    override that did was deleted 2026-07-25 (user contract: the bot
+    never hunts below full stock, no exceptions).
 
     Args:
         ctx: Decision context.
@@ -395,13 +375,20 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
 def should_exit_hunt(ctx: DecideCtx) -> bool:
     """Return True when HUNT should release control.
 
+    A held HUNT releases only when a COLLECT trigger fires -- fuel at
+    the low break, a weapon or radar break, or between-kills resume
+    shortfalls. Deliberately NOT ``not should_enter_hunt``: entry
+    requires a full stock, and the first shot of a fight spends a
+    dual, so re-checking the entry bar every tick would thrash
+    ownership one shot into every engagement.
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when COLLECT now has a stronger entry condition.
+        True when COLLECT now has an entry condition.
     """
-    return not should_enter_hunt(ctx)
+    return should_enter_collect(ctx)
 
 
 def derive_hunt_mode_state(decision: TickDecisionDict) -> AIModeState:

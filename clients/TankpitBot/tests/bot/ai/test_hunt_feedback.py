@@ -44,7 +44,7 @@ class TestDecideCombatFeedback:
                 liveness="deactivated",
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state_with_shot = AIStateDict(
             **{
@@ -63,7 +63,7 @@ class TestDecideCombatFeedback:
 
     def test_miss_with_no_target_in_world_opens_map(self) -> None:
         """Miss feedback with no target state falls through to reacquisition."""
-        world, self_state = make_world(fuel=800)
+        world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         ai_state_with_shot = AIStateDict(
             **{
@@ -104,7 +104,7 @@ class TestDecideCombatFeedback:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = make_scanned_ai_state()
         ai_state_with_shot = AIStateDict(
             **{
@@ -124,7 +124,7 @@ class TestDecideCombatFeedback:
 
     def test_no_feedback_when_no_shot_pending(self) -> None:
         """Empty combat feedback leaves normal planning unchanged."""
-        world, self_state = make_world(fuel=800)
+        world, self_state = make_world(fuel=1200)
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
 
@@ -160,7 +160,7 @@ class TestDecideShotTracking:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -205,7 +205,7 @@ class TestDecideKillCooldown:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -255,7 +255,7 @@ class TestDecideKillCooldown:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -300,7 +300,7 @@ class TestDecideKillCooldown:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -347,7 +347,7 @@ class TestDecideKillCooldown:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -453,7 +453,7 @@ class TestDecideKillCooldown:
 
     def test_expired_kills_removed(self) -> None:
         """Expired kill cooldown entries are removed from the updated AI state."""
-        world, self_state = make_world(fuel=800)
+        world, self_state = make_world(fuel=1200)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -494,7 +494,7 @@ class TestDecideKillCooldown:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),
@@ -625,7 +625,7 @@ class TestDepartedTargetFollowUp:
                 last_viewport_observation_ms=100000,
             ),
         }
-        world, self_state = make_world(fuel=800, tanks=tanks)
+        world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
             **{
                 **make_scanned_ai_state(),

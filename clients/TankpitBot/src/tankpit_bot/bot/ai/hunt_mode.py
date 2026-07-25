@@ -152,20 +152,38 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
             return engage_target(ctx, locked)
         return close_target(ctx, locked)
     if ctx.ai_state["combat_target_id"] != -1:
-        # A lock that reaches ACQUIRE with its target off-viewport is a
-        # stale engagement resumed after a mode interrupt (COLLECT may
-        # have relocated the bot arbitrarily far). The user contract
-        # (2026-07-02): never fire from stand-off range on resume --
-        # release the lock and re-acquire fresh. If the same enemy is
-        # still the best affordable candidate, acquisition teleports
-        # back to it (live run 2026-07-01 20:48: the old resume path
-        # fired at a target 92 tiles away and looped on server
-        # rejections).
+        # A lock that reaches ACQUIRE with its target off-viewport is
+        # an engagement resumed after a mode interrupt (COLLECT may
+        # have relocated the bot arbitrarily far). User contract
+        # (2026-07-25): the restock cycle does NOT abandon the target
+        # -- damage persists, so return to the same tank and finish
+        # it. Resuming means GOING to the target, never firing from
+        # stand-off range (user contract 2026-07-02; live run
+        # 2026-07-01 20:48 fired at a target 92 tiles away and looped
+        # on server rejections): teleport back on a trustworthy
+        # position, refresh the map on a stale one, and release the
+        # lock only when the target is genuinely gone (dead or
+        # vanished from the registry).
+        pursuit = _locked_target_pursuit(ctx)
+        if pursuit is None:
+            emit_ai(
+                "locked target id=%d is gone - re-acquiring fresh",
+                ctx.ai_state["combat_target_id"],
+            )
+            return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
+        if not target_position_is_fresh(ctx, pursuit):
+            emit_ai(
+                "returning to locked target %s - refreshing stale position via map",
+                pursuit["name"],
+            )
+            return open_map_for_target(ctx, pursuit)
         emit_ai(
-            "releasing stale lock on id=%d - target off viewport after resume",
-            ctx.ai_state["combat_target_id"],
+            "returning to locked target %s at (%d,%d) after mode interrupt",
+            pursuit["name"],
+            pursuit["x"],
+            pursuit["y"],
         )
-        return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
+        return teleport_to_target(ctx, pursuit)
 
     return _decide_hunt_acquire_fresh(ctx, threats, ctx.base)
 
