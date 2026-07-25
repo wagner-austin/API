@@ -14,6 +14,7 @@ from covenant_domain.models import (
     DealId,
     Measurement,
 )
+from platform_core.errors import AppError, ErrorCode
 
 from .protocols import ConnectionProtocol
 
@@ -64,7 +65,7 @@ class PostgresDealRepository:
         self._conn.commit()
 
     def get(self, deal_id: DealId) -> Deal:
-        """Get deal by ID. Raises KeyError if not found."""
+        """Get deal by ID. Raises AppError(NOT_FOUND) if absent."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -76,7 +77,10 @@ class PostgresDealRepository:
         )
         row = cursor.fetchone()
         if row is None:
-            raise KeyError(f"Deal not found: {deal_id['value']}")
+            raise AppError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Deal not found: {deal_id['value']}",
+            )
         return _row_to_deal(row)
 
     def list_all(self) -> Sequence[Deal]:
@@ -93,7 +97,7 @@ class PostgresDealRepository:
         return [_row_to_deal(row) for row in rows]
 
     def update(self, deal: Deal) -> None:
-        """Update existing deal. Raises KeyError if not found."""
+        """Update existing deal. Raises AppError(NOT_FOUND) if absent."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -113,15 +117,21 @@ class PostgresDealRepository:
             ),
         )
         if cursor.rowcount == 0:
-            raise KeyError(f"Deal not found: {deal['id']['value']}")
+            raise AppError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Deal not found: {deal['id']['value']}",
+            )
         self._conn.commit()
 
     def delete(self, deal_id: DealId) -> None:
-        """Delete deal. Raises KeyError if not found."""
+        """Delete deal. Raises AppError(NOT_FOUND) if absent."""
         cursor = self._conn.cursor()
         cursor.execute("DELETE FROM deals WHERE id = %s", (deal_id["value"],))
         if cursor.rowcount == 0:
-            raise KeyError(f"Deal not found: {deal_id['value']}")
+            raise AppError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Deal not found: {deal_id['value']}",
+            )
         self._conn.commit()
 
 
@@ -154,7 +164,7 @@ class PostgresCovenantRepository:
         self._conn.commit()
 
     def get(self, covenant_id: CovenantId) -> Covenant:
-        """Get covenant by ID. Raises KeyError if not found."""
+        """Get covenant by ID. Raises AppError(NOT_FOUND) if absent."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -166,7 +176,10 @@ class PostgresCovenantRepository:
         )
         row = cursor.fetchone()
         if row is None:
-            raise KeyError(f"Covenant not found: {covenant_id['value']}")
+            raise AppError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Covenant not found: {covenant_id['value']}",
+            )
         return _row_to_covenant(row)
 
     def list_for_deal(self, deal_id: DealId) -> Sequence[Covenant]:
@@ -184,11 +197,14 @@ class PostgresCovenantRepository:
         return [_row_to_covenant(row) for row in rows]
 
     def delete(self, covenant_id: CovenantId) -> None:
-        """Delete covenant. Raises KeyError if not found."""
+        """Delete covenant. Raises AppError(NOT_FOUND) if absent."""
         cursor = self._conn.cursor()
         cursor.execute("DELETE FROM covenants WHERE id = %s", (covenant_id["value"],))
         if cursor.rowcount == 0:
-            raise KeyError(f"Covenant not found: {covenant_id['value']}")
+            raise AppError(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Covenant not found: {covenant_id['value']}",
+            )
         self._conn.commit()
 
 

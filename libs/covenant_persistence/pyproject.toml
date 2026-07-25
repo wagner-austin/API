@@ -17,6 +17,7 @@ include = ["src/covenant_persistence/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.11"
 covenant-domain = { path = "../covenant_domain", develop = true }
+platform-core = { path = "../platform_core", develop = true }
 psycopg = {version = "^3.3", extras = ["binary", "pool"]}
 
 [tool.poetry.group.dev.dependencies]

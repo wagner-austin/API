@@ -9,6 +9,7 @@ from covenant_domain.models import (
     Deal,
     Measurement,
 )
+from platform_core.errors import AppError, ErrorCode
 
 from covenant_persistence.postgres import (
     PostgresCovenantRepository,
@@ -55,14 +56,16 @@ class TestPostgresDealRepository:
         assert retrieved["borrower"] == "Acme Corp"
 
     def test_get_not_found_raises(self) -> None:
-        """Get non-existent deal raises KeyError."""
+        """Get non-existent deal raises AppError(NOT_FOUND)."""
         conn, _ = _create_connection()
         typed_conn: ConnectionProtocol = conn
         repo = PostgresDealRepository(typed_conn)
 
-        with pytest.raises(KeyError) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             repo.get({"value": "missing"})
         assert "Deal not found" in str(exc_info.value)
+        assert exc_info.value.code is ErrorCode.NOT_FOUND
+        assert exc_info.value.http_status == 404
 
     def test_list_all(self) -> None:
         """List all deals."""
@@ -131,7 +134,7 @@ class TestPostgresDealRepository:
         assert retrieved["name"] == "Updated"
 
     def test_update_not_found_raises(self) -> None:
-        """Update non-existent deal raises KeyError."""
+        """Update non-existent deal raises AppError(NOT_FOUND)."""
         conn, _ = _create_connection()
         typed_conn: ConnectionProtocol = conn
         repo = PostgresDealRepository(typed_conn)
@@ -146,9 +149,11 @@ class TestPostgresDealRepository:
             "currency": "USD",
             "maturity_date_iso": "2025-01-01",
         }
-        with pytest.raises(KeyError) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             repo.update(deal)
         assert "Deal not found" in str(exc_info.value)
+        assert exc_info.value.code is ErrorCode.NOT_FOUND
+        assert exc_info.value.http_status == 404
 
     def test_delete(self) -> None:
         """Delete a deal."""
@@ -169,18 +174,20 @@ class TestPostgresDealRepository:
         repo.create(deal)
         repo.delete({"value": "deal-123"})
 
-        with pytest.raises(KeyError):
+        with pytest.raises(AppError):
             repo.get({"value": "deal-123"})
 
     def test_delete_not_found_raises(self) -> None:
-        """Delete non-existent deal raises KeyError."""
+        """Delete non-existent deal raises AppError(NOT_FOUND)."""
         conn, _ = _create_connection()
         typed_conn: ConnectionProtocol = conn
         repo = PostgresDealRepository(typed_conn)
 
-        with pytest.raises(KeyError) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             repo.delete({"value": "missing"})
         assert "Deal not found" in str(exc_info.value)
+        assert exc_info.value.code is ErrorCode.NOT_FOUND
+        assert exc_info.value.http_status == 404
 
 
 class TestPostgresCovenantRepository:
@@ -211,14 +218,16 @@ class TestPostgresCovenantRepository:
         assert retrieved["frequency"] == "QUARTERLY"
 
     def test_get_not_found_raises(self) -> None:
-        """Get non-existent covenant raises KeyError."""
+        """Get non-existent covenant raises AppError(NOT_FOUND)."""
         conn, _ = _create_connection()
         typed_conn: ConnectionProtocol = conn
         repo = PostgresCovenantRepository(typed_conn)
 
-        with pytest.raises(KeyError) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             repo.get({"value": "missing"})
         assert "Covenant not found" in str(exc_info.value)
+        assert exc_info.value.code is ErrorCode.NOT_FOUND
+        assert exc_info.value.http_status == 404
 
     def test_list_for_deal(self) -> None:
         """List covenants for a deal."""
@@ -269,18 +278,20 @@ class TestPostgresCovenantRepository:
         repo.create(covenant)
         repo.delete({"value": "cov-123"})
 
-        with pytest.raises(KeyError):
+        with pytest.raises(AppError):
             repo.get({"value": "cov-123"})
 
     def test_delete_not_found_raises(self) -> None:
-        """Delete non-existent covenant raises KeyError."""
+        """Delete non-existent covenant raises AppError(NOT_FOUND)."""
         conn, _ = _create_connection()
         typed_conn: ConnectionProtocol = conn
         repo = PostgresCovenantRepository(typed_conn)
 
-        with pytest.raises(KeyError) as exc_info:
+        with pytest.raises(AppError) as exc_info:
             repo.delete({"value": "missing"})
         assert "Covenant not found" in str(exc_info.value)
+        assert exc_info.value.code is ErrorCode.NOT_FOUND
+        assert exc_info.value.http_status == 404
 
 
 class TestPostgresMeasurementRepository:

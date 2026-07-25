@@ -4,7 +4,7 @@ from typing import Literal, TypedDict
 
 from platform_core.logging import LogLevel
 
-from ._utils import _parse_bool, _parse_int, _parse_str
+from ._utils import _parse_bool, _parse_int, _parse_str, _require_env_str
 
 # ML backend type - matches covenant_ml.types.BackendName
 MLBackend = Literal["xgboost", "mlp", "lstm", "lightgbm"]
@@ -213,7 +213,12 @@ def load_covenant_radar_settings() -> CovenantRadarSettings:
         "rq": rq_cfg,
         "app": app_cfg,
         "datadog": datadog_cfg,
-        "database_url": _parse_str("DATABASE_URL", ""),
+        # Required, not defaulted: psycopg treats an empty DSN as "connect to
+        # the local socket using PG* defaults", so a deployment that forgets
+        # DATABASE_URL would silently attach to whatever Postgres is nearby
+        # instead of failing. streaming_worker_entry and scripts/seed already
+        # hard-fail on this variable; this makes the API agree with them.
+        "database_url": _require_env_str("DATABASE_URL"),
     }
 
 

@@ -343,6 +343,18 @@ class InMemoryConnection:
         """Rollback transaction (no-op for in-memory)."""
         pass
 
+    @property
+    def closed(self) -> bool:
+        """Whether the connection has been closed.
+
+        Lets consumers assert resource-lifecycle behaviour, such as a service
+        container releasing its connection on application shutdown.
+
+        Returns:
+            True once close() has been called, False otherwise.
+        """
+        return self._closed
+
     def close(self) -> None:
         """Close connection."""
         self._closed = True

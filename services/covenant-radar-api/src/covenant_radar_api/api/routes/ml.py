@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal, Protocol, TypedDict
 
 from covenant_domain import DealId
@@ -23,6 +24,7 @@ from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
 from platform_workers.rq_harness import RQClientQueue
 
+from ...core.model_paths import resolve_model_path
 from ..decode import (
     ExplainResponse,
     OptimizeResponse,
@@ -213,6 +215,8 @@ class ContainerProtocol(Protocol):
 
     def get_job_status(self, job_id: str) -> JobStatus: ...
 
+    def models_root(self) -> Path: ...
+
 
 def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> None:
     async def _predict(request: Request) -> Response:
@@ -225,7 +229,9 @@ def _register_predict(router: APIRouter, get_container: ContainerProtocol) -> No
             JSON object with probability and risk_tier.
 
         Raises:
-            KeyError: Deal not found or required metrics missing
+            AppError: NOT_FOUND (404) if the deal does not exist.
+            KeyError: If a required metric is missing from the measurements,
+                which is a data defect and surfaces as a 500.
         """
         body_bytes = await request.body()
         req = parse_predict_request(body_bytes)
@@ -808,10 +814,18 @@ def _register_predict_regression(router: APIRouter, get_container: ContainerProt
         except JSONTypeError as exc:
             raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
 
+        # Confine the caller-supplied path before it reaches any loader: this
+        # route loads in the API process, so an unconstrained path would open
+        # an arbitrary host file here.
+        try:
+            model_path = resolve_model_path(req["model_path"], get_container.models_root())
+        except ValueError as exc:
+            raise AppError(code=ErrorCode.INVALID_INPUT, message=str(exc), http_status=400) from exc
+
         # Load the regressor backend and model
         registry = hooks.regressor_registry_factory()
         backend = registry.get(req["backend"])
-        model = backend.load(path=req["model_path"])
+        model = backend.load(path=str(model_path))
 
         # Convert features to numpy array and run inference
         x: NDArray[np.float64] = np.array(req["features"], dtype=np.float64)

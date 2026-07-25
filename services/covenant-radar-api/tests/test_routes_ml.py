@@ -9,7 +9,6 @@ import numpy as np
 from covenant_domain import Deal, DealId, Measurement
 from covenant_ml.testing import make_train_config
 from covenant_ml.trainer import save_model, train_model
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from numpy.typing import NDArray
 from platform_core.json_utils import (
@@ -25,7 +24,7 @@ from platform_core.json_utils import (
 from covenant_radar_api.api.routes.ml import build_router
 from covenant_radar_api.worker import _regression_hooks as regression_hooks
 
-from .conftest import ContainerAndStore
+from .conftest import ContainerAndStore, make_route_test_client
 
 
 class _XGBRegressorProto(Protocol):
@@ -38,10 +37,7 @@ class _XGBRegressorProto(Protocol):
 
 def _create_test_client(cas: ContainerAndStore) -> TestClient:
     """Create test client with real container."""
-    app = FastAPI()
-    router = build_router(cas.container)
-    app.include_router(router)
-    return TestClient(app, raise_server_exceptions=False)
+    return make_route_test_client(build_router(cas.container))
 
 
 def _create_and_save_model(model_path: Path) -> None:
@@ -180,8 +176,8 @@ class TestPredictEndpoint:
         client = _create_test_client(container_with_store)
         response = client.post("/ml/predict", content=b'{"deal_id": "nonexistent"}')
 
-        # KeyError from deal_repo.get()
-        assert response.status_code == 500
+        # RecordNotFoundError from deal_repo.get() maps to 404.
+        assert response.status_code == 404
 
     def test_predict_missing_measurements(self, container_with_store: ContainerAndStore) -> None:
         """Test prediction with deal that has no measurements."""
@@ -195,7 +191,8 @@ class TestPredictEndpoint:
         client = _create_test_client(container_with_store)
         response = client.post("/ml/predict", content=b'{"deal_id": "d1"}')
 
-        # KeyError from missing metrics
+        # A bare KeyError from missing metrics is a defect, not an absent row,
+        # so it stays a 500 rather than being softened into a 404.
         assert response.status_code == 500
 
     def test_predict_invalid_json(self, container_with_store: ContainerAndStore) -> None:
@@ -207,7 +204,7 @@ class TestPredictEndpoint:
         client = _create_test_client(container_with_store)
         response = client.post("/ml/predict", content=b"not json")
 
-        assert response.status_code == 500
+        assert response.status_code == 400
 
 
 class TestTrainEndpoint:
@@ -269,14 +266,14 @@ class TestTrainEndpoint:
         client = _create_test_client(container_with_store)
         response = client.post("/ml/train", content=b"not json")
 
-        assert response.status_code == 500
+        assert response.status_code == 400
 
     def test_train_missing_field(self, container_with_store: ContainerAndStore) -> None:
         """Test training with missing field."""
         client = _create_test_client(container_with_store)
         response = client.post("/ml/train", content=b'{"learning_rate": 0.1}')
 
-        assert response.status_code == 500
+        assert response.status_code == 400
 
 
 class TestModelsActiveEndpoint:
@@ -299,9 +296,10 @@ class TestJobStatusEndpoint:
 
     def test_get_job_status_not_found(self, container_with_store: ContainerAndStore) -> None:
         """Test getting status of non-existent job."""
-        from platform_workers.testing import hooks, make_fake_fetch_job_not_found
+        from platform_workers.testing import hooks as workers_hooks
+        from platform_workers.testing import make_fake_fetch_job_not_found
 
-        hooks.fetch_job = make_fake_fetch_job_not_found()
+        workers_hooks.fetch_job = make_fake_fetch_job_not_found()
 
         client = _create_test_client(container_with_store)
         response = client.get("/ml/jobs/nonexistent-job-id")
@@ -314,10 +312,11 @@ class TestJobStatusEndpoint:
 
     def test_get_job_status_queued(self, container_with_store: ContainerAndStore) -> None:
         """Test getting status of queued job."""
-        from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+        from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+        from platform_workers.testing import hooks as workers_hooks
 
         fake_job = FakeFetchedJob(job_id="job-queued", status="queued", result=None)
-        hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+        workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
         client = _create_test_client(container_with_store)
         response = client.get("/ml/jobs/job-queued")
@@ -331,14 +330,15 @@ class TestJobStatusEndpoint:
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Test getting status of finished job with result."""
-        from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+        from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+        from platform_workers.testing import hooks as workers_hooks
 
         fake_job = FakeFetchedJob(
             job_id="job-finished",
             status="finished",
             result={"model_path": "/path/to/model.ubj"},
         )
-        hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+        workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
         client = _create_test_client(container_with_store)
         response = client.get("/ml/jobs/job-finished")
@@ -401,7 +401,7 @@ class TestTrainExternalEndpoint:
         enqueued = container_with_store.queue.jobs[-1]
         assert "us" in str(enqueued.args[0])
 
-    def test_train_external_invalid_dataset_returns_500(
+    def test_train_external_invalid_dataset_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid dataset triggers edge validation and results in error (unhandled in tests)."""
@@ -415,10 +415,10 @@ class TestTrainExternalEndpoint:
                 b'"random_state":42}'
             ),
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_train_external_non_object_json_returns_500(
+    def test_train_external_non_object_json_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Non-object JSON (e.g., list) triggers JSONTypeError in decoder."""
@@ -427,8 +427,8 @@ class TestTrainExternalEndpoint:
             "/ml/train-external",
             content=b"[]",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
 
 class TestTrainExternalRegressionEndpoint:
@@ -498,7 +498,7 @@ class TestTrainExternalRegressionEndpoint:
         enqueued = container_with_store.queue.jobs[-1]
         assert "financial_distress" in str(enqueued.args[0])
 
-    def test_invalid_dataset_returns_500(self, container_with_store: ContainerAndStore) -> None:
+    def test_invalid_dataset_returns_400(self, container_with_store: ContainerAndStore) -> None:
         """Invalid regression dataset triggers edge validation error."""
         client = _create_test_client(container_with_store)
         response = client.post(
@@ -509,9 +509,9 @@ class TestTrainExternalRegressionEndpoint:
                 b'"colsample_bytree":0.8,"random_state":42}'
             ),
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_invalid_backend_returns_500(self, container_with_store: ContainerAndStore) -> None:
+    def test_invalid_backend_returns_400(self, container_with_store: ContainerAndStore) -> None:
         """Invalid regressor backend triggers edge validation error."""
         client = _create_test_client(container_with_store)
         response = client.post(
@@ -522,16 +522,16 @@ class TestTrainExternalRegressionEndpoint:
                 b'"subsample":0.8,"colsample_bytree":0.8,"random_state":42}'
             ),
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_non_object_json_returns_500(self, container_with_store: ContainerAndStore) -> None:
+    def test_non_object_json_returns_400(self, container_with_store: ContainerAndStore) -> None:
         """Non-object JSON triggers JSONTypeError edge validation."""
         client = _create_test_client(container_with_store)
         response = client.post(
             "/ml/train-external-regression",
             content=b'"just a string"',
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
 
 class TestOptimizeEndpoint:
@@ -583,7 +583,7 @@ class TestOptimizeEndpoint:
         assert "cuda" in config_str
         assert "log_only" in config_str
 
-    def test_optimize_invalid_dataset_returns_500(
+    def test_optimize_invalid_dataset_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid dataset triggers edge validation and results in error."""
@@ -595,10 +595,10 @@ class TestOptimizeEndpoint:
                 "n_trials": 50
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_optimize_missing_n_trials_returns_500(
+    def test_optimize_missing_n_trials_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Missing n_trials triggers JSONTypeError in decoder."""
@@ -609,10 +609,10 @@ class TestOptimizeEndpoint:
                 "dataset": "taiwan"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_optimize_invalid_device_returns_500(
+    def test_optimize_invalid_device_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid device triggers JSONTypeError in decoder."""
@@ -625,10 +625,10 @@ class TestOptimizeEndpoint:
                 "device": "tpu"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_optimize_non_object_json_returns_500(
+    def test_optimize_non_object_json_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Non-object JSON (e.g., list) triggers TypeError in decoder."""
@@ -637,8 +637,8 @@ class TestOptimizeEndpoint:
             "/ml/optimize",
             content=b"[]",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
     def test_optimize_mlp_backend_enqueues_unified_job(
         self, container_with_store: ContainerAndStore
@@ -809,7 +809,7 @@ class TestOptimizeRegressionEndpoint:
         assert "lightgbm_reg" in config_str
         assert "cuda" in config_str
 
-    def test_optimize_regression_invalid_dataset_returns_500(
+    def test_optimize_regression_invalid_dataset_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid regression dataset triggers error."""
@@ -821,9 +821,9 @@ class TestOptimizeRegressionEndpoint:
                 "n_trials": 50
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_optimize_regression_missing_n_trials_returns_500(
+    def test_optimize_regression_missing_n_trials_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Missing n_trials triggers JSONTypeError."""
@@ -834,9 +834,9 @@ class TestOptimizeRegressionEndpoint:
                 "dataset": "financial_distress"
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_optimize_regression_invalid_backend_returns_500(
+    def test_optimize_regression_invalid_backend_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid regressor backend triggers error."""
@@ -849,7 +849,7 @@ class TestOptimizeRegressionEndpoint:
                 "n_trials": 50
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
     def test_optimize_regression_forwards_raw_json_body(
         self, container_with_store: ContainerAndStore
@@ -927,7 +927,7 @@ class TestExplainEndpoint:
         assert "mlp" in config_str
         assert "gradient" in config_str
 
-    def test_explain_invalid_dataset_returns_500(
+    def test_explain_invalid_dataset_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid dataset triggers edge validation and results in error."""
@@ -941,10 +941,10 @@ class TestExplainEndpoint:
                 "explainer": "permutation"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_explain_invalid_backend_returns_500(
+    def test_explain_invalid_backend_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid backend triggers JSONTypeError in decoder."""
@@ -958,10 +958,10 @@ class TestExplainEndpoint:
                 "explainer": "permutation"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_explain_invalid_explainer_returns_500(
+    def test_explain_invalid_explainer_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid explainer triggers JSONTypeError in decoder."""
@@ -975,10 +975,10 @@ class TestExplainEndpoint:
                 "explainer": "invalid"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_explain_missing_required_field_returns_500(
+    def test_explain_missing_required_field_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Missing required field triggers JSONTypeError in decoder."""
@@ -991,10 +991,10 @@ class TestExplainEndpoint:
                 "model_path": "/models/model.ubj"
             }""",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
-    def test_explain_non_object_json_returns_500(
+    def test_explain_non_object_json_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Non-object JSON (e.g., list) triggers TypeError in decoder."""
@@ -1003,8 +1003,8 @@ class TestExplainEndpoint:
             "/ml/explain",
             content=b"[]",
         )
-        # AppError is unhandled in these route tests, so FastAPI returns 500
-        assert response.status_code == 500
+        # AppError is unhandled in these route tests, so FastAPI returns 400
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -1035,18 +1035,22 @@ class TestPredictRegressionEndpoint:
     """Tests for POST /ml/predict-regression."""
 
     def setup_method(self) -> None:
-        """Save original regression hooks."""
+        """Save original regression workers_hooks."""
         self._orig_regressor_registry = regression_hooks.regressor_registry_factory
 
     def teardown_method(self) -> None:
-        """Restore original regression hooks."""
+        """Restore original regression workers_hooks."""
         regression_hooks.regressor_registry_factory = self._orig_regressor_registry
 
     def test_predict_regression_returns_predictions(
         self, container_with_store: ContainerAndStore, tmp_path: Path
     ) -> None:
         """Predict-regression returns predicted continuous values."""
-        model_path = tmp_path / "model.ubj"
+        # Must live under the container's models_root: the route confines
+        # caller-supplied model_path before loading.
+        models_root = tmp_path / "models"
+        models_root.mkdir(parents=True, exist_ok=True)
+        model_path = models_root / "model.ubj"
         _create_and_save_xgb_regressor(model_path)
 
         client = _create_test_client(container_with_store)
@@ -1068,7 +1072,33 @@ class TestPredictRegressionEndpoint:
         assert len(preds) == 2
         assert all(require_float({"v": v}, "v") > -1e10 for v in preds)
 
-    def test_predict_regression_invalid_backend_returns_500(
+    def test_predict_regression_rejects_model_path_outside_models_root(
+        self, container_with_store: ContainerAndStore, tmp_path: Path
+    ) -> None:
+        """A model_path escaping models_root returns 400 and loads nothing.
+
+        This route loads in the API process, so an unconstrained path would
+        open an arbitrary host file inside the web worker.
+
+        Args:
+            container_with_store: Fixture providing the wired container.
+            tmp_path: Pytest temporary directory unique to this test.
+        """
+        outside = tmp_path / "outside.ubj"
+        _create_and_save_xgb_regressor(outside)
+
+        client = _create_test_client(container_with_store)
+        body = (
+            '{"backend": "xgboost_reg",'
+            f' "model_path": "{outside.as_posix()}",'
+            ' "features": [[1.0, 2.0, 3.0]]}'
+        )
+        response = client.post("/ml/predict-regression", content=body.encode())
+
+        assert response.status_code == 400
+        assert "must resolve inside the models root" in response.text
+
+    def test_predict_regression_invalid_backend_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid backend triggers ValueError in decoder."""
@@ -1077,9 +1107,9 @@ class TestPredictRegressionEndpoint:
             "/ml/predict-regression",
             content=b'{"backend": "invalid", "model_path": "/tmp/m.ubj", "features": [[1.0]]}',
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_predict_regression_missing_features_returns_500(
+    def test_predict_regression_missing_features_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Missing features field triggers JSONTypeError in decoder."""
@@ -1088,9 +1118,9 @@ class TestPredictRegressionEndpoint:
             "/ml/predict-regression",
             content=b'{"backend": "xgboost_reg", "model_path": "/tmp/m.ubj"}',
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_predict_regression_empty_features_returns_500(
+    def test_predict_regression_empty_features_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Empty features list triggers JSONTypeError in decoder."""
@@ -1099,9 +1129,9 @@ class TestPredictRegressionEndpoint:
             "/ml/predict-regression",
             content=b'{"backend": "xgboost_reg", "model_path": "/tmp/m.ubj", "features": []}',
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_predict_regression_non_object_json_returns_500(
+    def test_predict_regression_non_object_json_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Non-object JSON triggers JSONTypeError."""
@@ -1110,7 +1140,7 @@ class TestPredictRegressionEndpoint:
             "/ml/predict-regression",
             content=b'"just a string"',
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -1169,7 +1199,7 @@ class TestExplainRegressionEndpoint:
         assert "lightgbm_reg" in config_str
         assert "shap_tree" in config_str
 
-    def test_explain_regression_invalid_backend_returns_500(
+    def test_explain_regression_invalid_backend_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid backend triggers error at API edge."""
@@ -1183,9 +1213,9 @@ class TestExplainRegressionEndpoint:
                 "explainer": "permutation"
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_explain_regression_invalid_explainer_returns_500(
+    def test_explain_regression_invalid_explainer_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Invalid explainer triggers JSONTypeError at API edge."""
@@ -1199,9 +1229,9 @@ class TestExplainRegressionEndpoint:
                 "explainer": "invalid"
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_explain_regression_missing_explainer_returns_500(
+    def test_explain_regression_missing_explainer_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Missing explainer triggers JSONTypeError at API edge."""
@@ -1214,9 +1244,9 @@ class TestExplainRegressionEndpoint:
                 "model_path": "/m"
             }""",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400
 
-    def test_explain_regression_non_object_json_returns_500(
+    def test_explain_regression_non_object_json_returns_400(
         self, container_with_store: ContainerAndStore
     ) -> None:
         """Non-object JSON triggers error at API edge."""
@@ -1225,4 +1255,4 @@ class TestExplainRegressionEndpoint:
             "/ml/explain-regression",
             content=b"[]",
         )
-        assert response.status_code == 500
+        assert response.status_code == 400

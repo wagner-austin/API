@@ -99,6 +99,18 @@ def _safe_divide(numerator: float, denominator: float, default: float = 0.0) -> 
     return numerator / denominator
 
 
+# The metric names extract_features reads out of metrics_current. Published so
+# callers can check completeness before calling, rather than discovering a
+# missing metric as a KeyError from inside feature extraction.
+REQUIRED_CURRENT_METRICS: tuple[str, ...] = (
+    "total_debt",
+    "ebitda",
+    "interest_expense",
+    "current_assets",
+    "current_liabilities",
+)
+
+
 def extract_features(
     deal: Deal,
     metrics_current: Mapping[str, int],
@@ -160,6 +172,7 @@ def extract_features(
 
 __all__ = [
     "FEATURE_ORDER",
+    "REQUIRED_CURRENT_METRICS",
     "LoanFeatures",
     "RiskPrediction",
     "RiskTier",

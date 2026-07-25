@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from platform_core.config import CovenantRadarSettings, load_covenant_radar_settings
 from platform_core.testing import make_fake_env
 
@@ -32,16 +34,37 @@ def test_load_covenant_radar_settings_success() -> None:
 
 
 def test_load_covenant_radar_settings_uses_defaults() -> None:
-    """Test load_covenant_radar_settings uses defaults when env vars not set."""
-    _env = make_fake_env()  # Install fake env but don't set any vars
-    # Neither REDIS_URL nor DATABASE_URL set - uses defaults
+    """Test load_covenant_radar_settings uses defaults when optional vars unset."""
+    env = make_fake_env()
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
     settings = load_covenant_radar_settings()
 
     # Redis defaults to redis://redis:6379/0
     assert settings["redis"]["url"] == "redis://redis:6379/0"
-    # DATABASE_URL defaults to empty string
-    assert settings["database_url"] == ""
+
+
+def test_load_covenant_radar_settings_requires_database_url() -> None:
+    """A missing DATABASE_URL fails fast instead of defaulting to an empty DSN.
+
+    An empty DSN is not an error to libpq: it connects to the local socket
+    using the PG* defaults. A deployment that omitted the variable would
+    therefore attach to whatever Postgres happened to be reachable rather than
+    failing, so the loader must reject it.
+    """
+    _env = make_fake_env()  # Install fake env but set no vars
+
+    with pytest.raises(RuntimeError, match="Missing required env var: DATABASE_URL"):
+        load_covenant_radar_settings()
+
+
+def test_load_covenant_radar_settings_rejects_blank_database_url() -> None:
+    """A DATABASE_URL of only whitespace is rejected as well as an absent one."""
+    env = make_fake_env()
+    env.set("DATABASE_URL", "   ")
+
+    with pytest.raises(RuntimeError, match="Empty env var: DATABASE_URL"):
+        load_covenant_radar_settings()
 
 
 def test_load_covenant_radar_settings_custom_app_config() -> None:
@@ -206,7 +229,8 @@ def test_load_covenant_radar_settings_invalid_backend_raises() -> None:
 
 def test_load_covenant_radar_settings_datadog_defaults() -> None:
     """Test load_covenant_radar_settings uses Datadog defaults."""
-    _env = make_fake_env()
+    env = make_fake_env()
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
 
     settings = load_covenant_radar_settings()
 
@@ -222,6 +246,7 @@ def test_load_covenant_radar_settings_datadog_defaults() -> None:
 def test_load_covenant_radar_settings_datadog_custom() -> None:
     """Test load_covenant_radar_settings uses custom Datadog config."""
     env = make_fake_env()
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("DATADOG__ENABLED", "true")
     env.set("DATADOG__SERVICE", "my-service")
     env.set("DATADOG__ENV", "production")
@@ -244,6 +269,7 @@ def test_load_covenant_radar_settings_datadog_custom() -> None:
 def test_load_covenant_radar_settings_datadog_staging_env() -> None:
     """Test load_covenant_radar_settings parses staging env."""
     env = make_fake_env()
+    env.set("DATABASE_URL", "postgresql://user:pass@host/db")
     env.set("DATADOG__ENV", "staging")
 
     settings = load_covenant_radar_settings()

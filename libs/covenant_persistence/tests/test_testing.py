@@ -47,8 +47,9 @@ class TestInMemoryConnection:
     def test_close_sets_closed_flag(self) -> None:
         store = InMemoryStore()
         conn = InMemoryConnection(store)
+        assert conn.closed is False
         conn.close()
-        assert conn._closed is True
+        assert conn.closed is True
 
 
 class TestInMemoryCursorDeals:
