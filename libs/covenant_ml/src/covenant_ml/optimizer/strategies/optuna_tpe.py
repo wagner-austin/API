@@ -17,22 +17,28 @@ from platform_core.logging import get_logger
 from ..protocol import ObjectiveProtocol, TrialCallbackProtocol
 from ..strategy_protocol import OptimizerStrategyCapabilities, OptimizerStrategyName
 from ..type_guards import (
+    is_cleargbm_search_space,
     is_lightgbm_search_space,
+    is_logreg_search_space,
     is_lstm_search_space,
     is_mlp_search_space,
+    is_random_forest_search_space,
     is_xgboost_search_space,
 )
 from ..types import (
     CategoricalFloatSpec,
     CategoricalIntSpec,
     CategoricalStringSpec,
+    ClearGBMSearchSpace,
     FloatRangeSpec,
     IntRangeSpec,
     LightGBMSearchSpace,
+    LogRegSearchSpace,
     LSTMSearchSpace,
     MLPSearchSpace,
     OptimizationConfig,
     OptimizationSummary,
+    RandomForestSearchSpace,
     SampledFloatParams,
     SampledIntParams,
     SampledStringParams,
@@ -399,6 +405,72 @@ def _sample_lightgbm_params(
     return int_params, float_params, string_params
 
 
+def _sample_cleargbm_params(
+    trial: OptunaTrialProtocol,
+    space: ClearGBMSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample ClearGBM hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "n_estimators": _sample_int(trial, "n_estimators", space["n_estimators"]),
+        "max_depth": _sample_int(trial, "max_depth", space["max_depth"]),
+        "min_samples_split": _sample_int(trial, "min_samples_split", space["min_samples_split"]),
+        "min_samples_leaf": _sample_int(trial, "min_samples_leaf", space["min_samples_leaf"]),
+        "max_bins": _sample_int(trial, "max_bins", space["max_bins"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": _sample_float(trial, "learning_rate", space["learning_rate"]),
+        "subsample": _sample_float(trial, "subsample", space["subsample"]),
+    }
+    string_params: SampledStringParams = {}
+    return int_params, float_params, string_params
+
+
+def _sample_random_forest_params(
+    trial: OptunaTrialProtocol,
+    space: RandomForestSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample RandomForest hyperparameters from search space.
+
+    RandomForest samples no learning rate: it is not a boosted method. Sending
+    its space to the XGBoost sampler, which every RandomForest run did while
+    is_xgboost_search_space matched on max_depth alone, failed on exactly that
+    missing key.
+    """
+    int_params: SampledIntParams = {
+        "n_estimators": _sample_int(trial, "n_estimators", space["n_estimators"]),
+        "max_depth": _sample_int(trial, "max_depth", space["max_depth"]),
+        "min_samples_split": _sample_int(trial, "min_samples_split", space["min_samples_split"]),
+        "min_samples_leaf": _sample_int(trial, "min_samples_leaf", space["min_samples_leaf"]),
+    }
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {
+        "max_features": _sample_string(trial, "max_features", space["max_features"]),
+    }
+    return int_params, float_params, string_params
+
+
+def _sample_logreg_params(
+    trial: OptunaTrialProtocol,
+    space: LogRegSearchSpace,
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Sample LogReg hyperparameters from search space."""
+    int_params: SampledIntParams = {
+        "max_iter": _sample_int(trial, "max_iter", space["max_iter"]),
+    }
+    float_params: SampledFloatParams = {
+        "C": _sample_float(trial, "C", space["C"]),
+        "tol": _sample_float(trial, "tol", space["tol"]),
+    }
+    string_params: SampledStringParams = {}
+    if "penalty" in space:
+        string_params["penalty"] = _sample_string(trial, "penalty", space["penalty"])
+    if "solver" in space:
+        string_params["solver"] = _sample_string(trial, "solver", space["solver"])
+    if "l1_ratio" in space:
+        float_params["l1_ratio"] = _sample_float(trial, "l1_ratio", space["l1_ratio"])
+    return int_params, float_params, string_params
+
+
 def _sample_params(
     trial: OptunaTrialProtocol,
     search_space: SearchSpace,
@@ -410,7 +482,16 @@ def _sample_params(
         return _sample_mlp_params(trial, search_space)
     if is_lstm_search_space(search_space):
         return _sample_lstm_params(trial, search_space)
-    # LightGBM is the remaining type after other guards
+    if is_cleargbm_search_space(search_space):
+        return _sample_cleargbm_params(trial, search_space)
+    if is_random_forest_search_space(search_space):
+        return _sample_random_forest_params(trial, search_space)
+    if is_logreg_search_space(search_space):
+        return _sample_logreg_params(trial, search_space)
+    # LightGBM is the only remaining space type. Every guard above keys off a
+    # field unique to its own space, so the order of these branches does not
+    # matter -- which is the property that was missing when is_xgboost matched
+    # on max_depth alone and swallowed RandomForest and ClearGBM.
     assert is_lightgbm_search_space(search_space)
     return _sample_lightgbm_params(trial, search_space)
 
@@ -505,6 +586,63 @@ def _extract_lightgbm_best_params(
     return int_params, float_params, string_params
 
 
+def _extract_cleargbm_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for ClearGBM."""
+    int_params: SampledIntParams = {
+        "n_estimators": int(best_params["n_estimators"]),
+        "max_depth": int(best_params["max_depth"]),
+        "min_samples_split": int(best_params["min_samples_split"]),
+        "min_samples_leaf": int(best_params["min_samples_leaf"]),
+        "max_bins": int(best_params["max_bins"]),
+    }
+    float_params: SampledFloatParams = {
+        "learning_rate": float(best_params["learning_rate"]),
+        "subsample": float(best_params["subsample"]),
+    }
+    string_params: SampledStringParams = {}
+    return int_params, float_params, string_params
+
+
+def _extract_random_forest_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for RandomForest."""
+    int_params: SampledIntParams = {
+        "n_estimators": int(best_params["n_estimators"]),
+        "max_depth": int(best_params["max_depth"]),
+        "min_samples_split": int(best_params["min_samples_split"]),
+        "min_samples_leaf": int(best_params["min_samples_leaf"]),
+    }
+    float_params: SampledFloatParams = {}
+    string_params: SampledStringParams = {
+        "max_features": str(best_params["max_features"]),
+    }
+    return int_params, float_params, string_params
+
+
+def _extract_logreg_best_params(
+    best_params: dict[str, float | int | str],
+) -> tuple[SampledIntParams, SampledFloatParams, SampledStringParams]:
+    """Extract best parameters for LogReg."""
+    int_params: SampledIntParams = {
+        "max_iter": int(best_params["max_iter"]),
+    }
+    float_params: SampledFloatParams = {
+        "C": float(best_params["C"]),
+        "tol": float(best_params["tol"]),
+    }
+    string_params: SampledStringParams = {}
+    if "penalty" in best_params:
+        string_params["penalty"] = str(best_params["penalty"])
+    if "solver" in best_params:
+        string_params["solver"] = str(best_params["solver"])
+    if "l1_ratio" in best_params:
+        float_params["l1_ratio"] = float(best_params["l1_ratio"])
+    return int_params, float_params, string_params
+
+
 def _extract_best_params(
     search_space: SearchSpace,
     best_params: dict[str, float | int | str],
@@ -516,7 +654,13 @@ def _extract_best_params(
         return _extract_mlp_best_params(best_params)
     if is_lstm_search_space(search_space):
         return _extract_lstm_best_params(best_params)
-    # LightGBM is the remaining type after other guards
+    if is_cleargbm_search_space(search_space):
+        return _extract_cleargbm_best_params(best_params)
+    if is_random_forest_search_space(search_space):
+        return _extract_random_forest_best_params(best_params)
+    if is_logreg_search_space(search_space):
+        return _extract_logreg_best_params(best_params)
+    # LightGBM is the only remaining space type; see _sample_params.
     assert is_lightgbm_search_space(search_space)
     return _extract_lightgbm_best_params(best_params)
 
