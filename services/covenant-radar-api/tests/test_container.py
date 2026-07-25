@@ -401,9 +401,10 @@ def test_container_get_job_status_not_found(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status returns not_found when job doesn't exist."""
-    from platform_workers.testing import hooks, make_fake_fetch_job_not_found
+    from platform_workers.testing import hooks as workers_hooks
+    from platform_workers.testing import make_fake_fetch_job_not_found
 
-    hooks.fetch_job = make_fake_fetch_job_not_found()
+    workers_hooks.fetch_job = make_fake_fetch_job_not_found()
 
     status = container_with_store.container.get_job_status("nonexistent-job-id")
     assert status["job_id"] == "nonexistent-job-id"
@@ -415,10 +416,11 @@ def test_container_get_job_status_queued(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status returns queued status."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     fake_job = FakeFetchedJob(job_id="job-queued", status="queued", result=None)
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-queued")
     assert status["job_id"] == "job-queued"
@@ -430,10 +432,11 @@ def test_container_get_job_status_started(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status returns started status."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     fake_job = FakeFetchedJob(job_id="job-started", status="started", result=None)
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-started")
     assert status["job_id"] == "job-started"
@@ -445,14 +448,15 @@ def test_container_get_job_status_finished_with_result(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status returns finished status with result."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     fake_job = FakeFetchedJob(
         job_id="job-finished",
         status="finished",
         result={"model_path": "/path/to/model.ubj"},
     )
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-finished")
     assert status["job_id"] == "job-finished"
@@ -464,10 +468,11 @@ def test_container_get_job_status_failed(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status returns failed status."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     fake_job = FakeFetchedJob(job_id="job-failed", status="failed", result=None)
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-failed")
     assert status["job_id"] == "job-failed"
@@ -479,10 +484,11 @@ def test_container_get_job_status_unknown_status(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status maps unknown RQ status to not_found."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     fake_job = FakeFetchedJob(job_id="job-unknown", status="deferred", result=None)
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-unknown")
     assert status["job_id"] == "job-unknown"
@@ -494,11 +500,12 @@ def test_container_get_job_status_finished_with_non_dict_result(
     container_with_store: ContainerAndStore,
 ) -> None:
     """Test get_job_status ignores non-dict result."""
-    from platform_workers.testing import FakeFetchedJob, hooks, make_fake_fetch_job_found
+    from platform_workers.testing import FakeFetchedJob, make_fake_fetch_job_found
+    from platform_workers.testing import hooks as workers_hooks
 
     # Result is a string, not a dict - should be ignored
     fake_job = FakeFetchedJob(job_id="job-string-result", status="finished", result="ok")
-    hooks.fetch_job = make_fake_fetch_job_found(fake_job)
+    workers_hooks.fetch_job = make_fake_fetch_job_found(fake_job)
 
     status = container_with_store.container.get_job_status("job-string-result")
     assert status["job_id"] == "job-string-result"

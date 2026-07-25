@@ -52,7 +52,7 @@ from platform_core.json_utils import (
 from platform_core.testing import FakeEnv
 
 from covenant_radar_api.worker import _regression_hooks as reg_hooks
-from covenant_radar_api.worker import _test_hooks as hooks
+from covenant_radar_api.worker import _test_hooks as worker_hooks
 from covenant_radar_api.worker.train_external_regression_job import (
     _build_lightgbm_reg_log,
     _build_xgboost_reg_log,
@@ -616,7 +616,7 @@ class TestRunExternalRegressionTraining:
     """Tests for run_external_regression_training."""
 
     def setup_method(self) -> None:
-        """Install fake hooks."""
+        """Install fake worker_hooks."""
         self._orig_dataset_registry = reg_hooks.regression_registry_factory
         self._orig_dataset_loader = reg_hooks.regression_dataset_loader
         self._orig_regressor_registry = reg_hooks.regressor_registry_factory
@@ -632,7 +632,7 @@ class TestRunExternalRegressionTraining:
         reg_hooks.regressor_registry_factory = _reg_factory
 
     def teardown_method(self) -> None:
-        """Restore original hooks."""
+        """Restore original worker_hooks."""
         reg_hooks.regression_registry_factory = self._orig_dataset_registry
         reg_hooks.regression_dataset_loader = self._orig_dataset_loader
         reg_hooks.regressor_registry_factory = self._orig_regressor_registry
@@ -772,11 +772,11 @@ class TestProcessExternalRegressionTrainJob:
     """Tests for process_external_regression_train_job."""
 
     def setup_method(self) -> None:
-        """Install fake hooks."""
+        """Install fake worker_hooks."""
         self._orig_dataset_registry = reg_hooks.regression_registry_factory
         self._orig_dataset_loader = reg_hooks.regression_dataset_loader
         self._orig_regressor_registry = reg_hooks.regressor_registry_factory
-        self._orig_data_bank = hooks.data_bank_uploader
+        self._orig_data_bank = worker_hooks.data_bank_uploader
 
         reg_hooks.regression_registry_factory = _make_fake_regression_registry
         reg_hooks.regression_dataset_loader = _make_fake_regression_loader
@@ -789,11 +789,11 @@ class TestProcessExternalRegressionTrainJob:
         reg_hooks.regressor_registry_factory = _reg_factory
 
     def teardown_method(self) -> None:
-        """Restore original hooks."""
+        """Restore original worker_hooks."""
         reg_hooks.regression_registry_factory = self._orig_dataset_registry
         reg_hooks.regression_dataset_loader = self._orig_dataset_loader
         reg_hooks.regressor_registry_factory = self._orig_regressor_registry
-        hooks.data_bank_uploader = self._orig_data_bank
+        worker_hooks.data_bank_uploader = self._orig_data_bank
 
     def test_process_job_without_data_bank(self, tmp_path: Path) -> None:
         """RQ entry point works without data-bank config."""
@@ -848,7 +848,7 @@ class TestProcessExternalRegressionTrainJob:
             upload_calls.append(str(model_path))
             return "fake-file-id-123"
 
-        hooks.data_bank_uploader = _fake_uploader
+        worker_hooks.data_bank_uploader = _fake_uploader
 
         data_root = tmp_path / "data"
         external_dir = data_root / "external"

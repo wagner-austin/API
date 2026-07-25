@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from covenant_ml.optimizer import use_real_optuna
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
@@ -11,6 +14,7 @@ from platform_core.request_context import install_request_id_middleware
 from ..core.config import Settings, settings_from_env
 from ..core.container import ServiceContainer
 from ..integrations.datadog.tracing import setup_datadog_tracing
+from .error_handlers import install_covenant_error_handlers
 from .routes import covenants as routes_covenants
 from .routes import dashboard as routes_dashboard
 from .routes import deals as routes_deals
@@ -57,9 +61,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Create container with eager model loading for fast first predictions
     container = ServiceContainer.from_settings(cfg, eager_load_model=True)
-    app = FastAPI(title="covenant-radar-api", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        """Hold the container open for the app's lifetime.
+
+        Args:
+            _app: The FastAPI application being started. Unused; the container
+                is captured from the enclosing `create_app` scope.
+
+        Yields:
+            None, for the duration of the application lifespan.
+        """
+        with container:
+            yield
+
+    app = FastAPI(title="covenant-radar-api", version="0.1.0", lifespan=lifespan)
     install_request_id_middleware(app)
     install_exception_handlers_fastapi(app)
+    install_covenant_error_handlers(app)
 
     app.include_router(routes_health.build_router(container))
     app.include_router(routes_status.build_router(container))

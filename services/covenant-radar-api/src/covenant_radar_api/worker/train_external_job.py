@@ -633,36 +633,26 @@ def process_external_train_job(
     # Get data-bank config
     data_bank_url = settings["app"]["data_bank_api_url"]
     data_bank_key = settings["app"]["data_bank_api_key"]
-    use_data_bank = bool(data_bank_url and data_bank_key)
 
     # Get directories from settings
     data_root = Path(settings["app"]["data_root"])
     external_dir = data_root / "external"
 
-    # Use temp directory if data-bank is configured
-    if use_data_bank:
-        temp_dir = tempfile.mkdtemp(prefix="covenant_model_")
-        output_dir = Path(temp_dir)
-    else:
-        output_dir = Path(settings["app"]["models_root"])
-        output_dir.mkdir(parents=True, exist_ok=True)
+    if data_bank_url and data_bank_key:
+        # TemporaryDirectory removes the tree on scope exit, including the
+        # paths where run_external_training raises on an invalid config.
+        with tempfile.TemporaryDirectory(prefix="covenant_model_") as temp_dir:
+            result = run_external_training(config_json, external_dir, Path(temp_dir))
+            result["model_file_id"] = _upload_model_to_data_bank(
+                Path(str(result["active_model_path"])),
+                data_bank_url,
+                data_bank_key,
+            )
+            return result
 
-    result = run_external_training(config_json, external_dir, output_dir)
-
-    # Upload to data-bank if configured
-    if use_data_bank:
-        model_path = Path(str(result["active_model_path"]))
-        file_id = _upload_model_to_data_bank(
-            model_path,
-            data_bank_url,
-            data_bank_key,
-        )
-        result["model_file_id"] = file_id
-
-        # Clean up temp directory
-        shutil.rmtree(output_dir, ignore_errors=True)
-
-    return result
+    output_dir = Path(settings["app"]["models_root"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return run_external_training(config_json, external_dir, output_dir)
 
 
 __all__ = ["process_external_train_job", "run_external_training"]

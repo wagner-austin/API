@@ -24,6 +24,7 @@ from covenant_persistence import (
     MeasurementRepository,
 )
 from numpy.typing import NDArray
+from platform_core.config import CovenantRadarSettings
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
 
@@ -412,6 +413,49 @@ def _upload_model_to_data_bank(
     return hooks.data_bank_uploader(model_path, data_bank_url, data_bank_key)
 
 
+def _train_and_upload(
+    config_json: str,
+    settings: CovenantRadarSettings,
+    model_output_dir: Path,
+    data_bank_url: str,
+    data_bank_key: str,
+) -> dict[str, JSONValue]:
+    """Train into a caller-owned directory and upload the model to data-bank.
+
+    The caller owns `model_output_dir` and is responsible for removing it; this
+    function does not clean up after itself.
+
+    Args:
+        config_json: JSON string with training configuration.
+        settings: Resolved service settings.
+        model_output_dir: Directory the trained model is written into.
+        data_bank_url: Base URL of the data-bank API.
+        data_bank_key: API key for the data-bank API.
+
+    Returns:
+        Job result with model metrics and the assigned `model_file_id`.
+
+    Raises:
+        ValueError: If the training config is invalid or the data is insufficient.
+    """
+    # Imported here, not at module scope: core.container defers its own
+    # worker imports to break the container <-> worker cycle.
+    from covenant_radar_api.core.container import ServiceContainer
+
+    with ServiceContainer.from_settings(
+        settings,
+        model_output_dir=model_output_dir,
+    ) as container:
+        result = run_training(config_json, container)
+
+    result["model_file_id"] = _upload_model_to_data_bank(
+        Path(str(result["active_model_path"])),
+        data_bank_url,
+        data_bank_key,
+    )
+    return result
+
+
 def process_train_job(config_json: str) -> dict[str, JSONValue]:
     """RQ job entry point for model training.
 
@@ -434,38 +478,26 @@ def process_train_job(config_json: str) -> dict[str, JSONValue]:
     # Get data-bank config
     data_bank_url = settings["app"]["data_bank_api_url"]
     data_bank_key = settings["app"]["data_bank_api_key"]
-    use_data_bank = bool(data_bank_url and data_bank_key)
 
-    # Use temp directory if data-bank is configured, otherwise use models_root
-    if use_data_bank:
-        temp_dir = tempfile.mkdtemp(prefix="covenant_train_")
-        model_output_dir = Path(temp_dir)
-    else:
-        model_output_dir = Path(settings["app"]["models_root"])
-        model_output_dir.mkdir(parents=True, exist_ok=True)
+    if data_bank_url and data_bank_key:
+        # TemporaryDirectory removes the tree on scope exit, including the
+        # paths where run_training raises on bad config or insufficient data.
+        with tempfile.TemporaryDirectory(prefix="covenant_train_") as temp_dir:
+            return _train_and_upload(
+                config_json,
+                settings,
+                Path(temp_dir),
+                data_bank_url,
+                data_bank_key,
+            )
 
-    container = ServiceContainer.from_settings(
+    model_output_dir = Path(settings["app"]["models_root"])
+    model_output_dir.mkdir(parents=True, exist_ok=True)
+    with ServiceContainer.from_settings(
         settings,
         model_output_dir=model_output_dir,
-    )
-
-    result = run_training(config_json, container)
-
-    # Upload to data-bank if configured
-    if use_data_bank:
-        model_path = Path(str(result["active_model_path"]))
-        file_id = _upload_model_to_data_bank(
-            model_path,
-            data_bank_url,
-            data_bank_key,
-        )
-        result["model_file_id"] = file_id
-
-        # Clean up temp directory
-        shutil.rmtree(model_output_dir, ignore_errors=True)
-
-    container.close()
-    return result
+    ) as container:
+        return run_training(config_json, container)
 
 
 __all__ = ["TrainingDataProvider", "process_train_job", "run_training"]

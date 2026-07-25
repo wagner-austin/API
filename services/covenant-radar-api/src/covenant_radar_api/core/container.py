@@ -8,6 +8,7 @@ the container rather than creating their own connections.
 from __future__ import annotations
 
 from pathlib import Path
+from types import TracebackType
 from typing import Literal, TypedDict
 
 from covenant_ml.predictor import load_model
@@ -233,6 +234,39 @@ class ServiceContainer:
         self.redis.close()
         self.db_conn.close()
         self._redis_rq.close()
+
+    def __enter__(self: ServiceContainer) -> ServiceContainer:
+        """Enter the container's resource scope.
+
+        Returns:
+            This container, for use as the `with` target.
+        """
+        return self
+
+    def __exit__(
+        self: ServiceContainer,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Close all held resources on scope exit.
+
+        Returns None so any in-flight exception propagates unchanged.
+
+        Args:
+            exc_type: Type of the in-flight exception, or None.
+            exc_value: The in-flight exception, or None.
+            traceback: Traceback of the in-flight exception, or None.
+        """
+        self.close()
+
+    def models_root(self: ServiceContainer) -> Path:
+        """Directory that caller-supplied model paths must resolve under.
+
+        Returns:
+            The configured models root as an absolute-capable Path.
+        """
+        return Path(self.settings["app"]["models_root"])
 
     def deal_repo(self: ServiceContainer) -> DealRepository:
         """Get deal repository bound to container's connection."""

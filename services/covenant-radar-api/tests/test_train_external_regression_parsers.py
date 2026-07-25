@@ -16,7 +16,7 @@ from covenant_ml.datasets import (
 from covenant_ml.datasets.types import RegressionTargetSpec
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
-from covenant_radar_api.worker import _regression_hooks as hooks
+from covenant_radar_api.worker import _regression_hooks as regression_hooks
 from covenant_radar_api.worker._train_external_regression_parsers import (
     parse_external_regression_train_config,
 )
@@ -66,18 +66,18 @@ def _make_fake_regression_registry() -> RegressionDatasetRegistry:
 
 
 class _HookGuard:
-    """RAII guard for installing/restoring regression hooks."""
+    """RAII guard for installing/restoring regression regression_hooks."""
 
     def __init__(self) -> None:
-        self._orig_registry = hooks.regression_registry_factory
+        self._orig_registry = regression_hooks.regression_registry_factory
 
     def install(self) -> None:
-        """Install fake hooks."""
-        hooks.regression_registry_factory = _make_fake_regression_registry
+        """Install fake regression_hooks."""
+        regression_hooks.regression_registry_factory = _make_fake_regression_registry
 
     def restore(self) -> None:
-        """Restore original hooks."""
-        hooks.regression_registry_factory = self._orig_registry
+        """Restore original regression_hooks."""
+        regression_hooks.regression_registry_factory = self._orig_registry
 
 
 # =============================================================================
@@ -94,7 +94,7 @@ class TestParseXGBoostRegConfig:
         self._guard.install()
 
     def teardown_method(self) -> None:
-        """Restore original hooks."""
+        """Restore original regression_hooks."""
         self._guard.restore()
 
     def test_minimal_xgboost_reg_config(self) -> None:
@@ -188,7 +188,7 @@ class TestParseLightGBMRegConfig:
         self._guard.install()
 
     def teardown_method(self) -> None:
-        """Restore original hooks."""
+        """Restore original regression_hooks."""
         self._guard.restore()
 
     def test_lightgbm_reg_config(self) -> None:
@@ -254,7 +254,7 @@ class TestParseRegressionTrainErrors:
         self._guard.install()
 
     def teardown_method(self) -> None:
-        """Restore original hooks."""
+        """Restore original regression_hooks."""
         self._guard.restore()
 
     def test_invalid_dataset_raises_value_error(self) -> None:

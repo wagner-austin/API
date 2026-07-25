@@ -32,6 +32,7 @@ class TestXGBoostTraining:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "learning_rate": 0.3,
                 "max_depth": 3,
                 "n_estimators": 10,
@@ -74,6 +75,7 @@ class TestXGBoostTraining:
         config_json = dump_json_str(
             {
                 "dataset": "us",
+                "device": "cpu",
                 "learning_rate": 0.3,
                 "max_depth": 3,
                 "n_estimators": 10,
@@ -100,6 +102,7 @@ class TestXGBoostTraining:
         config_json = dump_json_str(
             {
                 "dataset": "polish",
+                "device": "cpu",
                 "learning_rate": 0.3,
                 "max_depth": 3,
                 "n_estimators": 10,
@@ -136,6 +139,7 @@ class TestMLPTraining:
             {
                 "backend": "mlp",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "learning_rate": 0.01,
                 "batch_size": 1024,
                 "n_epochs": 3,
@@ -181,6 +185,7 @@ class TestMLPTraining:
             {
                 "backend": "mlp",
                 "dataset": "us",
+                "device": "cpu",
                 "learning_rate": 0.05,
                 "batch_size": 1024,
                 "n_epochs": 3,
@@ -225,6 +230,7 @@ class TestLSTMTraining:
             {
                 "backend": "lstm",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "learning_rate": 0.01,
                 "batch_size": 1024,
                 "n_epochs": 2,
@@ -267,6 +273,7 @@ class TestClearGBMTraining:
             {
                 "backend": "cleargbm",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "n_estimators": 5,
                 "max_depth": 3,
                 "learning_rate": 0.3,
@@ -306,6 +313,7 @@ class TestLogRegTraining:
             {
                 "backend": "logreg",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "solver": "saga",
                 "penalty": "l2",
                 "C": 1.0,
@@ -348,6 +356,7 @@ class TestRandomForestTraining:
             {
                 "backend": "random_forest",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "n_estimators": 10,
                 "max_depth": 5,
                 "min_samples_split": 5,
@@ -396,6 +405,7 @@ class TestLightGBMTraining:
             {
                 "backend": "lightgbm",
                 "dataset": "taiwan",
+                "device": "cpu",
                 "learning_rate": 0.1,
                 "n_estimators": 10,
                 "max_depth": 3,

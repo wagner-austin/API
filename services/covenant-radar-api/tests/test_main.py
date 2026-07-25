@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from covenant_persistence import ConnectionProtocol
+from covenant_persistence.testing import InMemoryConnection
 from fastapi.testclient import TestClient
 
 from covenant_radar_api.api.main import create_app
+from covenant_radar_api.core import _test_hooks as core_hooks
 from covenant_radar_api.core.config import Settings
 from covenant_radar_api.integrations.datadog import _test_hooks as datadog_test_hooks
 
@@ -20,6 +23,47 @@ def test_app_factory_creates_fastapi_app(
 
     assert app.title == "covenant-radar-api"
     assert app.version == "0.1.0"
+
+
+def test_app_lifespan_closes_container_connection(
+    container_with_store: ContainerAndStore,
+) -> None:
+    """App shutdown releases the database connection the container holds.
+
+    Regression guard: create_app built a ServiceContainer and never registered
+    a shutdown hook, so every API process leaked its psycopg connection and
+    both Redis clients.
+
+    Args:
+        container_with_store: Fixture installing in-memory fakes via hooks.
+    """
+    created: list[InMemoryConnection] = []
+
+    def recording_connection_factory(dsn: str) -> ConnectionProtocol:
+        """Create an in-memory connection and record it for inspection.
+
+        Args:
+            dsn: Connection string; ignored by the in-memory implementation.
+
+        Returns:
+            A fresh InMemoryConnection backed by the fixture's store.
+        """
+        del dsn
+        conn = InMemoryConnection(container_with_store.store)
+        created.append(conn)
+        return conn
+
+    original_factory = core_hooks.connection_factory
+    core_hooks.connection_factory = recording_connection_factory
+
+    app = create_app(container_with_store.container.settings)
+    with TestClient(app):
+        pass
+
+    core_hooks.connection_factory = original_factory
+
+    assert len(created) == 1
+    assert created[0].closed is True
 
 
 def test_app_factory_health_endpoints(
