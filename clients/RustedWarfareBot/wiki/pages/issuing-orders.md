@@ -14,6 +14,7 @@ source_paths:
   - "wiki/sources/m5-order/scriptengine-update.txt:2"
   - "wiki/sources/m5-order/order-accepted-unit-moved.txt:9"
   - "wiki/sources/m5-order/order-accepted-building-did-not-move.txt:4"
+  - "wiki/sources/m5-order/controller-delegate.txt:2"
   - "agent/src/rwbot/agent/Orders.java"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-25"
@@ -36,6 +37,8 @@ cmd.a(x, y);                 // set a destination
 ```
 
 Nothing dispatches the command afterwards. `cf.a(team)` enqueues on construction, and the tick drains the queue — `cf.c()` is called from the simulation tick ([[engine-tick-and-clock]]).
+
+`a(n)` is a one-line delegate: its whole body is `return this.b(n2);`.[^9] The construction, timestamping and enqueue described below all live in `b(n)`, which is why the citations name that method rather than the one the code block calls.
 
 This is the built-in AI's own idiom, not a reconstruction of one: the engine's AI issues orders with exactly this sequence.[^2] Using the same route is what makes the bot's input the same class of thing a player's input is.
 
@@ -77,7 +80,7 @@ The roster is short at skirmish start: the Command Center, one Builder, and an e
 
 ## Drift
 
-Every name above is obfuscated and moves between releases. `Orders.verifyBindings` resolves all of them — six classes, six fields, four method signatures — against the jar with no game running, and `make check` fails on any that moved.[^8] After a game update the failure names the whole broken surface at once rather than the first item.
+Every name above is obfuscated and moves between releases. `Orders.verifyBindings` resolves all of them — seven classes, four fields and five method signatures — against the jar with no game running, and `make check` fails on any that moved.[^8] After a game update the failure names the whole broken surface at once rather than the first item.
 
 [^1]: `agent/src/rwbot/agent/Orders.java` — `moveTo` performs exactly these three reflective calls, resolving `a(n)` on the controller and `a(y)` / `a(float,float)` on the command by parameter type.
 [^2]: `wiki/sources/m5-order/builtin-ai-order-idiom.txt:3` — `com.corrodinggames.rts.gameFramework.e e2 = l2.cf.a(this);` followed by `e2.a(y2);` and `e2.a(c2);` in the engine's AI base class.
@@ -86,4 +89,5 @@ Every name above is obfuscated and moves between releases. `Orders.verifyBinding
 [^5]: `wiki/sources/m5-order/scriptengine-update.txt:2` — `if (!mainScriptThreadMarked) { mainScriptThreadMarked = true; isMainScriptThread.set(true); }`, with the drain under `synchronized (arrayList)` at `:8`.
 [^6]: `wiki/sources/m5-order/order-accepted-building-did-not-move.txt:4` — three samples at t+2s, t+5s and t+10s all reporting `(4250.0, 2550.0)` after an order to `(4490.0, 2550.0)` recorded at `:2`.
 [^7]: `wiki/sources/m5-order/order-accepted-unit-moved.txt:9` — `t+2s ... at (4335.7466, 2610.003)`, with t+5s at `:10` and t+10s at `:11`; the roster of three owned entities is at `:2`–`:4`.
-[^8]: `agent/src/rwbot/agent/Orders.java` — `verifyBindings` returns one message per unresolved name and is asserted empty by `SelfTest.checkOrderBindings`, which `make check` runs via `agent-selftest`.
+[^8]: `agent/src/rwbot/agent/Orders.java` — `verifyBindings` calls `checkClass` seven times (entity, team, orderable, command, controller, scripts, tree), `checkField` four times (entity list, owner, x, y) and `checkMethod` five times (controller `a(team)`, command `a(orderable)`, command `a(float,float)`, `getInstance`, `addRunnableToQueue`). It returns one message per unresolved name and is asserted empty by `SelfTest.checkOrderBindings`, which `make check` runs via `agent-selftest`.
+[^9]: `wiki/sources/m5-order/controller-delegate.txt:2` — `return this.b(n2);`, the entire body of `public e a(n n2)` on `gameFramework.c`.

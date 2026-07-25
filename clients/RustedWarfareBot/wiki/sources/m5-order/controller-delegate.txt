@@ -1,0 +1,3 @@
+    public e a(n n2) {
+        return this.b(n2);
+    }
