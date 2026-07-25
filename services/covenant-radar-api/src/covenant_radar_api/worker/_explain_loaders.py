@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Protocol, TypedDict
 
 import numpy as np
+from covenant_ml.backends.lightgbm.backend import LightGBMBackend
+from covenant_ml.backends.xgboost.backend import XGBoostBackend
 from covenant_ml.types import BackendName
 from covenant_nn.backends.lstm.backend import load_lstm_for_inference
 from covenant_nn.backends.mlp.backend import load_mlp_for_inference
@@ -72,32 +74,17 @@ class GradientPredictorProtocol(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# XGBoost Loading
+# XGBoost and LightGBM Loading
+#
+# Both backends already know how to restore themselves from the files their
+# trainers wrote, so the loading lives with them in covenant_ml rather than
+# being reimplemented here. This module previously carried its own copy of
+# each, including a second LightGBM Booster wrapper.
 # ---------------------------------------------------------------------------
 
 
-class _XGBBoosterProtocol(Protocol):
-    """Protocol for XGBoost Booster."""
-
-    def save_model(self, fname: str) -> None: ...
-
-
-class _XGBModelProtocol(Protocol):
-    """Protocol for XGBoost classifier with load_model."""
-
-    def load_model(self, fname: str) -> None: ...
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
-    def get_booster(self) -> _XGBBoosterProtocol: ...
-
-
-class _XGBClassifierCtor(Protocol):
-    """Protocol for XGBClassifier constructor."""
-
-    def __call__(self) -> _XGBModelProtocol: ...
-
-
 def _load_xgboost_model(model_path: str) -> PredictorProtocol:
-    """Load XGBoost model from file.
+    """Load an XGBoost model from file.
 
     Args:
         model_path: Path to saved model file (.ubj format).
@@ -105,63 +92,11 @@ def _load_xgboost_model(model_path: str) -> PredictorProtocol:
     Returns:
         Model implementing PredictorProtocol.
     """
-    xgb_module = __import__("xgboost")
-    classifier_ctor: _XGBClassifierCtor = xgb_module.XGBClassifier
-    model = classifier_ctor()
-    model.load_model(model_path)
-    return model
-
-
-# ---------------------------------------------------------------------------
-# LightGBM Loading
-# ---------------------------------------------------------------------------
-
-
-class _LGBBoosterProtocol(Protocol):
-    """Protocol for LightGBM Booster."""
-
-    def predict(self, data: NDArray[np.float64]) -> NDArray[np.float64]: ...
-
-
-class _LGBBoosterCtor(Protocol):
-    """Protocol for LightGBM Booster constructor."""
-
-    def __call__(self, *, model_file: str) -> _LGBBoosterProtocol: ...
-
-
-class _LGBMBoosterWrapper:
-    """Wrapper for LightGBM Booster providing predict_proba interface."""
-
-    def __init__(self, booster: _LGBBoosterProtocol) -> None:
-        """Initialize wrapper.
-
-        Args:
-            booster: LightGBM Booster instance.
-        """
-        self._booster = booster
-
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Predict class probabilities.
-
-        Args:
-            x: Input features with shape (n_samples, n_features).
-
-        Returns:
-            Array of shape (n_samples, 2) with [P(class=0), P(class=1)].
-        """
-        proba_positive: NDArray[np.float64] = self._booster.predict(x)
-        n_samples = int(proba_positive.shape[0])
-
-        result: NDArray[np.float64] = np.zeros((n_samples, 2), dtype=np.float64)
-        for i in range(n_samples):
-            p: float = float(proba_positive.flat[i])
-            result[i, 0] = 1.0 - p
-            result[i, 1] = p
-        return result
+    return XGBoostBackend().load(path=model_path)
 
 
 def _load_lightgbm_model(model_path: str) -> PredictorProtocol:
-    """Load LightGBM model from file.
+    """Load a LightGBM model from file.
 
     Args:
         model_path: Path to saved model file (.txt format).
@@ -169,10 +104,7 @@ def _load_lightgbm_model(model_path: str) -> PredictorProtocol:
     Returns:
         Model implementing PredictorProtocol.
     """
-    lgb_module = __import__("lightgbm", fromlist=["Booster"])
-    booster_ctor: _LGBBoosterCtor = lgb_module.Booster
-    booster = booster_ctor(model_file=model_path)
-    return _LGBMBoosterWrapper(booster)
+    return LightGBMBackend().load(path=model_path)
 
 
 # ---------------------------------------------------------------------------
