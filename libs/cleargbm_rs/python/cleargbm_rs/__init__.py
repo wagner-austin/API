@@ -1,99 +1,54 @@
-"""ClearGBM Rust core Python bindings — re-export layer.
+"""ClearGBM Rust core — Python entry point for the compiled extension.
 
-Re-exports all function stubs and classes from the focused sub-modules:
+The compiled extension module (``cleargbm_rs.cleargbm_rs``) carries every real
+implementation. Attribute access on this package is forwarded to it on demand
+via :pep:`562`, so the package exposes exactly what the extension exports with
+no hand-maintained signature list to drift out of sync with the Rust source.
 
-- ``_stubs_histogram`` — build_histogram_rs, subtract_histogram_rs
-- ``_stubs_tree`` — PyTree, build_tree_rs, py_tree_*_rs
-- ``_stubs_prediction`` — sigmoid_rs, predict_*_rs
-- ``_stubs_loss`` — binary_log_loss_*_rs, sigmoid_array_rs
-- ``_stubs_binning`` — precompute_feature_bins_rs, compute_bin_edges_rs, bin_samples_rs
-- ``_stubs_training`` — PyGbmModel, train_gradient_boosting_rs, predict_*_model_rs
-
-The compiled native extension (``.pyd``) replaces these stubs at runtime.
-When the extension is not built, all stubs raise ``ImportError``.
+Deliberately untyped here. Consumers bind the symbols they use to
+Protocol-typed names at their own boundary -- see ``cleargbm._rust``, which
+resolves each function through ``__import__`` and annotates it at the
+assignment site. That keeps the type contract in one place, next to the code
+that depends on it, rather than duplicated into stub modules that have to be
+edited in lockstep with the Rust signatures.
 """
 
 from __future__ import annotations
 
-from cleargbm_rs._stubs_binning import (
-    bin_samples_rs,
-    compute_bin_edges_rs,
-    precompute_feature_bins_rs,
-)
-from cleargbm_rs._stubs_histogram import (
-    build_histogram_rs,
-    subtract_histogram_rs,
-)
-from cleargbm_rs._stubs_loss import (
-    binary_log_loss_gradients_rs,
-    binary_log_loss_hessians_rs,
-    binary_log_loss_initial_prediction_rs,
-    binary_log_loss_rs,
-    sigmoid_array_rs,
-)
-from cleargbm_rs._stubs_prediction import (
-    predict_ensemble_rs,
-    predict_proba_rs,
-    predict_single_rs,
-    predict_tree_rs,
-    sigmoid_rs,
-)
-from cleargbm_rs._stubs_training import (
-    PyGbmModel,
-    predict_proba_model_rs,
-    predict_raw_model_rs,
-    py_gbm_model_feature_importances_rs,
-    py_gbm_model_from_json_rs,
-    py_gbm_model_n_classes_rs,
-    py_gbm_model_n_trees_rs,
-    py_gbm_model_to_json_rs,
-    train_gradient_boosting_rs,
-)
-from cleargbm_rs._stubs_tree import (
-    PyTree,
-    build_tree_rs,
-    py_tree_from_json_rs,
-    py_tree_max_depth_rs,
-    py_tree_n_leaves_rs,
-    py_tree_n_nodes_rs,
-    py_tree_repr_rs,
-    py_tree_to_json_rs,
-)
+import types
 
-__version__ = "0.1.0"
+#: Dotted path of the compiled extension module built by maturin.
+_EXTENSION_MODULE = "cleargbm_rs.cleargbm_rs"
 
-__all__ = [
-    "PyGbmModel",
-    "PyTree",
-    "__version__",
-    "bin_samples_rs",
-    "binary_log_loss_gradients_rs",
-    "binary_log_loss_hessians_rs",
-    "binary_log_loss_initial_prediction_rs",
-    "binary_log_loss_rs",
-    "build_histogram_rs",
-    "build_tree_rs",
-    "compute_bin_edges_rs",
-    "precompute_feature_bins_rs",
-    "predict_ensemble_rs",
-    "predict_proba_model_rs",
-    "predict_proba_rs",
-    "predict_raw_model_rs",
-    "predict_single_rs",
-    "predict_tree_rs",
-    "py_gbm_model_feature_importances_rs",
-    "py_gbm_model_from_json_rs",
-    "py_gbm_model_n_classes_rs",
-    "py_gbm_model_n_trees_rs",
-    "py_gbm_model_to_json_rs",
-    "py_tree_from_json_rs",
-    "py_tree_max_depth_rs",
-    "py_tree_n_leaves_rs",
-    "py_tree_n_nodes_rs",
-    "py_tree_repr_rs",
-    "py_tree_to_json_rs",
-    "sigmoid_array_rs",
-    "sigmoid_rs",
-    "subtract_histogram_rs",
-    "train_gradient_boosting_rs",
-]
+
+def _extension() -> types.ModuleType:
+    """Import the compiled extension module.
+
+    Returns:
+        The loaded extension module. The import is cached by ``sys.modules``,
+        so repeated calls cost a dictionary lookup.
+
+    Raises:
+        ImportError: If the extension has not been built. Build it with
+            ``maturin develop --release`` from ``libs/cleargbm_rs``.
+    """
+    return __import__(_EXTENSION_MODULE, fromlist=["*"])
+
+
+def __getattr__(name: str) -> types.FunctionType | type:
+    """Resolve an attribute from the compiled extension module.
+
+    Args:
+        name: Attribute name, such as ``train_gradient_boosting_rs``.
+
+    Returns:
+        The function or class the extension exports under ``name``.
+
+    Raises:
+        AttributeError: If the extension exports no such attribute.
+    """
+    resolved: types.FunctionType | type = getattr(_extension(), name)
+    return resolved
+
+
+__all__: list[str] = []

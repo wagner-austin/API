@@ -1,6 +1,5 @@
 //! Helper functions for histogram testing.
 
-use crate::error::ClearGbmError;
 use crate::histogram::subtract_histogram;
 use crate::types::HistogramBuffer;
 
@@ -77,86 +76,8 @@ pub fn check_subtraction_result(
 }
 
 // =========================================================================
-// Error propagation wrapper functions
-// =========================================================================
-
-/// Wrapper to test gradient sum check propagation with pre-computed values.
-pub fn test_gradient_sum_propagation(
-    actual: f64,
-    expected: f64,
-) -> Result<(), proptest::test_runner::TestCaseError> {
-    match check_gradient_sum_matches(actual, expected, 1e-9_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    Ok(())
-}
-
-/// Wrapper to test count check propagation with pre-computed values.
-pub fn test_count_propagation(
-    actual: usize,
-    expected: usize,
-) -> Result<(), proptest::test_runner::TestCaseError> {
-    match check_count_matches(actual, expected) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    Ok(())
-}
-
-/// Wrapper to test gradient zero check propagation.
-pub fn test_gradient_zero_propagation(
-    value: f64,
-) -> Result<(), proptest::test_runner::TestCaseError> {
-    match check_gradient_is_zero(value, 1e-10_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    Ok(())
-}
-
-/// Wrapper to test count zero check propagation.
-pub fn test_count_zero_propagation(
-    value: usize,
-) -> Result<(), proptest::test_runner::TestCaseError> {
-    match check_count_is_zero(value) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    Ok(())
-}
-
-/// Wrapper to test subtraction check propagation.
-pub fn test_subtraction_propagation(
-    sibling: f64,
-    parent: f64,
-    child: f64,
-    bin: usize,
-) -> Result<(), proptest::test_runner::TestCaseError> {
-    match check_subtraction_result(sibling, parent, child, bin, 1e-9_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    }
-    Ok(())
-}
-
-// =========================================================================
 // Conversion and utility helpers
 // =========================================================================
-
-/// Helper for converting ClearGbmError to proptest TestCaseError.
-pub fn to_test_error<T>(
-    result: Result<T, ClearGbmError>,
-    context: &str,
-) -> Result<T, proptest::test_runner::TestCaseError> {
-    match result {
-        Ok(v) => Ok(v),
-        Err(e) => Err(proptest::test_runner::TestCaseError::fail(format!(
-            "{}: {}",
-            context, e
-        ))),
-    }
-}
 
 /// Helper for subtract_histogram that converts errors.
 pub fn subtract_for_test(

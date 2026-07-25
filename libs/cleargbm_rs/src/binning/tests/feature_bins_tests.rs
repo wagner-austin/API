@@ -215,3 +215,55 @@ fn test_bins_for_feature_out_of_range_returns_empty() -> Result<(), ClearGbmErro
     assert!(fb.bins_for_feature(999_usize).is_empty());
     Ok(())
 }
+
+#[test]
+fn test_precompute_rejects_max_bins_above_u8_range() -> Result<(), ClearGbmError> {
+    // Bin indices are packed into u8 for cache density. The training config
+    // caps max_bins at 255, but `precompute_feature_bins` is public, so it
+    // enforces the same ceiling itself rather than trusting the caller — a
+    // truncated bin index would silently corrupt every downstream histogram.
+    let data: Vec<Vec<f64>> = (0_usize..300_usize)
+        .map(|i| {
+            let value = f64::from(u32::try_from(i).unwrap_or(0_u32));
+            vec![value]
+        })
+        .collect();
+    let rows: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+
+    match precompute_feature_bins(&rows, 300_usize) {
+        Ok(_) => Err(ClearGbmError::InvalidParameter {
+            name: "max_bins".to_string(),
+            reason: "max_bins of 300 must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "max_bins");
+            assert!(
+                reason.contains("255"),
+                "rejection should name the u8 ceiling, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_precompute_accepts_the_maximum_supported_bin_count() -> Result<(), ClearGbmError> {
+    // The boundary the training config enforces: 255 regular bins plus the
+    // NaN bin at index 255 still fits in u8.
+    let data: Vec<Vec<f64>> = (0_usize..300_usize)
+        .map(|i| {
+            let value = f64::from(u32::try_from(i).unwrap_or(0_u32));
+            vec![value]
+        })
+        .collect();
+    let rows: Vec<&[f64]> = data.iter().map(Vec::as_slice).collect();
+
+    let bins = match precompute_feature_bins(&rows, 255_usize) {
+        Ok(b) => b,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(bins.n_samples(), 300_usize);
+    assert_eq!(bins.n_features(), 1_usize);
+    Ok(())
+}

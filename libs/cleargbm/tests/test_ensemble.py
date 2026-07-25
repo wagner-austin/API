@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 from cleargbm.ensemble import (
     _config_to_rust_dict,
     _validate_training_inputs,
+    export_model_json,
     predict_proba,
     predict_raw,
     train_gradient_boosting,
@@ -27,6 +28,7 @@ def _make_config(
     reg_lambda: float = 0.0,
     monotonic_constraints: tuple[int, ...] | None = None,
     early_stopping_rounds: int | None = None,
+    n_jobs: int = 1,
 ) -> GradientBoostingConfig:
     """Return a minimal valid training config."""
     return GradientBoostingConfig(
@@ -43,7 +45,7 @@ def _make_config(
         monotonic_constraints=monotonic_constraints,
         reg_alpha=0.0,
         reg_lambda=reg_lambda,
-        n_jobs=1,
+        n_jobs=n_jobs,
         early_stopping_rounds=early_stopping_rounds,
     )
 
@@ -100,8 +102,8 @@ class TestValidateTrainingInputs:
 class TestConfigToRustDict:
     """Config translation: Python-only fields are dropped, monotonic list is passed through."""
 
-    def test_carries_the_twelve_rust_fields(self) -> None:
-        """The Rust-side dict has exactly the 12 fields Rust expects."""
+    def test_carries_the_twelve_hyperparameters_plus_n_jobs(self) -> None:
+        """The Rust-side dict has exactly the 13 keys the Rust trainer reads."""
         result = _config_to_rust_dict(_make_config())
         expected = {
             "n_estimators",
@@ -116,15 +118,25 @@ class TestConfigToRustDict:
             "reg_lambda",
             "monotonic_constraints",
             "early_stopping_rounds",
+            "n_jobs",
         }
         assert set(result.keys()) == expected
 
+    def test_forwards_n_jobs_to_the_rust_core(self) -> None:
+        """n_jobs must reach Rust, where it bounds the worker pool.
+
+        Regression guard: n_jobs was previously dropped here, so the Rust core
+        fell back to rayon's global pool and used every core regardless of what
+        the caller asked for.
+        """
+        result = _config_to_rust_dict(_make_config(n_jobs=3))
+        assert result["n_jobs"] == 3
+
     def test_drops_python_only_fields(self) -> None:
-        """max_features, track_contributions, n_jobs must not leak into Rust."""
+        """max_features and track_contributions have no Rust implementation."""
         result = _config_to_rust_dict(_make_config())
         assert "max_features" not in result
         assert "track_contributions" not in result
-        assert "n_jobs" not in result
 
     def test_monotonic_constraints_none_stays_none(self) -> None:
         """None constraint stays None in the dict."""
@@ -234,3 +246,29 @@ class TestTrainAndPredict:
                 config=_make_config(),
                 feature_names=("a", "b"),
             )
+
+
+class TestExportModelJson:
+    """Model introspection through the public JSON surface."""
+
+    def test_export_returns_the_tree_structure(self) -> None:
+        """The export names every tree and its nodes."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+
+        document = export_model_json(model)
+
+        assert '"trees"' in document
+        assert '"nodes"' in document
+        assert '"is_leaf"' in document
+
+    def test_export_is_stable_for_one_model(self) -> None:
+        """Serializing the same model twice yields the same document."""
+        x, y, names = _make_binary_dataset()
+        model = train_gradient_boosting(
+            x_train=x, y_train=y, x_val=None, y_val=None, config=_make_config(), feature_names=names
+        )
+
+        assert export_model_json(model) == export_model_json(model)

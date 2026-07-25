@@ -1,7 +1,7 @@
 //! Property-based tests using proptest for tree module.
 
 use crate::error::ClearGbmError;
-use crate::tree::builder::EPSILON;
+use crate::tree::nodes::EPSILON;
 use crate::tree::nodes::{compute_leaf_value, should_stop, split_samples};
 use proptest::prop_assert;
 use proptest::prop_assert_eq;
@@ -175,9 +175,7 @@ fn prop_split_samples_preserves_count() -> Result<(), ClearGbmError> {
             &(2_usize..20_usize, 0_usize..5_usize, proptest::bool::ANY),
             |(n_samples, split_bin, nan_goes_left)| {
                 let n_regular_bins = 6_usize;
-                let sample_indices: Vec<u32> = (0_u32..)
-                    .take(n_samples)
-                    .collect();
+                let sample_indices: Vec<u32> = (0_u32..).take(n_samples).collect();
 
                 // Create column-major flat bin storage (1 feature).
                 // n_regular_bins = 6, so each `i % n_regular_bins` fits in u8.

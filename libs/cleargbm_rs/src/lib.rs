@@ -57,7 +57,7 @@ pub mod testkit;
 
 pub use binning::{bin_samples, compute_bin_edges, precompute_feature_bins, BinEdges, FeatureBins};
 pub use error::ClearGbmError;
-pub use histogram::{build_histogram, subtract_histogram};
+pub use histogram::subtract_histogram;
 pub use hooks::Hooks;
 pub use losses::{
     binary_log_loss, binary_log_loss_gradients, binary_log_loss_hessians,
@@ -73,7 +73,7 @@ pub use split::{
 };
 pub use training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
-    GradientBoostingModel,
+    GradientBoostingModel, Parallelism,
 };
 pub use tree::{build_tree, compute_leaf_value, BuildTreeInput, Tree, TreeBuildConfig};
 pub use types::{HistogramBuffer, SplitConfig, TreeNode, TreeNodeConfig};

@@ -25,6 +25,7 @@ from cleargbm._rust import (
     PyGbmModelProto,
     predict_proba_model_rs,
     predict_raw_model_rs,
+    py_gbm_model_to_json_rs,
     train_gradient_boosting_rs,
 )
 from cleargbm.types import GradientBoostingConfig
@@ -64,10 +65,15 @@ def _config_to_rust_dict(
 ) -> dict[str, int | float | bool | list[int] | None]:
     """Translate a Python ``GradientBoostingConfig`` into the Rust-side dict.
 
-    The Rust training function extracts 12 hyperparameter fields from the dict
-    it receives; the three Python-only fields (``max_features``,
-    ``track_contributions``, ``n_jobs``) are silently dropped because the Rust
-    core does not implement them.
+    The Rust training function extracts 12 hyperparameter fields plus
+    ``n_jobs`` from the dict it receives. ``n_jobs`` selects the worker-thread
+    policy for the run and is deliberately not part of the Rust
+    ``GradientBoostingConfig``: it does not change the fitted model, and that
+    config is serialized into the saved model.
+
+    The two remaining Python-only fields (``max_features``,
+    ``track_contributions``) are dropped because the Rust core does not
+    implement them.
 
     ``monotonic_constraints`` is stored as a tuple of ints on the Python side
     and as a list of enum-variant strings on the Rust side; this function
@@ -94,6 +100,7 @@ def _config_to_rust_dict(
         "reg_lambda": config["reg_lambda"],
         "monotonic_constraints": mc_list,
         "early_stopping_rounds": config["early_stopping_rounds"],
+        "n_jobs": config["n_jobs"],
     }
 
 
@@ -185,7 +192,30 @@ def predict_raw(
     return predict_raw_model_rs(model, x)
 
 
+def export_model_json(model: PyGbmModelProto) -> str:
+    """Serialize a trained model to its JSON representation.
+
+    Exposes the full ensemble structure -- every tree, node, split threshold,
+    leaf value and per-node sample count -- so callers can inspect what the
+    model learned rather than treating it as a black box. This is the
+    public entry point for model introspection and for round-tripping a model
+    through :func:`load_model_json`.
+
+    Args:
+        model: Trained ``PyGbmModel`` handle.
+
+    Returns:
+        JSON document describing the ensemble.
+
+    Raises:
+        RuntimeError: Propagated from the native serializer on Rust-side error.
+    """
+    return py_gbm_model_to_json_rs(model)
+
+
 __all__ = [
+    "PyGbmModelProto",
+    "export_model_json",
     "predict_proba",
     "predict_raw",
     "train_gradient_boosting",

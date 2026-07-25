@@ -1,9 +1,10 @@
 //! Tests for tree building functions.
 
 use crate::error::ClearGbmError;
+use crate::histogram::HistogramRequest;
 use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
-use crate::tree::builder::EPSILON;
+use crate::tree::nodes::EPSILON;
 use crate::tree::nodes::{compute_leaf_value, compute_sums, should_stop, split_samples};
 use crate::tree::{build_tree, BuildTreeInput, TreeBuildConfig};
 use crate::types::SplitConfig;
@@ -261,8 +262,8 @@ fn test_build_tree_single_leaf() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![0.1_f32, 0.1_f32, 0.1_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![0.1_f64, 0.1_f64, 0.1_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
     // 3 samples, 1 feature, all bin 0 (column-major flat).
     let bins: Vec<u8> = vec![0_u8, 0_u8, 0_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
@@ -309,8 +310,8 @@ fn test_build_tree_with_split() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
     // Left samples (bins 0,1) have positive gradients
     // Right samples (bins 2,3) have negative gradients
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     // 4 samples, 1 feature, column-major flat.
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
@@ -358,8 +359,8 @@ fn test_build_tree_empty_input() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices: Vec<u32> = vec![];
-    let gradients: Vec<f32> = vec![];
-    let hessians: Vec<f32> = vec![];
+    let gradients: Vec<f64> = vec![];
+    let hessians: Vec<f64> = vec![];
     let bins: Vec<u8> = vec![];
     let bin_thresholds: Vec<Vec<f64>> = vec![];
 
@@ -398,8 +399,8 @@ fn test_build_tree_max_depth_constraint() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -440,8 +441,8 @@ fn test_build_tree_max_leaves_constraint() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -478,8 +479,8 @@ fn test_build_tree_gradients_too_short() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![1.0_f32]; // Too short!
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64]; // Too short!
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
 
@@ -517,8 +518,8 @@ fn test_build_tree_hessians_too_short() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, 1.0_f32];
-    let hessians = vec![1.0_f32]; // Too short!
+    let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
+    let hessians = vec![1.0_f64]; // Too short!
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8];
     let bin_thresholds = vec![vec![0.5_f64]];
 
@@ -556,8 +557,8 @@ fn test_build_tree_no_features() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, 1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
     // n_features = 0 -> flat slice empty
     let bins: Vec<u8> = vec![];
     let bin_thresholds: Vec<Vec<f64>> = vec![];
@@ -597,8 +598,8 @@ fn test_build_tree_bins_shape_mismatch() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, 1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64];
     // Declared n_samples=3 * n_features=1 = 3, but supplied only 2 bytes.
     let bins: Vec<u8> = vec![0_u8, 0_u8];
     let bin_thresholds: Vec<Vec<f64>> = vec![vec![0.5_f64]];
@@ -637,8 +638,8 @@ fn test_build_tree_with_monotonic_constraints() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
     let constraints = vec![MonotonicConstraint::Increasing];
@@ -677,8 +678,8 @@ fn test_build_tree_with_l1_regularization() -> Result<(), ClearGbmError> {
     };
 
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -718,8 +719,8 @@ fn test_build_tree_left_larger_than_right() -> Result<(), ClearGbmError> {
     // 6 samples: 4 in low bins (left), 2 in high bins (right).
     // Column-major flat: bins for feature 0 = [0, 0, 1, 1, 2, 3].
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32, 4_u32, 5_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, -2.0_f32, -2.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, -2.0_f64, -2.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 0_u8, 1_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -760,14 +761,12 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
     };
 
     // 8 samples with varying gradients
-    let sample_indices = vec![
-        0_u32, 1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32,
-    ];
+    let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32];
     let gradients = vec![
-        4.0_f32, 3.0_f32, 2.0_f32, 1.0_f32, -1.0_f32, -2.0_f32, -3.0_f32, -4.0_f32,
+        4.0_f64, 3.0_f64, 2.0_f64, 1.0_f64, -1.0_f64, -2.0_f64, -3.0_f64, -4.0_f64,
     ];
     let hessians = vec![
-        1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32,
+        1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64,
     ];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8, 4_u8, 5_u8, 6_u8, 7_u8];
     let bin_thresholds = vec![vec![
@@ -810,8 +809,8 @@ fn test_build_tree_deep_tree() -> Result<(), ClearGbmError> {
 #[test]
 fn test_compute_sums_basic() -> Result<(), ClearGbmError> {
     let sample_indices = vec![0_u32, 1_u32, 2_u32];
-    let gradients = vec![1.0_f32, 2.0_f32, 3.0_f32];
-    let hessians = vec![0.5_f32, 0.5_f32, 0.5_f32];
+    let gradients = vec![1.0_f64, 2.0_f64, 3.0_f64];
+    let hessians = vec![0.5_f64, 0.5_f64, 0.5_f64];
 
     let (g_sum, h_sum) = compute_sums(&sample_indices, &gradients, &hessians);
     assert!((g_sum - 6.0_f64).abs() < EPSILON);
@@ -825,8 +824,8 @@ fn test_compute_sums_basic() -> Result<(), ClearGbmError> {
 fn test_compute_sums_gradient_out_of_bounds() -> Result<(), ClearGbmError> {
     // Sample indices include index 5, but gradients only has indices 0-2
     let sample_indices = vec![0_u32, 1_u32, 5_u32];
-    let gradients = vec![1.0_f32, 2.0_f32, 3.0_f32]; // length 3
-    let hessians = vec![0.5_f32, 0.5_f32, 0.5_f32, 0.5_f32, 0.5_f32, 0.5_f32]; // length 6
+    let gradients = vec![1.0_f64, 2.0_f64, 3.0_f64]; // length 3
+    let hessians = vec![0.5_f64, 0.5_f64, 0.5_f64, 0.5_f64, 0.5_f64, 0.5_f64]; // length 6
 
     let (g_sum, h_sum) = compute_sums(&sample_indices, &gradients, &hessians);
     // g_sum = 1.0 + 2.0 + 0 (index 5 skipped) = 3.0
@@ -842,8 +841,8 @@ fn test_compute_sums_gradient_out_of_bounds() -> Result<(), ClearGbmError> {
 fn test_compute_sums_hessian_out_of_bounds() -> Result<(), ClearGbmError> {
     // Sample indices include index 5, but hessians only has indices 0-2
     let sample_indices = vec![0_u32, 1_u32, 5_u32];
-    let gradients = vec![1.0_f32, 2.0_f32, 3.0_f32, 4.0_f32, 5.0_f32, 6.0_f32]; // length 6
-    let hessians = vec![0.5_f32, 0.5_f32, 0.5_f32]; // length 3
+    let gradients = vec![1.0_f64, 2.0_f64, 3.0_f64, 4.0_f64, 5.0_f64, 6.0_f64]; // length 6
+    let hessians = vec![0.5_f64, 0.5_f64, 0.5_f64]; // length 3
 
     let (g_sum, h_sum) = compute_sums(&sample_indices, &gradients, &hessians);
     // g_sum = 1.0 + 2.0 + 6.0 (index 5 is valid for gradients) = 9.0
@@ -864,18 +863,14 @@ thread_local! {
 }
 
 fn counting_error_histogram(
-    sample_indices: &[u32],
-    gradients: &[f32],
-    hessians: &[f32],
-    bins: &[u8],
-    n_bins: usize,
+    request: HistogramRequest<'_>,
 ) -> Result<crate::types::HistogramBuffer, ClearGbmError> {
     HISTOGRAM_CALL_COUNT.with(|count| {
         let current = count.get();
         count.set(current + 1_usize);
         // First call (root histogram) succeeds with real data, subsequent calls fail
         if current < 1_usize {
-            crate::histogram::build_histogram(sample_indices, gradients, hessians, bins, n_bins)
+            Ok(crate::histogram::build_histogram_ordered_trusted(request))
         } else {
             Err(ClearGbmError::EmptyInput {
                 context: "injected histogram build error".to_string(),
@@ -900,8 +895,8 @@ fn test_build_tree_child_histogram_error() -> Result<(), ClearGbmError> {
 
     // Create data that will produce a split
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -932,11 +927,7 @@ thread_local! {
 }
 
 fn wrong_size_histogram(
-    sample_indices: &[u32],
-    gradients: &[f32],
-    hessians: &[f32],
-    bins: &[u8],
-    n_bins: usize,
+    request: HistogramRequest<'_>,
 ) -> Result<crate::types::HistogramBuffer, ClearGbmError> {
     WRONG_SIZE_CALL_COUNT.with(|count| {
         let current = count.get();
@@ -944,10 +935,12 @@ fn wrong_size_histogram(
         // First call (root histogram) succeeds with correct size
         // Second call (child histogram) returns wrong size to trigger subtract_histogram error
         if current < 1_usize {
-            crate::histogram::build_histogram(sample_indices, gradients, hessians, bins, n_bins)
+            Ok(crate::histogram::build_histogram_ordered_trusted(request))
         } else {
             // Return histogram with wrong size to break sibling subtraction
-            Ok(crate::types::HistogramBuffer::new(n_bins + 10_usize))
+            Ok(crate::types::HistogramBuffer::new(
+                request.n_bins + 10_usize,
+            ))
         }
     })
 }
@@ -968,8 +961,8 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
 
     // Create data that will produce a split
     let sample_indices = vec![0_u32, 1_u32, 2_u32, 3_u32];
-    let gradients = vec![1.0_f32, 1.0_f32, -1.0_f32, -1.0_f32];
-    let hessians = vec![1.0_f32, 1.0_f32, 1.0_f32, 1.0_f32];
+    let gradients = vec![1.0_f64, 1.0_f64, -1.0_f64, -1.0_f64];
+    let hessians = vec![1.0_f64, 1.0_f64, 1.0_f64, 1.0_f64];
     let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
     let bin_thresholds = vec![vec![0.25_f64, 0.5_f64, 0.75_f64, 1.0_f64]];
 
@@ -993,4 +986,77 @@ fn test_build_tree_subtract_histogram_error() -> Result<(), ClearGbmError> {
     // Should fail when trying to subtract histograms with different sizes
     assert!(result.is_err());
     Ok(())
+}
+
+// =========================================================================
+// record_leaf_values tests
+// =========================================================================
+
+#[test]
+fn test_record_leaf_values_writes_every_index() -> Result<(), ClearGbmError> {
+    use crate::tree::builder::record_leaf_values;
+
+    let mut out = vec![f64::NAN; 5_usize];
+    record_leaf_values(&[0_u32, 2_u32, 4_u32], 0.75_f64, &mut out);
+    assert!((out[0_usize] - 0.75_f64).abs() < 1e-15_f64);
+    assert!((out[2_usize] - 0.75_f64).abs() < 1e-15_f64);
+    assert!((out[4_usize] - 0.75_f64).abs() < 1e-15_f64);
+    // Untouched samples keep the NaN sentinel the caller reads as
+    // "subsampled out this round".
+    assert!(out[1_usize].is_nan());
+    assert!(out[3_usize].is_nan());
+    Ok(())
+}
+
+#[test]
+fn test_build_tree_rejects_out_of_range_sample_index() -> Result<(), ClearGbmError> {
+    // The per-sample leaf-value buffer is sized `input.n_samples`, so an index
+    // past it has no slot. Rejecting up front is what lets the leaf-recording
+    // loop index directly; silently skipping would instead leave that sample
+    // at the NaN sentinel, which the caller reads as "subsampled out this
+    // round" and quietly rescores through a full tree walk.
+    let n_samples = 4_usize;
+    let n_features = 1_usize;
+    let split_config = match SplitConfig::new(2_usize, 1_usize, 4_usize, 1.0_f64, 0.0_f64) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let config = match TreeBuildConfig::new(2_usize, 0_usize, 0.0_f64, 1.0_f64, split_config) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let bins: Vec<u8> = vec![0_u8, 1_u8, 2_u8, 3_u8];
+    let gradients = vec![0.1_f64, -0.2_f64, 0.3_f64, -0.4_f64, 0.5_f64, -0.6_f64];
+    let hessians = vec![1.0_f64; 6_usize];
+    let thresholds: Vec<Vec<f64>> = vec![vec![0.5_f64, 1.5_f64, 2.5_f64]];
+
+    // Index 9 addresses no slot in a 4-sample buffer.
+    let sample_indices = vec![0_u32, 1_u32, 9_u32];
+    let input = BuildTreeInput {
+        sample_indices: &sample_indices,
+        gradients: &gradients,
+        hessians: &hessians,
+        bins: &bins,
+        n_samples,
+        n_features,
+        n_regular_bins: 4_usize,
+        bin_thresholds: &thresholds,
+        config: &config,
+        monotonic_constraints: None,
+    };
+
+    match build_tree(&input, &Hooks::default()) {
+        Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+            reason: "sample index 9 into a 4-sample buffer must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::SampleIndexOutOfBounds {
+            index,
+            n_samples: n,
+        }) => {
+            assert_eq!(index, 9_usize);
+            assert_eq!(n, 4_usize);
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
 }

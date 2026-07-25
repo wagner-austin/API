@@ -6,135 +6,11 @@ use numpy::{PyArray1, PyArray2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
+use super::helpers::{make_config_dict, set_config_i64, train_model, wrap_py_err};
 use crate::error::ClearGbmError;
 use crate::pyo3_module::training_fns::{
     predict_proba_model_from_args, predict_raw_model_from_args, train_gradient_boosting_from_args,
 };
-
-/// Helper: wraps a PyErr into ClearGbmError for test return types.
-fn wrap_py_err(e: &PyErr) -> ClearGbmError {
-    ClearGbmError::TreeConstructionFailed {
-        reason: format!("PyErr: {e}"),
-    }
-}
-
-/// Helper: sets an i64 value in a config dict.
-fn set_config_i64(dict: &Bound<'_, PyDict>, key: &str, val: i64) -> Result<(), ClearGbmError> {
-    match dict.set_item(key, val) {
-        Ok(()) => Ok(()),
-        Err(e) => Err(wrap_py_err(&e)),
-    }
-}
-
-/// Helper: sets an f64 value in a config dict.
-fn set_config_f64(dict: &Bound<'_, PyDict>, key: &str, val: f64) -> Result<(), ClearGbmError> {
-    match dict.set_item(key, val) {
-        Ok(()) => Ok(()),
-        Err(e) => Err(wrap_py_err(&e)),
-    }
-}
-
-/// Helper: builds a config dict with valid training hyperparameters.
-fn make_config_dict<'py>(py: Python<'py>) -> Result<Bound<'py, PyDict>, ClearGbmError> {
-    let config = PyDict::new(py);
-    match set_config_i64(&config, "n_estimators", 2_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_i64(&config, "max_depth", 2_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_f64(&config, "learning_rate", 0.1_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_i64(&config, "min_samples_split", 2_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_i64(&config, "min_samples_leaf", 1_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_i64(&config, "max_bins", 4_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_f64(&config, "subsample", 1.0_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_i64(&config, "random_state", 42_i64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_f64(&config, "reg_alpha", 0.0_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    match set_config_f64(&config, "reg_lambda", 1.0_f64) {
-        Ok(()) => {}
-        Err(e) => return Err(e),
-    };
-    Ok(config)
-}
-
-/// Helper: builds training args tuple for a small 6-sample, 2-feature dataset.
-fn make_training_args<'py>(py: Python<'py>) -> Result<Bound<'py, PyTuple>, ClearGbmError> {
-    let x_data = vec![
-        vec![0.1_f64, 0.2_f64],
-        vec![0.3_f64, 0.4_f64],
-        vec![0.5_f64, 0.6_f64],
-        vec![0.7_f64, 0.8_f64],
-        vec![0.9_f64, 1.0_f64],
-        vec![1.1_f64, 1.2_f64],
-    ];
-    let x_train = match PyArray2::from_vec2(py, &x_data) {
-        Ok(f) => f,
-        Err(e) => {
-            return Err(ClearGbmError::TreeConstructionFailed {
-                reason: format!("PyArray2 creation failed: {e}"),
-            })
-        }
-    };
-    let y_train = PyArray1::from_vec(py, vec![0_i64, 0_i64, 0_i64, 1_i64, 1_i64, 1_i64]);
-    let config = match make_config_dict(py) {
-        Ok(c) => c,
-        Err(e) => return Err(e),
-    };
-    let names = match PyList::new(py, ["f0", "f1"]) {
-        Ok(l) => l,
-        Err(e) => return Err(wrap_py_err(&e)),
-    };
-
-    match PyTuple::new(
-        py,
-        [
-            x_train.into_any(),
-            y_train.into_any(),
-            py.None().into_bound(py).into_any(),
-            py.None().into_bound(py).into_any(),
-            config.into_any(),
-            names.into_any(),
-        ],
-    ) {
-        Ok(t) => Ok(t),
-        Err(e) => Err(wrap_py_err(&e)),
-    }
-}
-
-/// Helper: trains a model and returns the PyObject.
-fn train_model(py: Python<'_>) -> Result<Py<PyAny>, ClearGbmError> {
-    let args = match make_training_args(py) {
-        Ok(a) => a,
-        Err(e) => return Err(e),
-    };
-    match train_gradient_boosting_from_args(&args) {
-        Ok(m) => Ok(m),
-        Err(e) => Err(wrap_py_err(&e)),
-    }
-}
 
 // =============================================================================
 // train_gradient_boosting_from_args
@@ -1261,6 +1137,48 @@ fn test_train_invalid_monotonic_constraint_value() -> Result<(), ClearGbmError> 
             Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
                 reason: "expected error for invalid monotonic constraint value".to_string(),
             }),
+        }
+    })
+}
+
+#[test]
+fn test_predict_proba_rejects_empty_feature_matrix() -> Result<(), ClearGbmError> {
+    pyo3::Python::initialize();
+    pyo3::Python::attach(|py| {
+        let model = match train_model(py) {
+            Ok(m) => m,
+            Err(e) => return Err(e),
+        };
+
+        // A zero-row matrix has no samples to score. Returning an empty result
+        // would let a caller silently believe every row was predicted, so the
+        // extraction boundary rejects it instead.
+        let empty: Vec<Vec<f64>> = Vec::new();
+        let x_empty = match PyArray2::from_vec2(py, &empty) {
+            Ok(a) => a,
+            Err(e) => {
+                return Err(ClearGbmError::TreeConstructionFailed {
+                    reason: format!("PyArray2 creation failed: {e}"),
+                })
+            }
+        };
+        let tuple = match PyTuple::new(py, [model.into_bound(py).into_any(), x_empty.into_any()]) {
+            Ok(t) => t,
+            Err(e) => return Err(wrap_py_err(&e)),
+        };
+
+        match predict_proba_model_from_args(&tuple) {
+            Ok(_) => Err(ClearGbmError::TreeConstructionFailed {
+                reason: "empty feature matrix must be rejected".to_string(),
+            }),
+            Err(e) => {
+                let text = e.to_string();
+                assert!(
+                    text.contains("zero rows"),
+                    "error should name the empty matrix, got: {text}"
+                );
+                Ok(())
+            }
         }
     })
 }

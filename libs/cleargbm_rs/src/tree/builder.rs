@@ -14,19 +14,18 @@ use crate::split::MonotonicConstraint;
 use crate::types::TreeNode;
 
 use super::histograms::{
-    build_feature_histograms, compute_child_histograms,
-    find_best_split_across_features_internal, BuildHistogramConfig, ChildHistogramConfig,
+    build_feature_histograms, compute_child_histograms, find_best_split_across_features_internal,
+    BuildHistogramConfig, ChildHistogramConfig,
 };
 use super::nodes::{
     compute_sums, finalize_nodes, should_stop, split_samples, BuildNode, PendingNode,
 };
 use super::{Tree, TreeBuildConfig};
 
-// Re-export the pieces external callers touch. `compute_leaf_value` and
-// `EPSILON` originate in `super::nodes`; the re-exports keep
-// `crate::tree::builder::…` paths that tests + the crate root use working.
+// Re-export the piece external callers touch. `compute_leaf_value` originates
+// in `super::nodes`; the re-export keeps the `crate::tree::builder::…` paths
+// that tests + the crate root use working.
 pub use super::nodes::compute_leaf_value;
-pub(crate) use super::nodes::EPSILON;
 
 /// Configuration for `build_tree` to avoid too many arguments.
 ///
@@ -44,11 +43,11 @@ pub struct BuildTreeInput<'a> {
     /// `crate::narrow::index_widen`).
     pub sample_indices: &'a [u32],
 
-    /// Gradients for all samples (f32 score-space per lightgbm-score-t-float).
-    pub gradients: &'a [f32],
+    /// Gradients for all samples.
+    pub gradients: &'a [f64],
 
-    /// Hessians for all samples (f32 score-space per lightgbm-score-t-float).
-    pub hessians: &'a [f32],
+    /// Hessians for all samples.
+    pub hessians: &'a [f64],
 
     /// Bin assignments in flat column-major u8 storage.
     ///
@@ -73,6 +72,34 @@ pub struct BuildTreeInput<'a> {
 
     /// Optional monotonic constraints per feature.
     pub monotonic_constraints: Option<&'a [MonotonicConstraint]>,
+}
+
+/// Records a leaf's value against every sample that reached it.
+///
+/// `sample_indices` are `u32` per the `lightgbm-score-t-float` note; they are
+/// widened for `Vec<f64>` access via the infallible
+/// [`crate::narrow::index_widen`].
+///
+/// Infallible: [`build_tree_with_leaf_assignment`] rejects an out-of-range
+/// sample index before construction begins, so by the time a leaf is finalized
+/// every index here addresses a real slot. Indexed directly rather than
+/// through `get_mut` for that reason — a `None` arm would be a branch this
+/// function's only caller has already made unreachable.
+///
+/// # Args
+///
+/// * `sample_indices` - Rows that reached this leaf.
+/// * `leaf_value` - The leaf's prediction.
+/// * `leaf_value_per_sample` - Per-sample output, length `n_samples`.
+pub(super) fn record_leaf_values(
+    sample_indices: &[u32],
+    leaf_value: f64,
+    leaf_value_per_sample: &mut [f64],
+) {
+    for &sample_idx in sample_indices {
+        let sample_idx_usize = crate::narrow::index_widen(sample_idx);
+        leaf_value_per_sample[sample_idx_usize] = leaf_value;
+    }
 }
 
 /// Builds a decision tree using histogram-based split finding.
@@ -140,6 +167,19 @@ pub fn build_tree_with_leaf_assignment(
             expected: format!("gradients.len() >= {n_samples}"),
             got: format!("gradients.len() = {}", input.gradients.len()),
         });
+    }
+    // Every sample index must address a slot in the per-sample leaf-value
+    // output. Checked once here rather than per write: the recording loop runs
+    // for every sample in every leaf, so a bound test inside it would be a
+    // branch in the hot path that this single up-front pass makes redundant.
+    for &sample_idx in input.sample_indices {
+        let sample_idx_usize = crate::narrow::index_widen(sample_idx);
+        if sample_idx_usize >= input.n_samples {
+            return Err(ClearGbmError::SampleIndexOutOfBounds {
+                index: sample_idx_usize,
+                n_samples: input.n_samples,
+            });
+        }
     }
     if input.hessians.len() < n_samples {
         return Err(ClearGbmError::ShapeMismatch {
@@ -242,15 +282,11 @@ pub fn build_tree_with_leaf_assignment(
             let leaf_value =
                 compute_leaf_value(g_sum, h_sum, config.reg_alpha(), config.reg_lambda());
 
-            // Record leaf-value assignment for every sample in this leaf.
-            // sample_indices are u32 per lightgbm-score-t-float; widen for
-            // Vec<f64> access via the infallible crate::narrow::index_widen.
-            for &sample_idx in &pending.sample_indices {
-                let sample_idx_usize = crate::narrow::index_widen(sample_idx);
-                if sample_idx_usize < leaf_value_per_sample.len() {
-                    leaf_value_per_sample[sample_idx_usize] = leaf_value;
-                }
-            }
+            record_leaf_values(
+                &pending.sample_indices,
+                leaf_value,
+                &mut leaf_value_per_sample,
+            );
 
             nodes.push(BuildNode {
                 node_id,
@@ -300,15 +336,11 @@ pub fn build_tree_with_leaf_assignment(
             let leaf_value =
                 compute_leaf_value(g_sum, h_sum, config.reg_alpha(), config.reg_lambda());
 
-            // Record leaf-value assignment for every sample in this leaf.
-            // sample_indices are u32 per lightgbm-score-t-float; widen for
-            // Vec<f64> access via the infallible crate::narrow::index_widen.
-            for &sample_idx in &pending.sample_indices {
-                let sample_idx_usize = crate::narrow::index_widen(sample_idx);
-                if sample_idx_usize < leaf_value_per_sample.len() {
-                    leaf_value_per_sample[sample_idx_usize] = leaf_value;
-                }
-            }
+            record_leaf_values(
+                &pending.sample_indices,
+                leaf_value,
+                &mut leaf_value_per_sample,
+            );
 
             nodes.push(BuildNode {
                 node_id,

@@ -62,8 +62,9 @@ impl Serialize for GradientBoostingConfig {
             Ok(()) => {}
             Err(e) => return Err(e),
         }
-        let mc_vec: Option<Vec<MonotonicConstraint>> =
-            self.monotonic_constraints().map(<[MonotonicConstraint]>::to_vec);
+        let mc_vec: Option<Vec<MonotonicConstraint>> = self
+            .monotonic_constraints()
+            .map(<[MonotonicConstraint]>::to_vec);
         match state.serialize_field("monotonic_constraints", &mc_vec) {
             Ok(()) => {}
             Err(e) => return Err(e),
@@ -85,7 +86,10 @@ impl Serialize for GradientBoostingConfig {
 }
 
 /// Field identifiers for `GradientBoostingConfig` deserialization.
-enum GradientBoostingConfigField {
+///
+/// `pub(crate)` because it is the `Value` type of the `pub(crate)`
+/// [`GradientBoostingConfigFieldVisitor`].
+pub(crate) enum GradientBoostingConfigField {
     /// The number of boosting iterations.
     NEstimators,
     /// The maximum tree depth.
@@ -113,7 +117,10 @@ enum GradientBoostingConfigField {
 }
 
 /// Visitor for deserializing `GradientBoostingConfigField` from string.
-struct GradientBoostingConfigFieldVisitor;
+///
+/// `pub(crate)` so [`crate::training::tests`] can drive its `expecting`
+/// formatter directly, matching the convention in [`crate::types::serde_impl`].
+pub(crate) struct GradientBoostingConfigFieldVisitor;
 
 impl<'de> Visitor<'de> for GradientBoostingConfigFieldVisitor {
     type Value = GradientBoostingConfigField;
@@ -406,7 +413,10 @@ impl Serialize for GradientBoostingModel {
 }
 
 /// Field identifiers for `GradientBoostingModel` deserialization.
-enum GradientBoostingModelField {
+///
+/// `pub(crate)` because it is the `Value` type of the `pub(crate)`
+/// [`GradientBoostingModelFieldVisitor`].
+pub(crate) enum GradientBoostingModelField {
     /// The trained decision trees.
     Trees,
     /// The base log-odds prediction.
@@ -422,7 +432,10 @@ enum GradientBoostingModelField {
 }
 
 /// Visitor for deserializing `GradientBoostingModelField` from string.
-struct GradientBoostingModelFieldVisitor;
+///
+/// `pub(crate)` so [`crate::training::tests`] can drive its `expecting`
+/// formatter directly, matching the convention in [`crate::types::serde_impl`].
+pub(crate) struct GradientBoostingModelFieldVisitor;
 
 impl<'de> Visitor<'de> for GradientBoostingModelFieldVisitor {
     type Value = GradientBoostingModelField;

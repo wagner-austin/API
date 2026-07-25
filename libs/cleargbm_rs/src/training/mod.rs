@@ -6,6 +6,7 @@
 //! # Overview
 //!
 //! - [`GradientBoostingConfig`] holds validated training hyperparameters
+//! - [`Parallelism`] selects the worker-thread count for a run
 //! - [`train_gradient_boosting`] runs the full training loop
 //! - [`GradientBoostingModel`] wraps the trained ensemble for prediction
 
@@ -13,6 +14,7 @@ pub(crate) mod config;
 pub(crate) mod early_stopping;
 pub(crate) mod importance;
 pub(crate) mod model;
+pub(crate) mod parallelism;
 pub(crate) mod rng;
 pub(crate) mod serde_impl;
 pub(crate) mod subsampling;
@@ -25,4 +27,5 @@ mod tests;
 pub use config::{GradientBoostingConfig, GradientBoostingConfigParams};
 pub use importance::feature_importances;
 pub use model::GradientBoostingModel;
-pub use train::train_gradient_boosting;
+pub use parallelism::Parallelism;
+pub use train::{train_gradient_boosting, TrainingRuntime};

@@ -350,3 +350,39 @@ fn test_subsample_exactly_one() -> Result<(), ClearGbmError> {
     assert!((config.subsample() - 1.0_f64).abs() < 1e-15_f64);
     Ok(())
 }
+
+#[test]
+fn test_config_rejects_max_bins_above_u8_range() -> Result<(), ClearGbmError> {
+    // Bin indices are packed into u8 for cache density, so 255 is the ceiling.
+    // Rejecting here is what lets the binning layer treat the invariant as
+    // established rather than re-checking per sample.
+    let mut params = default_params();
+    params.max_bins = 256_usize;
+    match GradientBoostingConfig::new(params) {
+        Ok(_) => Err(ClearGbmError::InvalidParameter {
+            name: "max_bins".to_string(),
+            reason: "256 must be rejected".to_string(),
+        }),
+        Err(ClearGbmError::InvalidParameter { name, reason }) => {
+            assert_eq!(name, "max_bins");
+            assert!(
+                reason.contains("255"),
+                "rejection should name the u8 ceiling, got: {reason}"
+            );
+            Ok(())
+        }
+        Err(other) => Err(other),
+    }
+}
+
+#[test]
+fn test_config_accepts_max_bins_at_the_u8_ceiling() -> Result<(), ClearGbmError> {
+    let mut params = default_params();
+    params.max_bins = 255_usize;
+    let config = match GradientBoostingConfig::new(params) {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    assert_eq!(config.max_bins(), 255_usize);
+    Ok(())
+}

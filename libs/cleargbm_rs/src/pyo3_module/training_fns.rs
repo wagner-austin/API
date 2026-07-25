@@ -4,19 +4,19 @@
 //! The trained model is exposed as a [`PyGbmModel`] opaque class that
 //! can be passed back to Rust for prediction without serialization overhead.
 
-use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::error::ClearGbmError;
+use crate::hooks::Hooks;
 use crate::pyo3_module::array_helpers::{i64_to_usize, try_convert_int};
-use crate::pyo3_module::prediction_fns::extract_rows;
-use crate::pyo3_module::tree_fns::ser_err;
 use crate::split::MonotonicConstraint;
 use crate::training::{
     feature_importances, train_gradient_boosting, GradientBoostingConfig,
     GradientBoostingConfigParams, GradientBoostingModel,
 };
+use crate::training::{Parallelism, TrainingRuntime};
 
 /// Opaque Python wrapper around a trained [`GradientBoostingModel`].
 ///
@@ -36,11 +36,26 @@ pub(crate) struct PyGbmModel {
     inner: GradientBoostingModel,
 }
 
-/// Converts a deserialization failure description into a [`PyErr`].
+/// Converts a serialization failure description into a [`PyErr`].
 ///
-/// Companion to [`ser_err`]; kept module-local because deserialization is only
-/// exposed on `PyGbmModel` right now. If more callers need it, lift alongside
-/// `ser_err` in `tree_fns`.
+/// # Args
+///
+/// * `reason` - Human-readable description of the serialization failure.
+///
+/// # Returns
+///
+/// A Python `RuntimeError` wrapping the serialization error.
+///
+/// `pub(super)` rather than private so [`crate::pyo3_module::tests`] can assert
+/// the mapping directly. `serde_json::to_string` cannot fail for
+/// [`GradientBoostingModel`] — the type contains no non-string map keys, and
+/// writing to a `String` is infallible — so this arm is unreachable through
+/// [`py_gbm_model_to_json_rs`] and can only be covered by calling it.
+pub(super) fn ser_err(reason: String) -> PyErr {
+    ClearGbmError::SerializationFailed { reason }.into()
+}
+
+/// Converts a deserialization failure description into a [`PyErr`].
 ///
 /// # Args
 ///
@@ -49,8 +64,46 @@ pub(crate) struct PyGbmModel {
 /// # Returns
 ///
 /// A Python `RuntimeError` wrapping the deserialization error.
-fn de_err(reason: String) -> PyErr {
+pub(super) fn de_err(reason: String) -> PyErr {
     ClearGbmError::DeserializationFailed { reason }.into()
+}
+
+/// Extracts a 2D numpy feature matrix into a `Vec<Vec<f64>>` for row-wise access.
+///
+/// # Args
+///
+/// * `features` - 2D numpy readonly view of the feature matrix.
+///
+/// # Returns
+///
+/// A vector of row-vectors, each `n_cols` long.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::EmptyInput`] if the matrix has zero rows.
+fn extract_rows(features: &PyReadonlyArray2<'_, f64>) -> Result<Vec<Vec<f64>>, ClearGbmError> {
+    let shape = features.shape();
+    let n_rows = shape[0_usize];
+    let n_cols = shape[1_usize];
+
+    if n_rows == 0_usize {
+        return Err(ClearGbmError::EmptyInput {
+            context: "features matrix has zero rows".to_string(),
+        });
+    }
+
+    let array = features.as_array();
+    let mut rows = Vec::with_capacity(n_rows);
+
+    for row_idx in 0_usize..n_rows {
+        let mut row = Vec::with_capacity(n_cols);
+        for col_idx in 0_usize..n_cols {
+            row.push(array[[row_idx, col_idx]]);
+        }
+        rows.push(row);
+    }
+
+    Ok(rows)
 }
 
 /// Serializes a [`PyGbmModel`] to a JSON string.
@@ -312,6 +365,14 @@ pub(crate) fn train_gradient_boosting_rs(
     // Extract feature names
     let names = propagate!(extract_feature_names(feature_names));
 
+    // Extract the worker-thread policy. Read from the same dict as the
+    // hyperparameters but kept out of `GradientBoostingConfig`: it does not
+    // affect the fitted model and must not be persisted with it.
+    let parallelism = propagate_into!(Parallelism::from_n_jobs(propagate!(dict_get_i64(
+        config_dict,
+        "n_jobs"
+    ))));
+
     // Call training
     let model = propagate_into!(train_gradient_boosting(
         &train_slices,
@@ -320,6 +381,10 @@ pub(crate) fn train_gradient_boosting_rs(
         y_val_u8.as_deref(),
         &config,
         &names,
+        &TrainingRuntime {
+            parallelism,
+            hooks: &Hooks::default(),
+        },
     ));
 
     Py::new(py, PyGbmModel { inner: model })

@@ -8,7 +8,6 @@ use crate::binning::precompute_feature_bins;
 use crate::error::ClearGbmError;
 use crate::hooks::Hooks;
 use crate::losses::{binary_log_loss, binary_log_loss_initial_prediction, sigmoid_array};
-use crate::narrow::score_narrow;
 use crate::predict::predict_tree;
 use crate::tree::{build_tree_with_leaf_assignment, BuildTreeInput, Tree, TreeBuildConfig};
 use crate::types::SplitConfig;
@@ -16,9 +15,24 @@ use crate::types::SplitConfig;
 use super::config::GradientBoostingConfig;
 use super::early_stopping::EarlyStoppingState;
 use super::model::GradientBoostingModel;
+use super::parallelism::Parallelism;
 use super::rng::SimpleRng;
 use super::subsampling::get_sample_indices;
 use super::validation::{validate_training_inputs, validate_validation_inputs};
+
+/// How a training run executes, as opposed to what it learns.
+///
+/// Groups the two knobs that describe execution rather than the model: the
+/// worker-thread policy and the injection hooks. Neither is persisted with the
+/// fitted model, so they travel together and separately from the
+/// hyperparameters in [`GradientBoostingConfig`].
+pub struct TrainingRuntime<'a> {
+    /// Worker-thread policy for this run.
+    pub parallelism: Parallelism,
+
+    /// Dependency injection hooks for histogram building and pool construction.
+    pub hooks: &'a Hooks,
+}
 
 /// Trains a gradient boosting model on binary classification data.
 ///
@@ -39,6 +53,8 @@ use super::validation::{validate_training_inputs, validate_validation_inputs};
 /// * `y_val` - Optional validation labels.
 /// * `config` - Training hyperparameters.
 /// * `feature_names` - Feature names (one per feature).
+/// * `runtime` - Worker-thread policy and injection hooks. Does not affect the
+///   fitted model, only how it is built.
 ///
 /// # Returns
 ///
@@ -59,7 +75,9 @@ pub fn train_gradient_boosting(
     y_val: Option<&[u8]>,
     config: &GradientBoostingConfig,
     feature_names: &[String],
+    runtime: &TrainingRuntime<'_>,
 ) -> Result<GradientBoostingModel, ClearGbmError> {
+    let hooks = runtime.hooks;
     // 1. Validate training inputs
     let n_features = match validate_training_inputs(x_train, y_train, feature_names) {
         Ok(n) => n,
@@ -133,7 +151,16 @@ pub fn train_gradient_boosting(
         split_config,
     ));
 
-    let hooks = Hooks::default();
+    // Build the worker pool once for the whole run rather than per tree.
+    let pool = match (hooks.build_pool)(runtime.parallelism.thread_count()) {
+        Ok(built) => built,
+        Err(e) => {
+            return Err(ClearGbmError::InvalidParameter {
+                name: "n_jobs".to_string(),
+                reason: format!("could not build a worker pool: {e}"),
+            })
+        }
+    };
 
     // 9. Validate monotonic constraints length if provided
     if let Some(mc) = config.monotonic_constraints() {
@@ -145,110 +172,123 @@ pub fn train_gradient_boosting(
         }
     }
 
-    // 10. Boosting loop
-    let mut trees: Vec<Tree> = Vec::with_capacity(config.n_estimators());
+    // 10. Boosting loop, run inside the run-scoped pool so the caller's
+    // `n_jobs` actually bounds the worker count. Tree building owns every
+    // rayon dispatch in the crate (per-feature histogram construction), so
+    // installing here covers all of it. Without the install, `into_par_iter`
+    // would fall back to rayon's global pool — one worker per core regardless
+    // of `n_jobs` — which both ignores the caller and degrades badly on a
+    // contended machine, since every worker stays runnable and competes.
+    //
+    // Installed once for the whole run rather than once per tree: `install`
+    // hands the closure to the pool and blocks the calling thread until it
+    // finishes, so installing per boosting round adds one handoff per round.
+    let build_trees = || -> Result<Vec<Tree>, ClearGbmError> {
+        let mut trees: Vec<Tree> = Vec::with_capacity(config.n_estimators());
 
-    for round in 0_usize..config.n_estimators() {
-        // a. Compute probabilities from current raw predictions
-        let probas = sigmoid_array(&raw_preds_train);
+        for round in 0_usize..config.n_estimators() {
+            // a. Compute probabilities from current raw predictions
+            let probas = sigmoid_array(&raw_preds_train);
 
-        // b. Compute gradients and hessians (inline — lengths match by
-        // construction). Narrowed to f32 for the histogram hot loop's memory
-        // bandwidth (halves per-sample bytes for the two hottest streams);
-        // the HistogramBuffer accumulator stays f64. Binary-log-loss grad is
-        // bounded [-1, 1] and hess is bounded [0, 0.25], well inside f32's
-        // 7-digit precision range. See `crate::narrow::score_narrow` +
-        // `~/PROJECTS/tech-wiki/pages/lightgbm-score-t-float.md`.
-        let gradients: Vec<f32> = probas
-            .iter()
-            .zip(y_train.iter())
-            .map(|(&p, &y)| score_narrow(p - f64::from(y)))
-            .collect();
-        let hessians: Vec<f32> = probas
-            .iter()
-            .map(|&p| score_narrow(p * (1.0_f64 - p)))
-            .collect();
+            // b. Compute gradients and hessians (inline — lengths match by
+            // construction). Kept in f64 end to end. Narrowing these two streams
+            // to f32 for the histogram hot loop was measured 8% SLOWER on this
+            // workload: at the node sizes reached here both widths already fit in
+            // L2, so there is no bandwidth to save, and every element then pays a
+            // widening conversion before its accumulate. See the wiki page
+            // `cleargbm-f32-score-narrowing-reverted`.
+            let gradients: Vec<f64> = probas
+                .iter()
+                .zip(y_train.iter())
+                .map(|(&p, &y)| p - f64::from(y))
+                .collect();
+            let hessians: Vec<f64> = probas.iter().map(|&p| p * (1.0_f64 - p)).collect();
 
-        // c. Get sample indices (subsampling)
-        let sample_indices = propagate!(get_sample_indices(n_train, config.subsample(), &mut rng));
+            // c. Get sample indices (subsampling)
+            let sample_indices =
+                propagate!(get_sample_indices(n_train, config.subsample(), &mut rng));
 
-        // d. Build tree input
-        let input = BuildTreeInput {
-            sample_indices: &sample_indices,
-            gradients: &gradients,
-            hessians: &hessians,
-            bins: feature_bins.bins(),
-            n_samples: feature_bins.n_samples(),
-            n_features: feature_bins.n_features(),
-            n_regular_bins: feature_bins.n_regular_bins(),
-            bin_thresholds: &bin_thresholds,
-            config: &tree_build_config,
-            monotonic_constraints: config.monotonic_constraints(),
-        };
+            // d. Build tree input
+            let input = BuildTreeInput {
+                sample_indices: &sample_indices,
+                gradients: &gradients,
+                hessians: &hessians,
+                bins: feature_bins.bins(),
+                n_samples: feature_bins.n_samples(),
+                n_features: feature_bins.n_features(),
+                n_regular_bins: feature_bins.n_regular_bins(),
+                bin_thresholds: &bin_thresholds,
+                config: &tree_build_config,
+                monotonic_constraints: config.monotonic_constraints(),
+            };
 
-        // e. Build tree (and capture per-sample leaf assignments as a
-        // side effect — see build_tree_with_leaf_assignment docs)
-        let (tree, leaf_value_per_sample) =
-            propagate!(build_tree_with_leaf_assignment(&input, &hooks));
+            // e. Build tree (and capture per-sample leaf assignments as a
+            // side effect — see build_tree_with_leaf_assignment docs)
+            let (tree, leaf_value_per_sample) =
+                propagate!(build_tree_with_leaf_assignment(&input, hooks));
 
-        // f. Update training predictions.
-        // Fast path: for samples covered by sample_indices (leaf_value not
-        // NaN), the leaf-value is known from tree building — direct O(N)
-        // lookup + add, no tree walk. Fallback path: NaN samples
-        // (subsampled-out this round) need predict_tree. When subsample=1.0
-        // every sample is covered by the fast path.
-        let lr = config.learning_rate();
-        let mut needs_fallback: Vec<usize> = Vec::new();
-        for i in 0_usize..n_train {
-            let lv = leaf_value_per_sample[i];
-            if lv.is_nan() {
-                needs_fallback.push(i);
-            } else {
-                raw_preds_train[i] += lr * lv;
-            }
-        }
-        if !needs_fallback.is_empty() {
-            // Only walk the tree for samples the tree wasn't built on.
-            let fallback_features: Vec<&[f64]> =
-                needs_fallback.iter().map(|&i| x_train[i]).collect();
-            let fallback_preds = propagate!(predict_tree(&tree, &fallback_features));
-            for (j, &i) in needs_fallback.iter().enumerate() {
-                raw_preds_train[i] += lr * fallback_preds[j];
-            }
-        }
-
-        // g. Early stopping check on validation set (before push, so we can borrow tree)
-        let stop_at_round: Option<usize> = match validation_data {
-            Some((xv, yv)) => {
-                let val_preds = propagate!(predict_tree(&tree, xv));
-                for i in 0_usize..raw_preds_val.len() {
-                    raw_preds_val[i] += config.learning_rate() * val_preds[i];
+            // f. Update training predictions.
+            // Fast path: for samples covered by sample_indices (leaf_value not
+            // NaN), the leaf-value is known from tree building — direct O(N)
+            // lookup + add, no tree walk. Fallback path: NaN samples
+            // (subsampled-out this round) need predict_tree. When subsample=1.0
+            // every sample is covered by the fast path.
+            let lr = config.learning_rate();
+            let mut needs_fallback: Vec<usize> = Vec::new();
+            for i in 0_usize..n_train {
+                let lv = leaf_value_per_sample[i];
+                if lv.is_nan() {
+                    needs_fallback.push(i);
+                } else {
+                    raw_preds_train[i] += lr * lv;
                 }
-                let val_probas = sigmoid_array(&raw_preds_val);
-                let val_loss = propagate!(binary_log_loss(yv, &val_probas));
-                match es_state {
-                    Some(ref mut es) => {
-                        if es.update(val_loss, round) {
-                            Some(es.best_round())
-                        } else {
-                            None
-                        }
+            }
+            if !needs_fallback.is_empty() {
+                // Only walk the tree for samples the tree wasn't built on.
+                let fallback_features: Vec<&[f64]> =
+                    needs_fallback.iter().map(|&i| x_train[i]).collect();
+                let fallback_preds = propagate!(predict_tree(&tree, &fallback_features));
+                for (j, &i) in needs_fallback.iter().enumerate() {
+                    raw_preds_train[i] += lr * fallback_preds[j];
+                }
+            }
+
+            // g. Early stopping check on validation set (before push, so we can borrow tree)
+            let stop_at_round: Option<usize> = match validation_data {
+                Some((xv, yv)) => {
+                    let val_preds = propagate!(predict_tree(&tree, xv));
+                    for i in 0_usize..raw_preds_val.len() {
+                        raw_preds_val[i] += config.learning_rate() * val_preds[i];
                     }
-                    None => None,
+                    let val_probas = sigmoid_array(&raw_preds_val);
+                    let val_loss = propagate!(binary_log_loss(yv, &val_probas));
+                    match es_state {
+                        Some(ref mut es) => {
+                            if es.update(val_loss, round) {
+                                Some(es.best_round())
+                            } else {
+                                None
+                            }
+                        }
+                        None => None,
+                    }
                 }
+                None => None,
+            };
+
+            // h. Store tree
+            trees.push(tree);
+
+            // i. If early stopping triggered, truncate and break
+            if let Some(best_round) = stop_at_round {
+                trees.truncate(best_round + 1_usize);
+                break;
             }
-            None => None,
-        };
-
-        // h. Store tree
-        trees.push(tree);
-
-        // i. If early stopping triggered, truncate and break
-        if let Some(best_round) = stop_at_round {
-            trees.truncate(best_round + 1_usize);
-            break;
         }
-    }
+
+        Ok(trees)
+    };
+    let trees = propagate!(pool.install(build_trees));
 
     Ok(GradientBoostingModel::new(
         trees,

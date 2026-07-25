@@ -485,7 +485,7 @@ fn test_tree_failing_serializer_coverage() -> Result<(), ClearGbmError> {
     let mut ser = FailingSerializer::fail_after(100);
     assert!((&mut ser).serialize_u64(1_u64).is_ok());
     let mut ser = FailingSerializer::fail_after(100);
-    assert!((&mut ser).serialize_f32(1.0_f32).is_ok());
+    assert!((&mut ser).serialize_f64(1.0_f64).is_ok());
     let mut ser = FailingSerializer::fail_after(100);
     assert!((&mut ser).serialize_f64(1.0_f64).is_ok());
     let mut ser = FailingSerializer::fail_after(100);

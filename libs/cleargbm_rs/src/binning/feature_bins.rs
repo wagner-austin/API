@@ -17,21 +17,6 @@ use crate::error::ClearGbmError;
 use super::assignment::assign_bin;
 use super::edges::{compute_bin_edges, BinEdges};
 
-/// Converts a `usize` to `u8`, returning an `IntegerConversion` error on overflow.
-///
-/// Used at the storage boundary where bin indices are packed into `u8` for
-/// cache density. Under the `max_bins ≤ 255` invariant enforced upstream by
-/// the training config, the `try_from` call cannot fail — the Err arm is a
-/// defense-in-depth guard against callers that bypass the invariant.
-fn usize_to_u8(value: usize, context: &str) -> Result<u8, ClearGbmError> {
-    match u8::try_from(value) {
-        Ok(v) => Ok(v),
-        Err(_) => Err(ClearGbmError::IntegerConversion {
-            context: format!("{context}: {value} does not fit in u8"),
-        }),
-    }
-}
-
 /// Combined binning result: edges + sample assignments.
 ///
 /// Produced once per training run by `precompute_feature_bins`, then
@@ -162,9 +147,6 @@ impl FeatureBins {
 /// * Propagates errors from `compute_bin_edges`.
 /// * Returns `ClearGbmError::InvalidParameter` if `max_bins > 255` — the u8
 ///   bin-index invariant is broken.
-/// * Returns `ClearGbmError::IntegerConversion` if a computed bin index cannot
-///   be represented in `u8` (dead branch under the `max_bins ≤ 255` guard, but
-///   the check is kept as a defense in depth).
 pub fn precompute_feature_bins(
     x: &[&[f64]],
     max_bins: usize,
@@ -184,10 +166,6 @@ pub fn precompute_feature_bins(
     let n_samples = x.len();
     let n_features = bin_edges.len();
     let nan_bin_usize = max_bins;
-    let nan_bin: u8 = match usize_to_u8(nan_bin_usize, "nan_bin_index") {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
 
     // Flat column-major storage: sample_bins[feat_idx * n_samples + sample_idx]
     let mut sample_bins = vec![0_u8; n_samples * n_features];
@@ -202,14 +180,13 @@ pub fn precompute_feature_bins(
             } else {
                 assign_bin(val, feat_edges)
             };
-            let bin_idx: u8 = if bin_idx_usize == nan_bin_usize {
-                nan_bin
-            } else {
-                match usize_to_u8(bin_idx_usize, "bin_index") {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                }
-            };
+            // `max_bins <= 255` is rejected at the top of this function, and
+            // the NaN bin sits at `max_bins` — the largest index either branch
+            // above can produce — so every value here is already in u8 range.
+            // Written as a saturating conversion rather than a fallible one
+            // because the error arm would be statically dead: the guard has
+            // already run, so there is no input that reaches it.
+            let bin_idx: u8 = u8::try_from(bin_idx_usize).unwrap_or(u8::MAX);
             sample_bins[feat_col_start + sample_idx] = bin_idx;
         }
     }

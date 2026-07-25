@@ -1,7 +1,7 @@
 //! Tests for TreeBuildConfig and Tree structs.
 
 use crate::error::ClearGbmError;
-use crate::tree::builder::EPSILON;
+use crate::tree::nodes::EPSILON;
 use crate::tree::{Tree, TreeBuildConfig};
 use crate::types::{SplitConfig, TreeNode};
 

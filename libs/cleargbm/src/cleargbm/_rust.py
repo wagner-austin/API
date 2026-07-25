@@ -174,7 +174,7 @@ class _NClassesProto(Protocol):
         ...
 
 
-_native_mod: types.ModuleType = __import__("cleargbm_rs.cleargbm_rs", fromlist=["cleargbm_rs"])
+_native_mod: types.ModuleType = __import__("cleargbm_rs")
 
 train_gradient_boosting_rs: _TrainProto = _native_mod.train_gradient_boosting_rs
 predict_proba_model_rs: _PredictProbaProto = _native_mod.predict_proba_model_rs

@@ -1,11 +1,13 @@
 //! Serde tests for GradientBoostingConfig + GradientBoostingModel.
 
 use crate::error::ClearGbmError;
+use crate::hooks::Hooks;
 use crate::split::MonotonicConstraint;
 use crate::training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
     GradientBoostingModel,
 };
+use crate::training::{Parallelism, TrainingRuntime};
 
 // =============================================================================
 // Helpers
@@ -61,7 +63,18 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    train_gradient_boosting(&x_train, &y_train, None, None, &config, &feature_names)
+    train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &TrainingRuntime {
+            parallelism: Parallelism::Single,
+            hooks: &Hooks::default(),
+        },
+    )
 }
 
 /// Test helper: serialize via `serde_json`, mapping errors into
@@ -225,8 +238,7 @@ fn test_config_deserialize_unknown_field_errors() -> Result<(), ClearGbmError> {
 }
 
 #[test]
-fn test_config_deserialize_invalid_learning_rate_propagates_validation_error(
-) -> Result<(), ClearGbmError> {
+fn test_config_deserialize_invalid_learning_rate_errors() -> Result<(), ClearGbmError> {
     let cfg = match GradientBoostingConfig::new(default_params()) {
         Ok(c) => c,
         Err(e) => return Err(e),
@@ -317,7 +329,10 @@ fn test_model_roundtrip_predictions_identical() -> Result<(), ClearGbmError> {
     };
     assert_eq!(original_raw.len(), decoded_raw.len());
     for (a, b) in original_raw.iter().zip(decoded_raw.iter()) {
-        assert!((a - b).abs() < 1e-15_f64, "predict_raw mismatch: {a} vs {b}");
+        assert!(
+            (a - b).abs() < 1e-15_f64,
+            "predict_raw mismatch: {a} vs {b}"
+        );
     }
     Ok(())
 }
@@ -349,4 +364,340 @@ fn test_model_deserialize_wrong_type_errors() -> Result<(), ClearGbmError> {
     let result: Result<GradientBoostingModel, _> = serde_json::from_str(json);
     assert!(result.is_err());
     Ok(())
+}
+
+// =============================================================================
+// Error paths
+// =============================================================================
+//
+// The manual serde impls in `training::serde_impl` propagate every serializer
+// and deserializer failure by hand rather than with `?`. Each of those arms is
+// a place a future edit could silently swallow an error, so they are driven
+// individually: field-by-field serializer failures via `testkit`, and
+// field-by-field payload defects via round-tripped JSON.
+
+/// The fields `GradientBoostingConfig` serializes, in declaration order.
+const CONFIG_FIELDS: &[&str] = &[
+    "n_estimators",
+    "max_depth",
+    "learning_rate",
+    "min_samples_split",
+    "min_samples_leaf",
+    "max_bins",
+    "subsample",
+    "random_state",
+    "monotonic_constraints",
+    "reg_alpha",
+    "reg_lambda",
+    "early_stopping_rounds",
+];
+
+/// The fields `GradientBoostingModel` serializes, in declaration order.
+const MODEL_FIELDS: &[&str] = &[
+    "trees",
+    "base_prediction",
+    "learning_rate",
+    "feature_names",
+    "n_classes",
+    "config",
+];
+
+/// Serializes `value` and reparses it as a mutable JSON object.
+///
+/// Building the reference payload from the real `Serialize` impl (rather than
+/// a hand-written literal) keeps these tests honest if a field is renamed: the
+/// per-field assertions below fail loudly instead of quietly testing nothing.
+///
+/// # Args
+///
+/// * `value` - The value to serialize.
+///
+/// # Returns
+///
+/// The serialized form as a JSON object map.
+///
+/// # Errors
+///
+/// Returns [`ClearGbmError::SerializationFailed`] if serialization fails, or
+/// [`ClearGbmError::DeserializationFailed`] if the result is not a JSON object.
+fn as_json_object<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Map<String, serde_json::Value>, ClearGbmError> {
+    let text = match to_json(value) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    let parsed: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: e.to_string(),
+            })
+        }
+    };
+    match parsed {
+        serde_json::Value::Object(map) => Ok(map),
+        _ => Err(ClearGbmError::DeserializationFailed {
+            reason: "expected a JSON object".to_string(),
+        }),
+    }
+}
+
+/// Builds the reference config used by the error-path tests.
+fn reference_config() -> Result<GradientBoostingConfig, ClearGbmError> {
+    GradientBoostingConfig::new(default_params())
+}
+
+// -----------------------------------------------------------------------------
+// Serializer failures
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_config_serialize_fail_each_field() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let config = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    for (fail_at, field) in CONFIG_FIELDS.iter().enumerate() {
+        let mut ser = FailingSerializer::fail_after(fail_at);
+        assert!(
+            config.serialize(&mut ser).is_err(),
+            "serializer failure at field {fail_at} ({field}) was swallowed"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_config_serialize_fail_on_struct() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let config = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut ser = FailingSerializer::fail_on_struct();
+    assert!(config.serialize(&mut ser).is_err());
+    Ok(())
+}
+
+#[test]
+fn test_config_serialize_fail_on_end() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let config = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let mut ser = FailingSerializer::fail_on_end();
+    assert!(config.serialize(&mut ser).is_err());
+    Ok(())
+}
+
+#[test]
+fn test_model_serialize_fail_each_field() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    for (fail_at, field) in MODEL_FIELDS.iter().enumerate() {
+        let mut ser = FailingSerializer::fail_after(fail_at);
+        assert!(
+            model.serialize(&mut ser).is_err(),
+            "serializer failure at field {fail_at} ({field}) was swallowed"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_model_serialize_fail_on_struct() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let mut ser = FailingSerializer::fail_on_struct();
+    assert!(model.serialize(&mut ser).is_err());
+    Ok(())
+}
+
+#[test]
+fn test_model_serialize_fail_on_end() -> Result<(), ClearGbmError> {
+    use crate::testkit::FailingSerializer;
+    use serde::Serialize;
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let mut ser = FailingSerializer::fail_on_end();
+    assert!(model.serialize(&mut ser).is_err());
+    Ok(())
+}
+
+// -----------------------------------------------------------------------------
+// Deserializer failures: one defect per field
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_config_deserialize_rejects_each_missing_field() -> Result<(), ClearGbmError> {
+    let config = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let full = match as_json_object(&config) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    for field in CONFIG_FIELDS {
+        let mut partial = full.clone();
+        assert!(
+            partial.remove(*field).is_some(),
+            "serialized config does not contain '{field}'"
+        );
+        let text = serde_json::Value::Object(partial).to_string();
+        match serde_json::from_str::<GradientBoostingConfig>(&text) {
+            Ok(_) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: format!("config missing '{field}' was accepted"),
+                })
+            }
+            Err(e) => assert!(
+                e.to_string().contains(field),
+                "error for missing '{field}' does not name it: {e}"
+            ),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_config_deserialize_rejects_each_wrong_value_type() -> Result<(), ClearGbmError> {
+    let config = match reference_config() {
+        Ok(c) => c,
+        Err(e) => return Err(e),
+    };
+    let full = match as_json_object(&config) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    // A bare string is a valid JSON value but wrong for every config field:
+    // the numeric fields, the optional constraint list and the optional
+    // early-stopping count all reject it.
+    for field in CONFIG_FIELDS {
+        let mut broken = full.clone();
+        let previous = broken.insert(
+            (*field).to_string(),
+            serde_json::Value::String("wrong type".to_string()),
+        );
+        assert!(
+            previous.is_some(),
+            "serialized config does not contain '{field}'"
+        );
+        let text = serde_json::Value::Object(broken).to_string();
+        if serde_json::from_str::<GradientBoostingConfig>(&text).is_ok() {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: format!("config with a string in '{field}' was accepted"),
+            });
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_model_deserialize_rejects_each_missing_field() -> Result<(), ClearGbmError> {
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let full = match as_json_object(&model) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    for field in MODEL_FIELDS {
+        let mut partial = full.clone();
+        assert!(
+            partial.remove(*field).is_some(),
+            "serialized model does not contain '{field}'"
+        );
+        let text = serde_json::Value::Object(partial).to_string();
+        match serde_json::from_str::<GradientBoostingModel>(&text) {
+            Ok(_) => {
+                return Err(ClearGbmError::DeserializationFailed {
+                    reason: format!("model missing '{field}' was accepted"),
+                })
+            }
+            Err(e) => assert!(
+                e.to_string().contains(field),
+                "error for missing '{field}' does not name it: {e}"
+            ),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_model_deserialize_rejects_each_wrong_value_type() -> Result<(), ClearGbmError> {
+    let model = match make_test_model() {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    let full = match as_json_object(&model) {
+        Ok(m) => m,
+        Err(e) => return Err(e),
+    };
+    for field in MODEL_FIELDS {
+        let mut broken = full.clone();
+        let previous = broken.insert(
+            (*field).to_string(),
+            serde_json::Value::String("wrong type".to_string()),
+        );
+        assert!(
+            previous.is_some(),
+            "serialized model does not contain '{field}'"
+        );
+        let text = serde_json::Value::Object(broken).to_string();
+        if serde_json::from_str::<GradientBoostingModel>(&text).is_ok() {
+            return Err(ClearGbmError::DeserializationFailed {
+                reason: format!("model with a string in '{field}' was accepted"),
+            });
+        }
+    }
+    Ok(())
+}
+
+// -----------------------------------------------------------------------------
+// Field-identifier visitors
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_config_field_visitor_expecting_describes_a_field_identifier() -> Result<(), ClearGbmError> {
+    use crate::testkit::test_expecting_write_success;
+    use crate::training::serde_impl::GradientBoostingConfigFieldVisitor;
+
+    // "field identifier" is 16 bytes, so 50 is ample.
+    match test_expecting_write_success(&GradientBoostingConfigFieldVisitor, 50_usize) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ClearGbmError::SerializationFailed {
+            reason: "expecting() failed with a sufficient buffer".to_string(),
+        }),
+    }
+}
+
+#[test]
+fn test_model_field_visitor_expecting_describes_a_field_identifier() -> Result<(), ClearGbmError> {
+    use crate::testkit::test_expecting_write_success;
+    use crate::training::serde_impl::GradientBoostingModelFieldVisitor;
+
+    match test_expecting_write_success(&GradientBoostingModelFieldVisitor, 50_usize) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ClearGbmError::SerializationFailed {
+            reason: "expecting() failed with a sufficient buffer".to_string(),
+        }),
+    }
 }

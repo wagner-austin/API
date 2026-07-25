@@ -147,8 +147,8 @@ pub(super) fn should_stop(
 /// Handles out-of-bounds indices defensively by skipping them.
 pub(super) fn compute_sums(
     sample_indices: &[u32],
-    gradients: &[f32],
-    hessians: &[f32],
+    gradients: &[f64],
+    hessians: &[f64],
 ) -> (f64, f64) {
     let mut g_sum = 0.0_f64;
     let mut h_sum = 0.0_f64;
@@ -156,10 +156,10 @@ pub(super) fn compute_sums(
     for &idx in sample_indices {
         let idx_usize = crate::narrow::index_widen(idx);
         if idx_usize < gradients.len() {
-            g_sum += f64::from(gradients[idx_usize]);
+            g_sum += gradients[idx_usize];
         }
         if idx_usize < hessians.len() {
-            h_sum += f64::from(hessians[idx_usize]);
+            h_sum += hessians[idx_usize];
         }
     }
 
@@ -182,8 +182,16 @@ pub(super) fn split_samples(
 ) -> (Vec<u32>, Vec<u32>) {
     let nan_bin = n_regular_bins;
     let feat_col_start = feature_index * n_samples;
-    let mut left = Vec::new();
-    let mut right = Vec::new();
+    // Reserve the node's full sample count for both sides up front. Growing
+    // from empty reallocates and copies on every doubling — about sixteen
+    // times for a root node of ~55k samples, per side, per split — and the
+    // copied bytes roughly double the partition's write volume. One side
+    // always ends up over-reserved, but peak cost is bounded by the largest
+    // single node (the root: two buffers of `n * 4` bytes) because the
+    // builder walks the tree depth-first and only one split is live at a time.
+    let n_at_node = sample_indices.len();
+    let mut left = Vec::with_capacity(n_at_node);
+    let mut right = Vec::with_capacity(n_at_node);
 
     for &idx in sample_indices {
         let idx_usize = crate::narrow::index_widen(idx);

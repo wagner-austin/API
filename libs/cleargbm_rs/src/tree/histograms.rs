@@ -9,7 +9,7 @@
 use rayon::prelude::*;
 
 use crate::error::ClearGbmError;
-use crate::histogram::{reorder_grad_hess_into, subtract_histogram};
+use crate::histogram::{reorder_grad_hess_into, subtract_histogram, HistogramRequest};
 use crate::hooks::Hooks;
 use crate::split::{find_best_split_from_histogram, MonotonicConstraint, SplitResult};
 use crate::types::{HistogramBuffer, SplitConfig};
@@ -25,10 +25,10 @@ const RAYON_PER_FEATURE_MIN_SAMPLES: usize = 4096;
 pub(super) struct BuildHistogramConfig<'a> {
     /// Sample indices.
     pub(super) sample_indices: &'a [u32],
-    /// Gradients for all samples (f32 score-space per lightgbm-score-t-float).
-    pub(super) gradients: &'a [f32],
-    /// Hessians for all samples (f32 score-space per lightgbm-score-t-float).
-    pub(super) hessians: &'a [f32],
+    /// Gradients for all samples.
+    pub(super) gradients: &'a [f64],
+    /// Hessians for all samples.
+    pub(super) hessians: &'a [f64],
     /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
     pub(super) bins: &'a [u8],
     /// Sample count (row count of the original feature matrix).
@@ -82,8 +82,8 @@ pub(super) fn build_feature_histograms(
     // that's an 18x reduction in the input-side gather count. See wiki page
     // `lightgbm-construct-histogram-inner`.
     let n_at_node = config.sample_indices.len();
-    let mut ordered_gradients: Vec<f32> = vec![0.0_f32; n_at_node];
-    let mut ordered_hessians: Vec<f32> = vec![0.0_f32; n_at_node];
+    let mut ordered_gradients: Vec<f64> = vec![0.0_f64; n_at_node];
+    let mut ordered_hessians: Vec<f64> = vec![0.0_f64; n_at_node];
     reorder_grad_hess_into(
         config.sample_indices,
         config.gradients,
@@ -98,13 +98,13 @@ pub(super) fn build_feature_histograms(
         let feat_col_start = feat_idx * config.n_samples;
         let feat_col_end = feat_col_start + config.n_samples;
         let feat_bins = &config.bins[feat_col_start..feat_col_end];
-        (config.hooks.build_histogram)(
-            config.sample_indices,
-            ordered_g,
-            ordered_h,
-            feat_bins,
-            config.n_bins,
-        )
+        (config.hooks.build_histogram)(HistogramRequest {
+            sample_indices: config.sample_indices,
+            ordered_gradients: ordered_g,
+            ordered_hessians: ordered_h,
+            bins: feat_bins,
+            n_bins: config.n_bins,
+        })
     };
 
     let results: Vec<Result<HistogramBuffer, ClearGbmError>> =
@@ -173,10 +173,10 @@ pub(super) struct ChildHistogramConfig<'a> {
     pub(super) left_indices: &'a [u32],
     /// Right child sample indices.
     pub(super) right_indices: &'a [u32],
-    /// Gradients for all samples (f32 score-space per lightgbm-score-t-float).
-    pub(super) gradients: &'a [f32],
-    /// Hessians for all samples (f32 score-space per lightgbm-score-t-float).
-    pub(super) hessians: &'a [f32],
+    /// Gradients for all samples.
+    pub(super) gradients: &'a [f64],
+    /// Hessians for all samples.
+    pub(super) hessians: &'a [f64],
     /// Bin assignments in flat column-major u8 layout, length `n_samples * n_features`.
     pub(super) bins: &'a [u8],
     /// Sample count (row count of the original feature matrix).
@@ -216,8 +216,8 @@ pub(super) fn compute_child_histograms(
     // `lightgbm-sibling-subtraction-trick`), so the reorder cost pays off
     // n_features times just as in the root-histogram case.
     let n_at_smaller = smaller_indices.len();
-    let mut ordered_gradients: Vec<f32> = vec![0.0_f32; n_at_smaller];
-    let mut ordered_hessians: Vec<f32> = vec![0.0_f32; n_at_smaller];
+    let mut ordered_gradients: Vec<f64> = vec![0.0_f64; n_at_smaller];
+    let mut ordered_hessians: Vec<f64> = vec![0.0_f64; n_at_smaller];
     reorder_grad_hess_into(
         smaller_indices,
         config.gradients,
@@ -234,13 +234,13 @@ pub(super) fn compute_child_histograms(
             let feat_col_end = feat_col_start + config.n_samples;
             let feat_bins = &config.bins[feat_col_start..feat_col_end];
 
-            let smaller_hist = match (config.hooks.build_histogram)(
-                smaller_indices,
-                ordered_g,
-                ordered_h,
-                feat_bins,
-                config.n_bins,
-            ) {
+            let smaller_hist = match (config.hooks.build_histogram)(HistogramRequest {
+                sample_indices: smaller_indices,
+                ordered_gradients: ordered_g,
+                ordered_hessians: ordered_h,
+                bins: feat_bins,
+                n_bins: config.n_bins,
+            }) {
                 Ok(h) => h,
                 Err(e) => return Err(e),
             };

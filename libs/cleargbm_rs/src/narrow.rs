@@ -1,119 +1,67 @@
-//! Narrowing conversions for the perf-critical histogram inputs.
+//! Index width conversion for the perf-critical histogram inputs.
 //!
-//! LightGBM's `score_t` defaults to `float` (32-bit); the histogram
-//! accumulator (`hist_t`) is `double` (64-bit). That asymmetric shape halves
-//! the memory bandwidth on the two hottest input streams — see
-//! `~/PROJECTS/tech-wiki/pages/lightgbm-score-t-float.md`. This module is the
-//! ONE gated site where `f64 → f32` narrowing is allowed; everywhere else in
-//! the crate the `as_conversions` + `cast_precision_loss` lints forbid it.
+//! `sample_indices` are stored as `u32` to halve cache-line pressure versus
+//! `usize` on 64-bit targets (LightGBM's `data_size_t = int32` pattern), so
+//! every slice access widens back to `usize`. This module holds that one
+//! conversion.
+//!
+//! It contains no `as` casts. Gradients and hessians are `f64` end to end:
+//! narrowing them to `f32` was measured 8% SLOWER on this workload, because
+//! both widths already fit in L2 at the node sizes reached here, so there is
+//! no bandwidth to save and each element pays a widening conversion before
+//! its accumulate. See the wiki page `cleargbm-f32-score-narrowing-reverted`.
 
-/// Narrows an `f64` intermediate value to the `f32` score representation
-/// used by the histogram input streams.
+/// Compile-time guarantee that `u32` always fits in `usize`.
 ///
-/// # Precision
-///
-/// Binary-log-loss gradients live in `[-1, 1]` and hessians in `[0, 0.25]`.
-/// `f32`'s 7-digit mantissa is already better than the analytic uncertainty
-/// in the boosted probability at those magnitudes; the LightGBM analysis in
-/// `~/PROJECTS/tech-wiki/pages/lightgbm-score-t-float.md` walks through the
-/// precision accounting in more detail.
-///
-/// The histogram accumulator (`HistogramBuffer.gradient_sums` /
-/// `hessian_sums`) stays `f64`; the write site widens via `f64::from(x)`
-/// before the accumulate, preserving 15-digit precision across billions of
-/// summed values (the asymmetric shape LightGBM uses).
-#[expect(
-    clippy::as_conversions,
-    clippy::cast_precision_loss,
-    reason = "grad/hess narrowed to f32 for cache-line bandwidth per lightgbm-score-t-float; binary-log-loss range is [-1, 1] where f32's 7-digit precision exceeds analytic uncertainty"
-)]
-#[inline]
-#[must_use]
-pub const fn score_narrow(x: f64) -> f32 {
-    x as f32
-}
+/// Makes the error arm of [`index_widen`] statically dead rather than a
+/// runtime fallback: a target with a narrower `usize` fails to build here
+/// instead of silently truncating sample indices at run time.
+const _: () = assert!(usize::BITS >= u32::BITS);
 
 /// Widens a `u32` sample index to `usize` for slice/vec indexing.
 ///
 /// `sample_indices` are stored as `u32` to halve cache-line pressure vs
 /// `usize` on 64-bit targets (LightGBM's `data_size_t = int32` pattern).
-/// Widening back to `usize` at every array access is infallible on every
-/// supported target (x86_64, aarch64 — `usize` is 64-bit) since `u32`'s
-/// range trivially fits. The alternative — `usize::try_from(idx)` in the
-/// hot loop — introduces a branch per element that the optimizer keeps
-/// live in profile-guided compiles.
-#[expect(
-    clippy::as_conversions,
-    reason = "u32 -> usize is infallible widening on every supported target; try_from would add a per-iteration branch to the histogram hot loop"
-)]
+///
+/// Uses `try_from` rather than an `as` cast, which costs nothing and is
+/// strictly safer. Verified by comparing emitted assembly at `-O`: LLVM
+/// proves the conversion infallible and compiles this to the identical
+/// single `movl` that `idx as usize` produces — rustc aliases the two
+/// symbols outright — and the histogram hot loop emits the same instruction
+/// sequence either way. An `as` cast, by contrast, would silently truncate
+/// on a target with a narrower `usize`; the static assertion above plus
+/// `try_from` make that case a build failure instead.
 #[inline]
 #[must_use]
-pub const fn index_widen(idx: u32) -> usize {
-    idx as usize
+pub fn index_widen(idx: u32) -> usize {
+    // `unwrap_or` rather than a `match`: the error arm is statically dead
+    // (see the assertion above), so writing it as a branch here would leave a
+    // permanently uncoverable segment in a crate that requires 100% coverage.
+    usize::try_from(idx).unwrap_or(usize::MAX)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::score_narrow;
 
     #[test]
-    fn narrows_zero_to_zero() {
-        assert!(score_narrow(0.0_f64).to_bits() == 0_u32);
-    }
-
-    #[test]
-    fn narrows_representable_binary_log_loss_gradient() {
-        // -0.5 is exactly representable in both f32 and f64
-        let g_f64 = -0.5_f64;
-        let g_f32 = score_narrow(g_f64);
-        assert!(f64::from(g_f32) == g_f64);
-    }
-
-    #[test]
-    fn narrows_representable_binary_log_loss_hessian() {
-        // 0.25 is exactly representable in both f32 and f64
-        let h_f64 = 0.25_f64;
-        let h_f32 = score_narrow(h_f64);
-        assert!(f64::from(h_f32) == h_f64);
-    }
-
-    #[test]
-    fn narrowing_rounds_high_precision_input_within_f32_ulp() {
-        // A value that needs more than f32's mantissa precision
-        let x_f64 = 0.123_456_789_012_345_67_f64;
-        let x_f32 = score_narrow(x_f64);
-        let widened_back = f64::from(x_f32);
-        // Difference must be within one f32 ULP at this magnitude
-        let f32_ulp_at_1 = f64::from(f32::EPSILON);
-        assert!((widened_back - x_f64).abs() < f32_ulp_at_1);
-    }
-
-    #[test]
-    fn narrows_one_to_one() {
-        assert!(f64::from(score_narrow(1.0_f64)) == 1.0_f64);
-    }
-
-    #[test]
-    fn narrows_negative_one_to_negative_one() {
-        assert!(f64::from(score_narrow(-1.0_f64)) == -1.0_f64);
-    }
-
-    #[test]
-    fn index_widen_zero() {
+    fn index_widen_zero() -> Result<(), crate::error::ClearGbmError> {
         assert!(super::index_widen(0_u32) == 0_usize);
+        Ok(())
     }
 
     #[test]
-    fn index_widen_max_u32() {
-        // Every supported target has usize >= 32 bits, so u32::MAX widens exactly.
-        // On the (unsupported) 16-bit-usize target this test would be skipped.
-        if let Ok(want) = usize::try_from(u32::MAX) {
-            assert!(super::index_widen(u32::MAX) == want);
-        }
+    fn index_widen_max_u32() -> Result<(), crate::error::ClearGbmError> {
+        // The module's const assertion guarantees usize >= 32 bits, so u32::MAX
+        // always widens exactly. The expected value is spelled out rather than
+        // computed with `usize::try_from`, so the assertion does not restate
+        // the conversion it is checking.
+        assert!(super::index_widen(u32::MAX) == 4_294_967_295_usize);
+        Ok(())
     }
 
     #[test]
-    fn index_widen_mid_range() {
+    fn index_widen_mid_range() -> Result<(), crate::error::ClearGbmError> {
         assert!(super::index_widen(1_000_000_u32) == 1_000_000_usize);
+        Ok(())
     }
 }

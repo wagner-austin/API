@@ -1,10 +1,12 @@
 //! Tests for GradientBoostingModel.
 
 use crate::error::ClearGbmError;
+use crate::hooks::Hooks;
 use crate::training::{
     train_gradient_boosting, GradientBoostingConfig, GradientBoostingConfigParams,
     GradientBoostingModel,
 };
+use crate::training::{Parallelism, TrainingRuntime};
 
 /// Builds a small trained model for testing.
 fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
@@ -41,7 +43,18 @@ fn make_test_model() -> Result<GradientBoostingModel, ClearGbmError> {
         Err(e) => return Err(e),
     };
 
-    train_gradient_boosting(&x_train, &y_train, None, None, &config, &feature_names)
+    train_gradient_boosting(
+        &x_train,
+        &y_train,
+        None,
+        None,
+        &config,
+        &feature_names,
+        &TrainingRuntime {
+            parallelism: Parallelism::Single,
+            hooks: &Hooks::default(),
+        },
+    )
 }
 
 #[test]

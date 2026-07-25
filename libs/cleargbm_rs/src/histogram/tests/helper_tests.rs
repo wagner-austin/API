@@ -3,8 +3,6 @@
 use super::helpers::{
     check_count_is_zero, check_count_matches, check_gradient_is_zero, check_gradient_sum_matches,
     check_subtraction_result, get_count_for_test, get_gradient_for_test, subtract_for_test,
-    test_count_propagation, test_count_zero_propagation, test_gradient_sum_propagation,
-    test_gradient_zero_propagation, test_subtraction_propagation, to_test_error,
     validate_all_zeros, validate_histogram_sums, validate_subtraction_correctness,
 };
 use crate::error::ClearGbmError;
@@ -88,109 +86,8 @@ fn test_check_subtraction_result_fail() -> Result<(), ClearGbmError> {
 }
 
 // =========================================================================
-// Tests for error propagation wrappers
-// =========================================================================
-
-#[test]
-fn test_gradient_sum_propagation_ok() -> Result<(), ClearGbmError> {
-    let result = test_gradient_sum_propagation(1.0_f64, 1.0_f64);
-    assert!(result.is_ok());
-    Ok(())
-}
-
-#[test]
-fn test_gradient_sum_propagation_err() -> Result<(), ClearGbmError> {
-    let result = test_gradient_sum_propagation(1.0_f64, 999.0_f64);
-    assert!(result.is_err());
-    Ok(())
-}
-
-#[test]
-fn test_count_propagation_ok() -> Result<(), ClearGbmError> {
-    let result = test_count_propagation(10_usize, 10_usize);
-    assert!(result.is_ok());
-    Ok(())
-}
-
-#[test]
-fn test_count_propagation_err() -> Result<(), ClearGbmError> {
-    let result = test_count_propagation(10_usize, 999_usize);
-    assert!(result.is_err());
-    Ok(())
-}
-
-#[test]
-fn test_gradient_zero_propagation_ok() -> Result<(), ClearGbmError> {
-    let result = test_gradient_zero_propagation(0.0_f64);
-    assert!(result.is_ok());
-    Ok(())
-}
-
-#[test]
-fn test_gradient_zero_propagation_err() -> Result<(), ClearGbmError> {
-    let result = test_gradient_zero_propagation(999.0_f64);
-    assert!(result.is_err());
-    Ok(())
-}
-
-#[test]
-fn test_count_zero_propagation_ok() -> Result<(), ClearGbmError> {
-    let result = test_count_zero_propagation(0_usize);
-    assert!(result.is_ok());
-    Ok(())
-}
-
-#[test]
-fn test_count_zero_propagation_err() -> Result<(), ClearGbmError> {
-    let result = test_count_zero_propagation(999_usize);
-    assert!(result.is_err());
-    Ok(())
-}
-
-#[test]
-fn test_subtraction_propagation_ok() -> Result<(), ClearGbmError> {
-    // parent=10, child=3, sibling=7 (correct)
-    let result = test_subtraction_propagation(7.0_f64, 10.0_f64, 3.0_f64, 0_usize);
-    assert!(result.is_ok());
-    Ok(())
-}
-
-#[test]
-fn test_subtraction_propagation_err() -> Result<(), ClearGbmError> {
-    // parent=10, child=3, sibling=999 (wrong)
-    let result = test_subtraction_propagation(999.0_f64, 10.0_f64, 3.0_f64, 0_usize);
-    assert!(result.is_err());
-    Ok(())
-}
-
-// =========================================================================
 // Tests for conversion helpers
 // =========================================================================
-
-#[test]
-fn test_to_test_error_ok() -> Result<(), ClearGbmError> {
-    fn inner() -> Result<i32, proptest::test_runner::TestCaseError> {
-        let ok_result: Result<i32, ClearGbmError> = Ok(42_i32);
-        to_test_error(ok_result, "test")
-    }
-    let result = inner();
-    assert!(result.is_ok());
-    assert_eq!(result.ok(), Some(42_i32));
-    Ok(())
-}
-
-#[test]
-fn test_to_test_error_err() -> Result<(), ClearGbmError> {
-    fn inner() -> Result<i32, proptest::test_runner::TestCaseError> {
-        let err_result: Result<i32, ClearGbmError> = Err(ClearGbmError::EmptyInput {
-            context: "test".to_string(),
-        });
-        to_test_error(err_result, "context")
-    }
-    let result = inner();
-    assert!(result.is_err());
-    Ok(())
-}
 
 #[test]
 fn test_subtract_for_test_ok() -> Result<(), ClearGbmError> {

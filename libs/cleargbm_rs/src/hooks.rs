@@ -15,15 +15,14 @@
 //! ```rust,no_run
 //! use cleargbm_rs::{Hooks, ClearGbmError, build_tree, BuildTreeInput};
 //! use cleargbm_rs::types::HistogramBuffer;
+//! use cleargbm_rs::histogram::HistogramRequest;
 //!
 //! // Production: use default hooks (real implementations)
 //! let hooks = Hooks::default();
 //! // let result = build_tree(&input, &hooks);
 //!
 //! // Testing: inject custom behavior
-//! fn error_histogram(
-//!     _: &[u32], _: &[f32], _: &[f32], _: &[u8], _: usize,
-//! ) -> Result<HistogramBuffer, ClearGbmError> {
+//! fn error_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
 //!     Err(ClearGbmError::EmptyInput { context: "injected".to_string() })
 //! }
 //! let test_hooks = Hooks::with_histogram_builder(error_histogram);
@@ -32,34 +31,8 @@
 //! ```
 
 use crate::error::ClearGbmError;
+use crate::histogram::HistogramRequest;
 use crate::types::HistogramBuffer;
-
-/// Function signature for the per-feature histogram builder called by the
-/// tree builder.
-///
-/// Args:
-/// - `sample_indices` — sample IDs at this node (used for the per-feature
-///   bin gather; NOT indexed into the gradient/hessian arrays).
-/// - `ordered_gradients` — pre-permuted gradient stream: `ordered_gradients[i]`
-///   equals `gradients[sample_indices[i]]`. Length equals `sample_indices.len()`.
-/// - `ordered_hessians` — pre-permuted hessian stream, same shape.
-/// - `bins` — per-sample bin assignments (`u8`) for one feature.
-/// - `n_bins` — number of bins (including NaN bin).
-///
-/// The tree builder does one node-scoped reorder pass (via
-/// [`crate::histogram::reorder_grad_hess_into`]) before dispatching this
-/// hook per feature, so every per-feature call gets sequential-access-shaped
-/// gradient + hessian streams.
-///
-/// Returns a `Result` so error-injection tests can force failure through the
-/// same hook the production path uses — no separate injection surface.
-pub type BuildHistogramFn = fn(
-    sample_indices: &[u32],
-    ordered_gradients: &[f32],
-    ordered_hessians: &[f32],
-    bins: &[u8],
-    n_bins: usize,
-) -> Result<HistogramBuffer, ClearGbmError>;
 
 /// Dependency injection hooks for tree building.
 ///
@@ -67,46 +40,42 @@ pub type BuildHistogramFn = fn(
 /// for testing purposes. Production code uses `Hooks::default()` which provides
 /// the real implementations. Tests inject error-returning implementations to
 /// exercise error-propagation paths that would otherwise be unreachable.
+///
+/// The per-feature histogram builder receives pre-reordered inputs — the tree
+/// builder does one node-scoped reorder pass (via
+/// [`crate::histogram::reorder_grad_hess_into`]) before dispatching this hook
+/// per feature, so every per-feature call gets sequential-access-shaped
+/// `ordered_gradients` + `ordered_hessians` streams. Returns a `Result` so
+/// error-injection tests can force failure through the same hook the production
+/// path uses — no separate injection surface.
 #[derive(Clone)]
 pub struct Hooks {
     /// Hook for building one feature's histogram from pre-reordered inputs.
     ///
-    /// Default: [`default_trusted_build_histogram`], wrapping
-    /// [`crate::histogram::build_histogram_ordered_trusted`] in the fallible
-    /// signature.
-    pub build_histogram: BuildHistogramFn,
+    /// Default: [`crate::histogram::build_histogram_ordered_trusted`] wrapped
+    /// in `Ok(...)`.
+    pub build_histogram: fn(HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError>,
 
     /// Optional error to inject in finalize_nodes.
     ///
     /// If Some, finalize_nodes returns this error immediately.
     /// Used for testing error propagation in build_tree.
     pub finalize_nodes_error: Option<ClearGbmError>,
-}
 
-/// Default histogram builder used by [`Hooks::default`].
-///
-/// Wraps [`crate::histogram::build_histogram_ordered_trusted`] in the
-/// fallible signature that [`BuildHistogramFn`] demands. The wrapped
-/// function reads `ordered_gradients` / `ordered_hessians` sequentially by
-/// loop position; only the bin lookup is a gather. The tree builder
-/// establishes the caller-side invariants (index bounds, ordered-array
-/// length) by construction — see the docs on
-/// [`crate::histogram::build_histogram_ordered_trusted`].
-#[inline]
-fn default_trusted_build_histogram(
-    sample_indices: &[u32],
-    ordered_gradients: &[f32],
-    ordered_hessians: &[f32],
-    bins: &[u8],
-    n_bins: usize,
-) -> Result<HistogramBuffer, ClearGbmError> {
-    Ok(crate::histogram::build_histogram_ordered_trusted(
-        sample_indices,
-        ordered_gradients,
-        ordered_hessians,
-        bins,
-        n_bins,
-    ))
+    /// Hook for building the run-scoped rayon worker pool.
+    ///
+    /// Default: `rayon::ThreadPoolBuilder::new().num_threads(n).build()`.
+    ///
+    /// Typed with rayon's own error rather than [`ClearGbmError`] so the
+    /// default is a single expression with no error arm of its own; the
+    /// translation into a `ClearGbmError` happens at the one call site, in
+    /// [`crate::training::train_gradient_boosting`]. Pool construction is
+    /// injectable because it is the only fallible step in training that no
+    /// input can provoke — a caller cannot ask for a thread count the OS
+    /// refuses — so an error-injection test is the only way to reach the
+    /// failure path.
+    pub build_pool:
+        fn(core::num::NonZeroUsize) -> Result<rayon::ThreadPool, rayon::ThreadPoolBuildError>,
 }
 
 impl Default for Hooks {
@@ -115,8 +84,15 @@ impl Default for Hooks {
     /// This is what production code should use.
     fn default() -> Self {
         Self {
-            build_histogram: default_trusted_build_histogram,
+            build_histogram: |request| {
+                Ok(crate::histogram::build_histogram_ordered_trusted(request))
+            },
             finalize_nodes_error: None,
+            build_pool: |threads| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads.get())
+                    .build()
+            },
         }
     }
 }
@@ -126,13 +102,39 @@ impl Hooks {
     ///
     /// Used by error-injection tests to force `?`-propagation paths in the
     /// tree builder — the injected function receives the same
-    /// (`sample_indices`, `ordered_gradients`, `ordered_hessians`, `bins`,
-    /// `n_bins`) args the default does, and returns `Err(...)` to trigger
-    /// the failure path.
-    pub const fn with_histogram_builder(build_histogram: BuildHistogramFn) -> Self {
+    /// [`HistogramRequest`] the default does, and returns `Err(...)` to
+    /// trigger the failure path.
+    pub fn with_histogram_builder(
+        build_histogram: fn(HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError>,
+    ) -> Self {
         Self {
             build_histogram,
-            finalize_nodes_error: None,
+            ..Self::default()
+        }
+    }
+
+    /// Creates hooks with a custom worker-pool builder.
+    ///
+    /// Used by error-injection tests to reach the pool-construction failure
+    /// path in [`crate::training::train_gradient_boosting`], which no caller
+    /// input can trigger.
+    ///
+    /// # Args
+    ///
+    /// * `build_pool` - Replacement pool constructor.
+    ///
+    /// # Returns
+    ///
+    /// Hooks with the default histogram builder and the supplied pool builder.
+    #[must_use]
+    pub fn with_pool_builder(
+        build_pool: fn(
+            core::num::NonZeroUsize,
+        ) -> Result<rayon::ThreadPool, rayon::ThreadPoolBuildError>,
+    ) -> Self {
+        Self {
+            build_pool,
+            ..Self::default()
         }
     }
 
@@ -142,8 +144,8 @@ impl Hooks {
     /// provided error immediately. Used for testing error propagation.
     pub fn with_finalize_nodes_error(error: ClearGbmError) -> Self {
         Self {
-            build_histogram: default_trusted_build_histogram,
             finalize_nodes_error: Some(error),
+            ..Self::default()
         }
     }
 }
@@ -157,24 +159,23 @@ mod tests {
         let hooks = Hooks::default();
         // Verify default hooks work with valid input
         let sample_indices = vec![0_u32, 1_u32];
-        let gradients = vec![1.0_f32, 2.0_f32];
-        let hessians = vec![1.0_f32, 1.0_f32];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result =
-            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        let result = (hooks.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
         assert!(result.is_ok());
         Ok(())
     }
 
     #[test]
     fn test_hooks_with_custom_histogram_builder() -> Result<(), ClearGbmError> {
-        fn error_histogram(
-            _: &[u32],
-            _: &[f32],
-            _: &[f32],
-            _: &[u8],
-            _: usize,
-        ) -> Result<HistogramBuffer, ClearGbmError> {
+        fn error_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
             Err(ClearGbmError::EmptyInput {
                 context: "test injected error".to_string(),
             })
@@ -182,11 +183,16 @@ mod tests {
 
         let hooks = Hooks::with_histogram_builder(error_histogram);
         let sample_indices = vec![0_u32, 1_u32];
-        let gradients = vec![1.0_f32, 2.0_f32];
-        let hessians = vec![1.0_f32, 1.0_f32];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result =
-            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        let result = (hooks.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
         assert!(result.is_err());
         Ok(())
     }
@@ -197,14 +203,24 @@ mod tests {
         let hooks2 = hooks1.clone();
         // Both should work independently - verify by calling both
         let sample_indices = vec![0_u32, 1_u32];
-        let gradients = vec![1.0_f32, 2.0_f32];
-        let hessians = vec![1.0_f32, 1.0_f32];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
 
-        let result1 =
-            (hooks1.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
-        let result2 =
-            (hooks2.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        let result1 = (hooks1.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
+        let result2 = (hooks2.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
 
         assert!(result1.is_ok());
         assert!(result2.is_ok());
@@ -222,11 +238,16 @@ mod tests {
 
         // build_histogram should still be the default
         let sample_indices = vec![0_u32, 1_u32];
-        let gradients = vec![1.0_f32, 2.0_f32];
-        let hessians = vec![1.0_f32, 1.0_f32];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result =
-            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        let result = (hooks.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
         assert!(result.is_ok());
         Ok(())
     }
@@ -240,13 +261,7 @@ mod tests {
 
     #[test]
     fn test_hooks_with_histogram_builder_has_no_finalize_error() -> Result<(), ClearGbmError> {
-        fn custom_histogram(
-            _: &[u32],
-            _: &[f32],
-            _: &[f32],
-            _: &[u8],
-            _: usize,
-        ) -> Result<HistogramBuffer, ClearGbmError> {
+        fn custom_histogram(_: HistogramRequest<'_>) -> Result<HistogramBuffer, ClearGbmError> {
             Ok(HistogramBuffer::new(3_usize))
         }
 
@@ -255,11 +270,16 @@ mod tests {
 
         // Actually call the custom histogram to cover it
         let sample_indices = vec![0_u32, 1_u32];
-        let gradients = vec![1.0_f32, 2.0_f32];
-        let hessians = vec![1.0_f32, 1.0_f32];
+        let gradients = vec![1.0_f64, 2.0_f64];
+        let hessians = vec![1.0_f64, 1.0_f64];
         let bins = vec![0_u8, 1_u8];
-        let result =
-            (hooks.build_histogram)(&sample_indices, &gradients, &hessians, &bins, 3_usize);
+        let result = (hooks.build_histogram)(HistogramRequest {
+            sample_indices: &sample_indices,
+            ordered_gradients: &gradients,
+            ordered_hessians: &hessians,
+            bins: &bins,
+            n_bins: 3_usize,
+        });
         assert!(result.is_ok());
         Ok(())
     }

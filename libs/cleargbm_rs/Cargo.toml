@@ -61,9 +61,11 @@ unsafe_code = "forbid"
 missing_docs = "forbid"
 
 [lints.clippy]
-# All lints forbidden
-all = "forbid"
-cargo = "forbid"
+# All lints forbidden. Groups carry `priority = -1` so the specific lints
+# configured below are allowed to refine them; at equal priority Cargo rejects
+# the manifest outright ("lint group `all` has the same priority as a lint").
+all = { level = "forbid", priority = -1 }
+cargo = { level = "forbid", priority = -1 }
 
 # No escape hatches (equivalent to no type: ignore, no noqa)
 allow_attributes = "forbid"
@@ -80,7 +82,11 @@ unimplemented = "forbid"
 # No lazy error propagation - forces explicit error handling
 question_mark_used = "forbid"
 
-# No unsafe conversions (equivalent to no cast())
+# No unsafe conversions (equivalent to no cast()). All "forbid": the crate
+# contains zero `as` casts and zero `#[expect]` escape hatches, so nothing
+# needs to override these. `index_widen` uses `try_from` (compiles to the same
+# single instruction as a cast, verified in emitted assembly) and gradients
+# stay f64 end to end, so no narrowing conversion exists to justify.
 as_conversions = "forbid"
 cast_possible_truncation = "forbid"
 cast_sign_loss = "forbid"

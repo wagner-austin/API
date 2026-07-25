@@ -93,7 +93,7 @@ Documented on the tech-wiki but not shipped in this refactor:
 
 ## Reproducibility
 
-- **Script:** `C:\Users\Test\AppData\Local\Temp\claude\C--Users-Test-PROJECTS-tech-wiki\<session>\scratchpad\bench_lever1.py` (session-scratchpad; conceptually identical to the phase-e reproducer at `bench_cleargbm_vs_lightgbm.py`).
+- **Script:** `libs/cleargbm/scripts/bench_phase_e.py` — the phase-e reproducer, checked into the repo.
 - **Dataset:** `libs/covenant_ml/tests/data/american_bankruptcy.csv` — 78,682 rows, 18 features, ~6.6% positive class.
 - **Config:** `n_estimators=200, max_depth=6, learning_rate=0.05, min_samples_leaf=20, max_bins=64, subsample=1.0, reg_alpha=0.0, reg_lambda=0.0, early_stopping_rounds=None, n_jobs=1`.
 - **Seeds:** 42, 43, 44.
