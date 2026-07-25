@@ -22,6 +22,21 @@ hubs: [game-mechanics]
 
 Transcribed from the five in-game "How To Play" screens.[^1]
 
+## Combat rounds (turn structure, measured 2026-07-25)
+
+Combat is ROUND-BASED, not real-time (user contract: "there are
+turns... it's not instant. check the combat logs"). The server
+resolves one action per tank per ~2 s tick in a single burst, and
+within the burst actions resolve in **ascending tank id order** —
+archive-wide: 1,820/1,825 multi-shooter bursts are perfectly
+id-ordered, and all 5 exceptions are captures of our own simulator,
+not the real server (bots 500-535 therefore always resolve before
+players at ~1300+). A provoked fight's shape: tick 1 = your hit
+lands alone; from tick 2 onward every round carries each provoked
+responder's single AND your next shot, resolved id-first — engaging
+a sighted cluster of three trades 1-for-3 every round from the
+second tick ([[enemy-bot-behavior]] §Team aggro).[^4]
+
 ## Movement and combat
 
 - Click on a land tile and your tank will attempt to drive there
@@ -99,3 +114,4 @@ accrue per shot during fights, with kills as a bonus, not a gate.[^3]
 [^1]: in-game "How To Play" screens, transcribed 2026-06-16 from tankpit.com Practice room
 [^3]: user (Austin), 2026-07-20 — self-deactivation-impossibility contract, quoted verbatim above
 [^2]: "Higher rank tanks... have a larger radar" — official text; resolved 2026-07-06 with exact formulas via client mining (tpclient.js Gc gauge draw) + user measurements at ranks 1/3/4/6/7 — see [[game-economy]] and [[radar-mechanics]]
+[^4]: round-order sweep 2026-07-25: `analysis_scripts/mine_round_order.py` (0x53 bursts grouped at 100 ms, order vs sorted shooter ids) over every `runs/**/capture_session.json`; the worked example is the respawn-watch fight (rounds at 13.3-21.3 s: purple-2 510 -> blue-7 524 -> Artax 1301, identical all six rounds, 1 ms emission spacing).
