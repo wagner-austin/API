@@ -7,6 +7,7 @@ from typing import Protocol
 
 import numpy as np
 import pytest
+from covenant_ml.backends.registry import default_registry
 from covenant_nn.backends.lstm.backend import FC_STATE_PREFIX, LSTM_STATE_PREFIX
 from covenant_nn.backends.lstm.sequences import compute_features_per_step
 from numpy.typing import NDArray
@@ -268,26 +269,27 @@ class TestLoadModelForBackendXGBoost:
             load_model_for_backend("xgboost", str(model_path))
 
 
-class TestLoadModelForBackendUnsupported:
-    """Backends with no explain loader are named explicitly."""
+class TestLoadModelForBackendRegistryDelegation:
+    """Non-torch backends are restored through the registry that owns them."""
 
-    def test_raises_naming_the_backend(self, tmp_path: Path) -> None:
-        """cleargbm, logreg and random_forest report the real problem.
+    def test_every_registered_backend_is_reachable(self) -> None:
+        """No registered backend is left without a loader.
 
-        These are valid BackendName values that this module has no loader for.
-        They previously fell through to the LSTM branch and surfaced as
-        "lstm_config is required for LSTM backend", which named the wrong
-        problem and was undiagnosable for the caller.
-
-        Args:
-            tmp_path: Pytest temporary directory unique to this test.
+        cleargbm, logreg and random_forest are valid BackendName values that
+        this module used to reject with "No explain loader for backend", so
+        /ml/explain answered a 500 for three of the seven backends it
+        advertises. Permutation needs only predict_proba, so there was never
+        a reason they could not be explained. Enumerating backends here is
+        what let the list drift from the registry; it now delegates.
         """
-        model_path = tmp_path / "model.bin"
-        model_path.write_bytes(b"stub")
+        registered = set(default_registry().list_backends())
 
-        for backend in ("cleargbm", "logreg", "random_forest"):
-            with pytest.raises(ValueError, match=f"No explain loader for backend: {backend}"):
-                load_model_for_backend(backend, str(model_path))
+        assert registered == {"xgboost", "lightgbm", "cleargbm", "logreg", "random_forest"}
+
+    def test_missing_file_is_reported_before_dispatch(self, tmp_path: Path) -> None:
+        """A path with no model names the file, not the backend."""
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            load_model_for_backend("logreg", str(tmp_path / "absent.joblib"))
 
 
 class TestLoadModelForBackendLightGBM:

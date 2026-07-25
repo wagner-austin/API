@@ -15,8 +15,7 @@ from pathlib import Path
 from typing import Protocol, TypedDict
 
 import numpy as np
-from covenant_ml.backends.lightgbm.backend import LightGBMBackend
-from covenant_ml.backends.xgboost.backend import XGBoostBackend
+from covenant_ml.backends.registry import default_registry
 from covenant_ml.types import BackendName
 from covenant_nn.backends.lstm.backend import load_lstm_for_inference
 from covenant_nn.backends.mlp.backend import load_mlp_for_inference
@@ -71,40 +70,6 @@ class GradientPredictorProtocol(Protocol):
             Gradients with shape (n_samples, n_features).
         """
         ...
-
-
-# ---------------------------------------------------------------------------
-# XGBoost and LightGBM Loading
-#
-# Both backends already know how to restore themselves from the files their
-# trainers wrote, so the loading lives with them in covenant_ml rather than
-# being reimplemented here. This module previously carried its own copy of
-# each, including a second LightGBM Booster wrapper.
-# ---------------------------------------------------------------------------
-
-
-def _load_xgboost_model(model_path: str) -> PredictorProtocol:
-    """Load an XGBoost model from file.
-
-    Args:
-        model_path: Path to saved model file (.ubj format).
-
-    Returns:
-        Model implementing PredictorProtocol.
-    """
-    return XGBoostBackend().load(path=model_path)
-
-
-def _load_lightgbm_model(model_path: str) -> PredictorProtocol:
-    """Load a LightGBM model from file.
-
-    Args:
-        model_path: Path to saved model file (.txt format).
-
-    Returns:
-        Model implementing PredictorProtocol.
-    """
-    return LightGBMBackend().load(path=model_path)
 
 
 # ---------------------------------------------------------------------------
@@ -205,8 +170,15 @@ def load_model_for_backend(
 ) -> PredictorProtocol:
     """Load model based on backend type.
 
+    The torch backends need their architecture rebuilt before weights can be
+    loaded, so they take an explicit config. Every other backend restores
+    itself from the file its trainer wrote, and the registry already knows
+    which one that is -- enumerating them here only risked the list drifting
+    out of step with the registry. Between the two branches this covers all
+    of BackendName, so there is no unreachable fall-through.
+
     Args:
-        backend: Backend name (xgboost, lightgbm, mlp, lstm).
+        backend: Backend name.
         model_path: Path to saved model file.
         mlp_config: MLP architecture config (required if backend is 'mlp').
         lstm_config: LSTM architecture config (required if backend is 'lstm').
@@ -215,18 +187,13 @@ def load_model_for_backend(
         Model implementing PredictorProtocol.
 
     Raises:
-        ValueError: If required config is missing for MLP/LSTM backend, or if
-            the backend has no loader here.
+        ValueError: If required config is missing for the MLP or LSTM backend.
         FileNotFoundError: If model file doesn't exist.
     """
     path = Path(model_path)
     if not path.exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    if backend == "xgboost":
-        return _load_xgboost_model(model_path)
-    if backend == "lightgbm":
-        return _load_lightgbm_model(model_path)
     if backend == "mlp":
         if mlp_config is None:
             raise ValueError("mlp_config is required for MLP backend")
@@ -235,10 +202,7 @@ def load_model_for_backend(
         if lstm_config is None:
             raise ValueError("lstm_config is required for LSTM backend")
         return _load_lstm_model(model_path, lstm_config)
-    # BackendName also covers cleargbm, logreg and random_forest, which have no
-    # loader here. Falling through to the LSTM branch reported them as a
-    # missing lstm_config, which named the wrong problem entirely.
-    raise ValueError(f"No explain loader for backend: {backend}")
+    return default_registry().get(backend).load(path=model_path)
 
 
 def load_gradient_model(
