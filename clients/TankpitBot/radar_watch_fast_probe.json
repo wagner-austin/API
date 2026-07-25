@@ -1,0 +1,32 @@
+{
+  "session_id": "cd236df2-7ac4-4e6d-9d1f-6a02b4406821",
+  "start_timestamp_ms": 1784964688772,
+  "end_timestamp_ms": 1784965607975,
+  "base_url": "https://tankpit.com/play",
+  "spawn_x": 137,
+  "spawn_y": 126,
+  "capture_session_path": "radar_watch_fast_probe.capture_session.json",
+  "initial_sync_timeout_ms": 10000,
+  "startup_timing": {
+    "game_ready_timestamp_ms": 1784964701749,
+    "intel_ready_timestamp_ms": 1784964701795,
+    "initial_sync_started_ms": 1784964701795,
+    "initial_world_timestamp_ms": 1784964703574,
+    "command_ready_timestamp_ms": 1784964703597,
+    "first_attempt_started_ms": 1784964705128,
+    "game_ready_to_intel_ready_ms": 46,
+    "intel_ready_to_initial_world_ms": 1779,
+    "initial_world_to_command_ready_ms": 23,
+    "command_ready_to_first_attempt_ms": 1531
+  },
+  "duration_ms": 900000,
+  "scan_interval_ms": 1500,
+  "map_poll_interval_ms": 0,
+  "walks_sent": 587,
+  "extras_before": 22,
+  "extras_enabled_at_start": false,
+  "toggles_sent": 0,
+  "scans_sent": 587,
+  "map_polls_sent": 0,
+  "extras_after": 22
+}

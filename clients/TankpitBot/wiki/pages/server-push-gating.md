@@ -57,6 +57,29 @@ beat. The post-action push window is one ~2 s server tick; a 1.5 s
 action cadence merely re-opens it before it closes, which is why run
 7 looked continuous.[^3]
 
+## The connection itself is rate-gated (four-session discrimination)
+
+Beyond the per-action push window, the CONNECTION has its own play
+gate: **~12 minutes after join, the server disconnects a client
+whose action rate is too sparse** — and sparse actions do NOT reset
+the clock. Four radar-watch sessions varied one factor each:[^4]
+
+| Session | Design | Outcome |
+|---|---|---|
+| 1 | queries only, map polls | dead at ~716 s |
+| 2 | real walk every 15 s, map polls | dead at ~701 s |
+| 3 | free walk every 15 s, NO map | dead at ~714 s |
+| 4 | walk+scan every **1.5 s**, no map | **alive through the full 909 s** |
+
+Idleness, the map-open state, and per-action resets are all
+falsified; only the dense cadence survived. The threshold sits
+somewhere between 1.5 s and 15 s per action (unbracketed). The
+production bot acts every ~2 s, which is why it never sees this —
+the archive's 45-minute bot session is the long-duration
+cross-check. Corollary for observation probes: the 1.5 s walk
+shuffle is not optional politeness, it is the connection
+keepalive.[^4]
+
 ## What still counts as "playing"
 
 Server-rejected actions hold the stream open. Run 7's dwell never
@@ -102,6 +125,14 @@ position instead of repeating run 7's frozen-origin rejections.[^2]
 [^2]: `src/tankpit_bot/action_lab/enemy_teleport.py` —
     `_heartbeat_action` / `_settle_dwell` (per-beat drain + shuffle);
     `make bot-watch` in [[make-targets]].
+[^4]: radar-watch captures 2026-07-24/25:
+    `radar_watch_probe.capture_session.json` (sessions 1–2 overwrote
+    the same path; session 2 is the committed one),
+    `radar_watch_nomap_probe.capture_session.json` (session 3, fuel 0
+    throughout), `radar_watch_fast_probe.capture_session.json`
+    (session 4, 587 free walk+scan beats, receive traffic steady to
+    909 s). Kill times 716/701/714 s; the 45-minute archive session
+    is `runs/bot/bot-20260610-011333.capture_session.json`.
 [^3]: precision capture `bot_watch_pw6_probe.capture_session.json`
     (2026-07-24, 6 s walk heartbeat, same design as the decisive run
     otherwise): 101 five-byte walk frames at 6.0 s modal gap; per-beat

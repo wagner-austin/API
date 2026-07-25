@@ -6,7 +6,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "fead09fdc032cee26c7e26991ba1acbd43af9a71"
+  "src/tankpit_bot": "038a45f8ad9e1f7395f4f6ef572155fe545b49c9"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [architecture]

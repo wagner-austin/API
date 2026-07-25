@@ -157,6 +157,17 @@ own 0x67 within 5 s — a timing artifact, not evidence of another
 consumer; bots demonstrably never collect, [[enemy-bot-behavior]]).
 Placement distribution and true map-wide population remain open —
 they need wider radar coverage than bot sessions produce.[^4]
+**VERDICT (2026-07-24/25 live radar watches): the ~0.5%/tile/min
+near-player rate was a reveal artifact.** Four stationary
+free-radar sessions accumulated ~965 proven-empty tile-minutes on
+fully-covered 5×5 patches (every tile re-scanned every 1.5–15 s, so
+a spawn could not hide) and witnessed ZERO equipment spawns — the
+archive rate predicted ~4.8 (P(0)≈0.8%, rejected >99%). The archive's
+"witnessed spawns" were first-reveals of pre-existing containers.
+True equipment spawn rate is fuel-like (order 10⁻⁵/tile/min);
+pinning it precisely needs multi-hour watches, now cheap (walking
+and scanning are both free at fuel 0, and the 1.5 s cadence holds
+the connection open indefinitely — [[server-push-gating]]).[^8]
 
 ## What's still open
 
@@ -302,6 +313,11 @@ Each value above is matched 1:1 between a user-declared action and a measurable 
 [^2]: client gauge math: `Gc` in `tpclient.js` (blob-pinned in frontmatter); rank-table verifications 2026-07-06 (user deposits at ranks 1/3/6/7, recorded per-row in the table above and in the frontmatter `verified:` field); formula machine-checked by the `fuel-capacity` claim below.
 [^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
 [^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots).
+[^8]: live watches: `radar_watch_probe.capture_session.json`,
+`radar_watch_nomap_probe.capture_session.json`,
+`radar_watch_fast_probe.capture_session.json` (0 reveals each; the
+fast session's full 15.1 min survived the rate-gate disconnect);
+valid windows 12+12+12+15 min × 25 tiles ≈ 965 empty-tile-minutes.
 [^7]: re-sweep 2026-07-24: `analysis_scripts/mine_fuel_spawns.py`
 over every `runs/**/capture_session.json` — per-session consecutive
 0x4C `fuel_dots` set diffs, back-to-back (≤5 s) consistency buckets,
