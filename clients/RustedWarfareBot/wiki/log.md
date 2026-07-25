@@ -63,6 +63,19 @@ The measurement stands — `bx` still advances 299.8/s and is still incremented 
 
 Same artifact sharpened `by`: it accumulates `f2 * 16.666666f` (ms per frame at a 60 Hz baseline, scaled by delta), so its measured 1 kHz is a consequence of that formula rather than an independent clock. The page said "derived millisecond value", which was right but vaguer than the source allows.
 
+## [2026-07-25] build | M7 — the unit catalogue, and the mobility predicate falls out of it
+Pages written: mechanics-unit-catalogue
+Pages updated: index (11 pages), hubs/game-mechanics, hubs/bot-architecture
+Notes: `rw_bot.mechanics.catalogue` decodes the engine's own `-printunits` output into typed records — 90 units with price, HP, speed, mass, upgrade tiers and weapons. No new capture was needed: the artifact has been sitting in `wiki/sources/m0-probe/printunits.log` since M0, unmined. `make check` green, 100% statements and branches on the new module.
+
+The catalogue answers a question that was previously answered the expensive way. 38 of the 90 units have speed exactly zero, and `commandCenter` is one of them — which is the catalogue-level explanation for the first real order this project issued moving nothing. That was diagnosed empirically by sampling position before and after (see the issuing-orders entry). `speed > 0` is a read mobility predicate, so selection no longer has to discover immobility by ordering a building to walk.
+
+The type name is the join key and it already appears on three surfaces: `unit:builder` in the catalogue, the `type` field on the world stream, and the argument the type registry accepts when placing a building. No mapping table is needed between them.
+
+Two shapes had to be modelled rather than flattened. A unit is armed only if the engine prints an attack range (61 of 90); damage of a kind not printed is zero, which is a fact about the unit rather than a missing reading. And per-shot and per-volley damage are independent figures — the engine writes `Direct Damage: 12 (total:24.0)` for multi-barrel weapons, and the ratio is not fixed: 2x, 4x, 6x, and one unit at 1.84x. Assuming a barrel count would be wrong for most of them.
+
+Worth recording how that second shape was found: not by surveying the stat keys, which suggested a plain number and looked complete. The decoder was written against the key survey, run against the real log, and failed on `heavyInterceptor` with "non-numeric Direct Damage: '12 (total:24.0)'". The key names were surveyed; the value shapes were not. Running it against the real artifact is what closed the gap.
+
 ## [2026-07-25] build | M6 — the wire contract exists on both sides
 Pages written: wire-contract-ndjson
 Pages updated: index (10 pages), hubs/bot-architecture

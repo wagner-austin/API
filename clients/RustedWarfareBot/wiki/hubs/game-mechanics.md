@@ -11,3 +11,4 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 
 [Engine Entity Model](../pages/engine-entity-model.md) -- what a unit actually is in the engine: base class, master list, trees, owning player, starting credits
+[Unit Catalogue and the Mobility Predicate](../pages/mechanics-unit-catalogue.md) -- 90 units with prices, HP and weapons from the engine's own -printunits; speed>0 is the read mobility test
