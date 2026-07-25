@@ -152,10 +152,10 @@ def test_invalid_mode_state_reselects_recover_equipment_when_reserves_are_broken
 def test_invalid_mode_state_with_locked_combat_target_migrates_into_hunt() -> None:
     """Invalid mode state with a combat lock is migrated into durable HUNT.
 
-    The stale lock's target is nowhere in the registry, so the HUNT
-    acquire path releases it and searches fresh (user contract
-    2026-07-02: an off-viewport lock on resume is released, never
-    pursued from stand-off range).
+    The lock's target is nowhere in the registry -- genuinely gone --
+    so the resume path (2026-07-25 contract: pursue a surviving
+    off-viewport lock, never abandon it) releases this one and
+    searches fresh.
     """
     world, self_state = make_world(fuel=800)
     ai_state = AIStateDict(

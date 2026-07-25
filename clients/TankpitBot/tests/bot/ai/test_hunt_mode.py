@@ -436,15 +436,16 @@ def test_hunt_acquire_resumes_visible_locked_target_with_close_when_not_adjacent
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
-def test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable() -> None:
-    """ACQUIRE releases an off-viewport lock and re-acquires by teleport.
+def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> None:
+    """ACQUIRE returns to an off-viewport lock by teleport, keeping it.
 
-    User contract (2026-07-02): a lock that reaches ACQUIRE with its
-    target off-viewport is a stale engagement resumed after a mode
-    interrupt. The bot never fires from stand-off range on resume --
-    it releases the lock and re-acquires fresh. When the same enemy is
-    still the nearest affordable candidate, acquisition teleports back
-    to it (the recorded human behavior: purple-1 was resumed by
+    User contract (2026-07-25): a lock that reaches ACQUIRE with its
+    target off-viewport is an engagement resumed after a mode
+    interrupt, and the restock cycle does not abandon the target.
+    The bot never fires from stand-off range on resume (user contract
+    2026-07-02) -- with a fresh position and an affordable return
+    (~127 + 650 against 800 here) it teleports straight back to the
+    locked tank (the recorded human behavior: purple-1 was resumed by
     map-teleporting onto it, session 2026-07-01).
     """
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=115, y=115)}
@@ -467,6 +468,7 @@ def test_hunt_acquire_releases_stale_lock_and_teleports_back_when_affordable() -
 
     assert decision["command"]["cmd_type"] == "teleport"
     assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
