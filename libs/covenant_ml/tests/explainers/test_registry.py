@@ -13,6 +13,7 @@ from platform_ml.explainers import FeatureExplainer
 from platform_ml.explainers.protocol import PredictorProtocol
 
 from covenant_ml.backends.protocol import PreparedClassifier
+from covenant_ml.backends.registry import default_registry
 from covenant_ml.explainers.registry import (
     ExplainerFactory,
     ExplainerRegistration,
@@ -1152,3 +1153,51 @@ class TestShapTreeAdapterWithClearGBM:
             assert score["name"] in feature_names
             assert score["importance"] >= 0.0
             assert 1 <= score["rank"] <= 4
+
+
+class TestDefaultRegistryCoversEveryBackend:
+    """Every registered backend has at least one explainer it can use.
+
+    permutation's compatibility set omitted logreg and random_forest while its
+    own comment described it as model-agnostic, so both backends had no
+    compatible explainer at all: /ml/explain refused every request for them,
+    for every explainer, while the API happily accepted the backend name.
+    """
+
+    def test_every_backend_has_a_compatible_explainer(self) -> None:
+        """No registered backend is left with an empty explainer list."""
+        registry = default_explainer_registry()
+
+        empty = [
+            backend
+            for backend in default_registry().list_backends()
+            if not registry.list_compatible_explainers(backend)
+        ]
+
+        assert empty == []
+
+    def test_permutation_covers_every_backend(self) -> None:
+        """Permutation needs only predict_proba, which every backend has."""
+        registry = default_explainer_registry()
+
+        missing = [
+            backend
+            for backend in default_registry().list_backends()
+            if "permutation" not in registry.list_compatible_explainers(backend)
+        ]
+
+        assert missing == []
+
+    def test_gradient_explainers_stay_neural_only(self) -> None:
+        """Widening permutation must not widen the gradient explainers.
+
+        They need compute_gradients, which the tree and linear backends do
+        not have; claiming compatibility would trade a clear refusal for a
+        failure inside the explainer.
+        """
+        registry = default_explainer_registry()
+
+        for backend in ("xgboost", "lightgbm", "cleargbm", "logreg", "random_forest"):
+            compatible = registry.list_compatible_explainers(backend)
+            assert "gradient" not in compatible
+            assert "integrated_gradients" not in compatible

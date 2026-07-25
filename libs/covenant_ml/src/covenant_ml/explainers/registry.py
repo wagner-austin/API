@@ -671,12 +671,17 @@ def default_explainer_registry() -> ExplainerRegistry:
     """
     reg = ExplainerRegistry()
 
-    # Permutation: works with all backends (model-agnostic)
+    # Permutation needs only predict_proba, so it works with every backend.
+    # logreg and random_forest were missing from this set, which left them
+    # with no compatible explainer at all: /ml/explain refused every request
+    # for them, for every explainer, while the API accepted the backend.
     reg.register(
         "permutation",
         ExplainerRegistration(
             factory=_create_permutation_factory(),
-            compatible_backends=frozenset(["xgboost", "lightgbm", "mlp", "lstm", "cleargbm"]),
+            compatible_backends=frozenset(
+                ["xgboost", "lightgbm", "mlp", "lstm", "cleargbm", "logreg", "random_forest"]
+            ),
             requires_gradients=False,
         ),
     )
