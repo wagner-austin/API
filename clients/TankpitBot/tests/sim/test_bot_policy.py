@@ -9,7 +9,9 @@ from tankpit_bot.sim.bot_policy import (
     MIN_RESPAWN_DISPLACEMENT,
     decide_practice_bot,
     make_practice_bot_state,
+    note_hit_for_team_aggro,
     note_hit_on_bot,
+    queue_return,
     reactivate_practice_bot,
     teleport_off_threshold,
 )
@@ -162,3 +164,73 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
     assert max(abs(bot["x"] - 101), abs(bot["y"] - 100)) >= MIN_RESPAWN_DISPLACEMENT
     synced = [m for m in boundary if m["msg_type"] == 0x2E and m["tank_id"] == BOT_ID]
     assert len(synced) == 1
+
+
+def _aggro_arena() -> SimWorldDict:
+    """Player (team 2) at (100,99); purple victim + teammates; blue ally."""
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 99, 900)  # the player
+    world["tanks"][BOT_ID] = make_sim_tank(BOT_ID, 1, 0, 100, 100, 800)  # victim
+    world["tanks"][5] = make_sim_tank(5, 1, 0, 106, 100, 800)  # victim teammate, in sight
+    world["tanks"][6] = make_sim_tank(6, 1, 0, 120, 100, 800)  # victim teammate, out of sight
+    world["tanks"][7] = make_sim_tank(7, 2, 0, 100, 105, 800)  # attacker-team bot, in sight
+    return world
+
+
+def test_team_aggro_queues_gang_up_and_assist_within_sight() -> None:
+    """The victim's sighted teammate targets the attacker; the
+    attacker's sighted bot teammate targets the victim; the
+    out-of-sight teammate never joins (129/129 archive shots <= 8)."""
+    world = _aggro_arena()
+    states = {
+        5: make_practice_bot_state(),
+        6: make_practice_bot_state(),
+        7: make_practice_bot_state(),
+    }
+    responders = note_hit_for_team_aggro(world, states, BOT_ID, 9)
+    assert responders == [5, 7]
+    assert states[5]["has_pending_return"] is True
+    assert (states[5]["pending_return_x"], states[5]["pending_return_y"]) == (100, 99)
+    assert states[7]["has_pending_return"] is True
+    assert (states[7]["pending_return_x"], states[7]["pending_return_y"]) == (100, 100)
+    assert states[6]["has_pending_return"] is False
+    assert states[5]["hits_taken"] == 0
+
+
+def test_team_aggro_ignores_same_team_hits_and_dead_or_missing_bots() -> None:
+    """Friendly fire never ignites aggro; dead and unknown responders
+    are skipped; the victim and attacker never respond to themselves."""
+    world = _aggro_arena()
+    states = {5: make_practice_bot_state(), 8: make_practice_bot_state()}
+    assert note_hit_for_team_aggro(world, states, BOT_ID, 5) == []
+    world["tanks"][5]["alive"] = False
+    assert note_hit_for_team_aggro(world, states, BOT_ID, 9) == []
+    assert note_hit_for_team_aggro(world, states, 99, 9) == []
+    assert states[8]["has_pending_return"] is False
+
+
+def test_queue_return_refreshes_rather_than_stacks() -> None:
+    """Two hits before the tick leave ONE pending shot at the newest
+    tile — the shot-for-shot ratio ceiling."""
+    state = make_practice_bot_state()
+    queue_return(state, 10, 10)
+    queue_return(state, 12, 10)
+    assert state["has_pending_return"] is True
+    assert (state["pending_return_x"], state["pending_return_y"]) == (12, 10)
+
+
+def test_team_aggro_skips_principals_third_teams_and_far_allies() -> None:
+    """The victim and attacker never respond to their own hit, a
+    third-team bystander stays neutral, and an attacker-team bot out
+    of sight of the victim never assists."""
+    world = _aggro_arena()
+    world["tanks"][11] = make_sim_tank(11, 3, 0, 101, 100, 800)  # third team, adjacent
+    world["tanks"][12] = make_sim_tank(12, 2, 0, 120, 120, 800)  # ally, out of sight
+    states = {
+        9: make_practice_bot_state(),
+        BOT_ID: make_practice_bot_state(),
+        11: make_practice_bot_state(),
+        12: make_practice_bot_state(),
+    }
+    assert note_hit_for_team_aggro(world, states, BOT_ID, 9) == []
+    assert all(not s["has_pending_return"] for s in states.values())

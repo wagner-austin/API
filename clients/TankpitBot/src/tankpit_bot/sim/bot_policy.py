@@ -15,7 +15,16 @@ archive contains):
   unexplained drifts) and never place mines;
 - when hit, a bot returns exactly one ``weapon=0`` single
   (2,247/2,247) at the attacker's exact tile (98.7%) on the next
-  2 s queue tick (latency mass 1.5-2.5 s);
+  2 s queue tick (latency mass 1.5-2.5 s) — shot-for-shot, no aggro
+  state (user contract 2026-07-24: ratio ceiling 1.0; the bot's last
+  shot lands within one tick of the last hit taken in 99.2% of 397
+  engagements);
+- TEAM AGGRO, sight-gated: when any hit lands, same-team-as-victim
+  bots within :data:`AGGRO_SIGHT_RADIUS` of the attacker queue one
+  single at the attacker (gang-up — 48 archive shots), and
+  same-team-as-attacker bots within sight of the victim queue one
+  single at the victim (assist — 81 archive shots; the live blue-7
+  witness); never at a same-team tank (0/129);
 - after the rank's hit threshold (modal 7 at recruit, 8 at private
   — Sigma's table, wire-corroborated), the bot teleports off.
 
@@ -44,6 +53,12 @@ BOT_RETURN_WEAPON = 0
 BOT_RETURN_WINDOW_MS = 3000
 """Return fire lands within this window of the provoking hit (96.2%
 of archive bot shots; the latency mass is one 2 s queue tick)."""
+
+AGGRO_SIGHT_RADIUS = 8
+"""Chebyshev sight radius for team aggro: every one of the 129
+archive gang-up/assist shots was fired from within 8 tiles of its
+target (``analysis_scripts/mine_bot_aggro.py``; the viewport radius —
+the user's "a blue bot that can see that orange bot", 2026-07-24)."""
 
 BOT_TELEPORT_OFF_HITS: dict[int, int] = {0: 7, 1: 8, 2: 9}
 """Hits taken before the bot teleports off, by rank. Ranks 0-1 are
@@ -87,6 +102,23 @@ def make_practice_bot_state() -> PracticeBotStateDict:
     )
 
 
+def queue_return(state: PracticeBotStateDict, target_x: int, target_y: int) -> None:
+    """Queue one next-tick single at a tile (the per-hit reflex).
+
+    Shot-for-shot semantics: a second hit before the tick refreshes
+    the pending target rather than stacking — at most one return per
+    responder per tick, the mined ratio ceiling.
+
+    Args:
+        state: The responder's policy state (mutated in place).
+        target_x: Target tile x.
+        target_y: Target tile y.
+    """
+    state["has_pending_return"] = True
+    state["pending_return_x"] = target_x
+    state["pending_return_y"] = target_y
+
+
 def note_hit_on_bot(state: PracticeBotStateDict, attacker_x: int, attacker_y: int) -> None:
     """Record one hit landing on the bot and queue the return single.
 
@@ -96,9 +128,56 @@ def note_hit_on_bot(state: PracticeBotStateDict, attacker_x: int, attacker_y: in
         attacker_y: The attacker's tile y at hit time.
     """
     state["hits_taken"] += 1
-    state["has_pending_return"] = True
-    state["pending_return_x"] = attacker_x
-    state["pending_return_y"] = attacker_y
+    queue_return(state, attacker_x, attacker_y)
+
+
+def note_hit_for_team_aggro(
+    world: SimWorldDict,
+    states: dict[int, PracticeBotStateDict],
+    victim_id: int,
+    attacker_id: int,
+) -> list[int]:
+    """Queue sight-gated team-aggro responses to one landed hit.
+
+    The mined reflex ([[enemy-bot-behavior]] §Team aggro): when a hit
+    lands on ``victim_id`` from ``attacker_id``, every OTHER living
+    roster bot within :data:`AGGRO_SIGHT_RADIUS` (Chebyshev) of its
+    would-be target joins for one next-tick single — the victim's
+    teammates fire at the attacker (gang-up), the attacker's bot
+    teammates fire at the victim (assist). Never at a same-team tank;
+    per-hit, so stopping stops it (shot-for-shot).
+
+    Args:
+        world: Simulated world (positions and teams read).
+        states: Policy states by roster-bot tank id (mutated).
+        victim_id: The tank the hit landed on.
+        attacker_id: The tank whose shot landed.
+
+    Returns:
+        The responder ids that queued a shot (for tests/telemetry).
+    """
+    victim = world["tanks"].get(victim_id)
+    attacker = world["tanks"].get(attacker_id)
+    if victim is None or attacker is None or victim["team"] == attacker["team"]:
+        return []
+    responders: list[int] = []
+    for bot_id, state in states.items():
+        if bot_id in (victim_id, attacker_id):
+            continue
+        bot = world["tanks"].get(bot_id)
+        if bot is None or not bot["alive"]:
+            continue
+        if bot["team"] == victim["team"]:
+            reach = max(abs(bot["x"] - attacker["x"]), abs(bot["y"] - attacker["y"]))
+            if reach <= AGGRO_SIGHT_RADIUS:
+                queue_return(state, attacker["x"], attacker["y"])
+                responders.append(bot_id)
+        elif bot["team"] == attacker["team"]:
+            reach = max(abs(bot["x"] - victim["x"]), abs(bot["y"] - victim["y"]))
+            if reach <= AGGRO_SIGHT_RADIUS:
+                queue_return(state, victim["x"], victim["y"])
+                responders.append(bot_id)
+    return responders
 
 
 def teleport_off_threshold(rank: int) -> int:
@@ -226,6 +305,7 @@ def reactivate_practice_bot(world: SimWorldDict, terrain: TerrainMapProtocol, ta
 
 
 __all__ = [
+    "AGGRO_SIGHT_RADIUS",
     "BOT_RETURN_WEAPON",
     "BOT_RETURN_WINDOW_MS",
     "BOT_TELEPORT_OFF_HITS",
@@ -233,7 +313,9 @@ __all__ = [
     "PracticeBotStateDict",
     "decide_practice_bot",
     "make_practice_bot_state",
+    "note_hit_for_team_aggro",
     "note_hit_on_bot",
+    "queue_return",
     "reactivate_practice_bot",
     "teleport_off_threshold",
 ]

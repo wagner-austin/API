@@ -6,14 +6,18 @@ restated copy. A mismatch means the sim's bot model and the real
 bots disagree.
 
 The law (``bot-return-fire``): every shot fired by a practice bot is
-a ``BOT_RETURN_WEAPON`` single, fired within ``BOT_RETURN_WINDOW_MS``
-of the bot taking a hit, aimed at the attacker's last known tile
-(the aim clause is only judged when the attacker's position is
-known — position channels are viewport-scoped for far tanks).
-Archive fit at mining time (2026-07-24): ~95% exact over 2,247 bot
-shots; the residual is hit-attribution noise (multi-attacker fights,
-stale positions), the same positive-signed shape the audit's clean
-windows show.
+a ``BOT_RETURN_WEAPON`` single explained by ONE of the three mined
+per-hit reflexes — personal return fire (the bot itself was hit
+within ``BOT_RETURN_WINDOW_MS``; aim judged at the attacker's last
+known tile when known), GANG-UP (a same-team bot was hit within the
+window and the shooter is within ``AGGRO_SIGHT_RADIUS`` of its
+target), or ASSIST (the target tile holds an enemy-team bot that was
+hit within the window, shooter within sight). Bot teams derive from
+the roster name colors. Upgraded 2026-07-25 after the team-aggro
+mining ([[enemy-bot-behavior]] §Team aggro: 2,115 return / 48
+gang-up / 81 assist / 3 unexplained archive shots) — the pre-upgrade
+law judged only personal return fire and priced 94.6%; the residual
+was lawful team aggro, not noise.
 """
 
 from __future__ import annotations
@@ -21,7 +25,11 @@ from __future__ import annotations
 import re
 
 from tankpit_bot.physics.capacity import damage_tier, fuel_capacity
-from tankpit_bot.sim.bot_policy import BOT_RETURN_WEAPON, BOT_RETURN_WINDOW_MS
+from tankpit_bot.sim.bot_policy import (
+    AGGRO_SIGHT_RADIUS,
+    BOT_RETURN_WEAPON,
+    BOT_RETURN_WINDOW_MS,
+)
 from tankpit_bot.sim.server import CORPSE_WINDOW_TICKS, TICK_MS
 from tankpit_bot.validate.shadow_timeline import (
     ShadowTimelineDict,
@@ -37,6 +45,27 @@ law uses)."""
 
 BOT_NAME_PATTERN = re.compile(r"^(red|purple|blue|orange)-\d+$")
 """Practice-bot naming from the JS ``sd()`` initializer: team-N."""
+
+_TEAM_BY_COLOR = {"red": 0, "purple": 1, "blue": 2, "orange": 3}
+"""Roster color → team id (join-roster ground truth: red-1 arrives
+team 0, purple-2 team 1, blue-7 team 2, orange-1 team 3)."""
+
+
+def _bot_teams(timeline: ShadowTimelineDict) -> dict[int, int]:
+    """Map each practice-bot id to its team, from the name color.
+
+    Args:
+        timeline: One session's shadow timeline.
+
+    Returns:
+        Team id per bot tank id.
+    """
+    teams: dict[int, int] = {}
+    for tank_id, name in timeline["names"].items():
+        match = BOT_NAME_PATTERN.match(name)
+        if match is not None:
+            teams[tank_id] = _TEAM_BY_COLOR[match.group(1)]
+    return teams
 
 
 def _bot_ids(timeline: ShadowTimelineDict) -> frozenset[int]:
@@ -55,41 +84,118 @@ def _bot_ids(timeline: ShadowTimelineDict) -> frozenset[int]:
     )
 
 
+def _hit_in_window(hit: tuple[int, int] | None, shot_ms: int) -> bool:
+    """Report whether a recorded hit falls inside the reflex window.
+
+    Args:
+        hit: A ``(timestamp_ms, attacker_id)`` hit record, or None.
+        shot_ms: The judged shot's frame timestamp.
+
+    Returns:
+        True when the hit exists and is recent enough to provoke.
+    """
+    return hit is not None and shot_ms - hit[0] <= BOT_RETURN_WINDOW_MS
+
+
 def _shot_obeys_law(
     shot: ShotEventDict,
-    hit: tuple[int, int] | None,
+    shooter_team: int,
+    bot_teams: dict[int, int],
+    last_hit: dict[int, tuple[int, int]],
     positions: dict[int, tuple[int, int]],
 ) -> bool:
-    """Judge one bot shot against the return-fire law.
+    """Judge one bot shot against the full team-aggro reflex model.
 
     Args:
         shot: The bot's 0x53 echo.
-        hit: The latest hit the bot has taken, as
-            ``(timestamp_ms, attacker_id)``, or None.
+        shooter_team: The firing bot's team.
+        bot_teams: Team per practice-bot id.
+        last_hit: Latest hit per tank id, as
+            ``(timestamp_ms, attacker_id)``.
         positions: Latest known tile per tank id at shot time.
 
     Returns:
-        True when the shot is the mined return single: correct
-        weapon, inside the return window, and (when the attacker's
-        position is known) aimed at the attacker's tile.
+        True when the shot is one of the three mined per-hit
+        reflexes: personal return fire, gang-up, or assist.
     """
     if shot["weapon"] != BOT_RETURN_WEAPON:
         return False
-    if hit is None or shot["timestamp_ms"] - hit[0] > BOT_RETURN_WINDOW_MS:
-        return False
-    attacker_pos = positions.get(hit[1])
-    if attacker_pos is None:
+    if _is_personal_return(shot, last_hit, positions):
         return True
-    return shot["target_x"] == attacker_pos[0] and shot["target_y"] == attacker_pos[1]
+    shooter_pos = positions.get(shot["shooter_id"])
+    if shooter_pos is None:
+        return False
+    reach = max(
+        abs(shooter_pos[0] - shot["target_x"]),
+        abs(shooter_pos[1] - shot["target_y"]),
+    )
+    if reach > AGGRO_SIGHT_RADIUS:
+        return False
+    return _is_gang_up(shot, shooter_team, bot_teams, last_hit, positions) or _is_assist(
+        shot, shooter_team, bot_teams, last_hit, positions
+    )
+
+
+def _is_personal_return(
+    shot: ShotEventDict,
+    last_hit: dict[int, tuple[int, int]],
+    positions: dict[int, tuple[int, int]],
+) -> bool:
+    """Report whether the shot is the bot's own return single."""
+    own_hit = last_hit.get(shot["shooter_id"])
+    if own_hit is None or not _hit_in_window(own_hit, shot["timestamp_ms"]):
+        return False
+    attacker_pos = positions.get(own_hit[1])
+    return attacker_pos is None or (shot["target_x"], shot["target_y"]) == attacker_pos
+
+
+def _is_gang_up(
+    shot: ShotEventDict,
+    shooter_team: int,
+    bot_teams: dict[int, int],
+    last_hit: dict[int, tuple[int, int]],
+    positions: dict[int, tuple[int, int]],
+) -> bool:
+    """Report whether the shot avenges a recently-hit teammate."""
+    for teammate_id, teammate_team in bot_teams.items():
+        if teammate_team != shooter_team or teammate_id == shot["shooter_id"]:
+            continue
+        teammate_hit = last_hit.get(teammate_id)
+        if teammate_hit is None or not _hit_in_window(teammate_hit, shot["timestamp_ms"]):
+            continue
+        attacker_pos = positions.get(teammate_hit[1])
+        if attacker_pos is None or (shot["target_x"], shot["target_y"]) == attacker_pos:
+            return True
+    return False
+
+
+def _is_assist(
+    shot: ShotEventDict,
+    shooter_team: int,
+    bot_teams: dict[int, int],
+    last_hit: dict[int, tuple[int, int]],
+    positions: dict[int, tuple[int, int]],
+) -> bool:
+    """Report whether the shot joins against an engaged enemy bot."""
+    for target_id, target_team in bot_teams.items():
+        if target_team == shooter_team:
+            continue
+        if positions.get(target_id) != (shot["target_x"], shot["target_y"]):
+            continue
+        if _hit_in_window(last_hit.get(target_id), shot["timestamp_ms"]):
+            return True
+    return False
 
 
 def shadow_bot_return_fire(timelines: list[ShadowTimelineDict]) -> ClaimEvidenceDict:
-    """Judge every practice-bot shot against the mined policy.
+    """Judge every practice-bot shot against the mined reflex model.
 
     Walks each session's shots and positions in wire order, tracking
-    the latest tile per tank and the latest hit landing on each bot
-    (a shot whose target tile equals the bot's current tile). One
-    sample per bot shot.
+    the latest tile per tank and the latest hit landing on EVERY tank
+    (a shot whose target tile equals the tank's current tile — team
+    aggro needs hits on players and teammates alike). One sample per
+    bot shot; exact when the shot is a lawful return, gang-up, or
+    assist reflex.
 
     Args:
         timelines: Extracted shadow timelines.
@@ -100,8 +206,8 @@ def shadow_bot_return_fire(timelines: list[ShadowTimelineDict]) -> ClaimEvidence
     samples = 0
     exact = 0
     for timeline in timelines:
-        bots = _bot_ids(timeline)
-        if not bots:
+        bot_teams = _bot_teams(timeline)
+        if not bot_teams:
             continue
         positions: dict[int, tuple[int, int]] = {}
         last_hit: dict[int, tuple[int, int]] = {}
@@ -114,24 +220,23 @@ def shadow_bot_return_fire(timelines: list[ShadowTimelineDict]) -> ClaimEvidence
                 positions[pos["tank_id"]] = (pos["x"], pos["y"])
                 continue
             shot = timeline["shots"][index]
-            for bot_id in bots:
-                bot_pos = positions.get(bot_id)
-                if (
-                    bot_pos is not None
-                    and bot_id != shot["shooter_id"]
-                    and bot_pos == (shot["target_x"], shot["target_y"])
-                ):
-                    last_hit[bot_id] = (shot["timestamp_ms"], shot["shooter_id"])
-            if shot["shooter_id"] in bots:
+            shooter_team = bot_teams.get(shot["shooter_id"])
+            if shooter_team is not None:
                 samples += 1
-                if _shot_obeys_law(shot, last_hit.get(shot["shooter_id"]), positions):
+                if _shot_obeys_law(shot, shooter_team, bot_teams, last_hit, positions):
                     exact += 1
+            for tank_id, tank_pos in positions.items():
+                if tank_id != shot["shooter_id"] and tank_pos == (
+                    shot["target_x"],
+                    shot["target_y"],
+                ):
+                    last_hit[tank_id] = (shot["timestamp_ms"], shot["shooter_id"])
     return ClaimEvidenceDict(
         claim_id="bot-return-fire",
         samples=samples,
         exact=exact,
         mismatches=samples - exact,
-        detail="bot shots are provoked singles at the attacker (sim/bot_policy)",
+        detail="bot singles are per-hit reflexes: return, gang-up, or assist (sim/bot_policy)",
     )
 
 

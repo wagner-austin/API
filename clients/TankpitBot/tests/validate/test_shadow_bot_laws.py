@@ -252,3 +252,110 @@ class TestBotReactivation:
         )
         evidence = shadow_bot_reactivation([timeline])
         assert evidence["samples"] == 0
+
+
+ALLY_BOT_ID = 30
+
+
+class TestTeamAggro:
+    """The gang-up and assist reflexes (sim/bot_policy team aggro)."""
+
+    def test_gang_up_at_the_sighted_attacker_is_exact(self) -> None:
+        """A teammate of the hit bot, within sight, avenges at the
+        attacker's tile — one of the 48 archive gang-up shots."""
+        timeline = _timeline(
+            _names(),
+            shots=[
+                _shot(1000, HUMAN_ID, (10, 10), (11, 10)),
+                _shot(3000, OTHER_BOT_ID, (15, 10), (10, 10)),
+            ],
+            positions=[
+                _pos(0, HUMAN_ID, 10, 10),
+                _pos(0, BOT_ID, 11, 10),
+                _pos(0, OTHER_BOT_ID, 15, 10),
+            ],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+    def test_assist_at_the_engaged_enemy_bot_is_exact(self) -> None:
+        """A bot on the attacker's SIDE, within sight of the victim,
+        joins against it — the live blue-7 shape."""
+        names = _names()
+        names[ALLY_BOT_ID] = "blue-1"
+        timeline = _timeline(
+            names,
+            shots=[
+                _shot(1000, HUMAN_ID, (10, 10), (11, 10)),
+                _shot(3000, ALLY_BOT_ID, (14, 10), (11, 10)),
+            ],
+            positions=[
+                _pos(0, HUMAN_ID, 10, 10),
+                _pos(0, BOT_ID, 11, 10),
+                _pos(0, ALLY_BOT_ID, 14, 10),
+            ],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+    def test_out_of_sight_avenger_is_a_mismatch(self) -> None:
+        """The reflex is sight-gated at AGGRO_SIGHT_RADIUS (129/129
+        archive shots within 8 tiles): a far teammate never joins."""
+        timeline = _timeline(
+            _names(),
+            shots=[
+                _shot(1000, HUMAN_ID, (10, 10), (11, 10)),
+                _shot(3000, OTHER_BOT_ID, (30, 10), (10, 10)),
+            ],
+            positions=[
+                _pos(0, HUMAN_ID, 10, 10),
+                _pos(0, BOT_ID, 11, 10),
+                _pos(0, OTHER_BOT_ID, 30, 10),
+            ],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
+
+    def test_unpositioned_shooter_cannot_claim_team_aggro(self) -> None:
+        """Without the shooter's tile the sight gate cannot pass."""
+        timeline = _timeline(
+            _names(),
+            shots=[
+                _shot(1000, HUMAN_ID, (10, 10), (11, 10)),
+                _shot(3000, OTHER_BOT_ID, (15, 10), (10, 10)),
+            ],
+            positions=[_pos(0, HUMAN_ID, 10, 10), _pos(0, BOT_ID, 11, 10)],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
+
+    def test_gang_up_wrong_aim_tile_is_a_mismatch(self) -> None:
+        """A teammate was hit, but the shot ignores the attacker's
+        known tile — not the mined reflex."""
+        timeline = _timeline(
+            _names(),
+            shots=[
+                _shot(1000, HUMAN_ID, (10, 10), (11, 10)),
+                _shot(3000, OTHER_BOT_ID, (15, 10), (16, 10)),
+            ],
+            positions=[
+                _pos(0, HUMAN_ID, 10, 10),
+                _pos(0, BOT_ID, 11, 10),
+                _pos(0, OTHER_BOT_ID, 15, 10),
+            ],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
+
+    def test_shot_at_an_unengaged_enemy_bot_is_a_mismatch(self) -> None:
+        """Assist requires the target bot to have been hit recently —
+        bots never open fire on a calm enemy bot."""
+        names = _names()
+        names[ALLY_BOT_ID] = "blue-1"
+        timeline = _timeline(
+            names,
+            shots=[_shot(3000, ALLY_BOT_ID, (14, 10), (11, 10))],
+            positions=[_pos(0, BOT_ID, 11, 10), _pos(0, ALLY_BOT_ID, 14, 10)],
+        )
+        evidence = shadow_bot_return_fire([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 0)
