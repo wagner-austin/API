@@ -43,6 +43,7 @@ public final class SelfTest {
         failures += checkOptions();
         failures += checkDiscovery();
         failures += checkOrderBindings();
+        failures += checkStateStream();
         failures += checkLogPrefixing();
 
         if (failures > 0) {
@@ -369,5 +370,34 @@ public final class SelfTest {
             Class<?> defined = defineClass(binaryName, bytes, 0, bytes.length);
             resolveClass(defined);
         }
+    }
+
+    /**
+     * Exercises the NDJSON writer. The consumer parses these lines strictly and
+     * cannot fall back on a lenient JSON library, so malformed output here is a
+     * broken contract rather than cosmetic.
+     */
+    private static int checkStateStream() {
+        int failures = 0;
+
+        String frame = StateStream.frameRecord(1918, 6461, 3);
+        failures += expect(
+                frame.equals("{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,\"owned\":3}"),
+                "frame record is exact");
+
+        // The consumer splits on newlines before parsing, so a newline inside
+        // a record would silently become two malformed ones. Code points
+        // rather than character literals: 10 is LF, 13 is CR.
+        failures += expect(
+                frame.indexOf(10) < 0 && frame.indexOf(13) < 0,
+                "a record never contains a newline");
+        failures += expect(
+                frame.startsWith("{") && frame.endsWith("}"),
+                "a record is exactly one object");
+
+        failures += expect(
+                StateStream.frameRecord(0, 0, 0).contains("\"owned\":0"),
+                "an empty roster is still a record");
+        return failures;
     }
 }

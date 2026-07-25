@@ -1,0 +1,38 @@
+    public boolean a(au au2, boolean bl2) {
+        if (au2 == null) {
+            if (bl2) {
+                com.corrodinggames.rts.gameFramework.l.b("isValidNewWaypoint: Skipping null waypoint");
+            }
+            return false;
+        }
+        if (au2.d() == com.corrodinggames.rts.game.units.av.c) {
+            if (au2.b == null) {
+                if (bl2) {
+                    com.corrodinggames.rts.gameFramework.l.b("isValidNewWaypoint: Skipping build waypoint with no buildType");
+                }
+                return false;
+            }
+            s s2 = this.a(au2.b, au2.d, false);
+            if (s2 == null) {
+                if (bl2) {
+                    com.corrodinggames.rts.gameFramework.l.b("Unit '" + this.r().i() + "' can not queue build:" + au2.b.i());
+                }
+                return false;
+            }
+            if (!au2.n) {
+                if (s2.g(this)) {
+                    if (bl2) {
+                        com.corrodinggames.rts.gameFramework.l.b("Builder '" + this.r().i() + "' tried to queue a locked building:" + s2.O());
+                    }
+                    return false;
+                }
+                if (!s2.b(this)) {
+                    if (bl2) {
+                        com.corrodinggames.rts.gameFramework.l.b("Builder '" + this.r().i() + "' tried to queue a unavailable building:" + s2.O());
+                    }
+                    return false;
+                }
+            }
+        }
+        return true;
+    }

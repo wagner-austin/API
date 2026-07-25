@@ -86,6 +86,23 @@ New validator `require_absolute_path` (`RW-DECODE-005`). It also closed an exist
 
 `make check` now chains `agent-selftest`, so a patcher regression or an obfuscated name that moved in a game update fails at the gate. `make check` green: guard 0 violations, ruff clean, mypy strict clean, 88 tests (was 61), 100% statements and branches, agent-selftest OK.
 
+## [2026-07-25] milestone | M8 — the build verb; a builder placed a factory
+Pages written: building-structures
+Pages updated: index (9 pages), hubs/engine-internals, hubs/game-mechanics
+Artifacts: `wiki/sources/m8-build/` — `build-succeeded.txt` (28), `build-rejected-selector-zero.txt` (6), `waypoint-validator.txt` (38), `build-action-lookup.txt` (18), `placement-setter.txt` (8), `buildable-type-names.txt` (90)
+
+Notes: construction is the economic verb — a bot that can only move cannot open a game — and it turned out to reuse the move machinery entirely, differing in one setter and one integer. It is not a special action: the `gui.actions.*` translation table enumerates 55 keys of unit abilities and carries nothing for placing a structure. Placement rides the same waypoint slot in a third target kind, the same one the engine's system-spawn path requires.
+
+The integer cost a run by being read as a rotation. It is a build-action selector: a builder holds a list of build actions and the engine matches by type **and** selector, short-circuiting only on `-1`. Passing `0` asks for the action whose own index is 0, matches nothing, and the order is dropped by waypoint validation — builder never moved, no structure, no error. `-1` means "any action that builds this type" and is the only value that does not require knowing a builder's internal action ordering.
+
+Diagnosis came from the engine naming its own refusal. `isValidNewWaypoint==false on: builder(pos:4250,2610 id:214 t:0)` said a waypoint was refused but not why; the validator's four distinct rejection strings — missing build type, cannot queue, locked, unavailable — are the actual diagnostic, and finding them was a decompiler read, not a guess.
+
+With `-1` the same code worked: builder pathfinds from (4250, 2610) toward the site, and by t+5s the roster gains `units.d.m` at exactly (4450.0, 2730.0), the requested coordinates. Its drawables are `land_factory_*`, which identifies it independently of the type name asked for. The builder then stops in range and constructs.
+
+Also recorded: 90 buildable type names extracted from the `-printunits` catalogue, and the reason they resolve at all. The registry lookup tries mods, then a built-in enum, then aliases — and the enum arm is dead, because its constants are obfuscated to single letters while it compares against `Enum.name()`. Every name resolves through the `.ini` registry, which is where the built-in units live too.
+
+Still not playing. Two verbs exist and both are driven by command-line constants; nothing chooses, and Python has still never seen a game state.
+
 ## [2026-07-25] milestone | M5 — the bot issued a real order and a unit moved
 Pages written: issuing-orders
 Pages updated: index (8 pages), hubs/engine-internals, hubs/bot-architecture

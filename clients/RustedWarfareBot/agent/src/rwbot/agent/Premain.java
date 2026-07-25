@@ -42,13 +42,15 @@ public final class Premain {
                     options.discoverAtSeconds(),
                     options.exitAfterDiscovery(),
                     options.inspectFields(),
-                    options.findElementsUnder());
+                    options.findElementsUnder(),
+                    options.stateOutPath());
         }
         if (options.orderRequested()) {
             startOrderProbe(
                     options.orderMoveAtSeconds(),
                     options.orderMoveBy(),
-                    options.orderMoveUnitIndex());
+                    options.orderMoveUnitIndex(),
+                    options.buildType());
         }
         Log.info("ready; patched " + targets.size() + " class(es)");
     }
@@ -65,11 +67,12 @@ public final class Premain {
             int[] atSeconds,
             boolean exitAfter,
             String[] inspectFields,
-            String findElementsUnder) {
+            String findElementsUnder,
+            String stateOutPath) {
         Thread thread =
                 new Thread(
                         () -> {
-                            runDiscovery(atSeconds, inspectFields, findElementsUnder);
+                            runDiscovery(atSeconds, inspectFields, findElementsUnder, stateOutPath);
                             if (exitAfter) {
                                 Log.info("discovery complete; halting");
                                 Runtime.getRuntime().halt(0);
@@ -83,7 +86,10 @@ public final class Premain {
 
     /** Sleeps to each offset in turn and emits one snapshot per offset. */
     private static void runDiscovery(
-            int[] atSeconds, String[] inspectFields, String findElementsUnder) {
+            int[] atSeconds,
+            String[] inspectFields,
+            String findElementsUnder,
+            String stateOutPath) {
         long started = System.nanoTime();
         for (int second : atSeconds) {
             long targetNanos = started + second * 1_000_000_000L;
@@ -104,6 +110,9 @@ public final class Premain {
             }
             if (!findElementsUnder.isEmpty()) {
                 Log.info(Discovery.findCollections(engine, findElementsUnder, 4, 20000));
+            }
+            if (!stateOutPath.isEmpty()) {
+                writeSample(engine, stateOutPath);
             }
         }
     }
@@ -127,13 +136,17 @@ public final class Premain {
      * @param atSeconds Elapsed time at which to issue the order.
      * @param moveBy World-space offset to send the unit by.
      */
-    private static void startOrderProbe(int atSeconds, float[] moveBy, int unitIndex) {
+    private static void startOrderProbe(
+            int atSeconds, float[] moveBy, int unitIndex, String buildType) {
         Thread thread =
-                new Thread(() -> runOrderProbe(atSeconds, moveBy, unitIndex), "rw-agent-order");
+                new Thread(
+                        () -> runOrderProbe(atSeconds, moveBy, unitIndex, buildType),
+                        "rw-agent-order");
         thread.setDaemon(true);
         thread.start();
         Log.info(
-                "move order scheduled at "
+                (buildType.isEmpty() ? "move" : "build " + buildType)
+                        + " order scheduled at "
                         + atSeconds
                         + "s for roster["
                         + unitIndex
@@ -145,7 +158,8 @@ public final class Premain {
     }
 
     /** Waits for each offset in turn, ordering once and then sampling. */
-    private static void runOrderProbe(int atSeconds, float[] moveBy, int unitIndex) {
+    private static void runOrderProbe(
+            int atSeconds, float[] moveBy, int unitIndex, String buildType) {
         long started = System.nanoTime();
         if (!sleepUntil(started, atSeconds)) {
             return;
@@ -172,8 +186,20 @@ public final class Premain {
                     float toX = from[0] + moveBy[0];
                     float toY = from[1] + moveBy[1];
                     Log.info("order: subject " + Orders.describe(unit));
-                    Log.info("order: moving to (" + toX + ", " + toY + ")");
-                    Orders.moveTo(engine, unit, toX, toY);
+                    if (buildType.isEmpty()) {
+                        Log.info("order: moving to (" + toX + ", " + toY + ")");
+                        Orders.moveTo(engine, unit, toX, toY);
+                    } else {
+                        Log.info(
+                                "order: building "
+                                        + buildType
+                                        + " at ("
+                                        + toX
+                                        + ", "
+                                        + toY
+                                        + ")");
+                        Orders.buildAt(engine, unit, buildType, toX, toY);
+                    }
                     ordered.set(unit);
                     Log.info("order: issued");
                 });
@@ -190,6 +216,7 @@ public final class Premain {
                             return;
                         }
                         Log.info("order: t+" + elapsed + "s " + Orders.describe(unit));
+                        Log.info(Orders.describeOwned(EngineHandle.current()));
                     });
         }
     }
@@ -235,5 +262,71 @@ public final class Premain {
                         "rw-agent: target class not found on the classpath: " + binaryName, e);
             }
         }
+    }
+
+    /**
+     * Appends one NDJSON world sample to the stream file.
+     *
+     * <p>The read runs on the game thread and the write does not: file I/O on
+     * the simulation thread would pace the game by disk latency, while the
+     * sample itself must be coherent. So the sample is built on the game thread
+     * and handed back to be written here.
+     *
+     * @param engine The live engine instance.
+     * @param path Absolute path to append to.
+     */
+    private static void writeSample(Object engine, String path) {
+        // onGameThread enqueues and returns; it does not run the task. Reading
+        // the result straight after would always see nothing, so the render is
+        // awaited explicitly. The wait is bounded and fails loudly rather than
+        // hanging a probe against a stalled game.
+        final java.util.concurrent.atomic.AtomicReference<String> rendered =
+                new java.util.concurrent.atomic.AtomicReference<String>();
+        final java.util.concurrent.atomic.AtomicReference<RuntimeException> failure =
+                new java.util.concurrent.atomic.AtomicReference<RuntimeException>();
+        final java.util.concurrent.CountDownLatch done =
+                new java.util.concurrent.CountDownLatch(1);
+
+        Orders.onGameThread(
+                () -> {
+                    try {
+                        rendered.set(StateStream.sample(engine));
+                    } catch (RuntimeException e) {
+                        failure.set(e);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+
+        boolean completed;
+        try {
+            completed = done.await(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("rw-agent: interrupted awaiting a state sample", e);
+        }
+        if (!completed) {
+            throw new IllegalStateException(
+                    "rw-agent: the game thread did not render a state sample within 10s");
+        }
+        // Carried across the thread boundary rather than swallowed there, so a
+        // failure surfaces with its original stack on the probe thread.
+        RuntimeException thrown = failure.get();
+        if (thrown != null) {
+            throw thrown;
+        }
+        if (rendered.get() == null) {
+            Log.error("state sample was not produced");
+            return;
+        }
+        try (java.io.Writer writer =
+                new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(path, true),
+                        java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(rendered.get());
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("rw-agent: cannot append state to " + path, e);
+        }
+        Log.info("state sample appended to " + path);
     }
 }

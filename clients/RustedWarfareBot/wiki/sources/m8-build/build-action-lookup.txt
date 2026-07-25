@@ -1,0 +1,18 @@
+    public s a(as as2, int n2, boolean bl2) {
+        ArrayList arrayList = this.N();
+        s s2 = null;
+        if (arrayList.size() > 0) {
+            for (s s3 : arrayList) {
+                as as3;
+                as as4 = s3.y();
+                if (bl2 && (as3 = s3.E()) != null) {
+                    as4 = as3;
+                }
+                if (as4 != as2 || n2 != -1 && n2 != s3.t()) continue;
+                s2 = s3;
+                if (!s3.b(this) || !s3.a((am)this, false)) continue;
+                return s3;
+            }
+        }
+        return s2;
+    }

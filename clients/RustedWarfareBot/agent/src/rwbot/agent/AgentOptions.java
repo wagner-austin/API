@@ -15,17 +15,21 @@ final class AgentOptions {
     private static final String EXIT_AFTER = "exitAfterDiscovery";
     private static final String INSPECT_FIELDS = "inspectFields";
     private static final String FIND_UNDER = "findElementsUnder";
+    private static final String STATE_OUT = "stateOutPath";
     private static final String ORDER_AT = "orderMoveAtSeconds";
     private static final String ORDER_BY = "orderMoveBy";
     private static final String ORDER_INDEX = "orderMoveUnitIndex";
+    private static final String BUILD_TYPE = "buildType";
 
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
     private final String[] inspectFields;
     private final String findElementsUnder;
+    private final String stateOutPath;
     private final int orderMoveAtSeconds;
     private final float[] orderMoveBy;
     private final int orderMoveUnitIndex;
+    private final String buildType;
 
     private AgentOptions(
             int[] discoverAtSeconds,
@@ -34,7 +38,9 @@ final class AgentOptions {
             String findElementsUnder,
             int orderMoveAtSeconds,
             float[] orderMoveBy,
-            int orderMoveUnitIndex) {
+            int orderMoveUnitIndex,
+            String buildType,
+            String stateOutPath) {
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
         this.inspectFields = inspectFields;
@@ -42,6 +48,20 @@ final class AgentOptions {
         this.orderMoveAtSeconds = orderMoveAtSeconds;
         this.orderMoveBy = orderMoveBy;
         this.orderMoveUnitIndex = orderMoveUnitIndex;
+        this.buildType = buildType;
+        this.stateOutPath = stateOutPath;
+    }
+
+    /**
+     * Unit-type name to construct instead of moving, or empty to move.
+     *
+     * <p>Shares the timer and roster index with the move probe because the two
+     * differ only in the verb: same subject, same destination, different
+     * command setter. Keeping them one option set makes that similarity
+     * visible rather than duplicating the scheduling.
+     */
+    String buildType() {
+        return buildType;
     }
 
     /**
@@ -94,6 +114,15 @@ final class AgentOptions {
     }
 
     /**
+     * Absolute path the NDJSON world stream is appended to, or empty when not
+     * requested. Written at each discovery offset, so it shares that schedule
+     * rather than inventing a second one.
+     */
+    String stateOutPath() {
+        return stateOutPath;
+    }
+
+    /**
      * Engine field names whose elements to expand, in declaration order.
      *
      * <p>A whole-object snapshot reports that a collection holds eleven things;
@@ -143,16 +172,19 @@ final class AgentOptions {
      */
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
-            return new AgentOptions(new int[0], false, new String[0], "", 0, DEFAULT_MOVE_BY.clone(), 0);
+            return new AgentOptions(
+                    new int[0], false, new String[0], "", 0, DEFAULT_MOVE_BY.clone(), 0, "", "");
         }
 
         int[] discoverAt = new int[0];
         boolean exitAfter = false;
         String[] inspect = new String[0];
         String findUnder = "";
+        String stateOut = "";
         int orderAt = 0;
         float[] orderBy = DEFAULT_MOVE_BY.clone();
         int orderIndex = 0;
+        String buildType = "";
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -171,6 +203,11 @@ final class AgentOptions {
                 exitAfter = parseBoolean(value);
             } else if (INSPECT_FIELDS.equals(key)) {
                 inspect = parseNames(value);
+            } else if (STATE_OUT.equals(key)) {
+                if (value.isEmpty()) {
+                    throw new IllegalArgumentException(STATE_OUT + " expects a path");
+                }
+                stateOut = value;
             } else if (FIND_UNDER.equals(key)) {
                 if (value.isEmpty()) {
                     throw new IllegalArgumentException(FIND_UNDER + " expects a package prefix");
@@ -182,15 +219,28 @@ final class AgentOptions {
                 orderBy = parseOffset(value);
             } else if (ORDER_INDEX.equals(key)) {
                 orderIndex = parseIndex(value);
+            } else if (BUILD_TYPE.equals(key)) {
+                if (value.isEmpty()) {
+                    throw new IllegalArgumentException(BUILD_TYPE + " expects a unit-type name");
+                }
+                buildType = value;
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
-                                + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", "
-                                + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX);
+                                + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
+                                + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE);
             }
         }
         return new AgentOptions(
-                discoverAt, exitAfter, inspect, findUnder, orderAt, orderBy, orderIndex);
+                discoverAt,
+                exitAfter,
+                inspect,
+                findUnder,
+                orderAt,
+                orderBy,
+                orderIndex,
+                buildType,
+                stateOut);
     }
 
     /** Default move offset: far enough that arrival is unambiguous, in world units. */

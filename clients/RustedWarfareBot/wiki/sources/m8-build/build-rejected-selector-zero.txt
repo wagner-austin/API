@@ -1,0 +1,6 @@
+[rw-agent] 
+[rw-agent] order: subject com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+[rw-agent] order: building landFactory at (4450.0, 2730.0)
+[rw-agent] order: issued
+[rw-agent] order: t+2s com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+2026-07-25 14:19:05.747: isValidNewWaypoint==false on: builder(pos:4250,2610 id:214 t:0)

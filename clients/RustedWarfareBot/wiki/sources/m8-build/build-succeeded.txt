@@ -1,0 +1,28 @@
+[rw-agent] === owned entities ===
+[rw-agent] [0] com.corrodinggames.rts.game.units.d.e at (4250.0, 2550.0) {e=6.6598234 f=1206.6571 g=1206.6571 i=58620.0 k=24.75989}
+[rw-agent] [1] com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+[rw-agent] [2] com.corrodinggames.rts.game.units.h at (-1000.0, -1000.0)
+[rw-agent] 
+[rw-agent] order: subject com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+[rw-agent] order: building landFactory at (4450.0, 2730.0)
+[rw-agent] order: issued
+[rw-agent] order: t+2s com.corrodinggames.rts.game.units.e.b at (4323.5557, 2654.092)
+[rw-agent] === owned entities ===
+[rw-agent] [0] com.corrodinggames.rts.game.units.d.e at (4250.0, 2550.0) {e=6.6598043 f=1326.6765 g=1326.6765 i=64620.0 k=5.559881}
+[rw-agent] [1] com.corrodinggames.rts.game.units.e.b at (4323.5557, 2654.092)
+[rw-agent] [2] com.corrodinggames.rts.game.units.h at (-1000.0, -1000.0)
+[rw-agent] 
+[rw-agent] order: t+5s com.corrodinggames.rts.game.units.e.b at (4380.5503, 2688.31)
+[rw-agent] === owned entities ===
+[rw-agent] [0] com.corrodinggames.rts.game.units.d.e at (4250.0, 2550.0) {e=6.6597757 f=1506.7058 g=1506.7058 i=73620.0 k=27.159891}
+[rw-agent] [1] com.corrodinggames.rts.game.units.e.b at (4380.5503, 2688.31)
+[rw-agent] [2] com.corrodinggames.rts.game.units.h at (-1000.0, -1000.0)
+[rw-agent] [3] com.corrodinggames.rts.game.units.d.m at (4450.0, 2730.0)
+[rw-agent] 
+[rw-agent] order: t+10s com.corrodinggames.rts.game.units.e.b at (4380.5503, 2688.31)
+[rw-agent] === owned entities ===
+[rw-agent] [0] com.corrodinggames.rts.game.units.d.e at (4250.0, 2550.0) {e=6.659728 f=1806.7546 g=1806.7546 i=88620.0 k=29.559893}
+[rw-agent] [1] com.corrodinggames.rts.game.units.e.b at (4380.5503, 2688.31)
+[rw-agent] [2] com.corrodinggames.rts.game.units.h at (-1000.0, -1000.0)
+[rw-agent] [3] com.corrodinggames.rts.game.units.d.m at (4450.0, 2730.0)
+[rw-agent] 

@@ -40,6 +40,10 @@ final class Orders {
     private static final String COMMAND_CLASS = "com.corrodinggames.rts.gameFramework.e";
     private static final String CONTROLLER_CLASS = "com.corrodinggames.rts.gameFramework.c";
     private static final String SCRIPTS_CLASS = "com.corrodinggames.librocket.scripts.ScriptEngine";
+    /** The unit-type interface a placement command carries. */
+    private static final String TYPE_CLASS = "com.corrodinggames.rts.game.units.as";
+    /** Holds the by-name unit-type lookup. */
+    private static final String TYPE_REGISTRY_CLASS = "com.corrodinggames.rts.game.units.ar";
 
     /** Static master entity list on the entity base class; holds units and trees alike. */
     private static final String ENTITY_LIST = "bE";
@@ -52,6 +56,15 @@ final class Orders {
     private static final String LOCAL_TEAM = "bs";
     /** The engine's CommandController instance. */
     private static final String CONTROLLER = "cf";
+
+    /**
+     * Build-action selector meaning "any action that builds this type".
+     *
+     * <p>The engine's match is {@code selector == -1 || selector == action.t()},
+     * so -1 is the only value that does not require knowing a builder's internal
+     * action ordering.
+     */
+    static final int ANY_BUILD_ACTION = -1;
 
     private Orders() {
     }
@@ -226,6 +239,94 @@ final class Orders {
     }
 
     /**
+     * Orders one builder to place a building of a named type at a world position.
+     *
+     * <p>Building is not a special action. The special-action vocabulary is
+     * unit abilities -- reclaim, repair, patrol, launchNuke, upgradeT2 -- and
+     * carries nothing for construction. Placement instead rides the same
+     * waypoint slot a move order uses, in a different target mode: the setter
+     * takes a position, a unit type and a build-action selector, and the
+     * interpreter routes on the target kind.
+     *
+     * <p>The selector is passed as {@link #ANY_BUILD_ACTION}. A builder holds a
+     * list of build actions, and the engine matches one by type <em>and</em> by
+     * selector unless the selector is -1, which means "any action that builds
+     * this type". Passing 0 asks for the action whose own index is 0 and
+     * silently matches nothing when it is not; the order is then dropped by
+     * waypoint validation with no visible effect.
+     *
+     * <p>Must be called on the game thread; see {@link #onGameThread}.
+     *
+     * @param engine The live engine instance.
+     * @param builder The unit that will construct it.
+     * @param typeName Unit-type name as it appears in the type registry, e.g.
+     *     {@code "landFactory"}.
+     * @param x Placement world x.
+     * @param y Placement world y.
+     * @throws IllegalStateException When the type name is unknown, or a pinned
+     *     name is absent.
+     */
+    static void buildAt(Object engine, Object builder, String typeName, float x, float y) {
+        Object team = readField(engine, LOCAL_TEAM);
+        if (team == null) {
+            throw new IllegalStateException("rw-agent: engine has no current player to build for");
+        }
+        Object controller = readField(engine, CONTROLLER);
+        if (controller == null) {
+            throw new IllegalStateException("rw-agent: engine has no CommandController yet");
+        }
+
+        Object type = resolveType(typeName);
+        if (type == null) {
+            throw new IllegalStateException(
+                    "rw-agent: no unit type named '" + typeName + "' in the registry" + PIN);
+        }
+
+        Method create = pinnedMethod(controller.getClass(), "a", pinnedClass(TEAM_CLASS));
+        Object command = invoke(create, controller, team);
+        if (command == null) {
+            throw new IllegalStateException("rw-agent: CommandController returned no command");
+        }
+
+        Method addUnit = pinnedMethod(command.getClass(), "a", pinnedClass(ORDERABLE_CLASS));
+        invoke(addUnit, command, builder);
+
+        Method place =
+                pinnedMethod(
+                        command.getClass(),
+                        "a",
+                        float.class,
+                        float.class,
+                        pinnedClass(TYPE_CLASS),
+                        int.class);
+        invoke(
+                place,
+                command,
+                Float.valueOf(x),
+                Float.valueOf(y),
+                type,
+                Integer.valueOf(ANY_BUILD_ACTION));
+    }
+
+    /**
+     * Resolves a unit type by name through the engine's own registry.
+     *
+     * <p>The registry lookup tries mod-defined types, then a built-in enum, then
+     * mod aliases. The built-in enum arm can never match: its constants are
+     * obfuscated to single letters and it compares against
+     * {@code Enum.name()}. Every name that resolves therefore resolves through
+     * the {@code .ini}-defined registry, which is also where the built-in units
+     * live.
+     *
+     * @param typeName Registry name, e.g. {@code "extractorT1"}.
+     * @return The unit type, or null when no type carries that name.
+     */
+    static Object resolveType(String typeName) {
+        Method lookup = pinnedMethod(pinnedClass(TYPE_REGISTRY_CLASS), "a", String.class);
+        return invoke(lookup, null, typeName);
+    }
+
+    /**
      * Reads an entity's world position.
      *
      * @param entity The entity to read.
@@ -268,6 +369,8 @@ final class Orders {
         Class<?> command = checkClass(COMMAND_CLASS, problems);
         Class<?> controller = checkClass(CONTROLLER_CLASS, problems);
         Class<?> scripts = checkClass(SCRIPTS_CLASS, problems);
+        Class<?> type = checkClass(TYPE_CLASS, problems);
+        Class<?> registry = checkClass(TYPE_REGISTRY_CLASS, problems);
         checkClass(TREE_CLASS, problems);
 
         if (entity != null) {
@@ -286,6 +389,12 @@ final class Orders {
         if (scripts != null) {
             checkMethod(scripts, "getInstance", problems);
             checkMethod(scripts, "addRunnableToQueue", problems, Runnable.class);
+        }
+        if (registry != null) {
+            checkMethod(registry, "a", problems, String.class);
+        }
+        if (command != null && type != null) {
+            checkMethod(command, "a", problems, float.class, float.class, type, int.class);
         }
         return problems;
     }
@@ -359,6 +468,23 @@ final class Orders {
             return pinnedField(target.getClass(), name).get(target);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException("rw-agent: cannot read " + name + PIN, e);
+        }
+    }
+
+    /**
+     * Reads an {@code int} field through the same pinned-name machinery as
+     * every other engine read, so a moved name fails identically here.
+     *
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not an int.
+     */
+    static int readIntField(Object target, String name) {
+        try {
+            return pinnedField(target.getClass(), name).getInt(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read int " + name + PIN, e);
         }
     }
 

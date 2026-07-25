@@ -6,7 +6,7 @@ Each ``require_*`` helper narrows exactly one field and raises
 :class:`DecodeError` with a traceable code when the field is absent or the
 wrong type.
 
-The payload type is spelled out as ``Mapping[str, str | int | bool]`` at every
+The payload type is spelled out as ``Mapping[str, str | int | float | bool]`` at every
 call site rather than hidden behind an alias: every payload this package
 decodes is flat and scalar, so the precise union is both accurate and
 checkable. A nested payload would need its own decoder rather than a widening
@@ -29,6 +29,7 @@ _WRONG_TYPE = "RW-DECODE-002"
 _EMPTY_STR = "RW-DECODE-003"
 _NOT_POSITIVE = "RW-DECODE-004"
 _NOT_ABSOLUTE = "RW-DECODE-005"
+_NOT_FINITE = "RW-DECODE-006"
 
 
 class DecodeError(RwBotError):
@@ -40,7 +41,9 @@ class DecodeError(RwBotError):
     """
 
 
-def _fetch(payload: Mapping[str, str | int | bool], field: str) -> str | int | bool:
+def _fetch(
+    payload: Mapping[str, str | int | float | bool], field: str
+) -> str | int | float | bool:
     """Return one field from a payload, or raise if it is absent.
 
     Args:
@@ -58,7 +61,7 @@ def _fetch(payload: Mapping[str, str | int | bool], field: str) -> str | int | b
     return payload[field]
 
 
-def require_str(payload: Mapping[str, str | int | bool], field: str) -> str:
+def require_str(payload: Mapping[str, str | int | float | bool], field: str) -> str:
     """Narrow one field to ``str``.
 
     Args:
@@ -78,7 +81,7 @@ def require_str(payload: Mapping[str, str | int | bool], field: str) -> str:
     return value
 
 
-def require_non_empty_str(payload: Mapping[str, str | int | bool], field: str) -> str:
+def require_non_empty_str(payload: Mapping[str, str | int | float | bool], field: str) -> str:
     """Narrow one field to a ``str`` with at least one non-whitespace character.
 
     Args:
@@ -98,7 +101,7 @@ def require_non_empty_str(payload: Mapping[str, str | int | bool], field: str) -
     return value
 
 
-def require_absolute_path(payload: Mapping[str, str | int | bool], field: str) -> str:
+def require_absolute_path(payload: Mapping[str, str | int | float | bool], field: str) -> str:
     """Narrow one field to a non-blank absolute Windows path.
 
     Absoluteness is a correctness requirement here rather than a style
@@ -137,7 +140,7 @@ def require_absolute_path(payload: Mapping[str, str | int | bool], field: str) -
     return value
 
 
-def require_int(payload: Mapping[str, str | int | bool], field: str) -> int:
+def require_int(payload: Mapping[str, str | int | float | bool], field: str) -> int:
     """Narrow one field to ``int``.
 
     ``bool`` is rejected even though it subclasses ``int``: a boolean arriving
@@ -160,7 +163,7 @@ def require_int(payload: Mapping[str, str | int | bool], field: str) -> int:
     return value
 
 
-def require_positive_int(payload: Mapping[str, str | int | bool], field: str) -> int:
+def require_positive_int(payload: Mapping[str, str | int | float | bool], field: str) -> int:
     """Narrow one field to an ``int`` greater than zero.
 
     Args:
@@ -180,7 +183,7 @@ def require_positive_int(payload: Mapping[str, str | int | bool], field: str) ->
     return value
 
 
-def require_bool(payload: Mapping[str, str | int | bool], field: str) -> bool:
+def require_bool(payload: Mapping[str, str | int | float | bool], field: str) -> bool:
     """Narrow one field to ``bool``.
 
     Args:
