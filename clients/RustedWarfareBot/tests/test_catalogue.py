@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from rw_bot.mechanics.catalogue import CatalogueError, Weapon, decode_catalogue
+from rw_bot.wire.state import decode_samples
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CATALOGUE = _PROJECT_ROOT / "wiki" / "sources" / "m0-probe" / "printunits.log"
@@ -120,11 +121,36 @@ def test_armed_and_unarmed_units_partition_the_catalogue() -> None:
     assert len(units) - len(armed) == 29
 
 
-def test_the_live_roster_types_are_all_priced_by_the_catalogue() -> None:
-    """The catalogue must answer for what the world stream actually reports."""
-    units = {u["type_name"]: u for u in decode_catalogue(_catalogue_lines())}
-    assert units["commandCenter"]["price"] > 0
-    assert units["builder"]["price"] > 0
+def test_every_live_roster_type_is_checked_against_the_catalogue() -> None:
+    """The join key is only useful where it actually joins, so this asserts the
+    real intersection rather than a hand-picked pair.
+
+    ``editorOrBuilder`` appears in the world stream and has no catalogue entry:
+    it is the map editor's placeholder, not a buildable unit. Recording it as a
+    known exception is the point -- an earlier version of this test named itself
+    "all priced" while checking two types, and that is what let the claim that
+    the catalogue prices everything the stream reports survive.
+    """
+    catalogue = {u["type_name"]: u for u in decode_catalogue(_catalogue_lines())}
+    samples = decode_samples(
+        (_PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    live = {e["type_name"] for s in samples for e in s["entities"]}
+    assert live, "the archived capture carries a roster"
+
+    unpriced = sorted(t for t in live if t not in catalogue)
+    assert unpriced == ["editorOrBuilder"]
+    for type_name in live - set(unpriced):
+        assert catalogue[type_name]["price"] > 0
+
+
+def test_the_catalogue_predicts_which_live_units_can_move() -> None:
+    """Verified live: see wiki/sources/m7-mobility/mobility-predicate.txt."""
+    catalogue = {u["type_name"]: u for u in decode_catalogue(_catalogue_lines())}
+    assert catalogue["commandCenter"]["speed"] == 0.0
+    assert catalogue["builder"]["speed"] > 0.0
 
 
 def test_multi_barrel_damage_keeps_per_shot_and_volley_apart() -> None:
