@@ -159,6 +159,99 @@ class AlertEventV1(TypedDict):
     triggered_at: str
 
 
+DlqEventType = Literal["covenant.dlq.v1"]
+
+# Why a message could not be processed. Specific rather than one generic
+# "error", so a consumer of the dead-letter topic can triage without parsing
+# free text.
+DlqReason = Literal[
+    "undecodable_payload",
+    "unknown_deal",
+]
+
+
+class DlqEventV1(TypedDict):
+    """A measurement that could not be processed, with why.
+
+    Carries the original payload verbatim so the message can be inspected or
+    replayed after the cause is fixed. Publishing this is what allows the
+    consumer to advance past a message it cannot handle; without it the same
+    message is redelivered forever.
+
+    Fields:
+        type: Event type discriminator.
+        event_id: UUID for this dead-letter record.
+        reason: Machine-readable cause.
+        detail: Human-readable explanation, including the originating message.
+        source_topic: Topic the original message came from.
+        source_partition: Partition of the original message.
+        source_offset: Offset of the original message.
+        payload: Original message payload, decoded as UTF-8 with replacement
+            for any invalid bytes so the envelope is always serialisable.
+        failed_at: ISO datetime when the failure was recorded.
+    """
+
+    type: DlqEventType
+    event_id: str
+    reason: DlqReason
+    detail: str
+    source_topic: str
+    source_partition: int
+    source_offset: int
+    payload: str
+    failed_at: str
+
+
+def make_dlq_event(
+    event_id: str,
+    reason: DlqReason,
+    detail: str,
+    source_topic: str,
+    source_partition: int,
+    source_offset: int,
+    payload: str,
+    failed_at: str,
+) -> DlqEventV1:
+    """Build a dead-letter event.
+
+    Args:
+        event_id: UUID for this dead-letter record.
+        reason: Machine-readable cause.
+        detail: Human-readable explanation.
+        source_topic: Topic the original message came from.
+        source_partition: Partition of the original message.
+        source_offset: Offset of the original message.
+        payload: Original message payload as text.
+        failed_at: ISO datetime when the failure was recorded.
+
+    Returns:
+        A populated DlqEventV1.
+    """
+    return {
+        "type": "covenant.dlq.v1",
+        "event_id": event_id,
+        "reason": reason,
+        "detail": detail,
+        "source_topic": source_topic,
+        "source_partition": source_partition,
+        "source_offset": source_offset,
+        "payload": payload,
+        "failed_at": failed_at,
+    }
+
+
+def encode_dlq_event(event: DlqEventV1) -> str:
+    """Serialize a dead-letter event to JSON string.
+
+    Args:
+        event: DlqEventV1 to serialize.
+
+    Returns:
+        Compact JSON string.
+    """
+    return dump_json_str(event)
+
+
 # =============================================================================
 # Union Type for All Events
 # =============================================================================
@@ -696,6 +789,9 @@ __all__ = [
     "AlertEventV1",
     "AlertSeverity",
     "AlertType",
+    "DlqEventType",
+    "DlqEventV1",
+    "DlqReason",
     "EvaluationStatus",
     "KafkaEventType",
     "KafkaEventV1",
@@ -710,6 +806,7 @@ __all__ = [
     "decode_measurement_event",
     "decode_prediction_event",
     "encode_alert_event",
+    "encode_dlq_event",
     "encode_kafka_event",
     "encode_measurement_event",
     "encode_prediction_event",
@@ -717,6 +814,7 @@ __all__ = [
     "is_measurement_event",
     "is_prediction_event",
     "make_alert_event",
+    "make_dlq_event",
     "make_measurement_event",
     "make_prediction_event",
 ]

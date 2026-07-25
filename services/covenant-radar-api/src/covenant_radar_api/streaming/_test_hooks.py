@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import ModuleType
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 from ._test_hooks_model import (
     FakeMetricsSink,
@@ -120,6 +120,46 @@ class RawKafkaProducerProtocol(Protocol):
         ...
 
 
+class TopicPartitionOffset(TypedDict, total=True):
+    """A commit position for one topic partition.
+
+    Fields:
+        topic: Topic name.
+        partition: Partition number.
+        offset: Offset of the NEXT message to consume, i.e. one past the last
+            message that has been fully processed.
+    """
+
+    topic: str
+    partition: int
+    offset: int
+
+
+class RawTopicPartitionProtocol(Protocol):
+    """Protocol for a confluent_kafka.TopicPartition instance.
+
+    Opaque to this codebase: it is constructed and handed straight back to
+    confluent-kafka, so no attributes are read from it.
+    """
+
+
+class RawTopicPartitionConstructor(Protocol):
+    """Protocol for the confluent_kafka.TopicPartition constructor."""
+
+    def __call__(self, topic: str, partition: int, offset: int) -> RawTopicPartitionProtocol:
+        """Construct a TopicPartition.
+
+        Args:
+            topic: Topic name.
+            partition: Partition number.
+            offset: Offset to associate with the partition.
+
+        Returns:
+            A confluent-kafka TopicPartition.
+        """
+        ...
+
+
 class RawKafkaConsumerProtocol(Protocol):
     """Protocol for raw confluent-kafka Consumer."""
 
@@ -131,8 +171,18 @@ class RawKafkaConsumerProtocol(Protocol):
         """Poll for a message."""
         ...
 
-    def commit(self) -> None:
-        """Commit offsets."""
+    def commit(
+        self,
+        *,
+        offsets: list[RawTopicPartitionProtocol],
+        asynchronous: bool,
+    ) -> None:
+        """Commit the given offsets.
+
+        Args:
+            offsets: Explicit positions to commit.
+            asynchronous: Whether to return before the broker acknowledges.
+        """
         ...
 
     def close(self) -> None:
@@ -279,8 +329,16 @@ class KafkaConsumerProtocol(Protocol):
         """
         ...
 
-    def commit(self) -> None:
-        """Commit current offsets synchronously."""
+    def commit(self, offsets: tuple[TopicPartitionOffset, ...]) -> None:
+        """Commit the given positions synchronously.
+
+        Positions are explicit rather than implicit: an argument-less commit
+        would commit the consumed position on every assigned partition,
+        including messages that have been polled but not yet processed.
+
+        Args:
+            offsets: Positions to commit.
+        """
         ...
 
     def close(self) -> None:
@@ -520,9 +578,27 @@ class RealKafkaConsumer:
             return None
         return RealConsumedMessage(msg)
 
-    def commit(self) -> None:
-        """Commit current offsets."""
-        self._consumer.commit()
+    def commit(self, offsets: tuple[TopicPartitionOffset, ...]) -> None:
+        """Commit the given positions synchronously.
+
+        Args:
+            offsets: Positions to commit. An empty tuple is a no-op; librdkafka
+                rejects a commit carrying no partitions.
+        """
+        if len(offsets) == 0:
+            return
+        confluent_kafka = _get_confluent_kafka()
+        topic_partition: RawTopicPartitionConstructor = confluent_kafka.TopicPartition
+        raw_offsets: list[RawTopicPartitionProtocol] = []
+        for position in offsets:
+            raw_offsets.append(
+                topic_partition(
+                    position["topic"],
+                    position["partition"],
+                    position["offset"],
+                )
+            )
+        self._consumer.commit(offsets=raw_offsets, asynchronous=False)
 
     def close(self) -> None:
         """Close consumer."""
@@ -714,6 +790,7 @@ class FakeKafkaConsumer:
         self.subscribed_topics: tuple[str, ...] = ()
         self.message_queue: list[FakeConsumedMessage] = []
         self.commit_count = 0
+        self.committed_offsets: list[tuple[TopicPartitionOffset, ...]] = []
         self.closed = False
         self.poll_count = 0
         self._on_poll: Callable[[], None] | None = None
@@ -750,9 +827,14 @@ class FakeKafkaConsumer:
         """
         self._on_poll = callback
 
-    def commit(self) -> None:
-        """Increment commit counter."""
+    def commit(self, offsets: tuple[TopicPartitionOffset, ...]) -> None:
+        """Record the committed positions.
+
+        Args:
+            offsets: Positions the worker asked to commit.
+        """
         self.commit_count += 1
+        self.committed_offsets.append(offsets)
 
     def close(self) -> None:
         """Mark consumer as closed."""

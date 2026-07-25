@@ -32,6 +32,7 @@ from covenant_domain import (
     evaluate_all_covenants_for_period,
 )
 from covenant_domain.features import (
+    REQUIRED_CURRENT_METRICS,
     LoanFeatures,
     RiskTier,
     classify_risk_tier,
@@ -45,9 +46,11 @@ from covenant_persistence import (
     DealRepository,
     MeasurementRepository,
 )
+from platform_core.logging import get_logger
 
 from ..integrations.datadog.metrics import MetricsClient
-from .consumer import StreamingConsumer
+from ._test_hooks import TopicPartitionOffset
+from .consumer import ConsumedMeasurement, StreamingConsumer, UndecodableMessage
 from .producer import StreamingProducer
 from .schemas import (
     AlertEventV1,
@@ -57,8 +60,11 @@ from .schemas import (
     MeasurementEventV1,
     PredictionEventV1,
     make_alert_event,
+    make_dlq_event,
     make_prediction_event,
 )
+
+_log = get_logger(__name__)
 
 # =============================================================================
 # Configuration Types
@@ -70,7 +76,6 @@ class WorkerConfig(TypedDict, total=True):
 
     Fields:
         model_version: Version string for the ML model.
-        batch_size: Max messages to poll per iteration.
         poll_timeout_seconds: Kafka poll timeout.
         alert_threshold: Risk probability threshold for alerts (default 0.8).
         commit_interval: Number of messages between commits.
@@ -80,7 +85,6 @@ class WorkerConfig(TypedDict, total=True):
     """
 
     model_version: str
-    batch_size: int
     poll_timeout_seconds: float
     alert_threshold: float
     commit_interval: int
@@ -97,7 +101,6 @@ def make_default_worker_config() -> WorkerConfig:
     """
     return {
         "model_version": "v1.0.0",
-        "batch_size": 100,
         "poll_timeout_seconds": 1.0,
         "alert_threshold": 0.80,
         "commit_interval": 10,
@@ -148,11 +151,15 @@ class BufferedPeriod(TypedDict, total=True):
         metrics: Mapping of metric_name to metric_value.
         first_received_at: Timestamp when first metric arrived.
         message_count: Number of messages received.
+        offsets: Kafka positions of the messages held here, as
+            (topic, partition, offset). Retained so the worker can tell which
+            offsets are still unprocessed and must not be committed yet.
     """
 
     metrics: dict[str, float]
     first_received_at: float
     message_count: int
+    offsets: list[tuple[str, int, int]]
 
 
 def _make_buffer_key(event: MeasurementEventV1) -> tuple[str, str, str]:
@@ -382,6 +389,14 @@ class StreamingWorker:
         # Buffer: (deal_id, period_start, period_end) -> BufferedPeriod
         self._buffer: dict[tuple[str, str, str], BufferedPeriod] = {}
 
+        # Offsets polled but still sitting in _buffer, per (topic, partition).
+        # A position may only be committed once it has left this set.
+        self._pending_offsets: dict[tuple[str, int], set[int]] = {}
+
+        # Highest offset seen per (topic, partition), used to derive the commit
+        # position once nothing is pending for that partition.
+        self._highest_offset: dict[tuple[str, int], int] = {}
+
     @property
     def is_running(self) -> bool:
         """Check if worker is currently running."""
@@ -392,12 +407,13 @@ class StreamingWorker:
         """Get number of periods currently buffered."""
         return len(self._buffer)
 
-    def _add_to_buffer(self, event: MeasurementEventV1) -> None:
-        """Add a measurement to the buffer.
+    def _add_to_buffer(self, consumed: ConsumedMeasurement) -> None:
+        """Add a consumed measurement to the buffer and mark its offset pending.
 
         Args:
-            event: Measurement event from Kafka.
+            consumed: Measurement event plus the Kafka position it came from.
         """
+        event = consumed["event"]
         key = _make_buffer_key(event)
 
         if key not in self._buffer:
@@ -405,11 +421,106 @@ class StreamingWorker:
                 "metrics": {},
                 "first_received_at": time.monotonic(),
                 "message_count": 0,
+                "offsets": [],
             }
 
         buffered = self._buffer[key]
         buffered["metrics"][event["metric_name"]] = event["metric_value"]
         buffered["message_count"] += 1
+
+        topic = consumed["topic"]
+        partition = consumed["partition"]
+        offset = consumed["offset"]
+        buffered["offsets"].append((topic, partition, offset))
+
+        tp = (topic, partition)
+        pending = self._pending_offsets.get(tp)
+        if pending is None:
+            pending = set()
+            self._pending_offsets[tp] = pending
+        pending.add(offset)
+
+        highest = self._highest_offset.get(tp)
+        if highest is None or offset > highest:
+            self._highest_offset[tp] = offset
+
+    def _dead_letter_undecodable(self, message: UndecodableMessage) -> None:
+        """Publish an undecodable message to the dead-letter topic.
+
+        The offset is recorded as seen but never marked pending, so the commit
+        position advances past it once the surrounding messages are processed.
+        That is the whole point of the dead-letter topic: without a durable
+        copy there is nowhere safe to move the offset to, and the same message
+        is redelivered on every restart forever.
+
+        Args:
+            message: The message that could not be decoded.
+        """
+        topic = message["topic"]
+        partition = message["partition"]
+        offset = message["offset"]
+
+        self._producer.produce_dlq(
+            make_dlq_event(
+                event_id=_generate_event_id(),
+                reason="undecodable_payload",
+                detail=message["reason"],
+                source_topic=topic,
+                source_partition=partition,
+                source_offset=offset,
+                payload=message["payload"],
+                failed_at=_current_iso_timestamp(),
+            )
+        )
+
+        tp = (topic, partition)
+        highest = self._highest_offset.get(tp)
+        if highest is None or offset > highest:
+            self._highest_offset[tp] = offset
+
+        _log.warning(
+            "Dead-lettered undecodable message",
+            extra={
+                "topic": topic,
+                "partition": str(partition),
+                "offset": str(offset),
+                "reason": message["reason"],
+            },
+        )
+
+    def _release_offsets(self, buffered: BufferedPeriod) -> None:
+        """Mark a flushed period's offsets as no longer pending.
+
+        Args:
+            buffered: The period whose messages have been fully processed.
+        """
+        # Indexed directly, not .get(): every offset recorded on a period was
+        # put there by _add_to_buffer, which creates the partition's set first.
+        for topic, partition, offset in buffered["offsets"]:
+            self._pending_offsets[(topic, partition)].discard(offset)
+
+    def _commit_positions(self) -> tuple[TopicPartitionOffset, ...]:
+        """Compute the highest position safe to commit on each partition.
+
+        For a partition still holding buffered messages, the safe position is
+        the lowest pending offset: everything below it has been processed, that
+        message has not. With nothing pending, everything through the highest
+        offset seen is done, so the next position is one past it.
+
+        Returns:
+            One position per assigned partition, possibly empty.
+        """
+        positions: list[TopicPartitionOffset] = []
+        for tp, highest in self._highest_offset.items():
+            pending = self._pending_offsets.get(tp)
+            safe = min(pending) if pending else highest + 1
+            position: TopicPartitionOffset = {
+                "topic": tp[0],
+                "partition": tp[1],
+                "offset": safe,
+            }
+            positions.append(position)
+        return tuple(positions)
 
     def _should_process_buffer(self, key: tuple[str, str, str]) -> bool:
         """Check if a buffered period should be processed.
@@ -447,6 +558,54 @@ class StreamingWorker:
             if self._should_process_buffer(key):
                 ready.append(key)
         return ready
+
+    def _missing_required_metrics(self, buffered: BufferedPeriod) -> tuple[str, ...]:
+        """Report which feature-extraction metrics a period still lacks.
+
+        min_metrics_per_period governs when a period is *considered*, which is
+        not the same as having everything extract_features reads. Checking the
+        published contract up front keeps a partial period from reaching
+        feature extraction and raising KeyError out of the run loop.
+
+        Args:
+            buffered: The buffered period to inspect.
+
+        Returns:
+            The missing metric names, empty if the period is complete.
+        """
+        present = buffered["metrics"].keys()
+        return tuple(name for name in REQUIRED_CURRENT_METRICS if name not in present)
+
+    def _discard_incomplete_period(
+        self,
+        key: tuple[str, str, str],
+        buffered: BufferedPeriod,
+        missing: tuple[str, ...],
+    ) -> None:
+        """Drop a period that can never produce a prediction, and say so.
+
+        A period only reaches here once it has timed out, so the measurements it
+        is missing are not going to arrive. Its offsets are released rather than
+        left pending, otherwise the same incomplete period would be replayed on
+        every restart and block the partition's commit position forever.
+
+        Args:
+            key: Buffer key (deal_id, period_start, period_end).
+            buffered: The period being discarded.
+            missing: Metric names that never arrived.
+        """
+        deal_id, period_start, period_end = key
+        _log.warning(
+            "Discarding incomplete period; required metrics never arrived",
+            extra={
+                "deal_id": deal_id,
+                "period_start": period_start,
+                "period_end": period_end,
+                "missing_metrics": ",".join(missing),
+                "metrics_received": ",".join(sorted(buffered["metrics"].keys())),
+            },
+        )
+        self._release_offsets(buffered)
 
     def _load_deal(self, deal_id: str) -> Deal:
         """Load deal from repository.
@@ -509,10 +668,11 @@ class StreamingWorker:
 
         Args:
             deal_id: Deal identifier.
-            periods_back: Number of historical periods to load.
+            periods_back: Number of most-recent periods to keep.
 
         Returns:
-            Dict mapping period_end to metrics dict.
+            Dict mapping period_end to metrics dict, holding at most
+            `periods_back` periods.
         """
         deal_id_typed = DealId(value=deal_id)
         measurements = self._measurement_repo.list_for_deal(deal_id_typed)
@@ -523,7 +683,11 @@ class StreamingWorker:
             period_key = m["period_end_iso"]
             by_period[period_key][m["metric_name"]] = m["metric_value_scaled"]
 
-        return dict(by_period)
+        # Honour periods_back. _build_features reads only the most recent
+        # period and the fourth most recent, so retaining everything grew the
+        # returned mapping with the deal's whole history for no benefit.
+        newest_first = sorted(by_period.keys(), reverse=True)[:periods_back]
+        return {period: by_period[period] for period in newest_first}
 
     def _build_features(
         self,
@@ -763,6 +927,11 @@ class StreamingWorker:
             deal_id, period_start, period_end = key
             buffered = self._buffer.pop(key)
 
+            missing = self._missing_required_metrics(buffered)
+            if len(missing) > 0:
+                self._discard_incomplete_period(key, buffered, missing)
+                continue
+
             result = self.process_buffered_period(
                 deal_id=deal_id,
                 period_start=period_start,
@@ -777,6 +946,8 @@ class StreamingWorker:
             if result["alert"] is not None:
                 self._producer.produce_alert(result["alert"])
 
+            # Only now may these offsets be committed.
+            self._release_offsets(buffered)
             processed += 1
 
         # Poll producer for delivery callbacks
@@ -792,26 +963,33 @@ class StreamingWorker:
             Tuple of (messages_consumed, periods_processed).
         """
         # Poll for new messages
-        consumed = self._consumer.poll(self._config["poll_timeout_seconds"])
+        polled = self._consumer.poll(self._config["poll_timeout_seconds"])
 
         messages_consumed = 0
-        if consumed is not None:
-            event = consumed["event"]
-
-            # Emit measurement received metric
-            self._metrics.increment_measurement_received(event["deal_id"], event["metric_name"])
-
-            # Add to buffer
-            self._add_to_buffer(event)
+        if polled is not None:
             messages_consumed = 1
             self._messages_since_commit += 1
+            if polled["kind"] == "measurement":
+                consumed: ConsumedMeasurement = polled
+                event = consumed["event"]
+
+                # Emit measurement received metric
+                self._metrics.increment_measurement_received(event["deal_id"], event["metric_name"])
+
+                # Add to buffer
+                self._add_to_buffer(consumed)
+            else:
+                undecodable: UndecodableMessage = polled
+                self._dead_letter_undecodable(undecodable)
 
         # Process ready buffers
         periods_processed = self._process_ready_buffers()
 
-        # Commit periodically
+        # Commit periodically. The positions exclude anything still buffered,
+        # so a crash after this point replays unprocessed messages rather than
+        # dropping them.
         if self._messages_since_commit >= self._config["commit_interval"]:
-            self._consumer.commit()
+            self._consumer.commit(self._commit_positions())
             self._messages_since_commit = 0
 
         return messages_consumed, periods_processed
@@ -842,11 +1020,22 @@ class StreamingWorker:
 
         return total_messages, total_periods
 
+    def request_stop(self) -> None:
+        """Ask the run loop to stop after the current iteration.
+
+        Safe to call from a signal handler: it only flips a flag, so no Kafka,
+        database or producer call is made at an arbitrary bytecode boundary in
+        the middle of run_once. Call shutdown() afterwards, once run() has
+        returned, to drain and close.
+        """
+        self._running = False
+
     def shutdown(self) -> None:
         """Graceful shutdown of the worker.
 
-        Processes any remaining buffered periods, commits offsets,
-        and flushes producer.
+        Processes any remaining buffered periods, flushes the producer, commits
+        the safe positions and closes the consumer. Must be called from the
+        main flow after run() returns, never from a signal handler.
 
         Raises:
             KeyError: If a deal does not exist during processing.
@@ -857,6 +1046,11 @@ class StreamingWorker:
         for key in list(self._buffer.keys()):
             deal_id, period_start, period_end = key
             buffered = self._buffer.pop(key)
+
+            missing = self._missing_required_metrics(buffered)
+            if len(missing) > 0:
+                self._discard_incomplete_period(key, buffered, missing)
+                continue
 
             result = self.process_buffered_period(
                 deal_id=deal_id,
@@ -869,14 +1063,18 @@ class StreamingWorker:
             if result["alert"] is not None:
                 self._producer.produce_alert(result["alert"])
 
-        # Commit any pending offsets
-        if self._messages_since_commit > 0:
-            self._consumer.commit()
+            self._release_offsets(buffered)
 
-        # Flush producer
+        # Flush before committing: a position must not be acknowledged until
+        # the events derived from it have actually reached the broker.
         self._producer.flush(timeout_seconds=10.0)
 
-        # Close consumer
+        self._consumer.commit(self._commit_positions())
+
+        # Cleared so a caller that resumes the loop after shutdown does not
+        # commit again on a closed consumer.
+        self._messages_since_commit = 0
+
         self._consumer.close()
 
 

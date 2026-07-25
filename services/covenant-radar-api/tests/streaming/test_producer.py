@@ -78,6 +78,7 @@ def _make_topics_config() -> KafkaTopicsConfig:
         "measurements": "test.measurements",
         "predictions": "test.predictions",
         "alerts": "test.alerts",
+        "dlq": "test.dlq",
     }
 
 
@@ -103,6 +104,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="pred-topic",
             alerts_topic="alert-topic",
+            dlq_topic="dlq-topic",
         )
         assert producer._producer is fake
         assert producer._predictions_topic == "pred-topic"
@@ -115,6 +117,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         event = make_prediction_event(
@@ -148,6 +151,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         event = make_alert_event(
@@ -176,6 +180,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         event = make_measurement_event(
@@ -203,6 +208,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         event = make_prediction_event(
@@ -233,6 +239,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         event = make_alert_event(
@@ -257,6 +264,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         assert fake.flush_called is False
@@ -273,6 +281,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         result = producer.flush()
@@ -287,6 +296,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         assert fake.poll_count == 0
@@ -303,6 +313,7 @@ class TestStreamingProducer:
             producer=fake,
             predictions_topic="test.predictions",
             alerts_topic="test.alerts",
+            dlq_topic="dlq-topic",
         )
 
         result = producer.poll()
@@ -342,6 +353,7 @@ class TestCreateProducerFromParts:
             producer_config=_make_producer_config(),
             predictions_topic="custom.predictions",
             alerts_topic="custom.alerts",
+            dlq_topic="dlq-topic",
         )
 
         # Verify producer has expected attributes (StreamingProducer-specific)

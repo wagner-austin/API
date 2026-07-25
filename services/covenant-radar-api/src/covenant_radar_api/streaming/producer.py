@@ -14,9 +14,11 @@ from ._test_hooks import KafkaProducerProtocol
 from .config import ConfluentConfig, ProducerConfig, StreamingConfig
 from .schemas import (
     AlertEventV1,
+    DlqEventV1,
     KafkaEventV1,
     PredictionEventV1,
     encode_alert_event,
+    encode_dlq_event,
     encode_kafka_event,
     encode_prediction_event,
 )
@@ -36,6 +38,7 @@ class StreamingProducer:
         producer: KafkaProducerProtocol,
         predictions_topic: str,
         alerts_topic: str,
+        dlq_topic: str,
     ) -> None:
         """Initialize streaming producer.
 
@@ -43,10 +46,12 @@ class StreamingProducer:
             producer: Underlying Kafka producer.
             predictions_topic: Topic name for prediction events.
             alerts_topic: Topic name for alert events.
+            dlq_topic: Topic name for dead-lettered messages.
         """
         self._producer = producer
         self._predictions_topic = predictions_topic
         self._alerts_topic = alerts_topic
+        self._dlq_topic = dlq_topic
 
     def produce_prediction(self, event: PredictionEventV1) -> None:
         """Produce a prediction event.
@@ -78,6 +83,23 @@ class StreamingProducer:
         key = event["deal_id"].encode("utf-8")
         self._producer.produce(
             topic=self._alerts_topic,
+            value=value,
+            key=key,
+        )
+
+    def produce_dlq(self, event: DlqEventV1) -> None:
+        """Produce a dead-letter event.
+
+        Keyed by source topic-partition rather than deal_id, because a
+        dead-lettered message may be one whose deal could not be identified.
+
+        Args:
+            event: Dead-letter event to publish.
+        """
+        value = encode_dlq_event(event).encode("utf-8")
+        key = f"{event['source_topic']}:{event['source_partition']}".encode()
+        self._producer.produce(
+            topic=self._dlq_topic,
             value=value,
             key=key,
         )
@@ -149,6 +171,7 @@ def create_streaming_producer(
         producer=producer,
         predictions_topic=config["topics"]["predictions"],
         alerts_topic=config["topics"]["alerts"],
+        dlq_topic=config["topics"]["dlq"],
     )
 
 
@@ -157,6 +180,7 @@ def create_producer_from_parts(
     producer_config: ProducerConfig,
     predictions_topic: str,
     alerts_topic: str,
+    dlq_topic: str,
 ) -> StreamingProducer:
     """Create a streaming producer from individual config parts.
 
@@ -167,6 +191,7 @@ def create_producer_from_parts(
         producer_config: Producer-specific settings.
         predictions_topic: Topic name for predictions.
         alerts_topic: Topic name for alerts.
+        dlq_topic: Topic name for dead-lettered messages.
 
     Returns:
         Configured StreamingProducer instance.
@@ -176,6 +201,7 @@ def create_producer_from_parts(
         producer=producer,
         predictions_topic=predictions_topic,
         alerts_topic=alerts_topic,
+        dlq_topic=dlq_topic,
     )
 
 

@@ -29,7 +29,6 @@ class TestMakeDefaultWorkerConfig:
         config = make_default_worker_config()
 
         assert config["model_version"] == "v1.0.0"
-        assert config["batch_size"] == 100
         assert config["poll_timeout_seconds"] == 1.0
         assert config["alert_threshold"] == 0.80
         assert config["commit_interval"] == 10

@@ -6,6 +6,7 @@ from typing import TypeVar
 
 from covenant_radar_api.streaming._test_hooks import (
     FakeKafkaConsumer,
+    TopicPartitionOffset,
     get_fake_consumer,
     use_fake_kafka,
 )
@@ -17,7 +18,9 @@ from covenant_radar_api.streaming.config import (
     StreamingConfig,
 )
 from covenant_radar_api.streaming.consumer import (
+    ConsumedMeasurement,
     StreamingConsumer,
+    UndecodableMessage,
     create_consumer_from_parts,
     create_streaming_consumer,
 )
@@ -31,6 +34,27 @@ def _require(value: _T | None) -> _T:
     if value is None:
         msg = "Expected non-None value"
         raise AssertionError(msg)
+    return value
+
+
+def _require_measurement(
+    value: ConsumedMeasurement | UndecodableMessage | None,
+) -> ConsumedMeasurement:
+    """Narrow a poll result to a decoded measurement.
+
+    Args:
+        value: Result of StreamingConsumer.poll.
+
+    Returns:
+        The decoded measurement.
+
+    Raises:
+        AssertionError: If nothing was polled, or the payload was undecodable.
+    """
+    if value is None:
+        raise AssertionError("Expected a polled message, got None")
+    if value["kind"] != "measurement":
+        raise AssertionError(f"Expected a decoded measurement, got {value['kind']}")
     return value
 
 
@@ -74,6 +98,7 @@ def _make_topics_config() -> KafkaTopicsConfig:
         "measurements": "test.measurements",
         "predictions": "test.predictions",
         "alerts": "test.alerts",
+        "dlq": "test.dlq",
     }
 
 
@@ -181,7 +206,7 @@ class TestStreamingConsumer:
             measurements_topic="test.measurements",
         )
 
-        result = _require(consumer.poll(1.0))
+        result = _require_measurement(consumer.poll(1.0))
 
         assert result["event"]["event_id"] == "evt-123"
         assert result["event"]["deal_id"] == "deal-456"
@@ -220,7 +245,7 @@ class TestStreamingConsumer:
         assert consumer.is_subscribed is True
 
         # Poll should skip subscribe and directly poll
-        result = _require(consumer.poll(1.0))
+        result = _require_measurement(consumer.poll(1.0))
 
         assert result["event"]["event_id"] == "evt-pre"
         assert consumer.is_subscribed is True
@@ -241,7 +266,7 @@ class TestStreamingConsumer:
             measurements_topic="test.measurements",
         )
 
-        result = _require(consumer.poll(1.0))
+        result = _require_measurement(consumer.poll(1.0))
 
         assert result["key"] is None
 
@@ -320,9 +345,15 @@ class TestStreamingConsumer:
 
         assert fake.commit_count == 0
 
-        consumer.commit()
+        position: TopicPartitionOffset = {
+            "topic": "test.measurements",
+            "partition": 0,
+            "offset": 12,
+        }
+        consumer.commit((position,))
 
         assert fake.commit_count == 1
+        assert fake.committed_offsets == [(position,)]
 
     def test_commit_multiple(self) -> None:
         """Multiple commits increment counter."""
@@ -332,9 +363,14 @@ class TestStreamingConsumer:
             measurements_topic="test.measurements",
         )
 
-        consumer.commit()
-        consumer.commit()
-        consumer.commit()
+        position: TopicPartitionOffset = {
+            "topic": "test.measurements",
+            "partition": 0,
+            "offset": 1,
+        }
+        consumer.commit((position,))
+        consumer.commit((position,))
+        consumer.commit((position,))
 
         assert fake.commit_count == 3
 

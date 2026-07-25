@@ -327,14 +327,15 @@ def _run_worker(
     Returns:
         Exit code (0 = success).
     """
-    # Set up signal handlers for graceful shutdown
-    shutdown_requested = False
 
+    # The handler only requests a stop. Draining from inside a signal handler
+    # would run Kafka, database and producer calls at an arbitrary bytecode
+    # boundary inside run_once, and leave the resumed main thread committing on
+    # an already-closed consumer.
     def handle_signal(signum: int, frame: FrameType | None) -> None:
-        nonlocal shutdown_requested
-        shutdown_requested = True
+        del signum, frame
         logger.info("Shutdown signal received, stopping worker...")
-        worker.shutdown()
+        worker.request_stop()
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
@@ -342,6 +343,11 @@ def _run_worker(
     logger.info("Starting streaming worker...")
 
     total_messages, total_periods = worker.run()
+
+    # Drain, flush, commit and close on the main flow, after the loop has
+    # exited of its own accord.
+    worker.shutdown()
+
     logger.info(
         "Worker stopped",
         extra={

@@ -66,11 +66,15 @@ class KafkaTopicsConfig(TypedDict):
         measurements: Input topic for measurement events.
         predictions: Output topic for prediction events.
         alerts: Output topic for high-severity alert events.
+        dlq: Dead-letter topic for messages that cannot be processed. Without
+            it a single undecodable message is replayed forever, because its
+            offset can never be advanced past.
     """
 
     measurements: str
     predictions: str
     alerts: str
+    dlq: str
 
 
 # =============================================================================
@@ -273,6 +277,7 @@ def load_streaming_config() -> StreamingConfig:
         "measurements": _parse_str("KAFKA__TOPIC_MEASUREMENTS", "covenant.measurements.v1"),
         "predictions": _parse_str("KAFKA__TOPIC_PREDICTIONS", "covenant.predictions.v1"),
         "alerts": _parse_str("KAFKA__TOPIC_ALERTS", "covenant.alerts.v1"),
+        "dlq": _parse_str("KAFKA__TOPIC_DLQ", "covenant.dlq.v1"),
     }
 
     # Parse consumer config

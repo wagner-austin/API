@@ -135,37 +135,37 @@ class TestUseRealHooks:
 
     def test_restores_perf_counter(self) -> None:
         """use_real_hooks restores perf_counter to real implementation."""
-        import covenant_radar_api.streaming._test_hooks_generic_worker as hooks
+        import covenant_radar_api.streaming._test_hooks_generic_worker as generic_worker_hooks
 
         # Override with a fake
-        hooks.perf_counter = lambda: 999.0
+        generic_worker_hooks.perf_counter = lambda: 999.0
 
         # Restore
         use_real_hooks()
 
         # Should be back to real implementation
-        assert hooks.perf_counter is _real_perf_counter
+        assert generic_worker_hooks.perf_counter is _real_perf_counter
 
     def test_restores_generate_uuid(self) -> None:
         """use_real_hooks restores generate_uuid to real implementation."""
-        import covenant_radar_api.streaming._test_hooks_generic_worker as hooks
+        import covenant_radar_api.streaming._test_hooks_generic_worker as generic_worker_hooks
 
         # Override with a fake
-        hooks.generate_uuid = lambda: "fake-uuid"
+        generic_worker_hooks.generate_uuid = lambda: "fake-uuid"
 
         # Restore
         use_real_hooks()
 
-        assert hooks.generate_uuid is _real_generate_uuid
+        assert generic_worker_hooks.generate_uuid is _real_generate_uuid
 
     def test_restores_current_iso_timestamp(self) -> None:
         """use_real_hooks restores current_iso_timestamp to real implementation."""
-        import covenant_radar_api.streaming._test_hooks_generic_worker as hooks
+        import covenant_radar_api.streaming._test_hooks_generic_worker as generic_worker_hooks
 
         # Override with a fake
-        hooks.current_iso_timestamp = lambda: "fake-timestamp"
+        generic_worker_hooks.current_iso_timestamp = lambda: "fake-timestamp"
 
         # Restore
         use_real_hooks()
 
-        assert hooks.current_iso_timestamp is _real_current_iso_timestamp
+        assert generic_worker_hooks.current_iso_timestamp is _real_current_iso_timestamp

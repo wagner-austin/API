@@ -107,6 +107,7 @@ def _make_test_streaming_config(enabled: bool = True) -> StreamingConfig:
             "measurements": "test.measurements.v1",
             "predictions": "test.predictions.v1",
             "alerts": "test.alerts.v1",
+            "dlq": "test.dlq.v1",
         },
         "consumer": {
             "group_id": "test-group",
@@ -846,7 +847,9 @@ class TestCreateWorker:
 
         deps: StreamingWorkerDeps = {
             "consumer": StreamingConsumer(fake_consumer, "test.measurements.v1"),
-            "producer": StreamingProducer(fake_producer, "test.predictions.v1", "test.alerts.v1"),
+            "producer": StreamingProducer(
+                fake_producer, "test.predictions.v1", "test.alerts.v1", "test.dlq.v1"
+            ),
             "metrics": MetricsClient(FakeMetricsSink()),
             "model": FakePredictor(),
             "deal_repo": FakeDealRepository(),
@@ -894,7 +897,9 @@ class TestRunWorker:
 
         worker = StreamingWorker(
             consumer=StreamingConsumer(fake_consumer, "test.measurements.v1"),
-            producer=StreamingProducer(fake_producer, "test.predictions.v1", "test.alerts.v1"),
+            producer=StreamingProducer(
+                fake_producer, "test.predictions.v1", "test.alerts.v1", "test.dlq.v1"
+            ),
             metrics=MetricsClient(FakeMetricsSink()),
             model=FakePredictor(),
             deal_repo=FakeDealRepository(),
@@ -961,7 +966,9 @@ class TestMainHappyPath:
 
         deps: StreamingWorkerDeps = {
             "consumer": StreamingConsumer(fake_consumer, "test.measurements.v1"),
-            "producer": StreamingProducer(fake_producer, "test.predictions.v1", "test.alerts.v1"),
+            "producer": StreamingProducer(
+                fake_producer, "test.predictions.v1", "test.alerts.v1", "test.dlq.v1"
+            ),
             "metrics": MetricsClient(FakeMetricsSink()),
             "model": FakePredictor(),
             "deal_repo": FakeDealRepository(),

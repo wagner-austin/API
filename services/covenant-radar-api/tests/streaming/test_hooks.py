@@ -11,9 +11,12 @@ from covenant_radar_api.streaming._test_hooks import (
     KafkaErrorProtocol,
     ProducedMessage,
     RawKafkaMessageProtocol,
+    RawTopicPartitionConstructor,
+    RawTopicPartitionProtocol,
     RealConsumedMessage,
     RealKafkaConsumer,
     RealKafkaProducer,
+    TopicPartitionOffset,
     _get_confluent_kafka,
     _real_consumer_factory,
     _real_producer_factory,
@@ -225,14 +228,17 @@ class TestFakeKafkaConsumer:
         assert msg4 is None
 
     def test_commit(self) -> None:
-        """Commit increments counter."""
+        """Commit records the requested positions."""
         consumer = FakeKafkaConsumer()
         assert consumer.commit_count == 0
 
-        consumer.commit()
-        consumer.commit()
+        first: TopicPartitionOffset = {"topic": "t", "partition": 0, "offset": 5}
+        second: TopicPartitionOffset = {"topic": "t", "partition": 1, "offset": 9}
+        consumer.commit((first,))
+        consumer.commit((second,))
 
         assert consumer.commit_count == 2
+        assert consumer.committed_offsets == [(first,), (second,)]
 
     def test_close(self) -> None:
         """Close marks consumer as closed."""
@@ -650,9 +656,39 @@ class TestRealKafkaConsumerCommit:
             consumer_config=_make_consumer_config(),
         )
         consumer.subscribe(("test-topic",))
-        # Commit without having consumed - this is valid
-        consumer.commit()
+        # Committing no positions is a no-op: librdkafka rejects a commit that
+        # carries no partitions, so RealKafkaConsumer must not forward it.
+        consumer.commit(())
         consumer.close()
+
+    def test_commit_forwards_positions_as_topic_partitions(self) -> None:
+        """Positions are converted to confluent TopicPartitions and committed.
+
+        Exercises the real conversion against the real confluent_kafka
+        TopicPartition constructor, with only the raw consumer replaced.
+        """
+        fake_raw = _FakeRawConsumer()
+        consumer = RealKafkaConsumer(
+            confluent_config=_make_confluent_config(),
+            consumer_config=_make_consumer_config(),
+        )
+        consumer._consumer = fake_raw
+
+        first: TopicPartitionOffset = {"topic": "measurements", "partition": 0, "offset": 7}
+        second: TopicPartitionOffset = {"topic": "measurements", "partition": 3, "offset": 41}
+        consumer.commit((first, second))
+
+        assert len(fake_raw.committed) == 1
+        forwarded = fake_raw.committed[0]
+        assert len(forwarded) == 2
+
+        # Build a reference through the same Protocol-typed constructor rather
+        # than reading confluent_kafka.TopicPartition as an untyped attribute.
+        confluent_kafka = _get_confluent_kafka()
+        topic_partition: RawTopicPartitionConstructor = confluent_kafka.TopicPartition
+        reference = topic_partition("measurements", 0, 7)
+        assert type(forwarded[0]) is type(reference)
+        assert type(forwarded[1]) is type(reference)
 
 
 class _TestKafkaError:
@@ -679,6 +715,7 @@ class _FakeRawConsumer:
         """Initialize fake consumer."""
         self._messages: list[RawKafkaMessageProtocol | None] = []
         self._subscribed_topics: list[str] = []
+        self.committed: list[list[RawTopicPartitionProtocol]] = []
 
     def subscribe(self, topics: list[str]) -> None:
         """Subscribe to topics."""
@@ -690,8 +727,20 @@ class _FakeRawConsumer:
             return None
         return self._messages.pop(0)
 
-    def commit(self) -> None:
-        """Commit offsets."""
+    def commit(
+        self,
+        *,
+        offsets: list[RawTopicPartitionProtocol],
+        asynchronous: bool,
+    ) -> None:
+        """Record the committed offsets.
+
+        Args:
+            offsets: Positions handed to the consumer.
+            asynchronous: Whether the commit was requested asynchronously.
+        """
+        del asynchronous
+        self.committed.append(offsets)
 
     def close(self) -> None:
         """Close consumer."""

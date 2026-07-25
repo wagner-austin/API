@@ -134,7 +134,6 @@ def make_worker_config() -> WorkerConfig:
     """Create a test worker config."""
     return {
         "model_version": "test-v1",
-        "batch_size": 10,
         "poll_timeout_seconds": 0.1,
         "alert_threshold": 0.80,
         "commit_interval": 5,
@@ -162,7 +161,7 @@ def make_streaming_worker() -> tuple[
 
     # Wrap in high-level classes
     consumer = StreamingConsumer(fake_consumer, "measurements")
-    producer = StreamingProducer(fake_producer, "predictions", "alerts")
+    producer = StreamingProducer(fake_producer, "predictions", "alerts", "dlq")
 
     # Create fake metrics
     fake_sink = FakeMetricsSink()

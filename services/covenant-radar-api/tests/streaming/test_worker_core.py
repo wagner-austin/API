@@ -697,6 +697,7 @@ class TestStreamingWorkerEdgeCases:
             "metrics": dict(REQUIRED_METRICS),  # All 5 metrics
             "first_received_at": time.monotonic(),
             "message_count": 5,
+            "offsets": [],
         }
 
         # Verify buffer has data
@@ -738,11 +739,13 @@ class TestStreamingWorkerEdgeCases:
             "metrics": dict(REQUIRED_METRICS),
             "first_received_at": time.monotonic(),
             "message_count": 5,
+            "offsets": [],
         }
         worker._buffer[buffer_key_2] = {
             "metrics": dict(REQUIRED_METRICS),
             "first_received_at": time.monotonic(),
             "message_count": 5,
+            "offsets": [],
         }
 
         # Verify 2 buffers
