@@ -1090,6 +1090,24 @@ scripted harness could not. `sim/opponent.py` remains the default
 `make sim-run` (deterministic kill path); practice mode is the
 fidelity soak.[^2]
 
+**Hunt-only-when-full contract (2026-07-25):** the practice-room
+soak's 21-round gang-up death was traced to the 2026-07-13
+cardinal-adjacent mode-selector override (never user-approved,
+shipped undocumented inside commit 89ab2715 — see the log
+post-mortem for the four-patch stack beneath it). User contract, now
+law in `bot/ai/mode_controller.py` + `ai_strategy.py`: HUNT is a
+privilege of a full tank — fuel ≥ `fuel_capacity(rank)`,
+duals+homings at `inventory_capacity(rank)`, radars ≥ cap−5 — with
+every bar rank-derived (the fixed `fuel_full_threshold` and resume
+thresholds are deleted from config). Mid-fight breaks disengage to
+COLLECT keeping the combat lock; `HUNT/ACQUIRE` returns to the
+locked target after the restock (damage persists, so the
+sortie-and-return cycle beats even a 3v1). Re-run proof:
+`make sim-run-practice` went from deactivated-in-21-rounds to 86
+rounds, kills on 510 + 511 + the scripted opponent, bot alive —
+session ends only when the sim world runs out of collectible
+equipment.[^2]
+
 **Round-resolution order wired in (2026-07-25):** the same-day
 measurement (`analysis_scripts/mine_round_order.py` — 1,820/1,825
 archive multi-shooter bursts fire in ascending shooter id; the only
