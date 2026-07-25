@@ -1,0 +1,16 @@
+        this.bY = new bg();
+        this.h("ModEngine");
+        this.bZ = new com.corrodinggames.rts.gameFramework.i.a();
+        this.bZ.a();
+        if (this.ee) {
+            this.bZ.g();
+        }
+        this.h("CommandController");
+        this.cf = new com.corrodinggames.rts.gameFramework.c();
+        this.h("GameSaver");
+        this.ca = new com.corrodinggames.rts.gameFramework.y();
+        this.h("ReplayEngine");
+        this.cb = new ba();
+        this.cb.a(context);
+        this.h("UnitGeoIndex");
+        this.cc = new com.corrodinggames.rts.game.units.f.c();

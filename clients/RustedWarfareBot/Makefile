@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump agent agent-selftest sandbox-probe
+.PHONY: help lint test check install boot-probe unit-dump agent agent-selftest sandbox-probe decompile
 
 help:
 	@Write-Host ""
@@ -27,6 +27,9 @@ help:
 	@Write-Host "Java agent:" -ForegroundColor Yellow
 	@Write-Host "  make agent                       compile + jar the javaagent"
 	@Write-Host "  make agent-selftest              patch the real jar, verify via the JVM verifier"
+	@Write-Host ""
+	@Write-Host "Static analysis:" -ForegroundColor Yellow
+	@Write-Host "  make decompile                   CFR the pinned jar into a readable tree (gitignored)"
 	@Write-Host ""
 
 install:
@@ -134,6 +137,35 @@ discover-probe: agent
 	New-Item -ItemType Directory -Force (Split-Path -Parent "$(DISCOVER_OUT)") | Out-Null
 	$$root = (Resolve-Path -LiteralPath ".").Path; $$agent = $$root + "\\$(AGENT_JAR)"; $$log = $$root + "\\$(DISCOVER_OUT)"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." "-javaagent:$$agent=discoverAtSeconds=$(DISCOVER_AT);exitAfterDiscovery=true" -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -sandbox -width 800 -height 600 -log $$log } finally { Pop-Location }
 	@Write-Host "[discover-probe] snapshots written to $(DISCOVER_OUT)" -ForegroundColor Green
+
+# Decompile the pinned jar into a readable source tree.
+#
+# Disassembly (javap) is ground truth but reads one method at a time, and
+# cross-referencing it by grep has already produced one false negative on this
+# codebase -- the real writer of the tick counter was missed because the
+# increment compiles against the subclass as a bare field name. A whole-jar
+# decompile answers "who calls this" and "what else writes this" directly.
+#
+# Output is DERIVED and gitignored. Anything a wiki page cites gets copied into
+# wiki/sources/ as an excerpt, the same discipline the javap artifacts follow.
+#
+# CFR is pinned by version: a decompiler is a heuristic, and an unpinned one
+# would silently change the source we reason about between runs.
+CFR_VERSION ?= 0.152
+CFR_JAR := .tools/cfr-$(CFR_VERSION).jar
+CFR_URL := https://repo1.maven.org/maven2/org/benf/cfr/$(CFR_VERSION)/cfr-$(CFR_VERSION).jar
+DECOMPILED ?= .decompiled
+
+decompile:
+	@Write-Host ""
+	@Write-Host "==> decompile (CFR $(CFR_VERSION) -> $(DECOMPILED))" -ForegroundColor Cyan
+	New-Item -ItemType Directory -Force ".tools" | Out-Null
+	if (-not (Test-Path "$(CFR_JAR)")) { Write-Host "  fetching $(CFR_URL)" -ForegroundColor DarkCyan; Invoke-WebRequest -Uri "$(CFR_URL)" -OutFile "$(CFR_JAR)" -UseBasicParsing }
+	if (Test-Path "$(DECOMPILED)") { Remove-Item -Recurse -Force "$(DECOMPILED)" }
+	& "$(JAVA)" -Xmx2g -jar "$(CFR_JAR)" "$(GAME_DIR)/game-lib.jar" --outputdir "$(DECOMPILED)" --comments false --silent true; if ($$LASTEXITCODE -ne 0) { Write-Host "[decompile] CFR failed" -ForegroundColor Red; exit $$LASTEXITCODE }
+	$$n = (Get-ChildItem "$(DECOMPILED)" -Recurse -Filter *.java | Measure-Object).Count; Write-Host "[decompile] $$n source files" -ForegroundColor Green
+	@Write-Host "  Reminder: decompiled Java is a RECONSTRUCTION. Pin load-bearing" -ForegroundColor DarkGray
+	@Write-Host "  claims to javap bytecode or observed runtime behaviour." -ForegroundColor DarkGray
 
 unit-dump:
 	@Write-Host ""

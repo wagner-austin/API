@@ -22,10 +22,15 @@ runs/
 agent/build/
 
 # Downloaded analysis tooling (CFR decompiler and friends). Binaries, fetched
-# on demand, and not ours to vendor. Decompiled output lands in runs/ above,
-# which is ignored for the separate reason that it is a derived work of a
-# commercial game and must never be committed.
+# on demand, and not ours to vendor.
 .tools/
+
+# Decompiler output, wherever it is written. A derived work of a commercial
+# game: regenerable in one command, and never committed. Both spellings are
+# listed because two of them have been used, and the cost of missing one is
+# 1,699 files of game source in the history.
+.decompiled/
+decompiled/
 
 # Python / tooling
 .venv/

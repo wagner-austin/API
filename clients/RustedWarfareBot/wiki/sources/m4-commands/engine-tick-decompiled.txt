@@ -1,0 +1,19 @@
+    public void a(float f2) {
+        Object object2;
+        int n2;
+        int n3;
+        if (this.ay() && f2 < 0.1f) {
+            com.corrodinggames.rts.gameFramework.j.ad.g("updateAllGame1: deltaSpeed:" + f2 + " frame:" + this.bx + " network.currentStepRate:" + this.bX.c());
+        }
+        if (this.bt != 1.0f && !this.bX.B && !this.cb.i()) {
+            f2 *= this.bt;
+        }
+        this.I = (f2 *= this.H) + 2.0f;
+        this.J = f2;
+        this.bX.c(f2);
+        this.by = (int)((float)this.by + f2 * 16.666666f);
+        this.cf.c();
+        this.cb.a(f2);
+        ++this.bx;
+        com.corrodinggames.rts.game.n.g(f2);
+        if (this.bL != null) {
