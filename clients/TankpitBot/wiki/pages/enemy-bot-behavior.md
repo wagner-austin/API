@@ -178,9 +178,11 @@ exceeds ~1 (mode 0.75–1.0 over 366 engagements — the deficit is the
 one-shot-per-tick cap plus flee/death truncation); and in 99.2% of
 397 engagements the bot's last shot lands within one tick of the
 last hit it took — zero chasing, zero continued fire.
-(`sim/bot_policy.py` models only personal return fire so far;
-sight-radius gang-up/assist under the same per-hit rule is the open
-sim-law candidate.)[^11][^12]
+(MODELED 2026-07-25: `sim/bot_policy.py::note_hit_for_team_aggro`
+implements the sight-gated per-hit reflex, and the `bot-return-fire`
+shadow law now judges all three classes — archive exactness rose
+from 94.6% to 97.6% (2,192/2,247) once the former "mismatches" were
+recognized as lawful team aggro.)[^11][^12]
 
 **The live witness of the assist side:** the fight
 had a third combatant — **blue-7 (id 524, the probe's own team)**

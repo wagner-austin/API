@@ -18,8 +18,8 @@ source_paths:
   - "src/tankpit_bot/validate"
 source_git_blobs:
   "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
-  "src/tankpit_bot/sim": "059c3f4d6a00385b3457a31a4521907b40867f56"
-  "src/tankpit_bot/validate": "e169542b1b78a0550f6f099ca76ce4ef22a860e5"
+  "src/tankpit_bot/sim": "6ebbc818b3a08a6a543d39d707a7557eba361879"
+  "src/tankpit_bot/validate": "d7f5c60b9d2048cab60968f95214be039f70e599"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [architecture]
@@ -1065,6 +1065,19 @@ clears; the `bot-reactivation` shadow law prices it at 39 samples /
 35 exact, PASS. Still uncertified: the teleport-off destination and
 the respawn placement DISTRIBUTION (both modeled as deterministic
 scatter, documented), and ranks ≥ 2 (no such bot in the archive).[^2]
+
+**Team aggro joined the model (2026-07-25):**
+`note_hit_for_team_aggro` implements the sight-gated per-hit reflex
+mined the day before ([[enemy-bot-behavior]] §Team aggro — 48
+gang-up + 81 assist archive shots, all within `AGGRO_SIGHT_RADIUS`
+= 8), and the `bot-return-fire` law was upgraded to judge all three
+reflex classes: archive exactness rose 94.6% → **97.6%
+(2,192/2,247)** as the former residual was recognized as lawful
+aggro. The law-test round also fixed a self-justification bug in
+the event walk (judgment now precedes hit recording). The model is
+NOT yet the live sim-run opponent — `sim/opponent.py` remains the
+deterministic soak harness by design; wiring roster bots driven by
+`decide_practice_bot` into sim sessions is the next as-built step.[^2]
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
