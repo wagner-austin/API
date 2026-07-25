@@ -15,4 +15,6 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Unit Catalogue and the Mobility Predicate](../pages/mechanics-unit-catalogue.md) -- what a unit costs and whether it can move at all, read rather than discovered by ordering
 [Issuing Orders](../pages/issuing-orders.md) -- the three-call command path, its threading rule, and the order that finally moved a unit
 
+[Command Channel](../pages/command-channel.md) -- orders originate in Python: one loopback socket, id-addressed units, and the backpressure rule that protects the tick
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

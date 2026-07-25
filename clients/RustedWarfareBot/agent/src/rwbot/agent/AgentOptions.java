@@ -20,6 +20,8 @@ final class AgentOptions {
     private static final String ORDER_BY = "orderMoveBy";
     private static final String ORDER_INDEX = "orderMoveUnitIndex";
     private static final String BUILD_TYPE = "buildType";
+    private static final String CHANNEL_PORT = "channelPort";
+    private static final String SAMPLE_MS = "sampleIntervalMs";
 
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
@@ -30,6 +32,8 @@ final class AgentOptions {
     private final float[] orderMoveBy;
     private final int orderMoveUnitIndex;
     private final String buildType;
+    private final int channelPort;
+    private final int sampleIntervalMs;
 
     private AgentOptions(
             int[] discoverAtSeconds,
@@ -40,7 +44,9 @@ final class AgentOptions {
             float[] orderMoveBy,
             int orderMoveUnitIndex,
             String buildType,
-            String stateOutPath) {
+            String stateOutPath,
+            int channelPort,
+            int sampleIntervalMs) {
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
         this.inspectFields = inspectFields;
@@ -50,6 +56,35 @@ final class AgentOptions {
         this.orderMoveUnitIndex = orderMoveUnitIndex;
         this.buildType = buildType;
         this.stateOutPath = stateOutPath;
+        this.channelPort = channelPort;
+        this.sampleIntervalMs = sampleIntervalMs;
+    }
+
+    /**
+     * Loopback port the planner connects to, or 0 when the channel is off.
+     *
+     * <p>Off by default. A probe run and a planner-driven run are different
+     * things, and opening a listening socket as a side effect of attaching the
+     * agent would make every discovery run also a server.
+     */
+    int channelPort() {
+        return channelPort;
+    }
+
+    /** True when a planner channel was requested. */
+    boolean channelRequested() {
+        return channelPort > 0;
+    }
+
+    /**
+     * Milliseconds between world samples pushed to the planner.
+     *
+     * <p>Defaults to 250 ms -- four decisions a second. An RTS does not need
+     * per-tick decisions, and the sampling rate is what keeps a cross-process
+     * planner viable (wiki: runtime-split-java-agent-python-brain).
+     */
+    int sampleIntervalMs() {
+        return sampleIntervalMs;
     }
 
     /**
@@ -173,7 +208,17 @@ final class AgentOptions {
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
             return new AgentOptions(
-                    new int[0], false, new String[0], "", 0, DEFAULT_MOVE_BY.clone(), 0, "", "");
+                    new int[0],
+                    false,
+                    new String[0],
+                    "",
+                    0,
+                    DEFAULT_MOVE_BY.clone(),
+                    0,
+                    "",
+                    "",
+                    0,
+                    DEFAULT_SAMPLE_MS);
         }
 
         int[] discoverAt = new int[0];
@@ -185,6 +230,8 @@ final class AgentOptions {
         float[] orderBy = DEFAULT_MOVE_BY.clone();
         int orderIndex = 0;
         String buildType = "";
+        int channelPort = 0;
+        int sampleIntervalMs = DEFAULT_SAMPLE_MS;
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -224,11 +271,16 @@ final class AgentOptions {
                     throw new IllegalArgumentException(BUILD_TYPE + " expects a unit-type name");
                 }
                 buildType = value;
+            } else if (CHANNEL_PORT.equals(key)) {
+                channelPort = parsePort(value);
+            } else if (SAMPLE_MS.equals(key)) {
+                sampleIntervalMs = parseInterval(value);
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
                                 + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
-                                + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE);
+                                + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
+                                + SAMPLE_MS);
             }
         }
         return new AgentOptions(
@@ -240,7 +292,9 @@ final class AgentOptions {
                 orderBy,
                 orderIndex,
                 buildType,
-                stateOut);
+                stateOut,
+                channelPort,
+                sampleIntervalMs);
     }
 
     /** Default move offset: far enough that arrival is unambiguous, in world units. */
@@ -256,6 +310,40 @@ final class AgentOptions {
         }
         if (parsed <= 0) {
             throw new IllegalArgumentException(ORDER_AT + " expects positive seconds, got " + parsed);
+        }
+        return parsed;
+    }
+
+    /** Default milliseconds between world samples: four decisions a second. */
+    private static final int DEFAULT_SAMPLE_MS = 250;
+
+    /** Parses a TCP port in the unprivileged range. */
+    private static int parsePort(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(CHANNEL_PORT + " expects a port, got " + value, e);
+        }
+        if (parsed < 1024 || parsed > 65535) {
+            throw new IllegalArgumentException(
+                    CHANNEL_PORT + " expects 1024-65535, got " + parsed);
+        }
+        return parsed;
+    }
+
+    /** Parses a positive sample interval in milliseconds. */
+    private static int parseInterval(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    SAMPLE_MS + " expects whole milliseconds, got " + value, e);
+        }
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(
+                    SAMPLE_MS + " expects a positive interval, got " + parsed);
         }
         return parsed;
     }

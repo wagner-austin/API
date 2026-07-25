@@ -44,6 +44,8 @@ public final class SelfTest {
         failures += checkDiscovery();
         failures += checkOrderBindings();
         failures += checkStateStream();
+        failures += checkCommandParsing();
+        failures += checkChannelBackpressure();
         failures += checkLogPrefixing();
 
         if (failures > 0) {
@@ -207,6 +209,87 @@ public final class SelfTest {
             System.out.println("FAIL order binding: " + problem);
         }
         return expect(problems.isEmpty(), "every order-path name resolves against the jar");
+    }
+
+    /** Exercises the inbound order format, including every rejection. */
+    private static int checkCommandParsing() {
+        int failures = 0;
+
+        CommandRecord move =
+                CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":214,\"x\":4550.0,\"y\":2610.5}");
+        failures += expect(move.kind() == CommandRecord.Kind.MOVE, "move verb parsed");
+        failures += expect(move.unitId() == 214L, "move unit id parsed");
+        failures += expect(move.x() == 4550.0f && move.y() == 2610.5f, "move target parsed");
+        failures += expect(move.buildType().isEmpty(), "a move carries no build type");
+
+        CommandRecord build =
+                CommandRecord.parse(
+                        "{\"kind\":\"build\",\"unit_id\":215,\"x\":1.0,\"y\":2.0,"
+                                + "\"type\":\"landFactory\"}");
+        failures += expect(build.kind() == CommandRecord.Kind.BUILD, "build verb parsed");
+        failures += expect("landFactory".equals(build.buildType()), "build type parsed");
+
+        failures += expect(
+                CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()
+                        == -3.0f,
+                "an integer coordinate is accepted as a float");
+
+        // A field that belongs to another verb is rejected rather than ignored:
+        // silently dropping it would let a mistyped build read as a move.
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":1,\"y\":2,\"type\":\"landFactory\"}",
+                "a move carrying a build type");
+        failures += expectBadCommand("{\"kind\":\"fly\",\"unit_id\":1,\"x\":1,\"y\":2}", "unknown verb");
+        failures += expectBadCommand("{\"kind\":\"move\",\"x\":1,\"y\":2}", "missing unit id");
+        failures += expectBadCommand("{\"kind\":\"move\",\"unit_id\":1,\"y\":2}", "missing x");
+        failures += expectBadCommand(
+                "{\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2}", "build with no type");
+        failures += expectBadCommand(
+                "{\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2,\"type\":\"\"}",
+                "build with a blank type");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":NaN,\"y\":2}", "a non-finite coordinate");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":\"lots\",\"x\":1,\"y\":2}",
+                "a non-numeric unit id");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":1,\"y\":2}extra", "trailing text");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":{\"v\":1},\"y\":2}", "a nested value");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2}",
+                "a duplicate key");
+        failures += expectBadCommand("not json at all", "text that is not an object");
+        return failures;
+    }
+
+    /**
+     * A slow planner must never stall the simulation.
+     *
+     * <p>The outbox drops its oldest sample when full rather than blocking the
+     * game thread. Asserted rather than commented, because the failure mode --
+     * a paused match whenever the planner is busy -- would be attributed to the
+     * game long before it was attributed to the queue.
+     */
+    private static int checkChannelBackpressure() {
+        int failures = 0;
+        CommandChannel channel = new CommandChannel(0, 250);
+        for (int i = 0; i < 4; i++) {
+            failures += expect(channel.offer("sample " + i), "sample " + i + " queued without a drop");
+        }
+        failures += expect(!channel.offer("sample 4"), "the fifth sample reports a drop");
+        failures += expect(channel.queued() == 4, "the outbox stays bounded at its depth");
+        return failures;
+    }
+
+    /** Asserts one command line is rejected. */
+    private static int expectBadCommand(String line, String what) {
+        try {
+            CommandRecord.parse(line);
+        } catch (IllegalArgumentException e) {
+            return expect(true, "rejects " + what);
+        }
+        return expect(false, "rejects " + what);
     }
 
     /** The engine captures stdout, so every emitted line must carry the prefix. */

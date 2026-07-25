@@ -52,6 +52,9 @@ public final class Premain {
                     options.orderMoveUnitIndex(),
                     options.buildType());
         }
+        if (options.channelRequested()) {
+            new CommandChannel(options.channelPort(), options.sampleIntervalMs()).start();
+        }
         Log.info("ready; patched " + targets.size() + " class(es)");
     }
 

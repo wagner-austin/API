@@ -113,6 +113,25 @@ New validator `require_absolute_path` (`RW-DECODE-005`). It also closed an exist
 
 `make check` now chains `agent-selftest`, so a patcher regression or an obfuscated name that moved in a game update fails at the gate. `make check` green: guard 0 violations, ruff clean, mypy strict clean, 88 tests (was 61), 100% statements and branches, agent-selftest OK.
 
+## [2026-07-25] milestone | M7 — the command channel; orders now originate in Python
+Pages written: command-channel
+Pages updated: index (12 pages), hubs/bot-architecture, hubs/engine-internals
+Artifacts: `wiki/sources/m7-channel/` — `planner-drove-a-live-game.txt` (13), `world-sample-with-ids.ndjson` (12), `scriptengine-drain.txt` (26)
+
+Notes: a planner connected to a live sandbox, read one sample, selected the builder by type name, computed a destination from that builder's own position, sent a build order, and watched the roster gain a `landFactory` three samples later. Nothing in the sequence was a constant — the subject came from the sample and the destination came from the subject.
+
+One design decision was made before any wire code and is the reason the loop is usable: units are addressed by engine identity, not roster position. The Python contract had documented index as "the handle an order is dispatched against", which would have hardened a bug — index renumbers the moment anything is built or dies, which in this game is constant. The engine's `eh` is assigned once behind an "ID for GameObject is already set" guard and is what the engine uses for network identity. Entity records now carry both, plus the readable type name, which is what makes selection possible at all.
+
+Backpressure is the constraint the channel is shaped around. Samples are produced on the game thread and written by another through a bounded queue that drops its oldest entry when full; blocking a socket write on the game thread would let a slow planner stall the simulation. Asserted in the selftest rather than left as a comment, because a match that pauses whenever the planner is busy would be blamed on the game long before the queue.
+
+Both parsers reject independently. The Java side accepts a flat object of scalars and nothing else — nesting, arrays, duplicate keys, trailing text, non-finite coordinates and a move carrying a build type are all errors, fourteen rejection cases asserted. The Python encoder refuses the same shapes before sending. Neither side trusts the other.
+
+Also fixed in passing, all caught by the gate rather than by review: a local `_parse_float` in `mechanics/catalogue.py` (the guard bans that name as a reimplemented config helper — renamed to `_parse_stat_number`, which is what it actually is, with the reason recorded at the definition), four `assert ... is not None` narrowing guards replaced by whole-record comparisons that also catch drift in fields the old assertions ignored, two `string in output` checks replaced by exact line comparisons, and four tuple-slice expressions that trip `disallow_any_expr` replaced by named parts.
+
+`make check` green: guard 0 violations, ruff + mypy clean, 214 tests, 100% statements and branches, agent-selftest OK.
+
+Still not a player. The probe orders once and watches; there is no goal, no scoring, and no loop that reconsiders. What exists is the substrate: perceive, decide, act, observe, all in Python against a live match.
+
 ## [2026-07-25] milestone | M8 — the build verb; a builder placed a factory
 Pages written: building-structures
 Pages updated: index (9 pages), hubs/engine-internals, hubs/game-mechanics

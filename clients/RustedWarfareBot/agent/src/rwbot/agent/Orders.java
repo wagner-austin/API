@@ -56,6 +56,12 @@ final class Orders {
     private static final String LOCAL_TEAM = "bs";
     /** The engine's CommandController instance. */
     private static final String CONTROLLER = "cf";
+    /** Engine-assigned object identity, set once at construction. */
+    private static final String ENTITY_ID = "eh";
+    /** Entity accessor returning its unit type. */
+    private static final String TYPE_ACCESSOR = "r";
+    /** Unit-type accessor returning its readable name. */
+    private static final String TYPE_NAME_ACCESSOR = "i";
 
     /**
      * Build-action selector meaning "any action that builds this type".
@@ -374,6 +380,8 @@ final class Orders {
         checkClass(TREE_CLASS, problems);
 
         if (entity != null) {
+            checkField(entity, ENTITY_ID, problems);
+            checkMethod(entity, TYPE_ACCESSOR, problems);
             checkField(entity, ENTITY_LIST, problems);
             checkField(entity, OWNER, problems);
             checkField(entity, POS_X, problems);
@@ -392,6 +400,9 @@ final class Orders {
         }
         if (registry != null) {
             checkMethod(registry, "a", problems, String.class);
+        }
+        if (type != null) {
+            checkMethod(type, TYPE_NAME_ACCESSOR, problems);
         }
         if (command != null && type != null) {
             checkMethod(command, "a", problems, float.class, float.class, type, int.class);
@@ -486,6 +497,76 @@ final class Orders {
         } catch (IllegalAccessException | IllegalArgumentException e) {
             throw new IllegalStateException("rw-agent: cannot read int " + name + PIN, e);
         }
+    }
+
+    /**
+     * Reads a {@code long} field through the same pinned-name machinery.
+     *
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not a long.
+     */
+    static long readLongField(Object target, String name) {
+        try {
+            return pinnedField(target.getClass(), name).getLong(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read long " + name + PIN, e);
+        }
+    }
+
+    /**
+     * Returns an entity's engine-assigned identity.
+     *
+     * <p>Assigned once at construction, guarded by an "ID for GameObject is
+     * already set" throw, and used by the engine itself for network identity.
+     * That makes it the only stable handle for addressing a unit across
+     * frames: roster position renumbers whenever anything is built or dies.
+     *
+     * @param entity The entity to identify.
+     * @return Its identity.
+     */
+    static long idOf(Object entity) {
+        return readLongField(entity, ENTITY_ID);
+    }
+
+    /**
+     * Returns an entity's readable type name, e.g. {@code "builder"}.
+     *
+     * <p>The engine reaches this as {@code entity.r().i()} -- the unit type,
+     * then its name. Both hops are obfuscated; the name they yield is not, and
+     * it is the same string the type registry accepts when building.
+     *
+     * @param entity The entity to name.
+     * @return Its type name.
+     */
+    static String typeNameOf(Object entity) {
+        Object type = invoke(pinnedMethod(entity.getClass(), TYPE_ACCESSOR), entity);
+        if (type == null) {
+            throw new IllegalStateException("rw-agent: entity has no unit type" + PIN);
+        }
+        Object name = invoke(pinnedMethod(type.getClass(), TYPE_NAME_ACCESSOR), type);
+        if (!(name instanceof String)) {
+            throw new IllegalStateException("rw-agent: unit type name is not a String" + PIN);
+        }
+        return (String) name;
+    }
+
+    /**
+     * Finds an owned entity by its engine identity.
+     *
+     * @param engine The live engine instance.
+     * @param id The identity to find.
+     * @return The entity, or null when the current player owns no entity with
+     *     that identity -- which is the normal answer for a unit that has died.
+     */
+    static Object findOwnedById(Object engine, long id) {
+        for (Object entity : ownedUnits(engine)) {
+            if (idOf(entity) == id) {
+                return entity;
+            }
+        }
+        return null;
     }
 
     private static float readFloat(Object target, String name) {

@@ -1,0 +1,139 @@
+package rwbot.agent;
+
+/**
+ * One order arriving from the planner, parsed from a single NDJSON line.
+ *
+ * <p>The parser is deliberately strict and deliberately small. It accepts a
+ * flat object of scalar values and nothing else: no nesting, no arrays, no
+ * escapes beyond the six JSON defines. That is the same constraint
+ * {@link StateStream} places on the outbound direction, and for the same
+ * reason -- a format narrow enough to parse exactly is a format neither side
+ * can drift on.
+ *
+ * <p>Every rejection is loud. A command that cannot be parsed is not skipped:
+ * a planner whose orders are silently dropped looks identical to a planner
+ * whose orders do nothing, and that failure has already cost this project two
+ * runs (wiki: issuing-orders, building-structures).
+ */
+final class CommandRecord {
+
+    /** Order verbs the agent accepts. */
+    enum Kind {
+        /** Send a unit to a world position. */
+        MOVE,
+        /** Have a builder place a structure at a world position. */
+        BUILD
+    }
+
+    private final Kind kind;
+    private final long unitId;
+    private final float x;
+    private final float y;
+    private final String buildType;
+
+    private CommandRecord(Kind kind, long unitId, float x, float y, String buildType) {
+        this.kind = kind;
+        this.unitId = unitId;
+        this.x = x;
+        this.y = y;
+        this.buildType = buildType;
+    }
+
+    Kind kind() {
+        return kind;
+    }
+
+    /** Engine object identity of the unit to order. */
+    long unitId() {
+        return unitId;
+    }
+
+    float x() {
+        return x;
+    }
+
+    float y() {
+        return y;
+    }
+
+    /** Unit-type name to build; empty for a move. */
+    String buildType() {
+        return buildType;
+    }
+
+    /**
+     * Parses one command line.
+     *
+     * @param line A single NDJSON object, without its newline.
+     * @return The parsed command.
+     * @throws IllegalArgumentException When the line is not a flat object, a
+     *     required field is absent, a field has the wrong shape, or the verb is
+     *     unknown.
+     */
+    static CommandRecord parse(String line) {
+        java.util.Map<String, String> fields = Json.flatObject(line);
+
+        String kindText = require(fields, "kind", line);
+        long unitId = requireLong(fields, "unit_id", line);
+        float x = requireFloat(fields, "x", line);
+        float y = requireFloat(fields, "y", line);
+
+        if ("move".equals(kindText)) {
+            reject(fields, "type", line);
+            return new CommandRecord(Kind.MOVE, unitId, x, y, "");
+        }
+        if ("build".equals(kindText)) {
+            String type = require(fields, "type", line);
+            if (type.isEmpty()) {
+                throw new IllegalArgumentException("build command has an empty type: " + line);
+            }
+            return new CommandRecord(Kind.BUILD, unitId, x, y, type);
+        }
+        throw new IllegalArgumentException(
+                "unknown command kind '" + kindText + "'; expected move or build: " + line);
+    }
+
+    private static String require(java.util.Map<String, String> fields, String key, String line) {
+        String value = fields.get(key);
+        if (value == null) {
+            throw new IllegalArgumentException("command is missing '" + key + "': " + line);
+        }
+        return value;
+    }
+
+    /** Rejects a field that does not belong to this verb, rather than ignoring it. */
+    private static void reject(java.util.Map<String, String> fields, String key, String line) {
+        if (fields.containsKey(key)) {
+            throw new IllegalArgumentException(
+                    "move command must not carry '" + key + "': " + line);
+        }
+    }
+
+    private static long requireLong(
+            java.util.Map<String, String> fields, String key, String line) {
+        String text = require(fields, key, line);
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "command field '" + key + "' is not a whole number: " + line, e);
+        }
+    }
+
+    private static float requireFloat(
+            java.util.Map<String, String> fields, String key, String line) {
+        String text = require(fields, key, line);
+        float value;
+        try {
+            value = Float.parseFloat(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "command field '" + key + "' is not a number: " + line, e);
+        }
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            throw new IllegalArgumentException(
+                    "command field '" + key + "' is not finite: " + line);
+        }
+        return value;
+    }
+}

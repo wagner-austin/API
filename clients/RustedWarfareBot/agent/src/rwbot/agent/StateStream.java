@@ -68,7 +68,15 @@ final class StateStream {
         return out.toString();
     }
 
-    /** Renders one owned entity. */
+    /**
+     * Renders one owned entity.
+     *
+     * <p>Carries both {@code index} and {@code id}. Index is enumeration order
+     * and is useful only for reading a single sample; it renumbers whenever
+     * anything is built or dies. {@code id} is the engine's own object
+     * identity, assigned once at construction, and is the handle an order is
+     * dispatched against.
+     */
     static String entityRecord(int frame, int index, Object entity) {
         float[] at = Orders.positionOf(entity);
         StringBuilder out = new StringBuilder();
@@ -78,6 +86,10 @@ final class StateStream {
         appendInt(out, "frame", frame);
         out.append(',');
         appendInt(out, "index", index);
+        out.append(',');
+        appendLong(out, "id", Orders.idOf(entity));
+        out.append(',');
+        appendString(out, "type", Orders.typeNameOf(entity));
         out.append(',');
         appendString(out, "class", entity.getClass().getName());
         out.append(',');
@@ -92,6 +104,11 @@ final class StateStream {
         quote(out, key);
         out.append(':');
         quote(out, value);
+    }
+
+    private static void appendLong(StringBuilder out, String key, long value) {
+        quote(out, key);
+        out.append(':').append(value);
     }
 
     private static void appendInt(StringBuilder out, String key, int value) {

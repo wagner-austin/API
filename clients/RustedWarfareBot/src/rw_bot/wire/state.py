@@ -50,8 +50,14 @@ class Entity(TypedDict):
     """One entity the local player owns at a given frame.
 
     Attributes:
-        index: Position in the owned roster, as the agent enumerated it. This is
-            the handle an order is dispatched against.
+        index: Position in the owned roster, as the agent enumerated it. Useful
+            for reading a single sample and nothing else: it renumbers whenever
+            anything is built or dies, so it is not an addressing handle.
+        unit_id: The engine's own object identity, assigned once at construction
+            and used by the engine for network identity. This is the handle an
+            order is dispatched against.
+        type_name: Readable unit-type name, e.g. ``"builder"``. The same string
+            the type registry accepts when building.
         class_name: Engine class of the entity, obfuscated and pinned to the
             recorded build.
         x: World x coordinate.
@@ -59,6 +65,8 @@ class Entity(TypedDict):
     """
 
     index: int
+    unit_id: int
+    type_name: str
     class_name: str
     x: float
     y: float
@@ -137,6 +145,8 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
             entities.append(
                 Entity(
                     index=require_int(record, "index"),
+                    unit_id=require_int(record, "id"),
+                    type_name=require_non_empty_str(record, "type"),
                     class_name=require_non_empty_str(record, "class"),
                     x=require_finite_float(record, "x"),
                     y=require_finite_float(record, "y"),
@@ -194,8 +204,10 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
     ]
     for entity in sample["entities"]:
         name = _escape(entity["class_name"])
+        type_name = _escape(entity["type_name"])
         lines.append(
             f'{{"kind":"{KIND_ENTITY}","frame":{frame},"index":{entity["index"]},'
+            f'"id":{entity["unit_id"]},"type":"{type_name}",'
             f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r}}}'
         )
     return tuple(lines)

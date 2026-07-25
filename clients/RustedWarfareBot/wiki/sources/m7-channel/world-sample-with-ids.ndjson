@@ -1,0 +1,12 @@
+{"kind":"frame","frame":854,"clock_ms":2907,"owned":3}
+{"kind":"entity","frame":854,"index":0,"id":213,"type":"commandCenter","class":"com.corrodinggames.rts.game.units.d.e","x":4250.0,"y":2550.0}
+{"kind":"entity","frame":854,"index":1,"id":214,"type":"builder","class":"com.corrodinggames.rts.game.units.e.b","x":4250.0,"y":2610.0}
+{"kind":"entity","frame":854,"index":2,"id":217,"type":"editorOrBuilder","class":"com.corrodinggames.rts.game.units.h","x":-1000.0,"y":-1000.0}
+{"kind":"frame","frame":2650,"clock_ms":8894,"owned":3}
+{"kind":"entity","frame":2650,"index":0,"id":213,"type":"commandCenter","class":"com.corrodinggames.rts.game.units.d.e","x":4250.0,"y":2550.0}
+{"kind":"entity","frame":2650,"index":1,"id":214,"type":"builder","class":"com.corrodinggames.rts.game.units.e.b","x":4250.0,"y":2610.0}
+{"kind":"entity","frame":2650,"index":2,"id":217,"type":"editorOrBuilder","class":"com.corrodinggames.rts.game.units.h","x":-1000.0,"y":-1000.0}
+{"kind":"frame","frame":4450,"clock_ms":14896,"owned":3}
+{"kind":"entity","frame":4450,"index":0,"id":213,"type":"commandCenter","class":"com.corrodinggames.rts.game.units.d.e","x":4250.0,"y":2550.0}
+{"kind":"entity","frame":4450,"index":1,"id":214,"type":"builder","class":"com.corrodinggames.rts.game.units.e.b","x":4250.0,"y":2610.0}
+{"kind":"entity","frame":4450,"index":2,"id":217,"type":"editorOrBuilder","class":"com.corrodinggames.rts.game.units.h","x":-1000.0,"y":-1000.0}
