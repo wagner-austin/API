@@ -13,6 +13,11 @@ Allowed patterns:
    ``setattr(module, "attr", original)``), intermediate
    ``module.attr = fake`` and ``setattr(module, "attr", fake)``
    assignments within that function are treated as proper hook-based DI.
+5. Reset-based hook containers: an autouse fixture calling ``X.reset()``
+   leaves every attribute of ``X`` clean at the start of each test in its
+   scope, isolating tests exactly as save-and-restore does. Libraries expose
+   this shape from ``testing.py`` as a container class rather than a
+   ``_test_hooks`` module, so the suffix allowlist alone does not see it.
 
 Banned patterns:
     module.function = fake_function          (without save/restore in same scope)
@@ -24,16 +29,33 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TypedDict
 
 from monorepo_guards import Violation
 
 
+class IsolationContext(TypedDict):
+    """Isolation guarantees in force for one test file.
+
+    Attributes:
+        restored_attrs: (module_name, attr_key) pairs covered by a
+            save-and-restore pair, whether written inline or in a conftest.
+        reset_containers: Names of hook containers that an autouse fixture
+            resets, which covers every attribute of that container.
+    """
+
+    restored_attrs: frozenset[tuple[str, str]]
+    reset_containers: frozenset[str]
+
+
 _HOOKS_SUFFIXES = ("_test_hooks", "_hooks", "_hooks_guard")
 
-_ALLOWED_TARGETS = frozenset({
-    "sys",
-    "os",
-})
+_ALLOWED_TARGETS = frozenset(
+    {
+        "sys",
+        "os",
+    }
+)
 
 
 def _attr_key(node: ast.expr) -> str | None:
@@ -84,16 +106,21 @@ class MonkeyPatchBanRule:
         """
         aliases: set[str] = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    bound = alias.asname if alias.asname else alias.name
-                    aliases.add(bound)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module is not None:
-                    for alias in node.names:
-                        bound = alias.asname if alias.asname else alias.name
-                        aliases.add(bound)
+            if isinstance(node, ast.Import) or (
+                isinstance(node, ast.ImportFrom) and node.module is not None
+            ):
+                self._add_bound_names(node.names, aliases)
         return aliases
+
+    def _add_bound_names(self, names: list[ast.alias], aliases: set[str]) -> None:
+        """Add the names an import statement binds into the alias set.
+
+        Args:
+            names: Alias clauses from an Import or ImportFrom node.
+            aliases: Mutable set of bound names to extend.
+        """
+        for alias in names:
+            aliases.add(alias.asname if alias.asname else alias.name)
 
     def _record_save(
         self,
@@ -249,7 +276,7 @@ class MonkeyPatchBanRule:
         path: Path,
         node: ast.Assign,
         module_aliases: set[str],
-        restored_attrs: set[tuple[str, str]],
+        isolation: IsolationContext,
         lines: list[str],
     ) -> list[Violation]:
         """Check a single assignment for module attribute monkey-patching.
@@ -258,7 +285,7 @@ class MonkeyPatchBanRule:
             path: Source file path.
             node: Assignment AST node.
             module_aliases: Names known to be module imports.
-            restored_attrs: (module, attr_key) pairs with save-restore fixtures.
+            isolation: Restore guarantees in force for this file.
             lines: Source lines for violation context.
 
         Returns:
@@ -275,7 +302,9 @@ class MonkeyPatchBanRule:
                 continue
             if isinstance(node.value, ast.Constant) and node.value.value is None:
                 continue
-            if (obj_name, f"name:{target.attr}") in restored_attrs:
+            if obj_name in isolation["reset_containers"]:
+                continue
+            if (obj_name, f"name:{target.attr}") in isolation["restored_attrs"]:
                 continue
             line_text = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
             violations.append(
@@ -293,7 +322,7 @@ class MonkeyPatchBanRule:
         path: Path,
         node: ast.Call,
         module_aliases: set[str],
-        restored_attrs: set[tuple[str, str]],
+        isolation: IsolationContext,
         lines: list[str],
     ) -> list[Violation]:
         """Check a setattr call for module attribute monkey-patching.
@@ -302,7 +331,7 @@ class MonkeyPatchBanRule:
             path: Source file path.
             node: Call AST node.
             module_aliases: Names known to be module imports.
-            restored_attrs: (module, attr_key) pairs with save-restore fixtures.
+            isolation: Restore guarantees in force for this file.
             lines: Source lines for violation context.
 
         Returns:
@@ -321,10 +350,12 @@ class MonkeyPatchBanRule:
         value = node.args[2]
         if isinstance(value, ast.Constant) and value.value is None:
             return []
+        if obj_name in isolation["reset_containers"]:
+            return []
         key = _attr_key(node.args[1])
         if key is None:
             return []
-        if (obj_name, key) in restored_attrs:
+        if (obj_name, key) in isolation["restored_attrs"]:
             return []
         line_text = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
         attr_display = key.split(":", 1)[1]
@@ -349,6 +380,93 @@ class MonkeyPatchBanRule:
         posix = path.as_posix()
         return "/tests/" in posix or "\\tests\\" in str(path)
 
+    def _is_autouse_fixture(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+        """Check whether a function is a pytest fixture with autouse=True.
+
+        Only autouse fixtures qualify: a fixture a test must request by name
+        proves nothing about the tests that do not request it.
+
+        Args:
+            node: Function definition to inspect.
+
+        Returns:
+            True if any decorator passes ``autouse=True``.
+        """
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            for keyword in decorator.keywords:
+                if (
+                    keyword.arg == "autouse"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value is True
+                ):
+                    return True
+        return False
+
+    def _collect_reset_containers(self, tree: ast.AST) -> set[str]:
+        """Collect names reset by an autouse fixture in this file.
+
+        Args:
+            tree: Parsed AST of a test module or conftest.
+
+        Returns:
+            Names on which ``<name>.reset()`` is called inside an autouse
+            fixture, so every attribute of that name is restored per test.
+        """
+        containers: set[str] = set()
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if not self._is_autouse_fixture(node):
+                continue
+            for inner in ast.walk(node):
+                if (
+                    isinstance(inner, ast.Call)
+                    and isinstance(inner.func, ast.Attribute)
+                    and inner.func.attr == "reset"
+                    and isinstance(inner.func.value, ast.Name)
+                ):
+                    containers.add(inner.func.value.id)
+        return containers
+
+    def _isolation_for(self, path: Path, tree: ast.AST) -> IsolationContext:
+        """Build the isolation guarantees covering one test file.
+
+        pytest applies a conftest fixture to every test module at or below its
+        directory, so isolation living in conftest.py protects sibling modules
+        just as effectively as isolation written inline. Analysing each file
+        alone cannot see that, which reported correctly isolated tests as
+        monkey-patching.
+
+        Args:
+            path: Test file whose governing conftests should be read.
+            tree: Parsed AST of that test file.
+
+        Returns:
+            The restored attributes and reset containers in force for it.
+        """
+        restored = self._collect_restored_attrs(tree)
+        containers = self._collect_reset_containers(tree)
+        # Every ancestor is walked, matching pytest, which collects conftest.py
+        # from the rootdir downward rather than stopping at a "tests" segment.
+        for parent in path.parents:
+            conftest = parent / "conftest.py"
+            if conftest.is_file():
+                # Read and parse without a guard: a conftest that cannot be
+                # read or parsed is a real problem in the tree being checked,
+                # and should surface rather than be silently skipped.
+                conftest_tree = ast.parse(
+                    conftest.read_text(encoding="utf-8"),
+                    filename=str(conftest),
+                )
+                restored.update(self._collect_restored_attrs(conftest_tree))
+                containers.update(self._collect_reset_containers(conftest_tree))
+        return {
+            "restored_attrs": frozenset(restored),
+            "reset_containers": frozenset(containers),
+        }
+
     def run(self, files: list[Path]) -> list[Violation]:
         """Check all test files for monkey-patch violations.
 
@@ -362,28 +480,34 @@ class MonkeyPatchBanRule:
         for path in files:
             if not self._is_test_file(path):
                 continue
-            try:
-                source = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-            try:
-                tree = ast.parse(source, filename=str(path))
-            except SyntaxError:
-                continue
+            # Read and parse without a guard: a test file that cannot be read
+            # or parsed is a real problem in the tree being checked. Silently
+            # skipping it meant a file with a syntax error was also silently
+            # exempt from this rule.
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
             lines = source.splitlines()
             module_aliases = self._collect_module_aliases(tree)
-            restored_attrs = self._collect_restored_attrs(tree)
+            isolation = self._isolation_for(path, tree)
             for node in ast.walk(tree):
                 if isinstance(node, ast.Assign):
                     out.extend(
                         self._check_assignment(
-                            path, node, module_aliases, restored_attrs, lines,
+                            path,
+                            node,
+                            module_aliases,
+                            isolation,
+                            lines,
                         )
                     )
                 elif isinstance(node, ast.Call):
                     out.extend(
                         self._check_setattr_call(
-                            path, node, module_aliases, restored_attrs, lines,
+                            path,
+                            node,
+                            module_aliases,
+                            isolation,
+                            lines,
                         )
                     )
         return out

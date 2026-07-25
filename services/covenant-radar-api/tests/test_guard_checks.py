@@ -4,11 +4,28 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
+import pytest
 from pytest import raises
 
 from scripts import guard as guard_mod
+
+
+@pytest.fixture()
+def restore_guard_is_dir() -> Generator[None, None, None]:
+    """Restore ``guard_mod._is_dir`` after a test overrides the injection seam.
+
+    Without this, a test that swaps the seam leaks it into every later test in
+    the same worker process.
+
+    Yields:
+        None, for the duration of the test.
+    """
+    original = guard_mod._is_dir
+    yield
+    guard_mod._is_dir = original
 
 
 def _project_root() -> Path:
@@ -76,8 +93,17 @@ def test_guard_main_entry_no_violations(tmp_path: Path) -> None:
     assert result.returncode == 0
 
 
-def test_guard_find_monorepo_root_raises_without_libs(tmp_path: Path) -> None:
-    """Test _find_monorepo_root raises when libs directory not found."""
+def test_guard_find_monorepo_root_raises_without_libs(
+    tmp_path: Path,
+    restore_guard_is_dir: None,
+) -> None:
+    """Test _find_monorepo_root raises when libs directory not found.
+
+    Args:
+        tmp_path: Temporary directory to search from.
+        restore_guard_is_dir: Fixture restoring the ``_is_dir`` seam afterwards.
+    """
+    del restore_guard_is_dir
 
     # Override hook to always return False for libs directory checks
     def _always_false(path: Path) -> bool:
@@ -159,8 +185,6 @@ def test_guard_default_is_dir_returns_false_for_nonexistent() -> None:
 def test_guard_find_monorepo_root_finds_libs_directory() -> None:
     """Test _find_monorepo_root finds the monorepo root."""
     project_root = _project_root()
-    # Reset hook to default before test
-    guard_mod._is_dir = guard_mod._default_is_dir
     root = guard_mod._find_monorepo_root(project_root)
     # Should find the root with libs directory
     assert (root / "libs").is_dir()
@@ -169,7 +193,6 @@ def test_guard_find_monorepo_root_finds_libs_directory() -> None:
 def test_guard_load_orchestrator_returns_callable() -> None:
     """Test _load_orchestrator returns a callable function."""
     project_root = _project_root()
-    guard_mod._is_dir = guard_mod._default_is_dir
     monorepo_root = guard_mod._find_monorepo_root(project_root)
     run_for_project = guard_mod._load_orchestrator(monorepo_root)
     assert callable(run_for_project)

@@ -387,7 +387,11 @@ class RustCoverageRule:
                     file=makefile,
                     line_no=1,
                     kind="rust-coverage-missing",
-                    line="Makefile must enforce 100% coverage via check_segment_coverage.py --threshold 100 or --fail-under-lines/regions 100",
+                    line=(
+                        "Makefile must enforce 100% coverage via "
+                        "check_segment_coverage.py --threshold 100 or "
+                        "--fail-under-lines/regions 100"
+                    ),
                 )
             )
 
