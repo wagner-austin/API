@@ -188,7 +188,10 @@ class RadarWatchProbe(ProbeBase):
         Args:
             duration_ms: Total watch duration.
             scan_interval_ms: Time between radar scans.
-            map_poll_interval_ms: Time between free map opens.
+            map_poll_interval_ms: Time between free map opens
+                (0 disables map polling entirely — the 2026-07-24
+                sessions suggest idling in the map-open state for
+                ~12 minutes disconnects the client).
 
         Returns:
             Tuple of (scans sent, map polls sent, walks sent).
@@ -204,7 +207,7 @@ class RadarWatchProbe(ProbeBase):
         beat = 0
         while action_hooks.get_current_time_ms() - started_ms < duration_ms:
             now_ms = action_hooks.get_current_time_ms()
-            if now_ms >= next_map_poll_ms:
+            if map_poll_interval_ms > 0 and now_ms >= next_map_poll_ms:
                 self.open_map()
                 map_polls += 1
                 next_map_poll_ms = now_ms + map_poll_interval_ms

@@ -174,6 +174,18 @@ def test_watch_loop_scans_and_map_polls_on_schedule() -> None:
     assert probe.move_calls == [(101, 100), (99, 100), (101, 100), (99, 100)]
 
 
+def test_watch_loop_zero_interval_disables_map_polls() -> None:
+    probe = _WatchHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+
+    scans, map_polls, walks = probe._watch_loop(60000, 15000, 0)
+    assert scans == 4
+    assert walks == 4
+    assert map_polls == 0
+    assert probe.map_calls == 0
+
+
 def test_watch_loop_skips_walks_without_self_state() -> None:
     probe = _WatchHarness()
     action_hooks.get_current_time_ms = probe._clock
