@@ -38,7 +38,11 @@ public final class Premain {
         }
 
         if (options.discoveryRequested()) {
-            startDiscovery(options.discoverAtSeconds(), options.exitAfterDiscovery());
+            startDiscovery(
+                    options.discoverAtSeconds(),
+                    options.exitAfterDiscovery(),
+                    options.inspectFields(),
+                    options.findElementsUnder());
         }
         Log.info("ready; patched " + targets.size() + " class(es)");
     }
@@ -51,11 +55,15 @@ public final class Premain {
      *
      * @param atSeconds Elapsed times to snapshot at, ascending.
      */
-    private static void startDiscovery(int[] atSeconds, boolean exitAfter) {
+    private static void startDiscovery(
+            int[] atSeconds,
+            boolean exitAfter,
+            String[] inspectFields,
+            String findElementsUnder) {
         Thread thread =
                 new Thread(
                         () -> {
-                            runDiscovery(atSeconds);
+                            runDiscovery(atSeconds, inspectFields, findElementsUnder);
                             if (exitAfter) {
                                 Log.info("discovery complete; halting");
                                 Runtime.getRuntime().halt(0);
@@ -68,7 +76,8 @@ public final class Premain {
     }
 
     /** Sleeps to each offset in turn and emits one snapshot per offset. */
-    private static void runDiscovery(int[] atSeconds) {
+    private static void runDiscovery(
+            int[] atSeconds, String[] inspectFields, String findElementsUnder) {
         long started = System.nanoTime();
         for (int second : atSeconds) {
             long targetNanos = started + second * 1_000_000_000L;
@@ -82,7 +91,14 @@ public final class Premain {
                     return;
                 }
             }
-            Log.info(Discovery.describe(EngineHandle.current(), "t=" + second + "s"));
+            Object engine = EngineHandle.current();
+            Log.info(Discovery.describe(engine, "t=" + second + "s"));
+            for (String fieldName : inspectFields) {
+                Log.info(Discovery.describeElements(engine, fieldName));
+            }
+            if (!findElementsUnder.isEmpty()) {
+                Log.info(Discovery.findCollections(engine, findElementsUnder, 4, 20000));
+            }
         }
     }
 

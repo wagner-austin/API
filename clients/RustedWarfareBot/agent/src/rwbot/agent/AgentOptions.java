@@ -13,13 +13,43 @@ final class AgentOptions {
 
     private static final String DISCOVER_AT = "discoverAtSeconds";
     private static final String EXIT_AFTER = "exitAfterDiscovery";
+    private static final String INSPECT_FIELDS = "inspectFields";
+    private static final String FIND_UNDER = "findElementsUnder";
 
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
+    private final String[] inspectFields;
+    private final String findElementsUnder;
 
-    private AgentOptions(int[] discoverAtSeconds, boolean exitAfterDiscovery) {
+    private AgentOptions(
+            int[] discoverAtSeconds,
+            boolean exitAfterDiscovery,
+            String[] inspectFields,
+            String findElementsUnder) {
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
+        this.inspectFields = inspectFields;
+        this.findElementsUnder = findElementsUnder;
+    }
+
+    /**
+     * Binary-name prefix to search the live object graph for, or empty when not
+     * requested.
+     */
+    String findElementsUnder() {
+        return findElementsUnder;
+    }
+
+    /**
+     * Engine field names whose elements to expand, in declaration order.
+     *
+     * <p>A whole-object snapshot reports that a collection holds eleven things;
+     * it cannot say what distinguishes them. Naming a field opts into one extra
+     * level of depth for that field only, which keeps the default snapshot
+     * cheap and the expensive read deliberate.
+     */
+    String[] inspectFields() {
+        return inspectFields.clone();
     }
 
     /**
@@ -60,11 +90,13 @@ final class AgentOptions {
      */
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
-            return new AgentOptions(new int[0], false);
+            return new AgentOptions(new int[0], false, new String[0], "");
         }
 
         int[] discoverAt = new int[0];
         boolean exitAfter = false;
+        String[] inspect = new String[0];
+        String findUnder = "";
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -81,13 +113,34 @@ final class AgentOptions {
                 discoverAt = parseSeconds(value);
             } else if (EXIT_AFTER.equals(key)) {
                 exitAfter = parseBoolean(value);
+            } else if (INSPECT_FIELDS.equals(key)) {
+                inspect = parseNames(value);
+            } else if (FIND_UNDER.equals(key)) {
+                if (value.isEmpty()) {
+                    throw new IllegalArgumentException(FIND_UNDER + " expects a package prefix");
+                }
+                findUnder = value;
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
-                                + EXIT_AFTER);
+                                + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER);
             }
         }
-        return new AgentOptions(discoverAt, exitAfter);
+        return new AgentOptions(discoverAt, exitAfter, inspect, findUnder);
+    }
+
+    /** Parses a comma-separated list of non-blank field names. */
+    private static String[] parseNames(String value) {
+        String[] parts = value.split(",");
+        String[] names = new String[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            names[i] = parts[i].trim();
+            if (names[i].isEmpty()) {
+                throw new IllegalArgumentException(
+                        INSPECT_FIELDS + " expects non-blank field names, got " + value);
+            }
+        }
+        return names;
     }
 
     /** Parses a strict boolean; anything else is an error rather than false. */

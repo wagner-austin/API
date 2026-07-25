@@ -68,6 +68,16 @@ public final class SelfTest {
                 AgentOptions.parse("discoverAtSeconds=5;exitAfterDiscovery=true").exitAfterDiscovery(),
                 "exitAfterDiscovery honoured");
         failures += expectRejected("exitAfterDiscovery=yes", "non-boolean exit flag");
+        failures += expect(
+                AgentOptions.parse("inspectFields=X,W").inspectFields().length == 2,
+                "inspectFields parsed");
+        failures += expectRejected("inspectFields=X,,W", "blank field name");
+        failures += expect(
+                "com.x".equals(AgentOptions.parse("findElementsUnder=com.x").findElementsUnder()),
+                "findElementsUnder parsed");
+        failures += expect(
+                AgentOptions.parse("discoverAtSeconds=5").findElementsUnder().isEmpty(),
+                "findElementsUnder defaults empty");
         failures += expectRejected("discoverAtSeconds=0", "zero seconds");
         failures += expectRejected("discoverAtSeconds=-3", "negative seconds");
         failures += expectRejected("discoverAtSeconds=soon", "non-numeric seconds");
@@ -90,6 +100,51 @@ public final class SelfTest {
         failures += expect(report.contains("null"), "null field reported");
         failures += expect(report.contains("\"hello\""), "string value reported");
         failures += expect(report.contains("static "), "static field marked");
+
+        DiscoverySample sample = new DiscoverySample();
+        failures += expect(
+                Discovery.describeElements(null, "names").contains("target is null"),
+                "element expansion handles a null target");
+        failures += expect(
+                Discovery.describeElements(sample, "nope").contains("no field named nope"),
+                "element expansion names an absent field");
+        failures += expect(
+                Discovery.describeElements(sample, "text").contains("not a collection"),
+                "element expansion rejects a non-collection");
+        failures += expect(
+                Discovery.describeElements(sample, "absent").contains("field is null"),
+                "element expansion handles a null field");
+
+        String elements = Discovery.describeElements(sample, "names");
+        failures += expect(elements.contains("[0] java.lang.String"), "elements indexed and typed");
+        failures += expect(elements.contains("[2] "), "every element expanded");
+        failures += expect(
+                elements.contains("[0] java.lang.String = \"a\""),
+                "platform elements summarised, not reflected into");
+
+        failures += expect(
+                Discovery.findCollections(null, "com.x", 3, 100).contains("root is null"),
+                "graph search handles a null root");
+        String found = Discovery.findCollections(sample, "java.lang.String", 3, 500);
+        failures += expect(found.contains(".names"), "graph search finds a matching collection");
+        failures += expect(found.contains("visited "), "graph search reports its budget");
+        failures += expect(
+                !Discovery.findCollections(sample, "no.such.pkg", 3, 500).contains(".names"),
+                "graph search filters by element package");
+
+        // A container must be traversed by its elements, never by its declared
+        // fields. Reflecting into java.util internals warns on JDK 13 and is
+        // denied in later releases, so these names appearing in a path would be
+        // a regression to a route that stops working rather than a style point.
+        String deep = Discovery.findCollections(new NestedSample(), "java.lang.String", 4, 500);
+        failures += expect(
+                deep.contains(".holder[0].tag"),
+                "graph search descends through a collection by element index");
+        for (String internal : new String[] {"modCount", "elementData", "serialVersionUID"}) {
+            failures += expect(
+                    !deep.contains(internal),
+                    "graph search never walks the platform internal " + internal);
+        }
         return failures;
     }
 
@@ -142,6 +197,19 @@ public final class SelfTest {
         final int[] counts = {1, 2};
         final String text = "hello";
         final Object absent = null;
+    }
+
+    /** A non-platform object reachable only by descending through a collection. */
+    private static final class Leaf {
+        final java.util.List<String> tag = java.util.Arrays.asList("deep");
+    }
+
+    /**
+     * Mirrors the engine shape the search exists for: a collection of game
+     * objects, each owning the collection actually being hunted.
+     */
+    private static final class NestedSample {
+        final java.util.List<Leaf> holder = java.util.Arrays.asList(new Leaf());
     }
 
     private static boolean check(
