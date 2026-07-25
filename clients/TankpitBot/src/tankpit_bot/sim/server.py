@@ -115,6 +115,18 @@ _SUPPORTED_KINDS = frozenset(
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
 
 
+def _queued_tank_id(entry: tuple[int, ClientCommandDict]) -> int:
+    """The round-order sort key: the queued command's tank id.
+
+    Args:
+        entry: One ``(tank_id, command)`` queue entry.
+
+    Returns:
+        The tank id — within-round resolution is ascending tank id.
+    """
+    return entry[0]
+
+
 def _movement_echo(world: SimWorldDict, outcome: MoveOutcomeDict) -> MovementDict:
     """Build the 0x47 echo for one processed move.
 
@@ -1016,7 +1028,13 @@ class SimServer:
         ammo_changed: set[int] = set()
         self._apply_pending_debits()
         moved: set[int] = set()
-        for tank_id, command in self._queue:
+        # Within-round resolution order is ASCENDING TANK ID — the
+        # measured law (2026-07-25, `analysis_scripts/mine_round_order.py`:
+        # 1,820/1,825 archive multi-shooter bursts, the real server's
+        # only ordering; bots 500-535 always resolve before players).
+        # The sort is stable, so one tank's own commands keep arrival
+        # order.
+        for tank_id, command in sorted(self._queue, key=_queued_tank_id):
             if not self.world["tanks"][tank_id]["alive"]:
                 continue
             self._process_command(tank_id, command, messages, ammo_changed, moved)

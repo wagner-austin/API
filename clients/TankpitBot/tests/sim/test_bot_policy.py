@@ -258,3 +258,25 @@ def test_practice_room_ignores_shots_from_unknown_shooters() -> None:
     )
     driver.note_batch(world, [ghost_shot])
     assert all(not state["has_pending_return"] for state in driver.states.values())
+
+
+def test_round_resolution_orders_by_ascending_tank_id() -> None:
+    """The measured within-round law: lower ids resolve first even
+    when their commands were queued last (1,820/1,825 archive bursts;
+    the sim's old queue-order emission was the only violator)."""
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 900)
+    world["tanks"][510] = make_sim_tank(510, 1, 0, 101, 100, 800)
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    server.queue_command(
+        9,
+        ClientCommandDict(kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=510, slot=0),
+    )
+    server.queue_command(
+        510,
+        ClientCommandDict(kind="shoot", command=CMD_SHOOT, x=100, y=100, target_id=9, slot=0),
+    )
+    batch = server.advance_tick()
+    shooters = [m["shooter_id"] for m in batch if m["msg_type"] == 0x53]
+    assert shooters == [9, 510] or shooters == sorted(shooters)
+    assert shooters == sorted(shooters)

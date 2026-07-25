@@ -96,22 +96,25 @@ def test_deactivated_tank_drops_from_the_viewport_without_0x58() -> None:
 def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
     """The queue-race conversion: a stale click still finds the mover.
 
-    The enemy's move processes before the client's shot in the same
-    tick; the shot's coordinates point at the VACATED tile, but the id
-    reroutes it to the tank's new position and the same-tick move
-    draws homing.
+    The enemy carries the LOWER tank id, so under the measured
+    ascending-id round order its move processes before the client's
+    shot in the same tick; the shot's coordinates point at the VACATED
+    tile, but the id reroutes it to the tank's new position and the
+    same-tick move draws homing.
     """
-    world = _arena()
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][7] = make_sim_tank(7, 1, 1, 15, 10, 500)
+    world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
     enemy_move = ClientCommandDict(kind="move", command=112, x=15, y=12, target_id=0, slot=0)
-    server.queue_command(11, enemy_move)
-    server.queue_command(9, _id_shot(15, 10, 11))
+    server.queue_command(7, enemy_move)
+    server.queue_command(9, _id_shot(15, 10, 7))
     messages = server.advance_tick()
     shots = [m for m in messages if m["msg_type"] == 0x53]
     assert [s["weapon"] for s in shots] == [WEAPON_HOMING]
     assert world["tanks"][9]["counts"][SLOT_HOMING] == 1
-    assert world["tanks"][11]["fuel"] == 500 - 2 - 45
+    assert world["tanks"][7]["fuel"] == 500 - 2 - 45
 
 
 def test_id_shot_at_a_stationary_visible_target_is_a_dual() -> None:

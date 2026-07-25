@@ -180,11 +180,15 @@ def test_hit_victim_syncs_and_client_ammo_snapshot() -> None:
 
 
 def test_same_tick_move_then_shot_selects_homing() -> None:
-    """A queued move before the shot marks the mover for homing."""
+    """A same-round move resolving BEFORE the shot marks the mover
+    for homing. Within-round order is ascending tank id (the
+    2026-07-25 measured law), so the mover here is the LOWER id —
+    the client (9) arrives, then the enemy (11) fires at the arrival
+    tile."""
     server = _server()
-    server.world["tanks"][9]["counts"][SLOT_HOMING] = 1
-    server.queue_command(11, _move(15, 12))
-    server.queue_command(9, _shoot(15, 12))
+    server.world["tanks"][11]["counts"][SLOT_HOMING] = 1
+    server.queue_command(11, _shoot(11, 10))
+    server.queue_command(9, _move(11, 10))
     messages = server.advance_tick()
     assert [shot["weapon"] for shot in _shots(messages)] == [3]
 
