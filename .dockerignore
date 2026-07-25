@@ -30,6 +30,10 @@ dist
 build
 *.egg-info
 
+# Rust build output. libs/cleargbm_rs/target alone is ~2.6GB and was being
+# transferred into the build context on every docker build.
+target
+
 # Node
 node_modules
 

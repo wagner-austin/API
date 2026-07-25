@@ -877,7 +877,7 @@ class TestGenerateEnsemblePredictions2D:
         This tests line 654 where raw_preds.ndim == 2.
         Uses module-level Fake2DClassifier, Fake2DBackend, Fake2DRegistry.
         """
-        import scripts.amex._hooks as hooks_module
+        import scripts.amex._hooks as amex_hooks
 
         # Configure fakes first, then override registry
         train_spec = FakeDatasetSpec(
@@ -900,7 +900,7 @@ class TestGenerateEnsemblePredictions2D:
 
         # Override registry to use 2D backend
         fake_2d_registry = Fake2DRegistry(tmp_path / "models")
-        hooks_module.registry_hook = lambda: fake_2d_registry
+        amex_hooks.registry_hook = lambda: fake_2d_registry
 
         # Create model directory with model file
         fold_dir = tmp_path / "models" / "lightgbm" / "fold_1"

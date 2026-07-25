@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from fastapi.responses import HTMLResponse
+
+# Chart.js is vendored under api/static rather than pulled from a CDN; see
+# _get_chart_js for why SRI could not pin the jsDelivr URL.
+_CHART_JS_ROUTE = "/dashboard/chart.umd.min.js"
+_CHART_JS_PATH = Path(__file__).resolve().parent.parent / "static" / "chart.umd.min.js"
 
 # Dashboard HTML with embedded JS for a lightweight, single-page monitoring UI
 _DASHBOARD_HTML = """<!DOCTYPE html>
@@ -14,7 +20,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Covenant Radar Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/dashboard/chart.umd.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -246,6 +252,22 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     </main>
 
     <script>
+        // Escape before interpolating any API-derived string into innerHTML.
+        // Deal names and borrowers are free text written through POST /deals,
+        // so unescaped interpolation both breaks rendering on characters like
+        // & and < and lets stored markup execute in an operator's browser.
+        function escapeHtml(value) {
+            const entities = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            };
+            return String(value === null || value === undefined ? '' : value)
+                .replace(/[&<>"']/g, function (c) { return entities[c]; });
+        }
+
         // State
         let predictions = [];
         let trendChart = null;
@@ -338,11 +360,12 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
                 const container = document.getElementById('model-info');
                 const statusColor = data.is_loaded ? '#10b981' : '#ef4444';
                 const statusText = data.is_loaded ? 'Loaded' : 'Not Loaded';
-                const pathVal = data.model_path || 'N/A';
+                const pathVal = escapeHtml(data.model_path || 'N/A');
+                const modelId = escapeHtml(data.model_id || 'N/A');
                 container.innerHTML = `
                     <div class="model-row">
                         <span class="model-label">Model ID</span>
-                        <span class="model-value">${data.model_id || 'N/A'}</span>
+                        <span class="model-value">${modelId}</span>
                     </div>
                     <div class="model-row">
                         <span class="model-label">Path</span>
@@ -398,10 +421,10 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
             }
 
             container.innerHTML = predictions.slice(0, 20).map(p => {
-                const tier = p.risk_tier.toLowerCase();
+                const tier = escapeHtml(p.risk_tier.toLowerCase());
                 const pct = (p.probability * 100).toFixed(1);
-                const displayName = p.deal_name || p.deal_id.slice(0, 8) + '...';
-                const displayBorrower = p.borrower || '';
+                const displayName = escapeHtml(p.deal_name || p.deal_id.slice(0, 8) + '...');
+                const displayBorrower = escapeHtml(p.borrower || '');
                 return `
                 <div class="prediction-item ${tier}">
                     <div>
@@ -424,7 +447,9 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         // Fetch job status
         async function fetchJobStatus(jobId) {
             try {
-                const response = await fetch(`/ml/jobs/${jobId}`);
+                // URL context, not HTML: encode so a job id containing / or ?
+                // cannot reshape the request path.
+                const response = await fetch(`/ml/jobs/${encodeURIComponent(jobId)}`);
                 return await response.json();
             } catch (e) {
                 return { job_id: jobId, status: 'unknown' };
@@ -441,13 +466,14 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 
             const jobStatuses = await Promise.all(trackedJobs.map(fetchJobStatus));
             container.innerHTML = jobStatuses.map(job => {
-                const jobId = job.job_id.slice(0, 8);
+                const jobId = escapeHtml(job.job_id.slice(0, 8));
+                const status = escapeHtml(job.status);
                 return `
                 <div class="job-item">
                     <div>
                         <div class="job-id">${jobId}...</div>
                     </div>
-                    <span class="job-status job-${job.status}">${job.status}</span>
+                    <span class="job-status job-${status}">${status}</span>
                 </div>
             `}).join('');
         }
@@ -592,6 +618,24 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         """
         return HTMLResponse(content=_DASHBOARD_HTML)
 
+    def _get_chart_js() -> Response:
+        """Serve the vendored Chart.js bundle.
+
+        Chart.js is vendored rather than loaded from jsDelivr. The jsDelivr
+        `/npm/` path is dynamically generated, and jsDelivr explicitly document
+        that Subresource Integrity must not be used with it — so the CDN script
+        could not be pinned, leaving the dashboard trusting whatever that host
+        returned. Serving it from here removes the third-party trust entirely
+        and makes the dashboard work without external network access.
+
+        Returns:
+            The Chart.js bundle as JavaScript.
+        """
+        return Response(
+            content=_CHART_JS_PATH.read_text(encoding="utf-8"),
+            media_type="application/javascript",
+        )
+
     router.add_api_route(
         "/dashboard",
         _get_dashboard,
@@ -599,6 +643,14 @@ def build_router(get_container: ContainerProtocol) -> APIRouter:
         response_model=None,
         summary="Dashboard UI",
         description="Serves the real-time risk monitoring dashboard.",
+    )
+    router.add_api_route(
+        _CHART_JS_ROUTE,
+        _get_chart_js,
+        methods=["GET"],
+        response_model=None,
+        summary="Vendored Chart.js bundle",
+        description="Serves the Chart.js bundle used by the dashboard.",
     )
 
     return router

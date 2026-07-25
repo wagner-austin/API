@@ -12,7 +12,12 @@ packages = [
   { include = "scripts" }
 ]
 readme = "README.md"
-include = ["src/covenant_radar_api/py.typed"]
+include = [
+  "src/covenant_radar_api/py.typed",
+  # Vendored Chart.js served by the dashboard route. Without this the wheel
+  # ships the route but not the asset, and /dashboard renders chartless.
+  "src/covenant_radar_api/api/static/chart.umd.min.js",
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -109,9 +114,8 @@ mypy-init-return = true
 
 [tool.coverage.run]
 source = ["src", "scripts"]
-omit = [
-    "src/covenant_radar_api/worker/optimize_cleargbm_job.py",  # tests disabled - too slow
-]
+# No omissions: the 100% gate below covers every module that ships.
+omit = []
 branch = true
 
 [tool.coverage.report]
@@ -122,6 +126,13 @@ fail_under = 100
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# The ML tests used to fail intermittently under -n auto with MemoryError and
+# xgboost bad_malloc. The cause was not worker count: their configs omitted
+# "device", so each resolved device="auto" -> cuda and every xdist worker
+# opened its own CUDA context against a single GPU. Those configs now pin
+# "device": "cpu", after which -n auto runs clean. Keep the device pins if this
+# ever regresses - capping workers only masks it. The Makefile deliberately
+# does not pass -n, so this is the single source of truth.
 addopts = "-v -n auto --dist loadscope"
 timeout = 60
 timeout_method = "thread"

@@ -10,12 +10,16 @@ from covenant_ml.optimizer import use_real_optuna
 from covenant_ml.testing import set_cuda_hook
 from covenant_persistence import ConnectionProtocol
 from covenant_persistence.testing import InMemoryConnection, InMemoryStore
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
 from platform_core.config import _test_hooks as config_test_hooks
+from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_workers.redis import RedisBytesProto, RedisStrProto
 from platform_workers.rq_harness import RQClientQueue, _RedisBytesClient
 from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient
 
 from covenant_radar_api import _test_hooks as app_test_hooks
+from covenant_radar_api.api.error_handlers import install_covenant_error_handlers
 from covenant_radar_api.core import _test_hooks
 from covenant_radar_api.core.config import Settings
 from covenant_radar_api.core.container import ServiceContainer
@@ -72,7 +76,13 @@ def _make_fake_queue() -> FakeQueue:
     return FakeQueue()
 
 
-def _make_test_settings() -> Settings:
+def _make_test_settings(tmp_path: Path) -> Settings:
+    # Roots are real per-test directories, not the fictional "/data" tree. The
+    # API confines caller-supplied model paths to models_root, so that root has
+    # to be somewhere a test can actually write a model.
+    data_root = tmp_path / "data"
+    models_root = tmp_path / "models"
+    logs_root = tmp_path / "logs"
     return {
         "app_env": "dev",
         "logging": {"level": "INFO"},
@@ -84,13 +94,13 @@ def _make_test_settings() -> Settings:
             "failure_ttl_sec": 604800,
         },
         "app": {
-            "data_root": "/data",
-            "models_root": "/data/models",
-            "logs_root": "/data/logs",
-            "active_model_path": "/data/models/active_xgb.ubj",
+            "data_root": str(data_root),
+            "models_root": str(models_root),
+            "logs_root": str(logs_root),
+            "active_model_path": str(models_root / "active_xgb.ubj"),
             "ml_backend": "xgboost",
-            "active_model_path_xgb": "/data/models/active_xgb.ubj",
-            "active_model_path_mlp": "/data/models/active_mlp.pt",
+            "active_model_path_xgb": str(models_root / "active_xgb.ubj"),
+            "active_model_path_mlp": str(models_root / "active_mlp.pt"),
             "data_bank_api_url": "",
             "data_bank_api_key": "",
             "data_bank_model_file_id": "",
@@ -228,6 +238,33 @@ def _reset_datadog_hooks_impl() -> Generator[None, None, None]:
     datadog_test_hooks.metrics_sink_factory = orig_metrics_factory
     datadog_test_hooks.tracing_setup = orig_tracing_setup
     reset_tracing_state()
+
+
+# =============================================================================
+# Route Test Client
+# =============================================================================
+
+
+def make_route_test_client(router: APIRouter) -> TestClient:
+    """Build a TestClient wired the same way the production app is.
+
+    Installs the exception handlers that `create_app` installs, so route tests
+    observe the production error contract (an AppError surfaces as its declared
+    http_status) instead of a bare 500 from an unhandled exception. Route test
+    modules previously each built a plain FastAPI() with no handlers, which
+    made every AppError look like a 500.
+
+    Args:
+        router: Router under test, already bound to a container.
+
+    Returns:
+        TestClient that returns server exceptions as responses.
+    """
+    app = FastAPI()
+    install_exception_handlers_fastapi(app)
+    install_covenant_error_handlers(app)
+    app.include_router(router)
+    return TestClient(app, raise_server_exceptions=False)
 
 
 # =============================================================================

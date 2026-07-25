@@ -23,6 +23,7 @@ __pycache__/
 .coverage.*
 coverage.xml
 coverage_output.txt
+mypy_errors.txt
 htmlcov/
 
 # Virtual environments

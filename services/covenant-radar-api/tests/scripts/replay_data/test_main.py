@@ -163,7 +163,7 @@ class TestStreamingProducerAdapter:
     def test_produce_event_delegates(self) -> None:
         """Test produce_event delegates to StreamingProducer."""
         fake_kafka = FakeKafkaProducer()
-        streaming = StreamingProducer(fake_kafka, "pred", "alert")
+        streaming = StreamingProducer(fake_kafka, "pred", "alert", "dlq")
         adapter = _StreamingProducerAdapter(streaming)
 
         event = make_measurement_event(
@@ -184,7 +184,7 @@ class TestStreamingProducerAdapter:
     def test_poll_delegates(self) -> None:
         """Test poll delegates to StreamingProducer."""
         fake_kafka = FakeKafkaProducer()
-        streaming = StreamingProducer(fake_kafka, "pred", "alert")
+        streaming = StreamingProducer(fake_kafka, "pred", "alert", "dlq")
         adapter = _StreamingProducerAdapter(streaming)
 
         result = adapter.poll(1.0)
@@ -195,7 +195,7 @@ class TestStreamingProducerAdapter:
     def test_flush_delegates(self) -> None:
         """Test flush delegates to StreamingProducer."""
         fake_kafka = FakeKafkaProducer()
-        streaming = StreamingProducer(fake_kafka, "pred", "alert")
+        streaming = StreamingProducer(fake_kafka, "pred", "alert", "dlq")
         adapter = _StreamingProducerAdapter(streaming)
 
         result = adapter.flush(5.0)

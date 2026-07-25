@@ -5,7 +5,7 @@ Tests actual code paths using FakeTorchModule from testing.py.
 
 from __future__ import annotations
 
-from platform_ml import torch_types as torch_types_mod
+from platform_ml import torch_types as torch_types
 from platform_ml.testing import FakeTorchModule
 from platform_ml.torch_types import (
     ThreadConfig,
@@ -36,7 +36,7 @@ def test_configure_torch_threads_positive_threads() -> None:
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
-    torch_types_mod._import_torch = _fake_import
+    torch_types._import_torch = _fake_import
 
     configure_torch_threads(cfg)
 
@@ -51,7 +51,7 @@ def test_configure_torch_threads_zero_threads() -> None:
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
-    torch_types_mod._import_torch = _fake_import
+    torch_types._import_torch = _fake_import
 
     configure_torch_threads(cfg)
 
@@ -67,7 +67,7 @@ def test_configure_torch_threads_negative_threads() -> None:
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
-    torch_types_mod._import_torch = _fake_import
+    torch_types._import_torch = _fake_import
 
     configure_torch_threads(cfg)
 
@@ -93,7 +93,7 @@ def test_set_manual_seed() -> None:
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
-    torch_types_mod._import_torch = _fake_import
+    torch_types._import_torch = _fake_import
 
     set_manual_seed(42)
 
@@ -107,7 +107,7 @@ def test_get_num_threads() -> None:
     def _fake_import() -> _TorchModuleProtocol:
         return fake_torch
 
-    torch_types_mod._import_torch = _fake_import
+    torch_types._import_torch = _fake_import
 
     result = get_num_threads()
 

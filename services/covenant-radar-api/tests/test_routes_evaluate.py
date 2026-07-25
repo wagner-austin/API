@@ -5,13 +5,12 @@ from __future__ import annotations
 from typing import Literal
 
 from covenant_domain import Covenant, CovenantId, DealId, Measurement
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, narrow_json_to_list
 
 from covenant_radar_api.api.routes.evaluate import build_router
 
-from .conftest import ContainerAndStore
+from .conftest import ContainerAndStore, make_route_test_client
 
 # Period constants for tests
 Q1_START = "2024-01-01"
@@ -20,10 +19,7 @@ Q1_END = "2024-03-31"
 
 def _create_test_client(cas: ContainerAndStore) -> TestClient:
     """Create test client with real container."""
-    app = FastAPI()
-    router = build_router(cas.container)
-    app.include_router(router)
-    return TestClient(app, raise_server_exceptions=False)
+    return make_route_test_client(build_router(cas.container))
 
 
 def _add_test_covenant(
@@ -217,7 +213,7 @@ class TestEvaluateEndpoint:
 
         response = client.post("/evaluate", content=b"not valid json")
 
-        assert response.status_code == 500
+        assert response.status_code == 400
 
     def test_evaluate_missing_field(self, container_with_store: ContainerAndStore) -> None:
         """Test evaluation with missing required field."""
@@ -232,7 +228,7 @@ class TestEvaluateEndpoint:
         )
 
         # Missing period_end_iso and tolerance_ratio_scaled
-        assert response.status_code == 500
+        assert response.status_code == 400
 
     def test_evaluate_results_saved(self, container_with_store: ContainerAndStore) -> None:
         """Test that evaluation results are saved to repository."""

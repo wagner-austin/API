@@ -405,6 +405,9 @@ class FakeTorchModule:
         self._num_threads = num_threads
         self.set_num_threads_calls: list[int] = []
         self.manual_seed_calls: list[int] = []
+        # weights_only passed to the most recent load(), so callers can assert
+        # that a loader opted in to torch's safe unpickling path.
+        self.last_load_weights_only: bool = True
 
     @property
     def cuda(self) -> FakeCudaModule:
@@ -450,7 +453,21 @@ class FakeTorchModule:
     def save(self, obj: dict[str, TensorProtocol], f: str) -> None:
         pass
 
-    def load(self, f: str) -> dict[str, TensorProtocol]:
+    def load(self, f: str, *, weights_only: bool = True) -> dict[str, TensorProtocol]:
+        """Return an empty state dict.
+
+        Mirrors torch.load's keyword-only `weights_only`, which the real
+        TorchModuleProtocol declares so callers can opt in to safe unpickling.
+
+        Args:
+            f: Path to load from; ignored by the fake.
+            weights_only: Whether torch would restrict unpickling; recorded so
+                callers can assert on it.
+
+        Returns:
+            An empty state dict.
+        """
+        self.last_load_weights_only = weights_only
         return {}
 
     @property

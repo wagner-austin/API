@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Literal
 
 from covenant_domain import Covenant, CovenantId, DealId
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from platform_core.json_utils import (
     load_json_str,
@@ -15,15 +14,12 @@ from platform_core.json_utils import (
 
 from covenant_radar_api.api.routes.covenants import build_router
 
-from .conftest import ContainerAndStore
+from .conftest import ContainerAndStore, make_route_test_client
 
 
 def _create_test_client(cas: ContainerAndStore) -> TestClient:
     """Create test client with real container."""
-    app = FastAPI()
-    router = build_router(cas.container)
-    app.include_router(router)
-    return TestClient(app, raise_server_exceptions=False)
+    return make_route_test_client(build_router(cas.container))
 
 
 def _make_covenant(
@@ -143,7 +139,7 @@ class TestGetCovenant:
 
         response = client.get("/covenants/nonexistent")
 
-        assert response.status_code == 500
+        assert response.status_code == 404
 
 
 class TestDeleteCovenant:
@@ -166,4 +162,4 @@ class TestDeleteCovenant:
 
         response = client.delete("/covenants/nonexistent")
 
-        assert response.status_code == 500
+        assert response.status_code == 404

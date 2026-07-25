@@ -1,4 +1,4 @@
-"""Tests for wandb_publisher module using test hooks.
+"""Tests for wandb_publisher module using test wandb_hooks.
 
 These tests use Protocol-typed fake classes and the testing hooks to avoid
 MagicMock and Any types while maintaining strict mypy compliance.
@@ -17,8 +17,10 @@ from platform_ml.testing import (
     WandbModuleProtocol,
     WandbTableCtorProtocol,
     WandbTableProtocol,
-    hooks,
     reset_hooks,
+)
+from platform_ml.testing import (
+    hooks as wandb_hooks,
 )
 from platform_ml.wandb_publisher import (
     WandbPublisher,
@@ -52,7 +54,7 @@ class TestLoadWandbModule:
         def _load_wandb_unavailable() -> WandbModuleProtocol:
             raise WandbUnavailableError("wandb package is not installed")
 
-        hooks.load_wandb_module = _load_wandb_unavailable
+        wandb_hooks.load_wandb_module = _load_wandb_unavailable
 
         with pytest.raises(WandbUnavailableError, match="wandb package is not installed"):
             _load_wandb_module()
@@ -190,12 +192,12 @@ class FakeWandbModule:
 
 
 def _setup_fake_wandb(fake_wandb: FakeWandbModule) -> None:
-    """Set up fake wandb module via hooks."""
+    """Set up fake wandb module via wandb_hooks."""
 
     def _load_fake_wandb() -> WandbModuleProtocol:
         return fake_wandb
 
-    hooks.load_wandb_module = _load_fake_wandb
+    wandb_hooks.load_wandb_module = _load_fake_wandb
 
 
 def test_enabled_publisher_init() -> None:
@@ -396,7 +398,7 @@ def test_raises_when_enabled_but_wandb_not_installed() -> None:
     def _load_wandb_unavailable() -> WandbModuleProtocol:
         raise WandbUnavailableError("wandb package is not installed")
 
-    hooks.load_wandb_module = _load_wandb_unavailable
+    wandb_hooks.load_wandb_module = _load_wandb_unavailable
 
     with pytest.raises(WandbUnavailableError, match="wandb package is not installed"):
         WandbPublisher(project="test", run_name="run-1", enabled=True)
@@ -585,7 +587,7 @@ class TestProductionLoadWandbModule:
             return False  # Pretend wandb is not available
 
         # Inject the fake check
-        hooks.check_wandb_available = _fake_check_unavailable
+        wandb_hooks.check_wandb_available = _fake_check_unavailable
 
         # Should raise WandbUnavailableError
         with pytest.raises(WandbUnavailableError, match="wandb package is not installed"):
@@ -620,8 +622,8 @@ class TestProductionLoadWandbModule:
             return True  # Pretend wandb is available
 
         # Inject the fake hooks
-        hooks.check_wandb_available = _fake_check_wandb_available
-        hooks.import_wandb = _fake_import_wandb
+        wandb_hooks.check_wandb_available = _fake_check_wandb_available
+        wandb_hooks.import_wandb = _fake_import_wandb
 
         # Now call the production loader with our fakes
         result = _production_load_wandb_module()

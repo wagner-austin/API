@@ -791,17 +791,22 @@ src/covenant_radar_api/
 │   │   ├── measurements.py       # Financial metric ingestion
 │   │   ├── evaluate.py           # Deterministic evaluation
 │   │   └── ml.py                 # Prediction, training, optimization, explanation
-│   └── decode.py                 # JSON request decoders
+│   ├── decode.py                 # JSON request decoders
+│   └── error_handlers.py         # Decode failures -> 400 responses
 ├── core/
 │   ├── config.py                 # Settings re-export
 │   ├── container.py              # ServiceContainer for DI
+│   ├── model_paths.py            # Model path resolution under the models root
 │   └── _test_hooks.py            # Container hooks for testing
 ├── worker/
 │   ├── train_job.py              # Internal-data training job
 │   ├── train_external_job.py     # External-dataset training job
-│   ├── optimize_mlp_job.py       # MLP hyperparameter optimization
-│   ├── optimize_lstm_job.py      # LSTM hyperparameter optimization
+│   ├── evaluate_job.py           # Deterministic evaluation job
+│   ├── explain_job.py            # Explanation job
+│   ├── optimize_job.py           # Hyperparameter optimization, all backends
+│   ├── optimize_regression_job.py # Regression hyperparameter optimization
 │   ├── _model_loaders.py         # Model deserialization per backend
+│   ├── _explain_loaders.py       # Explainer construction per backend
 │   ├── _optimize_common.py       # Shared optimization utilities
 │   └── _test_hooks.py            # Worker DI hooks (registry, loaders, datasets)
 ├── worker_entry.py               # RQ worker entry point
