@@ -143,7 +143,7 @@ def test_rejected_moves_emit_supervisor_errors() -> None:
 def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
     """Pickups and destination mines ride the same tick's batch."""
     server = _server()
-    server.world["containers"].append(SimContainerDict(x=11, y=10, volume=50))
+    server.world["containers"].append(SimContainerDict(x=11, y=10, volume=50, dotted=True))
     server.world["mines"].append(SimMineDict(x=11, y=10, team=1))
     server.queue_command(9, _move(11, 10))
     messages = server.advance_tick()
@@ -300,7 +300,7 @@ def test_teleport_tick_emits_landing_position_and_sync() -> None:
     reroute clock starts here.
     """
     server = _server()
-    server.world["containers"].append(SimContainerDict(x=30, y=30, volume=40))
+    server.world["containers"].append(SimContainerDict(x=30, y=30, volume=40, dotted=True))
     server.queue_command(9, _command(("teleport", 116), 30, 30))
     messages = server.advance_tick()
     assert _kinds(messages) == [
@@ -426,7 +426,7 @@ def test_map_open_tick_emits_map_data() -> None:
 def test_pickup_click_routes_through_the_move_law() -> None:
     """A pickup-fuel click walks to the container and drains it."""
     server = _server()
-    server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30))
+    server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30, dotted=True))
     server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
     messages = server.advance_tick()
     assert _kinds(messages) == [0x47, "container_pickup", 0x5A, 0x2E, 0x2E]

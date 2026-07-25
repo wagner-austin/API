@@ -16,6 +16,7 @@ from typing import Literal, TypedDict
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import damage_tier, free_radar_radius
 from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
+from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
 from tankpit_bot.sim.blocks import blocks_at
 from tankpit_bot.sim.combat import SLOT_RADAR
@@ -178,11 +179,18 @@ def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
         """Report whether a tile lies inside the scan square."""
         return abs(x - cx) <= radius and abs(y - cy) <= radius
 
-    containers = [
-        RadarContainerDict(x=c["x"], y=c["y"], volume=c["volume"])
-        for c in world["containers"]
-        if c["volume"] > 0 and inside(c["x"], c["y"])
-    ]
+    containers = []
+    for c in world["containers"]:
+        if not inside(c["x"], c["y"]):
+            continue
+        # Exposure is the dot law (2026-07-25): a container revealed
+        # while holding MAP_DOT_MIN_VOLUME or more joins the 0x4C
+        # atlas permanently. Volume-0 containers ARE sent — the wire's
+        # cache value 0 is the client's "tile is empty" removal signal
+        # (323 zero-volume reveals in the archive).
+        if not c["dotted"] and c["volume"] >= MAP_DOT_MIN_VOLUME:
+            c["dotted"] = True
+        containers.append(RadarContainerDict(x=c["x"], y=c["y"], volume=c["volume"]))
     containers.extend(
         RadarContainerDict(x=e["x"], y=e["y"], volume=-1)
         for e in world["equipment"]
@@ -221,10 +229,15 @@ def _atlas_order(dot: tuple[int, int]) -> int:
 def build_map_data(world: SimWorldDict) -> MapDataDict:
     """Build the 0x4C strategic-map snapshot (law 8, map side).
 
-    Fuel dots are the non-empty containers in atlas stream order
-    (ascending linear position — the skip-RLE encoder's requirement);
-    tank blips cover every living tank. Mines are NOT on the map
-    (wiki [[map-data-decode]], user-confirmed 2026-07-21).
+    Fuel dots are the DOTTED containers — exposure memory, the
+    measured 2026-07-25 law ([[map-data-decode]]): a dot appears when
+    a container is revealed holding >= 500 volume and persists as the
+    container drains (even to 0), so the atlas over-promises exactly
+    the way the live one does (~40% of live dots still hold fuel).
+    Dots are emitted in atlas stream order (ascending linear position
+    — the skip-RLE encoder's requirement); tank blips cover every
+    living tank. Mines are NOT on the map ([[map-data-decode]],
+    user-confirmed 2026-07-21).
 
     Args:
         world: Simulated world.
@@ -233,7 +246,7 @@ def build_map_data(world: SimWorldDict) -> MapDataDict:
         The map snapshot.
     """
     dots = sorted(
-        ((c["x"], c["y"]) for c in world["containers"] if c["volume"] > 0),
+        ((c["x"], c["y"]) for c in world["containers"] if c["dotted"]),
         key=_atlas_order,
     )
     tanks = [

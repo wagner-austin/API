@@ -71,7 +71,6 @@ from tankpit_bot.sim.equipment import (
     resolve_equipment_pickup,
 )
 from tankpit_bot.sim.movement import MoveOutcomeDict, process_move
-from tankpit_bot.sim.spawn import respawn_containers
 from tankpit_bot.sim.world import SimWorldDict
 
 # TeleportLanded's 1-byte body observed in production captures.
@@ -229,12 +228,6 @@ class SimServer:
         self._died_at: dict[int, int] = {}
         self._pending_announcements: list[BinaryMessage] = []
         self._patched_dynamic_tiles: dict[tuple[int, int], int] = {}
-        # Steady-state populations for the replenishment law: the
-        # seeded world defines its own equilibrium ([[game-economy]],
-        # archive-mined 2026-07-22 — spawns replace consumption at
-        # ~1/min while below target, never above it).
-        self._fuel_target = sum(1 for c in world["containers"] if c["volume"] > 0)
-        self._equipment_target = len(world["equipment"])
         self._visible: set[int] = {
             tank_id
             for tank_id, tank in world["tanks"].items()
@@ -1022,7 +1015,10 @@ class SimServer:
             when the client's counts changed.
         """
         self.world["tick"] += 1
-        respawn_containers(self.world, self.terrain, self._fuel_target, self._equipment_target)
+        # No runtime container spawning: the 2026-07-22 "respawn law"
+        # was falsified 2026-07-25 (every observed "spawn" was an
+        # exposure of a pre-existing container — [[game-economy]]).
+        # The world is a static population seeded by sim.world_seed.
         messages: list[BinaryMessage] = list(self._pending_announcements)
         self._pending_announcements = []
         ammo_changed: set[int] = set()

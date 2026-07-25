@@ -46,6 +46,7 @@ from tankpit_bot.physics.damage import (
     MISSILE_HIT_VICTIM_COST,
     SINGLE_HIT_VICTIM_COST,
 )
+from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 
 __all__ = [
     "ARMOR_ABSORB_PER_SHIELD",
@@ -55,6 +56,7 @@ __all__ = [
     "DUAL_SHOT_COST",
     "HOMING_HIT_VICTIM_COST",
     "HOMING_SHOT_COST",
+    "MAP_DOT_MIN_VOLUME",
     "MINE_DETONATION_COST",
     "MINE_PRESS_COST",
     "MISSILE_HIT_VICTIM_COST",

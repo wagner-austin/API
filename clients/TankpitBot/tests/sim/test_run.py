@@ -10,13 +10,18 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict, narrow_
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
-from tankpit_bot.sim.practice_room import PRACTICE_ROSTER
 from tankpit_bot.sim.run import (
     SIM_FIELD,
     _require_seeds_passable,
     main,
     make_default_sim_world,
     run_sim_session,
+)
+from tankpit_bot.sim.world_seed import (
+    DOTTED_FUEL_COUNT,
+    HIDDEN_EQUIPMENT_COUNT,
+    HIDDEN_FUEL_COUNT,
+    select_practice_layout,
 )
 from tankpit_bot.types import decode_capture_session
 from tests.conftest import FakeFileSystem
@@ -123,17 +128,31 @@ def test_main_parses_arguments_and_reports(fake_fs: FakeFileSystem) -> None:
     assert any("sim-20260722-000008.capture_session.json" in path for path in files)
 
 
-def test_practice_session_faces_the_certified_roster(fake_fs: FakeFileSystem) -> None:
-    """Practice mode seeds the roster before the handshake, the bots
-    are driven by the certified policy, and the session archives."""
+def test_practice_session_seeds_the_mined_layout_and_population(
+    fake_fs: FakeFileSystem,
+) -> None:
+    """Practice mode seeds the stamp-selected real layout: the full
+    36-bot roster, the client at its mined join spawn, and the static
+    container field (dotted atlas + hidden fuel + hidden equipment).
+    The session archives normally."""
     _install_fake_terrain(fake_fs)
-    result = run_sim_session(8, practice=True, stamp="20260725-000001")
+    result = run_sim_session(14, practice=True, stamp="20260725-000001")
     assert result["rounds_played"] >= 1
+    layout = select_practice_layout("20260725-000001")
     world_doc = narrow_json_to_dict(load_json_str(fake_fs.read_text(Path(result["world_path"]))))
     raw_tanks = narrow_json_to_list(world_doc["tanks"])
     tank_ids = {narrow_json_to_dict(entry)["tank_id"] for entry in raw_tanks}
-    for roster_id, _team, _rank, _dx, _dy in PRACTICE_ROSTER:
+    for roster_id, _team, _rank, _x, _y in layout["roster"]:
         assert roster_id in tank_ids
+    raw_containers = narrow_json_to_list(world_doc["containers"])
+    dotted = sum(1 for entry in raw_containers if narrow_json_to_dict(entry)["dotted"] is True)
+    hidden = sum(1 for entry in raw_containers if narrow_json_to_dict(entry)["dotted"] is False)
+    # Playing EXPOSES: the client's scans dot hidden ≥500 containers,
+    # so dotted grows past the seeded census and hidden shrinks by
+    # exactly the same amount — the exposure law running end-to-end.
+    assert dotted + hidden == DOTTED_FUEL_COUNT + HIDDEN_FUEL_COUNT
+    assert dotted > DOTTED_FUEL_COUNT
+    assert len(narrow_json_to_list(world_doc["equipment"])) >= HIDDEN_EQUIPMENT_COUNT
 
 
 def test_main_practice_flag_drives_a_roster_session(fake_fs: FakeFileSystem) -> None:

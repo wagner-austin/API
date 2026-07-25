@@ -47,11 +47,21 @@ class SimTankDict(TypedDict):
 
 
 class SimContainerDict(TypedDict):
-    """One fuel container tile: position and remaining volume."""
+    """One fuel container tile: position, remaining volume, dot state.
+
+    ``dotted`` is the container's 0x4C map-atlas membership — set the
+    first time the container is EXPOSED (radar reveal) while holding
+    ``MAP_DOT_MIN_VOLUME`` (500) or more, and persistent afterwards
+    even as the volume drains (measured law 2026-07-25: dots are
+    exposure memory, ~60% of live dots no longer hold usable fuel).
+    Containers persist at volume 0 (the server answers pickup
+    attempts with 0x52 code 4 "Empty container").
+    """
 
     x: int
     y: int
     volume: int
+    dotted: bool
 
 
 class SimMineDict(TypedDict):
@@ -285,7 +295,8 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
     """
     tanks: list[JSONValue] = [encode_sim_tank(tank) for tank in world["tanks"].values()]
     containers: list[JSONValue] = [
-        {"x": c["x"], "y": c["y"], "volume": c["volume"]} for c in world["containers"]
+        {"x": c["x"], "y": c["y"], "volume": c["volume"], "dotted": c["dotted"]}
+        for c in world["containers"]
     ]
     mines: list[JSONValue] = [{"x": m["x"], "y": m["y"], "team": m["team"]} for m in world["mines"]]
     equipment: list[JSONValue] = [{"x": e["x"], "y": e["y"]} for e in world["equipment"]]
@@ -370,6 +381,7 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
             x=require_int(record, "x"),
             y=require_int(record, "y"),
             volume=require_int(record, "volume"),
+            dotted=require_bool(record, "dotted"),
         )
         for record in _require_record_list(data, "containers")
     ]

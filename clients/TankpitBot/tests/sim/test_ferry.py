@@ -100,7 +100,7 @@ def test_disembark_stops_one_step_onto_land() -> None:
 def test_floating_container_picks_up_while_riding() -> None:
     """A container on water drains normally from the ferry."""
     world = _world(13, 10)
-    world["containers"].append(SimContainerDict(x=17, y=12, volume=200))
+    world["containers"].append(SimContainerDict(x=17, y=12, volume=200, dotted=True))
     world["tanks"][9]["fuel"] = 500
     outcome = process_move(world, _channel_map(), 9, 17, 12)
     assert outcome["kind"] == "moved"

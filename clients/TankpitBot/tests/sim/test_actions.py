@@ -98,26 +98,53 @@ def test_teleport_insufficient_fuel_and_landing_pickup() -> None:
     assert rejected["kind"] == "insufficient_fuel"
 
     world = _world()
-    world["containers"].append(SimContainerDict(x=130, y=140, volume=100))
+    world["containers"].append(SimContainerDict(x=130, y=140, volume=100, dotted=True))
     landed = process_teleport(world, InMemoryTerrainMap(), 9, 130, 140)
     assert landed["pickups"] == [{"x": 130, "y": 140, "remaining_volume": 0}]
     assert world["tanks"][9]["fuel"] == 800 - landed["cost"] + 100
 
 
 def test_radar_consumes_extra_for_viewport_radius() -> None:
-    """An available extra covers radius 8 and is consumed."""
+    """An available extra covers radius 8 and is consumed.
+
+    Volume-0 containers ARE reported — the wire's cache value 0 is
+    the client's "tile is empty" removal signal (323 zero-volume
+    reveals in the archive); tiles outside the radius stay dark.
+    """
     world = _world()
     world["tanks"][9]["counts"][SLOT_RADAR] = 2
-    world["containers"].append(SimContainerDict(x=108, y=100, volume=50))
-    world["containers"].append(SimContainerDict(x=109, y=100, volume=50))
-    world["containers"].append(SimContainerDict(x=107, y=100, volume=0))
+    world["containers"].append(SimContainerDict(x=108, y=100, volume=50, dotted=True))
+    world["containers"].append(SimContainerDict(x=109, y=100, volume=50, dotted=True))
+    world["containers"].append(SimContainerDict(x=107, y=100, volume=0, dotted=True))
     world["mines"].append(SimMineDict(x=100, y=108, team=1))
     outcome = process_radar(world, 9)
     assert outcome["consumed_extra"] is True
     assert world["tanks"][9]["counts"][SLOT_RADAR] == 1
-    assert [(c["x"], c["y"]) for c in outcome["containers"]] == [(108, 100)]
+    assert [(c["x"], c["y"], c["volume"]) for c in outcome["containers"]] == [
+        (108, 100, 50),
+        (107, 100, 0),
+    ]
     assert [(m["x"], m["y"], m["team"]) for m in outcome["mines"]] == [(100, 108, 1)]
     assert outcome["enemy_found"] is False
+
+
+def test_radar_exposure_dots_large_hidden_fuel() -> None:
+    """A reveal at >= 500 volume joins the atlas; smaller never does.
+
+    The measured 2026-07-25 exposure law: the dot threshold is
+    exactly ``MAP_DOT_MIN_VOLUME`` (500), and dotting is permanent —
+    a later drain does not undo it.
+    """
+    world = _world()
+    world["tanks"][9]["counts"][SLOT_RADAR] = 1
+    world["containers"].append(SimContainerDict(x=105, y=100, volume=499, dotted=False))
+    world["containers"].append(SimContainerDict(x=106, y=100, volume=500, dotted=False))
+    process_radar(world, 9)
+    by_pos = {(c["x"], c["y"]): c for c in world["containers"]}
+    assert by_pos[(105, 100)]["dotted"] is False
+    assert by_pos[(106, 100)]["dotted"] is True
+    by_pos[(106, 100)]["volume"] = 0
+    assert (106, 100) in set(build_map_data(world)["fuel_dots"])
 
 
 def test_radar_without_extras_uses_rank_radius_and_finds_enemies() -> None:
@@ -137,15 +164,21 @@ def test_radar_without_extras_uses_rank_radius_and_finds_enemies() -> None:
 
 
 def test_map_data_sorts_dots_and_lists_living_tanks() -> None:
-    """The map snapshot: atlas-ordered dots, live blips, no mines."""
+    """The map snapshot: atlas-ordered DOTTED containers, live blips.
+
+    Dots are exposure memory (2026-07-25): a drained dotted container
+    stays on the map, and an unexposed stocked container never
+    appears. Mines are absent by law.
+    """
     world = _world()
-    world["containers"].append(SimContainerDict(x=5, y=200, volume=10))
-    world["containers"].append(SimContainerDict(x=200, y=3, volume=10))
-    world["containers"].append(SimContainerDict(x=1, y=1, volume=0))
+    world["containers"].append(SimContainerDict(x=5, y=200, volume=10, dotted=True))
+    world["containers"].append(SimContainerDict(x=200, y=3, volume=10, dotted=True))
+    world["containers"].append(SimContainerDict(x=1, y=1, volume=0, dotted=True))
+    world["containers"].append(SimContainerDict(x=2, y=1, volume=900, dotted=False))
     world["tanks"][11] = make_sim_tank(11, 1, 2, 50, 60, 500)
     world["tanks"][11]["alive"] = False
     snapshot = build_map_data(world)
-    assert snapshot["fuel_dots"] == [(200, 3), (5, 200)]
+    assert snapshot["fuel_dots"] == [(1, 1), (200, 3), (5, 200)]
     assert [entry["tank_id"] for entry in snapshot["tanks"]] == [9]
 
 

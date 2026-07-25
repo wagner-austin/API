@@ -9,16 +9,18 @@ states, notes hits from each tick's emission batch exactly the way
 the live wire reveals them (a 0x53 whose target tile holds a tank),
 and queues each bot's next-tick decision.
 
-The default roster mirrors a real practice-room encounter from the
-client's perspective (client is team 2): three purple bots clustered
-within sight of each other — so gang-up fire ignites when the client
-engages one — plus one blue ally bot that assists the client's own
-fights, the live blue-7 shape.
+The roster is a REAL practice-room state: the full 36-bot layout
+(ids 500-535, 9 per team, ranks 0-1) lifted from an archive capture
+by ``analysis_scripts/mine_practice_roster.py`` and shipped in
+``sim.world_seed.PRACTICE_LAYOUTS`` — bots at their actually
+observed map positions, so a session means finding fights across
+the whole field, not a scripted clearing.
 """
 
 from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.bot_policy import (
     PracticeBotStateDict,
@@ -31,18 +33,6 @@ from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 
-PRACTICE_ROSTER: tuple[tuple[int, int, int, int, int], ...] = (
-    (510, 1, 0, 8, 0),
-    (511, 1, 0, 9, 1),
-    (512, 1, 0, 8, -2),
-    (524, 2, 0, 6, 1),
-)
-"""Default roster as (tank_id, team, rank, dx, dy) client-relative
-offsets: three sighted purple recruits (the gang-up cluster) and one
-blue ally (the assist shape). Ids follow the live 36-slot roster."""
-
-_PRACTICE_BOT_FUEL = 800
-
 
 class PracticeRoomDriver:
     """Owns roster policy states and drives them each tick."""
@@ -52,29 +42,34 @@ class PracticeRoomDriver:
         world: SimWorldDict,
         terrain: TerrainMapProtocol,
         client_id: int,
+        roster: tuple[tuple[int, int, int, int, int], ...],
     ) -> None:
         """Seed the roster into the world and initialize states.
 
-        Each bot lands on the nearest open tile to its offset from
-        the client's spawn (a sealed offset leaves the bot exactly on
-        it — the seed positions are chosen inside the arena clearing).
+        Each bot lands on the nearest open tile to its mined
+        ``(x, y)`` position (a sealed position falls back to the
+        exact mined tile — real positions are passable on the real
+        map, so this only matters for artificial test terrains). Bots
+        boot at their rank's full fuel — the reactivation law's
+        full-tank state, the only fuel level the archive pins for a
+        bot at a known moment.
 
         Args:
             world: Simulated world (roster tanks added).
             terrain: Static terrain for the placement search.
-            client_id: The connected client's tank id.
+            client_id: The connected client's tank id (never seeded).
+            roster: ``(tank_id, team, rank, x, y)`` rows, absolute
+                map positions (see ``sim.world_seed.PRACTICE_LAYOUTS``).
         """
-        client = world["tanks"][client_id]
+        del client_id
         self.states: dict[int, PracticeBotStateDict] = {}
-        for tank_id, team, rank, dx, dy in PRACTICE_ROSTER:
-            seed_x = client["x"] + dx
-            seed_y = client["y"] + dy
+        for tank_id, team, rank, seed_x, seed_y in roster:
             landing = find_open_tile_near(
                 world, terrain, seed_x, seed_y, world["tick"], min_radius=0, max_radius=4
             )
             spot = landing if landing is not None else (seed_x, seed_y)
             world["tanks"][tank_id] = make_sim_tank(
-                tank_id, team, rank, spot[0], spot[1], _PRACTICE_BOT_FUEL
+                tank_id, team, rank, spot[0], spot[1], fuel_capacity(rank)
             )
             self.states[tank_id] = make_practice_bot_state()
 
@@ -138,6 +133,5 @@ class PracticeRoomDriver:
 
 
 __all__ = [
-    "PRACTICE_ROSTER",
     "PracticeRoomDriver",
 ]

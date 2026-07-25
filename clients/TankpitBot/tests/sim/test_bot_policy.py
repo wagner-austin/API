@@ -243,7 +243,7 @@ def test_practice_room_ignores_shots_from_unknown_shooters() -> None:
 
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 900)
-    driver = PracticeRoomDriver(world, InMemoryTerrainMap(), 9)
+    driver = PracticeRoomDriver(world, InMemoryTerrainMap(), 9, ((510, 1, 0, 108, 100),))
     ghost_shot = ShootEventDict(
         msg_type=0x53,
         team=0,

@@ -53,7 +53,7 @@ def test_route_cost_above_fuel_is_insufficient() -> None:
 def test_arrival_pickup_respects_capacity() -> None:
     """The destination container drains only what the tank can hold."""
     world = _world_with_tank(fuel=fuel_capacity(1) - 50)
-    world["containers"].append(SimContainerDict(x=11, y=10, volume=200))
+    world["containers"].append(SimContainerDict(x=11, y=10, volume=200, dotted=True))
     outcome = process_move(world, InMemoryTerrainMap(), 9, 11, 10)
     assert outcome["kind"] == "moved"
     assert world["tanks"][9]["fuel"] == fuel_capacity(1)
@@ -64,7 +64,7 @@ def test_arrival_pickup_respects_capacity() -> None:
 def test_empty_container_is_not_a_pickup() -> None:
     """A drained container at the destination produces no record."""
     world = _world_with_tank()
-    world["containers"].append(SimContainerDict(x=11, y=10, volume=0))
+    world["containers"].append(SimContainerDict(x=11, y=10, volume=0, dotted=True))
     outcome = process_move(world, InMemoryTerrainMap(), 9, 11, 10)
     assert outcome["kind"] == "moved"
     assert outcome["pickups"] == []

@@ -73,7 +73,7 @@ def _boot() -> tuple[SimServer, bytes]:
     world["tanks"][_CLIENT] = make_sim_tank(_CLIENT, 2, 1, 100, 100, 800)
     world["tanks"][_CLIENT]["counts"] = [25, 25, 25, 25, 25]
     world["tanks"][_ENEMY] = make_sim_tank(_ENEMY, 1, 1, 107, 100, 500)
-    world["containers"].append(SimContainerDict(x=103, y=100, volume=300))
+    world["containers"].append(SimContainerDict(x=103, y=100, volume=300, dotted=True))
     server = SimServer(world, InMemoryTerrainMap(), client_id=_CLIENT)
     _deliver(server.handshake(), table)
     return server, table

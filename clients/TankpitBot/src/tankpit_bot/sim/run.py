@@ -21,6 +21,7 @@ No live server, no browser, no fuel spent: free soaks.
 from __future__ import annotations
 
 import sys
+import zlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TypedDict
@@ -45,6 +46,11 @@ from tankpit_bot.sim.world import (
     encode_sim_world,
     make_sim_tank,
     make_sim_world,
+)
+from tankpit_bot.sim.world_seed import (
+    seed_field_population,
+    seed_practice_client,
+    select_practice_layout,
 )
 from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.sniffer.xor import build_global_xor_table, get_global_xor_table, reset_xor_state
@@ -145,7 +151,7 @@ def make_default_sim_world() -> SimWorldDict:
     world["tanks"][SIM_ENEMY_ID] = make_sim_tank(SIM_ENEMY_ID, 1, 8, _ARENA_X + 10, _ARENA_Y, 500)
     world["tanks"][SIM_ENEMY_ID]["counts"] = [0, 4, 0, 2, 3]
     for x, y, volume in _DEFAULT_FUEL_CONTAINERS:
-        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume))
+        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume, dotted=True))
     for x, y in _DEFAULT_EQUIPMENT:
         world["equipment"].append(SimEquipmentDict(x=x, y=y))
     return world
@@ -187,15 +193,23 @@ def _boot(
     world: SimWorldDict,
     *,
     practice: bool = False,
+    stamp: str = "",
 ) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
     """Wire a real Bot to the sim over the CDP seam.
 
     Args:
-        world: The seeded world the server will own.
-        practice: When True, seed the certified practice-bot roster
-            (``sim/practice_room``) before the handshake so the join
-            roster dump includes the bots, and hand the server their
-            ids for the corpse-window reactivation hook.
+        world: The world the server will own. In practice mode this
+            arrives EMPTY of tanks and containers — the stamp-selected
+            real layout seeds the client spawn and the full 36-bot
+            roster, and ``seed_field_population`` lays down the static
+            container field ([[game-economy]] 2026-07-25: the world
+            never spawns at runtime).
+        practice: When True, build the practice-room world before the
+            handshake so the join roster dump includes the bots, and
+            hand the server their ids for the corpse-window
+            reactivation hook.
+        stamp: The run stamp (practice mode's layout selector; unused
+            otherwise).
 
     Returns:
         The bot, the server, the seam link, and the practice-room
@@ -220,8 +234,17 @@ def _boot(
     driver: PracticeRoomDriver | None = None
     roster_ids: frozenset[int] = frozenset()
     if practice:
-        driver = PracticeRoomDriver(world, terrain, SIM_CLIENT_ID)
+        layout = select_practice_layout(stamp)
+        log.info(
+            "practice layout %s: client spawn %s, %d bots",
+            layout["provenance"],
+            layout["client_spawn"],
+            len(layout["roster"]),
+        )
+        seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
+        driver = PracticeRoomDriver(world, terrain, SIM_CLIENT_ID, layout["roster"])
         roster_ids = driver.roster_ids()
+        seed_field_population(world, terrain, seed=zlib.crc32(stamp.encode("utf-8")))
     _require_seeds_passable(world, terrain)
     server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
     bot = Bot("https://sim.tankpit.local/", headless=True)
@@ -258,8 +281,8 @@ def run_sim_session(
     """
     run_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = configure_probe_runtime_logging("sim", run_stamp)
-    world = make_default_sim_world()
-    bot, server, link, driver = _boot(world, practice=practice)
+    world = make_sim_world(SIM_FIELD) if practice else make_default_sim_world()
+    bot, server, link, driver = _boot(world, practice=practice, stamp=run_stamp)
     exit_reason = "rounds_exhausted"
     exit_detail = ""
     played = 0
@@ -294,7 +317,14 @@ def run_sim_session(
     _test_hooks.write_text(capture_path, dump_json_str(encode_capture_session(session)))
     _test_hooks.write_text(world_path, dump_json_str(encode_sim_world(server.world)))
     client = server.world["tanks"][SIM_CLIENT_ID]
-    enemy = server.world["tanks"][enemy_id]
+    if practice:
+        enemy_alive = any(
+            tank["alive"] and tank["team"] != client["team"]
+            for tank_id, tank in server.world["tanks"].items()
+            if tank_id != SIM_CLIENT_ID
+        )
+    else:
+        enemy_alive = server.world["tanks"][enemy_id]["alive"]
     return SimRunResultDict(
         stamp=run_stamp,
         rounds_played=played,
@@ -303,7 +333,7 @@ def run_sim_session(
         commands_sent=len(link.sent_commands),
         client_fuel=client["fuel"],
         client_alive=client["alive"],
-        enemy_alive=enemy["alive"],
+        enemy_alive=enemy_alive,
         capture_path=str(capture_path),
         world_path=str(world_path),
         events_path=artifacts["latest_events_path"],

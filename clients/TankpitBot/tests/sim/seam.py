@@ -136,7 +136,7 @@ def boot_seam(
     world["tanks"][SEAM_ENEMY_ID] = make_sim_tank(SEAM_ENEMY_ID, 1, 8, 110, 100, enemy_fuel)
     world["tanks"][SEAM_ENEMY_ID]["counts"] = list(enemy_counts)
     for x, y, volume in containers:
-        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume))
+        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume, dotted=True))
     for x, y in equipment:
         world["equipment"].append(SimEquipmentDict(x=x, y=y))
     for x, y in ferries:
