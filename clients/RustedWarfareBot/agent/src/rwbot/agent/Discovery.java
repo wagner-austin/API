@@ -42,10 +42,7 @@ final class Discovery {
         }
         out.append("target class: ").append(target.getClass().getName()).append('\n');
 
-        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
-            if (type == Object.class) {
-                break;
-            }
+        for (Class<?> type : ownedHierarchy(target.getClass())) {
             out.append("--- ").append(type.getName()).append(" ---\n");
             for (Field field : declaredFieldsOf(type)) {
                 out.append(describeField(target, field)).append('\n');
@@ -120,9 +117,7 @@ final class Discovery {
             // declared on the base. Listing only declared fields makes a
             // subclass look featureless, which is precisely how a tree class
             // was once mistaken for the unit class.
-            for (Class<?> type = element.getClass();
-                    type != null && type != Object.class && !isPlatformClass(type);
-                    type = type.getSuperclass()) {
+            for (Class<?> type : ownedHierarchy(element.getClass())) {
                 for (Field own : declaredFieldsOf(type)) {
                     if (Modifier.isStatic(own.getModifiers())) {
                         continue;
@@ -198,9 +193,7 @@ final class Discovery {
             if (isPlatformClass(node.value.getClass())) {
                 continue;
             }
-            for (Class<?> type = node.value.getClass();
-                    type != null && type != Object.class;
-                    type = type.getSuperclass()) {
+            for (Class<?> type : ownedHierarchy(node.value.getClass())) {
                 for (Field field : declaredFieldsOf(type)) {
                     Object child = readQuietly(node.value, field);
                     String path = node.path + "." + field.getName();
@@ -360,6 +353,34 @@ final class Discovery {
             }
         }
         return null;
+    }
+
+    /**
+     * The classes whose declared fields belong to a game object: the class
+     * itself and its superclasses, stopping at {@code Object} and at the first
+     * platform class.
+     *
+     * <p>Every hierarchy walk goes through here, and that is the point. The
+     * platform boundary had been applied in one walk and missed in another
+     * twice: first when containers were traversed by their declared fields,
+     * then again here, where a game class extending a JDK type -- twelve extend
+     * {@code Thread}, four extend {@code Exception}, and the master entity list
+     * type extends {@code AbstractList} -- had its superclass internals
+     * reflected. A shared helper makes the boundary structural instead of
+     * something each new walk has to remember.
+     *
+     * @param type Most-derived class to start from.
+     * @return The owned classes, most-derived first; empty when {@code type} is
+     *     itself a platform class.
+     */
+    private static java.util.List<Class<?>> ownedHierarchy(Class<?> type) {
+        java.util.List<Class<?>> chain = new java.util.ArrayList<Class<?>>();
+        for (Class<?> current = type;
+                current != null && current != Object.class && !isPlatformClass(current);
+                current = current.getSuperclass()) {
+            chain.add(current);
+        }
+        return chain;
     }
 
     /** Returns a class's declared fields, or none when reflection is refused. */
