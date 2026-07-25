@@ -1,0 +1,345 @@
+﻿-----------------------------
+ ()Lorg/lwjgl/opengl/DisplayMode;
+ com/corrodinggames/rts/java/Main
+ -debugscript requires parameters
+----- Game init finished in:
+ org/newdawn/slick/SlickException
+!Lcom/corrodinggames/rts/java/b/a;
+!Lcom/corrodinggames/rts/java/d/a;
+!Lorg/newdawn/slick/GameContainer;
+"()Lcom/corrodinggames/librocket/a;
+"(Lcom/corrodinggames/rts/java/d;)V
+"*+?
+"addScriptToQueueIfNotAlreadyQueued
+"com/corrodinggames/rts/java/Main$1
+"com/corrodinggames/rts/java/Main$2
+"com/corrodinggames/rts/java/Main$3
+"com/corrodinggames/rts/java/Main$4
+"Lcom/corrodinggames/rts/java/Main;
+#()Lcom/corrodinggames/rts/java/b/a;
+#Failed to disable VBOs, wrong class
+%(Lcom/corrodinggames/rts/java/Main;)V
+%Disabling sound with NullSoundFactory
+&(Ljava/lang/String;)Ljava/lang/String;
+&(Ljava/util/Locale;)Ljava/lang/String;
+&com/corrodinggames/rts/gameFramework/l
+&com/corrodinggames/rts/gameFramework/n
+()Ljava/lang/Runtime;
+()Ljava/lang/String;
+([Ljava/lang/String;)V
+(com/corrodinggames/rts/gameFramework/a/e
+(com/corrodinggames/rts/gameFramework/a/f
+(com/corrodinggames/rts/gameFramework/h/a
+(com/corrodinggames/rts/gameFramework/j/c
+(com/corrodinggames/rts/gameFramework/j/n
+(com/corrodinggames/rts/gameFramework/m/x
+(com/corrodinggames/rts/gameFramework/o/a
+(D)Ljava/lang/StringBuilder;
+(F)Ljava/lang/StringBuilder;
+(F)V
+(I)Ljava/lang/Integer;
+(I)Ljava/lang/StringBuilder;
+(I)V
+(II)V
+(III)V
+(ILjava/lang/String;)V
+(J)Ljava/lang/StringBuilder;
+(J)V
+(Lcom/corrodinggames/rts/gameFramework/n;
+(Ljava/io/InputStream;)V
+(Ljava/io/PrintStream;)V
+(Ljava/io/Reader;)V
+(Ljava/lang/CharSequence;)Z
+-(Ljava/lang/Object;)Ljava/lang/StringBuilder;
+(Ljava/lang/Object;)Z
+(Ljava/lang/Runnable;)V
+'(Ljava/lang/String;)[Ljava/lang/String;
+(Ljava/lang/String;)I
+-(Ljava/lang/String;)Ljava/lang/StringBuilder;
+(Ljava/lang/String;)V
+(Ljava/lang/String;)Z
+(Ljava/lang/String;J)V
+'(Ljava/lang/String;Ljava/lang/String;)V
+(Ljava/lang/String;Z)V
+(Ljava/lang/Throwable;)V
+(Lorg/newdawn/slick/Game;II)V
+(Lorg/newdawn/slick/Game;IIZ)V
+(Z)I
+(Z)Ljava/lang/StringBuilder;
+(Z)V
+)()Lorg/newdawn/slick/opengl/renderer/SGL;
+)com/corrodinggames/rts/gameFramework/j/ac
+)com/corrodinggames/rts/gameFramework/j/ad
+)L*?
+)L+?
+)Lcom/corrodinggames/rts/gameFramework/ai;
+)Lcom/corrodinggames/rts/gameFramework/aq;
+*()Lcom/corrodinggames/rts/gameFramework/l;
+*+,-
+*Lcom/corrodinggames/rts/gameFramework/a/h;
+*Lcom/corrodinggames/rts/gameFramework/j/r;
+*Lcom/corrodinggames/rts/gameFramework/o/a;
+*org/newdawn/slick/opengl/renderer/Renderer
+,()Lcom/corrodinggames/rts/gameFramework/o/a;
+,org.lwjgl.opengl.Display.allowSoftwareOpenGL
+.(Lcom/corrodinggames/rts/gameFramework/j/ae;)V
+.com/corrodinggames/rts/gameFramework/utility/l
+/com/corrodinggames/rts/gameFramework/utility/aj
+;???N*?
+?(Lcom/corrodinggames/rts/gameFramework/j/c;Ljava/lang/String;)V
+?-*?
+????
+?W*?
+?Y*?
+?Y*+?
+?Y,?
+[Ljava/lang/String;
++connect_lobby
++Disabling vbo on mac (without force option)
++Lcom/corrodinggames/rts/gameFramework/j/ac;
++Lcom/corrodinggames/rts/gameFramework/j/ad;
+<clinit>
+<init>
+0*Y?
+1com/corrodinggames/librocket/scripts/ScriptEngine
+1Lcom/corrodinggames/rts/gameFramework/utility/aj;
+2Failed to get display mode, defaulting to min size
+3com/corrodinggames/rts/gameFramework/SettingsEngine
+3com/corrodinggames/rts/java/audio/lwjgl/OpenALAudio
+3Lcom/corrodinggames/librocket/scripts/ScriptEngine;
+5()Lcom/corrodinggames/librocket/scripts/ScriptEngine;
+5Lcom/corrodinggames/rts/gameFramework/SettingsEngine;
+8(Lcom/corrodinggames/rts/java/audio/lwjgl/OpenALAudio;)V
+8(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+8L*?
+8Unknown options but running anyway due to being in steam
+9M,?
+A.??
+acquire
+addRunnableToQueue
+ADMIN
+allowSoftwareOpenGL is now on
+-allowsoftwarerender
+android/content/ServerContext
+android/graphics/Point
+append
+arg: 
+BL*?
+Build Number: 
+Cannot open log file:
+-canvasgl
+Code
+com/corrodinggames/librocket/a
+com/corrodinggames/rts/a/a
+com/corrodinggames/rts/game/i
+'com/corrodinggames/rts/gameFramework/ac
+'com/corrodinggames/rts/gameFramework/am
+'com/corrodinggames/rts/gameFramework/av
+'com/corrodinggames/rts/gameFramework/br
+com/corrodinggames/rts/java/b
+com/corrodinggames/rts/java/b/a
+com/corrodinggames/rts/java/c/b
+com/corrodinggames/rts/java/d
+com/corrodinggames/rts/java/d/a
+com/corrodinggames/rts/java/e
+com/corrodinggames/rts/java/i
+com/corrodinggames/rts/java/j
+com/corrodinggames/rts/java/k
+com/corrodinggames/rts/java/l
+com/corrodinggames/rts/java/o
+com/corrodinggames/rts/java/s
+com/corrodinggames/rts/java/u
+com/corrodinggames/rts/java/v
+connect lobby:
+contains
+d???*
+d????
+debug
+-debug
+-debug requires parameters
+-debugscript
+-devdebug
+-disable_atlas
+-disable_vbos
+disable_vbos requested
+disableControllers
+-disabletextureread
+disableVBOs
+displayModes
+E(Lcom/corrodinggames/rts/java/Main;Ljava/util/concurrent/Semaphore;)V
+Early steam init
+Early steam init done.
+end libRocket setup
+ENGLISH
+equals
+Error while reading stdin: 
+exit
+Exiting due to unknown option: 
+-extrasafemode
+fallback
+File logging started
+font/Delicious-Bold.otf
+font/Delicious-BoldItalic.otf
+font/Delicious-Italic.otf
+font/Delicious-Roman.otf
+font/DroidSansFallback.ttf
+font/NotoSansCJKsc-Regular.otf
+font/Roboto-Bold.ttf
+font/Roboto-Regular.ttf
+-force_vbos
+freeMemory
+-fullscreen
+Game arguments:
+Game Code: 176
+Game Version: 1.15
+GameEngine
+GameEngine ready
+getDisplayMode
+getHeight
+getInstance
+getProperty
+getRuntime
+getVersion
+getWidth
+GuiEngine
+hasDevice
+-height
+intValue
+Is 64bit: 
+is64Bit
+J(Lcom/corrodinggames/librocket/b;Lcom/corrodinggames/rts/appFramework/f;)V
+j?*?
+java.net.preferIPv4Stack
+java/io/FileNotFoundException
+java/io/InputStreamReader
+java/io/IOException
+java/io/PrintStream
+java/lang/Exception
+java/lang/Integer
+java/lang/InterruptedException
+java/lang/Object
+java/lang/Runtime
+java/lang/RuntimeException
+java/lang/SecurityException
+java/lang/String
+java/lang/StringBuilder
+java/lang/System
+java/lang/Thread
+java/util/concurrent/Semaphore
+java/util/Locale
+JVM freeMemory:
+JVM maxMemory:
+JVM totalMemory:
+k(Landroid/content/Context;Lcom/corrodinggames/rts/gameFramework/n;)Lcom/corrodinggames/rts/gameFramework/l;
+Landroid/graphics/Point;
+-lang
+-lang requires parameters
+Lcom/corrodinggames/rts/java/b;
+Lcom/corrodinggames/rts/java/d;
+Lcom/corrodinggames/rts/java/u;
+length
+libRocket - fonts
+libRocket setup took:
+LineNumberTable
+Ljava/io/InputStream;
+Ljava/lang/Class;
+Ljava/lang/Object;
+Ljava/lang/String;
+Ljava/lang/Thread;
+Ljava/util/Locale;
+loadFont
+loading libRocket
+-log
+-log requires parameters
+-logcolor
+LWJGL version: 
+mac os
+main
+maxMemory
+mp.refreshUI()
+Music disabled
+N(Ljava/lang/String;)Lcom/corrodinggames/librocket/scripts/ScriptEngine$Action;
+nanoTime
+-nobackground
+-nodisplay
+-nologfile
+-nomods
+-nomusic
+-nopostprocessing
+-nopreferipv4
+-noresources
+-nosound
+-noteamshaders
+notoSans
+NotoSansCJKsc end
+NotoSansCJKsc start
+-oldreplays
+openALAudio hasDevice:
+org/lwjgl/opengl/Display
+org/lwjgl/opengl/DisplayMode
+org/lwjgl/Sys
+org/newdawn/slick/GameContainer
+org/newdawn/slick/Input
+-org/newdawn/slick/opengl/renderer/VBORenderer
+org/newdawn/slick/ScalableGame
+OS name: 
+OS version: 
+os.name
+os.version
+-outputunitimages
+Overriding height to:
+Overriding width to:
+P(Lcom/corrodinggames/rts/gameFramework/j/c;Ljava/lang/String;)Ljava/lang/String;
+P(Ljava/lang/Runnable;)Lcom/corrodinggames/librocket/scripts/ScriptEngine$Action;
+parseInt
+-postprocessing
+printStackTrace
+-printunits
+Q(Lcom/corrodinggames/rts/gameFramework/j/c;Ljava/lang/String;Ljava/lang/String;)V
+Q(Lcom/corrodinggames/rts/gameFramework/j/c;Ljava/lang/String;Ljava/lang/String;)Z
+R(ILjava/lang/String;Ljava/lang/String;Lcom/corrodinggames/rts/gameFramework/j/c;)V
+R(Lcom/corrodinggames/rts/gameFramework/j/c;Ljava/lang/String;Ljava/lang/String;Z)V
+Reading args
+-replay_debug
+Rusted Warfare
+-safemode
+-sandbox
+screenHeight:
+screenWidth:
+setDaemon
+setErr
+setOut
+setProperty
+setRenderer
+setResizable
+setup
+showUnitGroups
+showZoomButton
+shutdownServer
+Skipping display mode call
+Skipping preferIPv4Stack=true
+sleep
+SourceFile
+split
+StackMapTable
+start
+start libRocket setup
+starting controllers
+startsWith
+-steam
+steam not requested
+t(Lcom/corrodinggames/rts/java/Main;ILjava/lang/String;Ljava/lang/String;Lcom/corrodinggames/rts/gameFramework/j/c;)V
+-teamshaders
+toLowerCase
+Too many stdin errors, ignoring
+toString
+totalMemory
+trim
+true
+Unknown option: 
+Unknown steam option: 
+Unknown two_part_arg: 
+unset
+valueOf
+version: 
+-width

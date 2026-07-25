@@ -1,0 +1,35 @@
+# Pinned game working copy — a 451 MB copy of a commercial game.
+# Never tracked. Runs launch from here so the Steam install stays clean
+# and the build stays pinned against Steam auto-update.
+.game/
+
+# Bulk run output (event streams, replays, per-session logs) — many
+# and large. The monorepo root .gitignore already excludes **/runs/;
+# this line is here for intent, not effect.
+runs/
+
+# Wiki source archive is the OPPOSITE: every artifact a wiki page
+# cites lives here and MUST be versioned, or citations break on a
+# fresh clone and source-path-exists fails wholesale. The root
+# .gitignore excludes *.log by pattern, so re-include explicitly.
+# This works where a runs/ exception could not: *.log is a FILE
+# pattern, and git can only re-include below a directory that was
+# never itself excluded.
+!wiki/sources/**
+
+# Compiled agent output. The Java SOURCE under agent/src/ is tracked; the
+# jar and classes are rebuilt by `make agent` and pinned to nothing.
+agent/build/
+
+# Python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+# pytest's basetemp, pinned inside the repo by --basetemp so xdist workers
+# share a predictable root. Test trees written here are throwaway fixtures.
+.pytest_tmp/
+.coverage
+.env

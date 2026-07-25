@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Premain-Class: rwbot.agent.Premain
+Implementation-Title: RustedWarfareBot agent
+Implementation-Version: 0.1.0

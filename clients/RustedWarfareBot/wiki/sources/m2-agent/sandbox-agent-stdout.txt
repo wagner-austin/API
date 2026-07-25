@@ -1,0 +1,49 @@
+[rw-agent] patched com/corrodinggames/rts/java/d/a [EnableScissorRegion(Z)V]
+[rw-agent] ready; patched 1 class(es)
+2026-07-25 11:29:46.466: Reading args
+start try
+Hello World from C++!
+Callback done
+Open(font/Delicious-Roman.otf)
+OpenConverted(font/Delicious-Roman.otf)
+Open(font/Delicious-Italic.otf)
+OpenConverted(font/Delicious-Italic.otf)
+Open(font/Delicious-Bold.otf)
+OpenConverted(font/Delicious-Bold.otf)
+Open(font/Delicious-BoldItalic.otf)
+OpenConverted(font/Delicious-BoldItalic.otf)
+Open(font/Roboto-Regular.ttf)
+OpenConverted(font/Roboto-Regular.ttf)
+Open(font/Roboto-Bold.ttf)
+OpenConverted(font/Roboto-Bold.ttf)
+font family override
+Open(font/NotoSansCJKsc-Regular.otf)
+OpenConverted(font/NotoSansCJKsc-Regular.otf)
+font family override
+Open(font/DroidSansFallback.ttf)
+OpenConverted(font/DroidSansFallback.ttf)
+loadDocument:assets/gui/mainMenu.rml
+Open(assets/gui/mainMenu.rml)
+OpenConverted(assets/gui/mainMenu.rml)
+Open(assets/gui/rkt.rcss)
+OpenConverted(assets/gui/rkt.rcss)
+Open(assets/gui/common.rcss)
+OpenConverted(assets/gui/common.rcss)
+Open(assets/gui/forms.rcss)
+OpenConverted(assets/gui/forms.rcss)
+ProcessEvent(onShowNewScreen();)
+loadDocument:assets/gui/sandboxOptions.rml
+Open(assets/gui/sandboxOptions.rml)
+OpenConverted(assets/gui/sandboxOptions.rml)
+Open(assets/gui/rkt.rcss)
+OpenConverted(assets/gui/rkt.rcss)
+Open(assets/gui/common.rcss)
+OpenConverted(assets/gui/common.rcss)
+Open(assets/gui/forms.rcss)
+OpenConverted(assets/gui/forms.rcss)
+ProcessEvent(setPageMinWidthAndHeight(700, 700); showLevelOptions(); onShowNewScreen();)
+Method:ReleaseTexture
+Method:ReleaseTexture
+Method:ReleaseTexture
+Method:ReleaseTexture
+Method:ReleaseTexture

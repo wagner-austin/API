@@ -1,0 +1,211 @@
+"""Field validators shared by every ``decode_*`` function in this package.
+
+Decoders receive flat scalar payloads — configuration files, CLI input, run
+artifacts — and must convert them into TypedDicts with guaranteed field types.
+Each ``require_*`` helper narrows exactly one field and raises
+:class:`DecodeError` with a traceable code when the field is absent or the
+wrong type.
+
+The payload type is spelled out as ``Mapping[str, str | int | bool]`` at every
+call site rather than hidden behind an alias: every payload this package
+decodes is flat and scalar, so the precise union is both accurate and
+checkable. A nested payload would need its own decoder rather than a widening
+of this one.
+
+These helpers never coerce. ``require_int`` on the string ``"5"`` is an error,
+not a silent ``int("5")`` — a payload that disagrees with its schema is a bug
+in the producer, and coercion would hide it.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from pathlib import PureWindowsPath
+
+from rw_bot import RwBotError
+
+_MISSING = "RW-DECODE-001"
+_WRONG_TYPE = "RW-DECODE-002"
+_EMPTY_STR = "RW-DECODE-003"
+_NOT_POSITIVE = "RW-DECODE-004"
+_NOT_ABSOLUTE = "RW-DECODE-005"
+
+
+class DecodeError(RwBotError):
+    """A payload field was absent or carried the wrong type.
+
+    Args:
+        code: Stable machine-readable identifier.
+        message: Human-readable description of the offending field.
+    """
+
+
+def _fetch(payload: Mapping[str, str | int | bool], field: str) -> str | int | bool:
+    """Return one field from a payload, or raise if it is absent.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The raw field value, not yet narrowed.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when the field is absent.
+    """
+    if field not in payload:
+        raise DecodeError(_MISSING, f"required field {field!r} is absent")
+    return payload[field]
+
+
+def require_str(payload: Mapping[str, str | int | bool], field: str) -> str:
+    """Narrow one field to ``str``.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as a ``str``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when the
+            value is not a ``str``.
+    """
+    value = _fetch(payload, field)
+    if not isinstance(value, str):
+        raise DecodeError(_WRONG_TYPE, f"field {field!r} must be str, got {type(value).__name__}")
+    return value
+
+
+def require_non_empty_str(payload: Mapping[str, str | int | bool], field: str) -> str:
+    """Narrow one field to a ``str`` with at least one non-whitespace character.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as a non-empty ``str``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when not a
+            ``str``, ``RW-DECODE-003`` when blank.
+    """
+    value = require_str(payload, field)
+    if value.strip() == "":
+        raise DecodeError(_EMPTY_STR, f"field {field!r} must not be blank")
+    return value
+
+
+def require_absolute_path(payload: Mapping[str, str | int | bool], field: str) -> str:
+    """Narrow one field to a non-blank absolute Windows path.
+
+    Absoluteness is a correctness requirement here rather than a style
+    preference. Every path in a launch configuration is consumed by the game
+    process, which runs with the game directory as its working directory, so a
+    relative path silently resolves against the pinned game tree instead of the
+    caller's location.
+
+    Windows semantics are applied explicitly rather than inherited from the
+    host: the engine ships a Windows ``java.exe`` and the whole harness is
+    pinned to that platform, so ``PureWindowsPath`` is the accurate reading and
+    keeps the rule identical wherever the test suite runs. A drive-rooted path
+    with no drive letter (``/runs/x``) is relative under those semantics and is
+    rejected.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as an absolute path.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when not a
+            ``str``, ``RW-DECODE-003`` when blank, ``RW-DECODE-005`` when the
+            value is not absolute.
+    """
+    value = require_non_empty_str(payload, field)
+    if not PureWindowsPath(value).is_absolute():
+        raise DecodeError(
+            _NOT_ABSOLUTE,
+            f"field {field!r} must be an absolute path, got {value!r}: the game process "
+            "runs with the game directory as its working directory, so a relative path "
+            "resolves against the game tree rather than the caller",
+        )
+    return value
+
+
+def require_int(payload: Mapping[str, str | int | bool], field: str) -> int:
+    """Narrow one field to ``int``.
+
+    ``bool`` is rejected even though it subclasses ``int``: a boolean arriving
+    where a count is expected is a producer bug, not an integer.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as an ``int``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when the
+            value is not an ``int`` or is a ``bool``.
+    """
+    value = _fetch(payload, field)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DecodeError(_WRONG_TYPE, f"field {field!r} must be int, got {type(value).__name__}")
+    return value
+
+
+def require_positive_int(payload: Mapping[str, str | int | bool], field: str) -> int:
+    """Narrow one field to an ``int`` greater than zero.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as a positive ``int``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when not an
+            ``int``, ``RW-DECODE-004`` when zero or negative.
+    """
+    value = require_int(payload, field)
+    if value <= 0:
+        raise DecodeError(_NOT_POSITIVE, f"field {field!r} must be > 0, got {value}")
+    return value
+
+
+def require_bool(payload: Mapping[str, str | int | bool], field: str) -> bool:
+    """Narrow one field to ``bool``.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as a ``bool``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when the
+            value is not a ``bool``.
+    """
+    value = _fetch(payload, field)
+    if not isinstance(value, bool):
+        raise DecodeError(_WRONG_TYPE, f"field {field!r} must be bool, got {type(value).__name__}")
+    return value
+
+
+__all__ = [
+    "DecodeError",
+    "require_absolute_path",
+    "require_bool",
+    "require_int",
+    "require_non_empty_str",
+    "require_positive_int",
+    "require_str",
+]

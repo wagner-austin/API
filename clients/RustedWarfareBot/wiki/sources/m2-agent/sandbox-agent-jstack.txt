@@ -1,0 +1,31 @@
+﻿=== SAMPLE A (t=12s) ===
+
+> "Thread-2" #23 prio=5 os_prio=0 cpu=4984.38ms 
+elapsed=12.00s tid=0x00000261df4c5800 nid=0x37c08 
+waiting on condition  [0x000000a5027ff000]
+     java.lang.Thread.State: TIMED_WAITING (sleeping)
+  	at java.lang.Thread.sleep(java.base@13/Native Method)
+  	at org.lwjgl.opengl.Sync.sync(Sync.java:72)
+  	at org.lwjgl.opengl.Display.sync(Display.java:411)
+  	at com.corrodinggames.rts.java.b.updateAndRender(Sour
+ceFile:272)
+  	at 
+com.corrodinggames.rts.java.b.gameLoop(SourceFile:146)
+
+
+
+=== SAMPLE B (t=24s) ===
+
+> "Thread-2" #23 prio=5 os_prio=0 cpu=7968.75ms 
+elapsed=24.13s tid=0x00000261df4c5800 nid=0x37c08 
+waiting on condition  [0x000000a5027ff000]
+     java.lang.Thread.State: TIMED_WAITING (sleeping)
+  	at java.lang.Thread.sleep(java.base@13/Native Method)
+  	at org.lwjgl.opengl.Sync.sync(Sync.java:72)
+  	at org.lwjgl.opengl.Display.sync(Display.java:411)
+  	at com.corrodinggames.rts.java.b.updateAndRender(Sour
+ceFile:272)
+  	at 
+com.corrodinggames.rts.java.b.gameLoop(SourceFile:146)
+
+

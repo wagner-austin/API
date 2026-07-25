@@ -1,0 +1,336 @@
+2026-07-25 01:31:20.973: File logging started
+2026-07-25 01:31:20.973: Game arguments:
+2026-07-25 01:31:20.973: arg: -nodisplay
+2026-07-25 01:31:20.973: arg: -nosound
+2026-07-25 01:31:20.973: arg: -log
+2026-07-25 01:31:20.973: arg: c:\users\test\appdata\local\temp\claude\c--users-test-projects\f6d2b10e-9c59-4168-a8e3-4fcce010bc03\scratchpad\nodisplay.log
+2026-07-25 01:31:20.973: arg: -nologfile
+2026-07-25 01:31:20.974: OS name: Windows 10
+2026-07-25 01:31:20.974: OS version: 10.0
+2026-07-25 01:31:20.979: LWJGL version: 2.9.3
+2026-07-25 01:31:20.979: Build Number: #28
+2026-07-25 01:31:20.979: Game Version: 1.15
+2026-07-25 01:31:20.979: Game Code: 176
+2026-07-25 01:31:20.983: Is 64bit: true
+2026-07-25 01:31:20.983: JVM maxMemory:1048576000
+2026-07-25 01:31:20.984: JVM totalMemory:534773760
+2026-07-25 01:31:20.984: JVM freeMemory:528482304
+2026-07-25 01:31:20.984: steam not requested
+corroding: nativePollOnce:100,0
+2026-07-25 01:31:20.994: --- ERROR: Skipping display mode call
+2026-07-25 01:31:20.995: screenHeight:800.0
+2026-07-25 01:31:20.995: screenWidth:600.0
+Sat Jul 25 01:31:21 PDT 2026 INFO:Slick Build #84
+Sat Jul 25 01:31:21 PDT 2026 INFO:LWJGL Version: 2.9.3
+Sat Jul 25 01:31:21 PDT 2026 INFO:OriginalDisplayMode: 1024 x 768 x 32 @60Hz
+Sat Jul 25 01:31:21 PDT 2026 INFO:TargetDisplayMode: 10 x 10 x 0 @0Hz
+Sat Jul 25 01:31:21 PDT 2026 INFO:Starting display 10x10
+Sat Jul 25 01:31:21 PDT 2026 INFO:Use Java PNG Loader = true
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 32x32
+2026-07-25 01:31:22.438: --Now loading:displayModes
+2026-07-25 01:31:22.444: --Now loading:starting controllers
+2026-07-25 01:31:22.491: Disabling sound with NullSoundFactory
+2026-07-25 01:31:22.497: --Now loading:loading libRocket
+2026-07-25 01:31:22.497: start libRocket setup
+In Java with: Hello from C++
+2026-07-25 01:31:22.523: --Now loading:libRocket - fonts
+2026-07-25 01:31:22.540: NotoSansCJKsc start
+2026-07-25 01:31:22.555: NotoSansCJKsc end
+2026-07-25 01:31:22.555: end libRocket setup
+2026-07-25 01:31:22.555: --Now loading:GuiEngine
+2026-07-25 01:31:22.555: libRocket setup took:58.573ms
+2026-07-25 01:31:22.555: --Now loading:GameEngine
+2026-07-25 01:31:22.558: GameEngine:GameEngine()
+2026-07-25 01:31:22.559: Created new gameEngine of:com.corrodinggames.rts.game.i
+2026-07-25 01:31:22.559: --- ----------------- ----
+2026-07-25 01:31:22.559: --- GameEngine:init() ----
+2026-07-25 01:31:22.559: --- ----------------- ----
+2026-07-25 01:31:22.560: Version:v1.15
+2026-07-25 01:31:22.566: --Now loading:Asset Index
+2026-07-25 01:31:22.567: densityScaleRaw*densityScaleMultiplier: 1.0
+2026-07-25 01:31:22.567: ------- createIndex -------
+2026-07-25 01:31:22.567: packageName:dedicatedServer
+2026-07-25 01:31:22.567: c:
+2026-07-25 01:31:22.567: --Now loading:InputController
+2026-07-25 01:31:22.570: slickToAndroidCodes: Could not find keycode for: NUMLOCK, RWIN, CONVERT, STOP, AX, UNDERLINE, DELETE, NOCONVERT, APPS, DECIMAL, SCROLL, END, KANJI, NUMPADDECIMAL, LWIN, CIRCUMFLEX, UNLABELED, F14, F13, COLON, F15, CAPITAL, 
+2026-07-25 01:31:22.571: gdxToAndroidCodes: Could not find keycode for: END, META_ALT_LEFT_ON, COLON, ANY_KEY, META_SHIFT_RIGHT_ON, 
+2026-07-25 01:31:22.571: gdxToSlickCodes: Could not find keycode for: MEDIA_REWIND, MEDIA_PLAY_PAUSE, BUTTON_SELECT, CENTER, BUTTON_X, BUTTON_Z, BUTTON_Y, MEDIA_PREVIOUS, SWITCH_CHARSET, SEARCH, META_ALT_ON, CAMERA, SHIFT_LEFT, BUTTON_START, MUTE, CALL, PICTSYMBOLS, FOCUS, VOLUME_DOWN, ENVELOPE, BUTTON_L2, BUTTON_L1, META_SHIFT_ON, NUM, SOFT_RIGHT, NOTIFICATION, STAR, MENU, DPAD_CENTER, BUTTON_R2, BUTTON_R1, BUTTON_THUMBL, MEDIA_FAST_FORWARD, BUTTON_THUMBR, EXPLORER, BACKSPACE, ENDCALL, FORWARD_DEL, BUTTON_MODE, SYM, SOFT_LEFT, PLUS, MEDIA_NEXT, META_ALT_LEFT_ON, MEDIA_STOP, VOLUME_UP, POUND, META_SHIFT_LEFT_ON, DEL, ANY_KEY, BUTTON_C, SHIFT_RIGHT, BUTTON_B, BUTTON_A, HEADSETHOOK, META_SHIFT_RIGHT_ON, UNKNOWN, CLEAR, 
+2026-07-25 01:31:22.572: getControllerCount:0
+2026-07-25 01:31:22.572: --Now loading:SettingsEngine
+2026-07-25 01:31:22.573: loadFromFileSystem filepath: C:\Program Files (x86)\Steam\steamapps\common\Rusted Warfare\preferences.ini
+2026-07-25 01:31:22.580: Saving settings to: C:\Program Files (x86)\Steam\steamapps\common\Rusted Warfare\preferences.ini
+2026-07-25 01:31:22.581: densityScale(): 1.0
+2026-07-25 01:31:22.582: Locale: default targetLocale:en_US
+2026-07-25 01:31:22.582: Locale: default targetLocale ISO3:eng
+2026-07-25 01:31:22.586: FileLoader: Could not find asset:assets/translations/Strings_en_us.properties
+2026-07-25 01:31:22.586: Locale: No locale for Strings_en_us.properties checking locale without variant 
+2026-07-25 01:31:22.586: FileLoader: Could not find asset:assets/translations/Strings_en_us.properties
+2026-07-25 01:31:22.586: Locale: No locale for Strings_en_us.properties checking locale without variant or country
+2026-07-25 01:31:22.586: FileLoader: Could not find asset:assets/translations/Strings_en.properties
+2026-07-25 01:31:22.586: Locale: No locale for Strings_en.properties using base locale
+2026-07-25 01:31:22.586: Locale.init took:4.635ms
+2026-07-25 01:31:22.601: --Now loading:AudioEngine
+2026-07-25 01:31:22.602: AudioEngine took:0.962ms
+2026-07-25 01:31:22.602: --Now loading:MusicController
+2026-07-25 01:31:22.602: Null musicFactory - load
+2026-07-25 01:31:22.604: Loaded track:Cont-Edgen-6084.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.604: Loaded track:battletanks1B.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.604: Loaded track:sile-Justin_R-6891.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.604: Loaded track:Acti-Rudy_Ves-8657.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.604: Loaded track:Ove - Earth Is All We Have.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.604: Loaded track:[noloop]Ove Melaa - Theme Crystalized.ogg
+2026-07-25 01:31:22.604: --Now loading:music
+2026-07-25 01:31:22.605: Loaded track:[noloop]The Planets - Mars (Part A).ogg
+2026-07-25 01:31:22.605: --Now loading:music
+2026-07-25 01:31:22.605: Loaded track:[noloop]The Planets - Mars (Part B).ogg
+2026-07-25 01:31:22.605: --Now loading:music
+2026-07-25 01:31:22.605: Loaded track:Adama-Bobthede-11966.ogg
+2026-07-25 01:31:22.605: --Now loading:music
+2026-07-25 01:31:22.605: init(): using GraphicsSlick2d
+2026-07-25 01:31:22.606: --Now loading:graphics.init
+2026-07-25 01:31:22.608: Creating BitmapOrTextureAlias: 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-25 01:31:22.614: --Now loading:Fonts
+2026-07-25 01:31:22.614: New font:16 bold:false
+2026-07-25 01:31:22.677: loadGlyphs
+2026-07-25 01:31:22.677: New font:18 bold:false
+2026-07-25 01:31:22.703: loadGlyphs
+2026-07-25 01:31:22.704: --Now loading:effects.init
+2026-07-25 01:31:22.730: --Now loading:minimapHandler
+2026-07-25 01:31:22.731: We have an initial screen size, can do early setup of image buffers
+2026-07-25 01:31:22.731: --Now loading:Map Buffers
+2026-07-25 01:31:22.731: Density size changed now: 1.0, refreshing fonts
+2026-07-25 01:31:22.735: map:setupLayerBuffers for size:13
+2026-07-25 01:31:22.735: layerBufferSize is too small
+2026-07-25 01:31:22.735: layerBufferCount:1
+2026-07-25 01:31:22.735: (layerBufferSize*(layerBufferCount):1024
+2026-07-25 01:31:22.735: longest+layerBufferSize+1:1038
+2026-07-25 01:31:22.735: longest:13
+2026-07-25 01:31:22.735: layerBufferSize:1024
+2026-07-25 01:31:22.735: layerBuffer:2x2 = 4 x2 for soft fade 
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-25 01:31:22.775: ----- layerBuffers create in:39.5297 ms
+2026-07-25 01:31:22.775: Creating minimap image buffers..
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 60x60
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 60x60
+Sat Jul 25 01:31:22 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:22 PDT 2026 DEBUG:Creating FBO 60x60
+2026-07-25 01:31:22.776: --Now loading:PathEngine
+2026-07-25 01:31:22.779: PathEngine:We have 24 cores, creating extra solvers
+2026-07-25 01:31:22.779: --Now loading:GroupController
+2026-07-25 01:31:22.780: --Now loading:CollisionEngine
+2026-07-25 01:31:22.781: --Now loading:InterfaceEngine
+2026-07-25 01:31:22.789: New font:16 bold:true
+2026-07-25 01:31:22.811: loadGlyphs
+2026-07-25 01:31:22.811: New font:14 bold:true
+2026-07-25 01:31:22.830: loadGlyphs
+2026-07-25 01:31:22.830: New font:34 bold:false
+2026-07-25 01:31:22.852: loadGlyphs
+2026-07-25 01:31:22.869: New font:20 bold:true
+2026-07-25 01:31:22.886: loadGlyphs
+2026-07-25 01:31:22.886: New font:18 bold:true
+2026-07-25 01:31:22.911: loadGlyphs
+2026-07-25 01:31:22.912: New font:12 bold:false
+2026-07-25 01:31:22.929: loadGlyphs
+2026-07-25 01:31:22.929: smallTextPaint size: 12.0
+2026-07-25 01:31:22.929: New font:10 bold:false
+2026-07-25 01:31:22.946: loadGlyphs
+2026-07-25 01:31:22.946: New font:8 bold:false
+2026-07-25 01:31:22.963: loadGlyphs
+2026-07-25 01:31:22.963: New font:20 bold:false
+2026-07-25 01:31:22.982: loadGlyphs
+2026-07-25 01:31:22.982: New font:14 bold:false
+2026-07-25 01:31:23.000: loadGlyphs
+2026-07-25 01:31:23.001: --Now loading:NetworkEngine
+2026-07-25 01:31:23.004: --Now loading:StatsHandler
+2026-07-25 01:31:23.008: --Now loading:ModEngine
+2026-07-25 01:31:23.009: disabledSteam - loadWorkshopMods
+2026-07-25 01:31:23.014: loading mod custom units at:/SD/mods/units
+2026-07-25 01:31:23.015: loading mod custom units at:builtin_mods
+2026-07-25 01:31:23.018: openAssetCached: Cache hit for: builtin_mods/mega_builders/mod-info.txt
+2026-07-25 01:31:23.018: loading mod custom units at:builtin_mods_enabled
+2026-07-25 01:31:23.018: ========= Mods ===========
+2026-07-25 01:31:23.018: Number of mods:1
+2026-07-25 01:31:23.018: Mod: 'Mega Builders
+2026-07-25 01:31:23.018: ================================
+2026-07-25 01:31:23.018: Loading mod selection
+2026-07-25 01:31:23.018: --Now loading:CommandController
+2026-07-25 01:31:23.019: --Now loading:GameSaver
+2026-07-25 01:31:23.020: --Now loading:ReplayEngine
+2026-07-25 01:31:23.021: --Now loading:UnitGeoIndex
+2026-07-25 01:31:23.021: --Now loading:Precalculating map fog
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 353x353
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 21x21
+2026-07-25 01:31:23.044: smoothFog load took:19.895ms
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 440x440
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 440x440
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 240x240
+Sat Jul 25 01:31:23 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 01:31:23 PDT 2026 DEBUG:Creating FBO 240x240
+2026-07-25 01:31:23.056: --Now loading:ScorchMark.load
+2026-07-25 01:31:23.061: --Now loading:Projectile.load
+2026-07-25 01:31:23.064: --Now loading:Emitter.load
+2026-07-25 01:31:23.064: --Now loading:Unit.loadAllUnits
+2026-07-25 01:31:23.075: Recreating image data from texture: res/drawable/extractor.png (0.360ms)
+2026-07-25 01:31:23.103: Recreating image data from texture: res/drawable/base.png (0.591ms)
+2026-07-25 01:31:23.131: Recreating image data from texture: res/drawable/ship.png (0.343ms)
+2026-07-25 01:31:23.139: Recreating image data from texture: res/drawable/laser_tank_base.png (0.149ms)
+2026-07-25 01:31:23.150: Recreating image data from texture: res/drawable/heavy_hover_tank.png (0.236ms)
+2026-07-25 01:31:23.163: Recreating image data from texture: res/drawable/unit_icon_building.png (0.321ms)
+2026-07-25 01:31:23.177: Recreating image data from texture: res/drawable/wall_v.png (0.305ms)
+2026-07-25 01:31:23.192: Recreating image data from texture: res/drawable/supply_depot.png (0.347ms)
+2026-07-25 01:31:23.200: loadAllUnits took:135.822ms
+2026-07-25 01:31:23.200: --Now loading:Loading custom unit data
+2026-07-25 01:31:23.200: disabledSteam - loadWorkshopMods
+2026-07-25 01:31:23.200: loading mod custom units at:/SD/mods/units
+2026-07-25 01:31:23.200: loading mod custom units at:builtin_mods
+2026-07-25 01:31:23.201: loading mod custom units at:builtin_mods_enabled
+2026-07-25 01:31:23.201: ========= Mods ===========
+2026-07-25 01:31:23.201: Number of mods:1
+2026-07-25 01:31:23.201: Mod: 'Mega Builders
+2026-07-25 01:31:23.201: ================================
+2026-07-25 01:31:23.441: Setting missingPlaceHolder
+2026-07-25 01:31:23.546: Disabled mod at:builtin_mods/mega_builders (name:Mega Builders)
+2026-07-25 01:31:23.546: ==Timing==
+2026-07-25 01:31:23.546: imageLoad: 58.291ms
+2026-07-25 01:31:23.546: imageLoadOrGet: 88.608ms
+2026-07-25 01:31:23.546: soundLoad: 0ms
+2026-07-25 01:31:23.546: soundLoadOrGet: 0.139ms
+2026-07-25 01:31:23.546: iniParse: 18.132ms
+2026-07-25 01:31:23.546: unitParse: 300.661ms
+2026-07-25 01:31:23.546: iniOpen: 8.781ms
+2026-07-25 01:31:23.546: iniClose: 0.077ms
+2026-07-25 01:31:23.546: iniSetup: 17.589ms
+2026-07-25 01:31:23.546: actionParse: 47.709ms
+2026-07-25 01:31:23.546: unitParsePartA: 186.910ms
+2026-07-25 01:31:23.546: unitParsePartB: 208.027ms
+2026-07-25 01:31:23.546: unitParsePartC: 274.692ms
+2026-07-25 01:31:23.546: unitParsePartD: 280.615ms
+2026-07-25 01:31:23.546: enableAll: 
+2026-07-25 01:31:23.563: Done loading custom units. image cacheHits:402 image cacheMisses:305 (in: 361.224ms)
+2026-07-25 01:31:23.563: ========= Mods data loaded ===========
+2026-07-25 01:31:23.563: Number of mods:1
+2026-07-25 01:31:23.563: Mod: 'Mega Builders' - Memory use:0.00 mb - disabled  (disabled)
+2026-07-25 01:31:23.563: ================================
+2026-07-25 01:31:23.577: --Now loading:getAllUnitsChecksum
+2026-07-25 01:31:23.577: CustomUnits took:376.878ms
+2026-07-25 01:31:23.578: isOverLiquid called without map loaded
+2026-07-25 01:31:23.578: isOverLiquid called without map loaded
+2026-07-25 01:31:23.578: isOverLiquid called without map loaded
+2026-07-25 01:31:23.578: isOverLiquid called without map loaded
+2026-07-25 01:31:23.578: allUnitsChecksum took:0.303ms
+2026-07-25 01:31:23.586: Init completed
+2026-07-25 01:31:23.587: Loading took:1019.324ms
+2026-07-25 01:31:23.587: --Now loading:Loading map data
+2026-07-25 01:31:23.587: Saving settings to: C:\Program Files (x86)\Steam\steamapps\common\Rusted Warfare\preferences.ini
+2026-07-25 01:31:23.594: --- setStoppedIfNotInGameThread ---
+2026-07-25 01:31:23.594: --- setStopped ---
+2026-07-25 01:31:23.594: gameThread already null
+2026-07-25 01:31:23.603: enableAll: 
+2026-07-25 01:31:23.609:  --- Loading map ---
+2026-07-25 01:31:23.609: Mapfile: assets/maps/menu_background/menu2.tmx
+2026-07-25 01:31:23.610: ---- Loading map data ----
+2026-07-25 01:31:23.626: Map size: 170, 170
+2026-07-25 01:31:23.626: Setting up team fog..
+2026-07-25 01:31:23.646: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-07-25 01:31:23.646: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-07-25 01:31:23.646: FileLoader: Could not find asset:assets/tilesets/../decoration.tsx
+2026-07-25 01:31:23.647: MapLayer create: Ground
+2026-07-25 01:31:23.650: MapLayer create: Items
+2026-07-25 01:31:23.652: MapLayer create: Units
+2026-07-25 01:31:23.679: Map type: mission
+2026-07-25 01:31:23.680: New font:24 bold:true
+2026-07-25 01:31:23.700: loadGlyphs
+2026-07-25 01:31:23.701: Found 6 map triggers
+2026-07-25 01:31:23.702: global Seed: 432311276
+2026-07-25 01:31:23.702: getMapLevel for :maps/menu_background/menu2.tmx file:menu2.tmx
+2026-07-25 01:31:23.702: StateEngine: get(maps/menu_background/menu2.tmx)=null  (key=maps/menu_background/menu2.tmx)
+2026-07-25 01:31:23.702: PathEngine: Setting up map costs
+2026-07-25 01:31:23.724: PathEngine: Ready
+2026-07-25 01:31:23.725: selectAnyOnScreenBuilder: no builder found
+2026-07-25 01:31:23.783: loadAMenuMap took:195.837ms
+2026-07-25 01:31:23.783: --Now loading:Last setup
+2026-07-25 01:31:23.783: --Now loading:init complete
+2026-07-25 01:31:23.783: version: 1.15 176:#28
+2026-07-25 01:31:23.783: --- setRunning ---
+getNewTextureHolder: append:1
+2026-07-25 01:31:23.805: convertTexturePath for: drawable:title.png
+2026-07-25 01:31:23.809: ui[debug]: convertTextOnPage
+2026-07-25 01:31:23.810: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-25 01:31:23.810: converted key to:class
+2026-07-25 01:31:23.810: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-25 01:31:23.810: converted key to:class
+2026-07-25 01:31:23.810: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-25 01:31:23.810: converted key to:class
+2026-07-25 01:31:23.810: convertTextOnPage:_class: '${hideUnless(canResume())}' to 'hide'
+2026-07-25 01:31:23.811: converted key to:class
+2026-07-25 01:31:23.811: convertTextOnPage:_class: '${fullVersionOnlyStyle()}' to ''
+2026-07-25 01:31:23.811: converted key to:class
+2026-07-25 01:31:23.811: convertTextOnPage:_class: '${hideUnless(usingMods())}' to ''
+2026-07-25 01:31:23.811: converted key to:class
+2026-07-25 01:31:23.812: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-25 01:31:23.812: converted key to:class
+2026-07-25 01:31:23.812: ConvertText - { #1 = peak:3.08ms avg:3.08ms total:3.08ms }
+ScriptEngine:HandleEvent:onShowNewScreen();
+2026-07-25 01:31:23.813: --- setRunning ---
+2026-07-25 01:31:23.813: SlickContainer:setup
+2026-07-25 01:31:23.813: -----------------------------
+2026-07-25 01:31:23.813: ----- Game init finished in:1322.0735 ms
+2026-07-25 01:31:23.818: ai_debug(3):firstRun: no command center found
+2026-07-25 01:31:23.818: Not showing defeated message: Player - 4 had no starting units (Team: A)
+2026-07-25 01:31:23.818: ai_debug(4):firstRun: no command center found
+2026-07-25 01:31:23.818: Not showing defeated message: Player - 5 had no starting units (Team: E)
+2026-07-25 01:31:23.818: ai_debug(5):firstRun: no command center found
+2026-07-25 01:31:23.819: Not showing defeated message: Player - 6 had no starting units (Team: F)
+2026-07-25 01:31:23.819: ai_debug(6):firstRun: no command center found
+2026-07-25 01:31:23.819: Not showing defeated message: Player - 7 had no starting units (Team: G)
+2026-07-25 01:31:23.819: ai_debug(7):firstRun: no command center found
+2026-07-25 01:31:23.819: Not showing defeated message: Player - 8 had no starting units (Team: H)
+2026-07-25 01:31:23.819: ai_debug(8):firstRun: no command center found
+2026-07-25 01:31:23.819: Not showing defeated message: Player - 9 had no starting units (Team: I)
+2026-07-25 01:31:23.819: ai_debug(9):firstRun: no command center found
+2026-07-25 01:31:23.819: Not showing defeated message: Player - 10 had no starting units (Team: J)
+2026-07-25 01:31:23.834: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:2 (#units:4)
+2026-07-25 01:31:23.834: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:3 (#units:3)
+2026-07-25 01:31:23.834: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:7)
+2026-07-25 01:31:23.834: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:1)
+2026-07-25 01:31:23.835: Building smoothFog_cache
+getNewTextureHolder: append:2
+getNewTextureHolder: append:3
+getNewTextureHolder: append:4
+getNewTextureHolder: append:5
+getNewTextureHolder: append:6
+2026-07-25 01:31:23.897: Saving settings to: C:\Program Files (x86)\Steam\steamapps\common\Rusted Warfare\preferences.ini
+2026-07-25 01:31:25.851: MissionEngine:triggerLog:firstActivation: move at:2076 for teamId:1 to targetId:6 (#units:5)
+2026-07-25 01:31:31.930: MissionEngine:triggerLog:firstActivation: move at:8154 for teamId:1 to targetId:6 (#units:4)
