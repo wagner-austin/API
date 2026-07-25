@@ -25,7 +25,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
 _FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"owned":1}'
-_ENTITY = '{"kind":"entity","frame":7,"index":0,"class":"units.e.b","x":1.5,"y":-2.5}'
+_ENTITY = (
+    '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
+    '"class":"units.e.b","x":1.5,"y":-2.5}'
+)
 
 
 def _capture_lines() -> list[str]:
@@ -35,20 +38,44 @@ def _capture_lines() -> list[str]:
 def test_decodes_the_real_capture_into_three_samples() -> None:
     samples = decode_samples(_capture_lines())
     assert len(samples) == 3
-    assert [s["frame"] for s in samples] == [1, 1597, 3397]
-    assert [s["clock_ms"] for s in samples] == [50, 5388, 11388]
+    frames = [s["frame"] for s in samples]
+    clocks = [s["clock_ms"] for s in samples]
+    # Exact counter values are deliberately not pinned. The capture is
+    # regenerated whenever the contract changes, and two sessions regenerating
+    # it have already raced a hardcoded expectation. Monotonicity and
+    # distinctness are what must hold of any real capture.
+    assert frames == sorted(frames)
+    assert len(set(frames)) == 3
+    assert clocks == sorted(clocks)
+    assert len(set(clocks)) == 3
 
 
 def test_the_real_capture_carries_the_documented_roster() -> None:
-    """Command Center, Builder, and the entity parked off-map."""
+    """Command Center, Builder, and the placeholder parked off-map."""
     first = decode_samples(_capture_lines())[0]
+    assert [e["type_name"] for e in first["entities"]] == [
+        "commandCenter",
+        "builder",
+        "editorOrBuilder",
+    ]
     assert [e["class_name"] for e in first["entities"]] == [
         "com.corrodinggames.rts.game.units.d.e",
         "com.corrodinggames.rts.game.units.e.b",
         "com.corrodinggames.rts.game.units.h",
     ]
+    # The third entity is the map editor's placeholder, parked off-map. Its
+    # type name is what identified it; the class alone never did.
     assert first["entities"][2]["x"] == -1000.0
     assert first["entities"][2]["y"] == -1000.0
+
+
+def test_engine_ids_are_distinct_and_stable_across_samples() -> None:
+    """id is the dispatch handle; index renumbers, id does not."""
+    samples = decode_samples(_capture_lines())
+    ids = [e["unit_id"] for e in samples[0]["entities"]]
+    assert len(set(ids)) == len(ids)
+    for later in samples[1:]:
+        assert [e["unit_id"] for e in later["entities"]] == ids
 
 
 def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
@@ -59,9 +86,11 @@ def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
     assert 290.0 < frames / (millis / 1000.0) < 310.0
 
 
-def test_indices_are_the_dispatch_handles() -> None:
+def test_engine_ids_are_the_dispatch_handles() -> None:
+    """Index is enumeration order; id is what an order addresses."""
     first = decode_samples(_capture_lines())[0]
     assert [e["index"] for e in first["entities"]] == [0, 1, 2]
+    assert [e["unit_id"] for e in first["entities"]] == [213, 214, 217]
 
 
 def test_an_empty_stream_yields_no_samples() -> None:
@@ -136,7 +165,16 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
     hostile = Sample(
         frame=1,
         clock_ms=0,
-        entities=(Entity(index=0, class_name='a"b\\c\nd\te\rf\x01g', x=0.0, y=0.0),),
+        entities=(
+            Entity(
+                index=0,
+                unit_id=214,
+                type_name='a"b\\c\nd\te\rf\x01g',
+                class_name='a"b\\c\nd\te\rf\x01g',
+                x=0.0,
+                y=0.0,
+            ),
+        ),
     )
     lines = encode_sample(hostile)
     assert len(lines) == 2
