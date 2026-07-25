@@ -7,7 +7,7 @@ train_model_with_validation and preserves existing behavior.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeGuard
+from typing import Protocol, TypeGuard
 
 import numpy as np
 from numpy.typing import NDArray
@@ -27,11 +27,17 @@ from ...types import (
 from ..protocol import BackendCapabilities, ClassifierBackend, PreparedClassifier, ProgressCallback
 
 
-class _XGBPrepared:
-    """Prepared placeholder; real training returns outcomes with persisted model."""
+class _XGBClassifierProtocol(Protocol):
+    """Protocol for a fitted XGBClassifier."""
 
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        raise RuntimeError("XGBoost backend prepared model not available in this context")
+    def load_model(self, fname: str) -> None: ...
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
+
+class _XGBClassifierCtor(Protocol):
+    """Protocol for the XGBClassifier constructor."""
+
+    def __call__(self) -> _XGBClassifierProtocol: ...
 
 
 XGBOOST_CAPABILITIES: BackendCapabilities = {
@@ -59,8 +65,17 @@ class XGBoostBackend(ClassifierBackend):
         n_classes: int,
         feature_names: list[str] | None,
     ) -> PreparedClassifier:
-        # XGBoost uses on-demand training; preparation returns a placeholder.
-        return _XGBPrepared()
+        """Prepare is not supported.
+
+        XGBoost uses on-demand training via train(). Use train() to create
+        a fitted model, then load() to get a PreparedClassifier for inference.
+
+        Raises:
+            RuntimeError: Always, as prepare is not supported.
+        """
+        raise RuntimeError(
+            "XGBoostBackend.prepare not supported; train() then load() for inference."
+        )
 
     def train(
         self,
@@ -107,14 +122,36 @@ class XGBoostBackend(ClassifierBackend):
         return compute_all_metrics(y, pos)
 
     def save(self, *, model: PreparedClassifier, path: str) -> None:
-        # Intentionally no-op here; saving handled in train via trainer.save_model
-        # Consumers use TrainOutcome.model_path.
-        with open(path, "wb") as f:
-            f.write(b"")
+        """Save is not supported; the trainer persists the model.
+
+        Args:
+            model: Unused; this backend has no in-memory model to write.
+            path: Unused.
+
+        Raises:
+            RuntimeError: Always. Use TrainOutcome.model_path.
+        """
+        raise RuntimeError("XGBoostBackend.save not supported; use TrainOutcome.model_path.")
 
     def load(self, *, path: str) -> PreparedClassifier:
-        # Not supported in this backend wrapper; prediction uses different pipeline.
-        return _XGBPrepared()
+        """Load a fitted XGBoost model from a persisted booster file.
+
+        Args:
+            path: Path to the saved model file (.ubj format).
+
+        The fitted classifier is returned as-is rather than wrapped. It
+            already satisfies PreparedClassifier, and SHAP's TreeExplainer
+            introspects the native object -- it rejects a wrapper with
+            "Model type not yet supported by TreeExplainer".
+
+        Returns:
+            The loaded classifier, which implements PreparedClassifier.
+        """
+        xgb_module = __import__("xgboost")
+        classifier_ctor: _XGBClassifierCtor = xgb_module.XGBClassifier
+        model = classifier_ctor()
+        model.load_model(path)
+        return model
 
     def get_feature_importances(
         self,

@@ -169,58 +169,125 @@ def test_xgboost_backend_config_type_validation(tmp_path: Path) -> None:
         _invoke_backend_train(backend, x, y, names, mlp_config, tmp_path)
 
 
-def test_xgboost_backend_prepare_returns_placeholder() -> None:
-    """Prepare returns a placeholder that raises on predict_proba."""
+def _train_for_reload(backend: ClassifierBackend, tmp_path: Path) -> TrainOutcome:
+    """Train a small model so its persisted file can be reloaded.
+
+    Args:
+        backend: Backend under test.
+        tmp_path: Pytest temporary directory.
+
+    Returns:
+        The training outcome, whose model_path points at the saved booster.
+    """
+    x, y, names = _make_binary_dataset()
+    config: TrainConfig = {
+        "learning_rate": 0.1,
+        "max_depth": 3,
+        "n_estimators": 10,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "train_ratio": 0.6,
+        "val_ratio": 0.2,
+        "test_ratio": 0.2,
+        "random_state": 42,
+        "early_stopping_rounds": 5,
+        "device": "cpu",
+        "reg_alpha": 0.0,
+        "reg_lambda": 1.0,
+    }
+    return _invoke_backend_train(backend, x, y, names, config, tmp_path)
+
+
+def test_xgboost_backend_prepare_raises() -> None:
+    """Prepare is not supported, matching every other tree backend.
+
+    It previously returned a placeholder whose predict_proba raised, which
+    deferred the failure to the first prediction instead of the call that
+    was actually wrong.
+    """
     backend = create_xgboost_backend()
-    prepared = backend.prepare(n_features=4, n_classes=2, feature_names=None)
 
-    x = np.zeros((1, 4), dtype=np.float64)
-    with pytest.raises(RuntimeError, match="not available in this context"):
-        prepared.predict_proba(x)
+    with pytest.raises(RuntimeError, match="prepare not supported"):
+        backend.prepare(n_features=4, n_classes=2, feature_names=None)
 
 
-def test_xgboost_backend_save_creates_empty_file(tmp_path: Path) -> None:
-    """Save creates an empty file (actual saving done in train)."""
+def test_xgboost_backend_save_raises(tmp_path: Path) -> None:
+    """Save is not supported; the trainer persists the model.
+
+    It previously opened the path in "wb" and wrote zero bytes, so calling it
+    with an existing model path destroyed that model. A test asserted the
+    resulting file was empty, which made the data loss look intended.
+    """
     backend = create_xgboost_backend()
-    prepared = backend.prepare(n_features=4, n_classes=2, feature_names=None)
+    outcome = _train_for_reload(backend, tmp_path)
+    loaded = backend.load(path=outcome["model_path"])
 
-    save_path = tmp_path / "model.ubj"
-    backend.save(model=prepared, path=str(save_path))
-
-    assert save_path.exists()
-    assert save_path.stat().st_size == 0
+    with pytest.raises(RuntimeError, match="save not supported"):
+        backend.save(model=loaded, path=outcome["model_path"])
 
 
-def test_xgboost_backend_load_returns_placeholder() -> None:
-    """Load returns a placeholder (actual loading uses different pipeline)."""
+def test_xgboost_backend_save_does_not_touch_the_target(tmp_path: Path) -> None:
+    """The refused save leaves the model file byte-for-byte intact."""
     backend = create_xgboost_backend()
-    loaded = backend.load(path="nonexistent.ubj")
+    outcome = _train_for_reload(backend, tmp_path)
+    model_file = Path(outcome["model_path"])
+    before = model_file.read_bytes()
+    loaded = backend.load(path=outcome["model_path"])
 
-    x = np.zeros((1, 4), dtype=np.float64)
-    with pytest.raises(RuntimeError, match="not available in this context"):
-        loaded.predict_proba(x)
+    with pytest.raises(RuntimeError, match="save not supported"):
+        backend.save(model=loaded, path=str(model_file))
+
+    assert model_file.read_bytes() == before
 
 
-def test_xgboost_backend_get_feature_importances_returns_none() -> None:
+def test_xgboost_backend_load_and_predict(tmp_path: Path) -> None:
+    """Load restores a trained model that predicts, rather than a placeholder."""
+    backend = create_xgboost_backend()
+    outcome = _train_for_reload(backend, tmp_path)
+    x, y, _ = _make_binary_dataset()
+
+    loaded = backend.load(path=outcome["model_path"])
+    proba = loaded.predict_proba(x)
+
+    assert proba.shape == (x.shape[0], 2)
+    finite: NDArray[np.bool_] = np.isfinite(proba)
+    assert int(np.count_nonzero(finite)) == int(proba.size)
+    # Weights that failed to arrive would leave predictions at chance.
+    metrics = backend.evaluate(model=loaded, x=x, y=y)
+    assert metrics["auc"] > 0.7
+
+
+def test_xgboost_backend_get_feature_importances_returns_none(tmp_path: Path) -> None:
     """Feature importances returns None (provided by TrainOutcome)."""
     backend = create_xgboost_backend()
-    prepared = backend.prepare(n_features=4, n_classes=2, feature_names=None)
+    outcome = _train_for_reload(backend, tmp_path)
+    loaded = backend.load(path=outcome["model_path"])
 
-    result = backend.get_feature_importances(model=prepared, feature_names=["a", "b", "c", "d"])
+    result = backend.get_feature_importances(model=loaded, feature_names=["a", "b", "c", "d"])
     assert result is None
 
 
-def test_xgboost_backend_evaluate_uses_predict_proba() -> None:
-    """Evaluate calls predict_proba on the model."""
+class _FailingClassifier:
+    """Classifier whose prediction fails, to show evaluate does not swallow it."""
+
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Raise, standing in for any model that cannot predict.
+
+        Raises:
+            RuntimeError: Always.
+        """
+        raise RuntimeError("prediction unavailable")
+
+
+def test_xgboost_backend_evaluate_propagates_prediction_failure() -> None:
+    """Evaluate routes through predict_proba and lets its failure surface."""
     backend = create_xgboost_backend()
-    # Using prepared model that raises shows evaluate tries to use predict_proba
-    prepared = backend.prepare(n_features=4, n_classes=2, feature_names=None)
 
     x = np.zeros((10, 4), dtype=np.float64)
     y = np.zeros(10, dtype=np.int64)
 
-    with pytest.raises(RuntimeError, match="not available in this context"):
-        backend.evaluate(model=prepared, x=x, y=y)
+    with pytest.raises(RuntimeError, match="prediction unavailable"):
+        backend.evaluate(model=_FailingClassifier(), x=x, y=y)
 
 
 class _FakePreparedClassifier:
