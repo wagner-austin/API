@@ -122,6 +122,12 @@ public final class SelfTest {
                 elements.contains("[0] java.lang.String = \"a\""),
                 "platform elements summarised, not reflected into");
 
+        // A subclass whose identifying state lives on its base must not read as
+        // featureless -- the failure mode that sold an earlier wrong finding.
+        String inherited = Discovery.describeElements(new SubclassHolder(), "items");
+        failures += expect(inherited.contains("ownField"), "element's own field listed");
+        failures += expect(inherited.contains("baseField"), "element's INHERITED field listed");
+
         failures += expect(
                 Discovery.findCollections(null, "com.x", 3, 100).contains("root is null"),
                 "graph search handles a null root");
@@ -188,6 +194,21 @@ public final class SelfTest {
             return expect(true, "rejects " + description);
         }
         return expect(false, "rejects " + description);
+    }
+
+    /** Base carrying the state that identifies an element, as engine types do. */
+    private static class Base {
+        final int baseField = 7;
+    }
+
+    /** Subclass declaring little of its own, like {@code units.al} over {@code am}. */
+    private static final class Derived extends Base {
+        final String ownField = "own";
+    }
+
+    /** Holder whose collection elements are a subclass with an inherited field. */
+    private static final class SubclassHolder {
+        final java.util.List<Derived> items = java.util.Arrays.asList(new Derived());
     }
 
     /** Fixture with one field of every shape {@link Discovery} summarises. */

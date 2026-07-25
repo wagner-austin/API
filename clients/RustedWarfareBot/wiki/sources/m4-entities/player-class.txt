@@ -1,0 +1,23 @@
+extends bq
+implements Comparable {
+    static m a = new m();
+    static n[] b = new n[0];
+    public static int c = 10;
+    public static int d = 0;
+    public static int e = 100;
+    public static int f = c + d;
+    public static final n g = new com.corrodinggames.rts.game.e(-1, false, "<blank>");
+    public static final n h = new d(-2);
+    public static final n i = new d(-1);
+    private static n[] as = new n[f];
+    public static n j = new u(-99);
+    public int k = -1;
+    public final String l = "Note to modifiers: Changing credits will not allow you to cheat in multiplayer games, but it will only break sync";
+    public boolean m;
+    public boolean n;
+    public double o = 4000.0;
+    public double p = 0.0;
+    public int q = 0;
+    public int r;
+    public y s = com.corrodinggames.rts.game.units.t.a(this);
+    public y t = com.corrodinggames.rts.game.units.t.a(this);

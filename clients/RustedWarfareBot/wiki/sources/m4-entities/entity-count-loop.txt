@@ -1,0 +1,37 @@
+Decompiled with CFR 0.152 from the pinned .game/game-lib.jar.
+Excerpt: com.corrodinggames.rts.game.i, the post-load entity census.
+Reproduce: java -jar cfr.jar .game/game-lib.jar --outputdir <dir>
+
+--- com/corrodinggames/rts/game/i.java (entity census) ---
+        if (!(bl3 || this.ce != null && this.ce.q)) {
+            this.a(0.0f, 0.0f);
+            n3 = 0;
+            int n11 = 0;
+            n2 = 0;
+            for (com.corrodinggames.rts.game.units.am am4 : com.corrodinggames.rts.game.units.am.bE) {
+                if (am4 instanceof al) {
+                    ++n11;
+                } else {
+                    ++n3;
+                }
+                if (am4.bX != this.bs || !am4.bP) continue;
+                this.b(am4.eo, am4.ep);
+                n2 = 1;
+            }
+            if (n2 == 0) {
+                for (com.corrodinggames.rts.game.units.am am5 : com.corrodinggames.rts.game.units.am.bE) {
+                    if (am5.bX != this.bs || am5.t() || am5.u()) continue;
+                    this.b(am5.eo, am5.ep);
+                }
+            }
+            com.corrodinggames.rts.game.i.e("there are " + n3 + " units on this map and " + n11 + " trees");
+        }
+
+--- com/corrodinggames/rts/game/units/am.java:69 (the master list) ---
+    public static final u bE = new u();
+
+--- com/corrodinggames/rts/game/units/al.java:39-41,107 (tree sprites + error) ---
+        al.a[0] = l2.bO.a(R$drawable.palm_tree);
+        al.a[1] = l2.bO.a(R$drawable.trees);
+        al.a[2] = l2.bO.a(R$drawable.trees_snow);
+                    throw new RuntimeException("Tree sub type format error:" + stringArray[1]);

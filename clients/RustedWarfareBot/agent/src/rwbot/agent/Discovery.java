@@ -114,11 +114,21 @@ final class Discovery {
                 continue;
             }
             out.append('\n');
-            for (Field own : declaredFieldsOf(element.getClass())) {
-                if (Modifier.isStatic(own.getModifiers())) {
-                    continue;
+            // Walk the hierarchy, not just the element's own class. Engine
+            // entity types are deep -- units.al extends v extends am -- and the
+            // state that identifies an object (owner, position, health) is
+            // declared on the base. Listing only declared fields makes a
+            // subclass look featureless, which is precisely how a tree class
+            // was once mistaken for the unit class.
+            for (Class<?> type = element.getClass();
+                    type != null && type != Object.class && !isPlatformClass(type);
+                    type = type.getSuperclass()) {
+                for (Field own : declaredFieldsOf(type)) {
+                    if (Modifier.isStatic(own.getModifiers())) {
+                        continue;
+                    }
+                    out.append("      ").append(describeField(element, own)).append('\n');
                 }
-                out.append("      ").append(describeField(element, own)).append('\n');
             }
         }
         return out.toString();

@@ -21,6 +21,12 @@ runs/
 # jar and classes are rebuilt by `make agent` and pinned to nothing.
 agent/build/
 
+# Downloaded analysis tooling (CFR decompiler and friends). Binaries, fetched
+# on demand, and not ours to vendor. Decompiled output lands in runs/ above,
+# which is ignored for the separate reason that it is a derived work of a
+# commercial game and must never be committed.
+.tools/
+
 # Python / tooling
 .venv/
 __pycache__/

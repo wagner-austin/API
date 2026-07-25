@@ -7,6 +7,7 @@ Scope: the JVM-side game code (`com.corrodinggames.rts.*`) and its libRocket scr
 Every page here is pinned to a specific game build. An obfuscated class name is a fact about one build only.
 
 [Engine Name Oracle](../pages/engine-name-oracle.md) -- the boot log names engine objects and prints their obfuscated classes, replacing most manual mapping work
+[Engine Entity Model](../pages/engine-entity-model.md) -- `am` is every world object, `am.bE` the master list, `al` the tree class; owner and position fields named
 [Engine Tick Method and Clock](../pages/engine-tick-and-clock.md) -- `game.i.a(float)` is the simulation tick; `bx` counts it at ~300 Hz, `by` is the millisecond clock, and five other writers only restore them
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

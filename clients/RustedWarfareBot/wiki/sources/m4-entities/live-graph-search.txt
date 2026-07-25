@@ -1,0 +1,13 @@
+=== collections of com.corrodinggames.rts.game.units (depth<=4) ===
+.W  s size=11 of=com.corrodinggames.rts.game.units.e.b
+.X  s size=11 of=com.corrodinggames.rts.game.units.al
+.W.c  w[] len=12
+.X.c  w[] len=27
+.bS.bZ  u size=1 of=com.corrodinggames.rts.game.units.h
+.cc.i  u size=25 of=com.corrodinggames.rts.game.units.al
+.bs.s.aM  u size=1 of=com.corrodinggames.rts.game.units.e.b
+.bs.s.bE  u size=221 of=com.corrodinggames.rts.game.units.al
+.bs.s.a  o size=221 of=com.corrodinggames.rts.game.units.al
+.bs.s.cL  ap[] len=1
+.bs.s.a  o size=221 of=com.corrodinggames.rts.game.units.al
+.bs.s.er  s size=221 of=com.corrodinggames.rts.game.units.al

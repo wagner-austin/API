@@ -5,13 +5,14 @@ related:
   - "[[engine-name-oracle]]"
   - "[[agent-render-callback-noop]]"
   - "[[runtime-split-java-agent-python-brain]]"
+  - "[[engine-entity-model]]"
 source_paths:
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:84"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:87"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:74"
   - "wiki/sources/m3-discovery/engine-snapshots.log:531"
   - "wiki/sources/m3-discovery/engine-snapshots.log:1091"
-  - "wiki/sources/m3-discovery/engine-snapshots.log:452"
+  - "wiki/sources/m4-entities/entity-count-loop.txt:11"
   - "agent/src/rwbot/agent/EngineHandle.java"
   - "agent/src/rwbot/agent/Discovery.java"
 game_version: "1.15 (code 176, build #28)"
@@ -42,12 +43,12 @@ Five other methods write `bx`, and none of them advance it. `gameFramework.ba.h(
 
 `gameFramework.l.B()` returns the engine singleton and its whole body is `return al;`, so reading state through it cannot advance or mutate the simulation — which is what makes a probe thread safe.[^7] With `bx` identified, a decimated planner has a real tick basis to decimate against rather than wall-clock guessing ([[runtime-split-java-agent-python-brain]]).
 
-## Candidate unit lists, not yet confirmed
+## The entity list
 
-Two parallel collections on the engine hold eleven elements each on a freshly loaded ten-player skirmish: `X` of `com.corrodinggames.rts.game.units.al`, and `W` of `com.corrodinggames.rts.game.units.e.b`.[^2] Both are the engine's own `gameFramework.utility.s` container type.[^2] The element class of `X` makes it the likely unit list, but eleven is not yet reconciled against the eleven the map reports, and neither collection accounts for the 206 trees the same load logged — so this is a lead, not a finding.
+Resolved, and not where this page first guessed: the master list is the static `com.corrodinggames.rts.game.units.am.bE`, and `units.al` is the **tree** class rather than the unit class ([[engine-entity-model]]).[^2] The collections reached from the engine that hold `al` elements are therefore mostly trees, which is why their sizes never reconciled against the unit count.
 
 [^1]: `wiki/sources/m3-discovery/gameengine-tick-method.txt:84` — `158: getfield #456 // Field bx:I`, followed by `iconst_1`, `iadd` at `:86`, and `putfield #456 // Field bx:I` at `:87`, inside `public strictfp void a(float);` declared at `:1`. Disassembled from the pinned `.game/game-lib.jar` with the bundled `javap`.
-[^2]: `wiki/sources/m3-discovery/engine-snapshots.log:452` — `X : s = s size=11 of=com.corrodinggames.rts.game.units.al`, with `W : s = s size=11 of=com.corrodinggames.rts.game.units.e.b` at `:451`.
+[^2]: `wiki/sources/m4-entities/entity-count-loop.txt:11` — the census loop iterating `com.corrodinggames.rts.game.units.am.bE`, with the `instanceof al` tree branch at `:12`. See [[engine-entity-model]] for the full derivation.
 [^3]: `wiki/sources/m3-discovery/gameengine-tick-method.txt:74` — `138: putfield #457 // Field by:I`, preceded by the `f2i` conversion at offset 137.
 [^4]: `wiki/sources/m3-discovery/engine-snapshots.log:531` — `bx = 1918` and `by = 6461` at the `t=10s` snapshot headed at `:400`; the `t=20s` snapshot at `:680` reports `bx = 4911`, `by = 16455` at `:811`–`:812`.
 [^5]: `wiki/sources/m3-discovery/engine-snapshots.log:1091` — `bx = 7909` and `by = 26454` at the `t=30s` snapshot headed at `:960`.

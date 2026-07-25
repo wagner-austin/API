@@ -7,3 +7,5 @@ Scope: the rules of the game as a player experiences them. The code that impleme
 The game is its own oracle here. `-printunits` emits a complete stat catalogue on demand, and the mod `.ini` files under `.game/mods/` are declarative source for custom units — prefer both over inferring numbers from play. Stats change between builds and are affected by enabled mods, so pin `game_version` and state which mods were active.
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
+
+[Engine Entity Model](../pages/engine-entity-model.md) -- what a unit actually is in the engine: base class, master list, trees, owning player, starting credits
