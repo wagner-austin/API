@@ -82,7 +82,7 @@ Every "Extend view" game-log line is followed by a `0x5A` 0–2 s later — prov
 
 The bot never sends `Ia`, `Rb`, or `Sb`. The sniffer correctly captures inbound `0x5A` and updates the viewport origin (see `src/tankpit_bot/sniffer/viewport.py::update_viewport_origin`), but with autoscroll off and no scope commands, `0x5A` only fires on teleport — so the bot's world-model assumption "viewport is fixed until teleport" holds.[^7]
 
-This is a **bot configuration choice, not a game limit**. Turning it back on requires either sending `Ia("A1")` once (server takes over) or dispatching `Rb`/`Sb` when the planner wants to see off-viewport space. Consequences for existing bot logic in [[executor-rejection-loops]] and [[viewport-frame]].
+This is a **bot configuration choice, not a game limit** — and a deliberate one (user, verbatim, 2026-07-24: *"i usually run the bot with autoscroll off. it was too complicated too implement proper viewport awareness for the bot."*). The fixed-viewport + teleport-recenter model IS the intended operating mode; do not "restore" autoscroll to on for the account. Turning it back on requires either sending `Ia("A1")` once (server takes over) or dispatching `Rb`/`Sb` when the planner wants to see off-viewport space. Consequences for existing bot logic in [[executor-rejection-loops]] and [[viewport-frame]].
 
 ## Latent doc bug (fixed 2026-07-18)
 
