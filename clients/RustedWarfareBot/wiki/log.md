@@ -63,6 +63,20 @@ The measurement stands — `bx` still advances 299.8/s and is still incremented 
 
 Same artifact sharpened `by`: it accumulates `f2 * 16.666666f` (ms per frame at a 60 Hz baseline, scaled by delta), so its measured 1 kHz is a consequence of that formula rather than an independent clock. The page said "derived millisecond value", which was right but vaguer than the source allows.
 
+## [2026-07-25] build | M6 — the wire contract exists on both sides
+Pages written: wire-contract-ndjson
+Pages updated: index (10 pages), hubs/bot-architecture
+Artifacts: `wiki/sources/m6-wire/world-sample.ndjson` (12) — a real capture from a live headless skirmish
+Notes: the agent serialises the owned roster as NDJSON and the planner decodes it into typed samples. `make check` green: 148 tests (was 88), 100% statements and branches, `rw_bot.wire.ndjson` 105/40 and `rw_bot.wire.state` 80/28 fully covered.
+
+The format's defining property came from the consumer, not the producer. `json.loads` is unusable under `disallow_any_expr` — its return is `Any`, every expression touching it errors, `isinstance` does not rescue it because the call itself is the offending expression, and suppressions are banned. Verified by probe before designing around it rather than assumed. So the reader is hand-written, and a hand-written reader is only cheap if the grammar is small: every record is therefore a flat object of scalars, no nesting, no arrays, no null. Constraining the Java producer is what buys a fully typed Python consumer; the two are one decision.
+
+The reader coerces nothing and repairs nothing — six traceable codes, one per rejection, including duplicate keys and trailing content after the object. The check that earns its place is the declared-count check: a sample promising three entities and carrying two is a truncated capture, the ordinary result of reading while the agent is still writing, and yielding it silently would let a planner act on a roster it cannot fully see.
+
+Two real bugs found while building, both by running rather than reading. `Orders.onGameThread` enqueues without running, so reading the rendered sample straight after the call produced null every time — the render is now awaited on a latch with a bounded wait that fails loudly. And the first capture attempt wrote nothing at all, which the "state sample was not produced" line reported honestly instead of writing an empty file.
+
+`validation.py` gained `require_finite_float` (`RW-DECODE-006`) and its payload union widened to carry floats; the union is covariant so no existing caller changed. Non-finite values are rejected on both sides — JSON cannot carry them, so a NaN means the producer emitted something the format does not have, which is a bug rather than a datum.
+
 ## [2026-07-25] probe | M4 — decompiled the jar; the entity model falls out in three greps
 Pages written: engine-entity-model
 Pages updated: engine-tick-and-clock (its unit-list guess was wrong and is now corrected), index (7 pages), hubs/engine-internals, hubs/game-mechanics
