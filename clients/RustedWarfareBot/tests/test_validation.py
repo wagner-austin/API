@@ -8,6 +8,7 @@ from rw_bot.validation import (
     DecodeError,
     require_absolute_path,
     require_bool,
+    require_finite_float,
     require_int,
     require_non_empty_str,
     require_positive_int,
@@ -122,3 +123,48 @@ def test_require_absolute_path_rejects_wrong_type() -> None:
     with pytest.raises(DecodeError) as caught:
         require_absolute_path({"log_path": 5}, "log_path")
     assert caught.value.code == "RW-DECODE-002"
+
+
+def test_require_finite_float_returns_a_float() -> None:
+    assert require_finite_float({"x": 4250.5}, "x") == 4250.5
+
+
+def test_require_finite_float_widens_an_int() -> None:
+    """A whole-numbered coordinate is emitted as 4250, not 4250.0."""
+    # repr distinguishes the int 4250 from the float 4250.0; == does not.
+    assert repr(require_finite_float({"x": 4250}, "x")) == "4250.0"
+
+
+def test_require_finite_float_accepts_zero_and_negatives() -> None:
+    assert require_finite_float({"x": 0}, "x") == 0.0
+    assert require_finite_float({"x": -2610.75}, "x") == -2610.75
+
+
+def test_require_finite_float_rejects_an_absent_field() -> None:
+    with pytest.raises(DecodeError) as caught:
+        require_finite_float({}, "x")
+    assert caught.value.code == "RW-DECODE-001"
+    assert caught.value.message == "required field 'x' is absent"
+
+
+def test_require_finite_float_rejects_bool() -> None:
+    with pytest.raises(DecodeError) as caught:
+        require_finite_float({"x": True}, "x")
+    assert caught.value.code == "RW-DECODE-002"
+    assert caught.value.message == "field 'x' must be a number, got bool"
+
+
+def test_require_finite_float_rejects_a_numeric_string_without_coercing() -> None:
+    with pytest.raises(DecodeError) as caught:
+        require_finite_float({"x": "4250.0"}, "x")
+    assert caught.value.code == "RW-DECODE-002"
+    assert caught.value.message == "field 'x' must be a number, got str"
+
+
+@pytest.mark.parametrize("literal", ["nan", "inf", "-inf"])
+def test_require_finite_float_rejects_non_finite(literal: str) -> None:
+    """JSON cannot carry these, so their presence is a producer bug."""
+    with pytest.raises(DecodeError) as caught:
+        require_finite_float({"x": float(literal)}, "x")
+    assert caught.value.code == "RW-DECODE-006"
+    assert caught.value.message.startswith("field 'x' must be finite, got ")

@@ -20,6 +20,7 @@ in the producer, and coercion would hide it.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from math import isfinite
 from pathlib import PureWindowsPath
 
 from rw_bot import RwBotError
@@ -41,9 +42,7 @@ class DecodeError(RwBotError):
     """
 
 
-def _fetch(
-    payload: Mapping[str, str | int | float | bool], field: str
-) -> str | int | float | bool:
+def _fetch(payload: Mapping[str, str | int | float | bool], field: str) -> str | int | float | bool:
     """Return one field from a payload, or raise if it is absent.
 
     Args:
@@ -183,6 +182,42 @@ def require_positive_int(payload: Mapping[str, str | int | float | bool], field:
     return value
 
 
+def require_finite_float(payload: Mapping[str, str | int | float | bool], field: str) -> float:
+    """Narrow one field to a finite ``float``.
+
+    An ``int`` is accepted and widened, because a whole-numbered coordinate is
+    written by the producer as ``4250`` rather than ``4250.0`` whenever it has
+    no fractional part, and rejecting that would make the schema depend on the
+    value. ``bool`` is rejected despite subclassing ``int``, on the same
+    reasoning as :func:`require_int`.
+
+    Non-finite values are rejected rather than passed through. JSON has no
+    encoding for them, so a ``NaN`` here means the producer emitted something
+    the format cannot carry, which is a bug rather than a datum.
+
+    Args:
+        payload: The payload being decoded.
+        field: Field name to read.
+
+    Returns:
+        The field value as a finite ``float``.
+
+    Raises:
+        DecodeError: ``RW-DECODE-001`` when absent, ``RW-DECODE-002`` when the
+            value is not a number or is a ``bool``, ``RW-DECODE-006`` when it is
+            not finite.
+    """
+    value = _fetch(payload, field)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise DecodeError(
+            _WRONG_TYPE, f"field {field!r} must be a number, got {type(value).__name__}"
+        )
+    widened = float(value)
+    if not isfinite(widened):
+        raise DecodeError(_NOT_FINITE, f"field {field!r} must be finite, got {widened}")
+    return widened
+
+
 def require_bool(payload: Mapping[str, str | int | float | bool], field: str) -> bool:
     """Narrow one field to ``bool``.
 
@@ -207,6 +242,7 @@ __all__ = [
     "DecodeError",
     "require_absolute_path",
     "require_bool",
+    "require_finite_float",
     "require_int",
     "require_non_empty_str",
     "require_positive_int",
