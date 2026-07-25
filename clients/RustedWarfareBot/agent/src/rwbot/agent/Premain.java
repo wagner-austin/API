@@ -44,6 +44,12 @@ public final class Premain {
                     options.inspectFields(),
                     options.findElementsUnder());
         }
+        if (options.orderRequested()) {
+            startOrderProbe(
+                    options.orderMoveAtSeconds(),
+                    options.orderMoveBy(),
+                    options.orderMoveUnitIndex());
+        }
         Log.info("ready; patched " + targets.size() + " class(es)");
     }
 
@@ -99,6 +105,114 @@ public final class Premain {
             if (!findElementsUnder.isEmpty()) {
                 Log.info(Discovery.findCollections(engine, findElementsUnder, 4, 20000));
             }
+        }
+    }
+
+    /** Seconds after the order at which position is re-sampled to prove movement. */
+    private static final int[] ORDER_SAMPLE_OFFSETS = {2, 5, 10};
+
+    /**
+     * Issues one real move order and samples the unit's position around it.
+     *
+     * <p>This is the first time the agent writes to the simulation rather than
+     * reading it. The proof obligation is movement, not absence of error: an
+     * order that is accepted, queued and silently dropped looks identical to a
+     * successful one unless the position is watched afterwards. So the sequence
+     * is sample, order, then sample again at increasing offsets.
+     *
+     * <p>Every engine touch is posted to the game thread. Reads are as unsafe
+     * as writes here -- a position sampled mid-tick can be torn -- and the
+     * engine already provides the queue for this.
+     *
+     * @param atSeconds Elapsed time at which to issue the order.
+     * @param moveBy World-space offset to send the unit by.
+     */
+    private static void startOrderProbe(int atSeconds, float[] moveBy, int unitIndex) {
+        Thread thread =
+                new Thread(() -> runOrderProbe(atSeconds, moveBy, unitIndex), "rw-agent-order");
+        thread.setDaemon(true);
+        thread.start();
+        Log.info(
+                "move order scheduled at "
+                        + atSeconds
+                        + "s for roster["
+                        + unitIndex
+                        + "], offset ("
+                        + moveBy[0]
+                        + ", "
+                        + moveBy[1]
+                        + ")");
+    }
+
+    /** Waits for each offset in turn, ordering once and then sampling. */
+    private static void runOrderProbe(int atSeconds, float[] moveBy, int unitIndex) {
+        long started = System.nanoTime();
+        if (!sleepUntil(started, atSeconds)) {
+            return;
+        }
+
+        java.util.concurrent.atomic.AtomicReference<Object> ordered =
+                new java.util.concurrent.atomic.AtomicReference<Object>();
+        Orders.onGameThread(
+                () -> {
+                    Object engine = EngineHandle.current();
+                    Log.info(Orders.describeOwned(engine));
+                    java.util.List<Object> roster = Orders.ownedUnits(engine);
+                    if (unitIndex >= roster.size()) {
+                        Log.error(
+                                "order: roster["
+                                        + unitIndex
+                                        + "] requested but the player owns "
+                                        + roster.size()
+                                        + " order-taking entities");
+                        return;
+                    }
+                    Object unit = roster.get(unitIndex);
+                    float[] from = Orders.positionOf(unit);
+                    float toX = from[0] + moveBy[0];
+                    float toY = from[1] + moveBy[1];
+                    Log.info("order: subject " + Orders.describe(unit));
+                    Log.info("order: moving to (" + toX + ", " + toY + ")");
+                    Orders.moveTo(engine, unit, toX, toY);
+                    ordered.set(unit);
+                    Log.info("order: issued");
+                });
+
+        for (int offset : ORDER_SAMPLE_OFFSETS) {
+            if (!sleepUntil(started, atSeconds + offset)) {
+                return;
+            }
+            int elapsed = offset;
+            Orders.onGameThread(
+                    () -> {
+                        Object unit = ordered.get();
+                        if (unit == null) {
+                            return;
+                        }
+                        Log.info("order: t+" + elapsed + "s " + Orders.describe(unit));
+                    });
+        }
+    }
+
+    /**
+     * Sleeps until a given elapsed offset from a start instant.
+     *
+     * @param startedNanos Reference instant from {@code System.nanoTime}.
+     * @param second Offset to wake at.
+     * @return True when the offset was reached, false when interrupted.
+     */
+    private static boolean sleepUntil(long startedNanos, int second) {
+        long remaining = startedNanos + second * 1_000_000_000L - System.nanoTime();
+        if (remaining <= 0) {
+            return true;
+        }
+        try {
+            Thread.sleep(remaining / 1_000_000L);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Log.error("order probe interrupted before t=" + second + "s");
+            return false;
         }
     }
 

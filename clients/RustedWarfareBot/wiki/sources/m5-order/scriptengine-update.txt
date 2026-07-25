@@ -1,0 +1,26 @@
+    public void update(float f2) {
+        if (!mainScriptThreadMarked) {
+            mainScriptThreadMarked = true;
+            isMainScriptThread.set(true);
+        }
+        if (this.queuedScripts.size() != 0) {
+            ArrayList arrayList = this.queuedScripts;
+            synchronized (arrayList) {
+                Object object = this.queuedScripts.iterator();
+                while (object.hasNext()) {
+                    ScriptEngine$Action scriptEngine$Action = (ScriptEngine$Action)object.next();
+                    if (scriptEngine$Action.framesDelay > 0) {
+                        --scriptEngine$Action.framesDelay;
+                        continue;
+                    }
+                    this.runningScripts.add(scriptEngine$Action);
+                    object.remove();
+                }
+            }
+            for (Object object : this.runningScripts) {
+                ((ScriptEngine$Action)object).run(this);
+            }
+            this.runningScripts.clear();
+        }
+        this.root.onFrameUpdate(f2);
+    }

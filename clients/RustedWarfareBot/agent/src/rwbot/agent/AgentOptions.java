@@ -15,21 +15,74 @@ final class AgentOptions {
     private static final String EXIT_AFTER = "exitAfterDiscovery";
     private static final String INSPECT_FIELDS = "inspectFields";
     private static final String FIND_UNDER = "findElementsUnder";
+    private static final String ORDER_AT = "orderMoveAtSeconds";
+    private static final String ORDER_BY = "orderMoveBy";
+    private static final String ORDER_INDEX = "orderMoveUnitIndex";
 
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
     private final String[] inspectFields;
     private final String findElementsUnder;
+    private final int orderMoveAtSeconds;
+    private final float[] orderMoveBy;
+    private final int orderMoveUnitIndex;
 
     private AgentOptions(
             int[] discoverAtSeconds,
             boolean exitAfterDiscovery,
             String[] inspectFields,
-            String findElementsUnder) {
+            String findElementsUnder,
+            int orderMoveAtSeconds,
+            float[] orderMoveBy,
+            int orderMoveUnitIndex) {
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
         this.inspectFields = inspectFields;
         this.findElementsUnder = findElementsUnder;
+        this.orderMoveAtSeconds = orderMoveAtSeconds;
+        this.orderMoveBy = orderMoveBy;
+        this.orderMoveUnitIndex = orderMoveUnitIndex;
+    }
+
+    /**
+     * Index into the owned-entity roster of the unit to order.
+     *
+     * <p>The agent does not decide which unit is worth moving, or even which
+     * can move: it publishes the roster and dispatches against an index.
+     * Choosing is the planner's job, and a mobility predicate guessed here
+     * would be exactly the decision logic the agent must not hold (wiki:
+     * multiplayer-portability-invariants).
+     */
+    int orderMoveUnitIndex() {
+        return orderMoveUnitIndex;
+    }
+
+    /**
+     * Elapsed time at which to order the player's first unit to move, or 0 when
+     * not requested.
+     *
+     * <p>A time rather than a flag because the order is only meaningful once a
+     * map has loaded and the player owns something; issuing at boot would
+     * report "no unit" and prove nothing.
+     */
+    int orderMoveAtSeconds() {
+        return orderMoveAtSeconds;
+    }
+
+    /** True when a move order was requested. */
+    boolean orderRequested() {
+        return orderMoveAtSeconds > 0;
+    }
+
+    /**
+     * World-space offset the ordered unit is sent by, as {x, y}.
+     *
+     * <p>An offset rather than an absolute point: the destination has to be
+     * somewhere the unit can actually reach, and the only position known to be
+     * on reachable terrain is the one the unit already occupies.
+     */
+    float[] orderMoveBy() {
+        return orderMoveBy.clone();
     }
 
     /**
@@ -90,13 +143,16 @@ final class AgentOptions {
      */
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
-            return new AgentOptions(new int[0], false, new String[0], "");
+            return new AgentOptions(new int[0], false, new String[0], "", 0, DEFAULT_MOVE_BY.clone(), 0);
         }
 
         int[] discoverAt = new int[0];
         boolean exitAfter = false;
         String[] inspect = new String[0];
         String findUnder = "";
+        int orderAt = 0;
+        float[] orderBy = DEFAULT_MOVE_BY.clone();
+        int orderIndex = 0;
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -120,13 +176,71 @@ final class AgentOptions {
                     throw new IllegalArgumentException(FIND_UNDER + " expects a package prefix");
                 }
                 findUnder = value;
+            } else if (ORDER_AT.equals(key)) {
+                orderAt = parseOneSecond(value);
+            } else if (ORDER_BY.equals(key)) {
+                orderBy = parseOffset(value);
+            } else if (ORDER_INDEX.equals(key)) {
+                orderIndex = parseIndex(value);
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
-                                + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER);
+                                + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", "
+                                + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX);
             }
         }
-        return new AgentOptions(discoverAt, exitAfter, inspect, findUnder);
+        return new AgentOptions(
+                discoverAt, exitAfter, inspect, findUnder, orderAt, orderBy, orderIndex);
+    }
+
+    /** Default move offset: far enough that arrival is unambiguous, in world units. */
+    private static final float[] DEFAULT_MOVE_BY = {240.0f, 0.0f};
+
+    /** Parses a single positive whole-second offset. */
+    private static int parseOneSecond(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(ORDER_AT + " expects whole seconds, got " + value, e);
+        }
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(ORDER_AT + " expects positive seconds, got " + parsed);
+        }
+        return parsed;
+    }
+
+    /** Parses a non-negative roster index. */
+    private static int parseIndex(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(ORDER_INDEX + " expects an integer, got " + value, e);
+        }
+        if (parsed < 0) {
+            throw new IllegalArgumentException(
+                    ORDER_INDEX + " expects a non-negative index, got " + parsed);
+        }
+        return parsed;
+    }
+
+    /** Parses an {@code x,y} world-space offset. */
+    private static float[] parseOffset(String value) {
+        String[] parts = value.split(",");
+        if (parts.length != 2) {
+            throw new IllegalArgumentException(ORDER_BY + " expects x,y, got " + value);
+        }
+        float[] offset = new float[2];
+        for (int i = 0; i < 2; i++) {
+            try {
+                offset[i] = Float.parseFloat(parts[i].trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        ORDER_BY + " expects two numbers, got " + value, e);
+            }
+        }
+        return offset;
     }
 
     /** Parses a comma-separated list of non-blank field names. */

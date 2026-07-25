@@ -86,6 +86,23 @@ New validator `require_absolute_path` (`RW-DECODE-005`). It also closed an exist
 
 `make check` now chains `agent-selftest`, so a patcher regression or an obfuscated name that moved in a game update fails at the gate. `make check` green: guard 0 violations, ruff clean, mypy strict clean, 88 tests (was 61), 100% statements and branches, agent-selftest OK.
 
+## [2026-07-25] milestone | M5 — the bot issued a real order and a unit moved
+Pages written: issuing-orders
+Pages updated: index (8 pages), hubs/engine-internals, hubs/bot-architecture
+Artifacts: `wiki/sources/m5-order/` — `order-accepted-unit-moved.txt` (11), `order-accepted-building-did-not-move.txt` (6), `controller-create-and-enqueue.txt` (22), `command-setters.txt` (22), `scriptengine-update.txt` (26), `builtin-ai-order-idiom.txt` (6)
+
+Notes: the last of the three prerequisites is closed. The path is three calls — `cf.a(team)` to construct and enqueue, `a(unit)` to add a subject, `a(x,y)` to set a destination — and nothing dispatches afterwards, because the tick drains the queue. It is the built-in AI's own idiom rather than a reconstruction of one, which is what makes the bot's input the same class of thing a player's input is.
+
+Threading was decided by the engine, not by us. Commands land in a plain `ArrayList` the tick drains, so a probe-thread write would race the simulation; `ScriptEngine.addRunnableToQueue` appends under a lock and `ScriptEngine.update` runs the work on the thread that marks itself the main script thread. Every engine touch now goes through it, reads included — a position sampled mid-tick tears as easily as a write corrupts.
+
+The first order proved the probe design rather than the order path. Issued cleanly, no exception, and nothing happened: the subject was `units.d.e`, drawables `base`, the Command Center. Three samples at the same coordinates. Had the success criterion been "no exception thrown", that would have been recorded as working. Re-targeted at the Builder the same code moved it 300 units, with a y excursion at t+5s corrected by t+10s — pathfinding around an obstacle, which also rules out a direct field write — arriving 2.5 units from the destination. That settles `e.a(float,float)` as move-to-point by observation, where the target-kind enum is single letters and reading it statically would have been slower and weaker.
+
+Selection deliberately stayed out of the agent. It publishes the owned-entity roster and dispatches against an index; a mobility predicate guessed in the dispatch layer is exactly the decision logic the agent must not hold. That is also why the building order was possible to make, and worth having made.
+
+Two multiplayer invariants got independent confirmation from the decompiled enqueue rather than from reasoning: commands are stamped with the `by` millisecond clock at construction, and the enqueue forks on network role with a server-side check on one branch only.
+
+New drift guard: `Orders.verifyBindings` resolves six classes, six fields and four method signatures against the jar with no game running, asserted by `agent-selftest` inside `make check`. Not settled: the third owned entity, parked at (-1000, -1000), is unexplained — a lead, not a finding.
+
 ## [2026-07-25] tooling | whole-jar decompile, and the command path it found in one grep
 Artifacts: `wiki/sources/m4-commands/` — `CommandController-c.java.txt` (114), `Command-e-public-surface.txt` (56), `Command-add-unit.txt` (20), `engine-construction-site.txt` (16), `engine-tick-decompiled.txt` (19)
 

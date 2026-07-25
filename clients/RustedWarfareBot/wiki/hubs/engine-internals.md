@@ -10,4 +10,6 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 [Engine Entity Model](../pages/engine-entity-model.md) -- `am` is every world object, `am.bE` the master list, `al` the tree class; owner and position fields named
 [Engine Tick Method and Clock](../pages/engine-tick-and-clock.md) -- `game.i.a(float)` is the simulation tick; `bx` counts it at ~300 Hz, `by` is the millisecond clock, and five other writers only restore them
 
+[Issuing Orders](../pages/issuing-orders.md) -- the three-call command path, its threading rule, and the order that finally moved a unit
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

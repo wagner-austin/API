@@ -1,0 +1,11 @@
+[rw-agent] === owned entities ===
+[rw-agent] [0] com.corrodinggames.rts.game.units.d.e at (4250.0, 2550.0) {e=0.459885 f=1010.42847 g=1010.42847 i=49320.0 k=17.259892}
+[rw-agent] [1] com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+[rw-agent] [2] com.corrodinggames.rts.game.units.h at (-1000.0, -1000.0)
+[rw-agent] 
+[rw-agent] order: subject com.corrodinggames.rts.game.units.e.b at (4250.0, 2610.0)
+[rw-agent] order: moving to (4550.0, 2610.0)
+[rw-agent] order: issued
+[rw-agent] order: t+2s com.corrodinggames.rts.game.units.e.b at (4335.7466, 2610.003)
+[rw-agent] order: t+5s com.corrodinggames.rts.game.units.e.b at (4474.0933, 2628.788)
+[rw-agent] order: t+10s com.corrodinggames.rts.game.units.e.b at (4547.514, 2611.7942)

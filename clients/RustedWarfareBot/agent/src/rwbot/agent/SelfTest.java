@@ -42,6 +42,7 @@ public final class SelfTest {
 
         failures += checkOptions();
         failures += checkDiscovery();
+        failures += checkOrderBindings();
         failures += checkLogPrefixing();
 
         if (failures > 0) {
@@ -78,6 +79,27 @@ public final class SelfTest {
         failures += expect(
                 AgentOptions.parse("discoverAtSeconds=5").findElementsUnder().isEmpty(),
                 "findElementsUnder defaults empty");
+        failures += expect(
+                !AgentOptions.parse("discoverAtSeconds=5").orderRequested(),
+                "order not requested by default");
+        failures += expect(
+                AgentOptions.parse("orderMoveAtSeconds=25").orderMoveAtSeconds() == 25,
+                "orderMoveAtSeconds parsed");
+        failures += expect(
+                AgentOptions.parse("orderMoveAtSeconds=25").orderMoveUnitIndex() == 0,
+                "orderMoveUnitIndex defaults to 0");
+        failures += expect(
+                AgentOptions.parse("orderMoveAtSeconds=25;orderMoveUnitIndex=2")
+                                .orderMoveUnitIndex()
+                        == 2,
+                "orderMoveUnitIndex parsed");
+        float[] moveBy = AgentOptions.parse("orderMoveBy=300,-40").orderMoveBy();
+        failures += expect(
+                moveBy[0] == 300.0f && moveBy[1] == -40.0f, "orderMoveBy parsed as x,y");
+        failures += expectRejected("orderMoveAtSeconds=0", "zero order time");
+        failures += expectRejected("orderMoveUnitIndex=-1", "negative roster index");
+        failures += expectRejected("orderMoveBy=300", "one-component offset");
+        failures += expectRejected("orderMoveBy=300,left", "non-numeric offset");
         failures += expectRejected("discoverAtSeconds=0", "zero seconds");
         failures += expectRejected("discoverAtSeconds=-3", "negative seconds");
         failures += expectRejected("discoverAtSeconds=soon", "non-numeric seconds");
@@ -128,6 +150,22 @@ public final class SelfTest {
         failures += expect(inherited.contains("ownField"), "element's own field listed");
         failures += expect(inherited.contains("baseField"), "element's INHERITED field listed");
 
+        // The hierarchy walk must stop at the platform boundary. Twelve engine
+        // classes extend Thread, four extend Exception, and the master entity
+        // list type extends AbstractList -- so a game object's JDK superclass is
+        // the common case, not an edge one. Reflecting its internals warns on
+        // JDK 13 and is denied later.
+        String overJdk = Discovery.describe(new ExtendsPlatform(), "t=2s");
+        failures += expect(overJdk.contains("gameField"), "own field listed over a JDK base");
+        failures += expect(!overJdk.contains("priority"), "JDK superclass field NOT reflected");
+        failures += expect(!overJdk.contains("eetop"), "JDK superclass internals NOT reflected");
+
+        String overJdkGraph =
+                Discovery.findCollections(new ExtendsPlatformHolder(), "java.lang.String", 4, 500);
+        failures += expect(
+                !overJdkGraph.contains(".eetop") && !overJdkGraph.contains(".priority"),
+                "graph search does not climb into a JDK superclass");
+
         failures += expect(
                 Discovery.findCollections(null, "com.x", 3, 100).contains("root is null"),
                 "graph search handles a null root");
@@ -152,6 +190,22 @@ public final class SelfTest {
                     "graph search never walks the platform internal " + internal);
         }
         return failures;
+    }
+
+    /**
+     * Resolves every obfuscated name the order path uses, against the real jar.
+     *
+     * <p>No running game is needed: the classes, fields and method signatures
+     * either exist in the pinned jar or they do not. This is the difference
+     * between a game update failing at the gate with a list of what moved, and
+     * failing mid-run with a reflection error nobody sees until they read a log.
+     */
+    private static int checkOrderBindings() {
+        java.util.List<String> problems = Orders.verifyBindings();
+        for (String problem : problems) {
+            System.out.println("FAIL order binding: " + problem);
+        }
+        return expect(problems.isEmpty(), "every order-path name resolves against the jar");
     }
 
     /** The engine captures stdout, so every emitted line must carry the prefix. */
@@ -194,6 +248,19 @@ public final class SelfTest {
             return expect(true, "rejects " + description);
         }
         return expect(false, "rejects " + description);
+    }
+
+    /**
+     * A game-shaped class over a JDK base, as twelve engine classes are over
+     * {@code Thread}. Never started; only its fields are read.
+     */
+    private static final class ExtendsPlatform extends Thread {
+        final String gameField = "mine";
+    }
+
+    /** Reaches an {@link ExtendsPlatform} through a field, for the graph search. */
+    private static final class ExtendsPlatformHolder {
+        final ExtendsPlatform child = new ExtendsPlatform();
     }
 
     /** Base carrying the state that identifies an element, as engine types do. */

@@ -1,0 +1,22 @@
+    public void a(y y2) {
+        if (y2 == null) {
+            throw new RuntimeException("unit cannot be null");
+        }
+        if (y2.bX != this.i) {
+            // empty if block
+        }
+        if (this.i.w) {
+            if (y2.bX != this.i && com.corrodinggames.rts.gameFramework.l.B().bs != this.i) {
+                com.corrodinggames.rts.gameFramework.l.b("CommandController", "Warning AI: " + this.i.k + " gave an order to unit with team:" + y2.bX.k + " type:" + y2.r().i());
+                com.corrodinggames.rts.gameFramework.l.g("");
+            }
+            if (y2.cW()) {
+                com.corrodinggames.rts.gameFramework.l.b("CommandController", "Warning AI: " + this.i.k + " gave an order to unit with canNotBeGivenOrdersByPlayer: " + y2.r().i());
+            }
+        }
+        this.v.add(y2);
+    }
+    public void a(float f2, float f3) {
+        this.j = new au();
+        this.j.a(f2, f3);
+    }

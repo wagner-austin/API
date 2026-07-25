@@ -11,4 +11,6 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Agent: Render-Callback No-Op](../pages/agent-render-callback-noop.md) -- the agent's first job: bytecode-patching the render callbacks that kill a headless engine, and why the verifier is the oracle
 [Engine Tick Method and Clock](../pages/engine-tick-and-clock.md) -- the tick basis a decimated planner decimates against, and the safe read path to the live engine
 
+[Issuing Orders](../pages/issuing-orders.md) -- the three-call command path, its threading rule, and the order that finally moved a unit
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

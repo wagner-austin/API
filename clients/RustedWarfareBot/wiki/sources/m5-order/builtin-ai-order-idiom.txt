@@ -1,0 +1,6 @@
+    public void a(y y2, com.corrodinggames.rts.game.units.a.c c2) {
+        com.corrodinggames.rts.gameFramework.l l2 = com.corrodinggames.rts.gameFramework.l.B();
+        com.corrodinggames.rts.gameFramework.e e2 = l2.cf.a(this);
+        e2.a(y2);
+        e2.a(c2);
+    }

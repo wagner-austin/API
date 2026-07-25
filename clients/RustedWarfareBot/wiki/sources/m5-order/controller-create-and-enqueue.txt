@@ -1,0 +1,22 @@
+    public e b(n n2) {
+        if (n2 == null) {
+            throw new RuntimeException("team==null");
+        }
+        l l2 = l.B();
+        e e2 = new e(this);
+        e2.i = n2;
+        e2.d = l2.by;
+        if (a) {
+            l.e("Tracing source");
+            e2.b = l.a(new Exception("Test"));
+        }
+        if (!l2.bX.B) {
+            if (!e2.l()) {
+                l.b("Command failed prepareAndCheckOnServer()");
+            }
+            this.b.add(e2);
+        } else {
+            this.d.add(e2);
+        }
+        return e2;
+    }
