@@ -6,6 +6,7 @@ related:
   - "[[agent-render-callback-noop]]"
   - "[[runtime-split-java-agent-python-brain]]"
   - "[[engine-entity-model]]"
+  - "[[multiplayer-portability-invariants]]"
 source_paths:
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:84"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:87"
@@ -13,6 +14,8 @@ source_paths:
   - "wiki/sources/m3-discovery/engine-snapshots.log:531"
   - "wiki/sources/m3-discovery/engine-snapshots.log:1091"
   - "wiki/sources/m4-entities/entity-count-loop.txt:11"
+  - "wiki/sources/m4-commands/engine-tick-decompiled.txt:6"
+  - "wiki/sources/m4-commands/engine-tick-decompiled.txt:17"
   - "agent/src/rwbot/agent/EngineHandle.java"
   - "agent/src/rwbot/agent/Discovery.java"
 game_version: "1.15 (code 176, build #28)"
@@ -23,11 +26,19 @@ hubs: [engine-internals, bot-architecture]
 
 # Engine Tick Method and Clock
 
-The simulation advances in `com.corrodinggames.rts.game.i.a(float)`, which increments a tick counter once per call and maintains a millisecond clock beside it.[^1][^3] This resolves the first of the three prerequisites [[engine-name-oracle]] left open — the oracle names subsystems, not methods.
+The simulation advances in `com.corrodinggames.rts.game.i.a(float)`, which increments `bx` — the engine's own **frame** counter — exactly once per call, and accumulates a derived millisecond value in `by` beside it.[^1][^3][^8] This resolves the first of the three prerequisites [[engine-name-oracle]] left open — the oracle names subsystems, not methods.
 
 ## The method
 
 `game.i` is the class the boot log names as the live `gameEngine`, and `a(float)` takes a delta time.[^1] Its body contains a literal field increment — `getfield bx` / `iconst_1` / `iadd` / `putfield bx` — so `bx` counts invocations exactly.[^1] Immediately above, `by` is stored from an `f2i` conversion, making it a derived millisecond value rather than an independent counter.[^3]
+
+## What the engine calls them
+
+The engine names these fields itself, and its vocabulary is not the one this page first used. A debug line inside the same method prints `"updateAllGame1: deltaSpeed:" + f2 + " frame:" + this.bx + " network.currentStepRate:" + this.bX.c()` — so `bx` is the engine's **frame** counter, and the lockstep step rate is a separate quantity reached through the network engine.[^8]
+
+The distinction matters for the planner rather than for pedantry. Decimating against `bx` decimates against local frames; the quantity that is agreed between peers is the network step rate, and that is the one a multiplayer-legal decision cadence has to key off ([[multiplayer-portability-invariants]]). `bx` remains the right thing to read for "has the simulation advanced", because it is incremented exactly once per update call.[^8]
+
+`by` is likewise more specific than a plain millisecond counter: it accumulates `f2 * 16.666666f`, which is milliseconds per frame at a 60 Hz baseline scaled by the current delta.[^8] That it measures out at 1 kHz of wall-clock is a consequence of that formula, not an independent clock.
 
 ## The counters, measured
 
@@ -54,3 +65,4 @@ Resolved, and not where this page first guessed: the master list is the static `
 [^5]: `wiki/sources/m3-discovery/engine-snapshots.log:1091` — `bx = 7909` and `by = 26454` at the `t=30s` snapshot headed at `:960`.
 [^6]: `javap -p -c -cp .game/game-lib.jar` over every class in the jar [synthesis] — a scan for `putfield` of `bx` returns exactly six methods. `game.i.a(float)` is the increment; `gameFramework.ba.h()`, `j.ad.w()` and `j.ad.a(j.au)` each restore a saved pair after `y.a(Lj/k;ZZZ)Z`; `j.ad.aD()` writes `iconst_0` to both; `gameFramework.l.<init>` initialises them. The `.game/` tree is untracked by design, so the command is the reproduction path rather than an archived artifact.
 [^7]: `agent/src/rwbot/agent/EngineHandle.java` — the reflective accessor and the pinned-build failure contract; `javap` of `gameFramework.l.B()` shows a two-instruction body, `getstatic al` then `areturn`.
+[^8]: `wiki/sources/m4-commands/engine-tick-decompiled.txt:6` — the debug line naming `this.bx` as `frame:` and `this.bX.c()` as `network.currentStepRate:`, with `++this.bx;` at `:17` and `this.by = (int)((float)this.by + f2 * 16.666666f);` at `:14`.
