@@ -66,7 +66,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 
-from covenant_radar_api.worker import _test_hooks as hooks
+from covenant_radar_api.worker import _test_hooks as worker_hooks
 from covenant_radar_api.worker._optimize_common import (
     parse_bidirectional,
     parse_nn_optimizer,
@@ -606,15 +606,15 @@ class TestParseOptimizeConfig:
 
     def setup_method(self) -> None:
         """Install fake dataset registries before each test."""
-        self._orig_dataset_registry = hooks.dataset_registry_factory
-        self._orig_ts_registry = hooks.timeseries_registry_factory
-        hooks.dataset_registry_factory = _make_fake_standard_registry
-        hooks.timeseries_registry_factory = _make_fake_timeseries_registry
+        self._orig_dataset_registry = worker_hooks.dataset_registry_factory
+        self._orig_ts_registry = worker_hooks.timeseries_registry_factory
+        worker_hooks.dataset_registry_factory = _make_fake_standard_registry
+        worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
     def teardown_method(self) -> None:
         """Restore original hooks after each test."""
-        hooks.dataset_registry_factory = self._orig_dataset_registry
-        hooks.timeseries_registry_factory = self._orig_ts_registry
+        worker_hooks.dataset_registry_factory = self._orig_dataset_registry
+        worker_hooks.timeseries_registry_factory = self._orig_ts_registry
 
     def test_minimal_config_returns_defaults(self) -> None:
         """Minimal config uses defaults for all optional fields."""
@@ -756,29 +756,29 @@ class TestParseOptimizeConfig:
 
 
 class TestRunOptimization:
-    """Tests for run_optimization using fake hooks."""
+    """Tests for run_optimization using fake worker_hooks."""
 
     def setup_method(self) -> None:
         """Install all fake hooks before each test."""
-        self._orig_registry = hooks.registry_factory
-        self._orig_optimizer = hooks.optimizer_registry_factory
-        self._orig_objective = hooks.objective_factory
-        self._orig_dataset_registry = hooks.dataset_registry_factory
-        self._orig_ts_registry = hooks.timeseries_registry_factory
-        self._orig_dataset_loader = hooks.dataset_loader
+        self._orig_registry = worker_hooks.registry_factory
+        self._orig_optimizer = worker_hooks.optimizer_registry_factory
+        self._orig_objective = worker_hooks.objective_factory
+        self._orig_dataset_registry = worker_hooks.dataset_registry_factory
+        self._orig_ts_registry = worker_hooks.timeseries_registry_factory
+        self._orig_dataset_loader = worker_hooks.dataset_loader
 
         # Install fake dataset registries
-        hooks.dataset_registry_factory = _make_fake_standard_registry
-        hooks.timeseries_registry_factory = _make_fake_timeseries_registry
+        worker_hooks.dataset_registry_factory = _make_fake_standard_registry
+        worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
     def teardown_method(self) -> None:
         """Restore all original hooks after each test."""
-        hooks.registry_factory = self._orig_registry
-        hooks.optimizer_registry_factory = self._orig_optimizer
-        hooks.objective_factory = self._orig_objective
-        hooks.dataset_registry_factory = self._orig_dataset_registry
-        hooks.timeseries_registry_factory = self._orig_ts_registry
-        hooks.dataset_loader = self._orig_dataset_loader
+        worker_hooks.registry_factory = self._orig_registry
+        worker_hooks.optimizer_registry_factory = self._orig_optimizer
+        worker_hooks.objective_factory = self._orig_objective
+        worker_hooks.dataset_registry_factory = self._orig_dataset_registry
+        worker_hooks.timeseries_registry_factory = self._orig_ts_registry
+        worker_hooks.dataset_loader = self._orig_dataset_loader
 
     def _install_fakes(
         self,
@@ -806,9 +806,9 @@ class TestRunOptimization:
         fake_registry = _make_fake_backend_registry(fake_backend)
         fake_optimizer_registry = _make_fake_optimizer_registry(fake_optimizer)
 
-        hooks.registry_factory = lambda: fake_registry
+        worker_hooks.registry_factory = lambda: fake_registry
 
-        hooks.optimizer_registry_factory = lambda: fake_optimizer_registry
+        worker_hooks.optimizer_registry_factory = lambda: fake_optimizer_registry
 
         def _fake_objective_factory(
             backend_name: BackendName,
@@ -820,7 +820,7 @@ class TestRunOptimization:
             del backend_name, x, y, feature_names, config
             return fake_objective
 
-        hooks.objective_factory = _fake_objective_factory
+        worker_hooks.objective_factory = _fake_objective_factory
 
         def _fake_loader(
             config: DatasetConfig,
@@ -830,7 +830,7 @@ class TestRunOptimization:
             del config, external_dir, progress_callback
             return fake_dataset
 
-        hooks.dataset_loader = _fake_loader
+        worker_hooks.dataset_loader = _fake_loader
 
         return fake_backend, fake_optimizer, fake_objective
 
@@ -960,7 +960,7 @@ class TestRunOptimization:
                 )
             return fake_dataset
 
-        hooks.dataset_loader = _loading_loader
+        worker_hooks.dataset_loader = _loading_loader
 
         loading_infos: list[LoadingProgressInfo] = []
 
@@ -1275,24 +1275,24 @@ class TestProcessOptimizeJob:
 
     def setup_method(self) -> None:
         """Install all fake hooks before each test."""
-        self._orig_registry = hooks.registry_factory
-        self._orig_optimizer = hooks.optimizer_registry_factory
-        self._orig_objective = hooks.objective_factory
-        self._orig_dataset_registry = hooks.dataset_registry_factory
-        self._orig_ts_registry = hooks.timeseries_registry_factory
-        self._orig_dataset_loader = hooks.dataset_loader
+        self._orig_registry = worker_hooks.registry_factory
+        self._orig_optimizer = worker_hooks.optimizer_registry_factory
+        self._orig_objective = worker_hooks.objective_factory
+        self._orig_dataset_registry = worker_hooks.dataset_registry_factory
+        self._orig_ts_registry = worker_hooks.timeseries_registry_factory
+        self._orig_dataset_loader = worker_hooks.dataset_loader
 
-        hooks.dataset_registry_factory = _make_fake_standard_registry
-        hooks.timeseries_registry_factory = _make_fake_timeseries_registry
+        worker_hooks.dataset_registry_factory = _make_fake_standard_registry
+        worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
     def teardown_method(self) -> None:
         """Restore all original hooks after each test."""
-        hooks.registry_factory = self._orig_registry
-        hooks.optimizer_registry_factory = self._orig_optimizer
-        hooks.objective_factory = self._orig_objective
-        hooks.dataset_registry_factory = self._orig_dataset_registry
-        hooks.timeseries_registry_factory = self._orig_ts_registry
-        hooks.dataset_loader = self._orig_dataset_loader
+        worker_hooks.registry_factory = self._orig_registry
+        worker_hooks.optimizer_registry_factory = self._orig_optimizer
+        worker_hooks.objective_factory = self._orig_objective
+        worker_hooks.dataset_registry_factory = self._orig_dataset_registry
+        worker_hooks.timeseries_registry_factory = self._orig_ts_registry
+        worker_hooks.dataset_loader = self._orig_dataset_loader
 
     def test_process_optimize_job_returns_encoded_result(
         self,
@@ -1312,8 +1312,8 @@ class TestProcessOptimizeJob:
         fake_registry = _make_fake_backend_registry(fake_backend)
         fake_optimizer_registry = _make_fake_optimizer_registry(fake_optimizer)
 
-        hooks.registry_factory = lambda: fake_registry
-        hooks.optimizer_registry_factory = lambda: fake_optimizer_registry
+        worker_hooks.registry_factory = lambda: fake_registry
+        worker_hooks.optimizer_registry_factory = lambda: fake_optimizer_registry
 
         def _fake_objective_factory(
             backend_name: BackendName,
@@ -1325,7 +1325,7 @@ class TestProcessOptimizeJob:
             del backend_name, x, y, feature_names, config
             return fake_objective
 
-        hooks.objective_factory = _fake_objective_factory
+        worker_hooks.objective_factory = _fake_objective_factory
 
         def _fake_loader(
             config: DatasetConfig,
@@ -1335,7 +1335,7 @@ class TestProcessOptimizeJob:
             del config, external_dir, progress_callback
             return fake_dataset
 
-        hooks.dataset_loader = _fake_loader
+        worker_hooks.dataset_loader = _fake_loader
 
         fake_env = FakeEnv(
             {

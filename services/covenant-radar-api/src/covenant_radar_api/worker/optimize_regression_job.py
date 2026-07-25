@@ -30,6 +30,9 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
     optional_int,
     parse_bidirectional,
     parse_device,
@@ -103,7 +106,10 @@ def _parse_regression_optimize_config(
 
     # Neural network fields (defaults match classifier optimize_job)
     precision = parse_precision(raw.get("precision"))
-    nn_optimizer = parse_nn_optimizer(raw.get("nn_optimizer"))
+    # Wire key is "optimizer", matching optimize_job.py and
+    # _train_external_parsers.py. "nn_optimizer" is the internal config
+    # field name, not the client-facing one.
+    nn_optimizer = parse_nn_optimizer(raw.get("optimizer"))
     n_epochs = optional_int(raw, "n_epochs", 50)
     early_stopping_patience = optional_int(raw, "early_stopping_patience", 10)
     sequence_length = optional_int(raw, "sequence_length", 5)
@@ -375,6 +381,20 @@ def run_regression_optimization(
         "n_trials_failed": summary["n_trials_failed"],
         "duration_seconds": summary["total_duration_seconds"],
     }
+
+    # Encode best params for JSON using the shared encoders. Without this the
+    # saved *_optimal_config.json carries run metadata only and none of the
+    # tuned hyperparameters, making the run unreproducible.
+    int_encoded = encode_sampled_int_params(summary["best_int_params"])
+    for k, v in int_encoded.items():
+        result_dict[f"best_{k}"] = v
+    float_encoded = encode_sampled_float_params(summary["best_float_params"])
+    for k, v in float_encoded.items():
+        result_dict[f"best_{k}"] = v
+    string_encoded = encode_sampled_string_params(summary["best_string_params"])
+    for k, v in string_encoded.items():
+        result_dict[f"best_{k}"] = v
+
     config_dict: dict[str, JSONValue] = dict(result_dict)
 
     # Save results

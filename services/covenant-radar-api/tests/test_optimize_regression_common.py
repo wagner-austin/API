@@ -22,7 +22,7 @@ from covenant_ml.datasets.types import RegressionDatasetMeta, RegressionTargetSp
 from numpy.typing import NDArray
 from platform_core.json_utils import JSONTypeError
 
-from covenant_radar_api.worker import _regression_hooks as hooks
+from covenant_radar_api.worker import _regression_hooks as regression_hooks
 from covenant_radar_api.worker._optimize_regression_common import (
     load_regression_dataset,
     parse_regression_dataset_name,
@@ -161,12 +161,12 @@ class TestParseRegressionDatasetName:
 
     def setup_method(self) -> None:
         """Install fake regression registry before each test."""
-        self._orig_registry = hooks.regression_registry_factory
-        hooks.regression_registry_factory = _make_fake_regression_registry
+        self._orig_registry = regression_hooks.regression_registry_factory
+        regression_hooks.regression_registry_factory = _make_fake_regression_registry
 
     def teardown_method(self) -> None:
         """Restore original hooks after each test."""
-        hooks.regression_registry_factory = self._orig_registry
+        regression_hooks.regression_registry_factory = self._orig_registry
 
     def test_valid_dataset_name(self) -> None:
         """Valid dataset name returns the name."""
@@ -189,15 +189,15 @@ class TestLoadRegressionDataset:
 
     def setup_method(self) -> None:
         """Install fake hooks before each test."""
-        self._orig_registry = hooks.regression_registry_factory
-        self._orig_loader = hooks.regression_dataset_loader
-        hooks.regression_registry_factory = _make_fake_regression_registry
-        hooks.regression_dataset_loader = _make_fake_regression_loader
+        self._orig_registry = regression_hooks.regression_registry_factory
+        self._orig_loader = regression_hooks.regression_dataset_loader
+        regression_hooks.regression_registry_factory = _make_fake_regression_registry
+        regression_hooks.regression_dataset_loader = _make_fake_regression_loader
 
     def teardown_method(self) -> None:
         """Restore original hooks after each test."""
-        hooks.regression_registry_factory = self._orig_registry
-        hooks.regression_dataset_loader = self._orig_loader
+        regression_hooks.regression_registry_factory = self._orig_registry
+        regression_hooks.regression_dataset_loader = self._orig_loader
 
     def test_loads_regression_dataset(self, tmp_path: Path) -> None:
         """Loading regression dataset returns correct structure."""
@@ -229,7 +229,7 @@ class TestLoadRegressionDataset:
                 callback_calls.append("called")
             return _make_fake_regression_dataset(config["name"])
 
-        hooks.regression_dataset_loader = _fake_loader_with_callback
+        regression_hooks.regression_dataset_loader = _fake_loader_with_callback
 
         from covenant_ml.datasets.types import LoadProgress
 

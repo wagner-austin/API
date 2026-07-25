@@ -17,10 +17,10 @@ from platform_core.logging import (
     get_rich_console,
 )
 
-from covenant_radar_api.worker.optimize_types import (
-    _encode_sampled_float_params,
-    _encode_sampled_int_params,
-    _encode_sampled_string_params,
+from covenant_radar_api.worker._optimize_common import (
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
 )
 from scripts._test_hooks import UnifiedOptimizationResult
 from scripts.optimize.cli import PRESET_DESCRIPTIONS, DatasetName, FeaturePreset
@@ -129,19 +129,19 @@ def create_hyperparams_table(
     table.add_column("Value", style="bold yellow", justify="right")
 
     # Integer params — encode then extract with require_int
-    int_encoded = _encode_sampled_int_params(result["best_int_params"])
+    int_encoded = encode_sampled_int_params(result["best_int_params"])
     for name in int_encoded:
         val = require_int(int_encoded, name)
         table.add_row(f"[green]{name}[/green]", f"[bold]{val}[/bold]")
 
     # Float params — encode then extract with require_float
-    float_encoded = _encode_sampled_float_params(result["best_float_params"])
+    float_encoded = encode_sampled_float_params(result["best_float_params"])
     for name in float_encoded:
         fval = require_float(float_encoded, name)
         table.add_row(f"[magenta]{name}[/magenta]", f"{fval:.6f}")
 
     # String params — encode then extract with require_str
-    string_encoded = _encode_sampled_string_params(result["best_string_params"])
+    string_encoded = encode_sampled_string_params(result["best_string_params"])
     for name in string_encoded:
         sval = require_str(string_encoded, name)
         table.add_row(f"[blue]{name}[/blue]", sval)

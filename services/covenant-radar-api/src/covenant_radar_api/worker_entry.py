@@ -79,11 +79,9 @@ def main(
         logger: Logger instance. If None, uses default logger after setup.
         runner: Worker runner function. If None, uses _get_default_runner().
     """
-    from cleargbm._rust_adapters import use_rust_backend
     from covenant_ml.optimizer import use_real_optuna
 
     use_real_optuna()
-    use_rust_backend()
 
     setup_logging(
         level="INFO",

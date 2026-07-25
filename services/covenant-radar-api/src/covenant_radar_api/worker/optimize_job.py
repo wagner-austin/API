@@ -30,6 +30,9 @@ from platform_core.logging import get_logger
 
 from covenant_radar_api.worker._optimize_common import (
     build_optimization_config,
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
     load_any_dataset,
     optional_int,
     parse_backend_name,
@@ -49,9 +52,6 @@ from covenant_radar_api.worker.optimize_types import (
     TrialProgressInfo,
     UnifiedOptimizationResult,
     UnifiedOptimizeParseResult,
-    _encode_sampled_float_params,
-    _encode_sampled_int_params,
-    _encode_sampled_string_params,
     encode_unified_optimization_result,
 )
 
@@ -376,13 +376,13 @@ def run_optimization(
     }
 
     # Encode best params for JSON using typed encode functions
-    int_encoded = _encode_sampled_int_params(summary["best_int_params"])
+    int_encoded = encode_sampled_int_params(summary["best_int_params"])
     for k, v in int_encoded.items():
         result_dict[f"best_{k}"] = v
-    float_encoded = _encode_sampled_float_params(summary["best_float_params"])
+    float_encoded = encode_sampled_float_params(summary["best_float_params"])
     for k, v in float_encoded.items():
         result_dict[f"best_{k}"] = v
-    string_encoded = _encode_sampled_string_params(summary["best_string_params"])
+    string_encoded = encode_sampled_string_params(summary["best_string_params"])
     for k, v in string_encoded.items():
         result_dict[f"best_{k}"] = v
 

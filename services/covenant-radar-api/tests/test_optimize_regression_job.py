@@ -65,10 +65,11 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     dump_json_str,
+    load_json_str,
 )
 
 from covenant_radar_api.worker import _regression_hooks as regression_hooks
-from covenant_radar_api.worker import _test_hooks as hooks
+from covenant_radar_api.worker import _test_hooks as worker_hooks
 from covenant_radar_api.worker._test_hooks import ObjectiveWithFeatureCount
 from covenant_radar_api.worker.optimize_regression_job import (
     _make_regression_trial_callback,
@@ -585,7 +586,7 @@ class TestParseRegressionOptimizeConfig:
             early_stopping_rounds=20,
             n_jobs=4,
             precision="fp16",
-            nn_optimizer="adam",
+            optimizer="adam",
             n_epochs=100,
             early_stopping_patience=20,
             sequence_length=10,
@@ -608,6 +609,19 @@ class TestParseRegressionOptimizeConfig:
         assert result["early_stopping_patience"] == 20
         assert result["sequence_length"] == 10
         assert result["bidirectional"] is True
+
+    def test_optimizer_wire_key_matches_classifier(self) -> None:
+        """The optimizer is read from the 'optimizer' wire key, not 'nn_optimizer'.
+
+        Regression guard: this path previously read raw['nn_optimizer'] while the
+        classifier path, the external-train parser, and the API all send
+        'optimizer'. Because parse_nn_optimizer defaults None to 'adamw', a
+        client-supplied optimizer was silently discarded with no error.
+        """
+        for wire_value in ("adam", "sgd"):
+            config_json = _make_config_json(backend="mlp_reg", optimizer=wire_value)
+            result = _parse_regression_optimize_config(config_json)
+            assert result["nn_optimizer"] == wire_value
 
     def test_all_four_backends_accepted(self) -> None:
         """All 4 regressor backends are accepted."""
@@ -812,9 +826,9 @@ class TestRunRegressionOptimization:
         self._orig_regressor_objective = regression_hooks.regressor_objective_factory
 
         # Classifier hooks (for optimizer registry)
-        self._orig_optimizer_registry = hooks.optimizer_registry_factory
-        self._orig_dataset_registry = hooks.dataset_registry_factory
-        self._orig_ts_registry = hooks.timeseries_registry_factory
+        self._orig_optimizer_registry = worker_hooks.optimizer_registry_factory
+        self._orig_dataset_registry = worker_hooks.dataset_registry_factory
+        self._orig_ts_registry = worker_hooks.timeseries_registry_factory
 
         # Install fakes
         self._fake_backend = _FakeRegressorBackend()
@@ -827,11 +841,11 @@ class TestRunRegressionOptimization:
         )
         regression_hooks.regressor_objective_factory = _make_fake_objective_factory
 
-        hooks.optimizer_registry_factory = (
+        worker_hooks.optimizer_registry_factory = (
             lambda o=self._fake_optimizer: _make_fake_optimizer_registry(o)
         )
-        hooks.dataset_registry_factory = _make_fake_standard_registry
-        hooks.timeseries_registry_factory = _make_fake_timeseries_registry
+        worker_hooks.dataset_registry_factory = _make_fake_standard_registry
+        worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
     def teardown_method(self) -> None:
         """Restore original hooks after each test."""
@@ -840,9 +854,9 @@ class TestRunRegressionOptimization:
         regression_hooks.regressor_registry_factory = self._orig_regressor_registry
         regression_hooks.regressor_objective_factory = self._orig_regressor_objective
 
-        hooks.optimizer_registry_factory = self._orig_optimizer_registry
-        hooks.dataset_registry_factory = self._orig_dataset_registry
-        hooks.timeseries_registry_factory = self._orig_ts_registry
+        worker_hooks.optimizer_registry_factory = self._orig_optimizer_registry
+        worker_hooks.dataset_registry_factory = self._orig_dataset_registry
+        worker_hooks.timeseries_registry_factory = self._orig_ts_registry
 
     def test_basic_optimization(self, tmp_path: Path) -> None:
         """Basic regression optimization runs end to end."""
@@ -949,7 +963,9 @@ class TestRunRegressionOptimization:
             return _InvokingOptimizer()
 
         invoking_optimizer = _optimizer_with_callback()
-        hooks.optimizer_registry_factory = lambda: _make_fake_optimizer_registry(invoking_optimizer)
+        worker_hooks.optimizer_registry_factory = lambda: _make_fake_optimizer_registry(
+            invoking_optimizer
+        )
 
         trial_infos: list[RegressionTrialProgressInfo] = []
 
@@ -1027,6 +1043,51 @@ class TestRunRegressionOptimization:
         assert result["best_float_params"]["learning_rate"] == 0.1
         assert result["best_trial_number"] == 0
 
+    def test_saved_config_carries_tuned_hyperparameters(self, tmp_path: Path) -> None:
+        """The saved *_optimal_config.json contains the tuned hyperparameters.
+
+        Regression guard for two defects on this path: the flattening step was
+        never ported from the classifier job, so the file named
+        "optimal_config" held run metadata and no hyperparameters at all; and
+        the regressor param encoders omitted every neural-net key, so
+        hidden_size/dropout were dropped even once flattening existed.
+
+        Args:
+            tmp_path: Pytest temporary directory unique to this test.
+        """
+        summary = OptimizationSummary(
+            best_trial_number=3,
+            best_value=-0.125,
+            best_int_params=SampledIntParams(max_depth=7, hidden_size=128),
+            best_float_params=SampledFloatParams(learning_rate=0.05, dropout=0.25),
+            best_string_params=SampledStringParams(booster="gbtree"),
+            n_trials_total=5,
+            n_trials_complete=5,
+            n_trials_pruned=0,
+            n_trials_failed=0,
+            total_duration_seconds=2.0,
+        )
+        fake_optimizer = _FakeOptimizer(summary)
+        worker_hooks.optimizer_registry_factory = (
+            lambda o=fake_optimizer: _make_fake_optimizer_registry(o)
+        )
+
+        output_dir = tmp_path / "output"
+        run_regression_optimization(
+            _make_config_json(),
+            tmp_path / "external",
+            output_dir,
+        )
+
+        config_path = output_dir / "financial_distress_xgboost_reg_optimal_config.json"
+        saved = load_json_str(config_path.read_text(encoding="utf-8"))
+        assert type(saved) is dict
+        assert saved["best_max_depth"] == 7
+        assert saved["best_hidden_size"] == 128
+        assert saved["best_learning_rate"] == 0.05
+        assert saved["best_dropout"] == 0.25
+        assert saved["best_booster"] == "gbtree"
+
     def test_saves_results_to_output_dir(self, tmp_path: Path) -> None:
         """Results are saved to the output directory."""
         output_dir = tmp_path / "output"
@@ -1059,14 +1120,14 @@ class TestProcessRegressionOptimizeJob:
         self._orig_regression_loader = regression_hooks.regression_dataset_loader
         self._orig_regressor_registry = regression_hooks.regressor_registry_factory
         self._orig_regressor_objective = regression_hooks.regressor_objective_factory
-        self._orig_optimizer_registry = hooks.optimizer_registry_factory
-        self._orig_dataset_registry = hooks.dataset_registry_factory
-        self._orig_ts_registry = hooks.timeseries_registry_factory
+        self._orig_optimizer_registry = worker_hooks.optimizer_registry_factory
+        self._orig_dataset_registry = worker_hooks.dataset_registry_factory
+        self._orig_ts_registry = worker_hooks.timeseries_registry_factory
 
         regression_hooks.regression_registry_factory = _make_fake_regression_registry
         regression_hooks.regression_dataset_loader = _make_fake_regression_loader
-        hooks.dataset_registry_factory = _make_fake_standard_registry
-        hooks.timeseries_registry_factory = _make_fake_timeseries_registry
+        worker_hooks.dataset_registry_factory = _make_fake_standard_registry
+        worker_hooks.timeseries_registry_factory = _make_fake_timeseries_registry
 
     def teardown_method(self) -> None:
         """Restore all original hooks after each test."""
@@ -1074,9 +1135,9 @@ class TestProcessRegressionOptimizeJob:
         regression_hooks.regression_dataset_loader = self._orig_regression_loader
         regression_hooks.regressor_registry_factory = self._orig_regressor_registry
         regression_hooks.regressor_objective_factory = self._orig_regressor_objective
-        hooks.optimizer_registry_factory = self._orig_optimizer_registry
-        hooks.dataset_registry_factory = self._orig_dataset_registry
-        hooks.timeseries_registry_factory = self._orig_ts_registry
+        worker_hooks.optimizer_registry_factory = self._orig_optimizer_registry
+        worker_hooks.dataset_registry_factory = self._orig_dataset_registry
+        worker_hooks.timeseries_registry_factory = self._orig_ts_registry
 
     def test_process_regression_optimize_job_returns_encoded_result(
         self,
@@ -1097,7 +1158,9 @@ class TestProcessRegressionOptimizeJob:
             lambda b=fake_backend: _make_fake_regressor_registry(b)
         )
         regression_hooks.regressor_objective_factory = _make_fake_objective_factory
-        hooks.optimizer_registry_factory = lambda o=fake_optimizer: _make_fake_optimizer_registry(o)
+        worker_hooks.optimizer_registry_factory = (
+            lambda o=fake_optimizer: _make_fake_optimizer_registry(o)
+        )
 
         fake_env = FakeEnv(
             {

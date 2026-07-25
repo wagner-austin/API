@@ -26,6 +26,12 @@ from platform_core.json_utils import (
     JSONValue,
 )
 
+from ._optimize_common import (
+    encode_sampled_float_params,
+    encode_sampled_int_params,
+    encode_sampled_string_params,
+)
+
 # =============================================================================
 # Shared Validation Helpers (private, regression-specific)
 # =============================================================================
@@ -453,77 +459,10 @@ class UnifiedRegressionOptimizationResult(TypedDict, total=True):
     duration_seconds: float
 
 
-def _encode_sampled_int_params(params: SampledIntParams) -> JSONObject:
-    """Encode SampledIntParams to JSON-serializable dict.
-
-    Args:
-        params: Sampled integer parameters.
-
-    Returns:
-        JSON-serializable dict with only present keys.
-    """
-    result: JSONObject = {}
-    if "max_depth" in params:
-        result["max_depth"] = params["max_depth"]
-    if "n_estimators" in params:
-        result["n_estimators"] = params["n_estimators"]
-    if "num_leaves" in params:
-        result["num_leaves"] = params["num_leaves"]
-    if "min_child_samples" in params:
-        result["min_child_samples"] = params["min_child_samples"]
-    if "min_samples_split" in params:
-        result["min_samples_split"] = params["min_samples_split"]
-    if "min_samples_leaf" in params:
-        result["min_samples_leaf"] = params["min_samples_leaf"]
-    return result
-
-
-def _encode_sampled_float_params(params: SampledFloatParams) -> JSONObject:
-    """Encode SampledFloatParams to JSON-serializable dict.
-
-    Args:
-        params: Sampled float parameters.
-
-    Returns:
-        JSON-serializable dict with only present keys.
-    """
-    result: JSONObject = {}
-    if "learning_rate" in params:
-        result["learning_rate"] = params["learning_rate"]
-    if "reg_alpha" in params:
-        result["reg_alpha"] = params["reg_alpha"]
-    if "reg_lambda" in params:
-        result["reg_lambda"] = params["reg_lambda"]
-    if "subsample" in params:
-        result["subsample"] = params["subsample"]
-    if "colsample_bytree" in params:
-        result["colsample_bytree"] = params["colsample_bytree"]
-    if "drop_rate" in params:
-        result["drop_rate"] = params["drop_rate"]
-    if "skip_drop" in params:
-        result["skip_drop"] = params["skip_drop"]
-    if "rate_drop" in params:
-        result["rate_drop"] = params["rate_drop"]
-    if "feature_fraction" in params:
-        result["feature_fraction"] = params["feature_fraction"]
-    return result
-
-
-def _encode_sampled_string_params(params: SampledStringParams) -> JSONObject:
-    """Encode SampledStringParams to JSON-serializable dict.
-
-    Args:
-        params: Sampled string parameters.
-
-    Returns:
-        JSON-serializable dict with only present keys.
-    """
-    result: JSONObject = {}
-    if "boosting_type" in params:
-        result["boosting_type"] = params["boosting_type"]
-    if "booster" in params:
-        result["booster"] = params["booster"]
-    return result
+# Param encoders live in _optimize_common, shared with the classifier path.
+# This module previously kept its own copies which omitted every neural-net
+# key (n_layers, hidden_size, num_layers, batch_size, dropout, ...), so tuned
+# mlp_reg/lstm_reg hyperparameters were silently dropped from results.
 
 
 def _require_int_field(raw: JSONObject, field: str) -> int:
@@ -688,9 +627,9 @@ def encode_unified_regression_optimization_result(
         "n_trials_failed": result["n_trials_failed"],
         "best_trial_number": result["best_trial_number"],
         "best_value": result["best_value"],
-        "best_int_params": _encode_sampled_int_params(result["best_int_params"]),
-        "best_float_params": _encode_sampled_float_params(result["best_float_params"]),
-        "best_string_params": _encode_sampled_string_params(result["best_string_params"]),
+        "best_int_params": encode_sampled_int_params(result["best_int_params"]),
+        "best_float_params": encode_sampled_float_params(result["best_float_params"]),
+        "best_string_params": encode_sampled_string_params(result["best_string_params"]),
         "duration_seconds": result["duration_seconds"],
     }
 
