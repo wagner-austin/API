@@ -24,6 +24,10 @@ from covenant_ml.types import (
     PredictorProtocol,
     RandomForestModelMeta,
 )
+from covenant_nn.backends.lstm.sequences import (
+    compute_features_per_step,
+    reshape_flat_to_pseudo_sequences,
+)
 from numpy.typing import NDArray
 from platform_core.json_utils import (
     JSONObject,
@@ -434,9 +438,10 @@ def load_mlp_model(model_path: Path, meta_path: Path) -> PredictorProtocol:
         device="cpu",  # Load on CPU, move to GPU later if needed
     )
 
-    # Load state dict
+    # Load state dict. weights_only=True keeps torch on the safe unpickling
+    # path: model_path originates from a request body.
     torch_mod = _import_torch()
-    state_dict: dict[str, TensorProtocol] = torch_mod.load(str(model_path))
+    state_dict: dict[str, TensorProtocol] = torch_mod.load(str(model_path), weights_only=True)
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -567,7 +572,7 @@ def _build_lstm_model(
     nn_mod = __import__("torch.nn", fromlist=["LSTM", "Linear"])
 
     # Calculate input size (features per timestep)
-    input_size = (n_features + sequence_length - 1) // sequence_length
+    input_size = compute_features_per_step(n_features, sequence_length)
 
     # Create LSTM layer
     lstm: _LSTMLayerProto = nn_mod.LSTM(
@@ -588,33 +593,6 @@ def _build_lstm_model(
     model = _LSTMClassifierWrapper(lstm, fc)
 
     return model.to(device), input_size
-
-
-def _reshape_flat_to_sequences(x: NDArray[np.float64], sequence_length: int) -> NDArray[np.float64]:
-    """Reshape flat features to sequence format for LSTM.
-
-    Args:
-        x: Flat input array with shape (n_samples, n_features).
-        sequence_length: Number of timesteps to create.
-
-    Returns:
-        Reshaped array with shape (n_samples, sequence_length, features_per_step).
-    """
-    n_samples = int(x.shape[0])
-    n_features = int(x.shape[1])
-    features_per_step = (n_features + sequence_length - 1) // sequence_length
-
-    # Pad if necessary
-    target_size = sequence_length * features_per_step
-    if n_features < target_size:
-        padding = target_size - n_features
-        x = np.pad(x, ((0, 0), (0, padding)), mode="constant", constant_values=0.0)
-
-    # Reshape to (n_samples, sequence_length, features_per_step)
-    result: NDArray[np.float64] = x[:, : sequence_length * features_per_step].reshape(
-        n_samples, sequence_length, features_per_step
-    )
-    return result
 
 
 class _LSTMPreparedForInference:
@@ -648,7 +626,7 @@ class _LSTMPreparedForInference:
         softmax_ctor: _SoftmaxCtor = nn_mod.Softmax
 
         # Reshape to sequences
-        x_seq = _reshape_flat_to_sequences(x, self._sequence_length)
+        x_seq = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
 
         with torch_mod.no_grad():
             xt: TensorProtocol = torch_mod.tensor(x_seq, dtype=torch_mod.float32)
@@ -691,9 +669,10 @@ def load_lstm_model(model_path: Path, meta_path: Path) -> PredictorProtocol:
         device="cpu",
     )
 
-    # Load state dict
+    # Load state dict. weights_only=True keeps torch on the safe unpickling
+    # path: model_path originates from a request body.
     torch_mod = _import_torch()
-    state_dict: dict[str, TensorProtocol] = torch_mod.load(str(model_path))
+    state_dict: dict[str, TensorProtocol] = torch_mod.load(str(model_path), weights_only=True)
     model.load_state_dict(state_dict)
     model.eval()
 

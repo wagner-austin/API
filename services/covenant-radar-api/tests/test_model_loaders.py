@@ -22,7 +22,6 @@ from covenant_radar_api.worker._model_loaders import (
     _decode_mlp_meta,
     _decode_random_forest_meta,
     _load_model_metadata,
-    _reshape_flat_to_sequences,
     load_lightgbm_model,
     load_logreg_model,
     load_lstm_model,
@@ -396,25 +395,6 @@ class TestLoadModelMetadata:
             _load_model_metadata(meta_path)
 
         assert "Unknown backend 'unknown'" in str(exc_info.value)
-
-
-class TestReshapeFlatToSequences:
-    """Tests for _reshape_flat_to_sequences function."""
-
-    def test_reshape_exact_fit(self) -> None:
-        """Reshape when features divide evenly into sequences."""
-        x: NDArray[np.float64] = np.arange(20.0, dtype=np.float64).reshape(2, 10)
-        result = _reshape_flat_to_sequences(x, sequence_length=5)
-
-        assert result.shape == (2, 5, 2)
-
-    def test_reshape_with_padding(self) -> None:
-        """Reshape with padding when features don't divide evenly."""
-        x: NDArray[np.float64] = np.arange(18.0, dtype=np.float64).reshape(2, 9)
-        result = _reshape_flat_to_sequences(x, sequence_length=5)
-
-        # 9 features with seq_len=5 means 2 features per step, padding to 10
-        assert result.shape == (2, 5, 2)
 
 
 class TestLoadMlpModel:

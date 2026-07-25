@@ -348,7 +348,7 @@ class TestRunRegressionExplanation:
             }
         )
 
-        result = run_regression_explanation(config_json, external_dir)
+        result = run_regression_explanation(config_json, external_dir, tmp_path)
 
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost_reg"
@@ -382,7 +382,7 @@ class TestRunRegressionExplanation:
         )
 
         registry = default_regression_explainer_registry()
-        result = run_regression_explanation(config_json, external_dir, registry=registry)
+        result = run_regression_explanation(config_json, external_dir, tmp_path, registry=registry)
 
         assert result["status"] == "complete"
         assert result["explainer"] == "permutation"
@@ -407,7 +407,7 @@ class TestRunRegressionExplanation:
         )
 
         with pytest.raises(ValueError, match="is not compatible with"):
-            run_regression_explanation(config_json, external_dir)
+            run_regression_explanation(config_json, external_dir, tmp_path)
 
     def test_progress_callback(self, tmp_path: Path) -> None:
         """Progress callback receives all status transitions."""
@@ -435,6 +435,7 @@ class TestRunRegressionExplanation:
         result = run_regression_explanation(
             config_json,
             external_dir,
+            tmp_path,
             progress_callback=callback,
         )
 
@@ -468,7 +469,7 @@ class TestRunRegressionExplanation:
             }
         )
 
-        result = run_regression_explanation(config_json, external_dir)
+        result = run_regression_explanation(config_json, external_dir, tmp_path)
         assert result["n_samples_used"] == n_rows
 
 
@@ -503,7 +504,10 @@ class TestProcessRegressionExplainJob:
 
         _, _, feature_names = _copy_real_financial_distress(external_dir)
 
-        model_path = tmp_path / "model.ubj"
+        # Create model inside the configured models root:
+        # process_regression_explain_job confines model_path to APP__MODELS_ROOT.
+        models_dir.mkdir(parents=True, exist_ok=True)
+        model_path = models_dir / "model.ubj"
         _create_xgb_regressor_model(model_path, len(feature_names))
 
         fake_env = FakeEnv(

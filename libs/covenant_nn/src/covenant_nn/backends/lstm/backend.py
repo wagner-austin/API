@@ -29,6 +29,15 @@ from covenant_ml.backends.protocol import (
     ProgressCallback,
 )
 from covenant_ml.metrics import compute_all_metrics
+from covenant_ml.optimizer.search_spaces import (
+    make_lstm_default_space,
+    make_lstm_focused_space,
+)
+from covenant_ml.optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
+)
 from covenant_ml.trainer import preprocess_data_splits, stratified_split
 from covenant_ml.types import (
     BackendName,
@@ -805,6 +814,35 @@ def _finalize_metrics(
 
 class LSTMBackend(ClassifierBackend):
     """LSTM backend for tabular binary classification."""
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return the backend's default hyperparameter search space.
+
+        Returns:
+            The lstm default SearchSpace.
+        """
+        return make_lstm_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return a search space narrowed around prior best params.
+
+        Args:
+            best_int_params: Best integer params from prior optimization.
+            best_float_params: Best float params from prior optimization.
+
+        Returns:
+            The lstm focused SearchSpace.
+        """
+        return make_lstm_focused_space(
+            best_hidden_size=best_int_params["hidden_size"],
+            best_num_layers=best_int_params["num_layers"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
     def backend_name(self) -> BackendName:
         return "lstm"

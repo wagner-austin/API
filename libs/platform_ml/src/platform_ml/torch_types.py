@@ -57,9 +57,13 @@ class _TorchModuleProtocol(Protocol):
     # Context managers
     def no_grad(self) -> _NoGradContext: ...
 
-    # Serialization
+    # Serialization.
+    # `load` mirrors torch.load's keyword-only `weights_only`. Without it on
+    # this Protocol, callers typed against TorchModuleProtocol cannot opt in to
+    # the safe unpickling path and silently get torch's default, so a
+    # caller-supplied checkpoint path becomes an arbitrary-code-execution sink.
     def save(self, obj: dict[str, TensorProtocol], f: str) -> None: ...
-    def load(self, f: str) -> dict[str, TensorProtocol]: ...
+    def load(self, f: str, *, weights_only: bool = ...) -> dict[str, TensorProtocol]: ...
 
     # Data types (accessed as attributes)
     @property

@@ -7,6 +7,7 @@ from typing import Protocol
 
 import numpy as np
 import pytest
+from covenant_nn.backends.lstm.sequences import compute_features_per_step
 from numpy.typing import NDArray
 
 from covenant_radar_api.worker._explain_loaders import (
@@ -201,7 +202,7 @@ def _create_lstm_model(model_path: Path, n_features: int = 12) -> LSTMModelConfi
     dropout_rate = 0.0
     bidirectional = False
 
-    input_size = n_features // sequence_length
+    input_size = compute_features_per_step(n_features, sequence_length)
 
     lstm: _LSTMProtocol = lstm_cls(
         input_size,
@@ -221,9 +222,9 @@ def _create_lstm_model(model_path: Path, n_features: int = 12) -> LSTMModelConfi
     lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
     fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
     for k in lstm_sd:
-        state_dict[f"lstm.{k}"] = lstm_sd[k]
+        state_dict[f"_lstm.{k}"] = lstm_sd[k]
     for k in fc_sd:
-        state_dict[f"fc.{k}"] = fc_sd[k]
+        state_dict[f"_fc.{k}"] = fc_sd[k]
 
     save_fn: _TorchSaveFn = torch_mod.save
     save_fn(state_dict, str(model_path))
@@ -264,6 +265,28 @@ class TestLoadModelForBackendXGBoost:
 
         with pytest.raises(FileNotFoundError, match="Model file not found"):
             load_model_for_backend("xgboost", str(model_path))
+
+
+class TestLoadModelForBackendUnsupported:
+    """Backends with no explain loader are named explicitly."""
+
+    def test_raises_naming_the_backend(self, tmp_path: Path) -> None:
+        """cleargbm, logreg and random_forest report the real problem.
+
+        These are valid BackendName values that this module has no loader for.
+        They previously fell through to the LSTM branch and surfaced as
+        "lstm_config is required for LSTM backend", which named the wrong
+        problem and was undiagnosable for the caller.
+
+        Args:
+            tmp_path: Pytest temporary directory unique to this test.
+        """
+        model_path = tmp_path / "model.bin"
+        model_path.write_bytes(b"stub")
+
+        for backend in ("cleargbm", "logreg", "random_forest"):
+            with pytest.raises(ValueError, match=f"No explain loader for backend: {backend}"):
+                load_model_for_backend(backend, str(model_path))
 
 
 class TestLoadModelForBackendLightGBM:
@@ -428,6 +451,40 @@ class TestLoadModelForBackendLSTM:
 
         assert gradients.shape == (5, lstm_config["n_features"])
 
+    def test_lstm_with_features_not_divisible_by_sequence_length(self, tmp_path: Path) -> None:
+        """A feature count that does not divide evenly still loads and predicts.
+
+        Regression guard for two defects that were invisible while every
+        fixture used 12 features over 4 timesteps, where floor and ceil agree:
+
+        - input_size was floored here but ceiled during training, so the
+          explain path built a differently-shaped LSTM than the checkpoint.
+        - the reshape was a bare `.reshape` with that floored width, silently
+          dropping trailing features instead of zero-padding them.
+
+        Args:
+            tmp_path: Pytest temporary directory unique to this test.
+        """
+        model_path = tmp_path / "model.pt"
+        # 13 features over 4 timesteps: ceil gives 4 per step and pads to 16,
+        # floor would give 3 and drop a feature entirely.
+        lstm_config = _create_lstm_model(model_path, n_features=13)
+
+        model = load_gradient_model("lstm", str(model_path), lstm_config=lstm_config)
+
+        rng = np.random.default_rng(42)
+        x: NDArray[np.float64] = rng.random((5, 13))
+
+        proba: NDArray[np.float64] = model.predict_proba(x)
+        assert proba.shape == (5, 2)
+        row_sums: NDArray[np.float64] = np.sum(proba, axis=1)
+        assert np.allclose(row_sums, 1.0)
+
+        # Gradients come back trimmed to the real feature count, not the
+        # padded width.
+        gradients: NDArray[np.float64] = model.compute_gradients(x, target_class=1)
+        assert gradients.shape == (5, 13)
+
     def test_raises_without_lstm_config(self, tmp_path: Path) -> None:
         """Raises ValueError when lstm_config is missing."""
         model_path = tmp_path / "model.pt"
@@ -452,7 +509,7 @@ class TestLoadModelForBackendLSTM:
         dropout_rate = 0.0
         bidirectional = False
 
-        input_size = n_features // sequence_length
+        input_size = compute_features_per_step(n_features, sequence_length)
 
         lstm: _LSTMProtocol = lstm_cls(
             input_size,
@@ -470,9 +527,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"lstm.{k}"] = lstm_sd[k]
+            state_dict[f"_lstm.{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"fc.{k}"] = fc_sd[k]
+            state_dict[f"_fc.{k}"] = fc_sd[k]
         # Add extra key that doesn't match either prefix
         state_dict["extra_key"] = lstm_sd[next(iter(lstm_sd))]
 
@@ -514,7 +571,7 @@ class TestLoadModelForBackendLSTM:
         dropout_rate = 0.0
         bidirectional = True
 
-        input_size = n_features // sequence_length
+        input_size = compute_features_per_step(n_features, sequence_length)
 
         lstm: _LSTMProtocol = lstm_cls(
             input_size,
@@ -533,9 +590,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"lstm.{k}"] = lstm_sd[k]
+            state_dict[f"_lstm.{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"fc.{k}"] = fc_sd[k]
+            state_dict[f"_fc.{k}"] = fc_sd[k]
 
         model_path = tmp_path / "model_bidir.pt"
         save_fn: _TorchSaveFn = torch_mod.save
@@ -574,7 +631,7 @@ class TestLoadModelForBackendLSTM:
         dropout_rate = 0.1  # Dropout between layers
         bidirectional = False
 
-        input_size = n_features // sequence_length
+        input_size = compute_features_per_step(n_features, sequence_length)
 
         lstm: _LSTMProtocol = lstm_cls(
             input_size,
@@ -592,9 +649,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"lstm.{k}"] = lstm_sd[k]
+            state_dict[f"_lstm.{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"fc.{k}"] = fc_sd[k]
+            state_dict[f"_fc.{k}"] = fc_sd[k]
 
         model_path = tmp_path / "model_multi.pt"
         save_fn: _TorchSaveFn = torch_mod.save

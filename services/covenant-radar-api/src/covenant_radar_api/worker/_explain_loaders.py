@@ -17,7 +17,18 @@ from typing import Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.types import BackendName
+from covenant_nn.backends.lstm.sequences import (
+    compute_features_per_step,
+    reshape_flat_to_pseudo_sequences,
+)
 from numpy.typing import NDArray
+
+# Submodule names on the trained LSTM wrapper, which
+# covenant_nn.backends.lstm.backend declares as self._lstm and self._fc. The
+# state dict is keyed by those names, so any loader must strip these exact
+# prefixes.
+_LSTM_PREFIX = "_lstm."
+_FC_PREFIX = "_fc."
 
 # ---------------------------------------------------------------------------
 # Common Predictor Protocol
@@ -580,16 +591,22 @@ class _LSTMClassifierWrapper:
     def load_state_dict(self, state_dict: dict[str, _TensorProtocol]) -> None:
         """Load state dictionary.
 
+        Prefixes are "_lstm." and "_fc.", matching the trained model, whose
+        submodules are named self._lstm and self._fc
+        (covenant_nn.backends.lstm.backend). Stripping "lstm."/"fc." matched
+        nothing, so both sub-dicts came out empty and load_state_dict({})
+        raised on missing keys for every real checkpoint.
+
         Args:
-            state_dict: Dictionary with 'lstm.*' and 'fc.*' keys.
+            state_dict: Dictionary with '_lstm.*' and '_fc.*' keys.
         """
         lstm_state: dict[str, _TensorProtocol] = {}
         fc_state: dict[str, _TensorProtocol] = {}
         for k, v in state_dict.items():
-            if k.startswith("lstm."):
-                lstm_state[k[5:]] = v
-            elif k.startswith("fc."):
-                fc_state[k[3:]] = v
+            if k.startswith(_LSTM_PREFIX):
+                lstm_state[k[len(_LSTM_PREFIX) :]] = v
+            elif k.startswith(_FC_PREFIX):
+                fc_state[k[len(_FC_PREFIX) :]] = v
         self._lstm.load_state_dict(lstm_state)
         self._fc.load_state_dict(fc_state)
 
@@ -607,7 +624,7 @@ def _build_lstm_model(config: LSTMModelConfig) -> _LSTMClassifierWrapper:
     lstm_ctor: _NNLSTMCtor = nn_mod.LSTM
     linear_ctor: _NNLinearLayerCtor = nn_mod.Linear
 
-    input_size = config["n_features"] // config["sequence_length"]
+    input_size = compute_features_per_step(config["n_features"], config["sequence_length"])
 
     lstm: _LSTMLayerProto = lstm_ctor(
         input_size=input_size,
@@ -663,9 +680,11 @@ class _LSTMPrepared:
 
         softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
 
-        n_samples = int(x.shape[0])
-        features_per_step = self._n_features // self._sequence_length
-        x_seq: NDArray[np.float64] = x.reshape(n_samples, self._sequence_length, features_per_step)
+        # Canonical reshape: rounds up and zero-pads, exactly as training did.
+        # A bare reshape with a floored features_per_step silently dropped the
+        # trailing features whenever n_features was not a multiple of
+        # sequence_length.
+        x_seq: NDArray[np.float64] = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
 
         x_seq_fp32: NDArray[np.float32] = x_seq.astype(np.float32)
         x_tensor: _TensorProtocol = tensor(x_seq_fp32, dtype=fp32_dtype)
@@ -700,9 +719,11 @@ class _LSTMPrepared:
 
         softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
 
-        n_samples = int(x.shape[0])
-        features_per_step = self._n_features // self._sequence_length
-        x_seq: NDArray[np.float64] = x.reshape(n_samples, self._sequence_length, features_per_step)
+        # Canonical reshape: rounds up and zero-pads, exactly as training did.
+        # A bare reshape with a floored features_per_step silently dropped the
+        # trailing features whenever n_features was not a multiple of
+        # sequence_length.
+        x_seq: NDArray[np.float64] = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
 
         x_seq_fp32: NDArray[np.float32] = x_seq.astype(np.float32)
         x_tensor: _TensorProtocol = tensor(
@@ -724,10 +745,11 @@ class _LSTMPrepared:
         grad_numpy = grad_cpu.numpy()
         grad_seq: NDArray[np.float64] = grad_numpy.astype(np.float64)
 
+        grad_samples = int(grad_seq.shape[0])
         seq_len = int(grad_seq.shape[1])
         features_per_step_actual = int(grad_seq.shape[2])
         flat_seq_features = seq_len * features_per_step_actual
-        grad_flat: NDArray[np.float64] = grad_seq.reshape(n_samples, flat_seq_features)
+        grad_flat: NDArray[np.float64] = grad_seq.reshape(grad_samples, flat_seq_features)
 
         gradients: NDArray[np.float64] = grad_flat[:, : self._n_features]
         return gradients
@@ -782,7 +804,8 @@ def load_model_for_backend(
         Model implementing PredictorProtocol.
 
     Raises:
-        ValueError: If required config is missing for MLP/LSTM backend.
+        ValueError: If required config is missing for MLP/LSTM backend, or if
+            the backend has no loader here.
         FileNotFoundError: If model file doesn't exist.
     """
     path = Path(model_path)
@@ -797,10 +820,14 @@ def load_model_for_backend(
         if mlp_config is None:
             raise ValueError("mlp_config is required for MLP backend")
         return _load_mlp_model(model_path, mlp_config)
-    # backend == "lstm"
-    if lstm_config is None:
-        raise ValueError("lstm_config is required for LSTM backend")
-    return _load_lstm_model(model_path, lstm_config)
+    if backend == "lstm":
+        if lstm_config is None:
+            raise ValueError("lstm_config is required for LSTM backend")
+        return _load_lstm_model(model_path, lstm_config)
+    # BackendName also covers cleargbm, logreg and random_forest, which have no
+    # loader here. Falling through to the LSTM branch reported them as a
+    # missing lstm_config, which named the wrong problem entirely.
+    raise ValueError(f"No explain loader for backend: {backend}")
 
 
 def load_gradient_model(

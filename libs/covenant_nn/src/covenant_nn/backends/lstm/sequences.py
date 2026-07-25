@@ -129,6 +129,24 @@ def build_sequences(
     }
 
 
+def compute_features_per_step(n_features: int, sequence_length: int) -> int:
+    """Compute the LSTM input size for flat features reshaped to sequences.
+
+    Rounds up, because reshape_flat_to_pseudo_sequences zero-pads the feature
+    vector out to a multiple of sequence_length. Anything that builds an LSTM
+    for such data must size its input layer with this same value, or it builds
+    a differently-shaped model than the one that was trained.
+
+    Args:
+        n_features: Number of flat features per sample.
+        sequence_length: Number of timesteps to reshape into.
+
+    Returns:
+        Features per timestep, i.e. the LSTM's input_size.
+    """
+    return (n_features + sequence_length - 1) // sequence_length
+
+
 def reshape_flat_to_pseudo_sequences(
     x_features: NDArray[np.float64],
     sequence_length: int,
@@ -152,8 +170,7 @@ def reshape_flat_to_pseudo_sequences(
     n_samples: int = int(x_features.shape[0])
     n_features: int = int(x_features.shape[1])
 
-    # Calculate features per timestep
-    features_per_step: int = (n_features + sequence_length - 1) // sequence_length
+    features_per_step: int = compute_features_per_step(n_features, sequence_length)
     total_needed: int = features_per_step * sequence_length
 
     # Pad if necessary
@@ -172,5 +189,6 @@ def reshape_flat_to_pseudo_sequences(
 __all__ = [
     "SequenceData",
     "build_sequences",
+    "compute_features_per_step",
     "reshape_flat_to_pseudo_sequences",
 ]

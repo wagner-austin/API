@@ -23,6 +23,15 @@ from covenant_ml.backends.regressor_protocol import (
     RegressorProgressCallback,
 )
 from covenant_ml.metrics import compute_all_regression_metrics
+from covenant_ml.optimizer.search_spaces import (
+    make_mlp_default_space,
+    make_mlp_focused_space,
+)
+from covenant_ml.optimizer.types import (
+    SampledFloatParams,
+    SampledIntParams,
+    SearchSpace,
+)
 from covenant_ml.preprocessing import AutoPreprocessor
 from covenant_ml.trainer import RegressionDataSplits, regression_split
 from covenant_ml.types import (
@@ -638,7 +647,10 @@ def _run_regression_training_loop(
             device=device,
         )
 
-        train_rmse = float(np.sqrt(max(0.0, train_loss)))
+        # Annotated: np.sqrt is untyped here, and disallow_any_expr
+        # rejects the bare expression.
+        train_mse: float = max(0.0, train_loss)
+        train_rmse = math.sqrt(train_mse)
 
         if progress is not None:
             prog: RegressionTrainProgress = {
@@ -761,6 +773,35 @@ class MLPRegressorBackend:
     (classifier). Uses MSELoss, no class weights, output dim=1,
     early stopping on validation RMSE.
     """
+
+    def get_default_search_space(self) -> SearchSpace:
+        """Return the backend's default hyperparameter search space.
+
+        Returns:
+            The mlp_reg default SearchSpace.
+        """
+        return make_mlp_default_space()
+
+    def get_focused_search_space(
+        self,
+        *,
+        best_int_params: SampledIntParams,
+        best_float_params: SampledFloatParams,
+    ) -> SearchSpace:
+        """Return a search space narrowed around prior best params.
+
+        Args:
+            best_int_params: Best integer params from prior optimization.
+            best_float_params: Best float params from prior optimization.
+
+        Returns:
+            The mlp_reg focused SearchSpace.
+        """
+        return make_mlp_focused_space(
+            best_n_layers=best_int_params["n_layers"],
+            best_hidden_size=best_int_params["hidden_size"],
+            best_learning_rate=best_float_params["learning_rate"],
+        )
 
     def backend_name(self) -> RegressorBackendName:
         """Return the backend identifier.

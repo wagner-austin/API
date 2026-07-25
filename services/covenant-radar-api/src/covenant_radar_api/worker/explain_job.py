@@ -28,6 +28,7 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 from platform_ml.explainers.types import FeatureImportanceScore
 
+from covenant_radar_api.core.model_paths import resolve_model_path
 from covenant_radar_api.worker._explain_loaders import (
     LSTMModelConfig,
     MLPModelConfig,
@@ -355,6 +356,7 @@ class ExplainProgressCallbackProtocol(Protocol):
 def run_explanation(
     config_json: str,
     external_dir: Path,
+    models_root: Path,
     registry: ExplainerRegistry | None = None,
     progress_callback: ExplainProgressCallbackProtocol | None = None,
 ) -> ExplainResult:
@@ -363,6 +365,7 @@ def run_explanation(
     Args:
         config_json: JSON config with dataset, backend, model_path, explainer settings.
         external_dir: Path to data/external directory with datasets.
+        models_root: Directory the caller-supplied model_path must resolve under.
         registry: Optional explainer registry (uses default if None).
         progress_callback: Optional callback for progress updates.
 
@@ -370,7 +373,8 @@ def run_explanation(
         ExplainResult with feature importances.
 
     Raises:
-        ValueError: If explainer incompatible with backend.
+        ValueError: If explainer incompatible with backend, or if model_path
+            resolves outside models_root.
         FileNotFoundError: If model or dataset not found.
     """
     start_time = time.monotonic()
@@ -390,7 +394,8 @@ def run_explanation(
     parse_result = _parse_explain_config(config_json)
     dataset_name = parse_result["dataset"]
     backend = parse_result["backend"]
-    model_path = parse_result["model_path"]
+    # Confine the caller-supplied path before it reaches any loader.
+    model_path = str(resolve_model_path(parse_result["model_path"], models_root))
     explainer_name = parse_result["explainer"]
     target_class = parse_result["target_class"]
     n_samples = parse_result["n_samples"]
@@ -495,8 +500,9 @@ def process_explain_job(config_json: str) -> dict[str, JSONValue]:
     # Get data directory from settings
     data_root = Path(settings["app"]["data_root"])
     external_dir = data_root / "external"
+    models_root = Path(settings["app"]["models_root"])
 
-    result = run_explanation(config_json, external_dir)
+    result = run_explanation(config_json, external_dir, models_root)
 
     # Convert FeatureImportanceScore list to JSON-serializable format
     importances_json: list[JSONValue] = []

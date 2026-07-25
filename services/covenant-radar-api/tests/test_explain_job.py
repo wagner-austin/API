@@ -323,6 +323,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": "/path/to/model.ubj",
                 "explainer": "permutation",
@@ -348,6 +349,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": "/path/to/model.ubj",
                 "explainer": "shap_tree",
@@ -364,6 +366,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "mlp",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -388,6 +391,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "lstm",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -419,6 +423,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": "/path/to/model.ubj",
             }
@@ -431,6 +436,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "mlp",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -444,6 +450,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "mlp",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -458,6 +465,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "lstm",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -471,6 +479,7 @@ class TestParseExplainConfig:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "lstm",
                 "model_path": "/path/to/model.pt",
                 "explainer": "gradient",
@@ -558,6 +567,38 @@ def _create_xgboost_model(model_path: Path, n_features: int, n_samples: int = 10
 class TestRunExplanation:
     """Tests for run_explanation function."""
 
+    def test_run_explanation_rejects_model_path_outside_models_root(self, tmp_path: Path) -> None:
+        """A model_path escaping models_root is refused before any load.
+
+        model_path arrives on the request body and reaches pickle-backed
+        loaders, so an unconstrained value selects which host file is opened.
+
+        Args:
+            tmp_path: Pytest temporary directory unique to this test.
+        """
+        external_dir = tmp_path / "external"
+        _, _, feature_names = _copy_real_taiwan(external_dir)
+
+        models_root = tmp_path / "models"
+        models_root.mkdir()
+        outside_model = tmp_path / "outside.ubj"
+        _create_xgboost_model(outside_model, len(feature_names))
+
+        config_json = dump_json_str(
+            {
+                "dataset": "taiwan",
+                "device": "cpu",
+                "backend": "xgboost",
+                "model_path": str(models_root / ".." / "outside.ubj"),
+                "explainer": "permutation",
+                "n_samples": 10,
+                "random_state": 42,
+            }
+        )
+
+        with pytest.raises(ValueError, match="must resolve inside the models root"):
+            run_explanation(config_json, external_dir, models_root)
+
     def test_run_explanation_with_permutation_explainer(self, tmp_path: Path) -> None:
         """run_explanation completes with permutation explainer."""
         # Set up data
@@ -571,6 +612,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "permutation",
@@ -579,7 +621,7 @@ class TestRunExplanation:
             }
         )
 
-        result = run_explanation(config_json, external_dir)
+        result = run_explanation(config_json, external_dir, tmp_path)
 
         assert result["status"] == "complete"
         assert result["backend"] == "xgboost"
@@ -601,6 +643,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "shap_tree",
@@ -609,7 +652,7 @@ class TestRunExplanation:
             }
         )
 
-        result = run_explanation(config_json, external_dir)
+        result = run_explanation(config_json, external_dir, tmp_path)
 
         assert result["status"] == "complete"
         assert result["explainer"] == "shap_tree"
@@ -629,6 +672,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "permutation",
@@ -637,7 +681,7 @@ class TestRunExplanation:
             }
         )
 
-        result = run_explanation(config_json, external_dir)
+        result = run_explanation(config_json, external_dir, tmp_path)
 
         assert result["n_samples_used"] == n_rows
 
@@ -653,6 +697,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "gradient",
@@ -661,7 +706,7 @@ class TestRunExplanation:
         )
 
         with pytest.raises(ValueError, match="is not compatible with backend"):
-            run_explanation(config_json, external_dir)
+            run_explanation(config_json, external_dir, tmp_path)
 
     def test_run_explanation_with_progress_callback(self, tmp_path: Path) -> None:
         """run_explanation calls progress callback with status updates."""
@@ -674,6 +719,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "permutation",
@@ -686,7 +732,12 @@ class TestRunExplanation:
         def progress_callback(info: ExplainProgressInfo) -> None:
             callback_calls.append(info)
 
-        result = run_explanation(config_json, external_dir, progress_callback=progress_callback)
+        result = run_explanation(
+            config_json,
+            external_dir,
+            tmp_path,
+            progress_callback=progress_callback,
+        )
 
         assert result["status"] == "complete"
 
@@ -710,6 +761,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(tmp_path / "nonexistent.ubj"),
                 "explainer": "permutation",
@@ -718,7 +770,7 @@ class TestRunExplanation:
         )
 
         with pytest.raises(FileNotFoundError, match="Model file not found"):
-            run_explanation(config_json, external_dir)
+            run_explanation(config_json, external_dir, tmp_path)
 
     def test_run_explanation_with_custom_registry(self, tmp_path: Path) -> None:
         """run_explanation accepts custom explainer registry."""
@@ -733,6 +785,7 @@ class TestRunExplanation:
         config_json = dump_json_str(
             {
                 "dataset": "taiwan",
+                "device": "cpu",
                 "backend": "xgboost",
                 "model_path": str(model_path),
                 "explainer": "permutation",
@@ -742,7 +795,7 @@ class TestRunExplanation:
 
         # Use custom registry (same as default for this test)
         registry = default_explainer_registry()
-        result = run_explanation(config_json, external_dir, registry=registry)
+        result = run_explanation(config_json, external_dir, tmp_path, registry=registry)
 
         assert result["status"] == "complete"
 
@@ -770,8 +823,10 @@ class TestProcessExplainJob:
         # Copy real Taiwan data
         _, _, feature_names = _copy_real_taiwan(external_dir)
 
-        # Create model
-        model_path = tmp_path / "model.ubj"
+        # Create model inside the configured models root: process_explain_job
+        # confines model_path to APP__MODELS_ROOT.
+        models_dir.mkdir(parents=True, exist_ok=True)
+        model_path = models_dir / "model.ubj"
         _create_xgboost_model(model_path, len(feature_names))
 
         # Set up fake environment
@@ -791,6 +846,7 @@ class TestProcessExplainJob:
             config_json = dump_json_str(
                 {
                     "dataset": "taiwan",
+                    "device": "cpu",
                     "backend": "xgboost",
                     "model_path": str(model_path),
                     "explainer": "permutation",
