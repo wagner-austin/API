@@ -16,6 +16,8 @@ from typing import Protocol, TypeGuard
 import numpy as np
 from cleargbm.ensemble import (
     predict_proba as cgbm_predict_proba,
+)
+from cleargbm.ensemble import (
     train_gradient_boosting,
 )
 from cleargbm.types import GradientBoostingConfig

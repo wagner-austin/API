@@ -196,7 +196,6 @@ class ClearGBMObjective:
             early_stopping_rounds=self._early_stopping_rounds,
         )
 
-        # Train model (no progress callback for optimization)
         model = train_gradient_boosting(
             x_train=self._x_train,
             y_train=self._y_train,
@@ -204,7 +203,6 @@ class ClearGBMObjective:
             y_val=self._y_val,
             config=config,
             feature_names=self._feature_names,
-            progress_callback=None,
         )
 
         # Predict on validation set

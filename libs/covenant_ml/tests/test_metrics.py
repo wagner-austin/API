@@ -15,6 +15,8 @@ from covenant_ml.metrics import (
     compute_all_regression_metrics,
     compute_amex_metric,
     compute_auc,
+    compute_average_precision,
+    compute_brier_score,
     compute_f1_score,
     compute_log_loss,
     compute_mae,
@@ -698,3 +700,91 @@ def test_format_regression_metrics_str_uses_four_decimals() -> None:
 
     assert "MSE=0.0000" in result
     assert "RMSE=0.0000" in result
+
+
+def test_compute_average_precision_perfect_ranking() -> None:
+    """Average precision is 1.0 when every positive outranks every negative."""
+    y_true = _make_int_array([0, 0, 1, 1])
+    y_prob = _make_float_array([0.1, 0.2, 0.8, 0.9])
+
+    assert compute_average_precision(y_true, y_prob) == 1.0
+
+
+def test_compute_average_precision_worst_ranking() -> None:
+    """Average precision is low when every positive ranks below every negative."""
+    y_true = _make_int_array([1, 1, 0, 0])
+    y_prob = _make_float_array([0.1, 0.2, 0.8, 0.9])
+
+    assert compute_average_precision(y_true, y_prob) < 0.6
+
+
+def test_compute_average_precision_matches_hand_calculation() -> None:
+    """Step-wise definition: sum of recall gain times precision at each hit.
+
+    Ranked descending the labels are [1, 0, 1, 0]. Precision at the two hits
+    is 1/1 and 2/3; each contributes a recall gain of 1/2.
+    """
+    y_true = _make_int_array([1, 0, 1, 0])
+    y_prob = _make_float_array([0.9, 0.8, 0.7, 0.6])
+
+    expected = 0.5 * 1.0 + 0.5 * (2.0 / 3.0)
+
+    assert compute_average_precision(y_true, y_prob) == pytest.approx(expected)
+
+
+def test_compute_average_precision_without_positives_is_zero() -> None:
+    """Undefined without a positive case; reported as 0.0 rather than NaN."""
+    y_true = _make_int_array([0, 0, 0])
+    y_prob = _make_float_array([0.1, 0.5, 0.9])
+
+    assert compute_average_precision(y_true, y_prob) == 0.0
+
+
+def test_compute_average_precision_all_positives_is_one() -> None:
+    """Every ranked item is a hit, so precision is 1.0 throughout."""
+    y_true = _make_int_array([1, 1, 1])
+    y_prob = _make_float_array([0.1, 0.5, 0.9])
+
+    assert compute_average_precision(y_true, y_prob) == pytest.approx(1.0)
+
+
+def test_compute_brier_score_perfect_forecast_is_zero() -> None:
+    """A confident, correct forecast scores 0.0."""
+    y_true = _make_int_array([0, 1])
+    y_prob = _make_float_array([0.0, 1.0])
+
+    assert compute_brier_score(y_true, y_prob) == 0.0
+
+
+def test_compute_brier_score_worst_forecast_is_one() -> None:
+    """A confident, wrong forecast scores 1.0."""
+    y_true = _make_int_array([0, 1])
+    y_prob = _make_float_array([1.0, 0.0])
+
+    assert compute_brier_score(y_true, y_prob) == 1.0
+
+
+def test_compute_brier_score_matches_hand_calculation() -> None:
+    """Mean squared error between probability and outcome."""
+    y_true = _make_int_array([0, 1])
+    y_prob = _make_float_array([0.25, 0.75])
+
+    expected = (0.25**2 + 0.25**2) / 2.0
+
+    assert compute_brier_score(y_true, y_prob) == pytest.approx(expected)
+
+
+def test_compute_brier_score_penalises_overconfidence_at_equal_ranking() -> None:
+    """Two models that rank identically can still differ in calibration.
+
+    Both score the rows in the same order, so ROC-AUC cannot separate them.
+    The ranking is imperfect (a negative outranks both positives), and the
+    overconfident model pushes its probabilities toward the extremes, so it
+    pays a larger squared penalty on the rows it gets wrong.
+    """
+    y_true = _make_int_array([0, 1, 0, 1])
+    calibrated = _make_float_array([0.4, 0.6, 0.7, 0.3])
+    overconfident = _make_float_array([0.3, 0.7, 0.9, 0.1])
+
+    assert compute_auc(y_true, calibrated) == compute_auc(y_true, overconfident)
+    assert compute_brier_score(y_true, calibrated) < compute_brier_score(y_true, overconfident)

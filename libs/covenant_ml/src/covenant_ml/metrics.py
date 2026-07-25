@@ -89,6 +89,74 @@ def compute_auc(
     return float(np.sum(dx * avg_y))
 
 
+def compute_average_precision(
+    y_true: NDArray[np.int64],
+    y_prob: NDArray[np.float64],
+) -> float:
+    """Compute average precision (area under the precision-recall curve).
+
+    Summarises the precision-recall curve as the recall-weighted mean of the
+    precision at each threshold, which is the step-wise definition rather than
+    a trapezoidal interpolation. Preferred over ROC-AUC on heavily imbalanced
+    data, where a large true-negative count flatters ROC-AUC.
+
+    This is a pure numpy implementation without sklearn dependency.
+
+    Args:
+        y_true: True binary labels (0 or 1), shape (n_samples,)
+        y_prob: Predicted probabilities for class 1, shape (n_samples,)
+
+    Returns:
+        Average precision. Returns 0.0 when the labels contain no positive
+        case, where the metric is otherwise undefined.
+    """
+    n_pos = int(np.sum(y_true))
+    if n_pos == 0:
+        return 0.0
+
+    desc_score_indices: NDArray[np.intp] = np.argsort(y_prob)[::-1]
+    y_true_sorted: NDArray[np.int64] = y_true[desc_score_indices]
+
+    tps: NDArray[np.int64] = np.cumsum(y_true_sorted)
+    ranks: NDArray[np.float64] = np.arange(1, len(y_true_sorted) + 1, dtype=np.float64)
+
+    precision: NDArray[np.float64] = tps.astype(np.float64) / ranks
+    recall: NDArray[np.float64] = tps.astype(np.float64) / n_pos
+
+    # Recall gain at each position; the first position gains from zero.
+    origin: NDArray[np.float64] = np.zeros(1, dtype=np.float64)
+    recall_head: NDArray[np.float64] = recall[:-1]
+    recall_prev: NDArray[np.float64] = np.concatenate([origin, recall_head])
+    recall_gain: NDArray[np.float64] = recall - recall_prev
+
+    return float(np.sum(recall_gain * precision))
+
+
+def compute_brier_score(
+    y_true: NDArray[np.int64],
+    y_prob: NDArray[np.float64],
+) -> float:
+    """Compute the Brier score (mean squared error of the probabilities).
+
+    Measures calibration as well as discrimination: a model that ranks cases
+    perfectly but is systematically over-confident scores worse than one that
+    ranks equally well and is calibrated. Lower is better.
+
+    This is a pure numpy implementation without sklearn dependency.
+
+    Args:
+        y_true: True binary labels (0 or 1), shape (n_samples,)
+        y_prob: Predicted probabilities for class 1, shape (n_samples,)
+
+    Returns:
+        Brier score in the range [0.0, 1.0], where 0.0 is a perfect forecast.
+    """
+    y_true_float: NDArray[np.float64] = y_true.astype(np.float64)
+    squared_error: NDArray[np.float64] = (y_prob - y_true_float) ** 2
+    total = float(np.sum(squared_error))
+    return total / len(squared_error)
+
+
 def compute_amex_metric(
     y_true: NDArray[np.int64],
     y_pred: NDArray[np.float64],
