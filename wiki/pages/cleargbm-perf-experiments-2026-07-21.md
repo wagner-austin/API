@@ -1,15 +1,21 @@
 ---
 title: ClearGBM perf experiments — 2026-07-21 session
 tags: [ml, cleargbm, performance, benchmarks, negative-results]
-related: [[cleargbm-histogram-split-path]], [[cleargbm-perf-column-major-sample-bins]], [[cleargbm-perf-uint8-histogram-bins]], [[cleargbm-perf-simd-histogram-accumulator]], [[cleargbm-perf-leaf-wise-growth]]
-sources:
+related:
+  - "[[cleargbm-histogram-split-path]]"
+  - "[[cleargbm-perf-column-major-sample-bins]]"
+  - "[[cleargbm-perf-uint8-histogram-bins]]"
+  - "[[cleargbm-perf-simd-histogram-accumulator]]"
+  - "[[cleargbm-perf-leaf-wise-growth]]"
+source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/tree/histograms.rs
   - libs/cleargbm/docs/BENCHMARK_MANIFEST_2026-07-21_phase_e.json
   - ~/PROJECTS/tech-wiki/pages/lightgbm-construct-histogram-inner.md
   - ~/PROJECTS/tech-wiki/pages/lightgbm-implicit-count-cnt-factor.md
-fact_checked: 2026-07-21
+fact_checked: "2026-07-21"
 confidence: high
+hubs: [libs]
 ---
 
 # ClearGBM perf experiments — 2026-07-21 session
@@ -75,6 +81,13 @@ Every batch touched `libs/cleargbm_rs/src/histogram/mod.rs`, `libs/cleargbm_rs/s
 **Revert path.** `git checkout HEAD -- libs/cleargbm_rs/src/histogram/mod.rs`.
 
 **Implication.** The exact-count invariant in cleargbm's `find_best_split_from_histogram` is load-bearing for reproducibility. Dropping counts as LightGBM does requires ALSO changing `find_best_split_from_histogram` to consume `num_samples: usize` and reconstruct in an exact way (or accept the quality drift as a design choice). Not tested in this session.
+
+> **CLOSED 2026-07-24 — do not re-propose.** This idea was re-proposed as a "Phase 4" interleaved-histogram change and rejected on two independent lines of evidence.
+>
+> 1. **Already measured, twice.** Experiments 2 and 3 above cost 5% and 16% respectively, and experiment 3 also drifted quality one-sidedly. The variant hedged at the end of this section — plumbing `num_samples` into `find_best_split_from_histogram` — carries the *same* approximate counts and so inherits the same tree-structure drift; it only saves the O(n_bins) backfill pass, which is negligible. It would reproduce experiment 3's failure minus a rounding error.
+> 2. **It targets a non-binding dimension.** A `max_bins` sweep holding allocation count fixed while varying histogram *size* shows cleargbm flat from 16 → 64 bins (0.699 / 0.716 / 0.709s at 100 trees), rising only at 128 (0.806s) and 255 (0.976s). At the benchmark's `max_bins=64` the workload is not bound by histogram bytes, which is precisely what shrinking a histogram from three arrays to two would relieve.
+>
+> There is also no `min_sum_hessian_in_leaf` in cleargbm, so `counts` is the *only* leaf-size regularizer. LightGBM ships derived counts alongside an exact hessian constraint; adopting the approximation without that backstop is strictly worse than LightGBM's design, not equivalent to it.
 
 ## Meta-lesson from three negative results
 
@@ -245,6 +258,8 @@ Rendered per-seed line shows all four: `fit=0.936s (min of 5: min/med/mean/max =
 Same code, radically different signal-to-noise. The bench is now a real perf harness — the 5-15× tightening in stddev makes every sub-10% experiment on the queue actually resolvable. Cost: 5× wall-clock per bench invocation.
 
 ## Session-final benchmark (Phase I — stable)
+
+> **SUPERSEDED 2026-07-24.** The gap figure below does not reproduce, for two reasons, and should not be quoted. (a) The harness that produced it lived only in a session scratchpad and was lost; every later claim was measured on the noisier phase-E shape. (b) Its canonical statistic was the *minimum* of 5, which reports a turbo-boosted cold-start run rather than the steady state — see [[cleargbm-leaf-normalized-benchmarking]] for the evidence and the median-based replacement. Re-measured on a rebuilt harness, cleargbm is **1.2809s ± 0.0638** against LightGBM **0.8981s ± 0.0719** (raw 1.426×), and **0.937× per leaf** once the depth-wise/leaf-wise tree-size difference is divided out. The cleargbm figures below are also not directly comparable to that run, because this session's numbers were taken with an estimator that flatters whichever model has the shorter fit.
 
 `libs/cleargbm/docs/BENCHMARK_MANIFEST_2026-07-21.json`:
 

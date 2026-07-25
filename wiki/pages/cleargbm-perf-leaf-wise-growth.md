@@ -1,20 +1,25 @@
 ---
 title: ClearGBM perf — leaf-wise tree growth
 tags: [ml, cleargbm, rust, performance, tree]
-related: [[cleargbm-histogram-split-path]]
-sources:
+related:
+  - "[[cleargbm-histogram-split-path]]"
+  - "[[cleargbm-leaf-normalized-benchmarking]]"
+source_paths:
   - libs/cleargbm_rs/src/tree/builder.rs
   - libs/cleargbm_rs/src/tree/mod.rs
   - libs/cleargbm_rs/src/training/config.rs
-fact_checked: 2026-07-21
+fact_checked: "2026-07-24"
 confidence: medium
+hubs: [libs]
 ---
 
 # ClearGBM perf — leaf-wise tree growth
 
 Replace ClearGBM's depth-first tree growth with LightGBM's leaf-wise (best-first) strategy: at every step, expand the leaf with the highest split gain across the whole tree, not the deepest-yet-unfinished branch. This is a **capacity gain, not a speed gain** — leaf-wise reaches equivalent loss with fewer effective splits, so at matched `n_estimators` the model has more useful capacity per tree.
 
-**Confidence: medium.** Impact on this benchmark is ambiguous — quality is already a statistical tie with LightGBM[^1], so the ceiling is small. **Do this LAST** in the perf roadmap, after column-major + uint8 + SIMD have landed and the speed gap is closed. Leaf-wise also trades interpretability (unbalanced trees are harder to read as rules) for capacity, which cuts against ClearGBM's core value prop.
+**Confidence: medium.** Impact on this benchmark is ambiguous — quality is already a statistical tie with LightGBM[^1], so the accuracy ceiling is small. The *work* ceiling is not small: ClearGBM builds 1.52× LightGBM's leaves for that tied quality[^8], and leaf-wise is the change that closes it.
+
+The interpretability objection that previously appeared here has been **withdrawn** — it rested on ClearGBM producing balanced trees, which measurement disproves. See § "Interpretability cost".
 
 ## What today's code does (depth-first)
 
@@ -81,9 +86,21 @@ Serde on `GrowthStrategy` follows the same pattern as `MonotonicConstraint` in `
 
 ## Interpretability cost
 
-Depth-first produces balanced trees where every leaf sits at roughly the same depth — readable as short rule paths. Leaf-wise produces unbalanced trees where one branch may be 10 splits deep and its sibling a single leaf. Rule extraction becomes harder to reason about, and the wiki page on any consumer-facing "explainable model" story would need a caveat.
+**Superseded 2026-07-24 — the premise was false.** This section previously claimed depth-first "produces balanced trees where every leaf sits at roughly the same depth", and that switching to leaf-wise would therefore cost interpretability. Direct measurement of a trained model refutes the premise, so the objection does not apply to this codebase.
 
-Given ClearGBM's marketing is *Gradient Boosting You Can See Through*[^6], this trade-off is worth flagging to a human before shipping. Do the perf work in the other three pages first; revisit leaf-wise only if the speed gap doesn't close enough.
+What a tree dump at `max_depth=5` actually shows[^7]:
+
+- **Not balanced.** Root-to-leaf path lengths range 4–6, not a uniform depth.
+- **Not full.** A full binary tree at `max_depth=6` has 64 leaves; ClearGBM measures 57.9 there, and 47.15 on the authoritative benchmark run[^8]. Stopping criteria retire branches early.
+- **Not oblivious.** 13 distinct features appear at depth 5 — each node picks its own split, unlike CatBoost's symmetric trees where a whole level shares one test.
+
+So depth-wise growth here yields exactly the irregular shape the section warned leaf-wise would introduce. The shape is already irregular; leaf-wise would change *which* branches get deep, not whether any do.
+
+The rule-count comparison runs the other way from what was assumed: ClearGBM emits **47–58 leaves per tree against LightGBM's 31**[^8] — half again as many rules to read for statistically tied quality. On a rules-to-read measure, the depth-wise tree is the *less* readable of the two, and leaf-wise growth — which reaches equivalent loss with fewer effective splits — would likely improve it.
+
+Nothing in the interpretability machinery depends on tree shape: `export_model_json`, split-count feature importance, TreeSHAP and monotonic constraints all walk arbitrary trees. The genuine interpretability lever is **oblivious trees** (uniform per-level splits), which is a different change from leaf-wise and is not what this page proposes.
+
+Given ClearGBM's positioning as *Gradient Boosting You Can See Through*[^6], the honest framing is that today's growth strategy does not deliver that property, and leaf-wise does not take it away.
 
 [^1]: `libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md` § "Quality metrics" — every quality metric within seed std between cleargbm and lightgbm on the benchmark dataset.
 [^2]: `libs/cleargbm_rs/src/tree/builder.rs:199,209,218` — comment "Build tree using depth-first stack", `stack: Vec<PendingNode>`, and the `while let Some(pending) = stack.pop()` loop entry.
@@ -91,3 +108,5 @@ Given ClearGBM's marketing is *Gradient Boosting You Can See Through*[^6], this 
 [^4]: `libs/cleargbm_rs/src/training/config.rs:18,50,105-110` — `pub max_depth: usize` in the params struct, `max_depth: usize` in the validated config, validation `if max_depth < 1_usize { return Err(...) }`.
 [^5]: `libs/cleargbm_rs/src/tree/builder.rs:32` — `cached_histograms: Option<Vec<HistogramBuffer>>` on `PendingNode`; carried across the sibling boundary via the depth-first ordering.
 [^6]: `libs/cleargbm/README.md` header line — *Gradient Boosting You Can See Through*.
+[^7]: Tree dump of a model trained on the bankruptcy dataset at `max_depth=5`, read from `export_model_json` (2026-07-24): 13 distinct `feature_index` values among depth-5 internal nodes; root-to-leaf path lengths 4–6.
+[^8]: [[cleargbm-leaf-normalized-benchmarking]] § "Measured tree-size divergence" (57.9 vs 31.0 leaves at `max_depth=6`) and § "Authoritative measurement (2026-07-24)" (47.15 vs 30.96 leaves, leaf ratio 1.523×).

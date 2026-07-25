@@ -1,13 +1,16 @@
 ---
 title: ClearGBM perf — SIMD histogram accumulator
 tags: [ml, cleargbm, rust, performance, simd]
-related: [[cleargbm-histogram-split-path]], [[cleargbm-perf-uint8-histogram-bins]]
-sources:
+related:
+  - "[[cleargbm-histogram-split-path]]"
+  - "[[cleargbm-perf-uint8-histogram-bins]]"
+source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/types/mod.rs
   - libs/cleargbm_rs/Cargo.toml
-fact_checked: 2026-07-21
+fact_checked: "2026-07-21"
 confidence: medium
+hubs: [libs]
 ---
 
 # ClearGBM perf — SIMD histogram accumulator

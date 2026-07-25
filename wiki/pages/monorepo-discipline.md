@@ -1,13 +1,15 @@
 ---
 title: Monorepo Discipline — strict mypy, 100% coverage, monorepo-guards
 tags: [monorepo, typing, testing, guards, workspace-discipline]
-related: [[platform-workers-rq-pattern]]
-sources:
+related:
+  - "[[platform-workers-rq-pattern]]"
+source_paths:
   - monorepo-guards.toml
   - libs/monorepo_guards/
   - README.md
-fact_checked: 2026-07-20
+fact_checked: "2026-07-20"
 confidence: high
+hubs: [infrastructure]
 ---
 
 # Monorepo Discipline

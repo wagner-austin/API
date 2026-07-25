@@ -1,13 +1,15 @@
 ---
 title: Service Port Map — every FastAPI service and its port
 tags: [services, ports, infrastructure, routing]
-related: [[monorepo-discipline]]
-sources:
+related:
+  - "[[monorepo-discipline]]"
+source_paths:
   - README.md
   - docker-compose.yml
   - services/doc-extract-api/docker-compose.yml
-fact_checked: 2026-07-20
+fact_checked: "2026-07-20"
 confidence: high
+hubs: [services]
 ---
 
 # Service Port Map

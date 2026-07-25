@@ -1,14 +1,16 @@
 ---
 title: ClearGBM perf — column-major sample_bins layout
 tags: [ml, cleargbm, rust, performance]
-related: [[cleargbm-histogram-split-path]]
-sources:
+related:
+  - "[[cleargbm-histogram-split-path]]"
+source_paths:
   - libs/cleargbm_rs/src/binning/feature_bins.rs
   - libs/cleargbm_rs/src/binning/assignment.rs
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/tree/builder.rs
-fact_checked: 2026-07-21
+fact_checked: "2026-07-21"
 confidence: high
+hubs: [libs]
 ---
 
 # ClearGBM perf — column-major sample_bins layout

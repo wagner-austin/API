@@ -1,8 +1,9 @@
 ---
 title: ClearGBM histogram-based split finding
 tags: [ml, gradient-boosting, cleargbm, rust]
-related: [[monorepo-discipline]]
-sources:
+related:
+  - "[[monorepo-discipline]]"
+source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/split/mod.rs
   - libs/cleargbm_rs/src/tree/builder.rs
@@ -12,8 +13,9 @@ sources:
   - libs/cleargbm/src/cleargbm/ensemble.py
   - libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md
-fact_checked: 2026-07-21
+fact_checked: "2026-07-21"
 confidence: high
+hubs: [libs]
 ---
 
 # ClearGBM histogram-based split finding

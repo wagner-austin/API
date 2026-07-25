@@ -1,16 +1,19 @@
 ---
 title: ClearGBM perf — uint8 histogram bin dtype
 tags: [ml, cleargbm, rust, performance]
-related: [[cleargbm-histogram-split-path]], [[cleargbm-perf-column-major-sample-bins]]
-sources:
+related:
+  - "[[cleargbm-histogram-split-path]]"
+  - "[[cleargbm-perf-column-major-sample-bins]]"
+source_paths:
   - libs/cleargbm_rs/src/binning/feature_bins.rs
   - libs/cleargbm_rs/src/binning/assignment.rs
   - libs/cleargbm_rs/src/binning/edges.rs
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/training/config.rs
   - libs/cleargbm_rs/src/types/mod.rs
-fact_checked: 2026-07-21
+fact_checked: "2026-07-21"
 confidence: high
+hubs: [libs]
 ---
 
 # ClearGBM perf — uint8 histogram bin dtype

@@ -1,12 +1,14 @@
 ---
 title: platform_workers — RQ + Redis background job pattern
 tags: [platform-workers, rq, redis, background-jobs, libs]
-related: [[monorepo-discipline]]
-sources:
+related:
+  - "[[monorepo-discipline]]"
+source_paths:
   - libs/platform_workers/
   - libs/platform_workers/README.md
-fact_checked: 2026-07-20
+fact_checked: "2026-07-20"
 confidence: high
+hubs: [libs]
 ---
 
 # platform_workers — RQ + Redis background job pattern
