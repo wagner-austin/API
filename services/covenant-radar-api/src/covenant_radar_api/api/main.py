@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from covenant_ml.optimizer import use_real_optuna
+from covenant_ml.optimizer import use_real_optimizer
 from fastapi import FastAPI
 from platform_core.fastapi import install_exception_handlers_fastapi
 from platform_core.logging import setup_logging
@@ -25,7 +25,7 @@ from .routes import ml as routes_ml
 from .routes import status as routes_status
 
 # Wire real Optuna at module load for hyperparameter optimization
-use_real_optuna()
+use_real_optimizer()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

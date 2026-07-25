@@ -39,9 +39,15 @@ Usage:
     )
 
     # Or use backend-specific optimizers directly
-    from covenant_ml.optimizer import create_xgboost_optimizer, use_real_optuna
-    use_real_optuna()
+    from covenant_ml.optimizer import create_xgboost_optimizer, use_real_optimizer
+    use_real_optimizer()
     optimizer = create_xgboost_optimizer()
+
+Application startup must call use_real_optimizer(). The optimizer has two
+independent injection points -- the optuna module factories and the TPE
+strategy factories -- and both must be wired before any optimization runs.
+Calling only use_real_optuna(), which this docstring previously showed, left
+the TPE hook unset and every optimization raised "Optuna TPE hook not set".
 """
 
 from .objectives import (
@@ -120,6 +126,7 @@ from .strategies import (
     create_optuna_tpe_optimizer,
     create_random_search_optimizer,
 )
+from .strategies.optuna_tpe import set_optuna_tpe_hook, use_real_optuna_tpe
 from .strategy_protocol import (
     HyperparameterOptimizerProtocol,
     OptimizerStrategyCapabilities,
@@ -146,6 +153,25 @@ from .types import (
     TrialState,
     XGBoostSearchSpace,
 )
+
+
+def use_real_optimizer() -> None:
+    """Wire every injection point the optimizer needs, at application startup.
+
+    The optimizer has two independent hooks in separate modules: the optuna
+    module factories and the TPE strategy factories. Wiring one without the
+    other leaves optimization to fail at its first trial, which is what
+    happened -- every entry point called use_real_optuna() alone, following
+    this package's own documentation, so /ml/optimize raised "Optuna TPE hook
+    not set" for every backend.
+
+    Entry points should call this rather than the individual setters, so a
+    hook added later is wired everywhere by changing one function. The
+    granular setters remain for tests that need to substitute one seam.
+    """
+    use_real_optuna()
+    use_real_optuna_tpe()
+
 
 __all__ = [
     "CategoricalFloatSpec",
@@ -233,5 +259,8 @@ __all__ = [
     "make_xgboost_default_space",
     "make_xgboost_focused_space",
     "set_optuna_module_hook",
+    "set_optuna_tpe_hook",
+    "use_real_optimizer",
     "use_real_optuna",
+    "use_real_optuna_tpe",
 ]

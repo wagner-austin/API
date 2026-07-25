@@ -79,9 +79,9 @@ def main(
         logger: Logger instance. If None, uses default logger after setup.
         runner: Worker runner function. If None, uses _get_default_runner().
     """
-    from covenant_ml.optimizer import use_real_optuna
+    from covenant_ml.optimizer import use_real_optimizer
 
-    use_real_optuna()
+    use_real_optimizer()
 
     setup_logging(
         level="INFO",
