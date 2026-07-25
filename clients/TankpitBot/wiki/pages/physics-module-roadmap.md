@@ -18,7 +18,7 @@ source_paths:
   - "src/tankpit_bot/validate"
 source_git_blobs:
   "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
-  "src/tankpit_bot/sim": "0555379f06f3e3d1e53a0a590646a93c6296492f"
+  "src/tankpit_bot/sim": "022460326e21deae11f627a315eeb23dc46765f8"
   "src/tankpit_bot/validate": "d7f5c60b9d2048cab60968f95214be039f70e599"
 fact_checked: "2026-07-20"
 confidence: high
@@ -416,9 +416,12 @@ work on them for free.[^2]
 
 ### The laws (every rule carries its wiki anchor)
 
-1. **Global queue, 2 s tick**: commands queue and process in order at
-   tick boundaries; wire flushes batch per tick ([[shoot-event-format]]
-   queue model; log 2026-07-21 sync cadence).
+1. **Global queue, 2 s tick**: commands queue and process at tick
+   boundaries; wire flushes batch per tick ([[shoot-event-format]]
+   queue model; log 2026-07-21 sync cadence). Within-round order was
+   originally modeled as arrival order; measured 2026-07-25 as
+   **ascending tank id** ([[game-rules]] §Combat rounds,
+   1,820/1,825 archive bursts) and the sim now sorts the queue.
 2. **Movement is instant** ([[walk-mechanics]]): deterministic
    quadrant-keyed pathfinder (vertical-first, NE quadrant
    horizontal-first; routes around terrain + enemy mines), full path
@@ -539,7 +542,9 @@ in-memory terrain):[^2]
 - **`commands.py`** — typed decode of client `[!][type][cmd]` frames
   (move/shoot/teleport/radar/mine/map/pickups; unknowns preserved);
   `SimError` for anything outside the current build stage.
-- **`server.py`** — law 1: arrival-order queue, everything processed
+- **`server.py`** — law 1: global queue (arrival order as built at
+  this step; ascending-tank-id since 2026-07-25 — see the round-order
+  note below), everything processed
   and flushed per 2 s tick; shooter debits bill the NEXT tick
   (charge latency), victims instantly; emits decoded messages (0x47
   echoes, 0x2E fuel syncs, 0x43 pickups, 0x45 cascades, 0x52 command
@@ -1084,6 +1089,19 @@ fire — the sim now reproduces the live multi-bot failure mode the
 scripted harness could not. `sim/opponent.py` remains the default
 `make sim-run` (deterministic kill path); practice mode is the
 fidelity soak.[^2]
+
+**Round-resolution order wired in (2026-07-25):** the same-day
+measurement (`analysis_scripts/mine_round_order.py` — 1,820/1,825
+archive multi-shooter bursts fire in ascending shooter id; the only
+5 violations are our own sim captures) is now law in the sim:
+`SimServer.advance_tick` sorts the per-tick queue by tank id before
+processing ([[game-rules]] §Combat rounds). The stable sort keeps one
+tank's own commands in arrival order. Two sim tests that leaned on
+arrival order were re-anchored so the intended earlier actor carries
+the lower id; a pinning test
+(`test_round_resolution_orders_by_ascending_tank_id`) guards the
+law. Gate green (4,955 tests, 100%); all 7 shadow laws still
+PASS.[^2]
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
