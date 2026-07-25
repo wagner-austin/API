@@ -35,6 +35,7 @@ from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
+from tankpit_bot.sim.practice_room import PracticeRoomDriver
 from tankpit_bot.sim.server import SimServer
 from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
 from tankpit_bot.sim.world import (
@@ -182,15 +183,24 @@ def _require_seeds_passable(world: SimWorldDict, terrain: _test_hooks.TerrainMap
         )
 
 
-def _boot(world: SimWorldDict) -> tuple[Bot, SimServer, SimCDPSession]:
+def _boot(
+    world: SimWorldDict,
+    *,
+    practice: bool = False,
+) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
     """Wire a real Bot to the sim over the CDP seam.
 
     Args:
         world: The seeded world the server will own.
+        practice: When True, seed the certified practice-bot roster
+            (``sim/practice_room``) before the handshake so the join
+            roster dump includes the bots, and hand the server their
+            ids for the corpse-window reactivation hook.
 
     Returns:
-        The bot, the server, and the seam link, with the join
-        handshake already delivered.
+        The bot, the server, the seam link, and the practice-room
+        driver (None outside practice mode), with the join handshake
+        already delivered.
 
     Raises:
         RuntimeError: If the XOR static key or the field terrain GIF
@@ -207,28 +217,37 @@ def _boot(world: SimWorldDict) -> tuple[Bot, SimServer, SimCDPSession]:
     if not _test_hooks.path_exists(gif_path):
         raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")
     terrain = _test_hooks.load_terrain_map(gif_path)
+    driver: PracticeRoomDriver | None = None
+    roster_ids: frozenset[int] = frozenset()
+    if practice:
+        driver = PracticeRoomDriver(world, terrain, SIM_CLIENT_ID)
+        roster_ids = driver.roster_ids()
     _require_seeds_passable(world, terrain)
-    server = SimServer(world, terrain, client_id=SIM_CLIENT_ID)
+    server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
     bot = Bot("https://sim.tankpit.local/", headless=True)
     bot._magic = SIM_MAGIC
     bot._on_magic_captured(SIM_MAGIC)
     link = SimCDPSession(server, table)
     bot._cdp = link
     deliver_batch(bot._cdp_message_buffer, server.handshake(), link)
-    return bot, server, link
+    return bot, server, link, driver
 
 
 def run_sim_session(
     rounds: int,
     *,
     opponent: bool = True,
+    practice: bool = False,
     stamp: str | None = None,
 ) -> SimRunResultDict:
     """Play one production-bot session against the sim and archive it.
 
     Args:
         rounds: Maximum server ticks to play.
-        opponent: Whether the scripted opponent returns fire.
+        opponent: Whether the scripted opponent returns fire (ignored
+            in practice mode — the certified roster replaces it).
+        practice: Face the certified practice-bot roster
+            (``sim/practice_room``) instead of the scripted harness.
         stamp: Optional archive stamp override for deterministic tests.
 
     Returns:
@@ -240,7 +259,7 @@ def run_sim_session(
     run_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = configure_probe_runtime_logging("sim", run_stamp)
     world = make_default_sim_world()
-    bot, server, link = _boot(world)
+    bot, server, link, driver = _boot(world, practice=practice)
     exit_reason = "rounds_exhausted"
     exit_detail = ""
     played = 0
@@ -248,12 +267,18 @@ def run_sim_session(
     try:
         for _ in range(rounds):
             _tick_once(bot)
-            if opponent:
+            if driver is not None:
+                for bot_id, command in driver.decide_all(server.world, server.terrain):
+                    server.queue_command(bot_id, command)
+            elif opponent:
                 enemy_id = maybe_revive_opponent(server, enemy_id, SIM_CLIENT_ID)
                 opponent_command = decide_opponent(server.world, enemy_id, SIM_CLIENT_ID)
                 if opponent_command is not None:
                     server.queue_command(enemy_id, opponent_command)
-            deliver_batch(bot._cdp_message_buffer, server.advance_tick(), link)
+            batch = server.advance_tick()
+            if driver is not None:
+                driver.note_batch(server.world, batch)
+            deliver_batch(bot._cdp_message_buffer, batch, link)
             played += 1
     except SessionExitError as error:
         exit_reason = error.reason
@@ -300,6 +325,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = list(argv) if argv is not None else list(sys.argv[1:])
     rounds = _DEFAULT_ROUNDS
     opponent = True
+    practice = False
     stamp: str | None = None
     index = 0
     while index < len(args):
@@ -310,12 +336,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif token == "--no-opponent":
             opponent = False
             index += 1
+        elif token == "--practice":
+            practice = True
+            index += 1
         elif token == "--stamp" and index + 1 < len(args):
             stamp = args[index + 1]
             index += 2
         else:
             index += 1
-    result = run_sim_session(rounds, opponent=opponent, stamp=stamp)
+    result = run_sim_session(rounds, opponent=opponent, practice=practice, stamp=stamp)
     sys.stdout.write(
         f"sim session {result['stamp']}: {result['rounds_played']}/{rounds} rounds, "
         f"{result['commands_sent']} commands, exit={result['exit_reason']}\n"

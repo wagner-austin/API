@@ -234,3 +234,27 @@ def test_team_aggro_skips_principals_third_teams_and_far_allies() -> None:
     }
     assert note_hit_for_team_aggro(world, states, BOT_ID, 9) == []
     assert all(not s["has_pending_return"] for s in states.values())
+
+
+def test_practice_room_ignores_shots_from_unknown_shooters() -> None:
+    """A 0x53 whose shooter left the world never ignites anything."""
+    from tankpit_bot.protocol.types import ShootEventDict
+    from tankpit_bot.sim.practice_room import PracticeRoomDriver
+
+    world = make_sim_world("field01_r.gif")
+    world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 900)
+    driver = PracticeRoomDriver(world, InMemoryTerrainMap(), 9)
+    ghost_shot = ShootEventDict(
+        msg_type=0x53,
+        team=0,
+        shooter_id=777,
+        source_x=90,
+        source_y=90,
+        target_x=100,
+        target_y=100,
+        aim_x=100,
+        aim_y=100,
+        weapon=0,
+    )
+    driver.note_batch(world, [ghost_shot])
+    assert all(not state["has_pending_return"] for state in driver.states.values())

@@ -5,11 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import load_json_str, narrow_json_to_dict
+from platform_core.json_utils import load_json_str, narrow_json_to_dict, narrow_json_to_list
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.protocol.codec import DEFAULT_STATIC_KEY_PATH
+from tankpit_bot.sim.practice_room import PRACTICE_ROSTER
 from tankpit_bot.sim.run import (
     SIM_FIELD,
     _require_seeds_passable,
@@ -120,3 +121,25 @@ def test_main_parses_arguments_and_reports(fake_fs: FakeFileSystem) -> None:
     assert exit_code == 0
     files = fake_fs.get_written_files()
     assert any("sim-20260722-000008.capture_session.json" in path for path in files)
+
+
+def test_practice_session_faces_the_certified_roster(fake_fs: FakeFileSystem) -> None:
+    """Practice mode seeds the roster before the handshake, the bots
+    are driven by the certified policy, and the session archives."""
+    _install_fake_terrain(fake_fs)
+    result = run_sim_session(8, practice=True, stamp="20260725-000001")
+    assert result["rounds_played"] >= 1
+    world_doc = narrow_json_to_dict(load_json_str(fake_fs.read_text(Path(result["world_path"]))))
+    raw_tanks = narrow_json_to_list(world_doc["tanks"])
+    tank_ids = {narrow_json_to_dict(entry)["tank_id"] for entry in raw_tanks}
+    for roster_id, _team, _rank, _dx, _dy in PRACTICE_ROSTER:
+        assert roster_id in tank_ids
+
+
+def test_main_practice_flag_drives_a_roster_session(fake_fs: FakeFileSystem) -> None:
+    """`--practice` reaches run_sim_session and archives normally."""
+    _install_fake_terrain(fake_fs)
+    exit_code = main(["--rounds", "4", "--practice", "--stamp", "20260725-000002"])
+    assert exit_code == 0
+    files = fake_fs.get_written_files()
+    assert any("sim-20260725-000002.capture_session.json" in path for path in files)

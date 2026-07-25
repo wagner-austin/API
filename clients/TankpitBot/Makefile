@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run shadow
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -20,6 +20,7 @@ help:
 	@Write-Host "  make test                        pytest + coverage"
 	@Write-Host "  make audit                       re-derive wiki physics claims from the runs archive"
 	@Write-Host "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
+	@Write-Host "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
 	@Write-Host "  make install                     poetry install + playwright chromium"
 	@Write-Host ""
 	@Write-Host "Live action probes (need browser + accounts.json):" -ForegroundColor Yellow
@@ -275,6 +276,11 @@ sim-run:
 	@Write-Host ""
 	@Write-Host "==> sim-run (production bot vs the simulator on real terrain -- no server, no browser)" -ForegroundColor Cyan
 	poetry run tankpit-sim-run; if ($$LASTEXITCODE -ne 0) { Write-Host "[sim-run] session failed" -ForegroundColor Red; exit $$LASTEXITCODE }
+
+sim-run-practice:
+	@Write-Host ""
+	@Write-Host "==> sim-run-practice (production bot vs the certified practice-bot roster)" -ForegroundColor Cyan
+	poetry run tankpit-sim-run --practice; if ($$LASTEXITCODE -ne 0) { Write-Host "[sim-run-practice] session failed" -ForegroundColor Red; exit $$LASTEXITCODE }
 
 roundtrip:
 	@Write-Host ""
