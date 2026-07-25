@@ -1,0 +1,21 @@
+# Root ruff config: protects vendored third-party trees from ad-hoc runs.
+#
+# `make lint` iterates libs/, services/ and clients/ and never reaches these,
+# so the pipeline was never the problem. A `ruff check --fix` or `ruff format`
+# run from the repo root is, and one already rewrote all ten source files in
+# amex_1st_place -- dropping "unused" imports, adding PEP8 blank lines and
+# rewriting `class X(object)`. That code is a pristine clone of its upstream
+# and is read-only reference material; reformatting it only creates diff noise
+# against origin and makes the vendored copy harder to compare or update.
+#
+# Anything checked out from someone else's repository belongs in this list.
+# force-exclude makes the list apply even when a path is named explicitly.
+# Without it ruff only honours exclusions while walking directories, so
+# `ruff check amex_1st_place` would still rewrite the vendored tree.
+force-exclude = true
+
+extend-exclude = [
+    "amex_1st_place",
+    "**/mckinnon_sources",
+    "**/.venv",
+]
