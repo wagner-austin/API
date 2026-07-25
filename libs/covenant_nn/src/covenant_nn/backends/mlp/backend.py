@@ -796,8 +796,47 @@ class MLPBackend(ClassifierBackend):
         return None
 
 
+def load_mlp_for_inference(
+    *,
+    path: str,
+    n_features: int,
+    hidden_sizes: tuple[int, ...],
+    dropout: float,
+) -> _MLPPrepared:
+    """Restore a trained MLP from a checkpoint for inference and explanation.
+
+    The architecture must be rebuilt before the weights can be loaded, and it
+    must be rebuilt exactly as training built it -- the Sequential stack is
+    Linear/BatchNorm/ReLU with Dropout emitted only when the rate is above
+    zero, which shifts every later layer index in the state dict. Rebuilding
+    it here, beside the code that trains and saves it, is what keeps the two
+    from drifting; a caller that reimplements the stack silently loads a
+    differently shaped model.
+
+    Args:
+        path: Path to the saved state dict.
+        n_features: Number of input features the model was trained on.
+        hidden_sizes: Hidden layer widths used at training time.
+        dropout: Dropout rate used at training time.
+
+    Returns:
+        A prepared model exposing predict_proba and compute_gradients.
+    """
+    model = _build_model(n_features, hidden_sizes, dropout, "cpu")
+    torch_mod = _import_torch()
+    state: dict[str, TensorProtocol] = torch_mod.load(path, weights_only=True)
+    model.load_state_dict(state)
+    model.eval()
+    return _MLPPrepared(model)
+
+
 def create_mlp_backend() -> MLPBackend:
     return MLPBackend()
 
 
-__all__ = ["MLP_CAPABILITIES", "MLPBackend", "create_mlp_backend"]
+__all__ = [
+    "MLP_CAPABILITIES",
+    "MLPBackend",
+    "create_mlp_backend",
+    "load_mlp_for_inference",
+]

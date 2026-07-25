@@ -7,6 +7,7 @@ from typing import Protocol
 
 import numpy as np
 import pytest
+from covenant_nn.backends.lstm.backend import FC_STATE_PREFIX, LSTM_STATE_PREFIX
 from covenant_nn.backends.lstm.sequences import compute_features_per_step
 from numpy.typing import NDArray
 
@@ -222,9 +223,9 @@ def _create_lstm_model(model_path: Path, n_features: int = 12) -> LSTMModelConfi
     lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
     fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
     for k in lstm_sd:
-        state_dict[f"_lstm.{k}"] = lstm_sd[k]
+        state_dict[f"{LSTM_STATE_PREFIX}{k}"] = lstm_sd[k]
     for k in fc_sd:
-        state_dict[f"_fc.{k}"] = fc_sd[k]
+        state_dict[f"{FC_STATE_PREFIX}{k}"] = fc_sd[k]
 
     save_fn: _TorchSaveFn = torch_mod.save
     save_fn(state_dict, str(model_path))
@@ -527,9 +528,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"_lstm.{k}"] = lstm_sd[k]
+            state_dict[f"{LSTM_STATE_PREFIX}{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"_fc.{k}"] = fc_sd[k]
+            state_dict[f"{FC_STATE_PREFIX}{k}"] = fc_sd[k]
         # Add extra key that doesn't match either prefix
         state_dict["extra_key"] = lstm_sd[next(iter(lstm_sd))]
 
@@ -590,9 +591,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"_lstm.{k}"] = lstm_sd[k]
+            state_dict[f"{LSTM_STATE_PREFIX}{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"_fc.{k}"] = fc_sd[k]
+            state_dict[f"{FC_STATE_PREFIX}{k}"] = fc_sd[k]
 
         model_path = tmp_path / "model_bidir.pt"
         save_fn: _TorchSaveFn = torch_mod.save
@@ -649,9 +650,9 @@ class TestLoadModelForBackendLSTM:
         lstm_sd: dict[str, _TensorProtocol] = lstm.state_dict()
         fc_sd: dict[str, _TensorProtocol] = fc.state_dict()
         for k in lstm_sd:
-            state_dict[f"_lstm.{k}"] = lstm_sd[k]
+            state_dict[f"{LSTM_STATE_PREFIX}{k}"] = lstm_sd[k]
         for k in fc_sd:
-            state_dict[f"_fc.{k}"] = fc_sd[k]
+            state_dict[f"{FC_STATE_PREFIX}{k}"] = fc_sd[k]
 
         model_path = tmp_path / "model_multi.pt"
         save_fn: _TorchSaveFn = torch_mod.save

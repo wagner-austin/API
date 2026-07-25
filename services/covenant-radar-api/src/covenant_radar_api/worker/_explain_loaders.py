@@ -12,23 +12,13 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 from __future__ import annotations
 
 from pathlib import Path
-from types import TracebackType
 from typing import Protocol, TypedDict
 
 import numpy as np
 from covenant_ml.types import BackendName
-from covenant_nn.backends.lstm.sequences import (
-    compute_features_per_step,
-    reshape_flat_to_pseudo_sequences,
-)
+from covenant_nn.backends.lstm.backend import load_lstm_for_inference
+from covenant_nn.backends.mlp.backend import load_mlp_for_inference
 from numpy.typing import NDArray
-
-# Submodule names on the trained LSTM wrapper, which
-# covenant_nn.backends.lstm.backend declares as self._lstm and self._fc. The
-# state dict is keyed by those names, so any loader must strip these exact
-# prefixes.
-_LSTM_PREFIX = "_lstm."
-_FC_PREFIX = "_fc."
 
 # ---------------------------------------------------------------------------
 # Common Predictor Protocol
@@ -186,144 +176,14 @@ def _load_lightgbm_model(model_path: str) -> PredictorProtocol:
 
 
 # ---------------------------------------------------------------------------
-# PyTorch Protocol Definitions
-# ---------------------------------------------------------------------------
-
-
-class _DTypeProtocol(Protocol):
-    """Protocol for PyTorch dtype (torch.float32, etc)."""
-
-    @property
-    def is_floating_point(self) -> bool: ...
-
-
-class _HiddenStateProtocol(Protocol):
-    """Protocol for LSTM hidden state tuple (h_n, c_n)."""
-
-    def __len__(self) -> int: ...
-
-
-class _TensorProtocol(Protocol):
-    """Protocol for PyTorch tensor."""
-
-    @property
-    def grad(self) -> _TensorProtocol | None: ...
-    @property
-    def shape(self) -> tuple[int, ...]: ...
-    def cpu(self) -> _TensorProtocol: ...
-    def numpy(self) -> NDArray[np.float64]: ...
-    def select(self, dim: int, index: int) -> _TensorProtocol: ...
-    def sum(self) -> _TensorProtocol: ...
-    def backward(self) -> None: ...
-
-
-class _TrainableModel(Protocol):
-    """Protocol for PyTorch trainable model."""
-
-    def __call__(self, x: _TensorProtocol) -> _TensorProtocol: ...
-    def eval(self) -> _TrainableModel: ...
-    def state_dict(self) -> dict[str, _TensorProtocol]: ...
-    def load_state_dict(self, state_dict: dict[str, _TensorProtocol]) -> None: ...
-    def to(self, device: str) -> _TrainableModel: ...
-
-
-class _NoGradContext(Protocol):
-    """Protocol for torch.no_grad context manager."""
-
-    def __enter__(self) -> None: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None: ...
-
-
-class _NoGradFactory(Protocol):
-    """Protocol for torch.no_grad factory."""
-
-    def __call__(self) -> _NoGradContext: ...
-
-
-class _EnableGradContext(Protocol):
-    """Protocol for torch.enable_grad context manager."""
-
-    def __enter__(self) -> None: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None: ...
-
-
-class _EnableGradFactory(Protocol):
-    """Protocol for torch.enable_grad factory."""
-
-    def __call__(self) -> _EnableGradContext: ...
-
-
-class _SoftmaxFn(Protocol):
-    """Protocol for softmax function (already configured with dim)."""
-
-    def __call__(self, x: _TensorProtocol) -> _TensorProtocol: ...
-
-
-class _SoftmaxCtor(Protocol):
-    """Protocol for nn.Softmax constructor."""
-
-    def __call__(self, dim: int) -> _SoftmaxFn: ...
-
-
-class _TensorCtor(Protocol):
-    """Protocol for torch.tensor constructor."""
-
-    def __call__(
-        self,
-        data: NDArray[np.float32],
-        dtype: _DTypeProtocol,
-        requires_grad: bool = ...,
-    ) -> _TensorProtocol: ...
-
-
-class _TorchLoadFn(Protocol):
-    """Protocol for torch.load function."""
-
-    def __call__(self, f: str, weights_only: bool = ...) -> dict[str, _TensorProtocol]: ...
-
-
-class _NNLinearCtor(Protocol):
-    """Protocol for nn.Linear constructor."""
-
-    def __call__(self, in_features: int, out_features: int) -> _TrainableModel: ...
-
-
-class _NNBatchNorm1dCtor(Protocol):
-    """Protocol for nn.BatchNorm1d constructor."""
-
-    def __call__(self, num_features: int) -> _TrainableModel: ...
-
-
-class _NNReLUCtor(Protocol):
-    """Protocol for nn.ReLU constructor."""
-
-    def __call__(self) -> _TrainableModel: ...
-
-
-class _NNDropoutCtor(Protocol):
-    """Protocol for nn.Dropout constructor."""
-
-    def __call__(self, p: float) -> _TrainableModel: ...
-
-
-class _NNSequentialCtor(Protocol):
-    """Protocol for nn.Sequential constructor."""
-
-    def __call__(self, *modules: _TrainableModel) -> _TrainableModel: ...
-
-
-# ---------------------------------------------------------------------------
-# MLP Model Config and Loading
+# MLP and LSTM Model Loading
+#
+# The architectures, their checkpoint key layout and their prepared predictors
+# all live in covenant_nn beside the code that trains and saves them. They are
+# imported, never restated here: this module previously carried a second copy
+# of both model stacks, and the copies drifted -- the LSTM one derived its
+# state-dict prefixes from the wrapper's attribute names and so loaded no
+# weights at all, which every unit test passed straight over.
 # ---------------------------------------------------------------------------
 
 
@@ -341,168 +201,16 @@ class MLPModelConfig(TypedDict, total=True):
     dropout: float
 
 
-def _build_mlp_model(
-    n_in: int,
-    hidden: tuple[int, ...],
-    dropout: float,
-) -> _TrainableModel:
-    """Build MLP model architecture (CPU only for inference).
-
-    Args:
-        n_in: Number of input features.
-        hidden: Hidden layer sizes.
-        dropout: Dropout rate.
-
-    Returns:
-        MLP model (on CPU).
-    """
-    nn_mod = __import__(
-        "torch.nn",
-        fromlist=["Linear", "BatchNorm1d", "ReLU", "Dropout", "Sequential"],
-    )
-    linear: _NNLinearCtor = nn_mod.Linear
-    bn: _NNBatchNorm1dCtor = nn_mod.BatchNorm1d
-    relu: _NNReLUCtor = nn_mod.ReLU
-    drop: _NNDropoutCtor = nn_mod.Dropout
-    sequential: _NNSequentialCtor = nn_mod.Sequential
-
-    parts: list[_TrainableModel] = []
-    in_f = int(n_in)
-    for width in hidden:
-        parts.append(linear(in_f, int(width)))
-        parts.append(bn(int(width)))
-        parts.append(relu())
-        if dropout > 0.0:
-            parts.append(drop(dropout))
-        in_f = int(width)
-    parts.append(linear(in_f, 2))
-    return sequential(*parts)
-
-
-class _MLPPrepared:
-    """Prepared MLP model implementing PredictorProtocol with gradient support."""
-
-    def __init__(self, model: _TrainableModel) -> None:
-        """Initialize with PyTorch model.
-
-        Args:
-            model: PyTorch Sequential model.
-        """
-        self._model = model
-
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Return class probabilities for input samples.
-
-        Args:
-            x: Input features with shape (n_samples, n_features).
-
-        Returns:
-            Class probabilities with shape (n_samples, n_classes).
-        """
-        torch_mod = __import__("torch")
-        nn_mod = __import__("torch.nn", fromlist=["Softmax"])
-        no_grad: _NoGradFactory = torch_mod.no_grad
-        tensor: _TensorCtor = torch_mod.tensor
-        fp32_dtype: _DTypeProtocol = torch_mod.float32
-        softmax_ctor: _SoftmaxCtor = nn_mod.Softmax
-
-        softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
-        x_fp32: NDArray[np.float32] = x.astype(np.float32)
-        x_tensor: _TensorProtocol = tensor(x_fp32, dtype=fp32_dtype)
-
-        with no_grad():
-            logits: _TensorProtocol = self._model(x_tensor)
-            proba: _TensorProtocol = softmax_fn(logits)
-
-        proba_np: NDArray[np.float64] = proba.cpu().numpy().astype(np.float64)
-        return proba_np
-
-    def compute_gradients(
-        self,
-        x: NDArray[np.float64],
-        target_class: int,
-    ) -> NDArray[np.float64]:
-        """Compute gradients of output w.r.t. input features.
-
-        Args:
-            x: Input features with shape (n_samples, n_features).
-            target_class: Class index for which to compute gradients.
-
-        Returns:
-            Gradients with shape (n_samples, n_features).
-        """
-        torch_mod = __import__("torch")
-        nn_mod = __import__("torch.nn", fromlist=["Softmax"])
-        enable_grad: _EnableGradFactory = torch_mod.enable_grad
-        tensor: _TensorCtor = torch_mod.tensor
-        fp32_dtype: _DTypeProtocol = torch_mod.float32
-        softmax_ctor: _SoftmaxCtor = nn_mod.Softmax
-
-        softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
-
-        x_fp32: NDArray[np.float32] = x.astype(np.float32)
-        x_tensor: _TensorProtocol = tensor(
-            x_fp32,
-            dtype=fp32_dtype,
-            requires_grad=True,
-        )
-
-        with enable_grad():
-            logits: _TensorProtocol = self._model(x_tensor)
-            proba: _TensorProtocol = softmax_fn(logits)
-            target_proba: _TensorProtocol = proba.select(1, target_class)
-            scalar_output: _TensorProtocol = target_proba.sum()
-            scalar_output.backward()
-
-        grad_tensor = x_tensor.grad
-        assert grad_tensor is not None, "Gradient should not be None after backward()"
-        grad_cpu: _TensorProtocol = grad_tensor.cpu()
-        grad_numpy = grad_cpu.numpy()
-        gradients: NDArray[np.float64] = grad_numpy.astype(np.float64)
-        return gradients
-
-
-def _load_mlp_model(model_path: str, config: MLPModelConfig) -> GradientPredictorProtocol:
-    """Load MLP model from file.
-
-    Args:
-        model_path: Path to saved model file (.pt format).
-        config: Model architecture configuration.
-
-    Returns:
-        Model implementing GradientPredictorProtocol.
-    """
-    torch_mod = __import__("torch")
-    load_fn: _TorchLoadFn = torch_mod.load
-
-    model = _build_mlp_model(
-        n_in=config["n_features"],
-        hidden=config["hidden_sizes"],
-        dropout=config["dropout"],
-    )
-
-    state_dict: dict[str, _TensorProtocol] = load_fn(model_path, weights_only=True)
-    model.load_state_dict(state_dict)
-    _ = model.eval()
-
-    return _MLPPrepared(model)
-
-
-# ---------------------------------------------------------------------------
-# LSTM Model Config and Loading
-# ---------------------------------------------------------------------------
-
-
 class LSTMModelConfig(TypedDict, total=True):
     """Configuration required to reconstruct LSTM model architecture.
 
     Args:
-        n_features: Number of input features (flat, before reshaping to sequences).
-        hidden_size: LSTM hidden state dimension.
+        n_features: Number of input features.
+        hidden_size: LSTM hidden state size.
         num_layers: Number of stacked LSTM layers.
-        dropout: Dropout rate between LSTM layers.
-        bidirectional: Whether to use bidirectional LSTM.
-        sequence_length: Number of time steps in each sequence.
+        dropout: Dropout rate between layers.
+        bidirectional: Whether the LSTM is bidirectional.
+        sequence_length: Number of timesteps per sequence.
     """
 
     n_features: int
@@ -513,250 +221,8 @@ class LSTMModelConfig(TypedDict, total=True):
     sequence_length: int
 
 
-class _LSTMLayerProto(Protocol):
-    """Protocol for LSTM layer."""
-
-    def __call__(self, x: _TensorProtocol) -> tuple[_TensorProtocol, _HiddenStateProtocol]: ...
-    def eval(self) -> _LSTMLayerProto: ...
-    def state_dict(self) -> dict[str, _TensorProtocol]: ...
-    def load_state_dict(self, state_dict: dict[str, _TensorProtocol]) -> None: ...
-
-
-class _LinearLayerProto(Protocol):
-    """Protocol for Linear layer."""
-
-    def __call__(self, x: _TensorProtocol) -> _TensorProtocol: ...
-    def eval(self) -> _LinearLayerProto: ...
-    def state_dict(self) -> dict[str, _TensorProtocol]: ...
-    def load_state_dict(self, state_dict: dict[str, _TensorProtocol]) -> None: ...
-
-
-class _NNLSTMCtor(Protocol):
-    """Protocol for nn.LSTM constructor."""
-
-    def __call__(
-        self,
-        input_size: int,
-        hidden_size: int,
-        num_layers: int,
-        batch_first: bool,
-        dropout: float,
-        bidirectional: bool,
-    ) -> _LSTMLayerProto: ...
-
-
-class _NNLinearLayerCtor(Protocol):
-    """Protocol for nn.Linear constructor for LSTM classifier head."""
-
-    def __call__(self, in_features: int, out_features: int) -> _LinearLayerProto: ...
-
-
-class _LSTMClassifierWrapper:
-    """LSTM classifier wrapper for loading saved models."""
-
-    def __init__(self, lstm: _LSTMLayerProto, fc: _LinearLayerProto) -> None:
-        """Initialize wrapper.
-
-        Args:
-            lstm: LSTM layer.
-            fc: Fully connected classification head.
-        """
-        self._lstm = lstm
-        self._fc = fc
-
-    def eval(self) -> _LSTMClassifierWrapper:
-        """Set evaluation mode.
-
-        Returns:
-            Self for chaining.
-        """
-        _ = self._lstm.eval()
-        _ = self._fc.eval()
-        return self
-
-    def __call__(self, x: _TensorProtocol) -> _TensorProtocol:
-        """Forward pass: (batch, seq_len, input_size) -> (batch, 2).
-
-        Args:
-            x: Input tensor with shape (batch, seq_len, features_per_step).
-
-        Returns:
-            Logits tensor with shape (batch, 2).
-        """
-        out_tuple = self._lstm(x)
-        lstm_out: _TensorProtocol = out_tuple[0]
-        last_out: _TensorProtocol = lstm_out.select(1, -1)
-        return self._fc(last_out)
-
-    def load_state_dict(self, state_dict: dict[str, _TensorProtocol]) -> None:
-        """Load state dictionary.
-
-        Prefixes are "_lstm." and "_fc.", matching the trained model, whose
-        submodules are named self._lstm and self._fc
-        (covenant_nn.backends.lstm.backend). Stripping "lstm."/"fc." matched
-        nothing, so both sub-dicts came out empty and load_state_dict({})
-        raised on missing keys for every real checkpoint.
-
-        Args:
-            state_dict: Dictionary with '_lstm.*' and '_fc.*' keys.
-        """
-        lstm_state: dict[str, _TensorProtocol] = {}
-        fc_state: dict[str, _TensorProtocol] = {}
-        for k, v in state_dict.items():
-            if k.startswith(_LSTM_PREFIX):
-                lstm_state[k[len(_LSTM_PREFIX) :]] = v
-            elif k.startswith(_FC_PREFIX):
-                fc_state[k[len(_FC_PREFIX) :]] = v
-        self._lstm.load_state_dict(lstm_state)
-        self._fc.load_state_dict(fc_state)
-
-
-def _build_lstm_model(config: LSTMModelConfig) -> _LSTMClassifierWrapper:
-    """Build LSTM model architecture.
-
-    Args:
-        config: LSTM model configuration.
-
-    Returns:
-        LSTM classifier wrapper (on CPU).
-    """
-    nn_mod = __import__("torch.nn", fromlist=["LSTM", "Linear"])
-    lstm_ctor: _NNLSTMCtor = nn_mod.LSTM
-    linear_ctor: _NNLinearLayerCtor = nn_mod.Linear
-
-    input_size = compute_features_per_step(config["n_features"], config["sequence_length"])
-
-    lstm: _LSTMLayerProto = lstm_ctor(
-        input_size=input_size,
-        hidden_size=config["hidden_size"],
-        num_layers=config["num_layers"],
-        batch_first=True,
-        dropout=config["dropout"] if config["num_layers"] > 1 else 0.0,
-        bidirectional=config["bidirectional"],
-    )
-
-    num_directions = 2 if config["bidirectional"] else 1
-    lstm_out_size = config["hidden_size"] * num_directions
-    fc: _LinearLayerProto = linear_ctor(lstm_out_size, 2)
-
-    return _LSTMClassifierWrapper(lstm, fc)
-
-
-class _LSTMPrepared:
-    """Prepared LSTM model implementing PredictorProtocol with gradient support."""
-
-    def __init__(
-        self,
-        model: _LSTMClassifierWrapper,
-        sequence_length: int,
-        n_features: int,
-    ) -> None:
-        """Initialize with LSTM model.
-
-        Args:
-            model: LSTM classifier wrapper.
-            sequence_length: Number of time steps.
-            n_features: Number of flat input features.
-        """
-        self._model = model
-        self._sequence_length = sequence_length
-        self._n_features = n_features
-
-    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Return class probabilities for input samples.
-
-        Args:
-            x: Input features with shape (n_samples, n_features).
-
-        Returns:
-            Class probabilities with shape (n_samples, n_classes).
-        """
-        torch_mod = __import__("torch")
-        nn_mod = __import__("torch.nn", fromlist=["Softmax"])
-        no_grad: _NoGradFactory = torch_mod.no_grad
-        tensor: _TensorCtor = torch_mod.tensor
-        fp32_dtype: _DTypeProtocol = torch_mod.float32
-        softmax_ctor: _SoftmaxCtor = nn_mod.Softmax
-
-        softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
-
-        # Canonical reshape: rounds up and zero-pads, exactly as training did.
-        # A bare reshape with a floored features_per_step silently dropped the
-        # trailing features whenever n_features was not a multiple of
-        # sequence_length.
-        x_seq: NDArray[np.float64] = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
-
-        x_seq_fp32: NDArray[np.float32] = x_seq.astype(np.float32)
-        x_tensor: _TensorProtocol = tensor(x_seq_fp32, dtype=fp32_dtype)
-
-        with no_grad():
-            logits: _TensorProtocol = self._model(x_tensor)
-            proba: _TensorProtocol = softmax_fn(logits)
-
-        proba_np: NDArray[np.float64] = proba.cpu().numpy().astype(np.float64)
-        return proba_np
-
-    def compute_gradients(
-        self,
-        x: NDArray[np.float64],
-        target_class: int,
-    ) -> NDArray[np.float64]:
-        """Compute gradients of output w.r.t. input features.
-
-        Args:
-            x: Input features with shape (n_samples, n_features).
-            target_class: Class index for which to compute gradients.
-
-        Returns:
-            Gradients with shape (n_samples, n_features).
-        """
-        torch_mod = __import__("torch")
-        nn_mod = __import__("torch.nn", fromlist=["Softmax"])
-        enable_grad: _EnableGradFactory = torch_mod.enable_grad
-        tensor: _TensorCtor = torch_mod.tensor
-        fp32_dtype: _DTypeProtocol = torch_mod.float32
-        softmax_ctor: _SoftmaxCtor = nn_mod.Softmax
-
-        softmax_fn: _SoftmaxFn = softmax_ctor(dim=1)
-
-        # Canonical reshape: rounds up and zero-pads, exactly as training did.
-        # A bare reshape with a floored features_per_step silently dropped the
-        # trailing features whenever n_features was not a multiple of
-        # sequence_length.
-        x_seq: NDArray[np.float64] = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
-
-        x_seq_fp32: NDArray[np.float32] = x_seq.astype(np.float32)
-        x_tensor: _TensorProtocol = tensor(
-            x_seq_fp32,
-            dtype=fp32_dtype,
-            requires_grad=True,
-        )
-
-        with enable_grad():
-            logits: _TensorProtocol = self._model(x_tensor)
-            proba: _TensorProtocol = softmax_fn(logits)
-            target_proba: _TensorProtocol = proba.select(1, target_class)
-            scalar_output: _TensorProtocol = target_proba.sum()
-            scalar_output.backward()
-
-        grad_tensor = x_tensor.grad
-        assert grad_tensor is not None, "Gradient should not be None after backward()"
-        grad_cpu: _TensorProtocol = grad_tensor.cpu()
-        grad_numpy = grad_cpu.numpy()
-        grad_seq: NDArray[np.float64] = grad_numpy.astype(np.float64)
-
-        grad_samples = int(grad_seq.shape[0])
-        seq_len = int(grad_seq.shape[1])
-        features_per_step_actual = int(grad_seq.shape[2])
-        flat_seq_features = seq_len * features_per_step_actual
-        grad_flat: NDArray[np.float64] = grad_seq.reshape(grad_samples, flat_seq_features)
-
-        gradients: NDArray[np.float64] = grad_flat[:, : self._n_features]
-        return gradients
-
-
-def _load_lstm_model(model_path: str, config: LSTMModelConfig) -> GradientPredictorProtocol:
-    """Load LSTM model from file.
+def _load_mlp_model(model_path: str, config: MLPModelConfig) -> GradientPredictorProtocol:
+    """Load an MLP model from file.
 
     Args:
         model_path: Path to saved model file (.pt format).
@@ -765,19 +231,32 @@ def _load_lstm_model(model_path: str, config: LSTMModelConfig) -> GradientPredic
     Returns:
         Model implementing GradientPredictorProtocol.
     """
-    torch_mod = __import__("torch")
-    load_fn: _TorchLoadFn = torch_mod.load
-
-    model = _build_lstm_model(config)
-
-    state_dict: dict[str, _TensorProtocol] = load_fn(model_path, weights_only=True)
-    model.load_state_dict(state_dict)
-    _ = model.eval()
-
-    return _LSTMPrepared(
-        model=model,
-        sequence_length=config["sequence_length"],
+    return load_mlp_for_inference(
+        path=model_path,
         n_features=config["n_features"],
+        hidden_sizes=config["hidden_sizes"],
+        dropout=config["dropout"],
+    )
+
+
+def _load_lstm_model(model_path: str, config: LSTMModelConfig) -> GradientPredictorProtocol:
+    """Load an LSTM model from file.
+
+    Args:
+        model_path: Path to saved model file (.pt format).
+        config: Model architecture configuration.
+
+    Returns:
+        Model implementing GradientPredictorProtocol.
+    """
+    return load_lstm_for_inference(
+        path=model_path,
+        n_features=config["n_features"],
+        hidden_size=config["hidden_size"],
+        num_layers=config["num_layers"],
+        dropout=config["dropout"],
+        bidirectional=config["bidirectional"],
+        sequence_length=config["sequence_length"],
     )
 
 

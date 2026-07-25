@@ -61,7 +61,7 @@ from platform_ml.torch_types import (
     set_manual_seed,
 )
 
-from .sequences import reshape_flat_to_pseudo_sequences
+from .sequences import compute_features_per_step, reshape_flat_to_pseudo_sequences
 
 _log = get_logger(__name__)
 
@@ -309,6 +309,16 @@ class _LSTMPrepared:
         return gradients
 
 
+# Key prefixes in a saved LSTM state dict. _LSTMClassifierWrapper composes the
+# combined dict from two submodules, so these are the wire contract for every
+# checkpoint this backend writes. They are published because any out-of-package
+# reader must strip exactly these. Note they deliberately do NOT match the
+# wrapper's attribute names (self._lstm, self._fc); deriving them from the
+# attributes yields "_lstm."/"_fc.", matches nothing, and loads no weights.
+LSTM_STATE_PREFIX = "lstm."
+FC_STATE_PREFIX = "fc."
+
+
 LSTM_CAPABILITIES: BackendCapabilities = {
     "supports_train": True,
     "supports_gpu": True,
@@ -353,23 +363,23 @@ class _LSTMClassifierWrapper:
         return self._fc(last_out)
 
     def state_dict(self) -> dict[str, TensorProtocol]:
-        """Return combined state dictionary."""
+        """Return combined state dictionary keyed by the published prefixes."""
         combined: dict[str, TensorProtocol] = {}
         for k, v in self._lstm.state_dict().items():
-            combined[f"lstm.{k}"] = v
+            combined[f"{LSTM_STATE_PREFIX}{k}"] = v
         for k, v in self._fc.state_dict().items():
-            combined[f"fc.{k}"] = v
+            combined[f"{FC_STATE_PREFIX}{k}"] = v
         return combined
 
     def load_state_dict(self, state_dict: dict[str, TensorProtocol]) -> None:
-        """Load state dictionary."""
+        """Load a state dictionary written by :meth:`state_dict`."""
         lstm_state: dict[str, TensorProtocol] = {}
         fc_state: dict[str, TensorProtocol] = {}
         for k, v in state_dict.items():
-            if k.startswith("lstm."):
-                lstm_state[k[5:]] = v
-            elif k.startswith("fc."):
-                fc_state[k[3:]] = v
+            if k.startswith(LSTM_STATE_PREFIX):
+                lstm_state[k[len(LSTM_STATE_PREFIX) :]] = v
+            elif k.startswith(FC_STATE_PREFIX):
+                fc_state[k[len(FC_STATE_PREFIX) :]] = v
         self._lstm.load_state_dict(lstm_state)
         self._fc.load_state_dict(fc_state)
 
@@ -988,9 +998,64 @@ class LSTMBackend(ClassifierBackend):
         return None
 
 
+def load_lstm_for_inference(
+    *,
+    path: str,
+    n_features: int,
+    hidden_size: int,
+    num_layers: int,
+    dropout: float,
+    bidirectional: bool,
+    sequence_length: int,
+) -> _LSTMPrepared:
+    """Restore a trained LSTM from a checkpoint for inference and explanation.
+
+    Two details make this unsafe to reimplement elsewhere. The input size is a
+    ceiling divide, because flat features are zero-padded up to a multiple of
+    sequence_length before reshaping, so flooring builds a differently shaped
+    model. And the checkpoint's keys are composed by hand as "lstm."/"fc.",
+    which deliberately differ from the wrapper's attribute names; a caller
+    that derives the prefixes from those attributes strips nothing and loads
+    no weights at all.
+
+    Args:
+        path: Path to the saved state dict.
+        n_features: Number of flat input features at training time.
+        hidden_size: LSTM hidden dimension.
+        num_layers: Number of stacked LSTM layers.
+        dropout: Dropout rate between layers.
+        bidirectional: Whether the LSTM was trained bidirectionally.
+        sequence_length: Timesteps the flat features reshape into.
+
+    Returns:
+        A prepared model exposing predict_proba and compute_gradients.
+    """
+    input_size = compute_features_per_step(n_features, sequence_length)
+    model = _build_model(
+        input_size,
+        hidden_size,
+        num_layers,
+        dropout,
+        bidirectional,
+        "cpu",
+    )
+    torch_mod = _import_torch()
+    state: dict[str, TensorProtocol] = torch_mod.load(path, weights_only=True)
+    model.load_state_dict(state)
+    model.eval()
+    return _LSTMPrepared(model, sequence_length)
+
+
 def create_lstm_backend() -> LSTMBackend:
     """Create LSTM backend instance."""
     return LSTMBackend()
 
 
-__all__ = ["LSTM_CAPABILITIES", "LSTMBackend", "create_lstm_backend"]
+__all__ = [
+    "FC_STATE_PREFIX",
+    "LSTM_CAPABILITIES",
+    "LSTM_STATE_PREFIX",
+    "LSTMBackend",
+    "create_lstm_backend",
+    "load_lstm_for_inference",
+]
