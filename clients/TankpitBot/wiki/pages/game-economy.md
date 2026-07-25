@@ -150,10 +150,17 @@ and the archive confirms it exactly
 
 **The true container spawn law is now fully OPEN** — nothing in 223
 sessions ever witnessed one. The sim ([[physics-module-roadmap]])
-still implements the falsified 1/min replenishment
-(`sim/spawn.py`); its empirical basis is gone and the honest world
-model is a large mostly-hidden container population with an
-exposure-driven atlas — flagged as open sim work.
+implements the honest model as of the same day: the runtime spawner
+is DELETED (`sim/spawn.py` keeps only the deterministic tile
+pickers) and `sim/world_seed.py` seeds a static population — ~620
+dotted containers (2 in 5 stocked, matching the ~40% dot-hold rate),
+900 hidden fuel on the measured volume distribution (~1-in-6 below
+500), 450 hidden equipment (population sizes are documented
+calibrated assumptions) — with radar exposure dotting ≥500 reveals
+permanently (`MAP_DOT_MIN_VOLUME`, machine-checked claim below).
+The exposure miner run against a sim practice capture shows the
+same signature as the archive: 18/18 dot appearances
+exposure-preceded, zero unpreceded.
 
 **First equipment measurements (radar-reveal mining, 2026-07-24):**
 since equipment never appears on the map, the mining works from
@@ -199,6 +206,11 @@ to follow (and vice versa).
 ```json claims
 {
   "claims": [
+    {
+      "id": "map-dot-min-volume",
+      "code": "tankpit_bot.physics.map:MAP_DOT_MIN_VOLUME",
+      "value": 500
+    },
     {
       "id": "walk-cost",
       "code": "tankpit_bot.physics.costs:WALK_COST_PER_TILE",

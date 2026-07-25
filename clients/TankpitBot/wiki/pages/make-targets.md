@@ -33,7 +33,7 @@ hubs: [codebase]
 | `make bot` | Run the HFSM bot indefinitely (no timeout) |
 | `make run` | 5-minute timed session + scorecard (`TANKPIT_BOT_SESSION_SECONDS=300`) |
 | `make sim-run` | Production bot vs the simulator on real field01 terrain — no server, no browser, no fuel spent. Artifacts: `runs/probe/latest.sim.*` + `runs/sim/sim-<stamp>.capture_session.json` (standard CaptureSession — `tankpit-audit --runs-dir` can price it). `tankpit-sim-run --rounds N --no-opponent` for variants. See [[physics-module-roadmap]]. |
-| `make sim-run-practice` | Production bot vs the CERTIFIED practice-bot roster (`sim/practice_room.py`: gang-up cluster + ally, driven by `sim/bot_policy`) — the fidelity soak. First run 2026-07-25: the bot deactivated in 21 rounds under gang-up fire. `tankpit-sim-run --practice`. |
+| `make sim-run-practice` | Production bot vs a REAL practice room (2026-07-25 rework): a stamp-selected mined layout seeds the full 36-bot roster (ids 500-535, 9/team) at archive-observed positions plus the client's real join spawn, on a static container field (~620-dot exposure atlas at the live ~40% hold rate + 900 hidden fuel + 450 hidden equipment; no runtime spawning — the respawn law was falsified). Bots driven by the certified `sim/bot_policy`. The fidelity soak: 150/150 rounds sustainably, kills across the map, exposure law 18/18 on the sim's own capture. `tankpit-sim-run --practice`. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
 
 ## Live probes (need browser + accounts.json, touches live server)

@@ -9,8 +9,8 @@ source_paths:
   - "runs/bot"
   - "src/tankpit_bot/physics"
 source_git_blobs:
-  "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
-fact_checked: "2026-07-03"
+  "src/tankpit_bot/physics": "17831e6496a9c7f10ba2ea6ba18c2726390480c6"
+fact_checked: "2026-07-25"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -26,8 +26,12 @@ hubs: [game-mechanics]
   floor). This page previously said 300 (as of 2026-06-24); the
   config value has been 200 — trust `types.py:make_initial_ai_state`
   as the source of truth for the number.[^1]
-- `fuel_full_threshold`: 1100 — `COLLECT` releases (along with the
-  combat-reserve gate) when fuel reaches this level.
+- The COLLECT release / HUNT entry fuel bar is NOT a config value:
+  since 2026-07-25 it is `fuel_capacity(rank)` (1000 recruit … 1800
+  general) — the hunt-only-when-full contract derives every
+  readiness bar from rank, and the old `fuel_full_threshold` (1100,
+  unreachable by recruits) was deleted. See
+  [[bot-behavior-contract]] §3.1.
 - `hunt_min_fuel`: 100 — operating reserve for search/recovery
   teleport hops.
 - The historical `fuel_critical_threshold` was collapsed into

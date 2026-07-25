@@ -17,8 +17,8 @@ source_paths:
   - "src/tankpit_bot/sim"
   - "src/tankpit_bot/validate"
 source_git_blobs:
-  "src/tankpit_bot/physics": "f34614a50089be87a08af657a333ce6f1143e857"
-  "src/tankpit_bot/sim": "022460326e21deae11f627a315eeb23dc46765f8"
+  "src/tankpit_bot/physics": "17831e6496a9c7f10ba2ea6ba18c2726390480c6"
+  "src/tankpit_bot/sim": "3c9f979a4059037e3b2793485d3cabdbf03feb2a"
   "src/tankpit_bot/validate": "d7f5c60b9d2048cab60968f95214be039f70e599"
 fact_checked: "2026-07-20"
 confidence: high
@@ -1112,12 +1112,32 @@ equipment.[^2]
 population-seeking container replenishment in `sim/spawn.py` was
 built on the 2026-07-22 "spawn" mining, which is now FALSIFIED —
 all 605 "spawns" were our own exposures of pre-existing ≥500-volume
-containers ([[game-economy]], [[map-data-decode]]). OPEN sim work:
-replace the spawner with the honest world model — a large
-mostly-hidden container population (hidden until radar/viewport
-reveal, sub-500 fuel never on the map) with an exposure-driven dot
-atlas. The practice-room `no_productive_collect` starvation at
-round 86 was this model poverty, not a bot defect.[^2]
+containers ([[game-economy]], [[map-data-decode]]). The practice-room
+`no_productive_collect` starvation at round 86 was this model
+poverty, not a bot defect.[^2]
+
+**World rework as-built (2026-07-25, same day):** the spawner is
+deleted (`sim/spawn.py` keeps only the deterministic tile pickers)
+and the honest model is live. `SimContainerDict` gains ``dotted``;
+`process_radar` reports every in-radius container (volume-0 included
+— the wire's removal signal) and permanently dots ≥500 reveals
+(`physics/map.py::MAP_DOT_MIN_VOLUME`, machine-checked claim);
+`build_map_data` emits the DOTTED set, so the sim atlas over-promises
+exactly like live. `sim/world_seed.py` seeds the static population
+(620 dots at the ~40% hold rate / 900 hidden fuel on the measured
+volume mix / 450 hidden equipment; placements skip the pre-(1,1)
+region the 0x4C skip-RLE cannot encode) and carries THREE real
+practice layouts mined from archive first-map snapshots
+(`analysis_scripts/mine_practice_roster.py` — all 223 sessions show
+the same 36-bot shape, ids 500-535, 9 per team, ranks 0-1);
+`--practice` selects one by run stamp, spawns the client at its real
+join position at full stock, and `PracticeRoomDriver` drives all 36
+bots with the certified policy. Proof: the 150-round soak plays to
+`rounds_exhausted` (bot alive at 1082 fuel, kills on 529 + 508
+across the map, 109 pickups — no starvation), and the exposure miner
+against the sim's own capture matches the archive signature 18/18
+exposure-preceded / 0 unpreceded. Gate green (4,961 tests,
+100%).[^2]
 
 **Round-resolution order wired in (2026-07-25):** the same-day
 measurement (`analysis_scripts/mine_round_order.py` — 1,820/1,825

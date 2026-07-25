@@ -7,8 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "e72fed463e3f9668e36d10bea88444495221c805"
-fact_checked: "2026-06-16"
+  "src/tankpit_bot": "cd5165453c305435b16a5b7e97f5334ead5301c8"
+fact_checked: "2026-07-25"
 confidence: high
 hubs: [codebase]
 ---
@@ -30,6 +30,11 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `action_lab/` | Live probes — isolated experiments against the real server | `probe_base.py` (ProbeBase), `probe_factory.py` (DI), teleport/fuel/equipment/movement probes |
 | `diagnostics/` | Runtime + offline diagnostics — issue reports, alignment checks | `issue_report.py`, `entity_alignment.py`, `self_alignment.py`, `session_stats.py` |
 | `replay/` | Replay engine — re-runs captures through bot decision logic | `engine.py`, used by `tests/replay/` regression tests |
+| `physics/` | The game's measured laws, one symbol per machine-checked wiki claim | `costs.py`, `capacity.py`, `damage.py`, `combat.py`, `map.py` (see [[physics-module-roadmap]] Phase 1) |
+| `sim/` | The server twin — laws, world, transport, practice room | `server.py` (tick engine), `world.py` + `world_seed.py` (static population + mined layouts), `bot_policy.py` + `practice_room.py` (certified bot minds), `opponent.py` (scripted harness) |
+| `validate/` | Archive-priced law validators — `make audit` / `make shadow` / roundtrip | `audit.py`, `shadow*.py`, `roundtrip.py`, `wire_timeline.py` |
+| `ledger/` | Live physics bookkeeping — fuel and ammo books, divergence verdicts | `fuel_book.py`, `ammo_book.py` |
+| `service/` | The phone-driven bot service — aiohttp + SSE around the tick loop | `http_server.py`, `session_runner.py`, `mode_bridge.py`, `status_bus.py` |
 
 ## Support modules (top-level, not packages)
 
