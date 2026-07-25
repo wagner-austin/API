@@ -9,5 +9,6 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Runtime Split — Java Agent, Python Brain](../pages/runtime-split-java-agent-python-brain.md) -- why two processes, why those languages, decimated decision rate, standing orders for per-tick reaction
 [Multiplayer Portability Invariants](../pages/multiplayer-portability-invariants.md) -- the four rules that keep single-player work from stranding us outside multiplayer
 [Agent: Render-Callback No-Op](../pages/agent-render-callback-noop.md) -- the agent's first job: bytecode-patching the render callbacks that kill a headless engine, and why the verifier is the oracle
+[Engine Tick Method and Clock](../pages/engine-tick-and-clock.md) -- the tick basis a decimated planner decimates against, and the safe read path to the live engine
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

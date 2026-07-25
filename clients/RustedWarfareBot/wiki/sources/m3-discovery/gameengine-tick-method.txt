@@ -1,0 +1,105 @@
+  public strictfp void a(float);
+    Code:
+       0: aload_0
+       1: invokevirtual #767                // Method ay:()Z
+       4: ifeq          63
+       7: fload_1
+       8: ldc           #6                  // float 0.1f
+      10: fcmpg
+      11: ifge          63
+      14: new           #312                // class java/lang/StringBuilder
+      17: dup
+      18: invokespecial #1055               // Method java/lang/StringBuilder."<init>":()V
+      21: ldc           #187                // String updateAllGame1: deltaSpeed:
+      23: invokevirtual #1061               // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      26: fload_1
+      27: invokevirtual #1057               // Method java/lang/StringBuilder.append:(F)Ljava/lang/StringBuilder;
+      30: ldc           #29                 // String  frame:
+      32: invokevirtual #1061               // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      35: aload_0
+      36: getfield      #456                // Field bx:I
+      39: invokevirtual #1058               // Method java/lang/StringBuilder.append:(I)Ljava/lang/StringBuilder;
+      42: ldc           #30                 // String  network.currentStepRate:
+      44: invokevirtual #1061               // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      47: aload_0
+      48: getfield      #441                // Field bX:Lcom/corrodinggames/rts/gameFramework/j/ad;
+      51: invokevirtual #964                // Method com/corrodinggames/rts/gameFramework/j/ad.c:()F
+      54: invokevirtual #1057               // Method java/lang/StringBuilder.append:(F)Ljava/lang/StringBuilder;
+      57: invokevirtual #1062               // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+      60: invokestatic  #967                // Method com/corrodinggames/rts/gameFramework/j/ad.g:(Ljava/lang/String;)V
+      63: aload_0
+      64: getfield      #453                // Field bt:F
+      67: fconst_1
+      68: fcmpl
+      69: ifeq          99
+      72: aload_0
+      73: getfield      #441                // Field bX:Lcom/corrodinggames/rts/gameFramework/j/ad;
+      76: getfield      #634                // Field com/corrodinggames/rts/gameFramework/j/ad.B:Z
+      79: ifne          99
+      82: aload_0
+      83: getfield      #482                // Field cb:Lcom/corrodinggames/rts/gameFramework/ba;
+      86: invokevirtual #882                // Method com/corrodinggames/rts/gameFramework/ba.i:()Z
+      89: ifne          99
+      92: fload_1
+      93: aload_0
+      94: getfield      #453                // Field bt:F
+      97: fmul
+      98: fstore_1
+      99: fload_1
+     100: aload_0
+     101: getfield      #371                // Field H:F
+     104: fmul
+     105: fstore_1
+     106: aload_0
+     107: fload_1
+     108: fconst_2
+     109: fadd
+     110: putfield      #372                // Field I:F
+     113: aload_0
+     114: fload_1
+     115: putfield      #373                // Field J:F
+     118: aload_0
+     119: getfield      #441                // Field bX:Lcom/corrodinggames/rts/gameFramework/j/ad;
+     122: fload_1
+     123: invokevirtual #965                // Method com/corrodinggames/rts/gameFramework/j/ad.c:(F)V
+     126: aload_0
+     127: dup
+     128: getfield      #457                // Field by:I
+     131: i2f
+     132: fload_1
+     133: ldc           #15                 // float 16.666666f
+     135: fmul
+     136: fadd
+     137: f2i
+     138: putfield      #457                // Field by:I
+     141: aload_0
+     142: getfield      #486                // Field cf:Lcom/corrodinggames/rts/gameFramework/c;
+     145: invokevirtual #900                // Method com/corrodinggames/rts/gameFramework/c.c:()V
+     148: aload_0
+     149: getfield      #482                // Field cb:Lcom/corrodinggames/rts/gameFramework/ba;
+     152: fload_1
+     153: invokevirtual #878                // Method com/corrodinggames/rts/gameFramework/ba.a:(F)V
+     156: aload_0
+     157: dup
+     158: getfield      #456                // Field bx:I
+     161: iconst_1
+     162: iadd
+     163: putfield      #456                // Field bx:I
+     166: fload_1
+     167: invokestatic  #818                // Method com/corrodinggames/rts/game/n.g:(F)V
+     170: aload_0
+     171: getfield      #429                // Field bL:Lcom/corrodinggames/rts/game/b/b;
+     174: ifnull        185
+     177: aload_0
+     178: getfield      #429                // Field bL:Lcom/corrodinggames/rts/game/b/b;
+     181: fload_1
+     182: invokevirtual #722                // Method com/corrodinggames/rts/game/b/b.e:(F)V
+     185: aload_0
+     186: invokevirtual #767                // Method ay:()Z
+     189: ifeq          233
+     192: fload_1
+     193: ldc           #6                  // float 0.1f
+     195: fcmpg
+     196: ifge          233
+     199: new           #312                // class java/lang/StringBuilder
+     202: dup

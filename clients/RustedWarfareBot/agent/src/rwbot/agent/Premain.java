@@ -17,6 +17,8 @@ public final class Premain {
     }
 
     public static void premain(String argument, Instrumentation instrumentation) {
+        AgentOptions options = AgentOptions.parse(argument);
+
         java.util.Map<String, java.util.Set<String>> targets = Targets.byClass();
         NoOpTransformer transformer = new NoOpTransformer(targets);
         instrumentation.addTransformer(transformer);
@@ -34,7 +36,54 @@ public final class Premain {
                             + " obfuscated names change between releases, so re-derive"
                             + " them against this jar and update Targets.");
         }
+
+        if (options.discoveryRequested()) {
+            startDiscovery(options.discoverAtSeconds(), options.exitAfterDiscovery());
+        }
         Log.info("ready; patched " + targets.size() + " class(es)");
+    }
+
+    /**
+     * Starts a daemon thread that snapshots the engine at each requested time.
+     *
+     * <p>Daemon so a probe can never hold the JVM open past the game, and off
+     * the game thread so a snapshot cannot pace the simulation.
+     *
+     * @param atSeconds Elapsed times to snapshot at, ascending.
+     */
+    private static void startDiscovery(int[] atSeconds, boolean exitAfter) {
+        Thread thread =
+                new Thread(
+                        () -> {
+                            runDiscovery(atSeconds);
+                            if (exitAfter) {
+                                Log.info("discovery complete; halting");
+                                Runtime.getRuntime().halt(0);
+                            }
+                        },
+                        "rw-agent-discovery");
+        thread.setDaemon(true);
+        thread.start();
+        Log.info("discovery scheduled at " + java.util.Arrays.toString(atSeconds) + "s");
+    }
+
+    /** Sleeps to each offset in turn and emits one snapshot per offset. */
+    private static void runDiscovery(int[] atSeconds) {
+        long started = System.nanoTime();
+        for (int second : atSeconds) {
+            long targetNanos = started + second * 1_000_000_000L;
+            long remaining = targetNanos - System.nanoTime();
+            if (remaining > 0) {
+                try {
+                    Thread.sleep(remaining / 1_000_000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Log.error("discovery interrupted before t=" + second + "s");
+                    return;
+                }
+            }
+            Log.info(Discovery.describe(EngineHandle.current(), "t=" + second + "s"));
+        }
     }
 
     /**

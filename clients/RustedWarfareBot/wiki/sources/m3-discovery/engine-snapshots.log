@@ -1,0 +1,1239 @@
+2026-07-25 12:01:33.497: File logging started
+2026-07-25 12:01:33.497: Game arguments:
+2026-07-25 12:01:33.497: arg: -nodisplay
+2026-07-25 12:01:33.497: arg: -nosound
+2026-07-25 12:01:33.497: arg: -sandbox
+2026-07-25 12:01:33.497: arg: -width
+2026-07-25 12:01:33.497: arg: 800
+2026-07-25 12:01:33.497: arg: -height
+2026-07-25 12:01:33.497: arg: 600
+2026-07-25 12:01:33.497: arg: -log
+2026-07-25 12:01:33.497: arg: c:\users\test\projects\api\clients\rustedwarfarebot\runs\rates.log
+2026-07-25 12:01:33.498: OS name: Windows 10
+2026-07-25 12:01:33.498: OS version: 10.0
+2026-07-25 12:01:33.503: LWJGL version: 2.9.3
+2026-07-25 12:01:33.503: Build Number: #28
+2026-07-25 12:01:33.503: Game Version: 1.15
+2026-07-25 12:01:33.503: Game Code: 176
+2026-07-25 12:01:33.507: Is 64bit: true
+2026-07-25 12:01:33.507: JVM maxMemory:1048576000
+2026-07-25 12:01:33.507: JVM totalMemory:534773760
+2026-07-25 12:01:33.507: JVM freeMemory:526385152
+2026-07-25 12:01:33.507: steam not requested
+corroding: nativePollOnce:100,0
+2026-07-25 12:01:33.517: --- ERROR: Skipping display mode call
+2026-07-25 12:01:33.518: screenHeight:800.0
+2026-07-25 12:01:33.518: screenWidth:600.0
+2026-07-25 12:01:33.518: Overriding width to:800
+2026-07-25 12:01:33.518: Overriding height to:600
+Sat Jul 25 12:01:33 PDT 2026 INFO:Slick Build #84
+Sat Jul 25 12:01:33 PDT 2026 INFO:LWJGL Version: 2.9.3
+Sat Jul 25 12:01:33 PDT 2026 INFO:OriginalDisplayMode: 1024 x 768 x 32 @60Hz
+Sat Jul 25 12:01:33 PDT 2026 INFO:TargetDisplayMode: 800 x 600 x 0 @0Hz
+Sat Jul 25 12:01:34 PDT 2026 INFO:Starting display 800x600
+Sat Jul 25 12:01:34 PDT 2026 INFO:Use Java PNG Loader = true
+Sat Jul 25 12:01:34 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:34 PDT 2026 DEBUG:Creating FBO 32x32
+2026-07-25 12:01:34.968: --Now loading:displayModes
+2026-07-25 12:01:34.974: --Now loading:starting controllers
+2026-07-25 12:01:35.023: Disabling sound with NullSoundFactory
+2026-07-25 12:01:35.029: --Now loading:loading libRocket
+2026-07-25 12:01:35.029: start libRocket setup
+In Java with: Hello from C++
+2026-07-25 12:01:35.064: --Now loading:libRocket - fonts
+2026-07-25 12:01:35.080: NotoSansCJKsc start
+2026-07-25 12:01:35.090: NotoSansCJKsc end
+2026-07-25 12:01:35.090: end libRocket setup
+2026-07-25 12:01:35.090: --Now loading:GuiEngine
+2026-07-25 12:01:35.091: libRocket setup took:62.263ms
+2026-07-25 12:01:35.091: --Now loading:GameEngine
+2026-07-25 12:01:35.094: GameEngine:GameEngine()
+2026-07-25 12:01:35.095: Created new gameEngine of:com.corrodinggames.rts.game.i
+2026-07-25 12:01:35.095: --- ----------------- ----
+2026-07-25 12:01:35.095: --- GameEngine:init() ----
+2026-07-25 12:01:35.095: --- ----------------- ----
+2026-07-25 12:01:35.096: Version:v1.15
+2026-07-25 12:01:35.102: --Now loading:Asset Index
+2026-07-25 12:01:35.103: ------- createIndex -------
+2026-07-25 12:01:35.103: c:
+2026-07-25 12:01:35.103: densityScaleRaw*densityScaleMultiplier: 1.0
+2026-07-25 12:01:35.103: packageName:dedicatedServer
+2026-07-25 12:01:35.103: --Now loading:InputController
+2026-07-25 12:01:35.106: slickToAndroidCodes: Could not find keycode for: NUMLOCK, RWIN, CONVERT, STOP, AX, UNDERLINE, DELETE, NOCONVERT, APPS, DECIMAL, SCROLL, END, KANJI, NUMPADDECIMAL, LWIN, CIRCUMFLEX, UNLABELED, F14, F13, COLON, F15, CAPITAL, 
+2026-07-25 12:01:35.106: gdxToAndroidCodes: Could not find keycode for: END, META_ALT_LEFT_ON, COLON, ANY_KEY, META_SHIFT_RIGHT_ON, 
+2026-07-25 12:01:35.106: gdxToSlickCodes: Could not find keycode for: MEDIA_REWIND, MEDIA_PLAY_PAUSE, BUTTON_SELECT, CENTER, BUTTON_X, BUTTON_Z, BUTTON_Y, MEDIA_PREVIOUS, SWITCH_CHARSET, SEARCH, META_ALT_ON, CAMERA, SHIFT_LEFT, BUTTON_START, MUTE, CALL, PICTSYMBOLS, FOCUS, VOLUME_DOWN, ENVELOPE, BUTTON_L2, BUTTON_L1, META_SHIFT_ON, NUM, SOFT_RIGHT, NOTIFICATION, STAR, MENU, DPAD_CENTER, BUTTON_R2, BUTTON_R1, BUTTON_THUMBL, MEDIA_FAST_FORWARD, BUTTON_THUMBR, EXPLORER, BACKSPACE, ENDCALL, FORWARD_DEL, BUTTON_MODE, SYM, SOFT_LEFT, PLUS, MEDIA_NEXT, META_ALT_LEFT_ON, MEDIA_STOP, VOLUME_UP, POUND, META_SHIFT_LEFT_ON, DEL, ANY_KEY, BUTTON_C, SHIFT_RIGHT, BUTTON_B, BUTTON_A, HEADSETHOOK, META_SHIFT_RIGHT_ON, UNKNOWN, CLEAR, 
+2026-07-25 12:01:35.107: getControllerCount:0
+2026-07-25 12:01:35.107: --Now loading:SettingsEngine
+2026-07-25 12:01:35.108: loadFromFileSystem filepath: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-25 12:01:35.124: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-25 12:01:35.126: densityScale(): 1.0
+2026-07-25 12:01:35.126: Locale: forceEnglish
+2026-07-25 12:01:35.131: Locale: Using Strings.properties as locale
+2026-07-25 12:01:35.131: Locale.init took:5.639ms
+2026-07-25 12:01:35.147: --Now loading:AudioEngine
+2026-07-25 12:01:35.148: AudioEngine took:0.949ms
+2026-07-25 12:01:35.148: --Now loading:MusicController
+2026-07-25 12:01:35.148: Null musicFactory - load
+2026-07-25 12:01:35.149: Loaded track:Cont-Edgen-6084.ogg
+2026-07-25 12:01:35.149: --Now loading:music
+2026-07-25 12:01:35.149: Loaded track:battletanks1B.ogg
+2026-07-25 12:01:35.149: --Now loading:music
+2026-07-25 12:01:35.149: Loaded track:sile-Justin_R-6891.ogg
+2026-07-25 12:01:35.149: --Now loading:music
+2026-07-25 12:01:35.150: Loaded track:Acti-Rudy_Ves-8657.ogg
+2026-07-25 12:01:35.150: --Now loading:music
+2026-07-25 12:01:35.150: Loaded track:Ove - Earth Is All We Have.ogg
+2026-07-25 12:01:35.150: --Now loading:music
+2026-07-25 12:01:35.150: Loaded track:[noloop]Ove Melaa - Theme Crystalized.ogg
+2026-07-25 12:01:35.150: --Now loading:music
+2026-07-25 12:01:35.150: Loaded track:[noloop]The Planets - Mars (Part A).ogg
+2026-07-25 12:01:35.150: --Now loading:music
+2026-07-25 12:01:35.151: Loaded track:[noloop]The Planets - Mars (Part B).ogg
+2026-07-25 12:01:35.151: --Now loading:music
+2026-07-25 12:01:35.151: Loaded track:Adama-Bobthede-11966.ogg
+2026-07-25 12:01:35.151: --Now loading:music
+2026-07-25 12:01:35.152: init(): using GraphicsSlick2d
+2026-07-25 12:01:35.152: --Now loading:graphics.init
+2026-07-25 12:01:35.155: Creating BitmapOrTextureAlias: 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-25 12:01:35.166: --Now loading:Fonts
+2026-07-25 12:01:35.166: New font:16 bold:false
+2026-07-25 12:01:35.245: loadGlyphs
+2026-07-25 12:01:35.245: New font:18 bold:false
+2026-07-25 12:01:35.284: loadGlyphs
+2026-07-25 12:01:35.284: --Now loading:effects.init
+2026-07-25 12:01:35.312: --Now loading:minimapHandler
+2026-07-25 12:01:35.313: We have an initial screen size, can do early setup of image buffers
+2026-07-25 12:01:35.313: --Now loading:Map Buffers
+2026-07-25 12:01:35.314: Density size changed now: 1.0, refreshing fonts
+2026-07-25 12:01:35.318: map:setupLayerBuffers for size:603
+2026-07-25 12:01:35.318: layerBufferSize:1024
+2026-07-25 12:01:35.318: layerBuffer:2x2 = 4 x2 for soft fade 
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-25 12:01:35.401: ----- layerBuffers create in:83.1037 ms
+2026-07-25 12:01:35.401: Creating minimap image buffers..
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 240x240
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 240x240
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 240x240
+2026-07-25 12:01:35.404: --Now loading:PathEngine
+2026-07-25 12:01:35.406: PathEngine:We have 24 cores, creating extra solvers
+2026-07-25 12:01:35.407: --Now loading:GroupController
+2026-07-25 12:01:35.409: --Now loading:CollisionEngine
+2026-07-25 12:01:35.409: --Now loading:InterfaceEngine
+2026-07-25 12:01:35.419: New font:16 bold:true
+2026-07-25 12:01:35.448: loadGlyphs
+2026-07-25 12:01:35.448: New font:14 bold:true
+2026-07-25 12:01:35.475: loadGlyphs
+2026-07-25 12:01:35.476: New font:34 bold:false
+2026-07-25 12:01:35.512: loadGlyphs
+2026-07-25 12:01:35.533: New font:20 bold:true
+2026-07-25 12:01:35.565: loadGlyphs
+2026-07-25 12:01:35.565: New font:18 bold:true
+2026-07-25 12:01:35.594: loadGlyphs
+2026-07-25 12:01:35.594: New font:12 bold:false
+2026-07-25 12:01:35.626: loadGlyphs
+2026-07-25 12:01:35.626: smallTextPaint size: 12.0
+2026-07-25 12:01:35.626: New font:10 bold:false
+2026-07-25 12:01:35.652: loadGlyphs
+2026-07-25 12:01:35.652: New font:8 bold:false
+2026-07-25 12:01:35.679: loadGlyphs
+2026-07-25 12:01:35.679: New font:20 bold:false
+2026-07-25 12:01:35.707: loadGlyphs
+2026-07-25 12:01:35.707: New font:14 bold:false
+2026-07-25 12:01:35.735: loadGlyphs
+2026-07-25 12:01:35.735: --Now loading:NetworkEngine
+2026-07-25 12:01:35.740: --Now loading:StatsHandler
+2026-07-25 12:01:35.745: --Now loading:ModEngine
+2026-07-25 12:01:35.746: disabledSteam - loadWorkshopMods
+2026-07-25 12:01:35.753: loading mod custom units at:/SD/mods/units
+2026-07-25 12:01:35.753: loading mod custom units at:builtin_mods
+2026-07-25 12:01:35.757: openAssetCached: Cache hit for: builtin_mods/mega_builders/mod-info.txt
+2026-07-25 12:01:35.758: loading mod custom units at:builtin_mods_enabled
+2026-07-25 12:01:35.758: ========= Mods ===========
+2026-07-25 12:01:35.758: Number of mods:1
+2026-07-25 12:01:35.758: Mod: 'Mega Builders
+2026-07-25 12:01:35.758: ================================
+2026-07-25 12:01:35.758: Loading mod selection
+2026-07-25 12:01:35.758: --Now loading:CommandController
+2026-07-25 12:01:35.759: --Now loading:GameSaver
+2026-07-25 12:01:35.761: --Now loading:ReplayEngine
+2026-07-25 12:01:35.762: --Now loading:UnitGeoIndex
+2026-07-25 12:01:35.762: --Now loading:Precalculating map fog
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 353x353
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 21x21
+2026-07-25 12:01:35.792: smoothFog load took:25.900ms
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 440x440
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 440x440
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 240x240
+Sat Jul 25 12:01:35 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sat Jul 25 12:01:35 PDT 2026 DEBUG:Creating FBO 240x240
+2026-07-25 12:01:35.810: --Now loading:ScorchMark.load
+2026-07-25 12:01:35.814: --Now loading:Projectile.load
+2026-07-25 12:01:35.819: --Now loading:Emitter.load
+2026-07-25 12:01:35.820: --Now loading:Unit.loadAllUnits
+2026-07-25 12:01:35.835: Recreating image data from texture: res/drawable/extractor.png (0.426ms)
+2026-07-25 12:01:35.873: Recreating image data from texture: res/drawable/base.png (0.209ms)
+2026-07-25 12:01:35.912: Recreating image data from texture: res/drawable/ship.png (0.377ms)
+2026-07-25 12:01:35.924: Recreating image data from texture: res/drawable/laser_tank_base.png (0.185ms)
+2026-07-25 12:01:35.940: Recreating image data from texture: res/drawable/heavy_hover_tank.png (0.284ms)
+2026-07-25 12:01:35.958: Recreating image data from texture: res/drawable/unit_icon_building.png (0.396ms)
+2026-07-25 12:01:35.976: Recreating image data from texture: res/drawable/wall_v.png (0.378ms)
+2026-07-25 12:01:35.996: Recreating image data from texture: res/drawable/supply_depot.png (0.379ms)
+2026-07-25 12:01:36.007: loadAllUnits took:186.041ms
+2026-07-25 12:01:36.007: --Now loading:Loading custom unit data
+2026-07-25 12:01:36.008: disabledSteam - loadWorkshopMods
+2026-07-25 12:01:36.008: loading mod custom units at:/SD/mods/units
+2026-07-25 12:01:36.008: loading mod custom units at:builtin_mods
+2026-07-25 12:01:36.008: loading mod custom units at:builtin_mods_enabled
+2026-07-25 12:01:36.009: ========= Mods ===========
+2026-07-25 12:01:36.009: Number of mods:1
+2026-07-25 12:01:36.009: Mod: 'Mega Builders
+2026-07-25 12:01:36.009: ================================
+2026-07-25 12:01:36.313: Setting missingPlaceHolder
+2026-07-25 12:01:36.436: Disabled mod at:builtin_mods/mega_builders (name:Mega Builders)
+2026-07-25 12:01:36.437: ==Timing==
+2026-07-25 12:01:36.437: imageLoad: 65.898ms
+2026-07-25 12:01:36.437: imageLoadOrGet: 142.523ms
+2026-07-25 12:01:36.437: soundLoad: 0ms
+2026-07-25 12:01:36.437: soundLoadOrGet: 0.187ms
+2026-07-25 12:01:36.437: iniParse: 20.475ms
+2026-07-25 12:01:36.437: unitParse: 375.842ms
+2026-07-25 12:01:36.437: iniOpen: 10.411ms
+2026-07-25 12:01:36.437: iniClose: 0.121ms
+2026-07-25 12:01:36.437: iniSetup: 21.511ms
+2026-07-25 12:01:36.437: actionParse: 48.093ms
+2026-07-25 12:01:36.437: unitParsePartA: 237.700ms
+2026-07-25 12:01:36.437: unitParsePartB: 269.668ms
+2026-07-25 12:01:36.437: unitParsePartC: 346.117ms
+2026-07-25 12:01:36.437: unitParsePartD: 350.479ms
+2026-07-25 12:01:36.437: enableAll: 
+2026-07-25 12:01:36.452: Done loading custom units. image cacheHits:402 image cacheMisses:305 (in: 443.748ms)
+2026-07-25 12:01:36.452: ========= Mods data loaded ===========
+2026-07-25 12:01:36.452: Number of mods:1
+2026-07-25 12:01:36.453: Mod: 'Mega Builders' - Memory use:0.00 mb - disabled  (disabled)
+2026-07-25 12:01:36.453: ================================
+2026-07-25 12:01:36.468: --Now loading:getAllUnitsChecksum
+2026-07-25 12:01:36.469: CustomUnits took:461.265ms
+2026-07-25 12:01:36.469: isOverLiquid called without map loaded
+2026-07-25 12:01:36.469: isOverLiquid called without map loaded
+2026-07-25 12:01:36.469: isOverLiquid called without map loaded
+2026-07-25 12:01:36.469: isOverLiquid called without map loaded
+2026-07-25 12:01:36.469: allUnitsChecksum took:0.708ms
+2026-07-25 12:01:36.479: Init completed
+2026-07-25 12:01:36.479: Loading took:1376.746ms
+2026-07-25 12:01:36.480: --Now loading:Loading map data
+2026-07-25 12:01:36.480: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-25 12:01:36.488: --- setStoppedIfNotInGameThread ---
+2026-07-25 12:01:36.488: --- setStopped ---
+2026-07-25 12:01:36.488: gameThread already null
+2026-07-25 12:01:36.497: enableAll: 
+2026-07-25 12:01:36.503:  --- Loading map ---
+2026-07-25 12:01:36.503: Mapfile: assets/maps/menu_background/menu2.tmx
+2026-07-25 12:01:36.503: ---- Loading map data ----
+2026-07-25 12:01:36.520: Map size: 170, 170
+2026-07-25 12:01:36.520: Setting up team fog..
+2026-07-25 12:01:36.540: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-07-25 12:01:36.540: FileLoader: Could not find asset:assets/tilesets/../../decoration.tsx
+2026-07-25 12:01:36.540: FileLoader: Could not find asset:assets/tilesets/../decoration.tsx
+2026-07-25 12:01:36.541: MapLayer create: Ground
+2026-07-25 12:01:36.544: MapLayer create: Items
+2026-07-25 12:01:36.545: MapLayer create: Units
+2026-07-25 12:01:36.578: Map type: mission
+2026-07-25 12:01:36.579: New font:24 bold:true
+2026-07-25 12:01:36.608: loadGlyphs
+2026-07-25 12:01:36.611: Found 6 map triggers
+2026-07-25 12:01:36.611: global Seed: 171040210
+2026-07-25 12:01:36.612: getMapLevel for :maps/menu_background/menu2.tmx file:menu2.tmx
+2026-07-25 12:01:36.612: StateEngine: get(maps/menu_background/menu2.tmx)=null  (key=maps/menu_background/menu2.tmx)
+2026-07-25 12:01:36.612: PathEngine: Setting up map costs
+2026-07-25 12:01:36.638: PathEngine: Ready
+2026-07-25 12:01:36.639: selectAnyOnScreenBuilder: no builder found
+2026-07-25 12:01:36.700: loadAMenuMap took:220.436ms
+2026-07-25 12:01:36.700: --Now loading:Last setup
+2026-07-25 12:01:36.700: --Now loading:init complete
+2026-07-25 12:01:36.700: version: 1.15 176:#28
+2026-07-25 12:01:36.701: --- setRunning ---
+getNewTextureHolder: append:1
+2026-07-25 12:01:36.724: convertTexturePath for: drawable:title.png
+2026-07-25 12:01:36.728: ui[debug]: convertTextOnPage
+2026-07-25 12:01:36.728: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-25 12:01:36.728: converted key to:class
+2026-07-25 12:01:36.729: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-25 12:01:36.729: converted key to:class
+2026-07-25 12:01:36.729: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-25 12:01:36.729: converted key to:class
+2026-07-25 12:01:36.729: convertTextOnPage:_class: '${hideUnless(canResume())}' to 'hide'
+2026-07-25 12:01:36.729: converted key to:class
+2026-07-25 12:01:36.729: convertTextOnPage:_class: '${fullVersionOnlyStyle()}' to ''
+2026-07-25 12:01:36.729: converted key to:class
+2026-07-25 12:01:36.729: convertTextOnPage:_class: '${hideUnless(usingMods())}' to ''
+2026-07-25 12:01:36.729: converted key to:class
+2026-07-25 12:01:36.730: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-25 12:01:36.730: converted key to:class
+2026-07-25 12:01:36.731: ConvertText - { #1 = peak:2.37ms avg:2.37ms total:2.37ms }
+ScriptEngine:HandleEvent:onShowNewScreen();
+2026-07-25 12:01:36.731: --- setRunning ---
+2026-07-25 12:01:36.731: SlickContainer:setup
+2026-07-25 12:01:36.731: -----------------------------
+2026-07-25 12:01:36.731: ----- Game init finished in:1708.4067 ms
+2026-07-25 12:01:36.731: switching to sandbox
+2026-07-25 12:01:36.735: ai_debug(3):firstRun: no command center found
+2026-07-25 12:01:36.736: Not showing defeated message: Player - 4 had no starting units (Team: A)
+2026-07-25 12:01:36.736: ai_debug(4):firstRun: no command center found
+2026-07-25 12:01:36.736: Not showing defeated message: Player - 5 had no starting units (Team: E)
+2026-07-25 12:01:36.736: ai_debug(5):firstRun: no command center found
+2026-07-25 12:01:36.736: Not showing defeated message: Player - 6 had no starting units (Team: F)
+2026-07-25 12:01:36.736: ai_debug(6):firstRun: no command center found
+2026-07-25 12:01:36.737: Not showing defeated message: Player - 7 had no starting units (Team: G)
+2026-07-25 12:01:36.737: ai_debug(7):firstRun: no command center found
+2026-07-25 12:01:36.737: Not showing defeated message: Player - 8 had no starting units (Team: H)
+2026-07-25 12:01:36.737: ai_debug(8):firstRun: no command center found
+2026-07-25 12:01:36.737: Not showing defeated message: Player - 9 had no starting units (Team: I)
+2026-07-25 12:01:36.737: ai_debug(9):firstRun: no command center found
+2026-07-25 12:01:36.737: Not showing defeated message: Player - 10 had no starting units (Team: J)
+2026-07-25 12:01:36.753: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:2 (#units:4)
+2026-07-25 12:01:36.753: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:3 (#units:3)
+2026-07-25 12:01:36.753: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:7)
+2026-07-25 12:01:36.753: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:5 (#units:1)
+2026-07-25 12:01:36.754: Building smoothFog_cache
+ScriptEngine:HandleEvent:open('sandboxOptions.rml', 'maps/skirmish/[z;p10]Crossing Large (10p).tmx'); loadConfigAndStartNewSandbox('maps/skirmish/[z;p10]Crossing Large (10p).tmx');
+getNewTextureHolder: append:2
+2026-07-25 12:01:36.777: alpha=0.8
+2026-07-25 12:01:36.777: convertTexturePath for: panel2.png
+getNewTextureHolder: append:3
+2026-07-25 12:01:36.781: convertTexturePath for: assets/gui/button_close_hover.png
+2026-07-25 12:01:36.781: convertTexturePath already had path:assets/gui/button_close_hover.png
+getNewTextureHolder: append:4
+2026-07-25 12:01:36.782: convertTexturePath for: assets/gui/button_close.png
+2026-07-25 12:01:36.782: convertTexturePath already had path:assets/gui/button_close.png
+getNewTextureHolder: append:5
+2026-07-25 12:01:36.784: convertTexturePath for: widgets.png
+2026-07-25 12:01:36.818: ui[debug]: convertTextOnPage
+2026-07-25 12:01:36.819: convertTextOnPage:_src: '${getMapThumbnail(mode)}' to 'thumbnail:assets:maps/skirmish/[z;p10]Crossing Large (10p)_map.png'
+2026-07-25 12:01:36.819: converted key to:src
+2026-07-25 12:01:36.819: ConvertText - { #1 = peak:0.53ms avg:0.53ms total:0.53ms }
+ScriptEngine:HandleEvent:setPageMinWidthAndHeight(700, 700); showLevelOptions(); onShowNewScreen();
+2026-07-25 12:01:36.820: setPageMinWidthAndHeight(700.0, 700.0)
+2026-07-25 12:01:36.823: --- setRunning ---
+2026-07-25 12:01:36.823: --- setRunning ---
+2026-07-25 12:01:36.823: openDocument - { #1 = peak:51.07ms avg:51.07ms total:51.07ms }
+2026-07-25 12:01:36.823: LoadResources - { #4 = peak:3.78ms avg:1.98ms total:7.95ms }
+2026-07-25 12:01:36.823: Starting sandbox from map: maps/skirmish/[z;p10]Crossing Large (10p).tmx
+2026-07-25 12:01:36.823: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-25 12:01:36.824: endGame: network disconnect
+2026-07-25 12:01:36.824: Disconnect: shutdownServer
+2026-07-25 12:01:36.874: --- setStoppedIfNotInGameThread ---
+2026-07-25 12:01:36.874: --- setStopped ---
+2026-07-25 12:01:36.874: gameThread already null
+2026-07-25 12:01:36.875: --- setStopped ---
+2026-07-25 12:01:36.875: gameThread already null
+2026-07-25 12:01:36.875: Max teams on map: maps/skirmish/[z;p10]Crossing Large (10p).tmx = 10
+2026-07-25 12:01:36.875: Allies: 0/0
+2026-07-25 12:01:36.877: --- setStoppedIfNotInGameThread ---
+2026-07-25 12:01:36.877: --- setStopped ---
+2026-07-25 12:01:36.877: gameThread already null
+2026-07-25 12:01:36.887: enableAll: 
+2026-07-25 12:01:36.890:  --- Loading map ---
+2026-07-25 12:01:36.890: Mapfile: assets/maps/skirmish/[z;p10]Crossing Large (10p).tmx
+2026-07-25 12:01:36.891: ---- Loading map data ----
+2026-07-25 12:01:36.893: Map size: 230, 230
+2026-07-25 12:01:36.893: Setting up team fog..
+2026-07-25 12:01:36.909: MapLayer create: Ground
+2026-07-25 12:01:36.912: MapLayer create: Items
+2026-07-25 12:01:36.915: MapLayer create: Units
+2026-07-25 12:01:36.915: map:skipping unit without player:commandCenter at: 208,47 team:2
+2026-07-25 12:01:36.915: map:skipping unit without player:builder at: 208,50 team:2
+2026-07-25 12:01:36.915: map:skipping unit without player:commandCenter at: 214,90 team:6
+2026-07-25 12:01:36.915: map:skipping unit without player:builder at: 214,93 team:6
+2026-07-25 12:01:36.916: map:skipping unit without player:commandCenter at: 47,103 team:9
+2026-07-25 12:01:36.916: map:skipping unit without player:commandCenter at: 186,104 team:8
+2026-07-25 12:01:36.916: map:skipping unit without player:builder at: 47,106 team:9
+2026-07-25 12:01:36.916: map:skipping unit without player:builder at: 186,107 team:8
+2026-07-25 12:01:36.916: map:skipping unit without player:commandCenter at: 213,170 team:4
+2026-07-25 12:01:36.916: map:skipping unit without player:builder at: 213,173 team:4
+2026-07-25 12:01:36.929: Recreating image data from texture: tilesets/longgrass.png (2.484ms)
+2026-07-25 12:01:36.962: Recreating image data from texture: tilesets/misc.png (1.304ms)
+2026-07-25 12:01:36.962: Map type: skirmish
+2026-07-25 12:01:36.963: Found 0 map triggers
+2026-07-25 12:01:36.963: global Seed: 385139159
+2026-07-25 12:01:36.963: there are 10 units on this map and 206 trees
+2026-07-25 12:01:36.963: getMapLevel for :maps/skirmish/[z;p10]Crossing Large (10p).tmx file:[z;p10]Crossing Large (10p).tmx
+2026-07-25 12:01:36.963: StateEngine: get(maps/skirmish/[z;p10]Crossing Large (10p).tmx)=null  (key=maps/skirmish/[z;p10]Crossing Large (10p).tmx)
+2026-07-25 12:01:36.963: PathEngine: Setting up map costs
+2026-07-25 12:01:36.995: PathEngine: Ready
+2026-07-25 12:01:36.995: selectAnyOnScreenBuilder: found builder
+2026-07-25 12:01:36.996: Building smoothFog_cache
+2026-07-25 12:01:37.056: --- setRunning ---
+2026-07-25 12:01:37.058: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-25 12:01:37.059: Creating new debug editor
+2026-07-25 12:01:37.063: --setting up minimap--
+2026-07-25 12:01:37.064: Creating minimap image buffers..
+2026-07-25 12:01:37.077: Minimap map render took:13.478ms
+2026-07-25 12:01:37.083: --- Mouse API succeeded
+2026-07-25 12:01:37.098: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+[rw-agent] === discovery t=10s ===
+[rw-agent] target class: com.corrodinggames.rts.game.i
+[rw-agent] --- com.corrodinggames.rts.game.i ---
+[rw-agent] static a                        : String                   = "v1.15"
+[rw-agent] static b                        : boolean                  = true
+[rw-agent] static c                        : boolean                  = false
+[rw-agent]        d                        : int                      = 678359601
+[rw-agent]        e                        : float                    = 1.0
+[rw-agent] static f                        : String                   = null
+[rw-agent]        g                        : k[]                      = k[] len=6
+[rw-agent]        h                        : String                   = null
+[rw-agent]        i                        : boolean                  = false
+[rw-agent]        j                        : int                      = 917
+[rw-agent]        k                        : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        l                        : Paint                    = android.graphics.Paint
+[rw-agent]        m                        : Paint                    = android.graphics.Paint
+[rw-agent]        n                        : Paint                    = android.graphics.Paint
+[rw-agent]        o                        : Paint                    = android.graphics.Paint
+[rw-agent]        p                        : Paint                    = android.graphics.Paint
+[rw-agent]        q                        : int                      = 130
+[rw-agent]        r                        : int                      = 39
+[rw-agent]        s                        : int                      = 300
+[rw-agent]        t                        : float                    = 3.325
+[rw-agent]        u                        : String                   = "0fps"
+[rw-agent]        v                        : Rect                     = android.graphics.Rect
+[rw-agent]        w                        : ArrayList                = ArrayList size=0
+[rw-agent]        x                        : Paint                    = android.graphics.Paint
+[rw-agent]        y                        : Paint                    = android.graphics.Paint
+[rw-agent]        z                        : Paint                    = android.graphics.Paint
+[rw-agent]        A                        : Paint                    = android.graphics.Paint
+[rw-agent]        B                        : bf                       = com.corrodinggames.rts.gameFramework.bf
+[rw-agent]        C                        : be                       = com.corrodinggames.rts.gameFramework.be
+[rw-agent]        D                        : b                        = com.corrodinggames.rts.gameFramework.d.b
+[rw-agent]        E                        : a                        = com.corrodinggames.rts.game.b
+[rw-agent]        F                        : boolean                  = true
+[rw-agent]        G                        : float                    = 0.0
+[rw-agent]        H                        : float                    = 1.0
+[rw-agent]        I                        : float                    = 2.18
+[rw-agent]        J                        : float                    = 0.18
+[rw-agent]        K                        : j                        = null
+[rw-agent]        L                        : j                        = null
+[rw-agent]        M                        : boolean                  = false
+[rw-agent]        N                        : y                        = null
+[rw-agent]        O                        : e                        = null
+[rw-agent]        P                        : e                        = null
+[rw-agent]        Q                        : e                        = null
+[rw-agent]        R                        : float                    = 0.0
+[rw-agent]        S                        : Rect                     = android.graphics.Rect
+[rw-agent]        T                        : RectF                    = android.graphics.RectF
+[rw-agent]        U                        : e                        = null
+[rw-agent]        V                        : e                        = null
+[rw-agent]        W                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.e.b
+[rw-agent]        X                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.al
+[rw-agent]        Y                        : Matrix                   = android.graphics.Matrix
+[rw-agent]        Z                        : ArrayList                = ArrayList size=0
+[rw-agent]        aa                       : ArrayList                = ArrayList size=0
+[rw-agent]        ab                       : Timer                    = null
+[rw-agent]        ac                       : boolean                  = false
+[rw-agent]        ad                       : Object                   = java.lang.Object
+[rw-agent]        ae                       : int                      = 0
+[rw-agent]        af                       : am                       = null
+[rw-agent]        ag                       : am                       = null
+[rw-agent]        ah                       : float                    = 0.0
+[rw-agent]        ai                       : boolean                  = false
+[rw-agent] --- com.corrodinggames.rts.gameFramework.l ---
+[rw-agent]        aj                       : Object                   = java.lang.Object
+[rw-agent]        ak                       : Object                   = java.lang.Object
+[rw-agent] static al                       : l                        = com.corrodinggames.rts.game.i
+[rw-agent]        am                       : Context                  = android.content.ServerContext
+[rw-agent]        an                       : Context                  = null
+[rw-agent]        ao                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        ap                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        aq                       : boolean                  = false
+[rw-agent]        ar                       : boolean                  = false
+[rw-agent] static as                       : boolean                  = true
+[rw-agent] static at                       : boolean                  = false
+[rw-agent] static au                       : boolean                  = false
+[rw-agent] static av                       : Throwable                = null
+[rw-agent] static aw                       : boolean                  = false
+[rw-agent] static ax                       : boolean                  = false
+[rw-agent] static ay                       : boolean                  = false
+[rw-agent] static az                       : boolean                  = false
+[rw-agent] static aA                       : boolean                  = false
+[rw-agent] static aB                       : boolean                  = false
+[rw-agent] static aC                       : boolean                  = false
+[rw-agent] static aD                       : boolean                  = false
+[rw-agent] static aE                       : boolean                  = false
+[rw-agent] static aF                       : boolean                  = false
+[rw-agent] static aG                       : boolean                  = false
+[rw-agent] static aH                       : boolean                  = false
+[rw-agent] static aI                       : boolean                  = true
+[rw-agent] static aJ                       : boolean                  = false
+[rw-agent] static aK                       : String                   = null
+[rw-agent] static aL                       : boolean                  = false
+[rw-agent] static aM                       : boolean                  = false
+[rw-agent] static aN                       : boolean                  = false
+[rw-agent] static aO                       : boolean                  = false
+[rw-agent] static aP                       : boolean                  = false
+[rw-agent] static aQ                       : String                   = null
+[rw-agent] static aR                       : boolean                  = false
+[rw-agent]        aS                       : boolean                  = false
+[rw-agent] static aT                       : boolean                  = false
+[rw-agent] static aU                       : boolean                  = true
+[rw-agent] static aV                       : boolean                  = false
+[rw-agent] static aW                       : boolean                  = true
+[rw-agent] static aX                       : boolean                  = true
+[rw-agent] static aY                       : boolean                  = false
+[rw-agent] static aZ                       : boolean                  = false
+[rw-agent] static ba                       : String                   = null
+[rw-agent] static bb                       : boolean                  = true
+[rw-agent] static bc                       : boolean                  = true
+[rw-agent] static bd                       : boolean                  = true
+[rw-agent] static be                       : boolean                  = false
+[rw-agent] static bf                       : boolean                  = false
+[rw-agent] static bg                       : Class                    = java.lang.Class
+[rw-agent] static bh                       : y                        = null
+[rw-agent]        bi                       : boolean                  = true
+[rw-agent]        bj                       : boolean                  = true
+[rw-agent]        bk                       : boolean                  = false
+[rw-agent]        bl                       : boolean                  = false
+[rw-agent]        bm                       : boolean                  = false
+[rw-agent]        bn                       : boolean                  = false
+[rw-agent]        bo                       : boolean                  = false
+[rw-agent]        bp                       : boolean                  = false
+[rw-agent]        bq                       : boolean                  = true
+[rw-agent]        br                       : boolean                  = false
+[rw-agent]        bs                       : n                        = com.corrodinggames.rts.game.e
+[rw-agent]        bt                       : float                    = 1.0
+[rw-agent]        bu                       : float                    = -1.0
+[rw-agent]        bv                       : boolean                  = true
+[rw-agent]        bw                       : boolean                  = false
+[rw-agent]        bx                       : int                      = 1918
+[rw-agent]        by                       : int                      = 6461
+[rw-agent]        bz                       : int                      = 1919
+[rw-agent]        bA                       : int                      = 6511
+[rw-agent]        bB                       : int                      = 1000
+[rw-agent]        bC                       : int                      = 1000
+[rw-agent]        bD                       : boolean                  = true
+[rw-agent]        bE                       : boolean                  = false
+[rw-agent]        bF                       : boolean                  = true
+[rw-agent]        bG                       : boolean                  = true
+[rw-agent]        bH                       : boolean                  = false
+[rw-agent]        bI                       : boolean                  = false
+[rw-agent]        bJ                       : int                      = 385139159
+[rw-agent]        bK                       : i                        = com.corrodinggames.rts.gameFramework.utility.i
+[rw-agent]        bL                       : b                        = com.corrodinggames.rts.game.b.b
+[rw-agent]        bM                       : e                        = com.corrodinggames.rts.gameFramework.a.e
+[rw-agent]        bN                       : am                       = com.corrodinggames.rts.gameFramework.am
+[rw-agent]        bO                       : y                        = com.corrodinggames.rts.java.e
+[rw-agent]        bP                       : a                        = com.corrodinggames.rts.gameFramework.a
+[rw-agent]        bQ                       : SettingsEngine           = com.corrodinggames.rts.gameFramework.SettingsEngine
+[rw-agent]        bR                       : c                        = com.corrodinggames.rts.gameFramework.d.c
+[rw-agent]        bS                       : g                        = com.corrodinggames.rts.gameFramework.f.g
+[rw-agent]        bT                       : ac                       = com.corrodinggames.rts.gameFramework.ac
+[rw-agent]        bU                       : l                        = com.corrodinggames.rts.gameFramework.k.l
+[rw-agent]        bV                       : aa                       = com.corrodinggames.rts.gameFramework.aa
+[rw-agent]        bW                       : o                        = com.corrodinggames.rts.gameFramework.f.o
+[rw-agent]        bX                       : ad                       = com.corrodinggames.rts.gameFramework.j.ad
+[rw-agent]        bY                       : bg                       = com.corrodinggames.rts.gameFramework.bg
+[rw-agent]        bZ                       : a                        = com.corrodinggames.rts.gameFramework.i.a
+[rw-agent]        ca                       : y                        = com.corrodinggames.rts.gameFramework.y
+[rw-agent]        cb                       : ba                       = com.corrodinggames.rts.gameFramework.ba
+[rw-agent]        cc                       : c                        = com.corrodinggames.rts.game.units.f.c
+[rw-agent]        cd                       : br                       = com.corrodinggames.rts.gameFramework.br
+[rw-agent]        ce                       : f                        = com.corrodinggames.rts.gameFramework.n.f
+[rw-agent]        cf                       : c                        = com.corrodinggames.rts.gameFramework.c
+[rw-agent]        cg                       : a                        = com.corrodinggames.rts.gameFramework.g.a
+[rw-agent]        ch                       : boolean                  = false
+[rw-agent]        ci                       : float                    = 1.0
+[rw-agent]        cj                       : float                    = 1.0
+[rw-agent] static ck                       : Point                    = android.graphics.Point
+[rw-agent]        cl                       : float                    = 800.0
+[rw-agent]        cm                       : float                    = 600.0
+[rw-agent]        cn                       : float                    = 1.0
+[rw-agent]        co                       : float                    = 400.0
+[rw-agent]        cp                       : float                    = 300.0
+[rw-agent]        cq                       : float                    = 240.0
+[rw-agent]        cr                       : float                    = 0.0
+[rw-agent]        cs                       : float                    = 0.0
+[rw-agent]        ct                       : boolean                  = false
+[rw-agent]        cu                       : int                      = 3730
+[rw-agent]        cv                       : int                      = 2250
+[rw-agent]        cw                       : float                    = 3730.0
+[rw-agent]        cx                       : float                    = 2250.0
+[rw-agent]        cy                       : float                    = 3730.0
+[rw-agent]        cz                       : float                    = 2250.0
+[rw-agent]        cA                       : float                    = 800.0
+[rw-agent]        cB                       : float                    = 600.0
+[rw-agent]        cC                       : float                    = 0.0
+[rw-agent]        cD                       : float                    = 0.0
+[rw-agent]        cE                       : float                    = 561.0
+[rw-agent]        cF                       : float                    = 800.0
+[rw-agent]        cG                       : float                    = 561.0
+[rw-agent]        cH                       : float                    = 600.0
+[rw-agent]        cI                       : float                    = 400.0
+[rw-agent]        cJ                       : float                    = 300.0
+[rw-agent]        cK                       : Rect                     = android.graphics.Rect
+[rw-agent]        cL                       : Rect                     = android.graphics.Rect
+[rw-agent]        cM                       : RectF                    = android.graphics.RectF
+[rw-agent]        cN                       : Rect                     = android.graphics.Rect
+[rw-agent]        cO                       : RectF                    = android.graphics.RectF
+[rw-agent]        cP                       : RectF                    = android.graphics.RectF
+[rw-agent]        cQ                       : Rect                     = android.graphics.Rect
+[rw-agent]        cR                       : boolean                  = false
+[rw-agent]        cS                       : boolean                  = false
+[rw-agent]        cT                       : float                    = 0.0
+[rw-agent]        cU                       : boolean                  = false
+[rw-agent]        cV                       : float                    = 1.0
+[rw-agent]        cW                       : boolean                  = false
+[rw-agent]        cX                       : float                    = 1.0
+[rw-agent]        cY                       : float                    = 1.0
+[rw-agent]        cZ                       : boolean                  = false
+[rw-agent]        da                       : float                    = 0.0
+[rw-agent]        db                       : float                    = 0.0
+[rw-agent]        dc                       : boolean                  = true
+[rw-agent]        dd                       : boolean                  = true
+[rw-agent]        de                       : boolean                  = true
+[rw-agent]        df                       : boolean                  = true
+[rw-agent]        dg                       : boolean                  = true
+[rw-agent]        dh                       : float                    = 0.0
+[rw-agent]        di                       : float                    = 0.0
+[rw-agent]        dj                       : boolean                  = false
+[rw-agent]        dk                       : z                        = null
+[rw-agent]        dl                       : String                   = "maps/skirmish/[z;p10]Crossing Large (10p).tmx"
+[rw-agent]        dm                       : k                        = null
+[rw-agent]        dn                       : Paint                    = android.graphics.Paint
+[rw-agent]        do                       : Paint                    = android.graphics.Paint
+[rw-agent]        dp                       : Paint                    = android.graphics.Paint
+[rw-agent]        dq                       : boolean                  = false
+[rw-agent]        dr                       : boolean                  = false
+[rw-agent]        ds                       : float                    = 0.0
+[rw-agent]        dt                       : boolean                  = false
+[rw-agent]        du                       : boolean                  = false
+[rw-agent]        dv                       : boolean                  = false
+[rw-agent]        dw                       : int                      = 1
+[rw-agent]        dx                       : float                    = 0.0
+[rw-agent] static dy                       : o                        = com.corrodinggames.rts.gameFramework.v
+[rw-agent] static dz                       : String                   = "#28"
+[rw-agent]        dA                       : float                    = 1.0
+[rw-agent]        dB                       : boolean                  = true
+[rw-agent]        dC                       : ArrayList                = ArrayList size=41 of=com.corrodinggames.rts.gameFramework.m
+[rw-agent]        dD                       : Handler                  = android.os.Handler
+[rw-agent]        dE                       : String                   = null
+[rw-agent]        a                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$1
+[rw-agent]        dF                       : String                   = null
+[rw-agent]        dG                       : String                   = null
+[rw-agent]        b                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$2
+[rw-agent]        dH                       : n                        = com.corrodinggames.rts.java.i
+[rw-agent]        dI                       : String                   = null
+[rw-agent]        dJ                       : Object                   = java.lang.Object
+[rw-agent]        dK                       : String                   = null
+[rw-agent]        dL                       : String                   = null
+[rw-agent]        dM                       : boolean[]                = boolean[] len=10
+[rw-agent]        dN                       : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        c                        : boolean[]                = boolean[] len=223
+[rw-agent]        d                        : boolean[]                = boolean[] len=223
+[rw-agent]        e                        : int                      = 0
+[rw-agent] static dO                       : boolean                  = false
+[rw-agent] static dP                       : byte[]                   = byte[] len=2500000
+[rw-agent] static dQ                       : byte[]                   = byte[] len=1000
+[rw-agent] static dR                       : byte[]                   = byte[] len=1000
+[rw-agent] static dS                       : d                        = null
+[rw-agent] static dT                       : boolean                  = false
+[rw-agent] static dU                       : int                      = 0
+[rw-agent] static dV                       : boolean                  = false
+[rw-agent] static dW                       : u                        = null
+[rw-agent] static dX                       : boolean                  = false
+[rw-agent] static dY                       : boolean                  = false
+[rw-agent]        dZ                       : byte                     = 42
+[rw-agent]        ea                       : byte                     = 0
+[rw-agent]        eb                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ec                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ed                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ee                       : boolean                  = false
+[rw-agent]        ef                       : boolean                  = false
+[rw-agent]        eg                       : String                   = null
+[rw-agent]        eh                       : boolean                  = false
+[rw-agent]        ei                       : boolean                  = false
+[rw-agent] static ej                       : int                      = 0
+[rw-agent] 
+[rw-agent] === discovery t=20s ===
+[rw-agent] target class: com.corrodinggames.rts.game.i
+[rw-agent] --- com.corrodinggames.rts.game.i ---
+[rw-agent] static a                        : String                   = "v1.15"
+[rw-agent] static b                        : boolean                  = true
+[rw-agent] static c                        : boolean                  = false
+[rw-agent]        d                        : int                      = 678359601
+[rw-agent]        e                        : float                    = 1.0
+[rw-agent] static f                        : String                   = null
+[rw-agent]        g                        : k[]                      = k[] len=6
+[rw-agent]        h                        : String                   = null
+[rw-agent]        i                        : boolean                  = false
+[rw-agent]        j                        : int                      = 911
+[rw-agent]        k                        : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        l                        : Paint                    = android.graphics.Paint
+[rw-agent]        m                        : Paint                    = android.graphics.Paint
+[rw-agent]        n                        : Paint                    = android.graphics.Paint
+[rw-agent]        o                        : Paint                    = android.graphics.Paint
+[rw-agent]        p                        : Paint                    = android.graphics.Paint
+[rw-agent]        q                        : int                      = 107
+[rw-agent]        r                        : int                      = 32
+[rw-agent]        s                        : int                      = 300
+[rw-agent]        t                        : float                    = 3.325
+[rw-agent]        u                        : String                   = "0fps"
+[rw-agent]        v                        : Rect                     = android.graphics.Rect
+[rw-agent]        w                        : ArrayList                = ArrayList size=0
+[rw-agent]        x                        : Paint                    = android.graphics.Paint
+[rw-agent]        y                        : Paint                    = android.graphics.Paint
+[rw-agent]        z                        : Paint                    = android.graphics.Paint
+[rw-agent]        A                        : Paint                    = android.graphics.Paint
+[rw-agent]        B                        : bf                       = com.corrodinggames.rts.gameFramework.bf
+[rw-agent]        C                        : be                       = com.corrodinggames.rts.gameFramework.be
+[rw-agent]        D                        : b                        = com.corrodinggames.rts.gameFramework.d.b
+[rw-agent]        E                        : a                        = com.corrodinggames.rts.game.b
+[rw-agent]        F                        : boolean                  = true
+[rw-agent]        G                        : float                    = 0.0
+[rw-agent]        H                        : float                    = 1.0
+[rw-agent]        I                        : float                    = 2.18
+[rw-agent]        J                        : float                    = 0.18
+[rw-agent]        K                        : j                        = null
+[rw-agent]        L                        : j                        = null
+[rw-agent]        M                        : boolean                  = false
+[rw-agent]        N                        : y                        = null
+[rw-agent]        O                        : e                        = null
+[rw-agent]        P                        : e                        = null
+[rw-agent]        Q                        : e                        = null
+[rw-agent]        R                        : float                    = 0.0
+[rw-agent]        S                        : Rect                     = android.graphics.Rect
+[rw-agent]        T                        : RectF                    = android.graphics.RectF
+[rw-agent]        U                        : e                        = null
+[rw-agent]        V                        : e                        = null
+[rw-agent]        W                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.e.b
+[rw-agent]        X                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.al
+[rw-agent]        Y                        : Matrix                   = android.graphics.Matrix
+[rw-agent]        Z                        : ArrayList                = ArrayList size=0
+[rw-agent]        aa                       : ArrayList                = ArrayList size=0
+[rw-agent]        ab                       : Timer                    = null
+[rw-agent]        ac                       : boolean                  = false
+[rw-agent]        ad                       : Object                   = java.lang.Object
+[rw-agent]        ae                       : int                      = 0
+[rw-agent]        af                       : am                       = null
+[rw-agent]        ag                       : am                       = null
+[rw-agent]        ah                       : float                    = 0.0
+[rw-agent]        ai                       : boolean                  = false
+[rw-agent] --- com.corrodinggames.rts.gameFramework.l ---
+[rw-agent]        aj                       : Object                   = java.lang.Object
+[rw-agent]        ak                       : Object                   = java.lang.Object
+[rw-agent] static al                       : l                        = com.corrodinggames.rts.game.i
+[rw-agent]        am                       : Context                  = android.content.ServerContext
+[rw-agent]        an                       : Context                  = null
+[rw-agent]        ao                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        ap                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        aq                       : boolean                  = false
+[rw-agent]        ar                       : boolean                  = false
+[rw-agent] static as                       : boolean                  = true
+[rw-agent] static at                       : boolean                  = false
+[rw-agent] static au                       : boolean                  = false
+[rw-agent] static av                       : Throwable                = null
+[rw-agent] static aw                       : boolean                  = false
+[rw-agent] static ax                       : boolean                  = false
+[rw-agent] static ay                       : boolean                  = false
+[rw-agent] static az                       : boolean                  = false
+[rw-agent] static aA                       : boolean                  = false
+[rw-agent] static aB                       : boolean                  = false
+[rw-agent] static aC                       : boolean                  = false
+[rw-agent] static aD                       : boolean                  = false
+[rw-agent] static aE                       : boolean                  = false
+[rw-agent] static aF                       : boolean                  = false
+[rw-agent] static aG                       : boolean                  = false
+[rw-agent] static aH                       : boolean                  = false
+[rw-agent] static aI                       : boolean                  = true
+[rw-agent] static aJ                       : boolean                  = false
+[rw-agent] static aK                       : String                   = null
+[rw-agent] static aL                       : boolean                  = false
+[rw-agent] static aM                       : boolean                  = false
+[rw-agent] static aN                       : boolean                  = false
+[rw-agent] static aO                       : boolean                  = false
+[rw-agent] static aP                       : boolean                  = false
+[rw-agent] static aQ                       : String                   = null
+[rw-agent] static aR                       : boolean                  = false
+[rw-agent]        aS                       : boolean                  = false
+[rw-agent] static aT                       : boolean                  = false
+[rw-agent] static aU                       : boolean                  = true
+[rw-agent] static aV                       : boolean                  = false
+[rw-agent] static aW                       : boolean                  = true
+[rw-agent] static aX                       : boolean                  = true
+[rw-agent] static aY                       : boolean                  = false
+[rw-agent] static aZ                       : boolean                  = false
+[rw-agent] static ba                       : String                   = null
+[rw-agent] static bb                       : boolean                  = true
+[rw-agent] static bc                       : boolean                  = true
+[rw-agent] static bd                       : boolean                  = true
+[rw-agent] static be                       : boolean                  = false
+[rw-agent] static bf                       : boolean                  = false
+[rw-agent] static bg                       : Class                    = java.lang.Class
+[rw-agent] static bh                       : y                        = null
+[rw-agent]        bi                       : boolean                  = true
+[rw-agent]        bj                       : boolean                  = true
+[rw-agent]        bk                       : boolean                  = false
+[rw-agent]        bl                       : boolean                  = false
+[rw-agent]        bm                       : boolean                  = false
+[rw-agent]        bn                       : boolean                  = false
+[rw-agent]        bo                       : boolean                  = false
+[rw-agent]        bp                       : boolean                  = false
+[rw-agent]        bq                       : boolean                  = true
+[rw-agent]        br                       : boolean                  = false
+[rw-agent]        bs                       : n                        = com.corrodinggames.rts.game.e
+[rw-agent]        bt                       : float                    = 1.0
+[rw-agent]        bu                       : float                    = -1.0
+[rw-agent]        bv                       : boolean                  = true
+[rw-agent]        bw                       : boolean                  = false
+[rw-agent]        bx                       : int                      = 4911
+[rw-agent]        by                       : int                      = 16455
+[rw-agent]        bz                       : int                      = 4912
+[rw-agent]        bA                       : int                      = 16505
+[rw-agent]        bB                       : int                      = 1000
+[rw-agent]        bC                       : int                      = 1000
+[rw-agent]        bD                       : boolean                  = true
+[rw-agent]        bE                       : boolean                  = false
+[rw-agent]        bF                       : boolean                  = true
+[rw-agent]        bG                       : boolean                  = true
+[rw-agent]        bH                       : boolean                  = false
+[rw-agent]        bI                       : boolean                  = false
+[rw-agent]        bJ                       : int                      = 385139159
+[rw-agent]        bK                       : i                        = com.corrodinggames.rts.gameFramework.utility.i
+[rw-agent]        bL                       : b                        = com.corrodinggames.rts.game.b.b
+[rw-agent]        bM                       : e                        = com.corrodinggames.rts.gameFramework.a.e
+[rw-agent]        bN                       : am                       = com.corrodinggames.rts.gameFramework.am
+[rw-agent]        bO                       : y                        = com.corrodinggames.rts.java.e
+[rw-agent]        bP                       : a                        = com.corrodinggames.rts.gameFramework.a
+[rw-agent]        bQ                       : SettingsEngine           = com.corrodinggames.rts.gameFramework.SettingsEngine
+[rw-agent]        bR                       : c                        = com.corrodinggames.rts.gameFramework.d.c
+[rw-agent]        bS                       : g                        = com.corrodinggames.rts.gameFramework.f.g
+[rw-agent]        bT                       : ac                       = com.corrodinggames.rts.gameFramework.ac
+[rw-agent]        bU                       : l                        = com.corrodinggames.rts.gameFramework.k.l
+[rw-agent]        bV                       : aa                       = com.corrodinggames.rts.gameFramework.aa
+[rw-agent]        bW                       : o                        = com.corrodinggames.rts.gameFramework.f.o
+[rw-agent]        bX                       : ad                       = com.corrodinggames.rts.gameFramework.j.ad
+[rw-agent]        bY                       : bg                       = com.corrodinggames.rts.gameFramework.bg
+[rw-agent]        bZ                       : a                        = com.corrodinggames.rts.gameFramework.i.a
+[rw-agent]        ca                       : y                        = com.corrodinggames.rts.gameFramework.y
+[rw-agent]        cb                       : ba                       = com.corrodinggames.rts.gameFramework.ba
+[rw-agent]        cc                       : c                        = com.corrodinggames.rts.game.units.f.c
+[rw-agent]        cd                       : br                       = com.corrodinggames.rts.gameFramework.br
+[rw-agent]        ce                       : f                        = com.corrodinggames.rts.gameFramework.n.f
+[rw-agent]        cf                       : c                        = com.corrodinggames.rts.gameFramework.c
+[rw-agent]        cg                       : a                        = com.corrodinggames.rts.gameFramework.g.a
+[rw-agent]        ch                       : boolean                  = false
+[rw-agent]        ci                       : float                    = 1.0
+[rw-agent]        cj                       : float                    = 1.0
+[rw-agent] static ck                       : Point                    = android.graphics.Point
+[rw-agent]        cl                       : float                    = 800.0
+[rw-agent]        cm                       : float                    = 600.0
+[rw-agent]        cn                       : float                    = 1.0
+[rw-agent]        co                       : float                    = 400.0
+[rw-agent]        cp                       : float                    = 300.0
+[rw-agent]        cq                       : float                    = 240.0
+[rw-agent]        cr                       : float                    = 0.0
+[rw-agent]        cs                       : float                    = 0.0
+[rw-agent]        ct                       : boolean                  = false
+[rw-agent]        cu                       : int                      = 3730
+[rw-agent]        cv                       : int                      = 2250
+[rw-agent]        cw                       : float                    = 3730.0
+[rw-agent]        cx                       : float                    = 2250.0
+[rw-agent]        cy                       : float                    = 3730.0
+[rw-agent]        cz                       : float                    = 2250.0
+[rw-agent]        cA                       : float                    = 800.0
+[rw-agent]        cB                       : float                    = 600.0
+[rw-agent]        cC                       : float                    = 0.0
+[rw-agent]        cD                       : float                    = 0.0
+[rw-agent]        cE                       : float                    = 561.0
+[rw-agent]        cF                       : float                    = 800.0
+[rw-agent]        cG                       : float                    = 561.0
+[rw-agent]        cH                       : float                    = 600.0
+[rw-agent]        cI                       : float                    = 400.0
+[rw-agent]        cJ                       : float                    = 300.0
+[rw-agent]        cK                       : Rect                     = android.graphics.Rect
+[rw-agent]        cL                       : Rect                     = android.graphics.Rect
+[rw-agent]        cM                       : RectF                    = android.graphics.RectF
+[rw-agent]        cN                       : Rect                     = android.graphics.Rect
+[rw-agent]        cO                       : RectF                    = android.graphics.RectF
+[rw-agent]        cP                       : RectF                    = android.graphics.RectF
+[rw-agent]        cQ                       : Rect                     = android.graphics.Rect
+[rw-agent]        cR                       : boolean                  = false
+[rw-agent]        cS                       : boolean                  = false
+[rw-agent]        cT                       : float                    = 0.0
+[rw-agent]        cU                       : boolean                  = false
+[rw-agent]        cV                       : float                    = 1.0
+[rw-agent]        cW                       : boolean                  = false
+[rw-agent]        cX                       : float                    = 1.0
+[rw-agent]        cY                       : float                    = 1.0
+[rw-agent]        cZ                       : boolean                  = false
+[rw-agent]        da                       : float                    = 0.0
+[rw-agent]        db                       : float                    = 0.0
+[rw-agent]        dc                       : boolean                  = true
+[rw-agent]        dd                       : boolean                  = true
+[rw-agent]        de                       : boolean                  = true
+[rw-agent]        df                       : boolean                  = true
+[rw-agent]        dg                       : boolean                  = true
+[rw-agent]        dh                       : float                    = 0.0
+[rw-agent]        di                       : float                    = 0.0
+[rw-agent]        dj                       : boolean                  = false
+[rw-agent]        dk                       : z                        = null
+[rw-agent]        dl                       : String                   = "maps/skirmish/[z;p10]Crossing Large (10p).tmx"
+[rw-agent]        dm                       : k                        = null
+[rw-agent]        dn                       : Paint                    = android.graphics.Paint
+[rw-agent]        do                       : Paint                    = android.graphics.Paint
+[rw-agent]        dp                       : Paint                    = android.graphics.Paint
+[rw-agent]        dq                       : boolean                  = false
+[rw-agent]        dr                       : boolean                  = false
+[rw-agent]        ds                       : float                    = 0.0
+[rw-agent]        dt                       : boolean                  = false
+[rw-agent]        du                       : boolean                  = false
+[rw-agent]        dv                       : boolean                  = false
+[rw-agent]        dw                       : int                      = 1
+[rw-agent]        dx                       : float                    = 0.0
+[rw-agent] static dy                       : o                        = com.corrodinggames.rts.gameFramework.v
+[rw-agent] static dz                       : String                   = "#28"
+[rw-agent]        dA                       : float                    = 1.0
+[rw-agent]        dB                       : boolean                  = true
+[rw-agent]        dC                       : ArrayList                = ArrayList size=41 of=com.corrodinggames.rts.gameFramework.m
+[rw-agent]        dD                       : Handler                  = android.os.Handler
+[rw-agent]        dE                       : String                   = null
+[rw-agent]        a                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$1
+[rw-agent]        dF                       : String                   = null
+[rw-agent]        dG                       : String                   = null
+[rw-agent]        b                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$2
+[rw-agent]        dH                       : n                        = com.corrodinggames.rts.java.i
+[rw-agent]        dI                       : String                   = null
+[rw-agent]        dJ                       : Object                   = java.lang.Object
+[rw-agent]        dK                       : String                   = null
+[rw-agent]        dL                       : String                   = null
+[rw-agent]        dM                       : boolean[]                = boolean[] len=10
+[rw-agent]        dN                       : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        c                        : boolean[]                = boolean[] len=223
+[rw-agent]        d                        : boolean[]                = boolean[] len=223
+[rw-agent]        e                        : int                      = 0
+[rw-agent] static dO                       : boolean                  = false
+[rw-agent] static dP                       : byte[]                   = byte[] len=2500000
+[rw-agent] static dQ                       : byte[]                   = byte[] len=1000
+[rw-agent] static dR                       : byte[]                   = byte[] len=1000
+[rw-agent] static dS                       : d                        = null
+[rw-agent] static dT                       : boolean                  = false
+[rw-agent] static dU                       : int                      = 0
+[rw-agent] static dV                       : boolean                  = false
+[rw-agent] static dW                       : u                        = null
+[rw-agent] static dX                       : boolean                  = false
+[rw-agent] static dY                       : boolean                  = false
+[rw-agent]        dZ                       : byte                     = 42
+[rw-agent]        ea                       : byte                     = 0
+[rw-agent]        eb                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ec                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ed                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ee                       : boolean                  = false
+[rw-agent]        ef                       : boolean                  = false
+[rw-agent]        eg                       : String                   = null
+[rw-agent]        eh                       : boolean                  = false
+[rw-agent]        ei                       : boolean                  = false
+[rw-agent] static ej                       : int                      = 0
+[rw-agent] 
+[rw-agent] === discovery t=30s ===
+[rw-agent] target class: com.corrodinggames.rts.game.i
+[rw-agent] --- com.corrodinggames.rts.game.i ---
+[rw-agent] static a                        : String                   = "v1.15"
+[rw-agent] static b                        : boolean                  = true
+[rw-agent] static c                        : boolean                  = false
+[rw-agent]        d                        : int                      = 678359601
+[rw-agent]        e                        : float                    = 1.0
+[rw-agent] static f                        : String                   = null
+[rw-agent]        g                        : k[]                      = k[] len=6
+[rw-agent]        h                        : String                   = null
+[rw-agent]        i                        : boolean                  = false
+[rw-agent]        j                        : int                      = 909
+[rw-agent]        k                        : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        l                        : Paint                    = android.graphics.Paint
+[rw-agent]        m                        : Paint                    = android.graphics.Paint
+[rw-agent]        n                        : Paint                    = android.graphics.Paint
+[rw-agent]        o                        : Paint                    = android.graphics.Paint
+[rw-agent]        p                        : Paint                    = android.graphics.Paint
+[rw-agent]        q                        : int                      = 100
+[rw-agent]        r                        : int                      = 30
+[rw-agent]        s                        : int                      = 300
+[rw-agent]        t                        : float                    = 3.325
+[rw-agent]        u                        : String                   = "0fps"
+[rw-agent]        v                        : Rect                     = android.graphics.Rect
+[rw-agent]        w                        : ArrayList                = ArrayList size=0
+[rw-agent]        x                        : Paint                    = android.graphics.Paint
+[rw-agent]        y                        : Paint                    = android.graphics.Paint
+[rw-agent]        z                        : Paint                    = android.graphics.Paint
+[rw-agent]        A                        : Paint                    = android.graphics.Paint
+[rw-agent]        B                        : bf                       = com.corrodinggames.rts.gameFramework.bf
+[rw-agent]        C                        : be                       = com.corrodinggames.rts.gameFramework.be
+[rw-agent]        D                        : b                        = com.corrodinggames.rts.gameFramework.d.b
+[rw-agent]        E                        : a                        = com.corrodinggames.rts.game.b
+[rw-agent]        F                        : boolean                  = true
+[rw-agent]        G                        : float                    = 0.0
+[rw-agent]        H                        : float                    = 1.0
+[rw-agent]        I                        : float                    = 2.18
+[rw-agent]        J                        : float                    = 0.18
+[rw-agent]        K                        : j                        = null
+[rw-agent]        L                        : j                        = null
+[rw-agent]        M                        : boolean                  = false
+[rw-agent]        N                        : y                        = null
+[rw-agent]        O                        : e                        = null
+[rw-agent]        P                        : e                        = null
+[rw-agent]        Q                        : e                        = null
+[rw-agent]        R                        : float                    = 0.0
+[rw-agent]        S                        : Rect                     = android.graphics.Rect
+[rw-agent]        T                        : RectF                    = android.graphics.RectF
+[rw-agent]        U                        : e                        = null
+[rw-agent]        V                        : e                        = null
+[rw-agent]        W                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.e.b
+[rw-agent]        X                        : s                        = s size=11 of=com.corrodinggames.rts.game.units.al
+[rw-agent]        Y                        : Matrix                   = android.graphics.Matrix
+[rw-agent]        Z                        : ArrayList                = ArrayList size=0
+[rw-agent]        aa                       : ArrayList                = ArrayList size=0
+[rw-agent]        ab                       : Timer                    = null
+[rw-agent]        ac                       : boolean                  = false
+[rw-agent]        ad                       : Object                   = java.lang.Object
+[rw-agent]        ae                       : int                      = 0
+[rw-agent]        af                       : am                       = null
+[rw-agent]        ag                       : am                       = null
+[rw-agent]        ah                       : float                    = 0.0
+[rw-agent]        ai                       : boolean                  = false
+[rw-agent] --- com.corrodinggames.rts.gameFramework.l ---
+[rw-agent]        aj                       : Object                   = java.lang.Object
+[rw-agent]        ak                       : Object                   = java.lang.Object
+[rw-agent] static al                       : l                        = com.corrodinggames.rts.game.i
+[rw-agent]        am                       : Context                  = android.content.ServerContext
+[rw-agent]        an                       : Context                  = null
+[rw-agent]        ao                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        ap                       : f                        = com.corrodinggames.rts.java.d
+[rw-agent]        aq                       : boolean                  = false
+[rw-agent]        ar                       : boolean                  = false
+[rw-agent] static as                       : boolean                  = true
+[rw-agent] static at                       : boolean                  = false
+[rw-agent] static au                       : boolean                  = false
+[rw-agent] static av                       : Throwable                = null
+[rw-agent] static aw                       : boolean                  = false
+[rw-agent] static ax                       : boolean                  = false
+[rw-agent] static ay                       : boolean                  = false
+[rw-agent] static az                       : boolean                  = false
+[rw-agent] static aA                       : boolean                  = false
+[rw-agent] static aB                       : boolean                  = false
+[rw-agent] static aC                       : boolean                  = false
+[rw-agent] static aD                       : boolean                  = false
+[rw-agent] static aE                       : boolean                  = false
+[rw-agent] static aF                       : boolean                  = false
+[rw-agent] static aG                       : boolean                  = false
+[rw-agent] static aH                       : boolean                  = false
+[rw-agent] static aI                       : boolean                  = true
+[rw-agent] static aJ                       : boolean                  = false
+[rw-agent] static aK                       : String                   = null
+[rw-agent] static aL                       : boolean                  = false
+[rw-agent] static aM                       : boolean                  = false
+[rw-agent] static aN                       : boolean                  = false
+[rw-agent] static aO                       : boolean                  = false
+[rw-agent] static aP                       : boolean                  = false
+[rw-agent] static aQ                       : String                   = null
+[rw-agent] static aR                       : boolean                  = false
+[rw-agent]        aS                       : boolean                  = false
+[rw-agent] static aT                       : boolean                  = false
+[rw-agent] static aU                       : boolean                  = true
+[rw-agent] static aV                       : boolean                  = false
+[rw-agent] static aW                       : boolean                  = true
+[rw-agent] static aX                       : boolean                  = true
+[rw-agent] static aY                       : boolean                  = false
+[rw-agent] static aZ                       : boolean                  = false
+[rw-agent] static ba                       : String                   = null
+[rw-agent] static bb                       : boolean                  = true
+[rw-agent] static bc                       : boolean                  = true
+[rw-agent] static bd                       : boolean                  = true
+[rw-agent] static be                       : boolean                  = false
+[rw-agent] static bf                       : boolean                  = false
+[rw-agent] static bg                       : Class                    = java.lang.Class
+[rw-agent] static bh                       : y                        = null
+[rw-agent]        bi                       : boolean                  = true
+[rw-agent]        bj                       : boolean                  = true
+[rw-agent]        bk                       : boolean                  = false
+[rw-agent]        bl                       : boolean                  = false
+[rw-agent]        bm                       : boolean                  = false
+[rw-agent]        bn                       : boolean                  = false
+[rw-agent]        bo                       : boolean                  = false
+[rw-agent]        bp                       : boolean                  = false
+[rw-agent]        bq                       : boolean                  = true
+[rw-agent]        br                       : boolean                  = false
+[rw-agent]        bs                       : n                        = com.corrodinggames.rts.game.e
+[rw-agent]        bt                       : float                    = 1.0
+[rw-agent]        bu                       : float                    = -1.0
+[rw-agent]        bv                       : boolean                  = true
+[rw-agent]        bw                       : boolean                  = false
+[rw-agent]        bx                       : int                      = 7909
+[rw-agent]        by                       : int                      = 26454
+[rw-agent]        bz                       : int                      = 7910
+[rw-agent]        bA                       : int                      = 26504
+[rw-agent]        bB                       : int                      = 1000
+[rw-agent]        bC                       : int                      = 1000
+[rw-agent]        bD                       : boolean                  = true
+[rw-agent]        bE                       : boolean                  = false
+[rw-agent]        bF                       : boolean                  = true
+[rw-agent]        bG                       : boolean                  = true
+[rw-agent]        bH                       : boolean                  = false
+[rw-agent]        bI                       : boolean                  = false
+[rw-agent]        bJ                       : int                      = 385139159
+[rw-agent]        bK                       : i                        = com.corrodinggames.rts.gameFramework.utility.i
+[rw-agent]        bL                       : b                        = com.corrodinggames.rts.game.b.b
+[rw-agent]        bM                       : e                        = com.corrodinggames.rts.gameFramework.a.e
+[rw-agent]        bN                       : am                       = com.corrodinggames.rts.gameFramework.am
+[rw-agent]        bO                       : y                        = com.corrodinggames.rts.java.e
+[rw-agent]        bP                       : a                        = com.corrodinggames.rts.gameFramework.a
+[rw-agent]        bQ                       : SettingsEngine           = com.corrodinggames.rts.gameFramework.SettingsEngine
+[rw-agent]        bR                       : c                        = com.corrodinggames.rts.gameFramework.d.c
+[rw-agent]        bS                       : g                        = com.corrodinggames.rts.gameFramework.f.g
+[rw-agent]        bT                       : ac                       = com.corrodinggames.rts.gameFramework.ac
+[rw-agent]        bU                       : l                        = com.corrodinggames.rts.gameFramework.k.l
+[rw-agent]        bV                       : aa                       = com.corrodinggames.rts.gameFramework.aa
+[rw-agent]        bW                       : o                        = com.corrodinggames.rts.gameFramework.f.o
+[rw-agent]        bX                       : ad                       = com.corrodinggames.rts.gameFramework.j.ad
+[rw-agent]        bY                       : bg                       = com.corrodinggames.rts.gameFramework.bg
+[rw-agent]        bZ                       : a                        = com.corrodinggames.rts.gameFramework.i.a
+[rw-agent]        ca                       : y                        = com.corrodinggames.rts.gameFramework.y
+[rw-agent]        cb                       : ba                       = com.corrodinggames.rts.gameFramework.ba
+[rw-agent]        cc                       : c                        = com.corrodinggames.rts.game.units.f.c
+[rw-agent]        cd                       : br                       = com.corrodinggames.rts.gameFramework.br
+[rw-agent]        ce                       : f                        = com.corrodinggames.rts.gameFramework.n.f
+[rw-agent]        cf                       : c                        = com.corrodinggames.rts.gameFramework.c
+[rw-agent]        cg                       : a                        = com.corrodinggames.rts.gameFramework.g.a
+[rw-agent]        ch                       : boolean                  = false
+[rw-agent]        ci                       : float                    = 1.0
+[rw-agent]        cj                       : float                    = 1.0
+[rw-agent] static ck                       : Point                    = android.graphics.Point
+[rw-agent]        cl                       : float                    = 800.0
+[rw-agent]        cm                       : float                    = 600.0
+[rw-agent]        cn                       : float                    = 1.0
+[rw-agent]        co                       : float                    = 400.0
+[rw-agent]        cp                       : float                    = 300.0
+[rw-agent]        cq                       : float                    = 240.0
+[rw-agent]        cr                       : float                    = 0.0
+[rw-agent]        cs                       : float                    = 0.0
+[rw-agent]        ct                       : boolean                  = false
+[rw-agent]        cu                       : int                      = 3730
+[rw-agent]        cv                       : int                      = 2250
+[rw-agent]        cw                       : float                    = 3730.0
+[rw-agent]        cx                       : float                    = 2250.0
+[rw-agent]        cy                       : float                    = 3730.0
+[rw-agent]        cz                       : float                    = 2250.0
+[rw-agent]        cA                       : float                    = 800.0
+[rw-agent]        cB                       : float                    = 600.0
+[rw-agent]        cC                       : float                    = 0.0
+[rw-agent]        cD                       : float                    = 0.0
+[rw-agent]        cE                       : float                    = 561.0
+[rw-agent]        cF                       : float                    = 800.0
+[rw-agent]        cG                       : float                    = 561.0
+[rw-agent]        cH                       : float                    = 600.0
+[rw-agent]        cI                       : float                    = 400.0
+[rw-agent]        cJ                       : float                    = 300.0
+[rw-agent]        cK                       : Rect                     = android.graphics.Rect
+[rw-agent]        cL                       : Rect                     = android.graphics.Rect
+[rw-agent]        cM                       : RectF                    = android.graphics.RectF
+[rw-agent]        cN                       : Rect                     = android.graphics.Rect
+[rw-agent]        cO                       : RectF                    = android.graphics.RectF
+[rw-agent]        cP                       : RectF                    = android.graphics.RectF
+[rw-agent]        cQ                       : Rect                     = android.graphics.Rect
+[rw-agent]        cR                       : boolean                  = false
+[rw-agent]        cS                       : boolean                  = false
+[rw-agent]        cT                       : float                    = 0.0
+[rw-agent]        cU                       : boolean                  = false
+[rw-agent]        cV                       : float                    = 1.0
+[rw-agent]        cW                       : boolean                  = false
+[rw-agent]        cX                       : float                    = 1.0
+[rw-agent]        cY                       : float                    = 1.0
+[rw-agent]        cZ                       : boolean                  = false
+[rw-agent]        da                       : float                    = 0.0
+[rw-agent]        db                       : float                    = 0.0
+[rw-agent]        dc                       : boolean                  = true
+[rw-agent]        dd                       : boolean                  = true
+[rw-agent]        de                       : boolean                  = true
+[rw-agent]        df                       : boolean                  = true
+[rw-agent]        dg                       : boolean                  = true
+[rw-agent]        dh                       : float                    = 0.0
+[rw-agent]        di                       : float                    = 0.0
+[rw-agent]        dj                       : boolean                  = false
+[rw-agent]        dk                       : z                        = null
+[rw-agent]        dl                       : String                   = "maps/skirmish/[z;p10]Crossing Large (10p).tmx"
+[rw-agent]        dm                       : k                        = null
+[rw-agent]        dn                       : Paint                    = android.graphics.Paint
+[rw-agent]        do                       : Paint                    = android.graphics.Paint
+[rw-agent]        dp                       : Paint                    = android.graphics.Paint
+[rw-agent]        dq                       : boolean                  = false
+[rw-agent]        dr                       : boolean                  = false
+[rw-agent]        ds                       : float                    = 0.0
+[rw-agent]        dt                       : boolean                  = false
+[rw-agent]        du                       : boolean                  = false
+[rw-agent]        dv                       : boolean                  = false
+[rw-agent]        dw                       : int                      = 1
+[rw-agent]        dx                       : float                    = 0.0
+[rw-agent] static dy                       : o                        = com.corrodinggames.rts.gameFramework.v
+[rw-agent] static dz                       : String                   = "#28"
+[rw-agent]        dA                       : float                    = 1.0
+[rw-agent]        dB                       : boolean                  = true
+[rw-agent]        dC                       : ArrayList                = ArrayList size=41 of=com.corrodinggames.rts.gameFramework.m
+[rw-agent]        dD                       : Handler                  = android.os.Handler
+[rw-agent]        dE                       : String                   = null
+[rw-agent]        a                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$1
+[rw-agent]        dF                       : String                   = null
+[rw-agent]        dG                       : String                   = null
+[rw-agent]        b                        : Runnable                 = com.corrodinggames.rts.gameFramework.l$2
+[rw-agent]        dH                       : n                        = com.corrodinggames.rts.java.i
+[rw-agent]        dI                       : String                   = null
+[rw-agent]        dJ                       : Object                   = java.lang.Object
+[rw-agent]        dK                       : String                   = null
+[rw-agent]        dL                       : String                   = null
+[rw-agent]        dM                       : boolean[]                = boolean[] len=10
+[rw-agent]        dN                       : ConcurrentLinkedQueue    = ConcurrentLinkedQueue size=0
+[rw-agent]        c                        : boolean[]                = boolean[] len=223
+[rw-agent]        d                        : boolean[]                = boolean[] len=223
+[rw-agent]        e                        : int                      = 0
+[rw-agent] static dO                       : boolean                  = false
+[rw-agent] static dP                       : byte[]                   = byte[] len=2500000
+[rw-agent] static dQ                       : byte[]                   = byte[] len=1000
+[rw-agent] static dR                       : byte[]                   = byte[] len=1000
+[rw-agent] static dS                       : d                        = null
+[rw-agent] static dT                       : boolean                  = false
+[rw-agent] static dU                       : int                      = 0
+[rw-agent] static dV                       : boolean                  = false
+[rw-agent] static dW                       : u                        = null
+[rw-agent] static dX                       : boolean                  = false
+[rw-agent] static dY                       : boolean                  = false
+[rw-agent]        dZ                       : byte                     = 42
+[rw-agent]        ea                       : byte                     = 0
+[rw-agent]        eb                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ec                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ed                       : q                        = com.corrodinggames.rts.gameFramework.q
+[rw-agent]        ee                       : boolean                  = false
+[rw-agent]        ef                       : boolean                  = false
+[rw-agent]        eg                       : String                   = null
+[rw-agent]        eh                       : boolean                  = false
+[rw-agent]        ei                       : boolean                  = false
+[rw-agent] static ej                       : int                      = 0
+[rw-agent] 

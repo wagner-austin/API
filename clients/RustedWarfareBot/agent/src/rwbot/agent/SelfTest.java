@@ -40,11 +40,108 @@ public final class SelfTest {
             jar.close();
         }
 
+        failures += checkOptions();
+        failures += checkDiscovery();
+        failures += checkLogPrefixing();
+
         if (failures > 0) {
-            System.out.println("FAIL " + failures + " target(s)");
+            System.out.println("FAIL " + failures + " check(s)");
             System.exit(1);
         }
         System.out.println("OK " + targets.size() + " target(s) patched, defined and linked");
+    }
+
+    /** Exercises option parsing, including the rejections that must stay loud. */
+    private static int checkOptions() {
+        int failures = 0;
+
+        failures += expect(!AgentOptions.parse(null).discoveryRequested(), "no argument -> no discovery");
+        failures += expect(!AgentOptions.parse("").discoveryRequested(), "blank argument -> no discovery");
+
+        int[] parsed = AgentOptions.parse("discoverAtSeconds=20,5").discoverAtSeconds();
+        failures += expect(parsed.length == 2 && parsed[0] == 5 && parsed[1] == 20, "times parsed and sorted");
+
+        failures += expect(
+                !AgentOptions.parse("discoverAtSeconds=5").exitAfterDiscovery(),
+                "exitAfterDiscovery defaults off");
+        failures += expect(
+                AgentOptions.parse("discoverAtSeconds=5;exitAfterDiscovery=true").exitAfterDiscovery(),
+                "exitAfterDiscovery honoured");
+        failures += expectRejected("exitAfterDiscovery=yes", "non-boolean exit flag");
+        failures += expectRejected("discoverAtSeconds=0", "zero seconds");
+        failures += expectRejected("discoverAtSeconds=-3", "negative seconds");
+        failures += expectRejected("discoverAtSeconds=soon", "non-numeric seconds");
+        failures += expectRejected("unknownKey=1", "unknown key");
+        failures += expectRejected("noEquals", "malformed pair");
+        return failures;
+    }
+
+    /** Exercises the reflective snapshot against an object whose shape is known here. */
+    private static int checkDiscovery() {
+        int failures = 0;
+        failures += expect(Discovery.describe(null, "t=0s").contains("target is null"), "null target");
+
+        String report = Discovery.describe(new DiscoverySample(), "t=1s");
+        failures += expect(report.contains("=== discovery t=1s ==="), "snapshot is labelled");
+        failures += expect(report.contains("DiscoverySample"), "declaring class named");
+        failures += expect(report.contains("size=3"), "collection size reported");
+        failures += expect(report.contains("of=java.lang.String"), "element class reported");
+        failures += expect(report.contains("int[] len=2"), "array length reported");
+        failures += expect(report.contains("null"), "null field reported");
+        failures += expect(report.contains("\"hello\""), "string value reported");
+        failures += expect(report.contains("static "), "static field marked");
+        return failures;
+    }
+
+    /** The engine captures stdout, so every emitted line must carry the prefix. */
+    private static int checkLogPrefixing() {
+        java.io.PrintStream original = System.out;
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(captured, true));
+        try {
+            Log.info("first\nsecond\nthird");
+        } finally {
+            System.setOut(original);
+        }
+        String[] lines = captured.toString().split("\\R");
+        int prefixed = 0;
+        for (String line : lines) {
+            if (line.startsWith("[rw-agent] ")) {
+                prefixed++;
+            }
+        }
+        return expect(
+                lines.length == 3 && prefixed == 3,
+                "every line of a multi-line message is prefixed");
+    }
+
+    /** Reports one assertion, returning 1 when it failed. */
+    private static int expect(boolean condition, String description) {
+        if (condition) {
+            System.out.println("ok   " + description);
+            return 0;
+        }
+        System.out.println("FAIL " + description);
+        return 1;
+    }
+
+    /** Asserts that an option string is rejected rather than silently accepted. */
+    private static int expectRejected(String argument, String description) {
+        try {
+            AgentOptions.parse(argument);
+        } catch (IllegalArgumentException e) {
+            return expect(true, "rejects " + description);
+        }
+        return expect(false, "rejects " + description);
+    }
+
+    /** Fixture with one field of every shape {@link Discovery} summarises. */
+    private static final class DiscoverySample {
+        static final String MARKER = "marker";
+        final java.util.List<String> names = java.util.Arrays.asList("a", "b", "c");
+        final int[] counts = {1, 2};
+        final String text = "hello";
+        final Object absent = null;
     }
 
     private static boolean check(
