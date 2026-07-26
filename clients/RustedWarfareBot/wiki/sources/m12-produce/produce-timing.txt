@@ -1,0 +1,56 @@
+Production timing, measured against a live headless sandbox
+===========================================================
+
+Method: connect over the agent channel, pick the Command Center's option for
+the named type from the sample's own option list, send one produce order, then
+count samples until a unit appears in the owned roster that was not there
+before. Probe source kept out of the repo; the procedure is the record.
+
+Game: Rusted Warfare 1.15 (code 176, build #28), -nodisplay -nosound -sandbox.
+Producer: unit 213, commandCenter, the only producer a fresh sandbox owns.
+
+  HEADER produce scout at unit 213 frame=2712 credits=4243 owned=3
+    step 20 credits=3678
+    step 40 credits=3813
+  RESULT produce_samples=45 appeared=['scout'] frames=3378 credits=3849
+
+  HEADER produce builder at unit 213 frame=9993 credits=4200 owned=4
+    step 20 credits=3835
+  RESULT produce_samples=34 appeared=['builder'] frames=2553 credits=3929
+
+Prices from the archived -printunits catalogue: builder $500, scout $700.
+
+  builder   500 / 34 = 14.7 credits per sample
+  scout     700 / 45 = 15.6 credits per sample
+
+Linear in price within 6% across the two, which is what makes a produce window
+derivable rather than guessed. The rate belongs to the producing building's own
+build speed; both figures here are the Command Center's.
+
+Second finding, and the one that rules out the obvious alternative: credits do
+NOT fall monotonically while producing. The scout run reads 4243 -> 3678 ->
+3813 -> 3849 -- down at first, then RISING through the rest of production as
+income outpaced the drain. So "credits decreasing" cannot serve as an
+in-flight signal the way builder movement does for travel. At the time this
+left only a price-derived window; the third run below supersedes it.
+
+
+Third run, with the entity queue depth now carried in the world stream
+=====================================================================
+
+  HEADER produce scout at unit 213 frame=1675 credits=4153 owned=3
+    step 10 credits=3520 queued={213: 1, 214: 0, 217: 0}
+    step 20 credits=3588 queued={213: 1, 214: 0, 217: 0}
+    step 30 credits=3655 queued={213: 1, 214: 0, 217: 0}
+    step 40 credits=3723 queued={213: 1, 214: 0, 217: 0}
+  RESULT produce_samples=45 appeared=['scout'] frames=3377 credits=3754
+
+The producing building reports queued=1 for the whole of production and zero on
+the sample the unit appears, and the 45-sample timing reproduces exactly. That
+is a real in-flight signal, the production counterpart of builder movement, and
+it retires the price-derived window this file was originally measured for: no
+rate constant, no safety factor, and no cap on what the bot can afford to make.
+
+Note the credits column again -- 3520, 3588, 3655, 3723, rising monotonically
+through a production the queue reports as active. Whatever else is true, the
+balance is not a progress signal.

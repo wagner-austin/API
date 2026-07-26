@@ -72,6 +72,51 @@ final class Json {
         }
     }
 
+    /**
+     * Writes a JSON string literal, escaping what the grammar requires.
+     *
+     * <p>Every producer in the agent writes through this one. It was written
+     * three times before it was written once -- {@link StateStream} and
+     * {@link TypeFlags} each carried a private copy, and they had already
+     * diverged on control characters -- which is the ordinary way a wire format
+     * acquires two dialects. The consumer is a strict parser with no tolerance
+     * for either.
+     *
+     * @param out Buffer to append to.
+     * @param text The raw string.
+     */
+    static void quote(StringBuilder out, String text) {
+        out.append('"');
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                    break;
+            }
+        }
+        out.append('"');
+    }
+
     /** A position in the source text, with the reads the grammar needs. */
     private static final class Cursor {
 

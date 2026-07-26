@@ -123,6 +123,125 @@ final class EngineNames {
      */
     static final String TYPE_NEEDS_POOL = "p";
 
+    /**
+     * One thing a unit can do: an action, in the engine's own sense.
+     *
+     * <p>Building a structure and producing a unit are the same mechanism here.
+     * A builder's actions yield buildings and a factory's yield units, and the
+     * order path resolves either through the same lookup, which is why one
+     * command verb covers both (wiki: mechanics-build-actions).
+     */
+    static final String ACTION_CLASS = "com.corrodinggames.rts.game.units.a.s";
+
+    /**
+     * Entity accessor returning its action list.
+     *
+     * <p>Declared on the entity base and overridden per unit class, so the
+     * answer belongs to the class rather than to the type registry — which is
+     * why the options are read off live entities rather than dumped from the
+     * registry the way placement flags are.
+     */
+    static final String ACTIONS = "N";
+
+    /**
+     * Action accessor returning the type it makes.
+     *
+     * <p>Abstract on the action base, so every action answers it. This is the
+     * general "what does this action concern"; the narrower
+     * {@link #ACTION_PLACED_TYPE} is set only on the ones that place something
+     * at a position.
+     */
+    static final String ACTION_MAKES = "i";
+
+    /**
+     * Action accessor returning the type it places at a position, or null.
+     *
+     * <p>The discriminator between the two dispatch verbs, and it is the
+     * engine's own: the build-waypoint lookup matches candidate actions on
+     * exactly this accessor, so an action for which it is null cannot be
+     * reached that way and must be dispatched by action key instead
+     * (wiki: mechanics-build-actions).
+     */
+    static final String ACTION_PLACED_TYPE = "y";
+
+    /** Action predicate: whether it makes something at all, as opposed to a stop or a rally. */
+    static final String ACTION_MAKES_SOMETHING = "g";
+
+    /**
+     * Action accessor returning its interned key.
+     *
+     * <p>What an action command carries. Read off the action rather than built
+     * from a string, so the agent never has to know the engine's key format.
+     */
+    static final String ACTION_KEY = "N";
+
+    /** The interned identifier an action command carries. */
+    static final String ACTION_KEY_CLASS = "com.corrodinggames.rts.game.units.a.c";
+
+    /** Accessor on that identifier returning its readable name. */
+    static final String ACTION_KEY_NAME = "a";
+
+    /**
+     * Entity predicate: whether construction has finished.
+     *
+     * <p>A building appears in the entity list the moment construction starts,
+     * so presence is not completion. The distinction is load-bearing twice
+     * over: an unfinished factory never advances its production queue, and a
+     * planner counting roster entries would call an unfinished structure built
+     * (wiki: mechanics-build-actions).
+     */
+    static final String ENTITY_COMPLETE = "bT";
+
+    /**
+     * Production queue on a building that makes units.
+     *
+     * <p>Present only on producing buildings, which is itself the fact: an
+     * entity without the field makes nothing and queues nothing. Absence is
+     * therefore read as depth zero rather than treated as an error.
+     */
+    static final String PRODUCTION_QUEUE = "z";
+
+    /** The queued items inside that queue. An {@code AbstractList}. */
+    static final String QUEUE_ITEMS = "c";
+
+    /**
+     * The production-queue class.
+     *
+     * <p>Needed because the field name alone does not identify the queue.
+     * Obfuscation reuses single letters freely, and other classes carry an
+     * unrelated field of the same name — one of them crashed a run when it was
+     * read as a queue. The field is matched by declared type as well as name.
+     */
+    static final String QUEUE_CLASS = "com.corrodinggames.rts.game.units.d.k";
+
+    /** The point an action command carries. */
+    static final String POINT_CLASS = "android.graphics.PointF";
+
+    /**
+     * Action accessor returning its selector index.
+     *
+     * <p>The same integer a build command carries. Passing -1 means "whichever
+     * action produces this type"; the engine's own lookup compares against this
+     * (wiki: building-structures).
+     */
+    static final String ACTION_INDEX = "t";
+
+    /** Action predicate: whether the given unit may use it right now. */
+    static final String ACTION_AVAILABLE = "b";
+
+    /** Action predicate: whether the given unit has it locked. */
+    static final String ACTION_LOCKED = "g";
+
+    /**
+     * Action predicate: whether it applies to the given unit at all.
+     *
+     * <p>A third gate beyond available and locked, and the engine checks all
+     * three. The queue-add path returns null when any fails, without logging,
+     * so an option reported usable on fewer than three would be an option the
+     * order path then drops in silence.
+     */
+    static final String ACTION_APPLIES = "a";
+
     /** The engine's map instance. */
     static final String MAP = "bL";
 

@@ -223,6 +223,71 @@ final class Perception {
     }
 
     /**
+     * Reports whether an entity has finished being built.
+     *
+     * @param entity The entity to read.
+     * @return True once construction is complete.
+     */
+    static boolean isComplete(Object entity) {
+        Object done =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(entity.getClass(), EngineNames.ENTITY_COMPLETE),
+                        entity);
+        if (!(done instanceof Boolean)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.ENTITY_COMPLETE + "() did not return a boolean"
+                            + EngineNames.PIN);
+        }
+        return ((Boolean) done).booleanValue();
+    }
+
+    /**
+     * Returns how many units a building has queued for production.
+     *
+     * <p>The engine's public queue accessor reports zero for a factory — it is
+     * overridden only by other kinds of producer — so the queue itself is read
+     * instead. An entity with no queue field makes nothing, and reports zero
+     * for that reason rather than by failing.
+     *
+     * <p>This is what distinguishes an order the engine accepted from one it
+     * dropped. A production order produces no roster change until the unit is
+     * finished, so without the queue there is nothing to tell the two apart
+     * until a timeout expires (wiki: mechanics-build-actions).
+     *
+     * @param entity The entity to read.
+     * @return The number of items queued, or zero when it has no queue.
+     */
+    static int queuedCountOf(Object entity) {
+        java.lang.reflect.Field queueField =
+                EngineAccess.fieldIfPresent(entity.getClass(), EngineNames.PRODUCTION_QUEUE);
+        // Matched by type as well as name. Obfuscation reuses single letters,
+        // and reading an unrelated field of the same name off another unit
+        // class is not a hypothetical -- it crashed a live run.
+        if (queueField == null
+                || !EngineAccess.pinnedClass(EngineNames.QUEUE_CLASS)
+                        .isAssignableFrom(queueField.getType())) {
+            return 0;
+        }
+        Object queue;
+        try {
+            queue = queueField.get(entity);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read " + EngineNames.PRODUCTION_QUEUE + EngineNames.PIN, e);
+        }
+        if (queue == null) {
+            return 0;
+        }
+        Object items = EngineAccess.readField(queue, EngineNames.QUEUE_ITEMS);
+        if (!(items instanceof java.util.Collection)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.QUEUE_ITEMS + " is not a collection"
+                            + EngineNames.PIN);
+        }
+        return ((java.util.Collection<?>) items).size();
+    }
+
+    /**
      * Reads an entity's world position.
      *
      * @param entity The entity to read.
@@ -294,6 +359,21 @@ final class Perception {
         if (type == null) {
             throw new IllegalStateException("rw-agent: entity has no unit type" + EngineNames.PIN);
         }
+        return nameOfType(type);
+    }
+
+    /**
+     * Returns a unit type's readable name.
+     *
+     * <p>Split from {@link #typeNameOf} because a type is reached two ways. An
+     * entity carries one, and so does a build action that produces it; both
+     * name it identically, and both names are the string a plan and a build
+     * order use.
+     *
+     * @param type The unit type.
+     * @return Its name.
+     */
+    static String nameOfType(Object type) {
         Object name = EngineAccess.invoke(EngineAccess.pinnedMethod(type.getClass(), EngineNames.TYPE_NAME_ACCESSOR), type);
         if (!(name instanceof String)) {
             throw new IllegalStateException("rw-agent: unit type name is not a String" + EngineNames.PIN);

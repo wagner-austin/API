@@ -24,9 +24,18 @@ from typing import Literal, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.placement import TypePlacement
-from rw_bot.wire.state import Entity, ResourcePool, Sample
+from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 BUILDER_TYPE = "builder"
+
+#: Type name of the map editor's placeholder unit.
+#:
+#: An owned entity in every sample, parked off-map at (-1000, -1000) with
+#: 170,000 hit points, and not a playable unit. It answers the engine's build
+#: queries for nearly every type in the game, so anything that selects a
+#: producer by capability has to exclude it by name -- see
+#: :func:`find_producer` for what including it costs.
+PLACEHOLDER_TYPE = "editorOrBuilder"
 
 #: World-unit radius within which an entity is treated as occupying a pool.
 #:
@@ -62,19 +71,24 @@ class Decision(TypedDict):
     """What the policy wants to happen next.
 
     Attributes:
-        action: ``"build"`` to place the next structure, ``"wait"`` to do
-            nothing this tick, ``"done"`` when the plan is complete,
-            ``"blocked"`` when it cannot proceed at all, and ``"stalled"``
-            when an order was accepted but never took effect.
+        action: ``"build"`` to place the next structure at a chosen position,
+            ``"produce"`` to have a building make a unit that rolls out of it,
+            ``"wait"`` to do nothing this tick, ``"done"`` when the plan is
+            complete, ``"blocked"`` when it cannot proceed at all, and
+            ``"stalled"`` when an order was accepted but never took effect.
         reason: Human-readable justification, carried for the run log so a
             session can be read back without re-deriving why it stalled.
-        type_name: Structure to place. Empty unless ``action`` is ``"build"``.
-        unit_id: Builder to order. Zero unless ``action`` is ``"build"``.
-        x: Placement world x. Zero unless ``action`` is ``"build"``.
+        type_name: What to make. Empty unless ``action`` is ``"build"`` or
+            ``"produce"``.
+        unit_id: Unit to order. Zero unless ``action`` is ``"build"`` or
+            ``"produce"``.
+        x: Placement world x. Zero unless ``action`` is ``"build"`` -- a
+            produced unit appears where the engine puts it, not where the
+            planner asks.
         y: Placement world y. Zero unless ``action`` is ``"build"``.
     """
 
-    action: Literal["build", "wait", "done", "blocked", "stalled"]
+    action: Literal["build", "produce", "wait", "done", "blocked", "stalled"]
     reason: str
     type_name: str
     unit_id: int
@@ -95,17 +109,25 @@ def completed_count(sample: Sample, plan: Sequence[str]) -> int:
     without the ownership check an opponent building the same structure in
     view would advance this plan.
 
+    Only **finished** ones count, which is a distinction the roster alone
+    cannot make. A building joins the roster the moment construction starts,
+    so presence is not completion: counting on presence reported a plan done
+    while a factory was still a shell, and an unfinished factory produces
+    nothing, so the next entry could be ordered against a building that could
+    not accept it.
+
     Args:
         sample: One observation of the world.
-        plan: Structures to build, in order.
+        plan: What to make, in order. Entries may be structures or units.
 
     Returns:
-        How many plan entries are satisfied by structures currently owned.
+        How many plan entries are satisfied by finished structures the player
+        owns.
     """
     remaining: list[str] = list(plan)
     built = 0
     for entity in sample["entities"]:
-        if not entity["mine"]:
+        if not entity["mine"] or not entity["complete"]:
             continue
         if entity["type_name"] in remaining:
             remaining.remove(entity["type_name"])
@@ -128,14 +150,20 @@ def next_unsatisfied_index(sample: Sample, plan: Sequence[str]) -> int:
     entry fixes the order while keeping the inventory reading that makes
     progress resumable.
 
+    Unfinished structures do not satisfy an entry, for the same reason they do
+    not advance :func:`completed_count`. That keeps the two answers consistent
+    -- a half-built factory leaves the plan pointing at the same entry, and the
+    caller's once-per-position rule is what stops it being ordered twice while
+    it goes up.
+
     Args:
         sample: One observation of the world.
-        plan: Structures to build, in order.
+        plan: What to make, in order. Entries may be structures or units.
 
     Returns:
         The index to build next, or ``len(plan)`` when the plan is satisfied.
     """
-    owned: list[str] = [e["type_name"] for e in sample["entities"] if e["mine"]]
+    owned: list[str] = [e["type_name"] for e in sample["entities"] if e["mine"] and e["complete"]]
     for index, wanted in enumerate(plan):
         if wanted in owned:
             owned.remove(wanted)
@@ -267,6 +295,85 @@ def find_builder(sample: Sample) -> Entity | None:
     return None
 
 
+def find_producer(sample: Sample, target: str) -> BuildOption | None:
+    """Return the option by which something the player owns makes ``target``.
+
+    This replaces asking "which of my units is a builder", which was a guess
+    dressed as a constant. The engine answers the real question per unit, and
+    the answer rides in the sample ([[wire-contract-ndjson]]).
+
+    Entities of :data:`PLACEHOLDER_TYPE` are skipped, and that exclusion is
+    load-bearing rather than tidy. The map editor's placeholder is an owned
+    entity in every sample, parked off-map, and it offers 108 of the 123 options
+    in the archived capture -- a superset of everything the real Builder can
+    make, plus 95 more. Without the exclusion almost no plan entry is ever
+    unbuildable, so the check this function exists to support would pass on
+    types nothing playable can produce, and the resulting order would go to a
+    unit at (-1000, -1000) and do nothing at all. That is the same silent
+    failure the stall detector was built for, wearing a check that looks like
+    protection.
+
+    Unavailable options are returned rather than skipped. An action that exists
+    but is not usable yet is a wait; one that does not exist is a dead plan
+    entry, and the caller needs to tell those apart.
+
+    Args:
+        sample: One observation of the world.
+        target: Type name the plan asks for.
+
+    Returns:
+        The option, preferring an available one, or None when nothing the
+        player owns makes it.
+    """
+    placeholders = {
+        entity["unit_id"]
+        for entity in sample["entities"]
+        if entity["type_name"] == PLACEHOLDER_TYPE
+    }
+    fallback: BuildOption | None = None
+    for option in sample["options"]:
+        if option["produces"] != target or option["unit_id"] in placeholders:
+            continue
+        if option["available"]:
+            return option
+        if fallback is None:
+            fallback = option
+    return fallback
+
+
+def _undescribed(
+    target: str,
+    catalogue: Mapping[str, UnitStats],
+    placements: Mapping[str, TypePlacement],
+) -> Decision | None:
+    """Return the block for a target the dumps do not describe, or None.
+
+    Both dumps are read from the live engine and cover every registered type,
+    so a miss means the plan names something that does not exist in this build
+    -- a typo, or a type from a mod that is not loaded. That cannot resolve on
+    its own, which is why it blocks rather than waits.
+
+    Args:
+        target: Type name the plan asks for.
+        catalogue: Unit stats by type name.
+        placements: Placement rules by type name.
+
+    Returns:
+        The blocking decision, or None when both dumps describe the target.
+    """
+    if target not in catalogue:
+        return _decision(
+            "blocked",
+            f"{target!r} is not in the unit catalogue, so its price is unknown",
+        )
+    if target not in placements:
+        return _decision(
+            "blocked",
+            f"{target!r} is not in the placement dump, so where it may stand is unknown",
+        )
+    return None
+
+
 def decide(
     sample: Sample,
     plan: Sequence[str],
@@ -277,7 +384,7 @@ def decide(
 
     Args:
         sample: One observation of the world.
-        plan: Structures to build, in order.
+        plan: What to make, in order. Entries may be structures or units.
         catalogue: Unit stats by type name, for prices.
         placements: Placement rules by type name, for where a structure may
             stand.
@@ -288,44 +395,63 @@ def decide(
     built = completed_count(sample, plan)
     index = next_unsatisfied_index(sample, plan)
     if index >= len(plan):
-        return _decision("done", f"all {len(plan)} structures built")
+        return _decision("done", f"all {len(plan)} plan entries satisfied")
 
     target = plan[index]
-    stats = catalogue.get(target)
-    if stats is None:
+    undescribed = _undescribed(target, catalogue, placements)
+    if undescribed is not None:
+        return undescribed
+    stats = catalogue[target]
+    placement = placements[target]
+
+    # The engine's own answer to "can anything I own make this", asked before
+    # an order is spent rather than inferred from one that quietly did nothing.
+    # A builder cannot construct a laboratory, and the refusal produces no
+    # roster change and no error -- a plan naming one used to run for three
+    # hundred samples reporting progress ([[policy-loop]]).
+    producer = find_producer(sample, target)
+    if producer is None:
         return _decision(
             "blocked",
-            f"{target!r} is not in the unit catalogue, so its price is unknown",
+            f"nothing the player owns can make {target}; the plan is not playable from here",
         )
-    placement = placements.get(target)
-    if placement is None:
-        return _decision(
-            "blocked",
-            f"{target!r} is not in the placement dump, so where it may stand is unknown",
-        )
-
-    builder = find_builder(sample)
-    if builder is None:
-        return _decision("blocked", "the player owns no builder")
-
-    # Measure from the most stable reference available. A structure never
-    # moves; the builder does, and measuring from it collapses the ring. With
-    # no structure owned the builder is the only reference there is, so the
-    # collapse is unavoidable rather than chosen -- and a player who has lost
-    # every building should still be able to rebuild.
-    anchor = find_anchor(sample, catalogue) or builder
-
-    site = _site_for(sample, index, placement, anchor, catalogue)
-    if site is None:
-        # Not "blocked". Every pool in sight being taken is a state the world
-        # can leave on its own -- fog lifts as units move, and a destroyed
-        # extractor frees its pool -- so this is a wait, and the stall detector
-        # is what stops it waiting forever.
+    if not producer["available"]:
+        # Available is a property of the world, not of the plan. A prerequisite
+        # can still be built and tech can still be researched, so this is a
+        # wait and the stall detector bounds it.
         return _decision(
             "wait",
-            f"{target} needs a resource pool and every one of the "
-            f"{len(sample['pools'])} in sight is occupied",
+            f"unit {producer['unit_id']} can make {target} but the action is not available yet",
         )
+
+    # Where it goes is settled before whether it is affordable, so a structure
+    # with nowhere legal to stand says so rather than reporting a price. Credits
+    # arrive on their own; a taken pool does not become free by waiting for the
+    # bank.
+    site: tuple[float, float] | None = None
+    if producer["placed"]:
+        builder = find_builder(sample)
+        if builder is None:
+            return _decision("blocked", "the player owns no builder")
+
+        # Measure from the most stable reference available. A structure never
+        # moves; the builder does, and measuring from it collapses the ring.
+        # With no structure owned the builder is the only reference there is,
+        # so the collapse is unavoidable rather than chosen -- and a player who
+        # has lost every building should still be able to rebuild.
+        anchor = find_anchor(sample, catalogue) or builder
+
+        site = _site_for(sample, index, placement, anchor, catalogue)
+        if site is None:
+            # Not "blocked". Every pool in sight being taken is a state the
+            # world can leave on its own -- fog lifts as units move, and a
+            # destroyed extractor frees its pool -- so this is a wait, and the
+            # stall detector is what stops it waiting forever.
+            return _decision(
+                "wait",
+                f"{target} needs a resource pool and every one of the "
+                f"{len(sample['pools'])} in sight is occupied",
+            )
 
     if sample["credits"] < stats["price"]:
         return _decision(
@@ -333,11 +459,24 @@ def decide(
             f"{target} costs {stats['price']}, holding {sample['credits']}",
         )
 
+    if site is None:
+        # A produced unit rolls out of the building that made it. The engine
+        # chooses where, so this decision carries no position -- offering one
+        # would be a number the planner invented.
+        return Decision(
+            action="produce",
+            reason=f"producing {target} ({built + 1} of {len(plan)})",
+            type_name=target,
+            unit_id=producer["unit_id"],
+            x=0.0,
+            y=0.0,
+        )
+
     return Decision(
         action="build",
         reason=f"building {target} ({built + 1} of {len(plan)})",
         type_name=target,
-        unit_id=builder["unit_id"],
+        unit_id=producer["unit_id"],
         x=site[0],
         y=site[1],
     )
@@ -381,7 +520,7 @@ def _site_for(
 
 
 def _decision(
-    action: Literal["build", "wait", "done", "blocked", "stalled"], reason: str
+    action: Literal["build", "produce", "wait", "done", "blocked", "stalled"], reason: str
 ) -> Decision:
     """Build a decision that carries no order.
 
@@ -397,6 +536,7 @@ def _decision(
 
 __all__ = [
     "BUILDER_TYPE",
+    "PLACEHOLDER_TYPE",
     "PLACEMENT_RING",
     "POOL_OCCUPIED_RADIUS",
     "Decision",
@@ -405,5 +545,6 @@ __all__ = [
     "find_anchor",
     "find_builder",
     "find_free_pool",
+    "find_producer",
     "next_unsatisfied_index",
 ]

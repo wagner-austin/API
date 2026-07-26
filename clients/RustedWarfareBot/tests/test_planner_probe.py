@@ -28,14 +28,14 @@ def _entity(index: int, unit_id: int, type_name: str, x: float, y: float) -> str
     return (
         f'{{"kind":"entity","frame":1,"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":{y},'
-        f'"team":0,"mine":true,"hp":100.0,"max_hp":100.0}}'
+        f'"team":0,"mine":true,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
 def _sample_lines(*entities: str) -> list[str]:
     frame = (
         f'{{"kind":"frame","frame":1,"clock_ms":10,'
-        f'"visible":{len(entities)},"pools":0,"credits":4000}}'
+        f'"visible":{len(entities)},"pools":0,"options":0,"credits":4000}}'
     )
     return [frame, *entities]
 
@@ -151,6 +151,8 @@ def test_the_builder_is_found_by_type_not_by_position() -> None:
         mine=True,
         hp=100.0,
         max_hp=100.0,
+        complete=True,
+        queued=0,
     )
     assert find_builder(forward) == expected
     # Same unit, now first in the roster: the index differs, the choice must not.

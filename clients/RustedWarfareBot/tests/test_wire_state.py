@@ -14,6 +14,7 @@ import pytest
 from rw_bot.validation import DecodeError
 from rw_bot.wire.ndjson import NdjsonError
 from rw_bot.wire.state import (
+    BuildOption,
     Entity,
     ResourcePool,
     Sample,
@@ -25,11 +26,11 @@ from rw_bot.wire.state import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
-_FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"credits":4000}'
+_FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"credits":4000}'
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
     '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,'
-    '"hp":170.0,"max_hp":170.0}'
+    '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0}'
 )
 _POOL = '{"kind":"pool","frame":7,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}'
 
@@ -129,7 +130,9 @@ def test_blank_lines_are_skipped() -> None:
 
 
 def test_a_sample_with_no_entities_is_valid() -> None:
-    empty = '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"credits":4000}'
+    empty = (
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"credits":4000}'
+    )
     samples = decode_samples([empty])
     assert samples[0]["entities"] == ()
     assert samples[0]["pools"] == ()
@@ -171,10 +174,32 @@ def test_a_pool_before_any_frame_is_rejected() -> None:
 
 
 def test_a_sample_short_of_its_declared_pools_is_rejected() -> None:
-    short = '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"credits":4000}'
+    short = (
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,"credits":4000}'
+    )
     with pytest.raises(WireError) as caught:
         decode_samples([short, _POOL])
     assert caught.value.code == "RW-WIRE-005"
+    assert "truncated" in caught.value.message
+
+
+def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
+    """The same completeness rule the entity and pool counts get.
+
+    A half-read option list is the worst of the three to act on: it does not
+    look wrong, it looks like a unit that cannot make the thing the plan wants,
+    and the planner would answer that by declaring the plan dead.
+    """
+    short = (
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,"credits":4000}'
+    )
+    option = (
+        '{"kind":"option","frame":7,"index":0,"unit_id":214,'
+        '"produces":"landFactory","action":1,"placed":true,"available":true}'
+    )
+    with pytest.raises(WireError) as caught:
+        decode_samples([short, option])
+    assert caught.value.code == "RW-WIRE-006"
     assert "truncated" in caught.value.message
 
 
@@ -194,7 +219,10 @@ def test_an_entity_before_any_frame_is_rejected() -> None:
 def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
     """A planner acting on a roster it cannot fully see is the failure guarded."""
     with pytest.raises(WireError) as caught:
-        short = '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,"pools":0,"credits":4000}'
+        short = (
+            '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,'
+            '"pools":0,"options":0,"credits":4000}'
+        )
         decode_samples([short, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
     assert "truncated" in caught.value.message
@@ -202,7 +230,10 @@ def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
 
 def test_a_long_sample_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
-        long_frame = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"credits":4000}'
+        long_frame = (
+            '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,'
+            '"pools":0,"options":0,"credits":4000}'
+        )
         decode_samples([long_frame, _ENTITY, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
 
@@ -258,12 +289,24 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 mine=False,
                 hp=1.5,
                 max_hp=2.5,
+                complete=True,
+                queued=0,
             ),
         ),
         pools=(ResourcePool(index=0, tile_x=115, tile_y=6, x=2310.0, y=130.0),),
+        options=(
+            BuildOption(
+                index=0,
+                unit_id=214,
+                produces='a"b\\c\nd\te\rf\x01g',
+                action=1,
+                placed=True,
+                available=False,
+            ),
+        ),
     )
     lines = encode_sample(hostile)
-    assert len(lines) == 3
+    assert len(lines) == 4
     assert decode_samples(list(lines)) == (hostile,)
 
 

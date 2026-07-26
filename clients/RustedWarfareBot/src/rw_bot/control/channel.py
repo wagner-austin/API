@@ -17,7 +17,14 @@ from collections.abc import Sequence
 from rw_bot import RwBotError
 from rw_bot.control import _test_hooks
 from rw_bot.validation import require_int
-from rw_bot.wire.command import BuildOrder, MoveOrder, encode_build, encode_move
+from rw_bot.wire.command import (
+    BuildOrder,
+    MoveOrder,
+    ProduceOrder,
+    encode_build,
+    encode_move,
+    encode_produce,
+)
 from rw_bot.wire.ndjson import parse_object
 from rw_bot.wire.state import Sample, decode_samples
 
@@ -100,6 +107,17 @@ class AgentChannel:
         """
         self._connection.send_line(encode_build(order))
 
+    def send_produce(self, order: ProduceOrder) -> None:
+        """Send one produce order.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_produce(order))
+
     def close(self) -> None:
         """Release the connection."""
         self._connection.close()
@@ -146,7 +164,11 @@ def _complete_or_none(lines: Sequence[str]) -> Sample | None:
         DecodeError: When a record is missing a field or mistyped.
     """
     opening = parse_object(lines[0])
-    declared = require_int(opening, "visible") + require_int(opening, "pools")
+    declared = (
+        require_int(opening, "visible")
+        + require_int(opening, "pools")
+        + require_int(opening, "options")
+    )
     if len(lines) < declared + 1:
         return None
     return decode_samples(list(lines))[0]

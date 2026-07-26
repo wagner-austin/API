@@ -5,10 +5,16 @@ one line, in exactly the shape ``rwbot.agent.CommandRecord`` accepts — the
 agent rejects anything else loudly rather than skipping it, so this encoder
 exists to make malformed lines unrepresentable rather than merely unlikely.
 
-Two verbs are defined, matching the two the agent can dispatch: move a unit to
-a world position, and have a builder place a structure there. Both address a
-unit by its engine identity, never by roster position — position renumbers
-whenever anything is built or dies.
+Three verbs are defined, matching the three the agent can dispatch: move a unit
+to a world position, have a builder place a structure there, and have a
+building produce a unit. All address a unit by its engine identity, never by
+roster position — position renumbers whenever anything is built or dies.
+
+Placing and producing are separate verbs because the engine keeps them
+separate. A structure goes where the planner chooses and travels there as a
+build waypoint; a unit rolls out of the building that made it and is dispatched
+by the action's own key, with no position to carry
+([[mechanics-build-actions]]).
 """
 
 from __future__ import annotations
@@ -64,6 +70,24 @@ class BuildOrder(TypedDict):
     y: float
 
 
+class ProduceOrder(TypedDict):
+    """Have one building produce a unit.
+
+    Carries no position. The unit appears at the building that made it, so
+    there is nothing for the planner to choose, and the agent rejects a produce
+    order that carries a coordinate rather than ignoring it.
+
+    Attributes:
+        kind: Discriminator, always ``"produce"``.
+        unit_id: Engine identity of the producing building.
+        type_name: Registry name of the unit, e.g. ``"c_tank"``.
+    """
+
+    kind: Literal["produce"]
+    unit_id: int
+    type_name: str
+
+
 def move_order(*, unit_id: int, x: float, y: float) -> MoveOrder:
     """Build a validated move order.
 
@@ -96,14 +120,32 @@ def build_order(*, unit_id: int, type_name: str, x: float, y: float) -> BuildOrd
         The order.
 
     Raises:
-        CommandError: ``RW-CMD-001`` when the type name is blank,
-            ``RW-CMD-002`` when a coordinate is not finite.
+        CommandError: ``RW-CMD-001`` when the type name is blank or carries a
+            character the wire format cannot, ``RW-CMD-002`` when a coordinate
+            is not finite.
     """
-    if type_name.strip() == "":
-        raise CommandError(_BLANK_TYPE, "a build order needs a unit-type name")
+    _require_type_name(type_name, "build")
     _require_finite(x, "x")
     _require_finite(y, "y")
     return BuildOrder(kind="build", unit_id=unit_id, type_name=type_name, x=x, y=y)
+
+
+def produce_order(*, unit_id: int, type_name: str) -> ProduceOrder:
+    """Build a validated produce order.
+
+    Args:
+        unit_id: Engine identity of the producing building.
+        type_name: Registry name of the unit to produce.
+
+    Returns:
+        The order.
+
+    Raises:
+        CommandError: ``RW-CMD-001`` when the type name is blank or carries a
+            character the wire format cannot.
+    """
+    _require_type_name(type_name, "produce")
+    return ProduceOrder(kind="produce", unit_id=unit_id, type_name=type_name)
 
 
 def encode_move(order: MoveOrder) -> str:
@@ -121,33 +163,57 @@ def encode_move(order: MoveOrder) -> str:
 def encode_build(order: BuildOrder) -> str:
     """Render a build order as one wire line.
 
-    The type name is emitted unescaped: registry names are drawn from the
-    engine's own ``.ini`` vocabulary and contain no quotes or backslashes. A
-    name that did would be rejected by the agent's parser rather than
-    misinterpreted, because the parser reads one flat object and fails on
-    anything ambiguous.
+    The type name is emitted unescaped, which is safe because
+    :func:`build_order` already refused any name the flat format cannot carry.
 
     Args:
         order: The order to encode.
 
     Returns:
         One JSON object, without a trailing newline.
+    """
+    return (
+        f'{{"kind":"build","unit_id":{order["unit_id"]},'
+        f'"x":{order["x"]!r},"y":{order["y"]!r},"type":"{order["type_name"]}"}}'
+    )
+
+
+def encode_produce(order: ProduceOrder) -> str:
+    """Render a produce order as one wire line.
+
+    Args:
+        order: The order to encode.
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return f'{{"kind":"produce","unit_id":{order["unit_id"]},"type":"{order["type_name"]}"}}'
+
+
+def _require_type_name(type_name: str, verb: str) -> None:
+    """Reject a unit-type name the flat wire format cannot carry.
+
+    Checked when the order is built rather than when it is encoded, so a
+    malformed order cannot exist to be sent. Registry names come from the
+    engine's own vocabulary and contain none of these characters; one that did
+    would otherwise produce a line the agent's strict parser rejects at the far
+    end of a socket, rather than here.
+
+    Args:
+        type_name: The name to check.
+        verb: Order verb, for the message.
 
     Raises:
-        CommandError: ``RW-CMD-001`` when the type name contains a character
-            the flat wire format cannot carry.
+        CommandError: ``RW-CMD-001`` when the name is blank or unencodable.
     """
-    type_name = order["type_name"]
+    if type_name.strip() == "":
+        raise CommandError(_BLANK_TYPE, f"a {verb} order needs a unit-type name")
     for forbidden in ('"', "\\", "\n", "\r"):
         if forbidden in type_name:
             raise CommandError(
                 _BLANK_TYPE,
                 f"unit-type name {type_name!r} contains a character the wire format does not carry",
             )
-    return (
-        f'{{"kind":"build","unit_id":{order["unit_id"]},'
-        f'"x":{order["x"]!r},"y":{order["y"]!r},"type":"{type_name}"}}'
-    )
 
 
 def _require_finite(value: float, field: str) -> None:
@@ -168,8 +234,11 @@ __all__ = [
     "BuildOrder",
     "CommandError",
     "MoveOrder",
+    "ProduceOrder",
     "build_order",
     "encode_build",
     "encode_move",
+    "encode_produce",
     "move_order",
+    "produce_order",
 ]

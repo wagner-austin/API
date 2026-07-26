@@ -23,7 +23,7 @@ final class WireChecks {
     static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 4000);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 4000);
         // Pinned byte-for-byte on purpose. This is a wire contract, and the
         // consumer parses it strictly, so a field appearing, vanishing or being
         // renamed must fail here rather than at the far end of a socket. That
@@ -32,7 +32,7 @@ final class WireChecks {
         failures += Check.expect(
                 frame.equals(
                         "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
-                                + "\"visible\":3,\"pools\":2,\"credits\":4000}"),
+                                + "\"visible\":3,\"pools\":2,\"options\":5,\"credits\":4000}"),
                 "frame record is exact");
 
         // Pinned for the same reason, and separately: the consumer counts these
@@ -47,6 +47,29 @@ final class WireChecks {
         failures += Check.expect(
                 pool.indexOf(10) < 0 && pool.indexOf(13) < 0,
                 "a pool record never contains a newline");
+
+        String option =
+                StateStream.optionRecord(1918, 0, new BuildOptions.Option(228L, "tank", 3, false, true));
+        failures += Check.expect(
+                option.equals(
+                        "{\"kind\":\"option\",\"frame\":1918,\"index\":0,\"unit_id\":228,"
+                                + "\"produces\":\"tank\",\"action\":3,\"placed\":false,"
+                                + "\"available\":true}"),
+                "option record is exact");
+        // Reported rather than filtered out. An action a unit has but cannot use
+        // yet is a wait; one it does not have at all is a dead plan entry, and
+        // the planner can only tell them apart if both are on the wire.
+        failures += Check.expect(
+                StateStream.optionRecord(1, 0, new BuildOptions.Option(1L, "x", 0, true, false))
+                        .endsWith("\"available\":false}"),
+                "an option a unit cannot use yet says so rather than being omitted");
+        // Which verb orders it. A structure is placed at a chosen point; a unit
+        // is queued in the building that makes it, and the two are dispatched
+        // differently, so the flag has to survive the wire.
+        failures += Check.expect(
+                StateStream.optionRecord(1, 0, new BuildOptions.Option(1L, "x", 0, true, true))
+                        .contains("\"placed\":true"),
+                "a placed option is marked as one");
 
         // The placement flags are a separate stream with the same constraint.
         failures += Check.expect(
@@ -73,11 +96,14 @@ final class WireChecks {
                 "a record is exactly one object");
 
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0).contains("\"visible\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0).contains("\"pools\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"pools\":0"),
                 "a map with no pool in sight is still a record");
+        failures += Check.expect(
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"options\":0"),
+                "a player who can make nothing is still a record");
         return failures;
     }
 
@@ -98,6 +124,24 @@ final class WireChecks {
                                 + "\"type\":\"landFactory\"}");
         failures += Check.expect(build.kind() == CommandRecord.Kind.BUILD, "build verb parsed");
         failures += Check.expect("landFactory".equals(build.buildType()), "build type parsed");
+
+        CommandRecord produce =
+                CommandRecord.parse(
+                        "{\"kind\":\"produce\",\"unit_id\":228,\"type\":\"tank\"}");
+        failures += Check.expect(
+                produce.kind() == CommandRecord.Kind.PRODUCE, "produce verb parsed");
+        failures += Check.expect("tank".equals(produce.buildType()), "produce type parsed");
+        failures += Check.expect(produce.unitId() == 228L, "produce unit id parsed");
+        // A position on a produce command would be a coordinate nothing reads,
+        // so it is refused rather than ignored -- the same rule that keeps a
+        // mistyped build from reading as a move.
+        failures += expectBadCommand(
+                "{\"kind\":\"produce\",\"unit_id\":1,\"type\":\"tank\",\"x\":1}",
+                "a produce carrying a position");
+        failures += expectBadCommand(
+                "{\"kind\":\"produce\",\"unit_id\":1}", "produce with no type");
+        failures += expectBadCommand(
+                "{\"kind\":\"produce\",\"unit_id\":1,\"type\":\"\"}", "produce with a blank type");
 
         failures += Check.expect(
                 CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()

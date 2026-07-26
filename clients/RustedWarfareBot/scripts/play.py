@@ -31,12 +31,17 @@ from rw_bot.policy.runner import format_scorecard, run
 #: with the starting balance and nothing after it. Where they go is not a choice
 #: the plan makes -- the engine allows them on resource pools and nowhere else
 #: ([[mechanics-resource-pools]]).
+#: The last entry is a unit rather than a structure, and it is what proves the
+#: second verb. A Scout is produced by the Command Center the match starts
+#: with, so it needs no prerequisite -- and at $700 it is dear enough that a
+#: fixed stall window sized for a Builder would have declared it refused.
 DEFAULT_PLAN: tuple[str, ...] = (
     "extractorT1",
     "extractorT1",
     "landFactory",
     "extractorT1",
     "landFactory",
+    "scout",
 )
 
 DEFAULT_MAX_SAMPLES = 120

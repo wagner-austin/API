@@ -7,6 +7,7 @@ related:
   - "[[engine-entity-model]]"
   - "[[runtime-split-java-agent-python-brain]]"
   - "[[mechanics-resource-pools]]"
+  - "[[wire-contract-ndjson]]"
 source_paths:
   - "wiki/sources/m9-policy/plan-completed.txt:5"
   - "wiki/sources/m9-policy/plan-stalled-on-laboratory.txt:5"
@@ -14,6 +15,9 @@ source_paths:
   - "wiki/sources/m9-policy/visible-includes-opponents.ndjson:1"
   - "wiki/sources/m11-pools/pool-build-run.log:403"
   - "wiki/sources/m11-pools/builder-travel-timing.txt:13"
+  - "wiki/sources/m12-produce/produce-timing.txt"
+  - "wiki/sources/m12-produce/produce-run.log:411"
+  - "wiki/sources/m12-produce/produce-run.log:437"
   - "src/rw_bot/policy/build_order.py"
   - "src/rw_bot/policy/runner.py"
   - "scripts/play.py"
@@ -25,13 +29,19 @@ hubs: [bot-architecture, game-mechanics]
 
 # The Policy Loop
 
-The bot plays a build order unattended: it reads the world, decides what to build next, orders it, watches for the result, and reports a scorecard. Five structures, five orders, no waste ([[command-channel]]).
+The bot plays a build order unattended: it reads the world, decides what to make next, orders it, watches for the result, and reports a scorecard. Six entries, six orders, no waste -- five structures placed and one unit produced ([[command-channel]]).
 
 ## Deciding is pure
 
 `decide` takes a sample, a plan, the unit catalogue and the placement rules, and returns what to do. It opens no socket, reads no clock and mutates nothing, which is why the playing logic can be tested exhaustively without a game running — the same separation the agent holds on its own side ([[runtime-split-java-agent-python-brain]]).
 
 The loop around it is thin by design: read, ask, act, repeat.[^5] Everything that could be judged wrong lives in the pure half, where a world state goes in and a decision comes out.
+
+## Presence is not completion
+
+A building joins the roster the moment construction starts, so counting on presence reported a plan finished while a factory was still a shell -- and a shell produces nothing, so the next entry could be ordered against a building that could not accept it.[^6] Progress therefore counts only finished structures.
+
+That correction has a consequence which has to land with it. The builder stops moving the instant it arrives, and the structure appears unfinished at about the same moment, so movement stops being evidence of progress exactly when construction starts. Without the rising structure counting as in-flight too, the fix would trade a wrong scorecard for a false stall. The run is visibly slower for it -- the same six entries take 559 samples where presence-counting took 215, because it now waits for each one to finish.[^12]
 
 ## Progress is read, never counted
 
@@ -46,6 +56,28 @@ Structures take time to appear and the roster is what reports them, so re-decidi
 That protection has a cost, and a live run found it. A plan ending in a laboratory ran for three hundred samples and eighty-nine thousand frames, banked eleven thousand credits, and reported *"building laboratory (3 of 3)"* the entire time.[^2] Nothing was wrong with credits, placement or the channel. The engine had refused the order outright and said so only in its own log: **`Unit 'builder' can not queue build:laboratory`**.[^3]
 
 A builder cannot construct a laboratory. That is not derivable from the unit catalogue, which carries prices and stats but no build lists ([[building-structures]]), and the refusal produces no roster change and no error the planner can see.[^3] So the loop now stops after a bounded number of samples with no progress and reports `stalled`, naming what it was waiting on.[^5] A once-only order without that check is a bot that looks like it is working forever.
+
+## Who can make it is asked, not assumed
+
+The planner used to find a unit to order by looking for one whose type name was `builder`. That was a guess wearing the clothes of a constant, and it cost a three-hundred-sample run: a builder cannot construct a laboratory, the engine refuses the waypoint silently, and nothing in the catalogue says so ([[building-structures]]).
+
+The engine answers the question itself, per unit, and the answer now rides in every sample ([[wire-contract-ndjson]]). `find_producer` reads it, so a plan entry nothing owned can make is `blocked` before an order is spent rather than after three hundred samples of reporting progress.[^9]
+
+One exclusion is load-bearing. The map editor's placeholder is an owned entity in every sample, parked off-map at (-1000, -1000), and it answers for **108** types against the real Builder's **13** — a superset of everything the Builder can make, plus 95 more including the laboratory.[^10] Counting it would make the check above pass for types nothing playable can build, and the order would go to a unit that is not in the game. The check would look like protection while removing it.
+
+## Two verbs, because the engine has two
+
+A structure is placed at a position the planner chooses. A unit rolls out of the building that made it, and the engine decides where — so a produce order carries no coordinate at all. Which verb applies is read from the action rather than guessed from the produced type's speed.[^9]
+
+## One stall rule, two kinds of evidence
+
+The clock only runs while nothing observable is happening. What counts as observable differs by verb, and neither is a deadline the planner invents.
+
+A **placed build** is in flight while the builder walks to the site, and then while the structure itself is going up. A **produced unit** is in flight while the producing building holds it in its queue, which the building reports directly.[^9] That keeps the rule uniform: a factory never moves, so the movement test alone would call a working one refused.
+
+Two worse answers were tried first and are worth recording, because both look reasonable. Bounding production by **elapsed samples** caps what the bot can afford — production time scales with price, so any fixed window silently forbids expensive units, exactly as the pre-fix travel window forbade distant ones. Bounding it by **falling credits** does not work at all: measured through one production run the balance read 4243, 3678, 3813, 3849 — *rising* through most of it, because income outpaced the drain.[^11]
+
+The queue settles it, and it was measured rather than assumed: ordering a Scout, the Command Center reported `queued: 1` for all forty-five samples the unit took and dropped to zero on the sample it appeared.[^11] Production time itself is linear in price — a $500 Builder took 34 samples and a $700 Scout 45, or 14.7 and 15.6 credits per sample — which is why no constant derived from it could have been right for both.[^11]
 
 ## Two placement rules, because the engine has two
 
@@ -64,19 +96,23 @@ Timing one far build settled the fix. The structure appeared on the very sample 
 A run is judged, not just performed:[^7]
 
 ```
-outcome        done (all 5 structures built)
-completed      5/5
-orders sent    5
-samples seen   170
-frames elapsed 12703
-credits left   1710
+outcome        done (all 6 plan entries satisfied)
+completed      6/6
+orders sent    6
+samples seen   559
+frames elapsed 41814
+credits left   12682
 ```
+
+Six entries, six orders: three extractors and two factories placed, and one Scout produced.[^12]
 
 `orders sent` against `completed` is the figure that matters most — equal means nothing was wasted, higher means orders were re-issued, refused or lost. The stalled run scored three orders for two structures, which is what a refusal looks like in the numbers.[^2]
 
 ## What it still is not
 
 This policy executes a fixed sequence. It does not scout, fight, react to an opponent, or choose what to build from anything but a hardcoded list — and it plays against five opponents who are doing all of those things.[^1] It has no notion of winning. It now expands toward resources in the narrow sense that extractors go to pools, but it picks them by distance alone and never upgrades one.
+
+It knows what it *could* make and does not use that to plan. The build tree is read every sample, so the planner could derive that a Mammoth Tank needs a Land Factory first and insert it — but the plan is still a list a human wrote, and an entry whose prerequisite is missing is reported blocked rather than solved.
 
 What it does have is the shape a real policy needs: observe, decide, act, verify, score, and fail loudly when the world disagrees with it ([[building-structures]]).
 
@@ -86,4 +122,8 @@ What it does have is the shape a real policy needs: observe, decide, act, verify
 [^5]: `src/rw_bot/policy/runner.py` — `run` reads a sample, calls `decide`, and dispatches; `ordered_positions` bounds each plan position to one order, and `stall_samples` converts an unchanging position into a `stalled` outcome only once `_has_moved` reports the builder stationary.
 [^6]: `src/rw_bot/policy/build_order.py` — `completed_count` walks the roster, skipping entities whose `mine` is false, and matches each plan entry at most once.
 [^7]: `wiki/sources/m11-pools/pool-build-run.log:403` — the five `channel: build` lines of the pool-aware run, three `extractorT1` and two `landFactory`, scoring `completed 5/5, orders sent 5` over 170 samples. It supersedes the earlier three-factory run at `wiki/sources/m9-policy/plan-completed.txt:5`, which is what the scorecard block showed before extractors were in the plan.
+[^9]: `src/rw_bot/policy/build_order.py` — `find_producer` reads the sample's own option list; `decide` blocks on no producer, waits on an unavailable action, and branches to `produce` when the option reports `placed` false.
+[^10]: `wiki/sources/m6-wire/world-sample.ndjson` — in the first sample of the archived capture the option records divide 2 / 13 / 108 across units 213 (`commandCenter`), 214 (`builder`) and 217 (`editorOrBuilder`); all 13 of the Builder's types also appear under 217, and `laboratory` appears only under 217.
+[^11]: `wiki/sources/m12-produce/produce-timing.txt` — the two timings, the derived per-sample rate, and the credit series showing the balance rising mid-production.
+[^12]: `wiki/sources/m12-produce/produce-run.log:411`–`:437` — five `channel: build` lines followed by `produce: scout via action 'u_scout' on com.corrodinggames.rts.game.units.a.l` and `channel: produce scout by 213`, six dispatches for six plan entries with nothing re-issued. The action class is the same `a.l` the bytecode identified as unit production, which is what closes the loop between the reading and the dispatch.
 [^8]: `wiki/sources/m11-pools/builder-travel-timing.txt:13` — `RESULT travel_samples=52 total_samples=52`, with `construction_samples=0` at `:14` and `units_per_sample=11.72` at `:16`, over the 609.3-unit order stated in the header at `:5`.

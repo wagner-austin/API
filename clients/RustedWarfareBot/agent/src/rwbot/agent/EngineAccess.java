@@ -48,6 +48,31 @@ final class EngineAccess {
         }
     }
 
+    /**
+     * Finds a pinned field, or reports that this class does not have one.
+     *
+     * <p>Distinct from {@link #pinnedField} because absence means different
+     * things. A missing field on a class that should have it is drift and must
+     * fail loudly; a field only some unit classes carry -- a production queue,
+     * for instance -- is absent by design, and asking is the only way to tell.
+     *
+     * @param owner Class to search, including its superclasses.
+     * @param name Obfuscated field name.
+     * @return The accessible field, or null when this class has none.
+     */
+    static Field fieldIfPresent(Class<?> owner, String name) {
+        for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException e) {
+                continue;
+            }
+        }
+        return null;
+    }
+
     static Field pinnedField(Class<?> owner, String name) {
         for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
             try {

@@ -20,7 +20,7 @@ from rw_bot.policy.build_order import (
     find_free_pool,
     next_unsatisfied_index,
 )
-from rw_bot.wire.state import Entity, ResourcePool, Sample
+from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 
 def _unit(type_name: str, price: int, speed: float = 0.0) -> UnitStats:
@@ -87,6 +87,7 @@ def _entity(
     y: float = 0.0,
     *,
     mine: bool = True,
+    complete: bool = True,
 ) -> Entity:
     return Entity(
         index=0,
@@ -99,20 +100,52 @@ def _entity(
         mine=mine,
         hp=100.0,
         max_hp=100.0,
+        complete=complete,
+        queued=0,
     )
+
+
+def _option(
+    unit_id: int,
+    produces: str,
+    *,
+    placed: bool = True,
+    available: bool = True,
+) -> BuildOption:
+    return BuildOption(
+        index=0,
+        unit_id=unit_id,
+        produces=produces,
+        action=1,
+        placed=placed,
+        available=available,
+    )
+
+
+#: What the Builder offers by default in these worlds.
+#:
+#: Mirrors the live capture, where unit 214 reports thirteen placed structures
+#: including these. Supplying it by default keeps every test that is about
+#: placement or ordering from also having to restate the build tree; a test
+#: that is about the build tree passes its own.
+_BUILDER_OFFERS = ("landFactory", "airFactory", "extractorT1", "commandCenter", "teleporter")
 
 
 def _sample(
     *entities: Entity,
     credits: int = 4000,
     pools: tuple[ResourcePool, ...] = (),
+    options: tuple[BuildOption, ...] | None = None,
 ) -> Sample:
+    if options is None:
+        options = tuple(_option(214, name) for name in _BUILDER_OFFERS)
     return Sample(
         frame=1,
         clock_ms=10,
         credits=credits,
         entities=tuple(entities),
         pools=pools,
+        options=options,
     )
 
 
@@ -165,21 +198,145 @@ def test_a_finished_plan_reports_done() -> None:
     world = _sample(_BUILDER, _entity(300, "landFactory"), _entity(301, "airFactory"))
     decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS)
     assert decision["action"] == "done"
-    assert decision["reason"] == "all 2 structures built"
+    assert decision["reason"] == "all 2 plan entries satisfied"
 
 
 def test_insufficient_credits_waits_rather_than_ordering() -> None:
     world = _sample(_BUILDER, credits=899)
-    decision = decide(world, ("laboratory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS)
     assert decision["action"] == "wait"
-    assert decision["reason"] == "laboratory costs 900, holding 899"
+    assert decision["reason"] == "airFactory costs 900, holding 899"
     assert decision["type_name"] == ""
 
 
 def test_exactly_enough_credits_orders() -> None:
     """The boundary matters: the engine spends in whole units."""
     world = _sample(_BUILDER, credits=900)
-    assert decide(world, ("laboratory",), _CATALOGUE, _PLACEMENTS)["action"] == "build"
+    assert decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "build"
+
+
+def test_an_unfinished_structure_does_not_satisfy_the_plan() -> None:
+    """A building joins the roster when construction starts, not when it ends.
+
+    Counting on presence reported a plan finished while a factory was still a
+    shell -- and a shell produces nothing, so the next entry could be ordered
+    against a building that could not accept it.
+    """
+    shell = _entity(300, "landFactory", 4450.0, 2730.0, complete=False)
+    world = _sample(_BUILDER, _ANCHOR, shell)
+    assert completed_count(world, ("landFactory",)) == 0
+    assert next_unsatisfied_index(world, ("landFactory",)) == 0
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "build"
+
+
+def test_a_finished_structure_does_satisfy_the_plan() -> None:
+    """The same world, one flag different, is the whole of the distinction."""
+    done = _entity(300, "landFactory", 4450.0, 2730.0)
+    world = _sample(_BUILDER, _ANCHOR, done)
+    assert completed_count(world, ("landFactory",)) == 1
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "done"
+
+
+def test_a_type_nothing_owned_can_make_is_blocked() -> None:
+    """The laboratory failure, caught before an order is spent.
+
+    A builder has no action producing a laboratory. The engine refuses the
+    waypoint and says so only in its own log, so the old planner ordered it and
+    then reported "building laboratory" for three hundred samples. The build
+    tree answers the question up front instead.
+    """
+    decision = decide(_sample(_BUILDER), ("laboratory",), _CATALOGUE, _PLACEMENTS)
+    assert decision["action"] == "blocked"
+    assert "nothing the player owns can make laboratory" in decision["reason"]
+
+
+def test_the_editor_placeholder_never_counts_as_a_producer() -> None:
+    """The map editor's unit answers for nearly every type in the game.
+
+    It is owned, it is in every sample, and in the live capture it offers 108
+    types against the real Builder's 13 -- a superset, plus 95 more including
+    the laboratory. Counting it would make the check above pass for types
+    nothing playable can build, and the resulting order would go to a unit
+    parked at (-1000, -1000) and do nothing at all.
+    """
+    placeholder = _entity(217, "editorOrBuilder", -1000.0, -1000.0)
+    world = _sample(
+        _BUILDER,
+        placeholder,
+        options=(_option(217, "laboratory"),),
+    )
+    assert decide(world, ("laboratory",), _CATALOGUE, _PLACEMENTS)["action"] == "blocked"
+
+
+def test_an_action_that_exists_but_is_unavailable_waits() -> None:
+    """Present-but-unavailable is a world state, not a dead plan.
+
+    A prerequisite can still be built and tech can still be researched, so this
+    resolves on its own -- unlike an action that does not exist at all.
+    """
+    world = _sample(_BUILDER, options=(_option(214, "landFactory", available=False),))
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    assert decision["action"] == "wait"
+    assert "not available yet" in decision["reason"]
+
+
+def test_the_first_unavailable_option_is_the_one_reported() -> None:
+    """Two units both offer it and neither can act yet.
+
+    The wait is reported against one of them rather than collapsing to "nothing
+    can make this", which is the answer that would end the run. Which one is
+    named is the first seen, so the message stays stable across samples while
+    the roster does.
+    """
+    second = _entity(215, "builder", 4300.0, 2610.0)
+    world = _sample(
+        _BUILDER,
+        second,
+        options=(
+            _option(214, "landFactory", available=False),
+            _option(215, "landFactory", available=False),
+        ),
+    )
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    assert decision["action"] == "wait"
+    assert "unit 214" in decision["reason"]
+
+
+def test_an_available_action_is_preferred_over_an_unavailable_one() -> None:
+    """Two units offer the same type; only one can act on it now."""
+    second = _entity(215, "builder", 4300.0, 2610.0)
+    world = _sample(
+        _BUILDER,
+        second,
+        options=(
+            _option(214, "landFactory", available=False),
+            _option(215, "landFactory"),
+        ),
+    )
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["unit_id"] == 215
+
+
+def test_a_unit_that_rolls_out_is_produced_rather_than_placed() -> None:
+    """The engine decides where a produced unit appears, so no site is chosen.
+
+    ``placed`` is the engine's own distinction between the two verbs, read from
+    the action rather than guessed from the type's speed.
+    """
+    centre = _entity(213, "commandCenter", 4250.0, 2550.0)
+    world = _sample(centre, options=(_option(213, "builder", placed=False),))
+    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS)
+    assert decision["action"] == "produce"
+    assert decision["unit_id"] == 213
+    assert decision["type_name"] == "builder"
+    assert (decision["x"], decision["y"]) == (0.0, 0.0)
+
+
+def test_a_produced_unit_still_has_to_be_afforded() -> None:
+    centre = _entity(213, "commandCenter", 4250.0, 2550.0)
+    world = _sample(centre, credits=499, options=(_option(213, "builder", placed=False),))
+    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS)
+    assert decision["action"] == "wait"
+    assert decision["reason"] == "builder costs 500, holding 499"
 
 
 def test_no_builder_is_blocked_not_a_wait() -> None:

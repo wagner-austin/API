@@ -53,10 +53,10 @@ final class TypeFlags {
         java.util.LinkedHashMap<String, Boolean> flags =
                 new java.util.LinkedHashMap<String, Boolean>();
         for (Object type : builtInTypes()) {
-            flags.put(nameOf(type), Boolean.valueOf(needsPool(type)));
+            flags.put(Perception.nameOfType(type), Boolean.valueOf(needsPool(type)));
         }
         for (Object type : assetTypes()) {
-            flags.put(nameOf(type), Boolean.valueOf(needsPool(type)));
+            flags.put(Perception.nameOfType(type), Boolean.valueOf(needsPool(type)));
         }
 
         StringBuilder out = new StringBuilder();
@@ -72,7 +72,7 @@ final class TypeFlags {
     static String record(int index, String name, boolean needsPool) {
         StringBuilder out = new StringBuilder();
         out.append("{\"kind\":\"unittype\",\"index\":").append(index).append(",\"name\":");
-        appendQuoted(out, name);
+        Json.quote(out, name);
         out.append(",\"needs_pool\":").append(needsPool).append('}');
         return out.toString();
     }
@@ -145,43 +145,4 @@ final class TypeFlags {
         return ((Boolean) answer).booleanValue();
     }
 
-    /** Reads a type's readable name. */
-    private static String nameOf(Object type) {
-        Object name =
-                EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(
-                                type.getClass(), EngineNames.TYPE_NAME_ACCESSOR),
-                        type);
-        if (!(name instanceof String)) {
-            throw new IllegalStateException(
-                    "rw-agent: unit type name is not a String" + EngineNames.PIN);
-        }
-        return (String) name;
-    }
-
-    /**
-     * Writes a JSON string literal.
-     *
-     * <p>Type names are identifiers and contain nothing that needs escaping.
-     * They are escaped anyway, because a mod supplies its own names and a
-     * quote in one of them would otherwise produce a record that only a lenient
-     * parser accepts — and the consumer is not one.
-     *
-     * @param out Buffer to append to.
-     * @param text The raw string.
-     */
-    private static void appendQuoted(StringBuilder out, String text) {
-        out.append('"');
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '"' || c == '\\') {
-                out.append('\\').append(c);
-            } else if (c < 0x20) {
-                out.append(String.format("\\u%04x", (int) c));
-            } else {
-                out.append(c);
-            }
-        }
-        out.append('"');
-    }
 }

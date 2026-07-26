@@ -181,6 +181,125 @@ final class Orders {
      * @param typeName Registry name, e.g. {@code "extractorT1"}.
      * @return The unit type, or null when no type carries that name.
      */
+    /**
+     * Orders a building to produce a unit.
+     *
+     * <p>A different verb from {@link #buildAt}, and it has to be. Placing a
+     * structure sends a build waypoint carrying a type, which the engine
+     * resolves by scanning the subject's actions for one that <em>places</em>
+     * that type. A factory's actions place nothing — the unit rolls out of the
+     * building — so they are invisible to that lookup, and ordering a factory
+     * that way is refused with "can not queue build". Producing a unit instead
+     * sends the action's own interned key, which is what the game's own
+     * interface sends when the button is pressed (wiki: mechanics-build-actions).
+     *
+     * <p>The action is found on the unit and its key read off it, rather than
+     * composed from the type name. The engine builds those keys by a private
+     * convention, and reproducing that convention here would be a guess that
+     * happens to work.
+     *
+     * @param engine The live engine instance.
+     * @param producer The building to order.
+     * @param typeName The unit type to produce.
+     * @throws IllegalStateException When the producer has no action making that
+     *     type, naming what it can make instead.
+     */
+    static void produce(Object engine, Object producer, String typeName) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        if (team == null) {
+            throw new IllegalStateException("rw-agent: engine has no current player to produce for");
+        }
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
+        if (controller == null) {
+            throw new IllegalStateException("rw-agent: engine has no CommandController yet");
+        }
+
+        Object action = BuildOptions.actionMaking(producer, typeName);
+        if (action == null) {
+            throw new IllegalStateException(
+                    "rw-agent: " + Perception.typeNameOf(producer) + " has no action making '"
+                            + typeName + "'; it can make "
+                            + BuildOptions.describeMakeable(producer) + EngineNames.PIN);
+        }
+
+        Method create = EngineAccess.pinnedMethod(controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
+        if (command == null) {
+            throw new IllegalStateException("rw-agent: CommandController returned no command");
+        }
+
+        Method addUnit = EngineAccess.pinnedMethod(command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, producer);
+
+        Object key =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        action);
+        // The executor drops an action command whose key is null or the
+        // engine's "no action" sentinel, and drops it silently -- no log, no
+        // effect, indistinguishable from a command that ran and did nothing.
+        // Reporting the key is what makes that failure legible.
+        Log.info(
+                "produce: "
+                        + typeName
+                        + " via action "
+                        + describeKey(key)
+                        + " on "
+                        + action.getClass().getName()
+                        + " "
+                        + BuildOptions.describeGates(action, producer));
+        float[] at = Perception.positionOf(producer);
+        Method setAction =
+                EngineAccess.pinnedMethod(
+                        command.getClass(),
+                        "a",
+                        EngineAccess.pinnedClass(EngineNames.ACTION_KEY_CLASS),
+                        EngineAccess.pinnedClass(EngineNames.POINT_CLASS),
+                        EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS));
+        EngineAccess.invoke(setAction, command, key, newPoint(at[0], at[1]), null);
+    }
+
+    /**
+     * Renders an action key for a log line.
+     *
+     * @param key The interned key, or null.
+     * @return Its readable name, or a note that there is none.
+     */
+    private static String describeKey(Object key) {
+        if (key == null) {
+            return "<null>";
+        }
+        Object name =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(key.getClass(), EngineNames.ACTION_KEY_NAME),
+                        key);
+        return name instanceof String ? "'" + name + "'" : "<unnamed>";
+    }
+
+    /**
+     * Builds the point an action command carries.
+     *
+     * <p>The producer's own position. The engine's interface sends wherever the
+     * player clicked, and for a production action nothing consumes it; sending
+     * the building's own position keeps the command well-formed without
+     * inventing a destination the planner did not choose.
+     *
+     * @param x World x.
+     * @param y World y.
+     * @return A point the command will accept.
+     */
+    private static Object newPoint(float x, float y) {
+        Class<?> pointClass = EngineAccess.pinnedClass(EngineNames.POINT_CLASS);
+        try {
+            return pointClass
+                    .getConstructor(float.class, float.class)
+                    .newInstance(Float.valueOf(x), Float.valueOf(y));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot construct " + EngineNames.POINT_CLASS + EngineNames.PIN, e);
+        }
+    }
+
     static Object resolveType(String typeName) {
         Method lookup = EngineAccess.pinnedMethod(EngineAccess.pinnedClass(EngineNames.TYPE_REGISTRY_CLASS), "a", String.class);
         return EngineAccess.invoke(lookup, null, typeName);

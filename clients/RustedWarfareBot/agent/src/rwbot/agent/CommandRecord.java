@@ -22,7 +22,15 @@ final class CommandRecord {
         /** Send a unit to a world position. */
         MOVE,
         /** Have a builder place a structure at a world position. */
-        BUILD
+        BUILD,
+
+        /**
+         * Queue a unit in a building that makes it.
+         *
+         * <p>Carries no position, because there is nowhere to choose: the unit
+         * appears at the building that made it (wiki: mechanics-build-actions).
+         */
+        PRODUCE
     }
 
     private final Kind kind;
@@ -75,22 +83,45 @@ final class CommandRecord {
 
         String kindText = require(fields, "kind", line);
         long unitId = requireLong(fields, "unit_id", line);
-        float x = requireFloat(fields, "x", line);
-        float y = requireFloat(fields, "y", line);
 
+        // Required per verb rather than up front. A produce command has no
+        // position to carry, and demanding one would force the sender to
+        // invent a coordinate that nothing reads.
         if ("move".equals(kindText)) {
             reject(fields, "type", line);
-            return new CommandRecord(Kind.MOVE, unitId, x, y, "");
+            return new CommandRecord(
+                    Kind.MOVE,
+                    unitId,
+                    requireFloat(fields, "x", line),
+                    requireFloat(fields, "y", line),
+                    "");
         }
         if ("build".equals(kindText)) {
-            String type = require(fields, "type", line);
-            if (type.isEmpty()) {
-                throw new IllegalArgumentException("build command has an empty type: " + line);
-            }
-            return new CommandRecord(Kind.BUILD, unitId, x, y, type);
+            return new CommandRecord(
+                    Kind.BUILD,
+                    unitId,
+                    requireFloat(fields, "x", line),
+                    requireFloat(fields, "y", line),
+                    requireType(fields, "build", line));
+        }
+        if ("produce".equals(kindText)) {
+            reject(fields, "x", line);
+            reject(fields, "y", line);
+            return new CommandRecord(Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line));
         }
         throw new IllegalArgumentException(
-                "unknown command kind '" + kindText + "'; expected move or build: " + line);
+                "unknown command kind '" + kindText + "'; expected move, build or produce: "
+                        + line);
+    }
+
+    /** Reads the unit-type field, which no verb that carries it may leave blank. */
+    private static String requireType(
+            java.util.Map<String, String> fields, String verb, String line) {
+        String type = require(fields, "type", line);
+        if (type.isEmpty()) {
+            throw new IllegalArgumentException(verb + " command has an empty type: " + line);
+        }
+        return type;
     }
 
     private static String require(java.util.Map<String, String> fields, String key, String line) {

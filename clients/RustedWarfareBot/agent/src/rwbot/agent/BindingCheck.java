@@ -116,6 +116,29 @@ final class BindingCheck {
         if (customType != null) {
             checkField(customType, EngineNames.CUSTOM_TYPE_LIST, problems);
         }
+
+        Class<?> action = checkClass(EngineNames.ACTION_CLASS, problems);
+        if (entity != null) {
+            checkMethod(entity, EngineNames.ACTIONS, problems);
+        }
+        Class<?> actionKey = checkClass(EngineNames.ACTION_KEY_CLASS, problems);
+        Class<?> point = checkClass(EngineNames.POINT_CLASS, problems);
+        if (action != null) {
+            checkMethod(action, EngineNames.ACTION_MAKES, problems);
+            checkMethod(action, EngineNames.ACTION_PLACED_TYPE, problems);
+            checkMethod(action, EngineNames.ACTION_MAKES_SOMETHING, problems);
+            checkMethod(action, EngineNames.ACTION_KEY, problems);
+            checkMethod(action, EngineNames.ACTION_INDEX, problems);
+        }
+        if (command != null && actionKey != null && point != null && entity != null) {
+            // The production verb. Distinct from the placement one above, and
+            // checked separately, because a game update could move either.
+            checkMethod(command, "a", problems, actionKey, point, entity);
+        }
+        if (action != null && entity != null) {
+            checkMethod(action, EngineNames.ACTION_AVAILABLE, problems, entity);
+            checkMethod(action, EngineNames.ACTION_LOCKED, problems, entity);
+        }
         return problems;
     }
 

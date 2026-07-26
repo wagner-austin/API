@@ -40,11 +40,15 @@ KIND_ENTITY: Final = "entity"
 KIND_POOL: Final = "pool"
 """``kind`` value of a resource-pool record inside a sample."""
 
+KIND_OPTION: Final = "option"
+"""``kind`` value of a build-option record inside a sample."""
+
 _UNKNOWN_KIND = "RW-WIRE-001"
 _RECORD_BEFORE_FRAME = "RW-WIRE-002"
 _COUNT_MISMATCH = "RW-WIRE-003"
 _FRAME_MISMATCH = "RW-WIRE-004"
 _POOL_COUNT_MISMATCH = "RW-WIRE-005"
+_OPTION_COUNT_MISMATCH = "RW-WIRE-006"
 
 
 class WireError(RwBotError):
@@ -79,6 +83,13 @@ class Entity(TypedDict):
             buildings to itself.
         hp: Current health.
         max_hp: Health at full.
+        complete: Whether construction has finished. A building joins the roster
+            the moment construction starts, so presence is not completion — and
+            an unfinished factory never advances its production queue.
+        queued: Units this entity has queued for production, zero for anything
+            that makes nothing. A production order changes no roster until the
+            unit is finished, so this is the only immediate evidence that the
+            engine accepted one.
     """
 
     index: int
@@ -91,6 +102,8 @@ class Entity(TypedDict):
     mine: bool
     hp: float
     max_hp: float
+    complete: bool
+    queued: int
 
 
 class ResourcePool(TypedDict):
@@ -120,6 +133,39 @@ class ResourcePool(TypedDict):
     y: float
 
 
+class BuildOption(TypedDict):
+    """One thing an owned unit can make.
+
+    The engine treats placing a building and producing a unit as the same
+    mechanism: a builder's actions yield buildings, a factory's yield units, and
+    one command verb dispatches either. What differs is only which unit has the
+    action, so this is the table that answers "who can make X" — a question no
+    stat dump answers and that the bot has twice guessed wrong.
+
+    Attributes:
+        index: Position in the sample's option list. Enumeration order only.
+        unit_id: Engine identity of the unit that can make it. This is what an
+            order is addressed to, so no second lookup is needed.
+        produces: Type name it makes, in the same vocabulary a plan uses.
+        action: The engine's selector index for this action. Distinguishes two
+            actions on one unit that produce the same type.
+        placed: Whether the thing is put at a position the planner chooses. A
+            structure is; a unit rolls out of the building that made it. This
+            decides which verb orders it, and it is the engine's own
+            distinction rather than a guess from the type's speed.
+        available: Whether the unit may use it right now. An action that exists
+            but is unavailable is a wait; one that does not exist at all is a
+            dead plan entry, and the two need different answers.
+    """
+
+    index: int
+    unit_id: int
+    produces: str
+    action: int
+    placed: bool
+    available: bool
+
+
 class Sample(TypedDict):
     """One coherent observation of the world.
 
@@ -136,6 +182,8 @@ class Sample(TypedDict):
         pools: Every resource pool currently visible, in scan order. Fog-filtered
             by the engine's own per-tile test, so this grows as the map is
             explored rather than listing the whole map from the first frame.
+        options: Everything the player's own units can currently make, one entry
+            per producible type per unit.
     """
 
     frame: int
@@ -143,6 +191,7 @@ class Sample(TypedDict):
     credits: int
     entities: tuple[Entity, ...]
     pools: tuple[ResourcePool, ...]
+    options: tuple[BuildOption, ...]
 
 
 def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
@@ -170,9 +219,11 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
     clock_ms: int = 0
     declared_entities: int = 0
     declared_pools: int = 0
+    declared_options: int = 0
     credits: int = 0
     entities: list[Entity] = []
     pools: list[ResourcePool] = []
+    options: list[BuildOption] = []
     started = False
 
     for line in lines:
@@ -190,18 +241,36 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                         credits,
                         declared_entities,
                         declared_pools,
+                        declared_options,
                         entities,
                         pools,
+                        options,
                     )
                 )
             frame = require_int(record, "frame")
             clock_ms = require_int(record, "clock_ms")
             declared_entities = require_int(record, "visible")
             declared_pools = require_int(record, "pools")
+            declared_options = require_int(record, "options")
             credits = require_int(record, "credits")
             entities = []
             pools = []
+            options = []
             started = True
+            continue
+
+        if kind == KIND_OPTION:
+            _require_inside_sample(started, kind, frame, record)
+            options.append(
+                BuildOption(
+                    index=require_int(record, "index"),
+                    unit_id=require_int(record, "unit_id"),
+                    produces=require_non_empty_str(record, "produces"),
+                    action=require_int(record, "action"),
+                    placed=require_bool(record, "placed"),
+                    available=require_bool(record, "available"),
+                )
+            )
             continue
 
         if kind == KIND_POOL:
@@ -231,6 +300,8 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                     mine=require_bool(record, "mine"),
                     hp=require_finite_float(record, "hp"),
                     max_hp=require_finite_float(record, "max_hp"),
+                    complete=require_bool(record, "complete"),
+                    queued=require_int(record, "queued"),
                 )
             )
             continue
@@ -239,7 +310,17 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
 
     if started:
         samples.append(
-            _close(frame, clock_ms, credits, declared_entities, declared_pools, entities, pools)
+            _close(
+                frame,
+                clock_ms,
+                credits,
+                declared_entities,
+                declared_pools,
+                declared_options,
+                entities,
+                pools,
+                options,
+            )
         )
     return tuple(samples)
 
@@ -283,8 +364,10 @@ def _close(
     credits: int,
     declared_entities: int,
     declared_pools: int,
+    declared_options: int,
     entities: list[Entity],
     pools: list[ResourcePool],
+    options: list[BuildOption],
 ) -> Sample:
     """Finish a sample, checking it against its own declared counts.
 
@@ -294,15 +377,18 @@ def _close(
         credits: The sample's credit balance.
         declared_entities: The entity count the frame record promised.
         declared_pools: The pool count the frame record promised.
+        declared_options: The option count the frame record promised.
         entities: The entity records actually seen.
         pools: The pool records actually seen.
+        options: The option records actually seen.
 
     Returns:
         The completed sample.
 
     Raises:
         WireError: ``RW-WIRE-003`` when the entity counts disagree,
-            ``RW-WIRE-005`` when the pool counts do.
+            ``RW-WIRE-005`` when the pool counts do, ``RW-WIRE-006`` when the
+            option counts do.
     """
     if len(entities) != declared_entities:
         raise WireError(
@@ -316,12 +402,19 @@ def _close(
             f"frame {frame} declared {declared_pools} visible resource pools but carried "
             f"{len(pools)}; the capture is truncated or interleaved",
         )
+    if len(options) != declared_options:
+        raise WireError(
+            _OPTION_COUNT_MISMATCH,
+            f"frame {frame} declared {declared_options} build options but carried "
+            f"{len(options)}; the capture is truncated or interleaved",
+        )
     return Sample(
         frame=frame,
         clock_ms=clock_ms,
         credits=credits,
         entities=tuple(entities),
         pools=tuple(pools),
+        options=tuple(options),
     )
 
 
@@ -343,7 +436,7 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
     lines = [
         f'{{"kind":"{KIND_FRAME}","frame":{frame},'
         f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
-        f'"pools":{len(sample["pools"])},'
+        f'"pools":{len(sample["pools"])},"options":{len(sample["options"])},'
         f'"credits":{sample["credits"]}}}'
     ]
     for entity in sample["entities"]:
@@ -354,13 +447,24 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"id":{entity["unit_id"]},"type":"{type_name}",'
             f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
             f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
-            f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r}}}'
+            f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r},'
+            f'"complete":{str(entity["complete"]).lower()},'
+            f'"queued":{entity["queued"]}}}'
         )
     for pool in sample["pools"]:
         lines.append(
             f'{{"kind":"{KIND_POOL}","frame":{frame},"index":{pool["index"]},'
             f'"tile_x":{pool["tile_x"]},"tile_y":{pool["tile_y"]},'
             f'"x":{pool["x"]!r},"y":{pool["y"]!r}}}'
+        )
+    for option in sample["options"]:
+        produces = _escape(option["produces"])
+        lines.append(
+            f'{{"kind":"{KIND_OPTION}","frame":{frame},"index":{option["index"]},'
+            f'"unit_id":{option["unit_id"]},"produces":"{produces}",'
+            f'"action":{option["action"]},'
+            f'"placed":{str(option["placed"]).lower()},'
+            f'"available":{str(option["available"]).lower()}}}'
         )
     return tuple(lines)
 
@@ -394,7 +498,9 @@ def _escape(text: str) -> str:
 __all__ = [
     "KIND_ENTITY",
     "KIND_FRAME",
+    "KIND_OPTION",
     "KIND_POOL",
+    "BuildOption",
     "Entity",
     "ResourcePool",
     "Sample",

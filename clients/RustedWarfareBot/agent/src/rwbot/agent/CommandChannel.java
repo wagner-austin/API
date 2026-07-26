@@ -184,6 +184,15 @@ final class CommandChannel {
                             + ")");
             return;
         }
+        if (command.kind() == CommandRecord.Kind.PRODUCE) {
+            Orders.produce(engine, unit, command.buildType());
+            Log.info(
+                    "channel: produce "
+                            + command.buildType()
+                            + " by "
+                            + command.unitId());
+            return;
+        }
         Orders.buildAt(engine, unit, command.buildType(), command.x(), command.y());
         Log.info(
                 "channel: build "

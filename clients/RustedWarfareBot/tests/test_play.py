@@ -33,7 +33,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":100.0,"y":200.0,'
-        f'"team":0,"mine":true,"hp":100.0,"max_hp":100.0}}'
+        f'"team":0,"mine":true,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
@@ -45,20 +45,38 @@ def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
     )
 
 
+#: What the Builder offers by default here -- the plan's own types, which the
+#: live capture confirms unit 214 reports.
+_BUILDER_OFFERS = ("extractorT1", "landFactory")
+
+
+def _option_line(frame: int, index: int, unit_id: int, produces: str) -> str:
+    return (
+        f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
+        f'"produces":"{produces}","action":1,"placed":true,"available":true}}'
+    )
+
+
 def _sample_lines(
     frame: int,
     credits: int,
     *entities: tuple[int, str],
     pools: tuple[tuple[int, int], ...] = (),
+    options: tuple[tuple[int, str], ...] | None = None,
 ) -> list[str]:
+    if options is None:
+        options = tuple((214, name) for name in _BUILDER_OFFERS)
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
-        f'"visible":{len(entities)},"pools":{len(pools)},"credits":{credits}}}'
+        f'"visible":{len(entities)},"pools":{len(pools)},'
+        f'"options":{len(options)},"credits":{credits}}}'
     ]
     for index, (unit_id, type_name) in enumerate(entities):
         lines.append(_entity_line(frame, index, unit_id, type_name))
     for index, (tile_x, tile_y) in enumerate(pools):
         lines.append(_pool_line(frame, index, tile_x, tile_y))
+    for index, (unit_id, produces) in enumerate(options):
+        lines.append(_option_line(frame, index, unit_id, produces))
     return lines
 
 
@@ -149,9 +167,9 @@ class _StubbedConnect:
 
 
 def test_the_real_catalogue_prices_the_whole_plan() -> None:
-    """Every planned structure must be priceable, or the run blocks at once."""
+    """Every plan entry must be priceable, or the run blocks at once."""
     catalogue = load_catalogue(_CATALOGUE_PATH)
-    assert [catalogue[name]["price"] for name in DEFAULT_PLAN] == [700, 700, 700, 700, 700]
+    assert [catalogue[name]["price"] for name in DEFAULT_PLAN] == [700, 700, 700, 700, 700, 700]
 
 
 def test_the_real_dump_rules_every_planned_structure() -> None:
@@ -163,6 +181,7 @@ def test_the_real_dump_rules_every_planned_structure() -> None:
         False,
         True,
         False,
+        False,
     ]
 
 
@@ -171,20 +190,32 @@ def test_the_plan_opens_with_the_structures_that_pay_for_the_rest() -> None:
     assert DEFAULT_PLAN[0] == "extractorT1"
 
 
+def test_the_plan_ends_with_something_produced_rather_than_placed() -> None:
+    """The second verb needs exercising by the default plan, not just by tests.
+
+    A Scout is made by the Command Center the match starts with, so it needs no
+    prerequisite building -- which keeps the plan a straight line while still
+    proving production end to end.
+    """
+    assert DEFAULT_PLAN[-1] == "scout"
+    assert load_placements(_PLACEMENT_PATH)["scout"]["needs_pool"] is False
+
+
 def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     built = [(300 + i, name) for i, name in enumerate(DEFAULT_PLAN)]
     peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "5"]) == EXIT_OK
     assert capsys.readouterr().out.splitlines() == [
-        "plan: extractorT1 -> extractorT1 -> landFactory -> extractorT1 -> landFactory",
+        "plan: extractorT1 -> extractorT1 -> landFactory -> extractorT1 -> landFactory -> scout",
         "  extractorT1 costs 700, goes on a resource pool",
         "  extractorT1 costs 700, goes on a resource pool",
         "  landFactory costs 700, goes on the ring",
         "  extractorT1 costs 700, goes on a resource pool",
         "  landFactory costs 700, goes on the ring",
-        "outcome        done (all 5 structures built)",
-        "completed      5/5",
+        "  scout costs 700, goes on the ring",
+        "outcome        done (all 6 plan entries satisfied)",
+        "completed      6/6",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -196,10 +227,10 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
     peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER))
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[6:] == [
+    assert capsys.readouterr().out.splitlines()[7:] == [
         "outcome        sample_limit (extractorT1 needs a resource pool and every one"
         " of the 0 in sight is occupied)",
-        "completed      0/5",
+        "completed      0/6",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -214,9 +245,9 @@ def test_the_sample_budget_defaults_when_not_given(
     peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
-    assert capsys.readouterr().out.splitlines()[6:] == [
-        "outcome        done (all 5 structures built)",
-        "completed      5/5",
+    assert capsys.readouterr().out.splitlines()[7:] == [
+        "outcome        done (all 6 plan entries satisfied)",
+        "completed      6/6",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",

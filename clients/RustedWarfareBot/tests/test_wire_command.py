@@ -14,7 +14,9 @@ from rw_bot.wire.command import (
     build_order,
     encode_build,
     encode_move,
+    encode_produce,
     move_order,
+    produce_order,
 )
 
 
@@ -26,6 +28,36 @@ def test_move_encodes_to_the_exact_agent_format() -> None:
 def test_build_encodes_to_the_exact_agent_format() -> None:
     line = encode_build(build_order(unit_id=214, type_name="landFactory", x=4450.0, y=2730.0))
     assert line == ('{"kind":"build","unit_id":214,"x":4450.0,"y":2730.0,"type":"landFactory"}')
+
+
+def test_produce_encodes_to_the_exact_agent_format() -> None:
+    line = encode_produce(produce_order(unit_id=213, type_name="scout"))
+    assert line == '{"kind":"produce","unit_id":213,"type":"scout"}'
+
+
+def test_a_produce_order_carries_no_position() -> None:
+    """A produced unit rolls out of the building that made it.
+
+    The engine decides where it appears, so a coordinate here would be a number
+    the planner invented and the agent would have to ignore. Its absence is the
+    contract, which is why it is asserted rather than assumed.
+    """
+    line = encode_produce(produce_order(unit_id=213, type_name="builder"))
+    assert '"x"' not in line
+    assert '"y"' not in line
+
+
+def test_a_blank_produce_type_is_rejected() -> None:
+    with pytest.raises(CommandError) as caught:
+        produce_order(unit_id=213, type_name="  ")
+    assert caught.value.code == "RW-CMD-001"
+
+
+@pytest.mark.parametrize("hostile", ['sc"out', "sc\\out", "sc\nout", "sc\rout"])
+def test_a_produce_type_the_flat_format_cannot_carry_is_rejected(hostile: str) -> None:
+    with pytest.raises(CommandError) as caught:
+        produce_order(unit_id=213, type_name=hostile)
+    assert caught.value.code == "RW-CMD-001"
 
 
 def test_a_move_never_carries_a_build_type() -> None:

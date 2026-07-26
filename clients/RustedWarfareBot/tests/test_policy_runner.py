@@ -43,12 +43,17 @@ _CATALOGUE = {
     # every build standing on the site it just used, and a mobile unit must not
     # make that site read as occupied.
     "builder": _unit("builder", 500, speed=0.6),
+    # Priced as the live catalogue prices it, because the produce window is
+    # derived from the price rather than fixed -- a made-up figure here would
+    # make the window tests assert nothing.
+    "scout": _unit("scout", 700, speed=1.0),
 }
 
 _PLACEMENTS = {
     "landFactory": _place("landFactory"),
     "laboratory": _place("laboratory"),
     "extractorT1": _place("extractorT1", needs_pool=True),
+    "scout": _place("scout"),
 }
 
 
@@ -65,12 +70,14 @@ def _entity_line(
     type_name: str,
     mine: bool,
     at: tuple[float, float],
+    queued: int = 0,
+    complete: bool = True,
 ) -> str:
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{at[0]},"y":{at[1]},'
         f'"team":{0 if mine else 1},"mine":{str(mine).lower()},'
-        f'"hp":100.0,"max_hp":100.0}}'
+        f'"hp":100.0,"max_hp":100.0,"complete":{str(complete).lower()},"queued":{queued}}}'
     )
 
 
@@ -82,12 +89,27 @@ def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
     )
 
 
+#: What the Builder offers by default in these worlds, mirroring the capture.
+_BUILDER_OFFERS = ("landFactory", "airFactory", "extractorT1", "laboratory")
+
+
+def _option_line(frame: int, index: int, unit_id: int, produces: str, placed: bool) -> str:
+    return (
+        f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
+        f'"produces":"{produces}","action":1,'
+        f'"placed":{str(placed).lower()},"available":true}}'
+    )
+
+
 def _sample_lines(
     frame: int,
     credits: int,
     *entities: tuple[int, str, bool],
     pools: tuple[tuple[int, int], ...] = (),
     at: Mapping[int, tuple[float, float]] | None = None,
+    options: tuple[tuple[int, str, bool], ...] | None = None,
+    queued: Mapping[int, int] | None = None,
+    complete: Mapping[int, bool] | None = None,
 ) -> list[str]:
     """Render one sample.
 
@@ -98,14 +120,27 @@ def _sample_lines(
         pools: Tile coordinates of the visible resource pools.
         at: Positions by unit id, for the entities whose position matters.
             Anything absent stands at :data:`_DEFAULT_AT`.
+        options: ``(unit_id, produces, placed)`` per build option the player's
+            units offer. Defaults to the Builder offering the structures these
+            runs order, which is what the live capture shows it offering.
+        queued: Units queued for production, by unit id. Anything absent has an
+            empty queue, which is what the live capture shows for a building
+            that is not making anything.
+        complete: Construction state by unit id. Anything absent is finished,
+            since most tests are not about the construction window.
 
     Returns:
         The sample's NDJSON lines.
     """
+    if options is None:
+        options = tuple((214, name, True) for name in _BUILDER_OFFERS)
     positions = at if at is not None else {}
+    queues = queued if queued is not None else {}
+    done = complete if complete is not None else {}
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
-        f'"visible":{len(entities)},"pools":{len(pools)},"credits":{credits}}}'
+        f'"visible":{len(entities)},"pools":{len(pools)},'
+        f'"options":{len(options)},"credits":{credits}}}'
     ]
     for index, (unit_id, type_name, mine) in enumerate(entities):
         lines.append(
@@ -116,10 +151,14 @@ def _sample_lines(
                 type_name,
                 mine,
                 positions.get(unit_id, _DEFAULT_AT),
+                queues.get(unit_id, 0),
+                done.get(unit_id, True),
             )
         )
     for index, (tile_x, tile_y) in enumerate(pools):
         lines.append(_pool_line(frame, index, tile_x, tile_y))
+    for index, (unit_id, produces, placed) in enumerate(options):
+        lines.append(_option_line(frame, index, unit_id, produces, placed))
     return lines
 
 
@@ -276,7 +315,7 @@ def test_the_scorecard_renders_every_figure() -> None:
     )
     card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=5)
     assert format_scorecard(card) == (
-        "outcome        done (all 1 structures built)",
+        "outcome        done (all 1 plan entries satisfied)",
         "completed      1/1",
         "orders sent    1",
         "samples seen   2",
@@ -302,6 +341,188 @@ def test_an_order_the_engine_refuses_is_reported_as_stalled() -> None:
     assert card["orders_sent"] == 1
     assert card["completed"] == 0
     assert "laboratory was ordered but never appeared after 4 samples" in card["last_reason"]
+
+
+def test_a_produced_unit_leaves_as_a_produce_order_carrying_no_position() -> None:
+    """Two verbs, because the engine has two.
+
+    A structure is placed where the planner chooses; a unit rolls out of the
+    building that made it. Sending a build order for the second would offer the
+    engine a coordinate it does not want.
+    """
+    centre = (213, "commandCenter", True)
+    peer = _ScriptedPeer(_sample_lines(1, 4000, centre, options=((213, "scout", False),)))
+    card = run(
+        AgentChannel(peer),
+        ("scout",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=1,
+    )
+    assert peer.sent == ['{"kind":"produce","unit_id":213,"type":"scout"}']
+    assert card["orders_sent"] == 1
+
+
+def test_a_building_with_the_order_in_its_queue_is_not_called_stalled() -> None:
+    """The production counterpart of a builder still walking to its site.
+
+    A factory never moves, so the movement test alone would call a working one
+    refused after the window expired. The building reports what it is holding,
+    and that is the signal -- measured live, a Command Center read ``queued: 1``
+    for all forty-five samples a Scout took and dropped to zero on the sample it
+    appeared.
+    """
+    centre = (213, "commandCenter", True)
+    peer = _ScriptedPeer(
+        _sample_lines(
+            1,
+            9000,
+            centre,
+            options=((213, "scout", False),),
+            queued={213: 1},
+        )
+        * 40
+    )
+    card = run(
+        AgentChannel(peer),
+        ("scout",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=30,
+        stall_samples=4,
+    )
+    assert card["outcome"] == "sample_limit"
+    assert card["orders_sent"] == 1
+
+
+def test_a_structure_going_up_is_not_called_stalled() -> None:
+    """The regression that not counting unfinished structures would introduce.
+
+    The builder stops moving the moment it arrives, and the structure joins the
+    roster unfinished at about the same time. So movement stops being evidence
+    exactly when construction starts, and without the second half of the
+    in-flight test the run would call a rising factory refused.
+    """
+    peer = _ScriptedPeer(
+        _sample_lines(1, 4000, _BUILDER)
+        + _sample_lines(2, 4000, _BUILDER, (300, "landFactory", True), complete={300: False}) * 40
+    )
+    card = run(
+        AgentChannel(peer),
+        ("landFactory",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=20,
+        stall_samples=3,
+    )
+    assert card["outcome"] == "sample_limit"
+    assert card["orders_sent"] == 1
+    assert card["completed"] == 0
+
+
+def test_a_structure_that_finishes_ends_the_plan() -> None:
+    """The same run, with the flag flipping, completes rather than timing out."""
+    peer = _ScriptedPeer(
+        _sample_lines(1, 4000, _BUILDER)
+        + _sample_lines(2, 4000, _BUILDER, (300, "landFactory", True), complete={300: False})
+        + _sample_lines(3, 4000, _BUILDER, (300, "landFactory", True))
+    )
+    card = run(
+        AgentChannel(peer),
+        ("landFactory",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=20,
+        stall_samples=3,
+    )
+    assert card["outcome"] == "done"
+    assert card["completed"] == 1
+    assert card["orders_sent"] == 1
+
+
+def test_an_opponents_half_built_structure_does_not_keep_our_clock_alive() -> None:
+    """Ownership is checked, or an enemy site in view would suspend the stall."""
+    peer = _ScriptedPeer(
+        _sample_lines(1, 4000, _BUILDER)
+        + _sample_lines(2, 4000, _BUILDER, (900, "landFactory", False), complete={900: False}) * 40
+    )
+    card = run(
+        AgentChannel(peer),
+        ("landFactory",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=20,
+        stall_samples=3,
+    )
+    assert card["outcome"] == "stalled"
+
+
+def test_the_producer_is_found_wherever_it_sits_in_the_roster() -> None:
+    """Roster order is enumeration order and renumbers constantly.
+
+    The queue has to be read off the unit the order was addressed to, so a
+    producer standing behind other entities must still be found.
+    """
+    centre = (213, "commandCenter", True)
+    peer = _ScriptedPeer(
+        _sample_lines(
+            1,
+            9000,
+            _BUILDER,
+            centre,
+            options=((213, "scout", False),),
+            queued={213: 1},
+        )
+        * 40
+    )
+    card = run(
+        AgentChannel(peer),
+        ("scout",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=30,
+        stall_samples=4,
+    )
+    assert card["outcome"] == "sample_limit"
+
+
+def test_a_producer_holding_nothing_is_called_stalled() -> None:
+    """An empty queue after an order means the engine refused it."""
+    centre = (213, "commandCenter", True)
+    peer = _ScriptedPeer(_sample_lines(1, 9000, centre, options=((213, "scout", False),)) * 40)
+    card = run(
+        AgentChannel(peer),
+        ("scout",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=30,
+        stall_samples=4,
+    )
+    assert card["outcome"] == "stalled"
+    assert "scout was ordered but never appeared" in card["last_reason"]
+
+
+def test_a_producer_destroyed_mid_order_stalls_rather_than_waiting_forever() -> None:
+    """No producer in the roster is no evidence of progress.
+
+    Treating a missing building as "still working" would hang the run on
+    something that no longer exists, which is the same trap a missing builder
+    sets for the movement test.
+    """
+    centre = (213, "commandCenter", True)
+    peer = _ScriptedPeer(
+        _sample_lines(1, 9000, centre, options=((213, "scout", False),))
+        + _sample_lines(2, 9000, options=((213, "scout", False),)) * 40
+    )
+    card = run(
+        AgentChannel(peer),
+        ("scout",),
+        _CATALOGUE,
+        _PLACEMENTS,
+        max_samples=30,
+        stall_samples=4,
+    )
+    assert card["outcome"] == "stalled"
 
 
 def test_an_extractor_is_ordered_onto_a_pool_and_the_next_onto_a_different_one() -> None:

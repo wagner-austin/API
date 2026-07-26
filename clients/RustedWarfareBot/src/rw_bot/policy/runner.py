@@ -15,7 +15,7 @@ from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.build_order import Decision, completed_count, decide, find_builder
-from rw_bot.wire.command import build_order
+from rw_bot.wire.command import build_order, produce_order
 from rw_bot.wire.state import Sample
 
 #: Samples a *stationary* builder may persist without progress before the run
@@ -99,7 +99,7 @@ def run(
 
     Args:
         channel: An open connection to the agent.
-        plan: Structures to build, in order.
+        plan: What to make, in order. Entries may be structures or units.
         catalogue: Unit stats by type name, for prices.
         placements: Placement rules by type name, for where each may stand.
         max_samples: Stop after this many samples regardless of progress.
@@ -144,7 +144,13 @@ def run(
 
         position = completed_count(sample, plan)
         if position in ordered_positions:
-            if moved:
+            # One rule for both verbs: the clock only runs while nothing
+            # observable is happening. What counts as observable differs --
+            # a builder walking to its site, a building holding something in
+            # its queue -- but neither is a guess about how long the work
+            # should take, which is what makes the window independent of price,
+            # distance and map size alike.
+            if _in_flight(sample, decision, moved):
                 ordered_at = samples_seen
             elif samples_seen - ordered_at >= stall_samples:
                 decision = _stalled(decision, stall_samples)
@@ -152,17 +158,86 @@ def run(
             continue
         ordered_at = samples_seen
         ordered_positions.add(position)
-        channel.send_build(
-            build_order(
-                unit_id=decision["unit_id"],
-                type_name=decision["type_name"],
-                x=decision["x"],
-                y=decision["y"],
+        if decision["action"] == "produce":
+            channel.send_produce(
+                produce_order(
+                    unit_id=decision["unit_id"],
+                    type_name=decision["type_name"],
+                )
             )
-        )
+        else:
+            channel.send_build(
+                build_order(
+                    unit_id=decision["unit_id"],
+                    type_name=decision["type_name"],
+                    x=decision["x"],
+                    y=decision["y"],
+                )
+            )
         orders_sent += 1
 
     return _score(sample, decision, plan, orders_sent, samples_seen, first_frame)
+
+
+def _in_flight(sample: Sample, decision: Decision, moved: bool) -> bool:
+    """Report whether the pending order is visibly still being carried out.
+
+    Each verb has its own evidence, and both are things the world shows rather
+    than deadlines the planner invents.
+
+    A placed build is in flight while the builder is walking to the site, and
+    then while the structure itself is going up. Both halves are needed: the
+    builder stops moving the moment it arrives, and the structure joins the
+    roster unfinished at about the same time, so movement alone stops being
+    evidence exactly when construction starts.
+
+    Production is in flight while the producing building holds the order in its
+    queue. That is read straight off the entity, and it is what makes the rule
+    uniform: a factory never moves, so the movement test alone would call a
+    working factory stalled.
+
+    The queue is the second thing tried here and the first that works. Elapsed
+    time capped what the bot could afford, since production time scales with
+    price. Watching credits fall does not work either -- measured through one
+    production run the balance read 4243, 3678, 3813, 3849, *rising* through
+    most of it as income outpaced the drain (wiki: policy-loop).
+
+    Args:
+        sample: The current observation.
+        decision: The pending decision.
+        moved: Whether the builder moved since the previous sample.
+
+    Returns:
+        True while there is evidence the order is still being carried out.
+    """
+    if decision["action"] == "build":
+        return moved or _rising(sample, decision["type_name"])
+    for entity in sample["entities"]:
+        if entity["unit_id"] == decision["unit_id"]:
+            return entity["queued"] > 0
+    # The producer is gone -- destroyed, or never in the roster. Nothing is
+    # being made, so the clock runs and the run stops rather than waiting on a
+    # building that no longer exists.
+    return False
+
+
+def _rising(sample: Sample, type_name: str) -> bool:
+    """Report whether an unfinished structure of this type is going up.
+
+    Ownership is checked, or an opponent's half-built factory in view would
+    keep this run's clock alive indefinitely.
+
+    Args:
+        sample: The current observation.
+        type_name: The type that was ordered.
+
+    Returns:
+        True when the player owns an unfinished entity of that type.
+    """
+    for entity in sample["entities"]:
+        if entity["mine"] and not entity["complete"] and entity["type_name"] == type_name:
+            return True
+    return False
 
 
 def _has_moved(before: tuple[float, float] | None, after: tuple[float, float] | None) -> bool:

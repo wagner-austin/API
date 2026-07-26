@@ -50,6 +50,7 @@ final class StateStream {
         StringBuilder out = new StringBuilder();
         java.util.List<Object> visible = Perception.visibleEntities(engine);
         java.util.List<MapTiles.Pool> pools = MapTiles.visiblePools(engine);
+        java.util.List<BuildOptions.Option> options = BuildOptions.ownedOptions(engine);
         int frame = EngineAccess.readIntField(engine, FRAME_FIELD);
         int clock = EngineAccess.readIntField(engine, CLOCK_FIELD);
 
@@ -59,6 +60,7 @@ final class StateStream {
                                 clock,
                                 visible.size(),
                                 pools.size(),
+                                options.size(),
                                 Perception.creditsOf(engine)))
                 .append('\n');
         for (int index = 0; index < visible.size(); index++) {
@@ -67,12 +69,20 @@ final class StateStream {
         for (int index = 0; index < pools.size(); index++) {
             out.append(poolRecord(frame, index, pools.get(index))).append('\n');
         }
+        for (int index = 0; index < options.size(); index++) {
+            out.append(optionRecord(frame, index, options.get(index))).append('\n');
+        }
         return out.toString();
     }
 
     /** Renders the record that opens a sample. */
     static String frameRecord(
-            int frame, int clockMs, int visibleCount, int poolCount, int credits) {
+            int frame,
+            int clockMs,
+            int visibleCount,
+            int poolCount,
+            int optionCount,
+            int credits) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "frame");
@@ -85,7 +95,38 @@ final class StateStream {
         out.append(',');
         appendInt(out, "pools", poolCount);
         out.append(',');
+        appendInt(out, "options", optionCount);
+        out.append(',');
         appendInt(out, "credits", credits);
+        out.append('}');
+        return out.toString();
+    }
+
+    /**
+     * Renders one thing an owned unit can make.
+     *
+     * <p>Addressed by the producing unit's engine id rather than its type,
+     * because that id is what an order carries. A planner reading these needs
+     * no separate table to get from "I want a tank" to "order unit 228".
+     */
+    static String optionRecord(int frame, int index, BuildOptions.Option option) {
+        StringBuilder out = new StringBuilder();
+        out.append('{');
+        appendString(out, "kind", "option");
+        out.append(',');
+        appendInt(out, "frame", frame);
+        out.append(',');
+        appendInt(out, "index", index);
+        out.append(',');
+        appendLong(out, "unit_id", option.unitId());
+        out.append(',');
+        appendString(out, "produces", option.produces());
+        out.append(',');
+        appendInt(out, "action", option.actionIndex());
+        out.append(',');
+        appendBool(out, "placed", option.placed());
+        out.append(',');
+        appendBool(out, "available", option.available());
         out.append('}');
         return out.toString();
     }
@@ -156,12 +197,16 @@ final class StateStream {
         appendFloat(out, "hp", health[0]);
         out.append(',');
         appendFloat(out, "max_hp", health[1]);
+        out.append(',');
+        appendBool(out, "complete", Perception.isComplete(entity));
+        out.append(',');
+        appendInt(out, "queued", Perception.queuedCountOf(entity));
         out.append('}');
         return out.toString();
     }
 
     private static void appendBool(StringBuilder out, String key, boolean value) {
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':').append(value);
     }
 
@@ -171,23 +216,23 @@ final class StateStream {
             throw new IllegalStateException(
                     "rw-agent: refusing to serialise non-finite " + key + "=" + value);
         }
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':').append(value);
     }
 
     private static void appendString(StringBuilder out, String key, String value) {
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':');
-        quote(out, value);
+        Json.quote(out, value);
     }
 
     private static void appendLong(StringBuilder out, String key, long value) {
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':').append(value);
     }
 
     private static void appendInt(StringBuilder out, String key, int value) {
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':').append(value);
     }
 
@@ -204,40 +249,7 @@ final class StateStream {
             throw new IllegalStateException(
                     "rw-agent: refusing to serialise non-finite " + key + "=" + value);
         }
-        quote(out, key);
+        Json.quote(out, key);
         out.append(':').append(value);
-    }
-
-    /** Writes a JSON string, escaping what the grammar requires. */
-    private static void quote(StringBuilder out, String text) {
-        out.append('"');
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            switch (c) {
-                case '"':
-                    out.append("\\\"");
-                    break;
-                case '\\':
-                    out.append("\\\\");
-                    break;
-                case '\n':
-                    out.append("\\n");
-                    break;
-                case '\r':
-                    out.append("\\r");
-                    break;
-                case '\t':
-                    out.append("\\t");
-                    break;
-                default:
-                    if (c < 0x20) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-                    break;
-            }
-        }
-        out.append('"');
     }
 }
