@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from platform_core.json_utils import JSONObject, load_json_str, narrow_json_to_dict
 from tests.conftest import FakeFileSystem
 
@@ -20,6 +21,10 @@ from tankpit_bot.types import CapturedMessage, decode_capture_session
 
 class _ProbeHarness(ProbeArtifactsProtocol):
     @property
+    def session_id(self) -> str:
+        return "session-1"
+
+    @property
     def messages(self) -> list[CapturedMessage]:
         return [
             CapturedMessage(
@@ -27,12 +32,24 @@ class _ProbeHarness(ProbeArtifactsProtocol):
                 direction="received",
                 payload="abc",
                 ws_url="wss://tankpit.com/ws/",
-            )
+            ),
+            CapturedMessage(
+                timestamp_ms=250,
+                direction="sent",
+                payload="def",
+                ws_url="wss://tankpit.com/ws/",
+            ),
         ]
 
     @property
     def magic(self) -> str | None:
         return "magic"
+
+
+class _EmptyProbeHarness(_ProbeHarness):
+    @property
+    def messages(self) -> list[CapturedMessage]:
+        return []
 
 
 def _make_session() -> StandardProbeSessionDict:
@@ -105,3 +122,52 @@ def test_encode_standard_probe_session_sets_capture_path_before_encoding() -> No
     assert session["capture_session_path"] == "probe.capture_session.json"
     assert encoded["capture_session_path"] == "probe.capture_session.json"
     assert encoded["session_id"] == "session-1"
+
+
+def _raise_probe_failure(probe: ProbeArtifactsProtocol) -> StandardProbeSessionDict:
+    del probe
+    raise RuntimeError("probe aborted mid-session")
+
+
+def test_aborted_session_still_saves_the_capture_evidence(fake_fs: FakeFileSystem) -> None:
+    with pytest.raises(RuntimeError, match="probe aborted mid-session"):
+        run_and_save_standard_probe_session(
+            probe_factory=lambda target_url, *, headless, prefer_account: _ProbeHarness(),
+            run_session=_raise_probe_failure,
+            encoder=_encode,
+            summary_formatter=lambda current_session: current_session["session_id"],
+            target_url="https://tankpit.com/play",
+            output_path="probe_session.json",
+            headless=False,
+            prefer_account=False,
+        )
+
+    capture_written = fake_fs.read_text(Path("probe_session.capture_session.json"))
+    capture_decoded = decode_capture_session(narrow_json_to_dict(load_json_str(capture_written)))
+    assert capture_decoded["session_id"] == "session-1"
+    assert capture_decoded["magic"] == "magic"
+    assert capture_decoded["start_timestamp_ms"] == 100
+    assert capture_decoded["end_timestamp_ms"] == 250
+    assert len(capture_decoded["messages"]) == 2
+    with pytest.raises(FileNotFoundError):
+        fake_fs.read_text(Path("probe_session.json"))
+
+
+def test_aborted_session_with_no_frames_saves_an_empty_capture(fake_fs: FakeFileSystem) -> None:
+    with pytest.raises(RuntimeError, match="probe aborted mid-session"):
+        run_and_save_standard_probe_session(
+            probe_factory=lambda target_url, *, headless, prefer_account: _EmptyProbeHarness(),
+            run_session=_raise_probe_failure,
+            encoder=_encode,
+            summary_formatter=lambda current_session: current_session["session_id"],
+            target_url="https://tankpit.com/play",
+            output_path="probe_session.json",
+            headless=False,
+            prefer_account=False,
+        )
+
+    capture_written = fake_fs.read_text(Path("probe_session.capture_session.json"))
+    capture_decoded = decode_capture_session(narrow_json_to_dict(load_json_str(capture_written)))
+    assert capture_decoded["start_timestamp_ms"] == 0
+    assert capture_decoded["end_timestamp_ms"] == 0
+    assert capture_decoded["messages"] == []

@@ -25,6 +25,10 @@ class ProbeArtifactsProtocol(Protocol):
     """Minimal probe surface required to persist probe artifacts."""
 
     @property
+    def session_id(self) -> str:
+        """Return the probe session identifier."""
+
+    @property
     def messages(self) -> list[CapturedMessage]:
         """Return captured probe messages."""
 
@@ -65,6 +69,44 @@ class ProbeFactoryProtocol(Protocol[ProbeT_co]):
         """Create one probe instance."""
 
 
+def save_abort_capture(
+    probe: ProbeArtifactsProtocol,
+    *,
+    target_url: str,
+    output_path: str,
+) -> str:
+    """Persist the raw capture evidence of an aborted probe session.
+
+    An abort is exactly when the capture matters most — the
+    2026-07-25 viewport-probe aborts lost their raw autoscroll-ack
+    bytes because only successful runs saved, and the decoder bug
+    behind the aborts had to be proven from an older capture instead.
+    Timestamps come from the captured frames themselves since the
+    aborted run never produced a session payload.
+
+    Args:
+        probe: Probe whose capture buffer should be persisted.
+        target_url: Browser target URL the probe ran against.
+        output_path: Structured probe JSON output path (the capture
+            path is derived from it, same as the success path).
+
+    Returns:
+        Capture session output path.
+    """
+    messages = probe.messages
+    start_timestamp_ms = messages[0]["timestamp_ms"] if messages else 0
+    end_timestamp_ms = messages[-1]["timestamp_ms"] if messages else 0
+    return save_capture_session(
+        session_id=probe.session_id,
+        start_timestamp_ms=start_timestamp_ms,
+        end_timestamp_ms=end_timestamp_ms,
+        base_url=target_url,
+        messages=messages,
+        magic=probe.magic,
+        output_path=output_path,
+    )
+
+
 def run_and_save_probe_session(
     *,
     probe_factory: ProbeFactoryProtocol[ProbeT],
@@ -94,7 +136,12 @@ def run_and_save_probe_session(
         Completed and persisted session payload.
     """
     probe = probe_factory(target_url, headless=headless, prefer_account=prefer_account)
-    session = run_session(probe)
+    try:
+        session = run_session(probe)
+    except Exception:
+        capture_path = save_abort_capture(probe, target_url=target_url, output_path=output_path)
+        log.info("Probe session aborted; capture evidence saved to %s", capture_path)
+        raise
     capture_metadata = extract_capture_metadata(session)
     capture_session_path = save_capture_session(
         session_id=capture_metadata["session_id"],
@@ -205,4 +252,5 @@ __all__ = [
     "extract_standard_capture_metadata",
     "run_and_save_probe_session",
     "run_and_save_standard_probe_session",
+    "save_abort_capture",
 ]

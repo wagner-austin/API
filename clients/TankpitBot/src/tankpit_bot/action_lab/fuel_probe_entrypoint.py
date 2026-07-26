@@ -33,6 +33,10 @@ class FuelProbeEntrypointProtocol(Protocol):
         """Execute one live fuel-probe session."""
 
     @property
+    def session_id(self) -> str:
+        """Return the probe session identifier."""
+
+    @property
     def messages(self) -> list[CapturedMessage]:
         """Return captured wire messages."""
 
