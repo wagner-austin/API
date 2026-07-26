@@ -48,14 +48,14 @@ final class Orders {
      *     means the pinned names moved.
      */
     static void onGameThread(Runnable task) {
-        Class<?> scripts = EngineBindings.pinnedClass(EngineBindings.SCRIPTS_CLASS);
-        Object instance = EngineBindings.invokeStatic(scripts, "getInstance");
+        Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);
+        Object instance = EngineAccess.invokeStatic(scripts, "getInstance");
         if (instance == null) {
             throw new IllegalStateException(
                     "rw-agent: ScriptEngine.getInstance() returned null; the engine has not"
                             + " finished starting");
         }
-        Method enqueue = EngineBindings.pinnedMethod(scripts, "addRunnableToQueue", Runnable.class);
+        Method enqueue = EngineAccess.pinnedMethod(scripts, "addRunnableToQueue", Runnable.class);
         try {
             enqueue.invoke(instance, task);
         } catch (ReflectiveOperationException e) {
@@ -76,26 +76,26 @@ final class Orders {
      *     command cannot be constructed.
      */
     static void moveTo(Object engine, Object unit, float x, float y) {
-        Object team = EngineBindings.readField(engine, EngineBindings.LOCAL_TEAM);
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to order for");
         }
-        Object controller = EngineBindings.readField(engine, EngineBindings.CONTROLLER);
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
         if (controller == null) {
             throw new IllegalStateException("rw-agent: engine has no CommandController yet");
         }
 
-        Method create = EngineBindings.pinnedMethod(controller.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.TEAM_CLASS));
-        Object command = EngineBindings.invoke(create, controller, team);
+        Method create = EngineAccess.pinnedMethod(controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
         if (command == null) {
             throw new IllegalStateException("rw-agent: CommandController returned no command");
         }
 
-        Method addUnit = EngineBindings.pinnedMethod(command.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.ORDERABLE_CLASS));
-        EngineBindings.invoke(addUnit, command, unit);
+        Method addUnit = EngineAccess.pinnedMethod(command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, unit);
 
-        Method setPoint = EngineBindings.pinnedMethod(command.getClass(), "a", float.class, float.class);
-        EngineBindings.invoke(setPoint, command, Float.valueOf(x), Float.valueOf(y));
+        Method setPoint = EngineAccess.pinnedMethod(command.getClass(), "a", float.class, float.class);
+        EngineAccess.invoke(setPoint, command, Float.valueOf(x), Float.valueOf(y));
     }
 
     /**
@@ -127,11 +127,11 @@ final class Orders {
      *     name is absent.
      */
     static void buildAt(Object engine, Object builder, String typeName, float x, float y) {
-        Object team = EngineBindings.readField(engine, EngineBindings.LOCAL_TEAM);
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to build for");
         }
-        Object controller = EngineBindings.readField(engine, EngineBindings.CONTROLLER);
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
         if (controller == null) {
             throw new IllegalStateException("rw-agent: engine has no CommandController yet");
         }
@@ -139,27 +139,27 @@ final class Orders {
         Object type = resolveType(typeName);
         if (type == null) {
             throw new IllegalStateException(
-                    "rw-agent: no unit type named '" + typeName + "' in the registry" + EngineBindings.PIN);
+                    "rw-agent: no unit type named '" + typeName + "' in the registry" + EngineNames.PIN);
         }
 
-        Method create = EngineBindings.pinnedMethod(controller.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.TEAM_CLASS));
-        Object command = EngineBindings.invoke(create, controller, team);
+        Method create = EngineAccess.pinnedMethod(controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
         if (command == null) {
             throw new IllegalStateException("rw-agent: CommandController returned no command");
         }
 
-        Method addUnit = EngineBindings.pinnedMethod(command.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.ORDERABLE_CLASS));
-        EngineBindings.invoke(addUnit, command, builder);
+        Method addUnit = EngineAccess.pinnedMethod(command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, builder);
 
         Method place =
-                EngineBindings.pinnedMethod(
+                EngineAccess.pinnedMethod(
                         command.getClass(),
                         "a",
                         float.class,
                         float.class,
-                        EngineBindings.pinnedClass(EngineBindings.TYPE_CLASS),
+                        EngineAccess.pinnedClass(EngineNames.TYPE_CLASS),
                         int.class);
-        EngineBindings.invoke(
+        EngineAccess.invoke(
                 place,
                 command,
                 Float.valueOf(x),
@@ -182,7 +182,7 @@ final class Orders {
      * @return The unit type, or null when no type carries that name.
      */
     static Object resolveType(String typeName) {
-        Method lookup = EngineBindings.pinnedMethod(EngineBindings.pinnedClass(EngineBindings.TYPE_REGISTRY_CLASS), "a", String.class);
-        return EngineBindings.invoke(lookup, null, typeName);
+        Method lookup = EngineAccess.pinnedMethod(EngineAccess.pinnedClass(EngineNames.TYPE_REGISTRY_CLASS), "a", String.class);
+        return EngineAccess.invoke(lookup, null, typeName);
     }
 }

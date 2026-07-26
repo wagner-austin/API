@@ -97,23 +97,23 @@ final class MapTiles {
      *     there is no current player.
      */
     static java.util.List<Pool> visiblePools(Object engine) {
-        Object team = EngineBindings.readField(engine, EngineBindings.LOCAL_TEAM);
-        Object map = EngineBindings.readField(engine, EngineBindings.MAP);
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        Object map = EngineAccess.readField(engine, EngineNames.MAP);
         if (team == null || map == null) {
             return java.util.Collections.emptyList();
         }
-        java.util.List<Pool> all = pools(map);
+        java.util.List<Pool> all = pools(engine, map);
         Method visibleTo =
-                EngineBindings.pinnedMethod(
+                EngineAccess.pinnedMethod(
                         map.getClass(),
-                        EngineBindings.TILE_VISIBLE_TO,
+                        EngineNames.TILE_VISIBLE_TO,
                         int.class,
                         int.class,
-                        EngineBindings.pinnedClass(EngineBindings.TEAM_CLASS));
+                        EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
         java.util.List<Pool> visible = new java.util.ArrayList<Pool>();
         for (Pool pool : all) {
             Object seen =
-                    EngineBindings.invoke(
+                    EngineAccess.invoke(
                             visibleTo, map, Integer.valueOf(pool.tileX()),
                             Integer.valueOf(pool.tileY()), team);
             if (Boolean.TRUE.equals(seen)) {
@@ -126,16 +126,48 @@ final class MapTiles {
     /**
      * Returns the map's pool tiles, scanning it the first time it is seen.
      *
+     * @param engine The live engine instance.
      * @param map The engine's map instance.
      * @return Every pool on the map, visible or not.
      */
-    private static java.util.List<Pool> pools(Object map) {
+    private static java.util.List<Pool> pools(Object engine, Object map) {
         if (map != scannedMap) {
             scannedPools = scan(map);
             scannedMap = map;
             Log.info("map scan: " + scannedPools.size() + " resource pool(s)");
+            Log.info(describeFog(engine));
         }
         return scannedPools;
+    }
+
+    /**
+     * Reports whether the fog filter is actually in force for a player.
+     *
+     * <p>Both visibility tests short out when the map has no fog or the player
+     * has no fog grid, and they do so silently -- which is correct behaviour
+     * and a reporting problem. Without this, a run in which everything was
+     * visible is indistinguishable from a run in which the filter was working
+     * and happened to reveal everything, and only one of those tells you the
+     * bot is playing fairly (wiki: perception-visibility).
+     *
+     * @param engine The live engine instance.
+     * @return A short description of the fog state.
+     */
+    static String describeFog(Object engine) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        Object map = EngineAccess.readField(engine, EngineNames.MAP);
+        if (team == null || map == null) {
+            return "fog: no player or no map";
+        }
+        boolean enabled = EngineAccess.readBooleanField(map, EngineNames.FOG_ENABLED);
+        Object grid = EngineAccess.readField(team, EngineNames.FOG_GRID);
+        if (!enabled) {
+            return "fog: DISABLED on this map -- every visibility test passes";
+        }
+        if (grid == null) {
+            return "fog: enabled, but this player has no fog grid -- every test passes";
+        }
+        return "fog: enabled and this player has a grid -- visibility is filtered";
     }
 
     /**
@@ -150,24 +182,24 @@ final class MapTiles {
      * @return Every pool on the map, in row-major scan order.
      */
     private static java.util.List<Pool> scan(Object map) {
-        int tilesX = EngineBindings.readIntField(map, EngineBindings.MAP_TILES_X);
-        int tilesY = EngineBindings.readIntField(map, EngineBindings.MAP_TILES_Y);
-        int tileWidth = EngineBindings.readIntField(map, EngineBindings.TILE_WIDTH);
-        int tileHeight = EngineBindings.readIntField(map, EngineBindings.TILE_HEIGHT);
-        int centreX = EngineBindings.readIntField(map, EngineBindings.TILE_CENTRE_X);
-        int centreY = EngineBindings.readIntField(map, EngineBindings.TILE_CENTRE_Y);
+        int tilesX = EngineAccess.readIntField(map, EngineNames.MAP_TILES_X);
+        int tilesY = EngineAccess.readIntField(map, EngineNames.MAP_TILES_Y);
+        int tileWidth = EngineAccess.readIntField(map, EngineNames.TILE_WIDTH);
+        int tileHeight = EngineAccess.readIntField(map, EngineNames.TILE_HEIGHT);
+        int centreX = EngineAccess.readIntField(map, EngineNames.TILE_CENTRE_X);
+        int centreY = EngineAccess.readIntField(map, EngineNames.TILE_CENTRE_Y);
         Method tileAt =
-                EngineBindings.pinnedMethod(
-                        map.getClass(), EngineBindings.TILE_AT, int.class, int.class);
+                EngineAccess.pinnedMethod(
+                        map.getClass(), EngineNames.TILE_AT, int.class, int.class);
 
         java.util.List<Pool> found = new java.util.ArrayList<Pool>();
         for (int tileY = 0; tileY < tilesY; tileY++) {
             for (int tileX = 0; tileX < tilesX; tileX++) {
                 Object tile =
-                        EngineBindings.invoke(
+                        EngineAccess.invoke(
                                 tileAt, map, Integer.valueOf(tileX), Integer.valueOf(tileY));
                 if (tile == null
-                        || !EngineBindings.readBooleanField(tile, EngineBindings.TILE_IS_POOL)) {
+                        || !EngineAccess.readBooleanField(tile, EngineNames.TILE_IS_POOL)) {
                     continue;
                 }
                 found.add(

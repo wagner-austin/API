@@ -87,13 +87,13 @@ final class TypeFlags {
      * @return The enum constants.
      */
     private static Object[] builtInTypes() {
-        Class<?> registry = EngineBindings.pinnedClass(EngineBindings.TYPE_REGISTRY_CLASS);
+        Class<?> registry = EngineAccess.pinnedClass(EngineNames.TYPE_REGISTRY_CLASS);
         Object[] constants = registry.getEnumConstants();
         if (constants == null) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineBindings.TYPE_REGISTRY_CLASS
+                    "rw-agent: " + EngineNames.TYPE_REGISTRY_CLASS
                             + " is no longer an enum, so its built-in types cannot be"
-                            + " enumerated" + EngineBindings.PIN);
+                            + " enumerated" + EngineNames.PIN);
         }
         return constants;
     }
@@ -105,20 +105,20 @@ final class TypeFlags {
      *     mod.
      */
     private static Iterable<?> assetTypes() {
-        Class<?> custom = EngineBindings.pinnedClass(EngineBindings.CUSTOM_TYPE_CLASS);
+        Class<?> custom = EngineAccess.pinnedClass(EngineNames.CUSTOM_TYPE_CLASS);
         Object value;
         try {
-            value = EngineBindings.pinnedField(custom, EngineBindings.CUSTOM_TYPE_LIST).get(null);
+            value = EngineAccess.pinnedField(custom, EngineNames.CUSTOM_TYPE_LIST).get(null);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(
-                    "rw-agent: cannot read " + EngineBindings.CUSTOM_TYPE_LIST
-                            + EngineBindings.PIN, e);
+                    "rw-agent: cannot read " + EngineNames.CUSTOM_TYPE_LIST
+                            + EngineNames.PIN, e);
         }
         if (!(value instanceof Iterable)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineBindings.CUSTOM_TYPE_CLASS + "."
-                            + EngineBindings.CUSTOM_TYPE_LIST + " is not iterable"
-                            + EngineBindings.PIN);
+                    "rw-agent: " + EngineNames.CUSTOM_TYPE_CLASS + "."
+                            + EngineNames.CUSTOM_TYPE_LIST + " is not iterable"
+                            + EngineNames.PIN);
         }
         return (Iterable<?>) value;
     }
@@ -132,15 +132,15 @@ final class TypeFlags {
      */
     private static boolean needsPool(Object type) {
         Object answer =
-                EngineBindings.invoke(
-                        EngineBindings.pinnedMethod(
-                                type.getClass(), EngineBindings.TYPE_NEEDS_POOL),
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                type.getClass(), EngineNames.TYPE_NEEDS_POOL),
                         type);
         if (!(answer instanceof Boolean)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineBindings.TYPE_NEEDS_POOL + "() on "
+                    "rw-agent: " + EngineNames.TYPE_NEEDS_POOL + "() on "
                             + type.getClass().getName() + " did not return a boolean"
-                            + EngineBindings.PIN);
+                            + EngineNames.PIN);
         }
         return ((Boolean) answer).booleanValue();
     }
@@ -148,13 +148,13 @@ final class TypeFlags {
     /** Reads a type's readable name. */
     private static String nameOf(Object type) {
         Object name =
-                EngineBindings.invoke(
-                        EngineBindings.pinnedMethod(
-                                type.getClass(), EngineBindings.TYPE_NAME_ACCESSOR),
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                type.getClass(), EngineNames.TYPE_NAME_ACCESSOR),
                         type);
         if (!(name instanceof String)) {
             throw new IllegalStateException(
-                    "rw-agent: unit type name is not a String" + EngineBindings.PIN);
+                    "rw-agent: unit type name is not a String" + EngineNames.PIN);
         }
         return (String) name;
     }

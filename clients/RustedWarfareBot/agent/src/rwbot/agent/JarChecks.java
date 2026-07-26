@@ -113,7 +113,7 @@ final class JarChecks {
      * failing mid-run with a reflection error nobody sees until they read a log.
      */
     static int checkOrderBindings() {
-        java.util.List<String> problems = EngineBindings.verifyBindings();
+        java.util.List<String> problems = BindingCheck.verifyBindings();
         for (String problem : problems) {
             System.out.println("FAIL order binding: " + problem);
         }

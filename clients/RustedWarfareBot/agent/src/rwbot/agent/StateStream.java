@@ -50,8 +50,8 @@ final class StateStream {
         StringBuilder out = new StringBuilder();
         java.util.List<Object> visible = Perception.visibleEntities(engine);
         java.util.List<MapTiles.Pool> pools = MapTiles.visiblePools(engine);
-        int frame = EngineBindings.readIntField(engine, FRAME_FIELD);
-        int clock = EngineBindings.readIntField(engine, CLOCK_FIELD);
+        int frame = EngineAccess.readIntField(engine, FRAME_FIELD);
+        int clock = EngineAccess.readIntField(engine, CLOCK_FIELD);
 
         out.append(
                         frameRecord(
