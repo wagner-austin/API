@@ -307,11 +307,13 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         # Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
         # "blacklist this container forever" are not the same event.
         #
-        # * ``code=5`` ("Tank full"): the container was not empty, the
-        #   server refused because our tank could not accept the
-        #   transfer. Bug 0.2's ``_pickup_not_worth_walk`` pre-dispatch gate (né _would_overfill)
-        #   prevents this in the normal flow, so a surviving code=5 is
-        #   a race between planner-time and dispatch-time fuel state.
+        # * ``code=5`` ("Tank full"): the server's CLAMP RECEIPT — it
+        #   arrives ALONGSIDE the successful clamped transfer of the
+        #   same single click (bot-20260726-101949: one pickup_fuel,
+        #   then 0x44 391->1100, 0x44 +0, code 5 in one batch; the
+        #   10-kill run's 15 code-5s matched its 15 clamped_transfer
+        #   outcomes 1:1). Not a refusal and not a race — the pickup
+        #   SUCCEEDED and the container keeps the remainder.
         #   Blacklisting a still-full container is wrong -- the next
         #   tick with headroom can consume it.
         # * ``code=4`` ("Empty container"): the container is drained.
