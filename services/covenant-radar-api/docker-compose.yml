@@ -64,6 +64,33 @@ services:
               count: 1
               capabilities: [gpu]
 
+  streaming-worker:
+    build:
+      context: ../..
+      dockerfile: services/covenant-radar-api/Dockerfile
+      target: streaming
+    container_name: covenant-streaming-worker
+    env_file:
+      - .env
+    environment:
+      - STREAMING__ENABLED=${STREAMING__ENABLED:-false}
+      - STREAMING__DOMAIN=${STREAMING__DOMAIN:-weather}
+      # PLAINTEXT targets the in-stack broker. Point at Confluent Cloud by
+      # setting SASL_SSL with the API key and secret instead.
+      - CONFLUENT__BOOTSTRAP_SERVERS=${CONFLUENT__BOOTSTRAP_SERVERS:-platform-kafka:9092}
+      - CONFLUENT__SECURITY_PROTOCOL=${CONFLUENT__SECURITY_PROTOCOL:-PLAINTEXT}
+      - MODEL_PATH=${MODEL_PATH:-/data/models/active_xgb.ubj}
+      - MODEL_VERSION=${MODEL_VERSION:-v1.0.0}
+      - WEATHER__STATE_PATH=${WEATHER__STATE_PATH:-/data/weather/temporal_state.json}
+      - WEATHER__STATION_MAP_PATH=${WEATHER__STATION_MAP_PATH:-/data/weather/station_map.json}
+    volumes:
+      - ./data:/data
+      - ./models:/data/models
+      - ./logs:/data/logs
+    restart: unless-stopped
+    networks:
+      - platform-network
+
 networks:
   platform-network:
     external: true

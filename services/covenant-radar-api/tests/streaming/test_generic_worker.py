@@ -599,3 +599,20 @@ class TestShutdown:
         worker.shutdown()
 
         assert worker.is_running is False
+
+
+class TestSubscribesToTheDomainTopic:
+    """run() subscribes the consumer to the domain's own input topic."""
+
+    def test_subscribes_before_polling(self) -> None:
+        """The worker subscribes itself rather than trusting the caller.
+
+        Both output topics already come from domain.config. Leaving the
+        input topic to the caller meant a worker could poll an unsubscribed
+        consumer forever, reporting zero messages and no error.
+        """
+        worker, domain, consumer, _, _, _ = make_generic_streaming_worker()
+
+        worker.run(max_iterations=0)
+
+        assert consumer.subscribed_topics == (domain.config["input_topic"],)

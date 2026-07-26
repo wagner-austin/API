@@ -176,6 +176,7 @@ class GenericStreamingWorker:
     """Domain-agnostic streaming worker for ML prediction.
 
     Delegates all domain-specific logic through DomainProtocol:
+    - Input topic subscription via domain.config, on run()
     - Decoding and feature extraction via domain.decode_and_extract()
     - Event encoding via domain.encode_prediction_event()
     - Alert context via domain.generate_alert_context()
@@ -344,6 +345,13 @@ class GenericStreamingWorker:
         Returns:
             Tuple of (total_messages_consumed, total_events_produced).
         """
+        # Subscribing here, rather than leaving it to the caller, keeps the
+        # consumer symmetric with the producer: both output topics already
+        # come from domain.config, so the input topic should too. A caller
+        # that forgot this step got a worker that polled an unsubscribed
+        # consumer forever and reported zero messages with no error.
+        self._consumer.subscribe((self._domain.config["input_topic"],))
+
         self._running = True
         total_consumed: int = 0
         total_produced: int = 0

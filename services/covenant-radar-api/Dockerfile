@@ -67,6 +67,14 @@ FROM runtime-base AS worker
 
 CMD ["sh", "-c", "exec covenant-rq-worker"]
 
+# ---------- Streaming worker target ----------
+# Consumes a domain's input topic through GenericStreamingWorker. Which
+# domain it runs is configuration (STREAMING__DOMAIN), not a build choice,
+# so one image serves every domain.
+FROM runtime-base AS streaming
+
+CMD ["sh", "-c", "exec covenant-streaming-worker"]
+
 # ---------- API target (default) ----------
 FROM runtime-base AS api
 
