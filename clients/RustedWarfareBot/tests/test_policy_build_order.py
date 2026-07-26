@@ -13,20 +13,21 @@ from rw_bot.policy.build_order import (
     PLACEMENT_RING,
     completed_count,
     decide,
+    find_anchor,
     find_builder,
     next_unsatisfied_index,
 )
 from rw_bot.wire.state import Entity, Sample
 
 
-def _unit(type_name: str, price: int) -> UnitStats:
+def _unit(type_name: str, price: int, speed: float = 0.0) -> UnitStats:
     return UnitStats(
         type_name=type_name,
         display_name=type_name,
         description="",
         price=price,
         hp=100,
-        speed=0.0,
+        speed=speed,
         turn_speed=0.0,
         mass=1,
         upgrade_prices=(),
@@ -38,6 +39,11 @@ _CATALOGUE = {
     "landFactory": _unit("landFactory", 300),
     "extractorT1": _unit("extractorT1", 150),
     "laboratory": _unit("laboratory", 900),
+    # The two the live roster always starts with. The Command Center is the
+    # anchor placement is measured from; the builder must be mobile, or it
+    # would be eligible as an anchor and the ring would follow it again.
+    "commandCenter": _unit("commandCenter", 3000),
+    "builder": _unit("builder", 500, speed=0.6),
 }
 
 
@@ -69,6 +75,11 @@ def _sample(*entities: Entity, credits: int = 4000) -> Sample:
 
 _BUILDER = _entity(214, "builder", 4250.0, 2610.0)
 
+#: Placement is measured from the oldest owned immobile structure, so a world
+#: used for placement assertions needs one. The live game always has it: the
+#: Command Center, at this position on the sandbox map.
+_ANCHOR = _entity(213, "commandCenter", 4250.0, 2550.0)
+
 
 def test_an_empty_plan_is_immediately_done() -> None:
     assert decide(_sample(_BUILDER), (), _CATALOGUE)["action"] == "done"
@@ -93,11 +104,11 @@ def test_progress_is_read_from_the_roster_not_from_a_counter() -> None:
 
 
 def test_successive_structures_take_successive_ring_positions() -> None:
-    world = _sample(_BUILDER, _entity(300, "landFactory"))
+    world = _sample(_ANCHOR, _BUILDER, _entity(300, "landFactory", 4450.0, 2670.0))
     decision = decide(world, ("landFactory", "extractorT1"), _CATALOGUE)
     assert (decision["x"], decision["y"]) == (
-        4250.0 + PLACEMENT_RING[1][0],
-        2610.0 + PLACEMENT_RING[1][1],
+        _ANCHOR["x"] + PLACEMENT_RING[1][0],
+        _ANCHOR["y"] + PLACEMENT_RING[1][1],
     )
 
 
@@ -151,11 +162,16 @@ def test_credits_are_checked_before_a_builder_is_required() -> None:
 
 @pytest.mark.parametrize("built", range(len(PLACEMENT_RING) + 2))
 def test_the_placement_ring_wraps_rather_than_running_out(built: int) -> None:
-    entities = [_BUILDER] + [_entity(400 + i, "landFactory") for i in range(built)]
+    entities = [_ANCHOR, _BUILDER] + [
+        _entity(400 + i, "landFactory", 4450.0, 2670.0 + 40.0 * i) for i in range(built)
+    ]
     plan = ("landFactory",) * (built + 1)
     decision = decide(_sample(*entities), plan, _CATALOGUE)
     expected = PLACEMENT_RING[built % len(PLACEMENT_RING)]
-    assert (decision["x"], decision["y"]) == (4250.0 + expected[0], 2610.0 + expected[1])
+    assert (decision["x"], decision["y"]) == (
+        _ANCHOR["x"] + expected[0],
+        _ANCHOR["y"] + expected[1],
+    )
 
 
 def test_completed_count_matches_each_plan_entry_only_once() -> None:
@@ -229,3 +245,71 @@ def test_the_first_unsatisfied_entry_is_found_past_a_satisfied_one() -> None:
 def test_an_enemy_unit_never_satisfies_a_plan_entry() -> None:
     world = _sample(_entity(900, "landFactory", mine=False), credits=10_000)
     assert next_unsatisfied_index(world, ("landFactory",)) == 0
+
+
+def test_placement_is_measured_from_a_fixed_structure_not_the_builder() -> None:
+    """The ring only spreads if its centre holds still.
+
+    Measuring from the builder collapsed the spread, because the builder walks
+    to each site it is sent to. Observed live: the first factory landed at
+    (4450, 2730) and the third order went to (4451, 2646) -- 84 apart, close
+    enough to overlap, and the engine silently refused it.
+    """
+    command_centre = _entity(213, "commandCenter", 4250.0, 2550.0)
+    builder = _entity(214, "builder", 4250.0, 2610.0)
+    plan = ("landFactory", "landFactory", "landFactory")
+
+    owned = [command_centre, builder]
+    sites: list[tuple[float, float]] = []
+    for _step in range(3):
+        decision = decide(_sample(*owned, credits=99_999), plan, _CATALOGUE)
+        assert decision["action"] == "build"
+        sites.append((decision["x"], decision["y"]))
+        # The builder ends each build standing at the site it just built.
+        owned = [
+            command_centre,
+            _entity(214, "builder", decision["x"], decision["y"]),
+            *[_entity(300 + i, "landFactory", x, y) for i, (x, y) in enumerate(sites)],
+        ]
+
+    assert len(set(sites)) == 3
+    first_to_third = abs(sites[0][1] - sites[2][1]) + abs(sites[0][0] - sites[2][0])
+    assert first_to_third == 240.0
+
+
+def test_the_anchor_is_the_oldest_owned_immobile_structure() -> None:
+    """The factory is listed first, so first-seen would pick the wrong one."""
+    command_centre = _entity(213, "commandCenter", 1.0, 2.0)
+    world = _sample(
+        _entity(400, "landFactory", 9.0, 9.0),
+        command_centre,
+        _entity(214, "builder", 5.0, 5.0),
+        credits=10_000,
+    )
+    assert find_anchor(world, _CATALOGUE) == command_centre
+
+
+def test_a_mobile_unit_is_never_the_anchor() -> None:
+    """Immobility is read from the catalogue, not guessed from the type name."""
+    world = _sample(_entity(214, "builder", 5.0, 5.0), credits=10_000)
+    assert find_anchor(world, _CATALOGUE) is None
+
+
+def test_an_enemy_structure_is_never_the_anchor() -> None:
+    world = _sample(
+        _entity(1, "commandCenter", 0.0, 0.0, mine=False),
+        _entity(214, "builder", 5.0, 5.0),
+        credits=10_000,
+    )
+    assert find_anchor(world, _CATALOGUE) is None
+
+
+def test_with_no_structure_owned_the_builder_is_the_reference() -> None:
+    """A player who has lost every building must still be able to rebuild."""
+    world = _sample(_BUILDER, credits=10_000)
+    decision = decide(world, ("landFactory",), _CATALOGUE)
+    assert decision["action"] == "build"
+    assert (decision["x"], decision["y"]) == (
+        _BUILDER["x"] + PLACEMENT_RING[0][0],
+        _BUILDER["y"] + PLACEMENT_RING[0][1],
+    )

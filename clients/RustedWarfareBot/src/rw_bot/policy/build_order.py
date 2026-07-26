@@ -147,18 +147,19 @@ def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | 
         catalogue: Unit stats by type name, for the speed field.
 
     Returns:
-        The anchor entity, or None when the player owns no immobile structure.
+        The anchor entity, or None when the player owns no immobile structure,
+        in which case the caller measures from the builder instead.
     """
-    immobile = [
-        entity
-        for entity in sample["entities"]
-        if entity["mine"]
-        and entity["type_name"] in catalogue
-        and catalogue[entity["type_name"]]["speed"] == 0.0
-    ]
-    if not immobile:
-        return None
-    return min(immobile, key=lambda entity: entity["unit_id"])
+    oldest: Entity | None = None
+    for entity in sample["entities"]:
+        if not entity["mine"]:
+            continue
+        stats = catalogue.get(entity["type_name"])
+        if stats is None or stats["speed"] != 0.0:
+            continue
+        if oldest is None or entity["unit_id"] < oldest["unit_id"]:
+            oldest = entity
+    return oldest
 
 
 def find_builder(sample: Sample) -> Entity | None:
@@ -211,12 +212,12 @@ def decide(
     if builder is None:
         return _decision("blocked", "the player owns no builder")
 
-    anchor = find_anchor(sample, catalogue)
-    if anchor is None:
-        return _decision(
-            "blocked",
-            "the player owns no immobile structure to place buildings around",
-        )
+    # Measure from the most stable reference available. A structure never
+    # moves; the builder does, and measuring from it collapses the ring. With
+    # no structure owned the builder is the only reference there is, so the
+    # collapse is unavoidable rather than chosen -- and a player who has lost
+    # every building should still be able to rebuild.
+    anchor = find_anchor(sample, catalogue) or builder
 
     if sample["credits"] < stats["price"]:
         return _decision(
