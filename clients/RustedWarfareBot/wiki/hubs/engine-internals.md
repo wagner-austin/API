@@ -17,3 +17,4 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 [Command Channel](../pages/command-channel.md) -- orders originate in Python: one loopback socket, id-addressed units, and the backpressure rule that protects the tick
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
+[Perception: Visible Entities, Economy and Health](../pages/perception-visibility.md) -- `am.d(n)` is the engine's per-player fog test; credits, team and hit-point fields

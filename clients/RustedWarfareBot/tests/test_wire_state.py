@@ -24,10 +24,11 @@ from rw_bot.wire.state import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
-_FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"owned":1}'
+_FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"credits":4000}'
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
-    '"class":"units.e.b","x":1.5,"y":-2.5}'
+    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,'
+    '"hp":170.0,"max_hp":170.0}'
 )
 
 
@@ -51,22 +52,23 @@ def test_decodes_the_real_capture_into_three_samples() -> None:
 
 
 def test_the_real_capture_carries_the_documented_roster() -> None:
-    """Command Center, Builder, and the placeholder parked off-map."""
+    """Command Center, Builder, and the placeholder parked off-map -- ours only."""
     first = decode_samples(_capture_lines())[0]
-    assert [e["type_name"] for e in first["entities"]] == [
+    mine = [e for e in first["entities"] if e["mine"]]
+    assert [e["type_name"] for e in mine] == [
         "commandCenter",
         "builder",
         "editorOrBuilder",
     ]
-    assert [e["class_name"] for e in first["entities"]] == [
+    assert [e["class_name"] for e in mine] == [
         "com.corrodinggames.rts.game.units.d.e",
         "com.corrodinggames.rts.game.units.e.b",
         "com.corrodinggames.rts.game.units.h",
     ]
     # The third entity is the map editor's placeholder, parked off-map. Its
     # type name is what identified it; the class alone never did.
-    assert first["entities"][2]["x"] == -1000.0
-    assert first["entities"][2]["y"] == -1000.0
+    assert mine[2]["x"] == -1000.0
+    assert mine[2]["y"] == -1000.0
 
 
 def test_engine_ids_are_distinct_and_stable_across_samples() -> None:
@@ -89,8 +91,23 @@ def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
 def test_engine_ids_are_the_dispatch_handles() -> None:
     """Index is enumeration order; id is what an order addresses."""
     first = decode_samples(_capture_lines())[0]
-    assert [e["index"] for e in first["entities"]] == [0, 1, 2]
-    assert [e["unit_id"] for e in first["entities"]] == [213, 214, 217]
+    mine = [e for e in first["entities"] if e["mine"]]
+    assert [e["index"] for e in mine] == [6, 7, 10]
+    assert [e["unit_id"] for e in mine] == [213, 214, 217]
+
+
+def test_the_capture_carries_other_players_too() -> None:
+    """Nineteen entities are visible; three are ours. The rest are opponents."""
+    first = decode_samples(_capture_lines())[0]
+    assert len(first["entities"]) == 19
+    assert sum(1 for e in first["entities"] if e["mine"]) == 3
+    assert {e["team"] for e in first["entities"] if not e["mine"]} == {1, 3, 5, 7}
+
+
+def test_health_is_carried_for_every_visible_entity() -> None:
+    first = decode_samples(_capture_lines())[0]
+    centres = [e for e in first["entities"] if e["type_name"] == "commandCenter"]
+    assert [e["max_hp"] for e in centres] == [4000.0] * len(centres)
 
 
 def test_an_empty_stream_yields_no_samples() -> None:
@@ -102,7 +119,7 @@ def test_blank_lines_are_skipped() -> None:
 
 
 def test_a_sample_with_no_entities_is_valid() -> None:
-    empty = '{"kind":"frame","frame":1,"clock_ms":0,"owned":0}'
+    empty = '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"credits":4000}'
     samples = decode_samples([empty])
     assert samples[0]["entities"] == ()
 
@@ -116,14 +133,16 @@ def test_an_entity_before_any_frame_is_rejected() -> None:
 def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
     """A planner acting on a roster it cannot fully see is the failure guarded."""
     with pytest.raises(WireError) as caught:
-        decode_samples(['{"kind":"frame","frame":7,"clock_ms":25,"owned":3}', _ENTITY])
+        short = '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,"credits":4000}'
+        decode_samples([short, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
     assert "truncated" in caught.value.message
 
 
 def test_a_long_sample_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
-        decode_samples(['{"kind":"frame","frame":7,"clock_ms":25,"owned":1}', _ENTITY, _ENTITY])
+        long_frame = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"credits":4000}'
+        decode_samples([long_frame, _ENTITY, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
 
 
@@ -165,6 +184,7 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
     hostile = Sample(
         frame=1,
         clock_ms=0,
+        credits=4000,
         entities=(
             Entity(
                 index=0,
@@ -173,9 +193,26 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 class_name='a"b\\c\nd\te\rf\x01g',
                 x=0.0,
                 y=0.0,
+                team=3,
+                mine=False,
+                hp=1.5,
+                max_hp=2.5,
             ),
         ),
     )
     lines = encode_sample(hostile)
     assert len(lines) == 2
     assert decode_samples(list(lines)) == (hostile,)
+
+
+def test_the_real_capture_shows_credits_accruing() -> None:
+    """The Command Center generates income, so credits rise between samples.
+
+    The property is asserted, not the figures. Exact credit values depend on
+    when the capture was taken, and pinning them makes every recapture a test
+    edit -- the same brittleness already removed from the frame counters.
+    """
+    credits = [s["credits"] for s in decode_samples(_capture_lines())]
+    assert len(credits) >= 2
+    assert credits == sorted(credits)
+    assert credits[-1] > credits[0]

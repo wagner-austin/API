@@ -1,0 +1,54 @@
+---
+title: "Perception: Visible Entities, Economy and Health"
+tags: [perception, wire, fog, legitimacy, planner]
+related:
+  - "[[wire-contract-ndjson]]"
+  - "[[engine-entity-model]]"
+  - "[[multiplayer-portability-invariants]]"
+  - "[[mechanics-unit-catalogue]]"
+source_paths:
+  - "wiki/sources/m9-perception/perception-widened.txt:9"
+  - "wiki/sources/m9-perception/perception-widened.txt:11"
+  - "wiki/sources/m9-perception/perception-widened.txt:14"
+  - "wiki/sources/m9-perception/perception-widened.txt:15"
+  - "wiki/sources/m9-perception/perception-widened.txt:5"
+  - "agent/src/rwbot/agent/Orders.java"
+game_version: "1.15 (code 176, build #28)"
+fact_checked: "2026-07-25"
+confidence: medium
+hubs: [bot-architecture, engine-internals]
+---
+
+# Perception: Visible Entities, Economy and Health
+
+The world stream carried only the player's own units, their positions and their identities. A planner reading that could not tell whether it could afford anything, could not see an opponent, and could not distinguish a healthy unit from a dying one. It now carries enemies, credits and hit points.[^1][^3][^4]
+
+## Asking the engine what is visible, not reading the map
+
+The obvious implementation is wrong. `am.bE` is the master entity list and holds every unit on the map, so enumerating it directly would hand the bot perfect information and stop it playing the game a human plays ([[multiplayer-portability-invariants]]).
+
+The engine already has the right function. `am.d(n)` takes a player and fog-tests the entity's own cell against *that player's* fog grid, returning false when the cell reads as hidden; own units short-circuit before the test.[^6] Perception calls it per entity rather than reasoning about fog itself, so whatever the engine would show a human in a given mode is exactly what the bot sees. That is a legitimacy property obtained by delegation rather than by discipline.
+
+Its name is checked by the drift guard alongside the field names.[^6] Losing that binding would not break a build — it would silently make the bot omniscient, which is worse than a crash because nothing would look wrong.
+
+## What a sample now carries
+
+A frame record reports the visible-entity count and the player's credit balance; each entity adds its owning team, whether it is ours, and current and maximum hit points.[^1][^4][^5] Credits are floored from the engine's `double` to an `int`, which is the affordability-safe direction: it can under-report what is available but never over-report it.
+
+Perception went from 3 entities to 15 on the same map and moment.[^1] Across three samples the visible count rises 15 → 18 → 19 as opposing AI players build, and credits rise 4,121 → 4,283 → 4,445.[^1][^2] Both are live values rather than the 4,000 the engine initialises: the stream is reporting a world in motion, which is the minimum a planner needs to react to anything.
+
+## What this does not establish
+
+**Fog filtering is not demonstrated.** The map sets up team fog[^7], yet all four opposing teams are visible in every sample.[^1] The engine's test returns true whenever fog is disabled for the asking player or that player has no fog grid, so a plausible reading is that `-sandbox` does not apply fog to the local player — in which case a human in the same mode would also see everything and nothing improper is happening. That is a reading, not a finding: it has not been confirmed, and no capture yet shows the test hiding anything.
+
+The consequence is bounded and worth stating plainly. The *mechanism* is legitimate by construction, because it is the engine's own per-player test. The *behaviour under fog* is untested, so the claim "the bot sees only what a player sees" is currently supported by how the code is written rather than by observation. Establishing it needs a mode where the local player has a fog grid, and a capture showing an entity present in `am.bE` and absent from the stream.
+
+Confidence on this page is therefore `medium` rather than `high`, and it is the visibility claim specifically that holds it there.
+
+[^1]: `wiki/sources/m9-perception/perception-widened.txt:9` — `{"kind":"frame","frame":1348,"clock_ms":4555,"visible":15,"credits":4121}`, the first of three samples.
+[^2]: `wiki/sources/m9-perception/perception-widened.txt:11` — the third sample at `visible:19, credits:4445`, with the second at `:10` reading `visible:18, credits:4283`.
+[^3]: `wiki/sources/m9-perception/perception-widened.txt:14` — an owned entity carrying `"team":0,"mine":true,"hp":4000.0,"max_hp":4000.0`.
+[^4]: `wiki/sources/m9-perception/perception-widened.txt:15` — an opposing entity at `"team":5,"mine":false`, at `(410.0, 990.0)` against our base at `(4250.0, 2550.0)`.
+[^5]: `agent/src/rwbot/agent/StateStream.java` — the record shapes; hit points come from `Orders.healthOf`, which reads the pair the engine itself divides for a health fraction (`cu / cv`).
+[^6]: `agent/src/rwbot/agent/Orders.java` — `visibleEntities` calls the pinned `am.d(n)` per entity, and `verifyBindings` checks that method against the jar so a moved name fails at `make check`.
+[^7]: `wiki/sources/m9-perception/perception-widened.txt:5` — `Setting up team fog..` from the engine log of the same run.

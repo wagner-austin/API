@@ -1,0 +1,15 @@
+Widened perception capture. -sandbox, three samples.
+Reproduce: -javaagent:...=discoverAtSeconds=8,14,20;stateOutPath=<abs>;exitAfterDiscovery=true
+
+--- engine log: fog setup on this map ---
+2026-07-25 17:07:26.869: Setting up team fog..
+2026-07-25 17:07:27.250: Setting up team fog..
+
+--- frame records: visible count and credits over time ---
+{"kind":"frame","frame":1348,"clock_ms":4555,"visible":15,"credits":4121}
+{"kind":"frame","frame":3145,"clock_ms":10545,"visible":18,"credits":4283}
+{"kind":"frame","frame":4661,"clock_ms":16548,"visible":19,"credits":4445}
+
+--- one own entity and one enemy entity ---
+{"kind":"entity","frame":1348,"index":6,"id":213,"type":"commandCenter","class":"com.corrodinggames.rts.game.units.d.e","x":4250.0,"y":2550.0,"team":0,"mine":true,"hp":4000.0,"max_hp":4000.0}
+{"kind":"entity","frame":1348,"index":0,"id":207,"type":"commandCenter","class":"com.corrodinggames.rts.game.units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hp":4000.0,"max_hp":4000.0}

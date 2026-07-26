@@ -37,24 +37,25 @@ final class StateStream {
      * be torn exactly as a write can corrupt (wiki: issuing-orders).
      *
      * @param engine The live engine instance.
-     * @return One frame record followed by one record per owned entity, each
+     * @return One frame record followed by one record per visible entity, each
      *     newline-terminated.
      */
     static String sample(Object engine) {
         StringBuilder out = new StringBuilder();
-        java.util.List<Object> owned = Orders.ownedUnits(engine);
+        java.util.List<Object> visible = Orders.visibleEntities(engine);
         int frame = Orders.readIntField(engine, FRAME_FIELD);
         int clock = Orders.readIntField(engine, CLOCK_FIELD);
 
-        out.append(frameRecord(frame, clock, owned.size())).append('\n');
-        for (int index = 0; index < owned.size(); index++) {
-            out.append(entityRecord(frame, index, owned.get(index))).append('\n');
+        out.append(frameRecord(frame, clock, visible.size(), Orders.creditsOf(engine)))
+                .append('\n');
+        for (int index = 0; index < visible.size(); index++) {
+            out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
         }
         return out.toString();
     }
 
     /** Renders the record that opens a sample. */
-    static String frameRecord(int frame, int clockMs, int ownedCount) {
+    static String frameRecord(int frame, int clockMs, int visibleCount, int credits) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "frame");
@@ -63,7 +64,9 @@ final class StateStream {
         out.append(',');
         appendInt(out, "clock_ms", clockMs);
         out.append(',');
-        appendInt(out, "owned", ownedCount);
+        appendInt(out, "visible", visibleCount);
+        out.append(',');
+        appendInt(out, "credits", credits);
         out.append('}');
         return out.toString();
     }
@@ -77,8 +80,9 @@ final class StateStream {
      * identity, assigned once at construction, and is the handle an order is
      * dispatched against.
      */
-    static String entityRecord(int frame, int index, Object entity) {
+    static String entityRecord(int frame, int index, Object entity, Object engine) {
         float[] at = Orders.positionOf(entity);
+        float[] health = Orders.healthOf(entity);
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "entity");
@@ -96,8 +100,31 @@ final class StateStream {
         appendFloat(out, "x", at[0]);
         out.append(',');
         appendFloat(out, "y", at[1]);
+        out.append(',');
+        appendInt(out, "team", Orders.teamOf(entity));
+        out.append(',');
+        appendBool(out, "mine", Orders.isOwnedByLocalPlayer(engine, entity));
+        out.append(',');
+        appendFloat(out, "hp", health[0]);
+        out.append(',');
+        appendFloat(out, "max_hp", health[1]);
         out.append('}');
         return out.toString();
+    }
+
+    private static void appendBool(StringBuilder out, String key, boolean value) {
+        quote(out, key);
+        out.append(':').append(value);
+    }
+
+    /** Appends a double, rejecting non-finite values for the same reason as floats. */
+    private static void appendDouble(StringBuilder out, String key, double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new IllegalStateException(
+                    "rw-agent: refusing to serialise non-finite " + key + "=" + value);
+        }
+        quote(out, key);
+        out.append(':').append(value);
     }
 
     private static void appendString(StringBuilder out, String key, String value) {

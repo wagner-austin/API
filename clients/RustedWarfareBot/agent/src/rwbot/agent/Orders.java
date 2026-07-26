@@ -54,8 +54,27 @@ final class Orders {
     private static final String POS_Y = "ep";
     /** The engine's current player. */
     private static final String LOCAL_TEAM = "bs";
+    /** Team number on a player, as the engine prints it in its own AI warnings. */
+    private static final String TEAM_ID = "k";
+    /** Current and maximum hit points on an entity. */
+    private static final String HP = "cu";
+    private static final String MAX_HP = "cv";
+
+    /**
+     * The engine's own per-player visibility test, {@code am.d(n)}.
+     *
+     * <p>Its body fog-tests the entity's cell against the asking player's fog
+     * grid and returns false when the cell reads as hidden. Own units short out
+     * before the test. Using it is what keeps perception legitimate: the master
+     * entity list holds every unit on the map, so enumerating that directly
+     * would give the bot perfect information and stop it playing the same game a
+     * human plays (wiki: multiplayer-portability-invariants).
+     */
+    private static final String VISIBLE_TO = "d";
     /** The engine's CommandController instance. */
     private static final String CONTROLLER = "cf";
+    /** Credits held by a player. Sits beside the engine's own note to modders. */
+    private static final String CREDITS = "o";
     /** Engine-assigned object identity, set once at construction. */
     private static final String ENTITY_ID = "eh";
     /** Entity accessor returning its unit type. */
@@ -132,6 +151,95 @@ final class Orders {
             }
         }
         return owned;
+    }
+
+    /**
+     * Lists every entity the current player can legitimately see.
+     *
+     * <p>Own units plus enemy units the engine reports as visible, judged by
+     * the engine's own fog test rather than by reading the master list
+     * directly. That distinction is the whole point: {@code am.bE} holds every
+     * unit on the map, so a bot enumerating it would have perfect information
+     * and would no longer be playing the game a human plays (wiki:
+     * multiplayer-portability-invariants).
+     *
+     * <p>Trees are excluded, as in {@link #ownedUnits}. Buildings are kept:
+     * they are legitimate targets and legitimate order-takers, and filtering
+     * them here would put a judgement in the perception layer.
+     *
+     * @param engine The live engine instance.
+     * @return The visible entities, in entity-list order. Empty when there is
+     *     no current player.
+     */
+    static java.util.List<Object> visibleEntities(Object engine) {
+        java.util.List<Object> visible = new java.util.ArrayList<Object>();
+        Object team = readField(engine, LOCAL_TEAM);
+        if (team == null) {
+            return visible;
+        }
+        Class<?> treeClass = pinnedClass(TREE_CLASS);
+        Class<?> orderableClass = pinnedClass(ORDERABLE_CLASS);
+        Class<?> entityClass = pinnedClass(ENTITY_CLASS);
+        Method visibleTo = pinnedMethod(entityClass, VISIBLE_TO, pinnedClass(TEAM_CLASS));
+        for (Object entity : entities()) {
+            if (entity == null || treeClass.isInstance(entity) || !orderableClass.isInstance(entity)) {
+                continue;
+            }
+            Object seen = invoke(visibleTo, entity, team);
+            if (Boolean.TRUE.equals(seen)) {
+                visible.add(entity);
+            }
+        }
+        return visible;
+    }
+
+    /**
+     * Reports whether an entity belongs to the engine's current player.
+     *
+     * @param engine The live engine instance.
+     * @param entity The entity to test.
+     * @return True when the entity's owner is the current player.
+     */
+    static boolean isOwnedByLocalPlayer(Object engine, Object entity) {
+        return readField(entity, OWNER) == readField(engine, LOCAL_TEAM);
+    }
+
+    /**
+     * Returns an entity's owning team number, or -1 when it has no owner.
+     *
+     * @param entity The entity to read.
+     * @return The team number the engine uses in its own AI warnings.
+     */
+    static int teamOf(Object entity) {
+        Object owner = readField(entity, OWNER);
+        if (owner == null) {
+            return -1;
+        }
+        return readIntField(owner, TEAM_ID);
+    }
+
+    /**
+     * Returns current and maximum hit points.
+     *
+     * @param entity The entity to read.
+     * @return ``{current, maximum}``.
+     */
+    static float[] healthOf(Object entity) {
+        return new float[] {readFloat(entity, HP), readFloat(entity, MAX_HP)};
+    }
+
+    /**
+     * Returns the current player's team number and credit balance.
+     *
+     * @param engine The live engine instance.
+     * @return ``{team, credits}``, or null when there is no current player.
+     */
+    static double[] localPlayerState(Object engine) {
+        Object team = readField(engine, LOCAL_TEAM);
+        if (team == null) {
+            return null;
+        }
+        return new double[] {readIntField(team, TEAM_ID), readDoubleField(team, CREDITS)};
     }
 
     /**
@@ -386,9 +494,23 @@ final class Orders {
             checkField(entity, OWNER, problems);
             checkField(entity, POS_X, problems);
             checkField(entity, POS_Y, problems);
+            checkField(entity, HP, problems);
+            checkField(entity, MAX_HP, problems);
+        }
+        if (entity != null && team != null) {
+            // The fog test. Losing this name silently would not break a build --
+            // it would make the bot omniscient, which is worse than a crash
+            // because nothing would look wrong.
+            checkMethod(entity, VISIBLE_TO, problems, team);
+        }
+        if (team != null) {
+            checkField(team, TEAM_ID, problems);
         }
         if (controller != null && team != null) {
             checkMethod(controller, "a", problems, team);
+        }
+        if (team != null) {
+            checkField(team, CREDITS, problems);
         }
         if (command != null && orderable != null) {
             checkMethod(command, "a", problems, orderable);
@@ -526,6 +648,24 @@ final class Orders {
      * @param entity The entity to identify.
      * @return Its identity.
      */
+    /**
+     * Returns the current player's credits, rounded down to whole currency.
+     *
+     * <p>The engine holds this as a double and spends it in whole units, so a
+     * planner comparing against a unit price wants the floor rather than the
+     * raw value: 99.97 credits does not buy a 100-credit structure.
+     *
+     * @param engine The live engine instance.
+     * @return Credits, or 0 when there is no current player.
+     */
+    static int creditsOf(Object engine) {
+        Object team = readField(engine, LOCAL_TEAM);
+        if (team == null) {
+            return 0;
+        }
+        return (int) Math.floor(readDoubleField(team, CREDITS));
+    }
+
     static long idOf(Object entity) {
         return readLongField(entity, ENTITY_ID);
     }
@@ -567,6 +707,22 @@ final class Orders {
             }
         }
         return null;
+    }
+
+    /**
+     * Reads a {@code double} field through the same pinned-name machinery.
+     *
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not a double.
+     */
+    static double readDoubleField(Object target, String name) {
+        try {
+            return pinnedField(target.getClass(), name).getDouble(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read double " + name + PIN, e);
+        }
     }
 
     private static float readFloat(Object target, String name) {
