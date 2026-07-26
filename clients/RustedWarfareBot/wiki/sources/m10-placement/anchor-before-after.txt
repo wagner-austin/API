@@ -1,0 +1,19 @@
+Placement anchoring: before and after.
+Reproduce: start the game with channelPort=<p>, then scripts/play.py <p> <catalogue> 90
+
+--- BEFORE: offsets measured from the builder, which walks to each site ---
+orders issued (three separate runs, near-identical):
+channel: build landFactory by 214 at (4450.0, 2730.0)
+channel: build landFactory by 214 at (4180.5503, 2808.31)
+channel: build landFactory by 214 at (4451.299, 2645.8323)
+actual built structures at t=30s:
+  landFactory (4450.0, 2730.0)
+  landFactory (4170.0, 2790.0)
+third order (4451.3, 2645.8) is 84 units from the first factory -> refused
+outcome: stalled 2/3 in three of four runs
+
+--- AFTER: offsets measured from the oldest owned immobile structure ---
+channel: build landFactory by 214 at (4450.0, 2670.0)
+channel: build landFactory by 214 at (4050.0, 2670.0)
+channel: build landFactory by 214 at (4450.0, 2430.0)
+outcome: done 3/3 in three of three runs
