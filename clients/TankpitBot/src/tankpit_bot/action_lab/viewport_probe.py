@@ -28,12 +28,16 @@ wait after every step, and the GIF-terrain routing here.
 
 Autoscroll is flipped between phases with a physical ``a`` key press
 (the key-probe machinery) and VERIFIED from the wire: the server
-echoes the short 0x41 autoscroll ack carrying the new enabled flag.
-The probe expects to find autoscroll OFF (the user's standing
-config), runs phase A as-found, toggles ON for phase B, restores OFF
-— verified — and quits to the lobby. A fuel floor guards every
-phase: below it the probe skips ahead to restore + quit rather than
-stranding the tank (the 2026-07-25 sitting-duck rule).
+echoes the plaintext ``"A0"``/``"A1"`` ack carrying the new enabled
+flag. The initial state is unknowable without a press (no query
+carries the flag; the setting is server-persisted per account —
+probe run 20260725-192738 opened in exactly the OFF state run
+20260725-190352's restore press left), so the first press both
+reveals and flips the state and the probe normalizes to OFF before
+phase A, toggles ON for phase B, restores OFF — verified — and
+quits to the lobby. A fuel floor guards every phase: below it the
+probe skips ahead to restore + quit rather than stranding the tank
+(the 2026-07-25 sitting-duck rule).
 """
 
 from __future__ import annotations
@@ -440,11 +444,11 @@ class ViewportProbe(ProbeBase):
             # account lost a rank).
             try:
                 # Normalize to OFF. The initial state is unknowable without
-                # a press (no query carries the flag), and the first live
-                # run proved it cannot be assumed: a fresh browser session
-                # started ON despite the user's own client showing OFF —
-                # the flag looks client-local, not server-persisted. The
-                # first press both reveals and flips the state.
+                # a press (no query carries the flag) and cannot be assumed:
+                # the setting is server-persisted per account, so each
+                # session opens in whatever state the last one left (the
+                # 2026-07-24 key probe's inverted "restore" left it ON for
+                # a whole day). The first press both reveals and flips it.
                 state = self._toggle_autoscroll()
                 ack_states.append(state)
                 if state:
