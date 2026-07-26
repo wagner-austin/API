@@ -17,7 +17,7 @@ public final class Premain {
     }
 
     public static void premain(String argument, Instrumentation instrumentation) {
-        AgentOptions options = AgentOptions.parse(argument);
+        AgentOptions options = AgentOptionsParser.parse(argument);
 
         java.util.Map<String, java.util.Set<String>> targets = Targets.byClass();
         NoOpTransformer transformer = new NoOpTransformer(targets);
