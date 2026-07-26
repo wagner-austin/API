@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import Protocol
 
@@ -16,9 +17,10 @@ from tests.action_lab._replay_core import (
     WorldStateOverrideMixin,
 )
 from tests.conftest import FakeFileSystem
+from tests.fakes import InMemoryTerrainMap
 
 from tankpit_bot import _test_hooks as core_hooks
-from tankpit_bot._test_hooks import BufferedMessageSourceProtocol
+from tankpit_bot._test_hooks import BufferedMessageSourceProtocol, TerrainMapProtocol
 from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.action_lab import session as action_session
 from tankpit_bot.action_lab.probe_base import ProbeError
@@ -155,10 +157,29 @@ class _ViewportHarness(ViewportProbe):
         self.quits = 0
         self.fuel = 1000
         self.position = (100, 100)
+        self.window = (95, 92, 16, 16)
 
     @property
     def messages(self) -> list[CapturedMessage]:
         return self.message_log
+
+    def get_world_state(self) -> WorldStateDict:
+        world = _make_world(1000, self.position[0], self.position[1], self.fuel)
+        return WorldStateDict(
+            self_state=world["self_state"],
+            tanks=world["tanks"],
+            containers=world["containers"],
+            mines=world["mines"],
+            terrain=world["terrain"],
+            viewport=make_viewport_state(
+                left=self.window[0],
+                top=self.window[1],
+                width=self.window[2],
+                height=self.window[3],
+            ),
+            scanned_tiles=world["scanned_tiles"],
+            timestamp_ms=world["timestamp_ms"],
+        )
 
     def open_map(self) -> bool:
         self.map_calls += 1
@@ -188,6 +209,14 @@ class _ViewportHarness(ViewportProbe):
             fuel=self.fuel,
             leaderboard_position=1,
         )
+
+
+@pytest.fixture()
+def _all_ground_terrain() -> Generator[None, None, None]:
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap()
+    yield
+    viewport_module.get_terrain_map = original
 
 
 def _install_noop_drain() -> None:
@@ -264,18 +293,32 @@ def test_anchor_skips_below_the_fuel_floor() -> None:
     assert probe.teleports == []
 
 
-def test_walk_east_steps_one_tile_at_a_time() -> None:
+def test_anchor_skips_when_the_teleport_never_echoes() -> None:
+    class _Rejected(_ViewportHarness):
+        def teleport_to(self, x: int, y: int) -> bool:
+            self.teleports.append((x, y))
+            return True
+
+    probe = _Rejected()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+
+    assert probe._anchor() is False
+    assert probe.teleports == [(106, 100)]
+
+
+def test_walk_to_edge_steps_east_to_the_edge_column(_all_ground_terrain: None) -> None:
     probe = _ViewportHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
-    steps = probe._walk_east()
-    assert steps == 16
+    steps = probe._walk_to_edge()
+    assert steps == 10
     assert probe.moves[0] == (101, 100)
-    assert probe.moves[-1] == (116, 100)
+    assert probe.moves[-1] == (110, 100)
 
 
-def test_walk_east_stops_at_the_fuel_floor() -> None:
+def test_walk_to_edge_stops_at_the_fuel_floor(_all_ground_terrain: None) -> None:
     class _Draining(_ViewportHarness):
         def move_to(self, x: int, y: int) -> bool:
             self.fuel = 50
@@ -285,7 +328,126 @@ def test_walk_east_stops_at_the_fuel_floor() -> None:
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
-    assert probe._walk_east() == 1
+    assert probe._walk_to_edge() == 1
+
+
+def test_walk_to_edge_stops_when_no_walkable_step_remains() -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(100, 100)})
+    try:
+        assert probe._walk_to_edge() == 0
+    finally:
+        viewport_module.get_terrain_map = original
+    assert probe.moves == []
+
+
+def test_walk_to_edge_stops_when_a_step_never_echoes(_all_ground_terrain: None) -> None:
+    class _Frozen(_ViewportHarness):
+        def move_to(self, x: int, y: int) -> bool:
+            self.moves.append((x, y))
+            return True
+
+    probe = _Frozen()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+
+    assert probe._walk_to_edge() == 1
+    assert probe.moves == [(101, 100)]
+
+
+def test_terrain_map_raises_when_no_map_is_loaded() -> None:
+    probe = _ViewportHarness()
+    with pytest.raises(ProbeError, match="terrain map unavailable"):
+        probe._terrain_map()
+
+
+def test_pick_step_prefers_east_then_routes_around_water() -> None:
+    probe = _ViewportHarness()
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(
+        {(101, 99), (100, 101)}
+    )
+    try:
+        assert probe._pick_step(100, 100, 92, 16, set()) == (101, 99)
+        assert probe._pick_step(100, 100, 92, 16, {(101, 99)}) == (100, 101)
+        assert probe._pick_step(100, 100, 92, 16, {(101, 99), (100, 101)}) is None
+    finally:
+        viewport_module.get_terrain_map = original
+
+
+def test_pick_step_skips_rows_outside_the_window() -> None:
+    probe = _ViewportHarness()
+    # Standing on the window's top row with everything east under
+    # water: the north candidates fall outside the window and must be
+    # skipped, leaving the south sidestep.
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(100, 93)})
+    try:
+        assert probe._pick_step(100, 92, 92, 16, set()) == (100, 93)
+    finally:
+        viewport_module.get_terrain_map = original
+
+
+def test_walk_to_edge_spends_all_steps_short_of_a_wide_window(
+    _all_ground_terrain: None,
+) -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe.window = (95, 92, 32, 16)
+
+    assert probe._walk_to_edge() == 16
+    assert probe.moves[-1] == (116, 100)
+
+
+def test_cross_edge_skips_before_the_edge_column(_all_ground_terrain: None) -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+
+    probe._cross_edge()
+    assert probe.moves == []
+
+
+def test_cross_edge_steps_past_the_edge(_all_ground_terrain: None) -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe.position = (110, 100)
+
+    probe._cross_edge()
+    assert probe.moves == [(111, 100)]
+
+
+def test_cross_edge_scans_rows_for_a_passable_landing() -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe.position = (110, 100)
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set({(111, 102)})
+    try:
+        probe._cross_edge()
+    finally:
+        viewport_module.get_terrain_map = original
+    assert probe.moves == [(111, 102)]
+
+
+def test_cross_edge_skips_when_nothing_past_the_edge_is_passable() -> None:
+    probe = _ViewportHarness()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe.position = (110, 100)
+    original = viewport_module.get_terrain_map
+    viewport_module.get_terrain_map = lambda: InMemoryTerrainMap.from_passable_set(set())
+    try:
+        probe._cross_edge()
+    finally:
+        viewport_module.get_terrain_map = original
+    assert probe.moves == []
 
 
 def test_long_moves_fire_each_offset_from_the_current_tile() -> None:
@@ -311,14 +473,18 @@ def test_long_moves_stop_at_the_fuel_floor() -> None:
     assert probe._long_moves() == 1
 
 
-def test_run_phase_walks_then_probes_after_a_good_anchor() -> None:
+def test_run_phase_walks_crosses_then_probes_after_a_good_anchor(
+    _all_ground_terrain: None,
+) -> None:
     probe = _ViewportHarness()
     action_hooks.get_current_time_ms = probe._clock
     _install_noop_drain()
 
-    assert probe._run_phase() == (16, 5)
+    assert probe._run_phase() == (4, 5)
     assert probe.teleports == [(106, 100)]
-    assert len(probe.moves) == 21
+    # 4 walk steps (107..110), the edge crossing to 111, then 5 longs.
+    assert len(probe.moves) == 10
+    assert probe.moves[4] == (111, 100)
 
 
 def test_run_phase_returns_zeroes_when_the_anchor_fails() -> None:
@@ -390,6 +556,7 @@ class _FakeViewportProbe(ViewportProbe):
 
 class _ViewportModuleProtocol(Protocol):
     ViewportProbe: type[ViewportProbe]
+    get_terrain_map: Callable[[], TerrainMapProtocol | None]
 
 
 _viewport_module_import = __import__(

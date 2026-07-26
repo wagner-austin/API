@@ -10,12 +10,21 @@ open questions from the 2026-07-25 density runs):
   legal target (the last 0x5A window, a radius, or something else).
 
 Protocol per phase: teleport to a probe anchor near the tank (small,
-funded hop; map opened first — teleports need the map-open state),
-then walk EAST one tile at a time for ``_WALK_STEPS`` steps, then
-fire single long moves at ``_LONG_OFFSETS`` east of wherever the tank
-stands. Every accept (0x47 echo), reject (0x52), 0x5A origin, and
-0x3D position lands in the capture for offline analysis
-(``analysis_scripts/analyze_viewport_probe.py``).
+funded hop; map opened first — teleports need the map-open state;
+the landing is verified from the position echo before walking), then
+walk terrain-aware single-tile steps toward the window's EAST edge
+column, attempt ONE crossing step past the edge (the decisive
+experiment: does the 0x5A window shift, and only under autoscroll
+ON?), then fire single long moves at ``_LONG_OFFSETS`` east of
+wherever the tank stands. Every accept (0x47 echo), reject (0x52),
+0x5A origin, and 0x3D position lands in the capture for offline
+analysis (``analysis_scripts/analyze_viewport_probe.py``).
+
+The first live run (20260725-190352) proved the blind version of the
+walk useless for the ON phase: a step fired before the anchor echo
+landed, the server pathfound the tank west around water, and the
+edge was never reached. Hence the landing verification, the echo
+wait after every step, and the GIF-terrain routing here.
 
 Autoscroll is flipped between phases with a physical ``a`` key press
 (the key-probe machinery) and VERIFIED from the wire: the server
@@ -34,6 +43,7 @@ from typing import TypedDict
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.action_lab.probe_base import ProbeBase, ProbeError
 from tankpit_bot.action_lab.probe_entrypoint import run_and_save_standard_probe_session
 from tankpit_bot.action_lab.probe_runtime import (
@@ -45,6 +55,7 @@ from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.protocol import try_decode_plaintext_ack
+from tankpit_bot.sniffer.world_state import get_terrain_map
 
 log = get_logger(__name__)
 
@@ -54,6 +65,9 @@ _WALK_STEPS = 16
 _LONG_OFFSETS: tuple[int, ...] = (6, 10, 14, 18, 24)
 _ANCHOR_HOP = 6
 _FUEL_FLOOR = 120
+_POLL_MS = 500
+_STEP_POLLS = 4
+_CROSS_ROW_SCAN = 3
 
 
 class ViewportProbeSessionDict(TypedDict):
@@ -199,16 +213,58 @@ class ViewportProbe(ProbeBase):
         log.info("Viewport probe: autoscroll ack enabled=%s", enabled)
         return enabled
 
+    def _window(self) -> tuple[int, int, int, int]:
+        """Return the last-known 0x5A window as (left, top, width, height)."""
+        viewport = self.get_world_state()["viewport"]
+        return (viewport["left"], viewport["top"], viewport["width"], viewport["height"])
+
+    def _terrain_map(self) -> TerrainMapProtocol:
+        """Return the loaded GIF terrain map.
+
+        Raises:
+            ProbeError: If no terrain map is loaded — the edge walk
+                cannot be routed blind (run 20260725-190352 walked
+                into water and never reached the edge).
+        """
+        terrain = get_terrain_map()
+        if terrain is None:
+            raise ProbeError("terrain map unavailable; cannot route the edge walk")
+        return terrain
+
+    def _await_position_change(self, x: int, y: int) -> bool:
+        """Poll the wire until the tank's echoed position leaves (x, y).
+
+        Args:
+            x: Position X before the command.
+            y: Position Y before the command.
+
+        Returns:
+            True once the echoed position differs, False on timeout.
+        """
+        from tankpit_bot.action_lab import _test_hooks as action_hooks
+
+        page = self._require_page()
+        for _ in range(_STEP_POLLS):
+            page.wait_for_timeout(float(_POLL_MS))
+            action_hooks.drain_buffered_messages(self)
+            _, new_x, new_y = self._current_fuel()
+            if (new_x, new_y) != (x, y):
+                return True
+        return False
+
     def _anchor(self) -> bool:
         """Hop a few tiles east so the viewport re-centers on the tank.
 
         A teleport is the one guaranteed re-center (autoscroll-
         independent), giving each phase a clean centered baseline.
         The map is opened first — teleports require the map-open
-        state.
+        state — and the landing is verified from the position echo
+        before the phase walks (run 20260725-190352 fired its first
+        step before the echo landed and walked from a stale position).
 
         Returns:
-            True when the hop was funded and dispatched.
+            True when the hop landed, False when the phase must be
+            skipped (unfunded or the teleport never echoed).
         """
         from tankpit_bot.action_lab import _test_hooks as action_hooks
 
@@ -221,30 +277,115 @@ class ViewportProbe(ProbeBase):
         page.wait_for_timeout(float(_SETTLE_MS))
         action_hooks.drain_buffered_messages(self)
         self.teleport_to(x + _ANCHOR_HOP, y)
-        page.wait_for_timeout(float(_SETTLE_MS))
-        action_hooks.drain_buffered_messages(self)
+        if not self._await_position_change(x, y):
+            log.info("Viewport probe: anchor teleport never echoed - skipping phase")
+            return False
         return True
 
-    def _walk_east(self) -> int:
-        """Walk one tile east per step, capturing every echo and origin.
+    def _pick_step(
+        self,
+        x: int,
+        y: int,
+        top: int,
+        height: int,
+        visited: set[tuple[int, int]],
+    ) -> tuple[int, int] | None:
+        """Pick the next walkable one-tile step toward the east edge.
+
+        Callers only step from strictly inside the window, so every
+        eastward candidate stays at or inside the edge column.
+
+        Args:
+            x: Current position X.
+            y: Current position Y.
+            top: Window top row.
+            height: Window height in tiles.
+            visited: Tiles already stood on this walk (loop guard).
 
         Returns:
-            Steps sent (stops early at the fuel floor).
+            The chosen in-window step, or None when nothing walkable
+            and unvisited remains.
         """
-        from tankpit_bot.action_lab import _test_hooks as action_hooks
+        terrain = self._terrain_map()
+        candidates = ((x + 1, y), (x + 1, y - 1), (x + 1, y + 1), (x, y - 1), (x, y + 1))
+        for step_x, step_y in candidates:
+            if not top <= step_y < top + height:
+                continue
+            if (step_x, step_y) in visited:
+                continue
+            if terrain.is_passable(step_x, step_y):
+                return step_x, step_y
+        return None
 
-        page = self._require_page()
+    def _walk_to_edge(self) -> int:
+        """Walk terrain-aware steps until the tank stands on the east edge.
+
+        Returns:
+            Steps sent (stops early at the fuel floor, when no
+            walkable step remains, or when a step never echoes).
+        """
         steps = 0
+        visited: set[tuple[int, int]] = set()
+        left, top, width, height = self._window()
+        edge_x = left + width - 1
         for _ in range(_WALK_STEPS):
             fuel, x, y = self._current_fuel()
             if fuel < _FUEL_FLOOR:
                 log.info("Viewport probe: fuel %d below floor - ending walk", fuel)
                 break
-            self.move_to(x + 1, y)
+            if x >= edge_x:
+                break
+            visited.add((x, y))
+            step = self._pick_step(x, y, top, height, visited)
+            if step is None:
+                log.info("Viewport probe: no walkable unvisited step toward the edge")
+                break
+            self.move_to(step[0], step[1])
             steps += 1
-            page.wait_for_timeout(float(_SETTLE_MS))
-            action_hooks.drain_buffered_messages(self)
+            if not self._await_position_change(x, y):
+                log.info("Viewport probe: step to (%d,%d) never echoed", step[0], step[1])
+                break
         return steps
+
+    def _cross_edge(self) -> None:
+        """Attempt one step past the east edge and record the window's answer.
+
+        The decisive experiment: with the tank ON the edge column, a
+        move one column beyond it either rejects (static window) or
+        walks — and if it walks, the capture shows whether a 0x5A
+        shift came with it. Skipped when the walk never reached the
+        edge or no passable tile exists just past it.
+        """
+        left, top, width, _height = self._window()
+        edge_x = left + width - 1
+        fuel, x, y = self._current_fuel()
+        if fuel < _FUEL_FLOOR or x < edge_x:
+            log.info("Viewport probe: crossing skipped (fuel=%d x=%d edge=%d)", fuel, x, edge_x)
+            return
+        terrain = self._terrain_map()
+        target_y: int | None = None
+        for delta in range(_CROSS_ROW_SCAN + 1):
+            for row in (y - delta, y + delta):
+                if terrain.is_passable(edge_x + 1, row):
+                    target_y = row
+                    break
+            if target_y is not None:
+                break
+        if target_y is None:
+            log.info("Viewport probe: no passable tile past the edge near row %d", y)
+            return
+        self.move_to(edge_x + 1, target_y)
+        self._await_position_change(x, y)
+        new_left, new_top, _, _ = self._window()
+        log.info(
+            "Viewport probe: edge crossing to (%d,%d) - window (%d,%d) -> (%d,%d)",
+            edge_x + 1,
+            target_y,
+            left,
+            top,
+            new_left,
+            new_top,
+        )
 
     def _long_moves(self) -> int:
         """Fire single moves at growing eastward offsets.
@@ -268,14 +409,16 @@ class ViewportProbe(ProbeBase):
         return sent
 
     def _run_phase(self) -> tuple[int, int]:
-        """Anchor, edge-walk, and boundary-probe one phase.
+        """Anchor, edge-walk, edge-cross, and boundary-probe one phase.
 
         Returns:
             Tuple of (walk steps sent, long moves sent).
         """
         if not self._anchor():
             return 0, 0
-        return self._walk_east(), self._long_moves()
+        walks = self._walk_to_edge()
+        self._cross_edge()
+        return walks, self._long_moves()
 
     def execute_probe(
         self,
