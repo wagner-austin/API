@@ -257,8 +257,8 @@ service: install
 
 run: install
 	@Write-Host ""
-	@Write-Host "==> run (5-min timed session)" -ForegroundColor Cyan
-	$$env:TANKPIT_BOT_SESSION_SECONDS = '300'; poetry run tankpit-bot
+	@Write-Host "==> run (timed session; TANKPIT_BOT_SESSION_SECONDS / _KILLS honored, default 300s)" -ForegroundColor Cyan
+	if (-not $$env:TANKPIT_BOT_SESSION_SECONDS) { $$env:TANKPIT_BOT_SESSION_SECONDS = '300' }; poetry run tankpit-bot
 	@Write-Host ""
 	@Write-Host "==> scorecard" -ForegroundColor Cyan
 	poetry run tankpit-issue-report runs/bot/latest.events.jsonl

@@ -44,6 +44,21 @@ def resolve_session_seconds(argv: list[str], env_value: str | None) -> int:
     raise SystemExit(f"tankpit-bot: unrecognized arguments: {' '.join(argv)}\n\n{_USAGE}")
 
 
+def resolve_session_kills(env_value: str | None) -> int:
+    """Resolve the kill-target session bound from the environment.
+
+    Args:
+        env_value: Raw ``TANKPIT_BOT_SESSION_KILLS`` value, or None.
+
+    Returns:
+        Kill target; zero means no kill bound (time/stop-file only).
+
+    Raises:
+        ValueError: If the value is not an integer.
+    """
+    return int(env_value) if env_value is not None else 0
+
+
 def main() -> None:
     """Entry point for tankpit-bot command."""
     from tankpit_bot.bot.base import Bot
@@ -57,6 +72,7 @@ def main() -> None:
         _test_hooks.get_argv()[1:],
         _test_hooks.get_env("TANKPIT_BOT_SESSION_SECONDS"),
     )
+    session_kills = resolve_session_kills(_test_hooks.get_env("TANKPIT_BOT_SESSION_KILLS"))
     artifacts = configure_bot_runtime_logging()
     set_protocol_frame_logging(False)
     log.info("Bot latest log: %s", artifacts["latest_log_path"])
@@ -65,8 +81,9 @@ def main() -> None:
     stop_file_path = Path(artifacts["latest_log_path"]).parent / "STOP"
     _test_hooks.remove_file(stop_file_path)
     log.info(
-        "Session bound: %s; stop file: %s",
+        "Session bound: %s%s; stop file: %s",
         f"{session_seconds}s" if session_seconds > 0 else "until stopped",
+        f" or {session_kills} kills" if session_kills > 0 else "",
         stop_file_path,
     )
 
@@ -88,7 +105,11 @@ def main() -> None:
         headless=False,
         prefer_account=resolve_prefer_account(),
     )
-    bot.run(session_seconds=session_seconds, stop_file_path=stop_file_path)
+    bot.run(
+        session_seconds=session_seconds,
+        session_kills=session_kills,
+        stop_file_path=stop_file_path,
+    )
 
 
 __all__ = [

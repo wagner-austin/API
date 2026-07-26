@@ -186,6 +186,18 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
             fully stocked — the clean exit.
     """
     if ctx.ai_state["wind_down"]:
+        target = ctx.world["tanks"].get(str(ctx.ai_state["combat_target_id"]))
+        finishing_kill = (
+            ctx.mode == "HUNT"
+            and target is not None
+            and target["liveness"] == "alive"
+            and not should_exit_hunt(ctx)
+        )
+        if finishing_kill:
+            # Never abandon a fight in progress (user rulings 2026-07-25
+            # and 2026-07-26): the current kill completes; the break
+            # thresholds still protect, and no NEW target is acquired.
+            return "HUNT"
         if should_exit_collect(ctx):
             raise SessionExitError(
                 "session_complete",

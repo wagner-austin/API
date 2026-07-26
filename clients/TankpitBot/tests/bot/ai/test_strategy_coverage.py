@@ -510,6 +510,56 @@ class TestEquipmentSearchHopFallback:
 
         assert decision["behavior"]["mode"] == "COLLECT"
 
+    def test_wind_down_finishes_a_live_kill_before_collecting(self) -> None:
+        """A fight in progress completes before the wind-down collects.
+
+        User rulings 2026-07-25/26: never abandon a target mid-fight;
+        the kill boundary is the clean-exit point. The held HUNT with
+        a LIVE locked target keeps the tick while the break
+        thresholds stay green.
+        """
+        from tankpit_bot.state.types import make_tank_state
+
+        world, self_state = _make_world(fuel=900, scanned=True)
+        world["tanks"]["511"] = make_tank_state(
+            tank_id=511,
+            x=101,
+            y=100,
+            team=1,
+            rank=1,
+            name="WindDownTarget",
+            is_self=False,
+            is_bot=True,
+            damage_state=0,
+            timestamp_ms=99500,
+            last_wire_seen_ms=99500,
+            last_position_update_ms=99500,
+            last_viewport_observation_ms=99500,
+        )
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "combat_target_id": 511,
+                "wind_down": True,
+            }
+        )
+        inventory = _make_inventory(default_count=20, radar_count=15)
+
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((150, 100),),
+        )
+
+        assert decision["behavior"]["mode"] == "HUNT"
+
     def test_wind_down_with_collect_exhausted_exits_session_complete(self) -> None:
         """Winding down with nothing collectable ends the session early-clean."""
         import pytest

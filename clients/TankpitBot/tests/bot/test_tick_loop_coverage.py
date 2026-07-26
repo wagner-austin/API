@@ -152,6 +152,26 @@ class TestWindDown:
         )
         assert bot._ai_state["wind_down"] is True
 
+    def test_kill_target_triggers_wind_down(self) -> None:
+        """Reaching the kill bound flips ``wind_down`` at the kill boundary.
+
+        User request 2026-07-26: "maybe if we put it for kills instead
+        of time based" — the kill boundary is the natural clean-exit
+        point (no fight is ever interrupted).
+        """
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["session_kill_count"] = 2
+        run_tick_loop(
+            bot,
+            _FakePage(),
+            session_seconds=4,
+            session_kills=2,
+            stop_file_path=Path("C:/tmp/absent.sentinel"),
+        )
+        assert bot._ai_state["wind_down"] is True
+
     def test_short_diagnostic_session_never_winds_down(self) -> None:
         """Sessions of two windows or less keep the full loop active."""
         from tankpit_bot.bot.tick_loop import run_tick_loop

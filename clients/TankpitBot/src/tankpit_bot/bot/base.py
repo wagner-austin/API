@@ -360,7 +360,13 @@ class Bot(DispatchMixin):
     # Run Loop
     # =========================================================================
 
-    def run(self, *, session_seconds: int, stop_file_path: Path) -> None:
+    def run(
+        self,
+        *,
+        session_seconds: int,
+        session_kills: int = 0,
+        stop_file_path: Path,
+    ) -> None:
         """Run the bot.
 
         Launches browser, logs in, joins game, and runs the game loop.
@@ -448,6 +454,7 @@ class Bot(DispatchMixin):
                 self._game_loop(
                     page,
                     session_seconds=session_seconds,
+                    session_kills=session_kills,
                     stop_file_path=stop_file_path,
                 )
             except KeyboardInterrupt:
@@ -515,6 +522,7 @@ class Bot(DispatchMixin):
         page: PageProtocol,
         *,
         session_seconds: int,
+        session_kills: int = 0,
         stop_file_path: Path,
     ) -> None:
         """Run the tick loop: sync, decide, execute on each server tick.
@@ -532,6 +540,7 @@ class Bot(DispatchMixin):
             self,
             page,
             session_seconds=session_seconds,
+            session_kills=session_kills,
             stop_file_path=stop_file_path,
         )
 

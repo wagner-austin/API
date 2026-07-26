@@ -62,6 +62,18 @@ class TestMaybeCaptureAccountStatsOnce:
 class TestResolveSessionSeconds:
     """Tests for resolve_session_seconds (formerly _parse_session_seconds)."""
 
+    def test_resolve_session_kills_defaults_to_zero(self) -> None:
+        """No env value means no kill bound."""
+        from tankpit_bot.bot.entry import resolve_session_kills
+
+        assert resolve_session_kills(None) == 0
+
+    def test_resolve_session_kills_parses_env(self) -> None:
+        """A set env value becomes the kill target."""
+        from tankpit_bot.bot.entry import resolve_session_kills
+
+        assert resolve_session_kills("5") == 5
+
     def test_help_flag_raises_system_exit_zero(self) -> None:
         """--help raises SystemExit(0) after writing usage."""
         from tankpit_bot.bot.entry import resolve_session_seconds

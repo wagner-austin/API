@@ -99,6 +99,7 @@ def run_tick_loop(
     page: PageProtocol,
     *,
     session_seconds: int,
+    session_kills: int = 0,
     stop_file_path: Path,
 ) -> None:
     """Run the main tick loop.
@@ -121,6 +122,12 @@ def run_tick_loop(
         page: Playwright page for waiting between ticks.
         session_seconds: Bounded session length in seconds; zero or
             negative runs until externally stopped.
+        session_kills: Kill-target bound; when positive, reaching this
+            many session kills triggers the wind-down (finish nothing
+            new, top off, exit ``session_complete``) — the kill
+            boundary is the natural clean-exit point (user request
+            2026-07-26: end on kills, not mid-action on the clock).
+            Zero disables the kill bound.
         stop_file_path: Sentinel file whose existence requests a
             graceful shutdown.
     """
@@ -146,6 +153,16 @@ def run_tick_loop(
             log.info(
                 "Session wind-down (final %ds): disengaging and topping off for a clean exit",
                 _WIND_DOWN_SECONDS,
+            )
+        if (
+            session_kills > 0
+            and not bot._ai_state["wind_down"]
+            and bot._ai_state["session_kill_count"] >= session_kills
+        ):
+            bot._ai_state["wind_down"] = True
+            log.info(
+                "Kill target reached (%d): winding down for a clean exit",
+                session_kills,
             )
         try:
             _tick_once(bot)
