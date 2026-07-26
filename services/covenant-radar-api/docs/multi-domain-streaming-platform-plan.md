@@ -14,12 +14,48 @@ Refactor covenant-radar-api into a **domain-agnostic streaming ML platform** whe
 |-------|-------------|--------|
 | 1 | Core abstractions (base schemas, protocols, registry, generic worker) | ✅ Complete |
 | 2 | Weather domain + deployment | ✅ Complete — runs on a real broker, verified on real ERA5 observations |
-| 3 | Esports domain | ✅ Complete — runs on a real broker |
+| 3 | Esports domain | ✅ Complete — runs on a real broker, verified on real competitive matches |
 
-Esports is validated only as a pipeline. Weather has been run against real
-ERA5 observations end to end; no real esports dataset is on hand, so the
-match snapshots in its smoke are synthetic and say nothing about whether
-the win-probability model is any good.
+### Real-data verification
+
+Both domains have been run end to end on real observations through the
+production entry point, not just on fixtures.
+
+**Weather** — ERA5 daily maximum temperature, Phoenix and Irvine,
+1990-2024. Fitted on 1990-2015, streamed the held-out 2016-2024 summers.
+Out-of-sample exceedance of the 95th-percentile threshold was 9.78% and
+13.16% against the 5% a stationary climate implies, and held-out AUC on
+next-day extremes was 0.9118.
+
+**Esports** — 7,620 competitive League of Legends matches (Oracle's Elixir
+export via Kaggle `chuckephron/leagueoflegends`, CC0, 2014-2018). Snapshots
+reconstructed at minutes 10/15/20/25 from per-minute gold plus timestamped
+kill, turret, dragon and baron events; the label is the real match result.
+Split temporally and by match: fit on 2014-2016, evaluate on 2017-2018, so
+no match contributes to both. Held-out AUC 0.8163 over 14,057 snapshots,
+rising with game time (0.7112 at minute 10 to 0.8921 at minute 25) as a win
+probability should. The 0.5435 blue-side base rate matches the known
+historical blue advantage, which is the check that the sides are not
+transposed.
+
+Both datasets were validated before use, not merely downloaded: cross-column
+identities (`golddiff == goldblue - goldred`, exact over 282,036 values),
+monotonicity of cumulative counters, rule-fixed bounds, event timestamps
+inside the match, and a leakage check that no snapshot counts an event
+after its own timestamp. Two checks initially failed. One was a defect in
+the check — 37 match ids are Riot's Japanese regional match-history URLs,
+which carry no `gameHash`. The other was real: 8 of 7,620 matches (all
+2015, all in the training split) recorded `FOUNTAIN_TURRET` kills beyond
+the structures that exist. Turret counts now use an allowlist of the eleven
+real turrets, and 14 exactly-duplicated event rows are collapsed. Held-out
+AUC moved 0.8167 to 0.8163 under the correction.
+
+Caveat worth keeping: later minutes describe longer games, because a
+snapshot at minute 25 only exists for matches that reached it. That
+conditions the population on game length, which is a future fact. It does
+not leak the winner — blue's win rate across those populations is flat at
+0.5441/0.5441/0.5438/0.5418 — but minute-25 numbers are not drawn from the
+same match population as minute-10 numbers.
 
 ---
 
