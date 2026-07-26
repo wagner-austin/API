@@ -79,6 +79,40 @@ final class EngineNames {
     /** Team number on a player, as the engine prints it in its own AI warnings. */
     static final String TEAM_ID = "k";
 
+    /**
+     * Team predicate: whether another player is hostile to this one.
+     *
+     * <p>Not the negation of "mine", and the difference is not academic. The
+     * engine compares alliance group rather than team number, and answers false
+     * whenever either side is the neutral team — so a shared-alliance ally and a
+     * neutral map object both read as not hostile, which "everything that is not
+     * mine" gets wrong in both directions.
+     *
+     * <p>Its sibling {@code d(n)} is the same comparison inverted, which is what
+     * pins this one as the hostile direction rather than the friendly one.
+     */
+    static final String TEAM_HOSTILE_TO = "c";
+
+    /**
+     * Units a player holds, excluding buildings and including queued ones.
+     *
+     * <p>The engine names this field itself: when its cached figure disagrees
+     * with a recount it logs {@code
+     * unitCountExcludingBuildingsIncludingQueued:} and prints both. That log
+     * line is the whole derivation — nothing here is inferred from the name.
+     */
+    static final String TEAM_UNIT_COUNT = "w";
+
+    /**
+     * The unit cap this game was configured with.
+     *
+     * <p>Copied onto every player from the game-wide setting at start.
+     * {@link #TEAM_UNIT_COUNT} is compared against it on the production path,
+     * and a producer at the cap is refused silently (wiki:
+     * mechanics-build-actions).
+     */
+    static final String TEAM_UNIT_CAP = "x";
+
     /** Current and maximum hit points on an entity. */
     static final String HP = "cu";
 
@@ -152,6 +186,20 @@ final class EngineNames {
      * at a position.
      */
     static final String ACTION_MAKES = "i";
+
+    /**
+     * Unit-type accessor returning its action list at a tech level.
+     *
+     * <p>The static counterpart of {@link #ACTIONS}. That one is read off a
+     * live entity and answers "what can this unit make now"; this one is asked
+     * of a type in the registry and answers "what would one of these make",
+     * which is the question a plan has to answer before the thing exists.
+     *
+     * <p>Declared on the type interface itself, so every registered type
+     * answers it -- the per-class overrides of {@link #ACTIONS} all delegate
+     * here, which is why the two never disagree.
+     */
+    static final String TYPE_BUILD_ACTIONS = "a";
 
     /**
      * Action accessor returning the type it places at a position, or null.
@@ -235,10 +283,16 @@ final class EngineNames {
     /**
      * Action predicate: whether it applies to the given unit at all.
      *
-     * <p>A third gate beyond available and locked, and the engine checks all
-     * three. The queue-add path returns null when any fails, without logging,
-     * so an option reported usable on fewer than three would be an option the
-     * order path then drops in silence.
+     * <p>Broader than it looks. Its body folds in {@link #ACTION_LOCKED}, a
+     * per-key cooldown, and an affordability test, so a false answer has four
+     * possible causes and the narrower predicates are what separate them.
+     *
+     * <p><b>The boolean argument must be false.</b> Passed true, the engine
+     * routes the affordability test through its check-and-charge helper, which
+     * deducts the cost on success. The predicate is only a predicate on the
+     * false branch; on the true branch it is a purchase. That is why every
+     * caller here pins the argument rather than threading it through
+     * (wiki: mechanics-build-actions).
      */
     static final String ACTION_APPLIES = "a";
 

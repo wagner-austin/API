@@ -15,3 +15,5 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 [Engine Entity Model](../pages/engine-entity-model.md) -- what a unit actually is in the engine: base class, master list, trees, owning player, starting credits
 [Unit Catalogue and the Mobility Predicate](../pages/mechanics-unit-catalogue.md) -- 90 units with prices, HP and weapons from the engine's own -printunits; speed>0 is the read mobility test
 [Resource Pools and the Placement Rule](../pages/mechanics-resource-pools.md) -- credits come from a tileset property: `res_pool` tiles, the `placeOnlyOnResPool` flag, and where an extractor may stand
+[Build Actions: Two Families, Two Verbs, Five Gates](../pages/mechanics-build-actions.md) -- placing and producing are one mechanism dispatched two ways, and the five conditions that stop an order, four of which say nothing
+[Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership

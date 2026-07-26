@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from rw_bot.mechanics.catalogue import UnitStats
+from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.build_order import (
     PLACEMENT_RING,
@@ -17,13 +17,13 @@ from rw_bot.policy.build_order import (
     decide,
     find_anchor,
     find_builder,
-    find_free_pool,
     next_unsatisfied_index,
+    survey_pools,
 )
 from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 
-def _unit(type_name: str, price: int, speed: float = 0.0) -> UnitStats:
+def _unit(type_name: str, price: int, speed: float = 0.0, attack_range: float = 0.0) -> UnitStats:
     return UnitStats(
         type_name=type_name,
         display_name=type_name,
@@ -34,7 +34,18 @@ def _unit(type_name: str, price: int, speed: float = 0.0) -> UnitStats:
         turn_speed=0.0,
         mass=1,
         upgrade_prices=(),
-        weapon=None,
+        weapon=None if attack_range == 0.0 else _weapon(attack_range),
+    )
+
+
+def _weapon(attack_range: float) -> Weapon:
+    return Weapon(
+        shoot_delay=30.0,
+        attack_range=attack_range,
+        direct_damage=10.0,
+        direct_damage_volley=10.0,
+        area_damage=0.0,
+        area_damage_volley=0.0,
     )
 
 
@@ -49,6 +60,18 @@ _CATALOGUE = {
     "builder": _unit("builder", 500, speed=0.6),
     "extractorT1": _unit("extractorT1", 700),
 }
+
+
+#: Reach of the test turret, in world units.
+#:
+#: Comfortably wider than :data:`POOL_OCCUPIED_RADIUS` so that "this pool is
+#: covered" and "this pool is built on" are always distinguishable — a turret
+#: close enough to shoot a pool must not also be close enough to be standing on
+#: it, or the tests could not tell which rule rejected it.
+_TURRET_RANGE = 100.0
+
+#: The default catalogue plus something that shoots back.
+_ARMED = {**_CATALOGUE, "turret": _unit("turret", 400, attack_range=_TURRET_RANGE)}
 
 
 def _place(type_name: str, needs_pool: bool = False) -> TypePlacement:
@@ -88,7 +111,15 @@ def _entity(
     *,
     mine: bool = True,
     complete: bool = True,
+    hostile: bool | None = None,
 ) -> Entity:
+    """Build an entity record.
+
+    ``hostile`` defaults to the opposite of ``mine``, which is what a two-player
+    skirmish looks like. It is overridable because the engine does not derive it
+    that way: an ally is neither mine nor hostile, and the distinction only
+    shows up in a test that sets them independently.
+    """
     return Entity(
         index=0,
         unit_id=unit_id,
@@ -98,6 +129,7 @@ def _entity(
         y=y,
         team=0 if mine else 1,
         mine=mine,
+        hostile=(not mine) if hostile is None else hostile,
         hp=100.0,
         max_hp=100.0,
         complete=complete,
@@ -548,7 +580,12 @@ def test_an_enemy_extractor_holds_a_pool_just_as_firmly() -> None:
     taken = _pool(0, 220, 130)
     enemy = _entity(900, "extractorT1", taken["x"], taken["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, enemy, pools=(taken,), credits=10_000)
-    assert find_free_pool(world, _ANCHOR, _CATALOGUE) is None
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE) == {
+        "pool": None,
+        "visible": 1,
+        "occupied": 1,
+        "exposed": 0,
+    }
 
 
 def test_a_builder_parked_on_a_pool_does_not_occupy_it() -> None:
@@ -556,14 +593,14 @@ def test_a_builder_parked_on_a_pool_does_not_occupy_it() -> None:
     pool = _pool(0, 220, 130)
     parked = _entity(214, "builder", pool["x"], pool["y"])
     world = _sample(_ANCHOR, parked, pools=(pool,), credits=10_000)
-    assert find_free_pool(world, _ANCHOR, _CATALOGUE) == pool
+    assert survey_pools(world, _ANCHOR, parked, _CATALOGUE)["pool"] == pool
 
 
 def test_a_structure_outside_the_occupancy_radius_leaves_a_pool_free() -> None:
     pool = _pool(0, 220, 130)
     beyond = _entity(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS + 0.5, pool["y"])
     world = _sample(_ANCHOR, _BUILDER, beyond, pools=(pool,), credits=10_000)
-    assert find_free_pool(world, _ANCHOR, _CATALOGUE) == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] == pool
 
 
 def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
@@ -571,7 +608,7 @@ def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
     pool = _pool(0, 220, 130)
     astride = _entity(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS, pool["y"])
     world = _sample(_ANCHOR, _BUILDER, astride, pools=(pool,), credits=10_000)
-    assert find_free_pool(world, _ANCHOR, _CATALOGUE) is None
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] is None
 
 
 def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
@@ -579,7 +616,86 @@ def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
     pool = _pool(0, 220, 130)
     unknown = _entity(400, "someModStructure", pool["x"], pool["y"])
     world = _sample(_ANCHOR, _BUILDER, unknown, pools=(pool,), credits=10_000)
-    assert find_free_pool(world, _ANCHOR, _CATALOGUE) == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] == pool
+
+
+def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
+    pool = _pool(0, 220, 130)
+    turret = _entity(900, "turret", pool["x"] + 50.0, pool["y"], mine=False)
+    world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED) == {
+        "pool": None,
+        "visible": 1,
+        "occupied": 0,
+        "exposed": 1,
+    }
+
+
+def test_a_pool_is_rejected_for_the_walk_even_when_the_pool_itself_is_safe() -> None:
+    """The failure this rule exists for: the builder died in transit, not on arrival.
+
+    The turret sits beside the midpoint of the walk and nowhere near either end,
+    so a check that only looked at the destination would send the builder
+    straight past it.
+    """
+    pool = _pool(0, 220, 130)
+    midpoint = ((_BUILDER["x"] + pool["x"]) / 2, (_BUILDER["y"] + pool["y"]) / 2)
+    ambush = _entity(900, "turret", midpoint[0], midpoint[1] + 50.0, mine=False)
+    world = _sample(_ANCHOR, _BUILDER, ambush, pools=(pool,), credits=10_000)
+
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] is None
+    # ... and the same turret standing at the same distance from the pool, but
+    # behind the builder rather than between the two, rules out nothing.
+    behind = _entity(900, "turret", _BUILDER["x"], _BUILDER["y"] - 400.0, mine=False)
+    clear = _sample(_ANCHOR, _BUILDER, behind, pools=(pool,), credits=10_000)
+    assert survey_pools(clear, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+
+
+def test_a_pool_exactly_at_the_edge_of_a_gun_is_rejected() -> None:
+    """The boundary is inclusive: a unit at maximum range is a unit in range."""
+    pool = _pool(0, 220, 130)
+    turret = _entity(900, "turret", pool["x"] + _TURRET_RANGE, pool["y"], mine=False)
+    world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] is None
+
+
+def test_a_pool_beyond_every_gun_is_offered() -> None:
+    pool = _pool(0, 220, 130)
+    turret = _entity(900, "turret", pool["x"] + _TURRET_RANGE + 0.5, pool["y"], mine=False)
+    world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+
+
+def test_an_unarmed_enemy_standing_on_the_route_is_not_a_threat() -> None:
+    """An enemy builder is an obstacle, not a gun, and ruling out ground it
+    happens to stand on would concede the map to something that cannot shoot."""
+    pool = _pool(0, 220, 130)
+    harmless = _entity(900, "builder", pool["x"] + 10.0, pool["y"], mine=False)
+    world = _sample(_ANCHOR, _BUILDER, harmless, pools=(pool,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+
+
+def test_an_ally_is_not_a_threat_even_though_it_is_not_mine() -> None:
+    """Hostility is the engine's answer, not the negation of ownership."""
+    pool = _pool(0, 220, 130)
+    ally = _entity(900, "turret", pool["x"] + 50.0, pool["y"], mine=False, hostile=False)
+    world = _sample(_ANCHOR, _BUILDER, ally, pools=(pool,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+
+
+def test_the_nearest_safe_pool_beats_a_nearer_exposed_one() -> None:
+    """Threat filters before distance ranks, which is the whole ordering.
+
+    The two pools are deliberately not collinear with the builder. When they
+    are, the nearer one lies on the walk to the farther one and covering the
+    first necessarily covers the route to the second — so a test laid out that
+    way could never distinguish the rule from a blanket refusal.
+    """
+    near = _pool(0, 220, 130)
+    far = _pool(1, 220, 90)
+    turret = _entity(900, "turret", near["x"], near["y"] + 50.0, mine=False)
+    world = _sample(_ANCHOR, _BUILDER, turret, pools=(near, far), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == far
 
 
 def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None:
@@ -590,7 +706,23 @@ def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None
     decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS)
     assert decision["action"] == "wait"
     assert decision["reason"] == (
-        "extractorT1 needs a resource pool and every one of the 1 in sight is occupied"
+        "extractorT1 needs a resource pool: of the 1 in sight, 1 are built on and "
+        "0 can only be reached through enemy fire"
+    )
+
+
+def test_the_wait_reason_separates_a_taken_pool_from_a_covered_one() -> None:
+    """Two different games. One is progress, the other is losing ground."""
+    taken = _pool(0, 220, 130)
+    covered = _pool(1, 260, 130)
+    standing = _entity(400, "extractorT1", taken["x"], taken["y"])
+    turret = _entity(900, "turret", covered["x"], covered["y"] + 50.0, mine=False)
+    world = _sample(_ANCHOR, _BUILDER, standing, turret, pools=(taken, covered), credits=10_000)
+    decision = decide(world, ("extractorT1", "extractorT1"), _ARMED, _PLACEMENTS)
+    assert decision["action"] == "wait"
+    assert decision["reason"] == (
+        "extractorT1 needs a resource pool: of the 2 in sight, 1 are built on and "
+        "1 can only be reached through enemy fire"
     )
 
 
@@ -598,7 +730,7 @@ def test_an_extractor_with_no_pool_visible_waits() -> None:
     world = _sample(_ANCHOR, _BUILDER, credits=10_000)
     decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS)
     assert decision["action"] == "wait"
-    assert "every one of the 0 in sight is occupied" in decision["reason"]
+    assert decision["reason"] == "extractorT1 needs a resource pool and none is visible yet"
 
 
 def test_a_type_absent_from_the_placement_dump_is_blocked() -> None:

@@ -107,10 +107,16 @@ AGENT_CP := $(AGENT_JAR);$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*
 # it open -- that is the operating system, not something a build can route
 # around -- so the failure says which cause to look for instead of surfacing as
 # a bare "Device or resource busy".
+#
+# Move-Item needs -ErrorAction Stop for that catch to fire at all. Without it
+# the failure is non-terminating: PowerShell prints the error, skips the catch,
+# leaves $failed empty, and the target reports a successful build over a jar it
+# never replaced. Observed -- a stale jar reported as built while a game held
+# it open.
 agent:
 	@Write-Host ""
 	@Write-Host "==> agent (javac --release 11, zero third-party deps)" -ForegroundColor Cyan
-	$$dir = "agent/build/classes-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$tmp = "$(AGENT_JAR)." + [System.Guid]::NewGuid().ToString("N").Substring(0,8) + ".new"; $$failed = ""; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { $$failed = "javac failed" } else { & "$(JAR)" cfm $$tmp agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { $$failed = "jar failed" } else { try { Move-Item -Force -LiteralPath $$tmp -Destination "$(AGENT_JAR)" } catch { $$failed = "cannot replace $(AGENT_JAR): a JVM has it attached with -javaagent. Stop the running game, then retry." } } } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; if (Test-Path $$tmp) { Remove-Item -Force $$tmp } }; if ($$failed) { Write-Host "[agent] $$failed" -ForegroundColor Red; exit 1 }
+	$$dir = "agent/build/classes-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$tmp = "$(AGENT_JAR)." + [System.Guid]::NewGuid().ToString("N").Substring(0,8) + ".new"; $$failed = ""; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { $$failed = "javac failed" } else { & "$(JAR)" cfm $$tmp agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { $$failed = "jar failed" } else { try { Move-Item -Force -ErrorAction Stop -LiteralPath $$tmp -Destination "$(AGENT_JAR)" } catch { $$failed = "cannot replace $(AGENT_JAR): a JVM has it attached with -javaagent. Stop the running game, then retry." } } } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; if (Test-Path $$tmp) { Remove-Item -Force $$tmp } }; if ($$failed) { Write-Host "[agent] $$failed" -ForegroundColor Red; exit 1 }
 	@Write-Host "[agent] built $(AGENT_JAR)" -ForegroundColor Green
 
 # Patches every Targets entry in the real pinned jar and DEFINES each result,

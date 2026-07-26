@@ -14,34 +14,31 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from rw_bot.control.channel import open_channel
+from rw_bot.mechanics.build_tree import decode_build_tree
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
 from rw_bot.mechanics.placement import TypePlacement, decode_placements
+from rw_bot.policy.expand import expand
 from rw_bot.policy.runner import format_scorecard, run
 
-#: The opening.
+#: What the bot is asked for -- goals, not a build order.
 #:
-#: Every entry must be something a builder can actually construct. That is not
-#: derivable from the unit catalogue -- it carries prices and stats, not build
-#: lists -- and the engine reports a refusal only in its own log. A laboratory
-#: was in this plan until a live run stalled on it with 11,258 credits banked
-#: and the engine saying "Unit 'builder' can not queue build:laboratory".
+#: The distinction is the point. No factory appears here, and two of these
+#: entries need one: a Land Factory is what makes a tank, and the plan the bot
+#: actually executes has one inserted before them by
+#: :func:`rw_bot.policy.expand.expand`. Writing the prerequisite out by hand is
+#: what the build tree exists to stop.
 #:
 #: Extractors first, because they are the only entry that pays for the rest:
-#: each generates credits, and a factory built before them is a factory bought
-#: with the starting balance and nothing after it. Where they go is not a choice
-#: the plan makes -- the engine allows them on resource pools and nowhere else
+#: each generates credits, and anything built before them is bought with the
+#: starting balance and nothing after it. Where they go is not a choice the plan
+#: makes -- the engine allows them on resource pools and nowhere else
 #: ([[mechanics-resource-pools]]).
-#: The last entry is a unit rather than a structure, and it is what proves the
-#: second verb. A Scout is produced by the Command Center the match starts
-#: with, so it needs no prerequisite -- and at $700 it is dear enough that a
-#: fixed stall window sized for a Builder would have declared it refused.
-DEFAULT_PLAN: tuple[str, ...] = (
+DEFAULT_GOALS: tuple[str, ...] = (
     "extractorT1",
     "extractorT1",
-    "landFactory",
     "extractorT1",
-    "landFactory",
-    "scout",
+    "c_tank",
+    "c_tank",
 )
 
 DEFAULT_MAX_SAMPLES = 120
@@ -66,6 +63,26 @@ def load_catalogue(path: Path) -> dict[str, UnitStats]:
     """
     lines = path.read_text(encoding="utf-8", errors="strict").splitlines()
     return {unit["type_name"]: unit for unit in decode_catalogue(lines)}
+
+
+def load_build_tree(path: Path) -> dict[str, frozenset[str]]:
+    """Read the build tree produced by ``make type-flags``.
+
+    The same file the placement rules come from, because both are one pass over
+    one registry and two files could drift against different game builds.
+
+    Args:
+        path: Archived type dump.
+
+    Returns:
+        Product type names by producer type name.
+
+    Raises:
+        OSError: When the file cannot be read.
+        BuildTreeError: When the dump cannot be decoded.
+    """
+    lines = path.read_text(encoding="utf-8", errors="strict").splitlines()
+    return decode_build_tree(lines)
 
 
 def load_placements(path: Path) -> dict[str, TypePlacement]:
@@ -104,13 +121,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     catalogue = load_catalogue(Path(args[1]))
     placements = load_placements(Path(args[2]))
-    sys.stdout.write(f"plan: {' -> '.join(DEFAULT_PLAN)}\n")
-    for name in DEFAULT_PLAN:
+    tree = load_build_tree(Path(args[2]))
+
+    # Expansion needs to know what the player already has, so it runs against a
+    # real observation rather than an assumed opening roster. One sample is
+    # spent on it, which costs nothing: the loop reads its own.
+    channel = open_channel(int(args[0]))
+    opening = channel.next_sample()
+    owned = [e["type_name"] for e in opening["entities"] if e["mine"] and e["complete"]]
+    plan = expand(DEFAULT_GOALS, tree, owned, catalogue)
+
+    sys.stdout.write(f"goals: {' -> '.join(DEFAULT_GOALS)}\n")
+    sys.stdout.write(f"plan:  {' -> '.join(plan)}\n")
+    for name in plan:
         site = "on a resource pool" if placements[name]["needs_pool"] else "on the ring"
         sys.stdout.write(f"  {name} costs {catalogue[name]['price']}, goes {site}\n")
 
-    channel = open_channel(int(args[0]))
-    card = run(channel, DEFAULT_PLAN, catalogue, placements, max_samples)
+    card = run(channel, plan, catalogue, placements, max_samples)
     channel.close()
 
     for line in format_scorecard(card):

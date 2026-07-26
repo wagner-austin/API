@@ -81,6 +81,12 @@ class Entity(TypedDict):
         mine: Whether the local player owns it. The stream carries enemies too,
             so a consumer that skips this check would credit an opponent's
             buildings to itself.
+        hostile: Whether the engine considers this entity's owner an enemy of
+            the local player. Not the negation of ``mine``: an ally's units are
+            neither, and so are the neutral team's. Read from the engine's own
+            alliance comparison rather than derived here, because a planner that
+            treats every unowned unit as a threat cannot cross its own ally's
+            territory.
         hp: Current health.
         max_hp: Health at full.
         complete: Whether construction has finished. A building joins the roster
@@ -100,6 +106,7 @@ class Entity(TypedDict):
     y: float
     team: int
     mine: bool
+    hostile: bool
     hp: float
     max_hp: float
     complete: bool
@@ -298,6 +305,7 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                     y=require_finite_float(record, "y"),
                     team=require_int(record, "team"),
                     mine=require_bool(record, "mine"),
+                    hostile=require_bool(record, "hostile"),
                     hp=require_finite_float(record, "hp"),
                     max_hp=require_finite_float(record, "max_hp"),
                     complete=require_bool(record, "complete"),
@@ -447,6 +455,7 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"id":{entity["unit_id"]},"type":"{type_name}",'
             f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
             f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
+            f'"hostile":{str(entity["hostile"]).lower()},'
             f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r},'
             f'"complete":{str(entity["complete"]).lower()},'
             f'"queued":{entity["queued"]}}}'

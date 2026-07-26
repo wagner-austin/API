@@ -198,6 +198,18 @@ final class Orders {
      * convention, and reproducing that convention here would be a guess that
      * happens to work.
      *
+     * <p><b>A closed gate stops the order here rather than at the engine.</b>
+     * The engine's enqueue path drops a command it will not run and says
+     * nothing, so dispatching into a closed gate produces no unit, no error and
+     * no way to tell the two apart. Refusing here is not a second opinion about
+     * the engine's rules; it is the same reads the engine is about to make,
+     * made where the answer can be logged.
+     *
+     * <p>A closed gate is a refusal rather than a throw. Being at the unit cap
+     * or short of credits is an ordinary state of a game in progress, not a
+     * defect, and it can clear on its own. A missing action cannot, which is
+     * why that one still throws.
+     *
      * @param engine The live engine instance.
      * @param producer The building to order.
      * @param typeName The unit type to produce.
@@ -235,6 +247,7 @@ final class Orders {
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
                         action);
+        BuildOptions.Gates gates = BuildOptions.gatesOf(action, producer);
         // The executor drops an action command whose key is null or the
         // engine's "no action" sentinel, and drops it silently -- no log, no
         // effect, indistinguishable from a command that ran and did nothing.
@@ -247,7 +260,18 @@ final class Orders {
                         + " on "
                         + action.getClass().getName()
                         + " "
-                        + BuildOptions.describeGates(action, producer));
+                        + gates);
+        String closed = gates.closed();
+        if (closed != null) {
+            Log.error(
+                    "produce: refusing to dispatch "
+                            + typeName
+                            + " on "
+                            + Perception.typeNameOf(producer)
+                            + " -- "
+                            + closed);
+            return;
+        }
         float[] at = Perception.positionOf(producer);
         Method setAction =
                 EngineAccess.pinnedMethod(

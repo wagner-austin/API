@@ -28,6 +28,9 @@ from rw_bot.wire.ndjson import parse_object
 KIND_UNIT_TYPE: Final = "unittype"
 """``kind`` value of a placement record."""
 
+KIND_BUILD_EDGE: Final = "buildedge"
+"""``kind`` value of a build-tree record, which this decoder skips."""
+
 _UNKNOWN_KIND = "RW-PLACEMENT-001"
 _DUPLICATE_TYPE = "RW-PLACEMENT-002"
 
@@ -80,6 +83,13 @@ def decode_placements(lines: Sequence[str]) -> tuple[TypePlacement, ...]:
             continue
         record = parse_object(line)
         kind = require_non_empty_str(record, "kind")
+        if kind == KIND_BUILD_EDGE:
+            # One dump carries both kinds -- where a type may stand, and what it
+            # can make -- because they are one pass over one registry and two
+            # files could be regenerated against different builds and disagree.
+            # Each decoder projects its own kind; a kind neither claims is still
+            # an error in both, so nothing unknown passes silently.
+            continue
         if kind != KIND_UNIT_TYPE:
             raise PlacementError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
 
@@ -103,6 +113,7 @@ def decode_placements(lines: Sequence[str]) -> tuple[TypePlacement, ...]:
 
 
 __all__ = [
+    "KIND_BUILD_EDGE",
     "KIND_UNIT_TYPE",
     "PlacementError",
     "TypePlacement",

@@ -76,7 +76,7 @@ def _entity_line(
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{at[0]},"y":{at[1]},'
-        f'"team":{0 if mine else 1},"mine":{str(mine).lower()},'
+        f'"team":{0 if mine else 1},"mine":{str(mine).lower()},"hostile":{str(not mine).lower()},'
         f'"hp":100.0,"max_hp":100.0,"complete":{str(complete).lower()},"queued":{queued}}}'
     )
 
@@ -576,9 +576,7 @@ def test_an_extractor_with_no_pool_in_sight_waits_rather_than_ordering() -> None
     )
     assert card["outcome"] == "sample_limit"
     assert card["orders_sent"] == 0
-    assert card["last_reason"] == (
-        "extractorT1 needs a resource pool and every one of the 0 in sight is occupied"
-    )
+    assert card["last_reason"] == "extractorT1 needs a resource pool and none is visible yet"
 
 
 def test_a_slow_structure_inside_the_stall_window_is_not_called_stalled() -> None:

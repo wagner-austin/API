@@ -68,6 +68,27 @@ final class TypeFlags {
         return out.toString();
     }
 
+    /**
+     * Returns every registered unit type, built-in and asset-defined alike.
+     *
+     * <p>Shared with {@link BuildTree}, which asks the same set a different
+     * question. Enumeration is the fiddly half -- two registries, one enum and
+     * one static list, with asset units deliberately shadowing built-ins of the
+     * same name -- so it lives in one place and both readers get the same set.
+     *
+     * @return The types, built-ins first.
+     */
+    static java.util.List<Object> allTypes() {
+        java.util.List<Object> types = new java.util.ArrayList<Object>();
+        for (Object type : builtInTypes()) {
+            types.add(type);
+        }
+        for (Object type : assetTypes()) {
+            types.add(type);
+        }
+        return types;
+    }
+
     /** Renders one type record. */
     static String record(int index, String name, boolean needsPool) {
         StringBuilder out = new StringBuilder();

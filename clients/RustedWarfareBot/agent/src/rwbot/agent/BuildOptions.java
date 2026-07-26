@@ -143,7 +143,9 @@ final class BuildOptions {
                         new Option(
                                 id,
                                 Perception.nameOfType(type),
-                                intOf(EngineAccess.invoke(index, action)),
+                                intOf(
+                                        EngineAccess.invoke(index, action),
+                                        EngineNames.ACTION_INDEX),
                                 placed,
                                 isUsable(action, unit, available, locked)));
             }
@@ -238,20 +240,91 @@ final class BuildOptions {
     }
 
     /**
-     * Reports each gate the engine applies before queueing an action.
+     * The engine's answers to every gate a production order can be stopped by
+     * that can be asked without changing the game.
      *
-     * <p>The queue-add path checks three predicates and returns null when any
-     * fails, logging nothing. That makes a refused production indistinguishable
-     * from one that ran and did nothing, which cost a whole debugging session
-     * once; naming which gate closed is the difference.
+     * <p>That qualification is the whole design. The engine's enqueue path
+     * applies five conditions in order — the action resolves from its key, it
+     * is available, it applies, the player is under the unit cap, and the cost
+     * is paid — and the last one is not a question. It is
+     * {@code check-then-charge}: asking it deducts the credits. So a diagnostic
+     * can report the first four and must not touch the fifth, and an order that
+     * passes all four can still be refused at the till.
+     */
+    static final class Gates {
+
+        private final boolean applies;
+        private final boolean available;
+        private final boolean locked;
+        private final boolean room;
+
+        Gates(boolean applies, boolean available, boolean locked, boolean room) {
+            this.applies = applies;
+            this.available = available;
+            this.locked = locked;
+            this.room = room;
+        }
+
+        /**
+         * Names the first gate that would stop this order, or null when none
+         * would.
+         *
+         * <p>Ordered by how specific the answer is rather than by how the
+         * engine evaluates them. {@code applies} folds in the lock, a cooldown
+         * and affordability, so reporting it when the narrower {@code locked}
+         * already explains the refusal would name a symptom over its cause.
+         *
+         * @return The gate's name, or null when all four are open.
+         */
+        String closed() {
+            if (!available) {
+                return "available=false: the engine skips the action outright";
+            }
+            if (locked) {
+                return "locked=true: the unit has this action locked";
+            }
+            if (!applies) {
+                return "applies=false: locked, on cooldown, or unaffordable";
+            }
+            if (!room) {
+                return "room=false: the player is at the unit cap";
+            }
+            return null;
+        }
+
+        @Override
+        public String toString() {
+            return "[applies=" + applies
+                    + " available=" + available
+                    + " locked=" + locked
+                    + " room=" + room
+                    + "]";
+        }
+    }
+
+    /**
+     * Reads every gate the engine applies before queueing an action, except the
+     * one that charges for it.
+     *
+     * <p>This exists because the refusal is silent. The engine's own two
+     * complaints on this path — the action not resolving, and it not being
+     * available — go through a logger with a static counter that is never
+     * reset, so it prints four messages per process and then nothing, for the
+     * rest of the run. Everything past that point returns null without a word.
+     *
+     * <p>Reading the gates costs nothing and changes nothing: all four are pure
+     * reads of the engine's state, and the one that would not be is deliberately
+     * absent (wiki: mechanics-build-actions).
      *
      * @param action The action.
      * @param unit The unit that would run it.
-     * @return A readable summary of each predicate.
+     * @return The four readable gates.
      */
-    static String describeGates(Object action, Object unit) {
+    static Gates gatesOf(Object action, Object unit) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
         Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
+        // False, always. The true branch routes affordability through the
+        // engine's check-and-charge helper and spends the credits.
         boolean applies =
                 Boolean.TRUE.equals(
                         EngineAccess.invoke(
@@ -277,7 +350,49 @@ final class BuildOptions {
                                         actionClass, EngineNames.ACTION_LOCKED, entityClass),
                                 action,
                                 unit));
-        return "[applies=" + applies + " available=" + available + " locked=" + locked + "]";
+        return new Gates(applies, available, locked, hasRoomFor(action, unit));
+    }
+
+    /**
+     * Reports whether the player may hold one more unit.
+     *
+     * <p>The cap counts units excluding buildings and including ones already
+     * queued, so a factory with a full queue is at the cap before any of it has
+     * rolled out. An action that makes nothing is not capped at all, which is
+     * the engine's own short-circuit and not an exemption invented here.
+     *
+     * @param action The action.
+     * @param unit The unit that would run it.
+     * @return True when the action is uncapped or the player is under the cap.
+     */
+    private static boolean hasRoomFor(Object action, Object unit) {
+        Object makesSomething =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                EngineAccess.pinnedClass(EngineNames.ACTION_CLASS),
+                                EngineNames.ACTION_MAKES_SOMETHING),
+                        action);
+        if (!Boolean.TRUE.equals(makesSomething)) {
+            return true;
+        }
+        Object owner = EngineAccess.readField(unit, EngineNames.OWNER);
+        if (owner == null) {
+            return true;
+        }
+        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        int held =
+                intOf(
+                        EngineAccess.invoke(
+                                EngineAccess.pinnedMethod(teamClass, EngineNames.TEAM_UNIT_COUNT),
+                                owner),
+                        EngineNames.TEAM_UNIT_COUNT);
+        int cap =
+                intOf(
+                        EngineAccess.invoke(
+                                EngineAccess.pinnedMethod(teamClass, EngineNames.TEAM_UNIT_CAP),
+                                owner),
+                        EngineNames.TEAM_UNIT_CAP);
+        return held < cap;
     }
 
     /** Reads a unit's action list, treating an absent one as empty. */
@@ -294,12 +409,17 @@ final class BuildOptions {
         return (Iterable<?>) value;
     }
 
-    /** Unwraps a reflected {@code int} return. */
-    private static int intOf(Object value) {
+    /**
+     * Unwraps a reflected {@code int} return.
+     *
+     * @param value The reflected return.
+     * @param accessor The accessor that produced it, for the failure message.
+     * @return The int.
+     */
+    private static int intOf(Object value, String accessor) {
         if (!(value instanceof Integer)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.ACTION_INDEX + "() did not return an int"
-                            + EngineNames.PIN);
+                    "rw-agent: " + accessor + "() did not return an int" + EngineNames.PIN);
         }
         return ((Integer) value).intValue();
     }

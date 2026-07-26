@@ -13,7 +13,7 @@ from types import TracebackType
 
 import pytest
 from scripts.play import (
-    DEFAULT_PLAN,
+    DEFAULT_GOALS,
     EXIT_BAD_USAGE,
     EXIT_INCOMPLETE,
     EXIT_OK,
@@ -33,7 +33,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":100.0,"y":200.0,'
-        f'"team":0,"mine":true,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
@@ -47,7 +47,7 @@ def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
 
 #: What the Builder offers by default here -- the plan's own types, which the
 #: live capture confirms unit 214 reports.
-_BUILDER_OFFERS = ("extractorT1", "landFactory")
+_BUILDER_OFFERS = ("extractorT1", "landFactory", "c_tank")
 
 
 def _option_line(frame: int, index: int, unit_id: int, produces: str) -> str:
@@ -81,6 +81,18 @@ def _sample_lines(
 
 
 _BUILDER = (214, "builder")
+
+#: What DEFAULT_GOALS expands to against the real tree from the opening roster.
+#: Stated here so a change to either the goals or the tree fails loudly rather
+#: than quietly changing what these tests drive.
+_EXPANDED = (
+    "extractorT1",
+    "extractorT1",
+    "extractorT1",
+    "landFactory",
+    "c_tank",
+    "c_tank",
+)
 
 
 class _ScriptedPeer:
@@ -166,56 +178,59 @@ class _StubbedConnect:
         _test_hooks.connect = self._original
 
 
-def test_the_real_catalogue_prices_the_whole_plan() -> None:
-    """Every plan entry must be priceable, or the run blocks at once."""
+def test_the_real_catalogue_prices_every_goal() -> None:
+    """A goal the catalogue cannot price blocks the run at once."""
     catalogue = load_catalogue(_CATALOGUE_PATH)
-    assert [catalogue[name]["price"] for name in DEFAULT_PLAN] == [700, 700, 700, 700, 700, 700]
+    assert [catalogue[name]["price"] for name in DEFAULT_GOALS] == [700, 700, 700, 350, 350]
 
 
-def test_the_real_dump_rules_every_planned_structure() -> None:
-    """A plan entry the placement dump does not cover blocks the run at once."""
+def test_the_real_dump_rules_every_goal() -> None:
+    """A goal the placement dump does not cover blocks the run at once."""
     placements = load_placements(_PLACEMENT_PATH)
-    assert [placements[name]["needs_pool"] for name in DEFAULT_PLAN] == [
+    assert [placements[name]["needs_pool"] for name in DEFAULT_GOALS] == [
         True,
         True,
-        False,
         True,
         False,
         False,
     ]
 
 
-def test_the_plan_opens_with_the_structures_that_pay_for_the_rest() -> None:
-    """An extractor generates credits; a factory spends them."""
-    assert DEFAULT_PLAN[0] == "extractorT1"
+def test_the_goals_open_with_the_structures_that_pay_for_the_rest() -> None:
+    """An extractor generates credits; everything else spends them."""
+    assert DEFAULT_GOALS[0] == "extractorT1"
 
 
-def test_the_plan_ends_with_something_produced_rather_than_placed() -> None:
-    """The second verb needs exercising by the default plan, not just by tests.
+def test_the_goals_name_no_factory_but_the_plan_has_one() -> None:
+    """The distinction expansion exists to make.
 
-    A Scout is made by the Command Center the match starts with, so it needs no
-    prerequisite building -- which keeps the plan a straight line while still
-    proving production end to end.
+    A tank is asked for; the Land Factory that makes one is not, and writing it
+    out by hand is exactly what the build tree exists to stop. If this ever
+    passes trivially -- because someone put the factory back in the goals --
+    the expansion is no longer being exercised by a real run.
     """
-    assert DEFAULT_PLAN[-1] == "scout"
-    assert load_placements(_PLACEMENT_PATH)["scout"]["needs_pool"] is False
+    assert "landFactory" not in DEFAULT_GOALS
+    assert "c_tank" in DEFAULT_GOALS
 
 
 def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    built = [(300 + i, name) for i, name in enumerate(DEFAULT_PLAN)]
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
+    built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
+    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 2)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "5"]) == EXIT_OK
+    # The world already holds a finished Land Factory, so expansion inserts
+    # nothing -- the goals are reachable as written. That is the same rule the
+    # insertion cases exercise, seen from the other side.
     assert capsys.readouterr().out.splitlines() == [
-        "plan: extractorT1 -> extractorT1 -> landFactory -> extractorT1 -> landFactory -> scout",
+        "goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank",
+        "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank",
         "  extractorT1 costs 700, goes on a resource pool",
         "  extractorT1 costs 700, goes on a resource pool",
-        "  landFactory costs 700, goes on the ring",
         "  extractorT1 costs 700, goes on a resource pool",
-        "  landFactory costs 700, goes on the ring",
-        "  scout costs 700, goes on the ring",
-        "outcome        done (all 6 plan entries satisfied)",
-        "completed      6/6",
+        "  c_tank costs 350, goes on the ring",
+        "  c_tank costs 350, goes on the ring",
+        "outcome        done (all 5 plan entries satisfied)",
+        "completed      5/5",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -224,12 +239,11 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
 
 
 def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) -> None:
-    peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER))
+    peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER) * 2)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[7:] == [
-        "outcome        sample_limit (extractorT1 needs a resource pool and every one"
-        " of the 0 in sight is occupied)",
+    assert capsys.readouterr().out.splitlines()[8:] == [
+        "outcome        sample_limit (extractorT1 needs a resource pool and none is visible yet)",
         "completed      0/6",
         "orders sent    0",
         "samples seen   1",
@@ -241,13 +255,13 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
 def test_the_sample_budget_defaults_when_not_given(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    built = [(300 + i, name) for i, name in enumerate(DEFAULT_PLAN)]
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
+    built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
+    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 2)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
     assert capsys.readouterr().out.splitlines()[7:] == [
-        "outcome        done (all 6 plan entries satisfied)",
-        "completed      6/6",
+        "outcome        done (all 5 plan entries satisfied)",
+        "completed      5/5",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",

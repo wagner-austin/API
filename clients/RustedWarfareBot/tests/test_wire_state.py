@@ -29,7 +29,7 @@ _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson
 _FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"credits":4000}'
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
-    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,'
+    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,'
     '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0}'
 )
 _POOL = '{"kind":"pool","frame":7,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}'
@@ -287,6 +287,7 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 y=0.0,
                 team=3,
                 mine=False,
+                hostile=True,
                 hp=1.5,
                 max_hp=2.5,
                 complete=True,

@@ -14,7 +14,9 @@ demonstrates is a loop that observes, chooses, acts, and can be scored.
 Placement is the one part that is not simple, because the engine's rules are
 not. Most structures go on a ring around the base. Extractors go on resource
 pools and nowhere else, and which types those are is read from the engine
-rather than assumed ([[mechanics-resource-pools]]).
+rather than assumed ([[mechanics-resource-pools]]). Which pool is worth having
+is a separate question from which pool is legal, and it is answered by who can
+shoot the way there ([[policy-threat]]).
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from typing import Literal, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.policy.threat import route_is_exposed
 from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 BUILDER_TYPE = "builder"
@@ -210,35 +213,76 @@ def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | 
     return oldest
 
 
-def find_free_pool(
-    sample: Sample, anchor: Entity, catalogue: Mapping[str, UnitStats]
-) -> ResourcePool | None:
-    """Return the nearest visible resource pool with no structure on it.
+class PoolSurvey(TypedDict):
+    """Which pool to build on, and what happened to the ones passed over.
 
-    Nearest to the anchor rather than to the builder, so the economy grows out
-    from the base instead of trailing whichever pool the builder last walked
-    past. Distance is squared and left squared: the ordering is all that
-    matters and a square root would only cost precision.
+    The counts exist so a refusal can say something true. "Every pool in sight
+    is occupied" was the only explanation the policy could give, and once pools
+    can also be ruled out for sitting under enemy guns that sentence becomes a
+    lie on exactly the runs where the reason matters most.
+
+    Attributes:
+        pool: The pool to build on, or None when none qualifies.
+        visible: How many pools the sample carries.
+        occupied: How many already have a structure standing on them.
+        exposed: How many were reachable only through hostile fire.
+    """
+
+    pool: ResourcePool | None
+    visible: int
+    occupied: int
+    exposed: int
+
+
+def survey_pools(
+    sample: Sample, anchor: Entity, builder: Entity, catalogue: Mapping[str, UnitStats]
+) -> PoolSurvey:
+    """Choose a resource pool to build on, and account for the rejects.
+
+    Two filters and then a ranking. A pool with something standing on it is out.
+    A pool the builder can only reach by walking through hostile fire is out —
+    the route is what matters, not the destination, because the builder this
+    rule was written for died in transit rather than on arrival
+    ([[policy-threat]]). What survives is ranked by distance.
+
+    **The two measurements start from different places, deliberately.** Exposure
+    is measured along the builder's walk, because the builder is what gets shot
+    and it starts from wherever it happens to be standing. Distance is measured
+    from the anchor, because the economy should grow outward from the base
+    rather than trail whichever pool the builder last walked past. Using one
+    origin for both would get one of the two questions wrong.
+
+    Distance stays squared. The ordering is all that is wanted from it, and a
+    square root would only cost precision.
 
     Args:
         sample: One observation of the world.
         anchor: The structure to measure distance from.
-        catalogue: Unit stats by type name, for the speed field.
+        builder: The unit that will walk to the pool.
+        catalogue: Unit stats by type name, for speeds and attack ranges.
 
     Returns:
-        The nearest free pool, or None when every visible pool is taken — which
-        is also the answer when none is visible at all.
+        The chosen pool with the counts behind the choice. ``pool`` is None when
+        every visible pool is occupied or exposed, and when none is visible at
+        all.
     """
     best: ResourcePool | None = None
     best_distance = 0.0
+    occupied = 0
+    exposed = 0
+    origin = (builder["x"], builder["y"])
     for pool in sample["pools"]:
         if _is_occupied(sample, pool, catalogue):
+            occupied += 1
+            continue
+        if route_is_exposed(sample, catalogue, origin, (pool["x"], pool["y"])):
+            exposed += 1
             continue
         distance = (pool["x"] - anchor["x"]) ** 2 + (pool["y"] - anchor["y"]) ** 2
         if best is None or distance < best_distance:
             best = pool
             best_distance = distance
-    return best
+    return PoolSurvey(pool=best, visible=len(sample["pools"]), occupied=occupied, exposed=exposed)
 
 
 def _is_occupied(sample: Sample, pool: ResourcePool, catalogue: Mapping[str, UnitStats]) -> bool:
@@ -430,28 +474,10 @@ def decide(
     # bank.
     site: tuple[float, float] | None = None
     if producer["placed"]:
-        builder = find_builder(sample)
-        if builder is None:
-            return _decision("blocked", "the player owns no builder")
-
-        # Measure from the most stable reference available. A structure never
-        # moves; the builder does, and measuring from it collapses the ring.
-        # With no structure owned the builder is the only reference there is,
-        # so the collapse is unavoidable rather than chosen -- and a player who
-        # has lost every building should still be able to rebuild.
-        anchor = find_anchor(sample, catalogue) or builder
-
-        site = _site_for(sample, index, placement, anchor, catalogue)
-        if site is None:
-            # Not "blocked". Every pool in sight being taken is a state the
-            # world can leave on its own -- fog lifts as units move, and a
-            # destroyed extractor frees its pool -- so this is a wait, and the
-            # stall detector is what stops it waiting forever.
-            return _decision(
-                "wait",
-                f"{target} needs a resource pool and every one of the "
-                f"{len(sample['pools'])} in sight is occupied",
-            )
+        placed = _placed_site(sample, index, target, placement, catalogue)
+        if isinstance(placed, dict):
+            return placed
+        site = placed
 
     if sample["credits"] < stats["price"]:
         return _decision(
@@ -482,41 +508,80 @@ def decide(
     )
 
 
-def _site_for(
+def _placed_site(
     sample: Sample,
     index: int,
+    target: str,
     placement: TypePlacement,
-    anchor: Entity,
     catalogue: Mapping[str, UnitStats],
-) -> tuple[float, float] | None:
-    """Choose where to put the next structure.
+) -> tuple[float, float] | Decision:
+    """Choose where a placed structure goes, or explain why nowhere will do.
 
     Two placement rules, because the engine has two. A structure bound to a
-    resource pool has exactly as many legal sites as there are free pools, and
-    the ring is irrelevant to it — offering a ring position would produce an
+    resource pool has exactly as many legal sites as there are usable pools, and
+    the ring is irrelevant to it -- offering a ring position would produce an
     order the engine refuses without saying so. Everything else takes the next
     ring position around the anchor.
 
     Args:
         sample: One observation of the world.
-        index: The structure's position in the plan, which selects the ring
-            offset.
+        index: The target's position in the plan, which selects the ring offset.
+        target: The type being placed, for the failure message.
         placement: The engine's placement rule for it.
-        anchor: The structure ring offsets are measured from.
-        catalogue: Unit stats by type name, for judging pool occupancy.
+        catalogue: Unit stats by type name, for the anchor and pool judgement.
 
     Returns:
-        The world point to build at, or None when the structure needs a pool
-        and no free one is visible.
+        The world point to build at, or the decision that stops this tick.
     """
-    if placement["needs_pool"]:
-        pool = find_free_pool(sample, anchor, catalogue)
-        if pool is None:
-            return None
-        return pool["x"], pool["y"]
+    builder = find_builder(sample)
+    if builder is None:
+        return _decision("blocked", "the player owns no builder")
 
-    offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
-    return anchor["x"] + offset[0], anchor["y"] + offset[1]
+    # Measure from the most stable reference available. A structure never moves;
+    # the builder does, and measuring from it collapses the ring. With no
+    # structure owned the builder is the only reference there is, so the
+    # collapse is unavoidable rather than chosen -- and a player who has lost
+    # every building should still be able to rebuild.
+    anchor = find_anchor(sample, catalogue) or builder
+
+    if not placement["needs_pool"]:
+        offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
+        return (anchor["x"] + offset[0], anchor["y"] + offset[1])
+
+    survey = survey_pools(sample, anchor, builder, catalogue)
+    chosen = survey["pool"]
+    if chosen is None:
+        # Not "blocked". No pool being usable is a state the world can leave on
+        # its own -- fog lifts as units move, a destroyed extractor frees its
+        # pool, and a killed enemy stops covering the route to one -- so this is
+        # a wait, and the stall detector is what stops it waiting forever.
+        return _decision("wait", _no_pool_reason(target, survey))
+    return (chosen["x"], chosen["y"])
+
+
+def _no_pool_reason(target: str, survey: PoolSurvey) -> str:
+    """Explain why no pool was chosen, in terms of what was rejected.
+
+    Worth the separate function because the two cases read completely
+    differently to whoever is reading the run log. Nothing visible yet is a map
+    the bot has not explored; everything visible and rejected is a map where the
+    bot is losing ground, and one of those is a reason to keep playing while the
+    other is a reason to look at the screen.
+
+    Args:
+        target: Type name the plan asks for.
+        survey: The rejected counts.
+
+    Returns:
+        The wait reason.
+    """
+    if survey["visible"] == 0:
+        return f"{target} needs a resource pool and none is visible yet"
+    return (
+        f"{target} needs a resource pool: of the {survey['visible']} in sight, "
+        f"{survey['occupied']} are built on and {survey['exposed']} can only be "
+        "reached through enemy fire"
+    )
 
 
 def _decision(
@@ -540,11 +605,12 @@ __all__ = [
     "PLACEMENT_RING",
     "POOL_OCCUPIED_RADIUS",
     "Decision",
+    "PoolSurvey",
     "completed_count",
     "decide",
     "find_anchor",
     "find_builder",
-    "find_free_pool",
     "find_producer",
     "next_unsatisfied_index",
+    "survey_pools",
 ]

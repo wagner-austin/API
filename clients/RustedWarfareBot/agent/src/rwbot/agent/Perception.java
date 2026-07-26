@@ -110,6 +110,44 @@ final class Perception {
     }
 
     /**
+     * Reports whether an entity's owner is hostile to the current player.
+     *
+     * <p>Asked of the engine rather than derived from ownership. "Not mine" is
+     * the wrong test twice over: an allied player's units are not mine and not
+     * hostile, and neutral map objects are neither. The engine compares
+     * alliance group and excludes the neutral team explicitly, and that is the
+     * comparison used here (wiki: perception-visibility).
+     *
+     * <p>An entity with no owner is not hostile, which is the same answer the
+     * engine gives for the neutral team.
+     *
+     * @param engine The live engine instance.
+     * @param entity The entity to test.
+     * @return True when the current player and the entity's owner are on
+     *     opposing sides.
+     */
+    static boolean isHostileToLocalPlayer(Object engine, Object entity) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        Object owner = EngineAccess.readField(entity, EngineNames.OWNER);
+        if (team == null || owner == null) {
+            return false;
+        }
+        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        Object hostile =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                teamClass, EngineNames.TEAM_HOSTILE_TO, teamClass),
+                        team,
+                        owner);
+        if (!(hostile instanceof Boolean)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.TEAM_HOSTILE_TO + "() did not return a boolean"
+                            + EngineNames.PIN);
+        }
+        return ((Boolean) hostile).booleanValue();
+    }
+
+    /**
      * Returns an entity's owning team number, or -1 when it has no owner.
      *
      * @param entity The entity to read.

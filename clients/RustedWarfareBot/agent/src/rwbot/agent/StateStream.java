@@ -194,6 +194,8 @@ final class StateStream {
         out.append(',');
         appendBool(out, "mine", Perception.isOwnedByLocalPlayer(engine, entity));
         out.append(',');
+        appendBool(out, "hostile", Perception.isHostileToLocalPlayer(engine, entity));
+        out.append(',');
         appendFloat(out, "hp", health[0]);
         out.append(',');
         appendFloat(out, "max_hp", health[1]);

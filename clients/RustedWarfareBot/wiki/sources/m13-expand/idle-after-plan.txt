@@ -1,0 +1,34 @@
+What the bot does after its plan completes
+==========================================
+
+Every run before this one stopped the moment the plan finished, which measures
+whether the bot can execute a list -- not whether it can play. This observes
+only: no orders are sent, and the world is sampled for 800 samples (~30,000
+engine frames) after a completed six-entry plan on the sandbox skirmish map,
+five opposing AI players.
+
+START  frame  51046 credits  8539 mine 9 hp 178190 visible-enemy  54
+  t+ 200 frame  66050 credits 11689 mine 9 hp 178190 visible-enemy  63
+  t+ 400 frame  81058 credits 14843 mine 9 hp 178190 visible-enemy  81
+  t+ 600 frame  96032 credits 18001 mine 9 hp 178190 visible-enemy 102
+  t+ 800 frame 110949 credits 21164 mine 9 hp 178190 visible-enemy 126
+END    owned 9 -> 9
+
+Three readings, and the third is the one that matters.
+
+1. Nothing was lost. Owned entities held at 9 and total hit points did not move
+   by a single point -- so the bot took no damage at all, rather than surviving
+   damage. (170,000 of that total is the editor placeholder's; the real figure
+   is about 8,190, equally unchanged.)
+
+2. Credits rose from 8,539 to 21,164 and never stopped. The economy works and
+   nothing spends it. A bot banking 21,000 credits is a bot with three
+   extractors it does not need and an army it never built.
+
+3. Visible enemy units went from 54 to 126 over the same window. The opponents
+   more than doubled their force while the bot stood still.
+
+So "it survived" is true and misleading. It was not attacked, on a map large
+enough that five opponents had not reached it in five minutes. Nothing here
+shows the bot can take a hit, return one, or notice it is being approached --
+only that the failure has not arrived yet.

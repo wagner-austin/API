@@ -323,11 +323,17 @@ public final class Premain {
      * @param path Absolute path to write.
      */
     private static void writeTypeFlags(String path) {
+        // Both kinds ride in one file, taken in one pass over one registry.
+        // They answer different questions about the same types -- where each
+        // may stand, and what each can make -- and two files could be
+        // regenerated against different game builds and silently disagree.
         String rendered = renderOnGameThread(TypeFlags::dump, "type flags");
-        if (rendered == null) {
+        String edges = renderOnGameThread(BuildTree::dump, "build tree");
+        if (rendered == null || edges == null) {
             Log.error("type flags were not produced");
             return;
         }
+        rendered = rendered + edges;
         try (java.io.Writer writer =
                 new java.io.OutputStreamWriter(
                         new java.io.FileOutputStream(path, false),

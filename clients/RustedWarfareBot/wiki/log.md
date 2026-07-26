@@ -276,3 +276,22 @@ Worth recording how the factory case was diagnosed, because four separate attemp
 That completion flag exposed one more defect, this time in the planner: a building joins the roster when construction *starts*, so counting on presence reported a plan finished while a factory was still a shell. Progress now counts only finished structures — and the correction had to land with its own consequence, because the builder stops moving the instant it arrives and the shell appears at the same moment, so movement stops being evidence exactly when construction starts. A rising owned structure now counts as in-flight too, or the fix would have traded a wrong scorecard for a false stall. The run is visibly slower and more honest for it: 559 samples for the same six entries where presence-counting took 215.
 
 make check green: guard 0 violations, ruff + mypy clean, 338 tests, 100% statements and branches, agent-selftest OK.
+
+## [2026-07-25] policy | goals instead of a build order, and the first look at what the bot does afterwards
+Artifacts: `wiki/sources/m13-expand/` — `expanded-run.log` (438), `idle-after-plan.txt` (34); `wiki/sources/m11-pools/type-flags.ndjson` regenerated (487, now 173 types + 314 build edges)
+
+Notes: the plan was a list a human wrote, prerequisites and all. Ask for a tank and the planner answered `blocked` — correct, and useless, since the way to get one was in the engine's own registry.
+
+Two sources, and the split is deliberate. The option stream answers what each *owned* unit can make and is the right source for dispatch, because it carries the engine id an order is addressed to. It cannot answer what a plan asks, because a plan reasons about things that do not exist: nothing owned can make a tank until a factory stands. So the static half is dumped from the registry — every type asked for its own action list, each action for the type it makes. 314 edges over 173 types, riding in the same file as the placement flags because both are one pass over one registry and two files could drift against different builds.
+
+The two cross-check, which is what makes either trustworthy: the registry gives the Builder thirteen structures, and the live per-entity stream reports exactly those thirteen by a completely unrelated route. The dump also settles the laboratory outright — no type in the registry produces one at tech 1, so that plan was never executable, and it is now refused before a socket opens rather than after three hundred samples of reported progress.
+
+Expansion is a pure function run once, before the loop. Three properties earned their tests: availability accumulates, so two tanks insert one factory rather than two; goal order survives, so an extractor asked for first still opens the plan and pays for the rest; and the search terminates over a cyclic graph — a factory makes a builder and a builder makes a factory — by tracking what it is already resolving. Asked for a tank while owning nothing it names the real producers and refuses.
+
+Verified live: goals of three extractors and two tanks, no factory named. The plan gained one, and six orders produced six entries with nothing wasted — the tanks made by unit 267, the factory that did not exist when the plan was written.
+
+Then the question that had never been asked: what does it do afterwards? Every run to date stopped the moment the plan completed, which measures whether the bot can execute a list, not whether it can play. Observing 800 samples past a completed plan: nothing lost, not one hit point of damage taken, credits climbing 8,539 → 21,164, and visible enemy units going 54 → 126. "It survived" is true and misleading — it was not attacked. Nothing shows it can take a hit, return one, or notice it is being approached. The bot banks an economy it never spends while five opponents double their army.
+
+That is the next thing, and it is not a planner gap: the planner does what it is asked. There is no policy for what to do with what it built.
+
+make check green: guard 0 violations, ruff + mypy clean, 363 tests, 100% statements and branches, agent-selftest OK.

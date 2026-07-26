@@ -75,7 +75,11 @@ Worth noting against the catalogue: the builder's listed speed is 0.6, and the m
 
 ## Open questions
 
-Pools are chosen by distance from the base and nothing else, and that is already known to be too little. Aiming a builder at the *farthest* pool on this map — 4,293 world units out — walked it through two opponents' bases, and it was killed before arriving.[^13] Distance is not danger, and it is not reachability either: on a map where the nearest free pool is across water the same order would send a land builder somewhere it cannot go. Both want a model the planner does not have, one of threat and one of movement layers.
+Pools were chosen by distance from the base and nothing else, and that was too little. Aiming a builder at the *farthest* pool on this map — 4,293 world units out — walked it through two opponents' bases, and it was killed before arriving.[^13] Distance is not danger, and it is not reachability either: on a map where the nearest free pool is across water the same order would send a land builder somewhere it cannot go. Both want a model the planner did not have, one of threat and one of movement layers.
+
+**Half of that is now answered.** A pool is rejected when a visible hostile's attack range covers any point of the walk to it, hostility read from the engine's own alliance test rather than from ownership, and the survivors ranked by distance as before ([[policy-threat]]). The route is what is tested rather than the destination, because the builder in [^13] died in transit and the pool it was walking to was fine.
+
+Reachability is untouched and remains the open half. Nothing the planner reads knows that water is between it and a pool, so the same order across a channel still goes out and still fails — now with the threat check reporting the far shore perfectly safe.
 
 Extractors are also never upgraded. The catalogue prices a T2 and T3 tier for each, and the engine treats an upgrade as a distinct action from a build; nothing in the order path exercises it yet ([[building-structures]]).
 
@@ -95,4 +99,4 @@ And the fog filter over pools has never filtered anything, because fog is disabl
 [^12]: `wiki/sources/m11-pools/builder-travel-timing.txt:13` — `RESULT travel_samples=52 total_samples=52`, with `construction_samples=0` at `:14`, `units_per_sample=11.72` at `:16` and `units_per_second=46.9` at `:17`, for the 609.3-unit order named in the header at `:5`. A one-off calibration rather than a regenerable target: it needs a live game and a builder free to walk.
 [^13]: [synthesis] — the same measurement aimed at the farthest pool on the map first, 4,293 units out at tile (12, 52). The builder was still walking at sample 370, having reached (498, 1198) against opposing bases at roughly (370, 2430) and (590, 1690) in the archived capture, and had left the roster by sample 480. Recorded rather than archived because what the run establishes is a negative.
 [^14]: `com/corrodinggames/rts/game/units/ar$48.java` in the decompiled tree — `public String i() { return "marker"; }`, against the by-name lookup at `ar.java:291` which compares `ar2.name()`. Observed as a live failure first: the dump aborted with "the registry listed type marker but cannot resolve it by name".
-[^15]: `src/rw_bot/policy/build_order.py` — `find_free_pool` and `_is_occupied`, with `POOL_OCCUPIED_RADIUS` and the reasoning for each of its three conditions.
+[^15]: `src/rw_bot/policy/build_order.py` — `survey_pools` and `_is_occupied`, with `POOL_OCCUPIED_RADIUS` and the reasoning for each of its three conditions. The threat filter it applies before ranking lives in `src/rw_bot/policy/threat.py` ([[policy-threat]]).

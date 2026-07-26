@@ -19,3 +19,5 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [Perception: Visible Entities, Economy and Health](../pages/perception-visibility.md) -- `am.d(n)` is the engine's per-player fog test; credits, team and hit-point fields
 [Resource Pools and the Placement Rule](../pages/mechanics-resource-pools.md) -- credits come from a tileset property: `res_pool` tiles, the `placeOnlyOnResPool` flag, and where an extractor may stand
+[The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- what each type can make, dumped from the registry; the static half the option stream cannot answer
+[Build Actions: Two Families, Two Verbs, Five Gates](../pages/mechanics-build-actions.md) -- placing and producing are one mechanism dispatched two ways, and the five conditions that stop an order, four of which say nothing

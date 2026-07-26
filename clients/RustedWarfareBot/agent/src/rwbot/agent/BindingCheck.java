@@ -64,6 +64,13 @@ final class BindingCheck {
         }
         if (team != null) {
             checkField(team, EngineNames.TEAM_ID, problems);
+            // Hostility and the unit cap. Losing either fails quietly rather
+            // than loudly: the first would make every enemy read as harmless
+            // and send builders into gun range, the second would drop a gate
+            // from the produce diagnostic and take a silent refusal with it.
+            checkMethod(team, EngineNames.TEAM_HOSTILE_TO, problems, team);
+            checkMethod(team, EngineNames.TEAM_UNIT_COUNT, problems);
+            checkMethod(team, EngineNames.TEAM_UNIT_CAP, problems);
         }
         if (controller != null && team != null) {
             checkMethod(controller, "a", problems, team);
@@ -138,6 +145,14 @@ final class BindingCheck {
         if (action != null && entity != null) {
             checkMethod(action, EngineNames.ACTION_AVAILABLE, problems, entity);
             checkMethod(action, EngineNames.ACTION_LOCKED, problems, entity);
+            checkMethod(action, EngineNames.ACTION_APPLIES, problems, entity, boolean.class);
+        }
+        if (entity != null) {
+            checkMethod(entity, EngineNames.ENTITY_COMPLETE, problems);
+        }
+        Class<?> queue = checkClass(EngineNames.QUEUE_CLASS, problems);
+        if (queue != null) {
+            checkField(queue, EngineNames.QUEUE_ITEMS, problems);
         }
         return problems;
     }
