@@ -104,6 +104,7 @@ This is a **bot configuration choice, not a game limit** — and a deliberate on
 [^user]: user (Austin), 2026-07-17 — "auto shift doesnt center on bot every walk. it only shifts when the bot walks to a tile on the edge of the viewport. and then it recenters on bot btw." Reaffirmed: "when you walk to the edge, with auto scroll on, it will center the viewport on the bot."
 [^8]: Viewport probe captures `runs/probe/viewport-20260725-190352.capture_session.json` (OFF-phase edge walk to column 168, out-of-window rejects at 169+, ON-phase degenerate) and `runs/probe/viewport-20260725-192738.capture_session.json` (ON-phase edge arrival at column 153 → same-tick `0x5A (145,116)`); offline pairing via `analysis_scripts/analyze_viewport_probe.py`.
 [^9]: Raw short frames extracted from `key_probe.capture_session.json` (2026-07-24): autoscroll ack `4130` = ASCII `"A0"`, chat ack `4331` = ASCII `"C1"` — pre-XOR bytes, matching the plaintext `Ia`/`Ka` command encodings byte-for-byte. The inverted-restore inference: the key probe's restore press, decoded through the then-broken `== 1` test, reported OFF while actually leaving ON — consistent with viewport-probe runs -175629 through -190352 all opening ON and run -192738 (after -190352's verified OFF restore) opening OFF.
+[^10]: user (Austin), 2026-07-25, rejecting the walking-traversal suggestion this page briefly carried. Step latency from the run -192738 timeline: single-tile walk commands echoed their 0x47 ~1.7-2.0 s apart.
 
 ## Acceptance boundary (measured 2026-07-25)
 
@@ -116,7 +117,9 @@ The viewport probe paired every sent move with its response across both autoscro
 | Unreachable / no path (e.g. water target) | **Rejected**: `0x52 err=1` (`CANT_GO`) |
 | Re-sent while already walking to it | **Rejected**: `0x52 err=6` (`ALREADY_THERE`) |
 
-The bound is **the window, not a self-centered radius** — the earlier "Chebyshev ≤ 8" reading from the teleport probe was the same law seen from a freshly centered window (where window edge and self ± 8 coincide). Consequence with autoscroll ON: the window follows the walker, so a bot can traverse the map by walking alone — walking costs no fuel and executes instantly at fuel 0 ([[fuel-system]]) — where an autoscroll-OFF bot must spend teleport fuel to move its window.
+The bound is **the window, not a self-centered radius** — the earlier "Chebyshev ≤ 8" reading from the teleport probe was the same law seen from a freshly centered window (where window edge and self ± 8 coincide).[^8]
+
+**Walking is NOT a travel mechanism** (user ruling, verbatim, 2026-07-25: *"walking is too slow... we teleport for a reason. we walk for equipment and fuel pickups in the same viewport. but no we're not walking across the map or to enemies."*).[^10] The wire supports window-following traversal under autoscroll ON, but each step costs a full server round-trip (~2 s/tile measured in the probe runs[^8]) — crossing the map would take minutes where a teleport is instant. The bot contract stays: **teleport to travel, walk only for in-viewport pickups.** The measured laws above matter for correctness (what the server accepts and when the window moves), not as a traversal strategy.
 
 ## Rest-state law (corpus-swept 2026-07-22)
 
