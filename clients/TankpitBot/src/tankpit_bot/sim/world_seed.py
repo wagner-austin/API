@@ -11,13 +11,13 @@ static population accordingly:
   every 5 seeded dot containers are drained to volume 0 (they answer
   pickups with 0x52 code 4, exactly like live).
 * **Hidden fuel** — invisible until the client radars its tile.
-  Volumes cycle through the measured hidden-population distribution
-  (997 archive 0x4F fuel reveals: ~16% below 500, the rest in the
-  measured large bands). The population size is a CALIBRATED
-  ASSUMPTION (documented on the constant): enough that a fresh
-  full-viewport scan reveals a handful, matching live scans.
-* **Hidden equipment** — same placement model; population calibrated
-  to the live "~22 distinct equipment tiles seen per session" order.
+  Population, drained fraction, and small/large mix are MEASURED
+  (density probe 2026-07-25, 8 extra-radar sweeps of fresh
+  map-spread viewports): ~840 hidden fuel map-wide, half drained,
+  2-in-5 of the stocked below 500; large volumes cycle through the
+  archive band mix.
+* **Hidden equipment** — same placement model; ~180 map-wide,
+  measured by the same probe.
 
 Practice layouts are REAL practice-room states lifted from archive
 captures (`analysis_scripts/mine_practice_roster.py`): the full
@@ -42,15 +42,20 @@ DOTTED_FUEL_COUNT = 620
 DOTTED_STOCKED_PERIOD = 5
 """Every 5 seeded dots, 2 hold fuel and 3 are drained (~40% hold)."""
 
-HIDDEN_FUEL_COUNT = 900
-"""Hidden fuel containers (calibrated assumption: ~3.5 per fresh
-full-viewport scan at 256 tiles / 65,536 map tiles — the order live
-scans reveal; the true map-wide population is unmeasured)."""
+HIDDEN_FUEL_COUNT = 840
+"""Hidden fuel containers, MEASURED 2026-07-25 (density probe run 5,
+`runs/probe/density-20260725-171318`): 23 hidden fuel reveals over
+1,792 fresh tiles across 7 map-spread viewports ≈ 0.0128/tile ≈ 840
+map-wide. Roughly half are drained (12 of 23 held fuel) — see
+:data:`HIDDEN_DRAINED_PERIOD`."""
 
-HIDDEN_EQUIPMENT_COUNT = 450
-"""Hidden equipment containers (calibrated assumption: ~1.8 per
-fresh full-viewport scan, matching the live ~22 distinct equipment
-tiles seen per session)."""
+HIDDEN_DRAINED_PERIOD = 2
+"""Every 2nd hidden fuel container is drained to volume 0 (measured:
+12 stocked of 23 hidden reveals)."""
+
+HIDDEN_EQUIPMENT_COUNT = 180
+"""Hidden equipment containers, MEASURED same probe: 5 reveals over
+1,792 fresh tiles ≈ 0.0028/tile ≈ 180 map-wide."""
 
 LARGE_VOLUME_CYCLE: tuple[int, ...] = (
     520,
@@ -82,8 +87,11 @@ SMALL_VOLUME_CYCLE: tuple[int, ...] = (34, 57, 120, 180, 250, 320, 400, 460)
 """Deterministic sub-500 volume cycle (never dots; the live off-dot
 spot checks were 34 and 57)."""
 
-SMALL_PERIOD = 6
-"""Every 6th hidden fuel container is sub-500 (~16% measured)."""
+SMALL_PERIOD = 5
+"""2 of every 5 STOCKED hidden containers are sub-500 (density probe
+2026-07-25: 5 of 12 stocked hidden reveals were below 500 — fresh
+ground carries more small fuel than the archive's visited-area
+reveal mix suggested)."""
 
 _CLIENT_RANK = 1
 _CLIENT_COUNTS = 25
@@ -248,13 +256,16 @@ def _large_volume(index: int) -> int:
 def _hidden_volume(index: int) -> int:
     """Return the deterministic hidden-population volume for one index.
 
-    Every :data:`SMALL_PERIOD`-th container draws from the sub-500
-    cycle; the rest draw from the large cycle — the measured hidden
-    mix.
+    The measured hidden mix (density probe 2026-07-25): every 2nd
+    container is drained to 0; among the stocked, 2 of every 5 draw
+    from the sub-500 cycle and the rest from the large cycle.
     """
-    if index % SMALL_PERIOD == SMALL_PERIOD - 1:
-        return SMALL_VOLUME_CYCLE[(index // SMALL_PERIOD) % len(SMALL_VOLUME_CYCLE)]
-    return _large_volume(index)
+    if index % HIDDEN_DRAINED_PERIOD == HIDDEN_DRAINED_PERIOD - 1:
+        return 0
+    stocked_index = index // HIDDEN_DRAINED_PERIOD
+    if stocked_index % SMALL_PERIOD < 2:
+        return SMALL_VOLUME_CYCLE[(stocked_index // SMALL_PERIOD) % len(SMALL_VOLUME_CYCLE)]
+    return _large_volume(stocked_index)
 
 
 _MAP_SPAN = 256
@@ -387,6 +398,7 @@ def seed_practice_client(
 
 __all__ = [
     "DOTTED_FUEL_COUNT",
+    "HIDDEN_DRAINED_PERIOD",
     "HIDDEN_EQUIPMENT_COUNT",
     "HIDDEN_FUEL_COUNT",
     "LARGE_VOLUME_CYCLE",

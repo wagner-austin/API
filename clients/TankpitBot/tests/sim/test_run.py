@@ -147,11 +147,12 @@ def test_practice_session_seeds_the_mined_layout_and_population(
     raw_containers = narrow_json_to_list(world_doc["containers"])
     dotted = sum(1 for entry in raw_containers if narrow_json_to_dict(entry)["dotted"] is True)
     hidden = sum(1 for entry in raw_containers if narrow_json_to_dict(entry)["dotted"] is False)
-    # Playing EXPOSES: the client's scans dot hidden ≥500 containers,
-    # so dotted grows past the seeded census and hidden shrinks by
-    # exactly the same amount — the exposure law running end-to-end.
+    # Conservation: exposure moves containers hidden -> dotted, never
+    # creates or destroys them (the measured-density world is sparse
+    # enough that a short session may dot nothing; the exposure law
+    # itself is pinned by test_radar_exposure_dots_large_hidden_fuel).
     assert dotted + hidden == DOTTED_FUEL_COUNT + HIDDEN_FUEL_COUNT
-    assert dotted > DOTTED_FUEL_COUNT
+    assert dotted >= DOTTED_FUEL_COUNT
     assert len(narrow_json_to_list(world_doc["equipment"])) >= HIDDEN_EQUIPMENT_COUNT
 
 

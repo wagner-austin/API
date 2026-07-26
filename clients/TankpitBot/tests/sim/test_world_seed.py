@@ -12,6 +12,7 @@ from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tankpit_bot.sim.world_seed import (
     DOTTED_FUEL_COUNT,
     DOTTED_STOCKED_PERIOD,
+    HIDDEN_DRAINED_PERIOD,
     HIDDEN_EQUIPMENT_COUNT,
     HIDDEN_FUEL_COUNT,
     PRACTICE_LAYOUTS,
@@ -54,7 +55,8 @@ def test_population_counts_mix_and_exposure_threshold() -> None:
     """The seeded field carries the documented static population.
 
     Dotted containers hold fuel at the measured ~40% rate (2 of every
-    5); hidden fuel is never dotted, sub-500 at the measured ~1-in-6;
+    5); hidden fuel is never dotted, half drained, sub-500 at the
+    measured 2-in-5 of stocked;
     every stocked dotted container satisfies the ≥500 dot law; no two
     entities share a tile; nothing sits in the unencodable pre-(1,1)
     atlas region.
@@ -69,8 +71,11 @@ def test_population_counts_mix_and_exposure_threshold() -> None:
     stocked = [c for c in dotted if c["volume"] > 0]
     assert len(stocked) == DOTTED_FUEL_COUNT // DOTTED_STOCKED_PERIOD * 2
     assert all(c["volume"] >= MAP_DOT_MIN_VOLUME for c in stocked)
+    drained = [c for c in hidden if c["volume"] == 0]
+    assert len(drained) == HIDDEN_FUEL_COUNT // HIDDEN_DRAINED_PERIOD
+    stocked_hidden = len(hidden) - len(drained)
     small = [c for c in hidden if 0 < c["volume"] < MAP_DOT_MIN_VOLUME]
-    assert len(small) == HIDDEN_FUEL_COUNT // SMALL_PERIOD
+    assert len(small) == stocked_hidden // SMALL_PERIOD * 2
     tiles = [(c["x"], c["y"]) for c in world["containers"]]
     tiles.extend((e["x"], e["y"]) for e in world["equipment"])
     assert len(tiles) == len(set(tiles))
