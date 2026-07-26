@@ -13,8 +13,13 @@ Refactor covenant-radar-api into a **domain-agnostic streaming ML platform** whe
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Core abstractions (base schemas, protocols, registry, generic worker) | ✅ Complete |
-| 2 | Weather domain + deployment | ✅ Complete — runs on a real broker |
-| 3 | Esports domain | Not started |
+| 2 | Weather domain + deployment | ✅ Complete — runs on a real broker, verified on real ERA5 observations |
+| 3 | Esports domain | ✅ Complete — runs on a real broker |
+
+Esports is validated only as a pipeline. Weather has been run against real
+ERA5 observations end to end; no real esports dataset is on hand, so the
+match snapshots in its smoke are synthetic and say nothing about whether
+the win-probability model is any good.
 
 ---
 
@@ -33,10 +38,11 @@ domains/
     domain.py            # WeatherDomain + make_weather_domain
     _test_hooks.py       # Weather-specific hooks
 
-  esports/               # ❌ Not started
+  esports/               # ✅ Implemented
     schemas.py           # MatchEventV1 + encode/decode
     features.py          # EsportsFeatureExtractor
-    domain.py            # EsportsDomain class
+    domain.py            # EsportsDomain + make_esports_domain
+    _test_hooks.py       # No hookable dependencies; the extractor is pure
 
 streaming/
   generic_worker.py      # GenericStreamingWorker (domain-agnostic)
@@ -82,7 +88,7 @@ Change `process_event` to call `self._domain.decode_and_extract(payload)` instea
 
 `WeatherDomain` class implementing the refactored `DomainProtocol`. Factory: `make_weather_domain()`.
 
-### Step 5: Implement Esports Domain — not started
+### Step 5: Implement Esports Domain — ✅ done
 
 **New files:**
 - `src/covenant_radar_api/domains/esports/__init__.py`
@@ -91,6 +97,22 @@ Change `process_event` to call `self._domain.decode_and_extract(payload)` instea
 - `src/covenant_radar_api/domains/esports/domain.py` — EsportsDomain class
 - `src/covenant_radar_api/domains/esports/_test_hooks.py`
 - Tests for all of the above
+
+The core needed no change to accept it, which is what the protocol was for.
+Every count is an integer, so a snapshot round-trips through JSON exactly;
+gold as a float would have made the round trip approximate for no gain.
+
+### Design Fix (from Step 5 execution): lazy domain registration — ✅ done
+
+`DomainRegistry` held built domains, so `build_domain_registry()` had to
+construct every domain to offer any. Weather reads a fitted state and a
+station map off disk, so an esports-only deployment would have failed at
+startup demanding `WEATHER__STATE_PATH` for a domain it never runs.
+
+The registry now holds factories and runs them in `get()`, mirroring
+`BackendRegistration` in the two ML registries. Registration reads no
+configuration; a domain's requirements are read only when it is selected.
+Verified by running the esports smoke with the weather variables unset.
 
 ### Deployment — ✅ done
 

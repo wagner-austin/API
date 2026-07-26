@@ -110,7 +110,7 @@ class TestSatisfiesDomainProtocol:
         """
         registry = DomainRegistry()
 
-        registry.register(_make_domain())
+        registry.register(WEATHER_DOMAIN_NAME, _make_domain)
 
         assert registry.list_names() == (WEATHER_DOMAIN_NAME,)
         assert registry.get(WEATHER_DOMAIN_NAME).config["name"] == WEATHER_DOMAIN_NAME

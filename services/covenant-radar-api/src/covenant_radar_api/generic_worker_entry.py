@@ -10,6 +10,7 @@ Usage:
 Environment variables:
     STREAMING__ENABLED: Must be true, or the process exits non-zero.
     STREAMING__DOMAIN: Which registered domain to run (default: weather).
+    ESPORTS__ALERT_THRESHOLD: Win probability at or above which an alert fires.
     CONFLUENT__BOOTSTRAP_SERVERS: Kafka bootstrap servers.
     CONFLUENT__SECURITY_PROTOCOL: SASL_SSL (default) or PLAINTEXT.
     CONFLUENT__API_KEY / CONFLUENT__API_SECRET: SASL credentials.
@@ -33,9 +34,18 @@ from platform_core.config import _parse_float, _parse_str, _require_env_str
 from platform_core.logging import setup_logging
 
 from . import generic_worker_entry_hooks as _hooks
+from .domains.esports.domain import (
+    ESPORTS_ALERT_THRESHOLD,
+    ESPORTS_DOMAIN_NAME,
+    make_esports_domain,
+)
 from .domains.protocols import DomainProtocol
 from .domains.registry import DomainRegistry
-from .domains.weather.domain import WEATHER_ALERT_THRESHOLD, make_weather_domain
+from .domains.weather.domain import (
+    WEATHER_ALERT_THRESHOLD,
+    WEATHER_DOMAIN_NAME,
+    make_weather_domain,
+)
 from .generic_worker_entry_hooks import LoggerProtocol
 from .streaming._test_hooks import consumer_factory, producer_factory
 from .streaming._test_hooks_generic_worker import TextGeneratorProtocol
@@ -75,29 +85,40 @@ class GenericWorkerDeps(TypedDict, total=True):
 def build_domain_registry() -> DomainRegistry:
     """Build the registry of domains this deployment can run.
 
-    Weather is constructed from a fitted temporal state and a station map on
-    disk, because the seasonal cycle and tail thresholds come from training
-    data and cannot be derived at startup.
+    Registration is by factory, so a domain's configuration is read only if
+    that domain is the one selected. Weather needs a fitted seasonal state
+    and a station map off disk; demanding those from a deployment running
+    only esports would be a startup failure over files it never opens.
 
     Returns:
-        Registry with every available domain registered.
-
-    Raises:
-        RuntimeError: If a required environment variable is unset.
-        FileNotFoundError: If a referenced state or map file is missing.
+        Registry with every available domain registered, none built yet.
     """
-    state_path = Path(_require_env_str("WEATHER__STATE_PATH"))
-    station_map_path = Path(_require_env_str("WEATHER__STATION_MAP_PATH"))
-    alert_threshold = _parse_float("WEATHER__ALERT_THRESHOLD", WEATHER_ALERT_THRESHOLD)
 
-    registry = DomainRegistry()
-    registry.register(
-        make_weather_domain(
+    def _build_esports() -> DomainProtocol:
+        """Build the esports domain, which needs no fitted state."""
+        return make_esports_domain(
+            alert_threshold=_parse_float("ESPORTS__ALERT_THRESHOLD", ESPORTS_ALERT_THRESHOLD)
+        )
+
+    def _build_weather() -> DomainProtocol:
+        """Build the weather domain from its fitted state on disk.
+
+        Raises:
+            RuntimeError: If WEATHER__STATE_PATH or WEATHER__STATION_MAP_PATH
+                is unset.
+            FileNotFoundError: If either referenced file is missing.
+        """
+        state_path = Path(_require_env_str("WEATHER__STATE_PATH"))
+        station_map_path = Path(_require_env_str("WEATHER__STATION_MAP_PATH"))
+        return make_weather_domain(
             state=_hooks.temporal_state_loader(state_path),
             station_to_location=_hooks.station_map_loader(station_map_path),
-            alert_threshold=alert_threshold,
+            alert_threshold=_parse_float("WEATHER__ALERT_THRESHOLD", WEATHER_ALERT_THRESHOLD),
         )
-    )
+
+    registry = DomainRegistry()
+    registry.register(ESPORTS_DOMAIN_NAME, _build_esports)
+    registry.register(WEATHER_DOMAIN_NAME, _build_weather)
     return registry
 
 

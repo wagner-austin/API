@@ -25,6 +25,7 @@ from platform_core.json_utils import dump_json_str
 from platform_core.testing import make_fake_env
 
 from covenant_radar_api import generic_worker_entry_hooks as _hooks
+from covenant_radar_api.domains.esports.domain import ESPORTS_DOMAIN_NAME
 from covenant_radar_api.domains.weather.domain import WEATHER_DOMAIN_NAME, make_weather_domain
 from covenant_radar_api.generic_worker_entry import (
     GenericWorkerDeps,
@@ -181,23 +182,38 @@ def _wire_fakes() -> _FakeTextGenerator:
 class TestBuildDomainRegistry:
     """The registry is populated from configuration, not hard-coded."""
 
-    def test_registers_weather(self, weather_files: tuple[Path, Path]) -> None:
-        """Weather is registered and reachable by name.
+    def test_registers_every_available_domain(self) -> None:
+        """Both domains are offered, and neither needs configuration to be.
 
         Nothing registered a domain before this, so the registry was
         permanently empty and the generic worker had nothing to run.
         """
-        state_path, map_path = weather_files
-        make_fake_env(
-            {
-                "WEATHER__STATE_PATH": str(state_path),
-                "WEATHER__STATION_MAP_PATH": str(map_path),
-            }
-        )
+        make_fake_env({})
 
         registry = build_domain_registry()
 
-        assert registry.list_names() == (WEATHER_DOMAIN_NAME,)
+        assert registry.list_names() == (ESPORTS_DOMAIN_NAME, WEATHER_DOMAIN_NAME)
+
+    def test_registration_reads_no_configuration(self) -> None:
+        """Registering must not build, or every deployment pays for every domain.
+
+        Weather reads a fitted state and station map off disk. If
+        registration constructed it, a deployment running only esports
+        would fail at startup demanding files it never opens.
+        """
+        make_fake_env({})
+
+        registry = build_domain_registry()
+
+        assert registry.get(ESPORTS_DOMAIN_NAME).config["name"] == ESPORTS_DOMAIN_NAME
+
+    def test_esports_threshold_is_configurable(self) -> None:
+        """A deployment can tune esports alerts without weather configured."""
+        make_fake_env({"ESPORTS__ALERT_THRESHOLD": "0.60"})
+
+        domain = build_domain_registry().get(ESPORTS_DOMAIN_NAME)
+
+        assert domain.config["alert_threshold"] == pytest.approx(0.60)
 
     def test_alert_threshold_is_configurable(self, weather_files: tuple[Path, Path]) -> None:
         """A deployment can tune how often alerts fire without a rebuild."""
@@ -214,12 +230,17 @@ class TestBuildDomainRegistry:
 
         assert domain.config["alert_threshold"] == pytest.approx(0.25)
 
-    def test_missing_state_path_raises(self) -> None:
-        """A required path that is unset fails at startup, naming itself."""
+    def test_missing_state_path_raises_when_weather_is_requested(self) -> None:
+        """A required path that is unset fails when it is needed, naming itself.
+
+        The failure belongs at get(), not at register(): the same registry
+        serves an esports deployment that never sets these variables.
+        """
         make_fake_env({})
+        registry = build_domain_registry()
 
         with pytest.raises(RuntimeError, match="WEATHER__STATE_PATH"):
-            build_domain_registry()
+            registry.get(WEATHER_DOMAIN_NAME)
 
 
 class TestBuildDependencies:
@@ -278,13 +299,34 @@ class TestBuildDependencies:
                 "WEATHER__STATION_MAP_PATH": str(map_path),
                 "MODEL_PATH": "/models/model.ubj",
                 "GEMINI_API_KEY": "key",
-                "STREAMING__DOMAIN": "esports",
+                "STREAMING__DOMAIN": "curling",
             }
         )
         _wire_fakes()
 
-        with pytest.raises(KeyError, match="esports"):
+        with pytest.raises(KeyError, match="curling"):
             build_dependencies()
+
+    def test_esports_runs_without_any_weather_configuration(self) -> None:
+        """An esports deployment must not be asked for weather's files.
+
+        This is what the lazy registry buys. Registering weather eagerly
+        would make this raise on WEATHER__STATE_PATH, for a domain the
+        deployment never touches.
+        """
+        make_fake_env(
+            {
+                "MODEL_PATH": "/models/model.ubj",
+                "GEMINI_API_KEY": "key",
+                "STREAMING__DOMAIN": ESPORTS_DOMAIN_NAME,
+            }
+        )
+        _wire_fakes()
+
+        deps = build_dependencies()
+
+        assert deps["domain"].config["name"] == ESPORTS_DOMAIN_NAME
+        assert deps["domain"].config["input_topic"] == "esports.match_state.v1"
 
     def test_missing_gemini_key_raises(self, weather_files: tuple[Path, Path]) -> None:
         """Alerts cannot be summarised without a key, so it is required."""
