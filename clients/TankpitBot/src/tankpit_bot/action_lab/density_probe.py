@@ -386,6 +386,12 @@ class DensityProbe(ProbeBase):
         needed = teleport_cost(x, y, site_x, site_y) + _FUEL_RESERVE
         pickups = self._bootstrap_fuel(needed) if fuel < needed else 0
         hops = self._refuel_toward(site_x, site_y)
+        # Teleports require the map-open state (the bot's executor
+        # holds the same precondition); run 4 rejected all 16 site
+        # hops because a funded probe never opened the map.
+        self.open_map()
+        page.wait_for_timeout(float(_SETTLE_MS))
+        action_hooks.drain_buffered_messages(self)
         self.teleport_to(site_x, site_y)
         page.wait_for_timeout(float(_SETTLE_MS))
         action_hooks.drain_buffered_messages(self)
