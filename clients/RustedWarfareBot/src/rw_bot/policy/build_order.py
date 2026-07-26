@@ -31,14 +31,6 @@ from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 BUILDER_TYPE = "builder"
 
-#: Engine name of the movement layer a land unit travels on.
-#:
-#: Matched against :attr:`~rw_bot.wire.state.Entity.movement`. Only a unit on
-#: this layer can be judged against a pool's ``group_land``; comparing a hover
-#: unit's component id to a land grid would produce a confident wrong answer,
-#: so the check refuses rather than guesses ([[mechanics-movement-layers]]).
-LAND_MOVEMENT = "LAND"
-
 #: Type name of the map editor's placeholder unit.
 #:
 #: An owned entity in every sample, parked off-map at (-1000, -1000) with
@@ -245,7 +237,11 @@ class PoolSurvey(TypedDict):
 
 
 def survey_pools(
-    sample: Sample, anchor: Entity, builder: Entity, catalogue: Mapping[str, UnitStats]
+    sample: Sample,
+    anchor: Entity,
+    builder: Entity,
+    catalogue: Mapping[str, UnitStats],
+    reaches: Mapping[str, float],
 ) -> PoolSurvey:
     """Choose a resource pool to build on, and account for the rejects.
 
@@ -269,7 +265,9 @@ def survey_pools(
         sample: One observation of the world.
         anchor: The structure to measure distance from.
         builder: The unit that will walk to the pool.
-        catalogue: Unit stats by type name, for speeds and attack ranges.
+        catalogue: Unit stats by type name, for the speed that judges pool
+            occupancy.
+        reaches: Attack range by type name, for the threat filter.
 
     Returns:
         The chosen pool with the counts behind the choice. ``pool`` is None when
@@ -289,7 +287,7 @@ def survey_pools(
         if not _can_walk_to(builder, pool):
             unreachable += 1
             continue
-        if route_is_exposed(sample, catalogue, origin, (pool["x"], pool["y"])):
+        if route_is_exposed(sample, reaches, origin, (pool["x"], pool["y"])):
             exposed += 1
             continue
         distance = (pool["x"] - anchor["x"]) ** 2 + (pool["y"] - anchor["y"]) ** 2
@@ -319,22 +317,19 @@ def _can_walk_to(builder: Entity, pool: ResourcePool) -> bool:
     answers true. Refusing every negative is strictly more conservative than the
     engine, and costs at most a pool it might have allowed.
 
-    A builder that does not travel on land is answered True, which is a refusal
-    to guess rather than an optimistic default: its component id belongs to a
-    different grid, so comparing it against ``group_land`` would be meaningless.
-    Reachability simply does not apply to it, while occupancy and threat still
-    do.
+    There is deliberately no case for a builder that travels on some other
+    layer. Its component id would index a different grid and simply not match
+    any land component, so the pool is refused — the bot declines to build
+    rather than building somewhere it cannot reach, which is the safe direction
+    and needs no branch to arrange.
 
     Args:
         builder: The unit that would walk there.
         pool: The pool it would walk to.
 
     Returns:
-        True when the pool is known reachable, or when this builder's layer
-        cannot be judged against a land grid.
+        True when the builder and the pool share a land component.
     """
-    if builder["movement"] != LAND_MOVEMENT:
-        return True
     if builder["group"] < 0 or pool["group_land"] < 0:
         return False
     return builder["group"] == pool["group_land"]
@@ -478,6 +473,7 @@ def decide(
     plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
     placements: Mapping[str, TypePlacement],
+    reaches: Mapping[str, float],
 ) -> Decision:
     """Choose the next action from one observation.
 
@@ -487,6 +483,7 @@ def decide(
         catalogue: Unit stats by type name, for prices.
         placements: Placement rules by type name, for where a structure may
             stand.
+        reaches: Attack range by type name, for the threat filter.
 
     Returns:
         The decision.
@@ -529,7 +526,7 @@ def decide(
     # bank.
     site: tuple[float, float] | None = None
     if producer["placed"]:
-        placed = _placed_site(sample, index, target, placement, catalogue)
+        placed = _placed_site(sample, index, target, placement, catalogue, reaches)
         if isinstance(placed, dict):
             return placed
         site = placed
@@ -569,6 +566,7 @@ def _placed_site(
     target: str,
     placement: TypePlacement,
     catalogue: Mapping[str, UnitStats],
+    reaches: Mapping[str, float],
 ) -> tuple[float, float] | Decision:
     """Choose where a placed structure goes, or explain why nowhere will do.
 
@@ -584,6 +582,7 @@ def _placed_site(
         target: The type being placed, for the failure message.
         placement: The engine's placement rule for it.
         catalogue: Unit stats by type name, for the anchor and pool judgement.
+        reaches: Attack range by type name, for the threat filter.
 
     Returns:
         The world point to build at, or the decision that stops this tick.
@@ -603,7 +602,7 @@ def _placed_site(
         offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
         return (anchor["x"] + offset[0], anchor["y"] + offset[1])
 
-    survey = survey_pools(sample, anchor, builder, catalogue)
+    survey = survey_pools(sample, anchor, builder, catalogue, reaches)
     chosen = survey["pool"]
     if chosen is None:
         # Not "blocked". No pool being usable is a state the world can leave on
@@ -656,7 +655,6 @@ def _decision(
 
 __all__ = [
     "BUILDER_TYPE",
-    "LAND_MOVEMENT",
     "PLACEHOLDER_TYPE",
     "PLACEMENT_RING",
     "POOL_OCCUPIED_RADIUS",

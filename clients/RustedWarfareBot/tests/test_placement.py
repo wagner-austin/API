@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from rw_bot.mechanics.placement import PlacementError, decode_placements
+from rw_bot.mechanics.placement import PlacementError, decode_placements, decode_reaches
 from rw_bot.validation import DecodeError
 from rw_bot.wire.ndjson import NdjsonError
 
@@ -112,3 +112,50 @@ def test_a_malformed_line_propagates_as_an_ndjson_error() -> None:
     with pytest.raises(NdjsonError) as caught:
         decode_placements(["{oops}"])
     assert caught.value.code == "RW-NDJSON-003"
+
+
+def test_reaches_are_decoded_for_armed_and_unarmed_alike() -> None:
+    """Zero is an answer, not an absence.
+
+    The whole reason this dump exists is that the stat catalogue omits 83 of the
+    173 registered types, so a missing name and an unarmed unit became
+    indistinguishable ([[policy-threat]]). Carrying the unarmed at zero is what
+    lets the reader index instead of defaulting.
+    """
+    reaches = decode_reaches(
+        [
+            '{"kind":"unitcombat","index":0,"name":"turret","attack_range":165.0}',
+            '{"kind":"unitcombat","index":1,"name":"builder","attack_range":0.0}',
+        ]
+    )
+    assert reaches == {"turret": 165.0, "builder": 0.0}
+
+
+def test_the_reach_decoder_skips_the_kinds_it_does_not_own() -> None:
+    """One file, three kinds, three decoders that each project their own."""
+    lines = [
+        '{"kind":"unittype","index":0,"name":"extractorT1","needs_pool":true}',
+        '{"kind":"buildedge","index":0,"producer":"builder","produces":"landFactory"}',
+        '{"kind":"unitcombat","index":0,"name":"turret","attack_range":165.0}',
+    ]
+    assert decode_reaches(lines) == {"turret": 165.0}
+
+
+def test_an_unknown_kind_is_rejected_by_the_reach_decoder_too() -> None:
+    with pytest.raises(PlacementError) as caught:
+        decode_reaches(['{"kind":"nonsense","index":0,"name":"x","attack_range":1.0}'])
+    assert caught.value.code == "RW-PLACEMENT-001"
+
+
+def test_a_repeated_type_name_is_rejected_by_the_reach_decoder_too() -> None:
+    """It is the join key to live entities, so it must identify one type."""
+    line = '{"kind":"unitcombat","index":0,"name":"turret","attack_range":165.0}'
+    with pytest.raises(PlacementError) as caught:
+        decode_reaches([line, line])
+    assert caught.value.code == "RW-PLACEMENT-002"
+
+
+def test_the_reach_decoder_skips_blank_lines() -> None:
+    """The dump is appended to, so a trailing newline is the normal case."""
+    line = '{"kind":"unitcombat","index":0,"name":"turret","attack_range":165.0}'
+    assert decode_reaches(["", line, "   ", ""]) == {"turret": 165.0}

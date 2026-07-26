@@ -36,15 +36,33 @@ final class CommandChannel {
     /** Samples buffered before the oldest is dropped. Small on purpose. */
     private static final int OUTBOX_DEPTH = 4;
 
+    /**
+     * How long the simulation may wait for the planner before giving up on
+     * lockstep for that step.
+     *
+     * <p>Bounded because the alternative is a hung game. A planner that has
+     * died, or is simply thinking for too long, must not be able to freeze the
+     * engine indefinitely -- so the wait expires, says so, and the game runs
+     * on. That makes the run non-reproducible from that point, which is why it
+     * is logged as an error rather than a note.
+     */
+    private static final long ACK_TIMEOUT_MS = 15_000L;
+
     private final int port;
     private final int sampleIntervalMs;
+    private final int lockstepFrames;
+    private final java.util.concurrent.SynchronousQueue<Boolean> acks =
+            new java.util.concurrent.SynchronousQueue<Boolean>();
+    private int nextSampleFrame = -1;
+    private volatile boolean armed = false;
     private final ArrayBlockingQueue<String> outbox =
             new ArrayBlockingQueue<String>(OUTBOX_DEPTH);
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
-    CommandChannel(int port, int sampleIntervalMs) {
+    CommandChannel(int port, int sampleIntervalMs, int lockstepFrames) {
         this.port = port;
         this.sampleIntervalMs = sampleIntervalMs;
+        this.lockstepFrames = lockstepFrames;
     }
 
     /**
@@ -93,8 +111,15 @@ final class CommandChannel {
             Log.info("channel: planner connected");
             outbox.clear();
             connected.set(true);
+            armed = false;
+            nextSampleFrame = -1;
             serveOne(socket);
             connected.set(false);
+            // Release a step that is still waiting on the planner that just
+            // left, rather than making the simulation serve out the full ack
+            // timeout for an answer that can no longer come. A readiness probe
+            // that opens the port and closes it is the ordinary case.
+            acks.offer(Boolean.TRUE);
             Log.info("channel: planner disconnected");
         }
     }
@@ -109,6 +134,20 @@ final class CommandChannel {
             socket.close();
         } catch (IOException e) {
             Log.error("channel: closing socket failed: " + e);
+        }
+        // The writer is retired before the next planner is served, and this is
+        // not tidiness. It blocks taking from the shared outbox, so a writer
+        // left over from a closed connection goes on competing for samples --
+        // it took the first sample of the following connection, wrote it to a
+        // dead socket, and left the real planner waiting for state that had
+        // already been consumed. Under lockstep that showed up as the
+        // simulation stalling for the whole ack timeout on every run.
+        connected.set(false);
+        writer.interrupt();
+        try {
+            writer.join(1000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -156,6 +195,13 @@ final class CommandChannel {
             command = CommandRecord.parse(line);
         } catch (IllegalArgumentException e) {
             Log.error("channel: rejected order: " + e.getMessage());
+            return;
+        }
+        if (command.kind() == CommandRecord.Kind.ACK) {
+            // Released here rather than on the game thread: the game thread is
+            // the one being held, so posting the release into its own queue
+            // would deadlock it behind itself.
+            ack();
             return;
         }
         Orders.onGameThread(() -> apply(command));
@@ -253,6 +299,79 @@ final class CommandChannel {
         }
     }
 
+    /**
+     * Records that the planner has finished with the current sample.
+     *
+     * <p>Called from the reader thread. The handoff is a rendezvous rather
+     * than a flag so a late ack from a previous step cannot release the next
+     * one: if nothing is waiting, the ack is dropped, which is the correct
+     * reading of an ack nobody asked for.
+     */
+    void ack() {
+        acks.offer(Boolean.TRUE);
+    }
+
+    /**
+     * Runs one lockstep step on the game thread, then re-arms itself.
+     *
+     * <p>The engine drains this queue from its own update, so a runnable that
+     * posts itself again runs once per tick -- an every-tick hook without
+     * touching a single byte of engine code.
+     *
+     * <p>At each frame boundary the sample is published and the simulation is
+     * held until the planner answers. Holding the game thread is the whole
+     * point: it is what stops the planner's think time from deciding which
+     * frame its orders land on, and that coupling was the largest remaining
+     * source of run-to-run divergence once the engine's randomness was pinned
+     * (wiki: policy-determinism).
+     */
+    private void lockstepTick() {
+        Object engine = EngineHandle.current();
+        int frame = EngineAccess.readIntField(engine, StateStream.FRAME_FIELD);
+        if (nextSampleFrame < 0) {
+            nextSampleFrame = frame;
+        }
+        if (connected.get() && frame >= nextSampleFrame) {
+            offer(StateStream.sample(engine));
+            nextSampleFrame = frame + lockstepFrames;
+            awaitAck();
+        }
+        if (connected.get()) {
+            Orders.onGameThread(this::lockstepTick);
+        }
+    }
+
+    /**
+     * Blocks the simulation until the planner acks, the planner leaves, or the
+     * bound expires.
+     *
+     * <p>Waits in slices and re-tests rather than parking once on a handoff.
+     * A planner that disconnects mid-step cannot be relied on to release a
+     * waiter -- the rendezvous only completes if a consumer is already parked,
+     * and a readiness probe that opens the port and closes it loses that race
+     * routinely. Re-testing the connection makes departure a condition rather
+     * than a message.
+     */
+    private void awaitAck() {
+        long deadline = System.nanoTime() + ACK_TIMEOUT_MS * 1_000_000L;
+        while (System.nanoTime() < deadline) {
+            if (!connected.get()) {
+                return;
+            }
+            try {
+                if (acks.poll(200L, java.util.concurrent.TimeUnit.MILLISECONDS) != null) {
+                    return;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        Log.error(
+                "channel: no ack within " + ACK_TIMEOUT_MS
+                        + "ms; running on unlocked, so this run is no longer reproducible");
+    }
+
     /** Samples the world on the game thread at a fixed cadence. */
     private void sampleLoop() {
         while (true) {
@@ -263,6 +382,26 @@ final class CommandChannel {
                 return;
             }
             if (!connected.get()) {
+                continue;
+            }
+            if (lockstepFrames > 0) {
+                // In lockstep the tick hook owns sampling entirely; a second
+                // source would publish samples the planner never acked.
+                //
+                // Arming waits for the engine to be able to accept work rather
+                // than for a connection. The socket binds before the game has
+                // loaded a map, and a readiness probe can connect in that
+                // window -- arming on connect threw on the channel thread and
+                // took the channel down with it. The condition is tested
+                // directly, so a genuine binding failure still throws instead
+                // of being mistaken for "not started yet".
+                if (!armed && Orders.gameThreadReady()) {
+                    Orders.onGameThread(this::lockstepTick);
+                    armed = true;
+                    Log.info(
+                            "channel: lockstep every " + lockstepFrames
+                                    + " frame(s); the simulation waits for the planner");
+                }
                 continue;
             }
             Orders.onGameThread(

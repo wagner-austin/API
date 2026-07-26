@@ -74,6 +74,7 @@ def run(
     plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
     placements: Mapping[str, TypePlacement],
+    reaches: Mapping[str, float],
     max_samples: int,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
 ) -> Scorecard:
@@ -102,6 +103,7 @@ def run(
         plan: What to make, in order. Entries may be structures or units.
         catalogue: Unit stats by type name, for prices.
         placements: Placement rules by type name, for where each may stand.
+        reaches: Attack range by type name, for the threat filter.
         max_samples: Stop after this many samples regardless of progress.
         stall_samples: Observations of a stationary builder without progress
             before the run is called stalled.
@@ -128,53 +130,60 @@ def run(
             first_frame = sample["frame"]
         samples_seen += 1
 
-        # Read before deciding, and unconditionally. The builder's travel is
-        # what the stall clock measures, so it has to be sampled on every
-        # observation rather than only on the ones that reach an order.
-        builder = find_builder(sample)
-        builder_now = None if builder is None else (builder["x"], builder["y"])
-        moved = _has_moved(builder_was, builder_now)
-        builder_was = builder_now
+        # Every exit from the body acknowledges the sample, including the ones
+        # that break out. In lockstep the agent holds the simulation until this
+        # arrives, so a path that skipped it would stall the game rather than
+        # merely skip a message ([[policy-determinism]]).
+        try:
+            # Read before deciding, and unconditionally. The builder's travel is
+            # what the stall clock measures, so it has to be sampled on every
+            # observation rather than only on the ones that reach an order.
+            builder = find_builder(sample)
+            builder_now = None if builder is None else (builder["x"], builder["y"])
+            moved = _has_moved(builder_was, builder_now)
+            builder_was = builder_now
 
-        decision = decide(sample, plan, catalogue, placements)
-        if decision["action"] in ("done", "blocked", "stalled"):
-            break
-        if decision["action"] == "wait":
-            continue
-
-        position = completed_count(sample, plan)
-        if position in ordered_positions:
-            # One rule for both verbs: the clock only runs while nothing
-            # observable is happening. What counts as observable differs --
-            # a builder walking to its site, a building holding something in
-            # its queue -- but neither is a guess about how long the work
-            # should take, which is what makes the window independent of price,
-            # distance and map size alike.
-            if _in_flight(sample, decision, moved):
-                ordered_at = samples_seen
-            elif samples_seen - ordered_at >= stall_samples:
-                decision = _stalled(decision, stall_samples)
+            decision = decide(sample, plan, catalogue, placements, reaches)
+            if decision["action"] in ("done", "blocked", "stalled"):
                 break
-            continue
-        ordered_at = samples_seen
-        ordered_positions.add(position)
-        if decision["action"] == "produce":
-            channel.send_produce(
-                produce_order(
-                    unit_id=decision["unit_id"],
-                    type_name=decision["type_name"],
+            if decision["action"] == "wait":
+                continue
+
+            position = completed_count(sample, plan)
+            if position in ordered_positions:
+                # One rule for both verbs: the clock only runs while nothing
+                # observable is happening. What counts as observable differs --
+                # a builder walking to its site, a building holding something in
+                # its queue -- but neither is a guess about how long the work
+                # should take, which is what makes the window independent of price,
+                # distance and map size alike.
+                if _in_flight(sample, decision, moved):
+                    ordered_at = samples_seen
+                elif samples_seen - ordered_at >= stall_samples:
+                    decision = _stalled(decision, stall_samples)
+                    break
+                continue
+            ordered_at = samples_seen
+            ordered_positions.add(position)
+            if decision["action"] == "produce":
+                channel.send_produce(
+                    produce_order(
+                        unit_id=decision["unit_id"],
+                        type_name=decision["type_name"],
+                    )
                 )
-            )
-        else:
-            channel.send_build(
-                build_order(
-                    unit_id=decision["unit_id"],
-                    type_name=decision["type_name"],
-                    x=decision["x"],
-                    y=decision["y"],
+            else:
+                channel.send_build(
+                    build_order(
+                        unit_id=decision["unit_id"],
+                        type_name=decision["type_name"],
+                        x=decision["x"],
+                        y=decision["y"],
+                    )
                 )
-            )
-        orders_sent += 1
+            orders_sent += 1
+        finally:
+            channel.send_ack()
 
     return _score(sample, decision, plan, orders_sent, samples_seen, first_frame)
 

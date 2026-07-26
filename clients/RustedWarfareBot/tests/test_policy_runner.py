@@ -56,6 +56,12 @@ _PLACEMENTS = {
     "scout": _place("scout"),
 }
 
+#: Attack range by type name, as the registry dump gives it.
+#:
+#: Every type these worlds can name appears, armed or not, mirroring the real
+#: dump's coverage of all 173 registered types ([[policy-threat]]).
+_REACHES: dict[str, float] = dict.fromkeys(_CATALOGUE, 0.0)
+
 
 #: Where an entity stands unless a test says otherwise. Arbitrary, but fixed:
 #: most tests are about counting rather than geometry, and a builder that never
@@ -199,12 +205,25 @@ class _ScriptedPeer:
         """Release the connection."""
 
 
+def _orders(peer: _ScriptedPeer) -> list[str]:
+    """Everything the loop sent except the per-sample acknowledgements.
+
+    The ack is protocol rather than policy -- it tells the agent the sample is
+    finished with, and in lockstep it is what releases the simulation
+    ([[policy-determinism]]). Assertions here are about what the bot decided,
+    so the acks are filtered out rather than woven into every expectation.
+    """
+    return [line for line in peer.sent if '"kind":"ack"' not in line]
+
+
 def test_a_plan_already_satisfied_finishes_without_ordering() -> None:
     peer = _ScriptedPeer(_sample_lines(1, 4000, _BUILDER, (300, "landFactory", True)))
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=5)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=5
+    )
     assert card["outcome"] == "done"
     assert card["completed"] == 1
-    assert peer.sent == []
+    assert _orders(peer) == []
 
 
 def test_one_order_is_sent_and_the_structure_ends_the_plan() -> None:
@@ -212,11 +231,15 @@ def test_one_order_is_sent_and_the_structure_ends_the_plan() -> None:
         _sample_lines(1, 4000, _BUILDER)
         + _sample_lines(10, 3700, _BUILDER, (300, "landFactory", True))
     )
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=5)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=5
+    )
     assert card["outcome"] == "done"
     assert card["completed"] == 1
     assert card["orders_sent"] == 1
-    assert peer.sent == ['{"kind":"build","unit_id":214,"x":300.0,"y":320.0,"type":"landFactory"}']
+    assert _orders(peer) == [
+        '{"kind":"build","unit_id":214,"x":300.0,"y":320.0,"type":"landFactory"}'
+    ]
 
 
 def test_a_structure_still_being_built_is_not_re_ordered() -> None:
@@ -227,7 +250,9 @@ def test_a_structure_still_being_built_is_not_re_ordered() -> None:
         + _sample_lines(3, 3700, _BUILDER)
         + _sample_lines(4, 3700, _BUILDER, (300, "landFactory", True))
     )
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=8)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=8
+    )
     assert card["orders_sent"] == 1
     assert card["completed"] == 1
     assert card["outcome"] == "done"
@@ -240,14 +265,18 @@ def test_waiting_for_credits_sends_nothing_and_keeps_reading() -> None:
         + _sample_lines(3, 900, _BUILDER)
         + _sample_lines(4, 900, _BUILDER, (300, "laboratory", True))
     )
-    card = run(AgentChannel(peer), ("laboratory",), _CATALOGUE, _PLACEMENTS, max_samples=8)
+    card = run(
+        AgentChannel(peer), ("laboratory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=8
+    )
     assert card["orders_sent"] == 1
     assert card["outcome"] == "done"
 
 
 def test_a_blocked_plan_stops_immediately() -> None:
     peer = _ScriptedPeer(_sample_lines(1, 4000, (213, "commandCenter", True)))
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=9)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=9
+    )
     assert card["outcome"] == "blocked"
     assert card["last_reason"] == "the player owns no builder"
     assert card["samples_seen"] == 1
@@ -259,7 +288,9 @@ def test_the_sample_budget_bounds_a_run_that_never_finishes() -> None:
         + _sample_lines(2, 10, _BUILDER)
         + _sample_lines(3, 10, _BUILDER)
     )
-    card = run(AgentChannel(peer), ("laboratory",), _CATALOGUE, _PLACEMENTS, max_samples=3)
+    card = run(
+        AgentChannel(peer), ("laboratory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=3
+    )
     assert card["outcome"] == "sample_limit"
     assert card["samples_seen"] == 3
     assert card["orders_sent"] == 0
@@ -270,7 +301,9 @@ def test_frames_elapsed_spans_the_run() -> None:
         _sample_lines(100, 4000, _BUILDER)
         + _sample_lines(460, 3700, _BUILDER, (300, "landFactory", True))
     )
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=5)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=5
+    )
     assert card["frames_elapsed"] == 360
     assert card["credits_at_end"] == 3700
 
@@ -281,6 +314,7 @@ def test_a_zero_sample_budget_reports_that_nothing_was_read() -> None:
         ("landFactory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=0,
     )
     assert card["outcome"] == "sample_limit"
@@ -299,11 +333,12 @@ def test_two_structures_are_ordered_in_plan_sequence() -> None:
         ("landFactory", "laboratory"),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=6,
     )
     assert card["completed"] == 2
     assert card["orders_sent"] == 2
-    assert [line.split('"type":"')[1].rstrip('"}') for line in peer.sent] == [
+    assert [line.split('"type":"')[1].rstrip('"}') for line in _orders(peer)] == [
         "landFactory",
         "laboratory",
     ]
@@ -314,7 +349,9 @@ def test_the_scorecard_renders_every_figure() -> None:
         _sample_lines(1, 4000, _BUILDER)
         + _sample_lines(10, 3700, _BUILDER, (300, "landFactory", True))
     )
-    card = run(AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, max_samples=5)
+    card = run(
+        AgentChannel(peer), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES, max_samples=5
+    )
     assert format_scorecard(card) == (
         "outcome        done (all 1 plan entries satisfied)",
         "completed      1/1",
@@ -335,6 +372,7 @@ def test_an_order_the_engine_refuses_is_reported_as_stalled() -> None:
         ("laboratory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=20,
         stall_samples=4,
     )
@@ -358,9 +396,10 @@ def test_a_produced_unit_leaves_as_a_produce_order_carrying_no_position() -> Non
         ("scout",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=1,
     )
-    assert peer.sent == ['{"kind":"produce","unit_id":213,"type":"scout"}']
+    assert _orders(peer) == ['{"kind":"produce","unit_id":213,"type":"scout"}']
     assert card["orders_sent"] == 1
 
 
@@ -389,6 +428,7 @@ def test_a_building_with_the_order_in_its_queue_is_not_called_stalled() -> None:
         ("scout",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -413,6 +453,7 @@ def test_a_structure_going_up_is_not_called_stalled() -> None:
         ("landFactory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=20,
         stall_samples=3,
     )
@@ -433,6 +474,7 @@ def test_a_structure_that_finishes_ends_the_plan() -> None:
         ("landFactory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=20,
         stall_samples=3,
     )
@@ -452,6 +494,7 @@ def test_an_opponents_half_built_structure_does_not_keep_our_clock_alive() -> No
         ("landFactory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=20,
         stall_samples=3,
     )
@@ -481,6 +524,7 @@ def test_the_producer_is_found_wherever_it_sits_in_the_roster() -> None:
         ("scout",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -496,6 +540,7 @@ def test_a_producer_holding_nothing_is_called_stalled() -> None:
         ("scout",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -520,6 +565,7 @@ def test_a_producer_destroyed_mid_order_stalls_rather_than_waiting_forever() -> 
         ("scout",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -551,6 +597,7 @@ def test_an_extractor_is_ordered_onto_a_pool_and_the_next_onto_a_different_one()
         ("extractorT1", "extractorT1"),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=6,
     )
     assert card["outcome"] == "done"
@@ -559,7 +606,7 @@ def test_an_extractor_is_ordered_onto_a_pool_and_the_next_onto_a_different_one()
     # the first sample, so the nearer one is chosen: tile (5, 10) centres on
     # (110, 210). The second extractor then stands on it, pushing the next
     # order out to tile (30, 10) at (610, 210).
-    assert peer.sent == [
+    assert _orders(peer) == [
         '{"kind":"build","unit_id":214,"x":110.0,"y":210.0,"type":"extractorT1"}',
         '{"kind":"build","unit_id":214,"x":610.0,"y":210.0,"type":"extractorT1"}',
     ]
@@ -573,6 +620,7 @@ def test_an_extractor_with_no_pool_in_sight_waits_rather_than_ordering() -> None
         ("extractorT1",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=3,
     )
     assert card["outcome"] == "sample_limit"
@@ -593,6 +641,7 @@ def test_a_slow_structure_inside_the_stall_window_is_not_called_stalled() -> Non
         ("landFactory",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=20,
         stall_samples=5,
     )
@@ -633,6 +682,7 @@ def test_a_builder_still_walking_to_a_far_site_is_not_called_stalled() -> None:
         ("extractorT1",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -662,6 +712,7 @@ def test_a_builder_that_stops_without_building_is_still_called_stalled() -> None
         ("extractorT1",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )
@@ -680,6 +731,7 @@ def test_a_builder_lost_mid_order_blocks_rather_than_waiting_forever() -> None:
         ("extractorT1",),
         _CATALOGUE,
         _PLACEMENTS,
+        _REACHES,
         max_samples=30,
         stall_samples=4,
     )

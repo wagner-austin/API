@@ -34,6 +34,9 @@ KIND_BUILD_EDGE: Final = "buildedge"
 KIND_UNIT_TYPE: Final = "unittype"
 """``kind`` value of a placement record, which this decoder skips."""
 
+KIND_UNIT_COMBAT: Final = "unitcombat"
+"""``kind`` value of a combat-stat record, which this decoder skips."""
+
 _UNKNOWN_KIND = "RW-BUILDTREE-001"
 
 
@@ -72,7 +75,13 @@ def decode_build_tree(lines: Sequence[str]) -> dict[str, frozenset[str]]:
             continue
         record = parse_object(line)
         kind = require_non_empty_str(record, "kind")
-        if kind == KIND_UNIT_TYPE:
+        if kind in (KIND_UNIT_TYPE, KIND_UNIT_COMBAT):
+            # One dump, several kinds: each decoder projects its own and steps
+            # over its neighbours'. A kind no decoder claims is still an error
+            # in all of them, so nothing genuinely unknown passes silently --
+            # but a kind added for one reader must be listed here, and this
+            # decoder learned that by failing on a live run when a third kind
+            # appeared ([[mechanics-build-tree]]).
             continue
         if kind != KIND_BUILD_EDGE:
             raise BuildTreeError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
@@ -103,6 +112,7 @@ def producers_of(tree: Mapping[str, frozenset[str]], product: str) -> frozenset[
 
 __all__ = [
     "KIND_BUILD_EDGE",
+    "KIND_UNIT_COMBAT",
     "KIND_UNIT_TYPE",
     "BuildTreeError",
     "decode_build_tree",

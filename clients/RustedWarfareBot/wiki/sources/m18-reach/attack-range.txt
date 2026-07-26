@@ -1,0 +1,76 @@
+Attack range for every registered type, and what -printunits leaves out
+======================================================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28).
+
+The registry dump now carries a 'unitcombat' record per type, read off the
+engine's prototype for that type (a map lookup -- nothing is spawned). All
+figures below are derived from the archived dumps; no running game.
+
+--- coverage ---
+catalogue 90, registry 173, overlap 90
+disagreements on the overlap: 0
+
+types only the registry knows: 83, of which armed: 48
+  aaBeamGunship_afterburn      280.0
+  airShip                      170.0
+
+Zero disagreements across the 90 types both sources describe. The registry is
+a wider reading of the same fact, not a second opinion.
+
+--- why -printunits stops at 90 ---
+
+ar.s() filters: not an orderable unit; name starts with 'bug'; shadowed by
+another type; a custom type without its listing flag; one specific excluded
+type; and an explicit sixteen-name blocklist. The '--- ERROR: running
+printForHelp()' lines in the log are not errors -- it is a fifty-iteration
+banner loop at the top of the same method.
+
+--- is the gap reachable in play? ---
+types something can build: 117
+of those, armed AND absent from -printunits: 27
+  aaBeamGunship_afterburn    reach= 280.0  built by ['aaBeamGunship', 'aaBeamGunship_afterburn']
+  bugBee                     reach=   9.0  built by ['bugNest']
+  bugMelee                   reach=   9.0  built by ['bugNest']
+  bugRanged                  reach= 170.0  built by ['bugNest']
+  bugRangedT2                reach= 270.0  built by ['bugNest']
+  bugTurret                  reach= 210.0  built by ['bugFly', 'bugSpore']
+  bugWasp                    reach= 170.0  built by ['bugNest']
+  c_amphibiousJet            reach= 170.0  built by ['c_amphibiousJet_underwater']
+  c_amphibiousJet_underwater reach= 100.0  built by ['c_amphibiousJet', 'c_amphibiousJet_transition', 'c_amphibiousJet_underwater']
+  experimentalGunship        reach= 320.0  built by ['experimentalGunshipLanded']
+  experimentalGunshipLanded  reach= 390.0  built by ['experimentalGunship']
+  mechBunkerDeployed         reach= 240.0  built by ['mechBunker', 'mechBunkerDeployed', 'mechEngineer']
+  mechFlyingLanded           reach= 310.0  built by ['mechFlyingTakeoff']
+  mechFlyingTakeoff          reach= 310.0  built by ['mechFlyingLanded']
+  modularSpider_antiair      reach= 290.0  built by ['modularSpider_emptySlot']
+  modularSpider_antiairFlak  reach= 200.0  built by ['modularSpider_antiair']
+  modularSpider_antiairT2    reach= 400.0  built by ['modularSpider_antiair']
+  modularSpider_artillery    reach= 350.0  built by ['modularSpider_emptySlot']
+  modularSpider_gunturret    reach= 290.0  built by ['modularSpider_emptySlot']
+  modularSpider_gunturretT2  reach= 290.0  built by ['modularSpider_gunturret']
+  modularSpider_lightning    reach= 290.0  built by ['modularSpider_emptySlot']
+  modularSpider_smallgunturret reach= 290.0  built by ['modularSpider_emptySlot']
+  modularSpider_smallgunturretT2 reach= 290.0  built by ['modularSpider_smallgunturret']
+  nautilusSubmarineLand      reach= 240.0  built by ['nautilusSubmarine', 'nautilusSubmarineLand', 'nautilusSubmarineSurface']
+  nautilusSubmarineSurface   reach= 240.0  built by ['nautilusSubmarine', 'nautilusSubmarineLand', 'nautilusSubmarineSurface']
+  robotCrab                  reach= 110.0  built by ['robotCrabWater']
+  robotCrabWater             reach= 110.0  built by ['robotCrab', 'robotCrabWater']
+
+Reading:
+
+Not exotic. Most of the 27 are the SAME unit in another mode, and the mode is
+the type name a live entity reports while in it: a deployed mech bunker
+(240), a surfaced submarine (240), a landed experimental gunship (390), an
+amphibious jet underwater (100). Under the old source every one of those read
+as unarmed. Add the bug faction on any map with bug players (bugRangedT2 at
+270, bugTurret at 210) and the modular spider tree (up to 400).
+
+--- what it changed on one live sample ---
+
+Nothing, and that is worth recording too. Of 55 visible hostiles on
+[z;p10]Crossing Large, 20 read as armed under either source and the pool
+survey was identical: occupied=15 unreachable=12 exposed=1, same tile chosen.
+The five AI players had built only priced types by that point. The fix removes
+a latent hole rather than a firing one -- but the hole is ordinary unit states,
+not a hypothetical.

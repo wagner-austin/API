@@ -161,6 +161,18 @@ final class BindingCheck {
         // Terrain connectivity. Losing this fails quietly in the worst
         // direction: every pool would read as unreachable and the economy
         // would stop, which looks like a planner bug rather than a binding one.
+        // Attack range for every registered type, which -printunits covers for
+        // barely half. Losing these fails in the dangerous direction: every
+        // hostile would read as unarmed and the threat filter would pass
+        // everything (wiki: policy-threat).
+        if (entity != null && type != null) {
+            checkMethod(entity, EngineNames.TYPE_PROTOTYPE, problems, type);
+            checkMethod(entity, EngineNames.UNIT_ARMED, problems);
+        }
+        if (orderable != null) {
+            checkMethod(orderable, EngineNames.UNIT_ATTACK_RANGE, problems);
+        }
+
         Class<?> pathing = checkClass(EngineNames.PATHING_CLASS, problems);
         Class<?> movement = checkClass(EngineNames.MOVEMENT_CLASS, problems);
         if (pathing != null && movement != null) {

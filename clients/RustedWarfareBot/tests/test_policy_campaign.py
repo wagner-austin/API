@@ -100,6 +100,17 @@ class _ScriptedPeer:
         """Release the connection."""
 
 
+def _orders(peer: _ScriptedPeer) -> list[str]:
+    """Everything the loop sent except the per-sample acknowledgements.
+
+    The ack is protocol rather than policy -- it tells the agent the sample is
+    finished with, and in lockstep it is what releases the simulation
+    ([[policy-determinism]]). Assertions here are about what the bot decided,
+    so the acks are filtered out rather than woven into every expectation.
+    """
+    return [line for line in peer.sent if '"kind":"ack"' not in line]
+
+
 _TANK = (1, "c_tank", True, 0.0)
 _ENEMY = (9, "c_tank", False, 100.0)
 
@@ -107,7 +118,7 @@ _ENEMY = (9, "c_tank", False, 100.0)
 def test_the_army_is_sent_at_the_enemy() -> None:
     peer = _ScriptedPeer(_sample_lines(1, _TANK, _ENEMY) * 3)
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=3)
-    assert peer.sent == ['{"kind":"attack","unit_id":1,"target_id":9}']
+    assert _orders(peer) == ['{"kind":"attack","unit_id":1,"target_id":9}']
     assert battle["orders_sent"] == 1
 
 
@@ -135,7 +146,7 @@ def test_a_nearer_enemy_does_not_pull_the_army_off_its_target() -> None:
         + _sample_lines(2, _TANK, _ENEMY, (10, "c_tank", False, 5.0)) * 5
     )
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=6)
-    assert peer.sent == ['{"kind":"attack","unit_id":1,"target_id":9}']
+    assert _orders(peer) == ['{"kind":"attack","unit_id":1,"target_id":9}']
     assert battle["orders_sent"] == 1
 
 
@@ -145,7 +156,7 @@ def test_a_new_target_earns_a_new_order() -> None:
         _sample_lines(1, _TANK, _ENEMY) + _sample_lines(2, _TANK, (10, "c_tank", False, 50.0))
     )
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=2)
-    assert peer.sent == [
+    assert _orders(peer) == [
         '{"kind":"attack","unit_id":1,"target_id":9}',
         '{"kind":"attack","unit_id":1,"target_id":10}',
     ]
@@ -156,7 +167,7 @@ def test_no_enemy_left_is_cleared() -> None:
     peer = _ScriptedPeer(_sample_lines(1, _TANK))
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=5)
     assert battle["outcome"] == "cleared"
-    assert peer.sent == []
+    assert _orders(peer) == []
 
 
 def test_no_army_left_is_reported_apart_from_clearing_the_field() -> None:
@@ -208,7 +219,7 @@ def test_losses_are_replaced_while_the_fight_runs() -> None:
     peer = _ScriptedPeer(lines * 2)
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=2, reinforce=("c_tank",))
     assert battle["produced"] == 2
-    assert '{"kind":"produce","unit_id":300,"type":"c_tank"}' in peer.sent
+    assert '{"kind":"produce","unit_id":300,"type":"c_tank"}' in _orders(peer)
 
 
 def test_nothing_is_reinforced_when_nothing_is_wanted() -> None:

@@ -13,6 +13,7 @@ from rw_bot.wire.command import (
     CommandError,
     attack_order,
     build_order,
+    encode_ack,
     encode_attack,
     encode_build,
     encode_move,
@@ -84,6 +85,15 @@ def test_a_unit_cannot_be_ordered_to_attack_itself() -> None:
     with pytest.raises(CommandError) as caught:
         attack_order(unit_id=7, target_id=7)
     assert caught.value.code == "RW-CMD-003"
+
+
+def test_the_ack_is_a_bare_verb() -> None:
+    """It is about the exchange, not about a unit.
+
+    In lockstep the agent holds the simulation after each sample until this
+    arrives, so it carries no subject and needs none.
+    """
+    assert encode_ack() == '{"kind":"ack"}'
 
 
 def test_a_move_never_carries_a_build_type() -> None:

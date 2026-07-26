@@ -375,10 +375,12 @@ final class BuildOptions {
         if (!Boolean.TRUE.equals(makesSomething)) {
             return true;
         }
+        // Not guarded against a null owner. Every caller reaches this through a
+        // unit the local player owns, so an unowned one is a broken invariant
+        // rather than a state to accommodate -- and reporting "room=true" for it
+        // would put a reassuring number in a diagnostic that exists precisely
+        // because reassuring numbers are how this path fails.
         Object owner = EngineAccess.readField(unit, EngineNames.OWNER);
-        if (owner == null) {
-            return true;
-        }
         Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
         int held =
                 intOf(

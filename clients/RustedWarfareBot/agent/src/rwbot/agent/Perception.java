@@ -219,9 +219,6 @@ final class Perception {
         // check tries the centre and then four points around it before giving
         // up (wiki: mechanics-movement-layers).
         Object map = EngineAccess.readField(EngineHandle.current(), EngineNames.MAP);
-        if (map == null) {
-            return here;
-        }
         float step = EngineAccess.readIntField(map, EngineNames.TILE_WIDTH);
         float[][] neighbours = {{step, 0.0f}, {-step, 0.0f}, {0.0f, step}, {0.0f, -step}};
         for (float[] offset : neighbours) {

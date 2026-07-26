@@ -41,11 +41,36 @@ final class Orders {
     static final int ANY_BUILD_ACTION = -1;
 
     /**
+     * Reports whether the engine can accept work on its game thread yet.
+     *
+     * <p>The queue lives on the script engine, and that is constructed while
+     * the game starts -- so between the agent binding its socket and the
+     * engine being ready there is a window in which {@link #onGameThread}
+     * cannot work. A caller that needs to wait for that window asks here.
+     *
+     * <p>Deliberately a predicate rather than a caught exception. Treating a
+     * throw as "not ready" would give the same answer for "the engine is
+     * starting" and "a pinned name moved in this build", so a real binding
+     * failure would be retried forever instead of reported. This distinguishes
+     * them: a missing instance is false, and anything else still throws.
+     *
+     * @return True when work can be queued on the game thread.
+     * @throws IllegalStateException When the pinned script-engine names are
+     *     absent, which is a build mismatch rather than a timing one.
+     */
+    static boolean gameThreadReady() {
+        Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);
+        return EngineAccess.invokeStatic(scripts, "getInstance") != null;
+    }
+
+    /**
      * Runs a task on the engine's game thread.
      *
      * @param task Work to run. Executed from {@code ScriptEngine.update}.
-     * @throws IllegalStateException When the script engine is unreachable, which
-     *     means the pinned names moved.
+     * @throws IllegalStateException When the script engine is unreachable,
+     *     which means either that the engine has not started or that the
+     *     pinned names moved. Callers that need to distinguish those ask
+     *     {@link #gameThreadReady()} first.
      */
     static void onGameThread(Runnable task) {
         Class<?> scripts = EngineAccess.pinnedClass(EngineNames.SCRIPTS_CLASS);

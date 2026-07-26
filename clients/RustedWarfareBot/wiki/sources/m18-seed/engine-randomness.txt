@@ -1,0 +1,54 @@
+# Excerpt: com/corrodinggames/rts/gameFramework/f.java -- the two kinds of randomness
+# Rusted Warfare 1.15 (code 176, build #28), CFR 0.152 over the pinned game-lib.jar
+
+## The generators, as declared (f.java:38-39, :1229-1230)
+    static final Random a;
+    static final Random b;
+        a = new Random();
+        b = new Random();
+
+## The lockstep-safe path: no generator at all (f.java:117-138)
+    public static final strictfp int a(int n2, int n3, int n4) {
+        l l2 = com.corrodinggames.rts.gameFramework.l.B();
+        if (n2 >= n3) {
+            if (n2 > n3) {
+                com.corrodinggames.rts.gameFramework.l.b("min>max");
+            }
+            return n2;
+        }
+        int n5 = n3 - n2;
+        int n6 = l2.bJ;
+        n6 += n4 * 133333333 * n5;
+        n6 += n4 * 13131313;
+        n6 += n4 * (l2.bx * 13131313);
+        n6 += l2.bx * 1313131313 + l2.bx % 10;
+        if ((n6 %= n5) < 0) {
+            n6 = -n6;
+        }
+        if ((n6 += n2) < n2 || n6 > n3) {
+            com.corrodinggames.rts.gameFramework.l.b("notRandInt number not in range: " + n6 + " min:" + n2 + " max:" + n3);
+        }
+        return n6;
+    }
+
+## The unseeded path the opponents' choices use (f.java:336-355)
+
+    public static final strictfp float c(float f2, float f3) {
+        return a.nextFloat() * (f3 - f2) + f2;
+    }
+
+    public static final strictfp float d(float f2, float f3) {
+        return a.nextFloat() * (f3 - f2) + f2;
+    }
+
+    public static final strictfp int c(int n2) {
+        if (n2 == 0) {
+            return 0;
+        }
+        return a.nextInt(n2);
+    }
+
+    public static strictfp int a(int n2, int n3) {
+        int n4 = n3 == n2 ? 0 : a.nextInt(n3 - n2 + 1);
+        return n2 + n4;
+    }

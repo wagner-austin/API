@@ -11,7 +11,6 @@ import pytest
 from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.build_order import (
-    LAND_MOVEMENT,
     PLACEMENT_RING,
     POOL_OCCUPIED_RADIUS,
     completed_count,
@@ -74,6 +73,16 @@ _TURRET_RANGE = 100.0
 #: The default catalogue plus something that shoots back.
 _ARMED = {**_CATALOGUE, "turret": _unit("turret", 400, attack_range=_TURRET_RANGE)}
 
+#: Attack range by type name, as the registry dump gives it.
+#:
+#: Every type any fixture can name appears, armed or not. That mirrors the real
+#: dump, which covers all 173 registered types, and it is the contract
+#: :func:`~rw_bot.policy.threat.reach_of` indexes against rather than defaults
+#: through ([[policy-threat]]).
+_REACHES: dict[str, float] = dict.fromkeys(_ARMED, 0.0)
+_REACHES["turret"] = _TURRET_RANGE
+_REACHES["someModStructure"] = 0.0
+
 
 def _place(type_name: str, needs_pool: bool = False) -> TypePlacement:
     return TypePlacement(index=0, type_name=type_name, needs_pool=needs_pool)
@@ -126,7 +135,7 @@ def _entity(
     mine: bool = True,
     complete: bool = True,
     hostile: bool | None = None,
-    movement: str = LAND_MOVEMENT,
+    movement: str = "LAND",
     group: int = _MAINLAND,
 ) -> Entity:
     """Build an entity record.
@@ -208,11 +217,11 @@ _ANCHOR = _entity(213, "commandCenter", 4250.0, 2550.0)
 
 
 def test_an_empty_plan_is_immediately_done() -> None:
-    assert decide(_sample(_BUILDER), (), _CATALOGUE, _PLACEMENTS)["action"] == "done"
+    assert decide(_sample(_BUILDER), (), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "done"
 
 
 def test_the_first_structure_is_ordered_from_the_builders_position() -> None:
-    decision = decide(_sample(_BUILDER), ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(_sample(_BUILDER), ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "build"
     assert decision["type_name"] == "landFactory"
     assert decision["unit_id"] == 214
@@ -225,13 +234,13 @@ def test_the_first_structure_is_ordered_from_the_builders_position() -> None:
 def test_progress_is_read_from_the_roster_not_from_a_counter() -> None:
     """A structure already standing counts, whoever built it."""
     world = _sample(_BUILDER, _entity(300, "landFactory"))
-    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["type_name"] == "airFactory"
 
 
 def test_successive_structures_take_successive_ring_positions() -> None:
     world = _sample(_ANCHOR, _BUILDER, _entity(300, "landFactory", 4450.0, 2670.0))
-    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert (decision["x"], decision["y"]) == (
         _ANCHOR["x"] + PLACEMENT_RING[1][0],
         _ANCHOR["y"] + PLACEMENT_RING[1][1],
@@ -241,19 +250,20 @@ def test_successive_structures_take_successive_ring_positions() -> None:
 def test_a_destroyed_structure_is_rebuilt_rather_than_counted() -> None:
     """Counting from the roster is what makes this fall out for free."""
     world = _sample(_BUILDER, credits=4000)
-    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["type_name"] == "landFactory"
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
+    assert decision["type_name"] == "landFactory"
 
 
 def test_a_finished_plan_reports_done() -> None:
     world = _sample(_BUILDER, _entity(300, "landFactory"), _entity(301, "airFactory"))
-    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory", "airFactory"), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "done"
     assert decision["reason"] == "all 2 plan entries satisfied"
 
 
 def test_insufficient_credits_waits_rather_than_ordering() -> None:
     world = _sample(_BUILDER, credits=899)
-    decision = decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert decision["reason"] == "airFactory costs 900, holding 899"
     assert decision["type_name"] == ""
@@ -262,7 +272,7 @@ def test_insufficient_credits_waits_rather_than_ordering() -> None:
 def test_exactly_enough_credits_orders() -> None:
     """The boundary matters: the engine spends in whole units."""
     world = _sample(_BUILDER, credits=900)
-    assert decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "build"
+    assert decide(world, ("airFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "build"
 
 
 def test_an_unfinished_structure_does_not_satisfy_the_plan() -> None:
@@ -276,7 +286,7 @@ def test_an_unfinished_structure_does_not_satisfy_the_plan() -> None:
     world = _sample(_BUILDER, _ANCHOR, shell)
     assert completed_count(world, ("landFactory",)) == 0
     assert next_unsatisfied_index(world, ("landFactory",)) == 0
-    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "build"
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "build"
 
 
 def test_a_finished_structure_does_satisfy_the_plan() -> None:
@@ -284,7 +294,7 @@ def test_a_finished_structure_does_satisfy_the_plan() -> None:
     done = _entity(300, "landFactory", 4450.0, 2730.0)
     world = _sample(_BUILDER, _ANCHOR, done)
     assert completed_count(world, ("landFactory",)) == 1
-    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "done"
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "done"
 
 
 def test_a_type_nothing_owned_can_make_is_blocked() -> None:
@@ -295,7 +305,7 @@ def test_a_type_nothing_owned_can_make_is_blocked() -> None:
     then reported "building laboratory" for three hundred samples. The build
     tree answers the question up front instead.
     """
-    decision = decide(_sample(_BUILDER), ("laboratory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(_sample(_BUILDER), ("laboratory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "blocked"
     assert "nothing the player owns can make laboratory" in decision["reason"]
 
@@ -315,7 +325,7 @@ def test_the_editor_placeholder_never_counts_as_a_producer() -> None:
         placeholder,
         options=(_option(217, "laboratory"),),
     )
-    assert decide(world, ("laboratory",), _CATALOGUE, _PLACEMENTS)["action"] == "blocked"
+    assert decide(world, ("laboratory",), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "blocked"
 
 
 def test_an_action_that_exists_but_is_unavailable_waits() -> None:
@@ -325,7 +335,7 @@ def test_an_action_that_exists_but_is_unavailable_waits() -> None:
     resolves on its own -- unlike an action that does not exist at all.
     """
     world = _sample(_BUILDER, options=(_option(214, "landFactory", available=False),))
-    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert "not available yet" in decision["reason"]
 
@@ -347,7 +357,7 @@ def test_the_first_unavailable_option_is_the_one_reported() -> None:
             _option(215, "landFactory", available=False),
         ),
     )
-    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert "unit 214" in decision["reason"]
 
@@ -363,7 +373,7 @@ def test_an_available_action_is_preferred_over_an_unavailable_one() -> None:
             _option(215, "landFactory"),
         ),
     )
-    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["unit_id"] == 215
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)["unit_id"] == 215
 
 
 def test_a_unit_that_rolls_out_is_produced_rather_than_placed() -> None:
@@ -374,7 +384,7 @@ def test_a_unit_that_rolls_out_is_produced_rather_than_placed() -> None:
     """
     centre = _entity(213, "commandCenter", 4250.0, 2550.0)
     world = _sample(centre, options=(_option(213, "builder", placed=False),))
-    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "produce"
     assert decision["unit_id"] == 213
     assert decision["type_name"] == "builder"
@@ -384,7 +394,7 @@ def test_a_unit_that_rolls_out_is_produced_rather_than_placed() -> None:
 def test_a_produced_unit_still_has_to_be_afforded() -> None:
     centre = _entity(213, "commandCenter", 4250.0, 2550.0)
     world = _sample(centre, credits=499, options=(_option(213, "builder", placed=False),))
-    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert decision["reason"] == "builder costs 500, holding 499"
 
@@ -392,20 +402,20 @@ def test_a_produced_unit_still_has_to_be_afforded() -> None:
 def test_no_builder_is_blocked_not_a_wait() -> None:
     """Waiting implies it could resolve on its own; this one cannot."""
     world = _sample(_entity(213, "commandCenter"))
-    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "blocked"
     assert decision["reason"] == "the player owns no builder"
 
 
 def test_a_structure_missing_from_the_catalogue_is_blocked() -> None:
-    decision = decide(_sample(_BUILDER), ("teleporter",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(_sample(_BUILDER), ("teleporter",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "blocked"
     assert "not in the unit catalogue" in decision["reason"]
 
 
 def test_credits_are_checked_before_a_builder_is_required() -> None:
     """A plan naming an unknown structure fails on the plan, not the roster."""
-    decision = decide(_sample(), ("teleporter",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(_sample(), ("teleporter",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "blocked"
     assert "catalogue" in decision["reason"]
 
@@ -416,7 +426,7 @@ def test_the_placement_ring_wraps_rather_than_running_out(built: int) -> None:
         _entity(400 + i, "landFactory", 4450.0, 2670.0 + 40.0 * i) for i in range(built)
     ]
     plan = ("landFactory",) * (built + 1)
-    decision = decide(_sample(*entities), plan, _CATALOGUE, _PLACEMENTS)
+    decision = decide(_sample(*entities), plan, _CATALOGUE, _PLACEMENTS, _REACHES)
     expected = PLACEMENT_RING[built % len(PLACEMENT_RING)]
     assert (decision["x"], decision["y"]) == (
         _ANCHOR["x"] + expected[0],
@@ -447,7 +457,7 @@ def test_find_builder_returns_the_builder() -> None:
 def test_an_enemy_structure_does_not_advance_the_plan() -> None:
     """The stream carries enemies, so ownership is what makes progress mine."""
     world = _sample(_BUILDER, _entity(900, "landFactory", mine=False))
-    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "build"
     assert decision["type_name"] == "landFactory"
 
@@ -456,7 +466,7 @@ def test_an_enemy_builder_is_never_selected() -> None:
     """Ordering a unit we do not own would be rejected by the engine anyway."""
     world = _sample(_entity(901, "builder", 1.0, 2.0, mine=False))
     assert find_builder(world) is None
-    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)["action"] == "blocked"
+    assert decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)["action"] == "blocked"
 
 
 def test_an_owned_structure_still_counts_when_an_enemy_has_one_too() -> None:
@@ -481,7 +491,7 @@ def test_a_plan_naming_a_starting_unit_does_not_skip_earlier_entries() -> None:
     assert completed_count(world, plan) == 1
     assert next_unsatisfied_index(world, plan) == 0
 
-    decision = decide(world, plan, _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, plan, _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "build"
     assert decision["type_name"] == "landFactory"
 
@@ -512,7 +522,7 @@ def test_placement_is_measured_from_a_fixed_structure_not_the_builder() -> None:
     owned = [command_centre, builder]
     sites: list[tuple[float, float]] = []
     for _step in range(3):
-        decision = decide(_sample(*owned, credits=99_999), plan, _CATALOGUE, _PLACEMENTS)
+        decision = decide(_sample(*owned, credits=99_999), plan, _CATALOGUE, _PLACEMENTS, _REACHES)
         assert decision["action"] == "build"
         sites.append((decision["x"], decision["y"]))
         # The builder ends each build standing at the site it just built.
@@ -557,7 +567,7 @@ def test_an_enemy_structure_is_never_the_anchor() -> None:
 def test_with_no_structure_owned_the_builder_is_the_reference() -> None:
     """A player who has lost every building must still be able to rebuild."""
     world = _sample(_BUILDER, credits=10_000)
-    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "build"
     assert (decision["x"], decision["y"]) == (
         _BUILDER["x"] + PLACEMENT_RING[0][0],
@@ -569,7 +579,7 @@ def test_an_extractor_is_placed_on_a_pool_and_not_on_the_ring() -> None:
     """The ring is not a legal site for it, so offering one would be refused."""
     pool = _pool(0, 200, 130)
     world = _sample(_ANCHOR, _BUILDER, pools=(pool,), credits=10_000)
-    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "build"
     assert decision["type_name"] == "extractorT1"
     assert (decision["x"], decision["y"]) == (pool["x"], pool["y"])
@@ -580,7 +590,7 @@ def test_the_nearest_free_pool_to_the_anchor_is_chosen() -> None:
     near = _pool(0, 220, 130)
     far = _pool(1, 10, 10)
     world = _sample(_ANCHOR, _BUILDER, pools=(far, near), credits=10_000)
-    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert (decision["x"], decision["y"]) == (near["x"], near["y"])
 
 
@@ -589,7 +599,7 @@ def test_a_pool_under_a_structure_is_not_offered_again() -> None:
     free = _pool(1, 230, 130)
     standing = _entity(400, "extractorT1", taken["x"], taken["y"])
     world = _sample(_ANCHOR, _BUILDER, standing, pools=(taken, free), credits=10_000)
-    decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert (decision["x"], decision["y"]) == (free["x"], free["y"])
 
 
@@ -598,7 +608,7 @@ def test_an_enemy_extractor_holds_a_pool_just_as_firmly() -> None:
     taken = _pool(0, 220, 130)
     enemy = _entity(900, "extractorT1", taken["x"], taken["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, enemy, pools=(taken,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE) == {
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES) == {
         "pool": None,
         "visible": 1,
         "occupied": 1,
@@ -612,14 +622,14 @@ def test_a_builder_parked_on_a_pool_does_not_occupy_it() -> None:
     pool = _pool(0, 220, 130)
     parked = _entity(214, "builder", pool["x"], pool["y"])
     world = _sample(_ANCHOR, parked, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, parked, _CATALOGUE)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, parked, _CATALOGUE, _REACHES)["pool"] == pool
 
 
 def test_a_structure_outside_the_occupancy_radius_leaves_a_pool_free() -> None:
     pool = _pool(0, 220, 130)
     beyond = _entity(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS + 0.5, pool["y"])
     world = _sample(_ANCHOR, _BUILDER, beyond, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES)["pool"] == pool
 
 
 def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
@@ -627,7 +637,7 @@ def test_a_structure_exactly_at_the_occupancy_radius_takes_the_pool() -> None:
     pool = _pool(0, 220, 130)
     astride = _entity(400, "landFactory", pool["x"] + POOL_OCCUPIED_RADIUS, pool["y"])
     world = _sample(_ANCHOR, _BUILDER, astride, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] is None
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES)["pool"] is None
 
 
 def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
@@ -635,7 +645,7 @@ def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
     pool = _pool(0, 220, 130)
     unknown = _entity(400, "someModStructure", pool["x"], pool["y"])
     world = _sample(_ANCHOR, _BUILDER, unknown, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES)["pool"] == pool
 
 
 def test_a_pool_across_water_is_not_offered_to_a_land_builder() -> None:
@@ -649,7 +659,7 @@ def test_a_pool_across_water_is_not_offered_to_a_land_builder() -> None:
     across = _pool(1, 12, 52)
     across["group_land"] = _ISLAND
     world = _sample(_ANCHOR, _BUILDER, pools=(across, here), credits=10_000)
-    survey = survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)
+    survey = survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES)
     assert survey["pool"] == here
     assert survey["unreachable"] == 1
 
@@ -664,36 +674,35 @@ def test_a_pool_with_no_land_component_at_all_is_not_offered() -> None:
     nowhere = _pool(0, 220, 130)
     nowhere["group_land"] = -1
     world = _sample(_ANCHOR, _BUILDER, pools=(nowhere,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["unreachable"] == 1
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE, _REACHES)["unreachable"] == 1
 
 
 def test_a_builder_off_the_land_grid_is_not_offered_a_pool_it_cannot_be_judged_for() -> None:
     """Its own component id belongs to a different grid, so it has none here."""
     stranded = _entity(214, "builder", 4250.0, 2610.0, group=-1)
     world = _sample(_ANCHOR, stranded, pools=(_pool(0, 220, 130),), credits=10_000)
-    assert survey_pools(world, _ANCHOR, stranded, _CATALOGUE)["unreachable"] == 1
+    assert survey_pools(world, _ANCHOR, stranded, _CATALOGUE, _REACHES)["unreachable"] == 1
 
 
-def test_a_builder_that_does_not_travel_on_land_is_not_judged_at_all() -> None:
-    """A refusal to guess, not an optimistic default.
+def test_a_builder_on_another_layer_refuses_the_pool_rather_than_guessing() -> None:
+    """No special case, and none needed.
 
-    A hover unit's component id indexes the hover grid, so comparing it against
-    a pool's land component would be a confident wrong answer. Reachability
-    stops applying; occupancy and threat still do.
+    A hover unit's component id indexes the hover grid, so it matches no land
+    component and the pool is simply refused. The safe direction falls out of
+    the comparison instead of being arranged by a branch.
     """
     hover = _entity(214, "builder", 4250.0, 2610.0, movement="HOVER", group=99)
-    pool = _pool(0, 220, 130)
-    world = _sample(_ANCHOR, hover, pools=(pool,), credits=10_000)
-    survey = survey_pools(world, _ANCHOR, hover, _CATALOGUE)
-    assert survey["pool"] == pool
-    assert survey["unreachable"] == 0
+    world = _sample(_ANCHOR, hover, pools=(_pool(0, 220, 130),), credits=10_000)
+    survey = survey_pools(world, _ANCHOR, hover, _CATALOGUE, _REACHES)
+    assert survey["pool"] is None
+    assert survey["unreachable"] == 1
 
 
 def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
     pool = _pool(0, 220, 130)
     turret = _entity(900, "turret", pool["x"] + 50.0, pool["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED) == {
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES) == {
         "pool": None,
         "visible": 1,
         "occupied": 0,
@@ -714,12 +723,12 @@ def test_a_pool_is_rejected_for_the_walk_even_when_the_pool_itself_is_safe() -> 
     ambush = _entity(900, "turret", midpoint[0], midpoint[1] + 50.0, mine=False)
     world = _sample(_ANCHOR, _BUILDER, ambush, pools=(pool,), credits=10_000)
 
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] is None
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] is None
     # ... and the same turret standing at the same distance from the pool, but
     # behind the builder rather than between the two, rules out nothing.
     behind = _entity(900, "turret", _BUILDER["x"], _BUILDER["y"] - 400.0, mine=False)
     clear = _sample(_ANCHOR, _BUILDER, behind, pools=(pool,), credits=10_000)
-    assert survey_pools(clear, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+    assert survey_pools(clear, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] == pool
 
 
 def test_a_pool_exactly_at_the_edge_of_a_gun_is_rejected() -> None:
@@ -727,14 +736,14 @@ def test_a_pool_exactly_at_the_edge_of_a_gun_is_rejected() -> None:
     pool = _pool(0, 220, 130)
     turret = _entity(900, "turret", pool["x"] + _TURRET_RANGE, pool["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] is None
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] is None
 
 
 def test_a_pool_beyond_every_gun_is_offered() -> None:
     pool = _pool(0, 220, 130)
     turret = _entity(900, "turret", pool["x"] + _TURRET_RANGE + 0.5, pool["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, turret, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] == pool
 
 
 def test_an_unarmed_enemy_standing_on_the_route_is_not_a_threat() -> None:
@@ -743,7 +752,7 @@ def test_an_unarmed_enemy_standing_on_the_route_is_not_a_threat() -> None:
     pool = _pool(0, 220, 130)
     harmless = _entity(900, "builder", pool["x"] + 10.0, pool["y"], mine=False)
     world = _sample(_ANCHOR, _BUILDER, harmless, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] == pool
 
 
 def test_an_ally_is_not_a_threat_even_though_it_is_not_mine() -> None:
@@ -751,7 +760,7 @@ def test_an_ally_is_not_a_threat_even_though_it_is_not_mine() -> None:
     pool = _pool(0, 220, 130)
     ally = _entity(900, "turret", pool["x"] + 50.0, pool["y"], mine=False, hostile=False)
     world = _sample(_ANCHOR, _BUILDER, ally, pools=(pool,), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == pool
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] == pool
 
 
 def test_the_nearest_safe_pool_beats_a_nearer_exposed_one() -> None:
@@ -766,7 +775,7 @@ def test_the_nearest_safe_pool_beats_a_nearer_exposed_one() -> None:
     far = _pool(1, 220, 90)
     turret = _entity(900, "turret", near["x"], near["y"] + 50.0, mine=False)
     world = _sample(_ANCHOR, _BUILDER, turret, pools=(near, far), credits=10_000)
-    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED)["pool"] == far
+    assert survey_pools(world, _ANCHOR, _BUILDER, _ARMED, _REACHES)["pool"] == far
 
 
 def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None:
@@ -774,7 +783,7 @@ def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None
     taken = _pool(0, 220, 130)
     standing = _entity(400, "extractorT1", taken["x"], taken["y"])
     world = _sample(_ANCHOR, _BUILDER, standing, pools=(taken,), credits=10_000)
-    decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert decision["reason"] == (
         "extractorT1 needs a resource pool: of the 1 in sight, 1 are built on, "
@@ -789,7 +798,7 @@ def test_the_wait_reason_separates_a_taken_pool_from_a_covered_one() -> None:
     standing = _entity(400, "extractorT1", taken["x"], taken["y"])
     turret = _entity(900, "turret", covered["x"], covered["y"] + 50.0, mine=False)
     world = _sample(_ANCHOR, _BUILDER, standing, turret, pools=(taken, covered), credits=10_000)
-    decision = decide(world, ("extractorT1", "extractorT1"), _ARMED, _PLACEMENTS)
+    decision = decide(world, ("extractorT1", "extractorT1"), _ARMED, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert decision["reason"] == (
         "extractorT1 needs a resource pool: of the 2 in sight, 1 are built on, "
@@ -799,7 +808,7 @@ def test_the_wait_reason_separates_a_taken_pool_from_a_covered_one() -> None:
 
 def test_an_extractor_with_no_pool_visible_waits() -> None:
     world = _sample(_ANCHOR, _BUILDER, credits=10_000)
-    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS)
+    decision = decide(world, ("extractorT1",), _CATALOGUE, _PLACEMENTS, _REACHES)
     assert decision["action"] == "wait"
     assert decision["reason"] == "extractorT1 needs a resource pool and none is visible yet"
 
@@ -809,7 +818,7 @@ def test_a_type_absent_from_the_placement_dump_is_blocked() -> None:
     catalogue = dict(_CATALOGUE)
     catalogue["teleporter"] = _unit("teleporter", 100)
     placements = {n: p for n, p in _PLACEMENTS.items() if n != "teleporter"}
-    decision = decide(_sample(_BUILDER), ("teleporter",), catalogue, placements)
+    decision = decide(_sample(_BUILDER), ("teleporter",), catalogue, placements, _REACHES)
     assert decision["action"] == "blocked"
     assert decision["reason"] == (
         "'teleporter' is not in the placement dump, so where it may stand is unknown"
@@ -829,6 +838,6 @@ def test_a_pool_placement_ignores_the_ring_index_entirely() -> None:
         pools=(first, second),
         credits=10_000,
     )
-    decision = decide(built, plan, _CATALOGUE, _PLACEMENTS)
+    decision = decide(built, plan, _CATALOGUE, _PLACEMENTS, _REACHES)
     assert (decision["x"], decision["y"]) == (first["x"], first["y"])
-    assert decide(world, plan, _CATALOGUE, _PLACEMENTS)["type_name"] == "landFactory"
+    assert decide(world, plan, _CATALOGUE, _PLACEMENTS, _REACHES)["type_name"] == "landFactory"

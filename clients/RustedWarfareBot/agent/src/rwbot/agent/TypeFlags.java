@@ -59,12 +59,89 @@ final class TypeFlags {
             flags.put(Perception.nameOfType(type), Boolean.valueOf(needsPool(type)));
         }
 
+        java.util.LinkedHashMap<String, Float> reach = new java.util.LinkedHashMap<String, Float>();
+        for (Object type : allTypes()) {
+            reach.put(Perception.nameOfType(type), Float.valueOf(attackRange(type)));
+        }
+
         StringBuilder out = new StringBuilder();
         int index = 0;
         for (java.util.Map.Entry<String, Boolean> entry : flags.entrySet()) {
             out.append(record(index++, entry.getKey(), entry.getValue().booleanValue()))
                     .append('\n');
         }
+        index = 0;
+        for (java.util.Map.Entry<String, Float> entry : reach.entrySet()) {
+            out.append(combatRecord(index++, entry.getKey(), entry.getValue().floatValue()))
+                    .append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
+     * Returns a type's attack range in world units, or zero when it is unarmed.
+     *
+     * <p>Read off the engine's prototype for the type rather than off a live
+     * unit, so asking costs a map lookup and spawns nothing.
+     *
+     * <p>Unarmed types are reported as zero rather than omitted. "This type
+     * cannot shoot" is an answer the threat model needs, and a missing record
+     * would be indistinguishable from a type the dump never reached — which is
+     * exactly the ambiguity that made the stat catalogue unsafe to read reach
+     * from (wiki: policy-threat).
+     *
+     * @param type The unit type.
+     * @return Its attack range, or zero.
+     */
+    private static float attackRange(Object type) {
+        Object prototype =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS),
+                                EngineNames.TYPE_PROTOTYPE,
+                                EngineAccess.pinnedClass(EngineNames.TYPE_CLASS)),
+                        null,
+                        type);
+        // A type with no prototype, and a prototype that takes no orders, are
+        // both unarmed for this purpose: neither can appear as a hostile
+        // holding a weapon, which is the only question being asked.
+        if (prototype == null
+                || !EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS).isInstance(prototype)) {
+            return 0.0f;
+        }
+        Object armed =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(prototype.getClass(), EngineNames.UNIT_ARMED),
+                        prototype);
+        if (!Boolean.TRUE.equals(armed)) {
+            return 0.0f;
+        }
+        Object range =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(
+                                prototype.getClass(), EngineNames.UNIT_ATTACK_RANGE),
+                        prototype);
+        if (!(range instanceof Float)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.UNIT_ATTACK_RANGE + "() did not return a float"
+                            + EngineNames.PIN);
+        }
+        return ((Float) range).floatValue();
+    }
+
+    /**
+     * Renders one type's combat facts.
+     *
+     * <p>Its own record kind rather than another field on the placement record,
+     * because the two answer unrelated questions and a type named for placement
+     * carrying an attack range would be a lie the decoder then has to keep
+     * telling. The file already carries more than one kind.
+     */
+    static String combatRecord(int index, String name, float attackRange) {
+        StringBuilder out = new StringBuilder();
+        out.append("{\"kind\":\"unitcombat\",\"index\":").append(index).append(",\"name\":");
+        Json.quote(out, name);
+        out.append(",\"attack_range\":").append(attackRange).append('}');
         return out.toString();
     }
 

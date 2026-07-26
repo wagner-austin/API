@@ -15,9 +15,10 @@ death exactly as before.
 Two things make the answer legitimate rather than invented. Hostility comes from
 the engine's own alliance comparison, carried per entity on the wire, so an
 ally's tank and a neutral map object are not mistaken for threats
-([[perception-visibility]]). Reach comes from each unit's declared attack range
-in the stat catalogue ([[mechanics-unit-catalogue]]), so no radius here is a
-number this module made up.
+([[perception-visibility]]). Reach comes from each unit's declared attack range,
+dumped from the engine's registry rather than from ``-printunits`` — that output
+covers 90 of 173 registered types and omits every turret ([[policy-threat]]) —
+so no radius here is a number this module made up, and none is missing.
 
 **What this deliberately does not model.** The route is a straight line, and the
 engine's pathfinder does not walk straight lines — it steers around terrain, so
@@ -34,43 +35,38 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.wire.state import Entity, Sample
 
 
-def reach_of(entity: Entity, catalogue: Mapping[str, UnitStats]) -> float:
+def reach_of(entity: Entity, reaches: Mapping[str, float]) -> float:
     """Return how far an entity can shoot.
 
-    Read from the catalogue's declared attack range rather than assumed from
-    what a unit looks like. A unit with no weapon has no reach, which is the
-    catalogue's own way of saying it: the weapon entry is absent for anything
-    the engine printed no attack range for.
+    Indexed rather than looked up with a default, and that is the whole point of
+    the change that produced this signature. The reach table is dumped from the
+    engine's registry and covers **every** registered type, so a missing name is
+    a stale dump against a running game, not a gap to absorb — and absorbing it
+    is what previously reported every turret as harmless
+    ([[mechanics-movement-layers]] for the sibling case, and the reasoning is
+    the same).
 
-    A type the catalogue does not describe is treated as harmless. The
-    alternative is to invent a range for it, and there is no honest number to
-    invent — the catalogue covers every registered type, so a miss means a type
-    from a mod that is not loaded rather than a gap in coverage.
+    A `KeyError` naming the type is therefore the correct failure. It is loud,
+    it says which type, and it cannot be mistaken for "this unit is unarmed" —
+    which is what a zero would have looked like.
 
     Args:
         entity: The entity to measure.
-        catalogue: Unit stats by type name.
+        reaches: Attack range by type name, from the registry dump.
 
     Returns:
-        Attack range in world units, comparable with entity positions, or zero
-        when the entity cannot shoot.
+        Attack range in world units, comparable with entity positions. Zero for
+        a unit the engine reports as unarmed.
     """
-    stats = catalogue.get(entity["type_name"])
-    if stats is None:
-        return 0.0
-    weapon = stats["weapon"]
-    if weapon is None:
-        return 0.0
-    return weapon["attack_range"]
+    return reaches[entity["type_name"]]
 
 
 def route_is_exposed(
     sample: Sample,
-    catalogue: Mapping[str, UnitStats],
+    reaches: Mapping[str, float],
     start: tuple[float, float],
     end: tuple[float, float],
 ) -> bool:
@@ -89,7 +85,7 @@ def route_is_exposed(
 
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name, for attack ranges.
+        reaches: Attack range by type name, from the registry dump.
         start: Where the walk begins, as world x and y.
         end: Where it ends.
 
@@ -100,7 +96,7 @@ def route_is_exposed(
     for entity in sample["entities"]:
         if not entity["hostile"]:
             continue
-        reach = reach_of(entity, catalogue)
+        reach = reach_of(entity, reaches)
         if reach <= 0.0:
             continue
         if _distance_squared_to_segment(entity["x"], entity["y"], start, end) <= reach**2:

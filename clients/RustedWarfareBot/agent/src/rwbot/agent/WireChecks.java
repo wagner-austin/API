@@ -197,7 +197,7 @@ final class WireChecks {
      */
     static int checkChannelBackpressure() {
         int failures = 0;
-        CommandChannel channel = new CommandChannel(0, 250);
+        CommandChannel channel = new CommandChannel(0, 250, 0);
         for (int i = 0; i < 4; i++) {
             failures += Check.expect(channel.offer("sample " + i), "sample " + i + " queued without a drop");
         }

@@ -22,6 +22,7 @@ from rw_bot.wire.command import (
     BuildOrder,
     MoveOrder,
     ProduceOrder,
+    encode_ack,
     encode_attack,
     encode_build,
     encode_move,
@@ -130,6 +131,18 @@ class AgentChannel:
             OSError: When the write fails.
         """
         self._connection.send_line(encode_attack(order))
+
+    def send_ack(self) -> None:
+        """Tell the agent this sample is finished with.
+
+        Harmless when the agent is not in lockstep -- it parses the line and
+        releases a barrier nobody is waiting on. Sending it unconditionally is
+        what keeps the planner from having to know which mode the agent is in.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_ack())
 
     def close(self) -> None:
         """Release the connection."""

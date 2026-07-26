@@ -30,7 +30,8 @@ package rwbot.agent;
  */
 final class StateStream {
 
-    private static final String FRAME_FIELD = "bx";
+    /** Package-visible: the lockstep hook gates on the same counter. */
+    static final String FRAME_FIELD = "bx";
     private static final String CLOCK_FIELD = "by";
 
     private StateStream() {

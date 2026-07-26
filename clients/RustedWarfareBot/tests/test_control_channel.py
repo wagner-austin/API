@@ -220,6 +220,13 @@ def test_an_attack_order_leaves_in_the_agent_format() -> None:
     assert peer.sent == ['{"kind":"attack","unit_id":276,"target_id":216}']
 
 
+def test_an_ack_leaves_in_the_agent_format() -> None:
+    """Sent unconditionally, so the planner need not know the agent's mode."""
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_ack()
+    assert peer.sent == ['{"kind":"ack"}']
+
+
 def test_closing_releases_the_connection() -> None:
     peer = _ScriptedPeer([])
     AgentChannel(peer).close()

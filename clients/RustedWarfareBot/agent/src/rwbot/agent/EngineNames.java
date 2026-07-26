@@ -326,6 +326,35 @@ final class EngineNames {
     static final String ZONE_CLASS = "com.corrodinggames.rts.game.a.o";
 
     /**
+     * Static lookup from a unit type to its prototype entity.
+     *
+     * <p>A map read, not a construction: the engine keeps one prototype per
+     * registered type and hands the same object back. Nothing is spawned and
+     * nothing is registered, which is what makes it safe to ask 173 types for
+     * their stats mid-game. The engine's own {@code -printunits} reads exactly
+     * this way (wiki: mechanics-unit-catalogue).
+     */
+    static final String TYPE_PROTOTYPE = "a";
+
+    /**
+     * Entity predicate: whether it has a weapon at all.
+     *
+     * <p>Abstract on the entity base, so every unit answers it. The same gate
+     * {@code -printunits} applies before printing an attack range.
+     */
+    static final String UNIT_ARMED = "l";
+
+    /**
+     * Orderable accessor returning its attack range in world units.
+     *
+     * <p>The figure {@code -printunits} labels "Attack Range", read from the
+     * accessor rather than from that output — which is the point, since the
+     * output covers 90 of 173 registered types and the threat model needs all
+     * of them (wiki: policy-threat).
+     */
+    static final String UNIT_ATTACK_RANGE = "m";
+
+    /**
      * The engine's terrain-connectivity utility.
      *
      * <p>Holds the answer to "can this thing get there", which the bot

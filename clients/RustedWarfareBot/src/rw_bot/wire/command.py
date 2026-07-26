@@ -129,6 +129,20 @@ def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
     return AttackOrder(kind="attack", unit_id=unit_id, target_id=target_id)
 
 
+def encode_ack() -> str:
+    """Render the sample acknowledgement.
+
+    Not an order, and carries no subject: it is about the exchange rather than
+    about a unit. In lockstep the agent holds the simulation after each sample
+    until this arrives, so that the planner's think time cannot decide which
+    frame its orders land on ([[policy-determinism]]).
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return '{"kind":"ack"}'
+
+
 def encode_attack(order: AttackOrder) -> str:
     """Render an attack order as one wire line.
 
@@ -291,6 +305,7 @@ __all__ = [
     "ProduceOrder",
     "attack_order",
     "build_order",
+    "encode_ack",
     "encode_attack",
     "encode_build",
     "encode_move",

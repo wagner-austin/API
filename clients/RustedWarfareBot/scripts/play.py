@@ -16,7 +16,7 @@ from pathlib import Path
 from rw_bot.control.channel import open_channel
 from rw_bot.mechanics.build_tree import decode_build_tree
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
-from rw_bot.mechanics.placement import TypePlacement, decode_placements
+from rw_bot.mechanics.placement import TypePlacement, decode_placements, decode_reaches
 from rw_bot.policy.campaign import fight, format_battle
 from rw_bot.policy.expand import expand
 from rw_bot.policy.runner import format_scorecard, run
@@ -88,6 +88,22 @@ def load_build_tree(path: Path) -> dict[str, frozenset[str]]:
     return decode_build_tree(lines)
 
 
+def load_reaches(path: Path) -> Mapping[str, float]:
+    """Read every registered type's attack range from the registry dump.
+
+    The same file the placement flags come from, because both are one pass over
+    one registry and two files could be regenerated against different builds
+    and disagree.
+
+    Args:
+        path: Path to the registry dump.
+
+    Returns:
+        Attack range by type name, zero for the unarmed.
+    """
+    return decode_reaches(path.read_text(encoding="utf-8", errors="strict").splitlines())
+
+
 def load_placements(path: Path) -> dict[str, TypePlacement]:
     """Read the placement rules produced by ``make type-flags``.
 
@@ -157,6 +173,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     catalogue = load_catalogue(Path(args[1]))
     placements = load_placements(Path(args[2]))
+    reaches = load_reaches(Path(args[2]))
     tree = load_build_tree(Path(args[2]))
 
     # Expansion needs to know what the player already has, so it runs against a
@@ -164,6 +181,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     # spent on it, which costs nothing: the loop reads its own.
     channel = open_channel(int(args[0]))
     opening = channel.next_sample()
+    # Acknowledged like any other sample. In lockstep the agent holds the
+    # simulation until this arrives, and an unacked opening stalled the game
+    # for the full ack timeout before it ran on unlocked
+    # ([[policy-determinism]]).
+    channel.send_ack()
     owned = [e["type_name"] for e in opening["entities"] if e["mine"] and e["complete"]]
     plan = expand(DEFAULT_GOALS, tree, owned, catalogue)
 
@@ -173,7 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         site = "on a resource pool" if placements[name]["needs_pool"] else "on the ring"
         sys.stdout.write(f"  {name} costs {catalogue[name]['price']}, goes {site}\n")
 
-    card = run(channel, plan, catalogue, placements, max_samples)
+    card = run(channel, plan, catalogue, placements, reaches, max_samples)
     for line in format_scorecard(card):
         sys.stdout.write(f"{line}\n")
 

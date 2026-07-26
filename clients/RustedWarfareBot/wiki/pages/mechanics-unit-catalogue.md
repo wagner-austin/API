@@ -16,7 +16,7 @@ source_paths:
   - "wiki/sources/m7-mobility/mobility-predicate.txt:15"
   - "src/rw_bot/mechanics/catalogue.py"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: "2026-07-26"
 confidence: high
 hubs: [game-mechanics, bot-architecture]
 ---
@@ -24,6 +24,14 @@ hubs: [game-mechanics, bot-architecture]
 # Unit Catalogue and the Mobility Predicate
 
 The engine prints its own unit catalogue on request and exits before the game loop ([[harness-nodisplay]]). It carries 90 units with prices, hit points, speed and weapons, and it is decoded into typed records rather than transcribed.[^6] These are the engine's numbers, not a table copied from a community wiki, and they regenerate in one command against any build.
+
+## Ninety of a hundred and seventy-three
+
+`-printunits` is not a census. It emits 90 records where the engine's registry holds 173 types, and the filter is in its own source: it skips anything that is not an orderable unit, anything whose name starts with `bug`, types shadowed by another, custom types without a listing flag, and sixteen names it blocklists outright.[^20]
+
+That is fine for a *catalogue of things a player picks from the build menu*, which is what it is for. It is not fine as a source of facts about units that can appear on the map, and reading it as one put a hole in the threat model: 48 armed types had no entry, among them every turret, and 27 of those are buildable ([[policy-threat]]). Where a fact has to hold for every type, ask the registry — the same pass that dumps placement flags now also dumps attack range, and the two sources agree exactly on all 90 they share.[^21]
+
+Worth knowing when reading the raw log: the fifty `--- ERROR: running printForHelp()` lines are not errors. They are a banner loop at the top of the printer.[^20]
 
 ## The join key
 
@@ -67,3 +75,5 @@ The longest-ranged unit is the T2 artillery turret at 460 world units.[^5] Entit
 [^6]: `src/rw_bot/mechanics/catalogue.py` — the decoder and its typed records; the aggregate counts (90 units, 61 armed, 17 upgradable, 38 immobile, price range $250–$90,000, damage ratios) are produced by running it over the archived log and are asserted in `tests/test_catalogue.py`.
 [^7]: `tests/test_catalogue.py` — `test_every_live_roster_type_is_checked_against_the_catalogue` decodes the archived world capture and the archived catalogue together, and asserts the unpriced set is exactly `["editorOrBuilder"]`.
 [^8]: `wiki/sources/m7-mobility/mobility-predicate.txt:9` — the Command Center still at `(4250.0, 2550.0)` ten seconds after being ordered to `(4550.0, 2550.0)`; `:15` shows the Builder at `(4547.5493, 2611.7517)` against a destination of `(4550.0, 2610.0)`.
+[^20]: `runs/decompiled/com/corrodinggames/rts/game/units/ar.java:371` — `s()`, its `continue` filter and its sixteen-name blocklist, preceded by `for (int i2 = 0; i2 < 50; ++i2) l.a("running printForHelp()")`.
+[^21]: `wiki/sources/m18-reach/attack-range.txt` — the coverage comparison, zero disagreements on the shared 90, and the 27 buildable armed types only the registry describes.

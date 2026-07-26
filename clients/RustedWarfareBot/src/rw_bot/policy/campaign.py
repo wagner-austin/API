@@ -102,46 +102,52 @@ def fight(
         sample = channel.next_sample()
         samples_seen += 1
 
-        army = find_army(sample, catalogue)
-        targets = find_targets(sample)
-        army_end = len(army)
-        targets_end = len(targets)
-        visible_now = {entity["unit_id"] for entity in targets}
-        if samples_seen == 1:
-            army_start = army_end
-            targets_seen = targets_end
+        # Acknowledged on every exit, including the ones that break out. In
+        # lockstep the agent holds the simulation until this arrives
+        # ([[policy-determinism]]).
+        try:
+            army = find_army(sample, catalogue)
+            targets = find_targets(sample)
+            army_end = len(army)
+            targets_end = len(targets)
+            visible_now = {entity["unit_id"] for entity in targets}
+            if samples_seen == 1:
+                army_start = army_end
+                targets_seen = targets_end
 
-        # Production runs before the army check, so a wave that has just been
-        # wiped still queues its replacements on the sample that notices.
-        for order in sustain(sample, catalogue, reinforce):
-            channel.send_produce(
-                produce_order(unit_id=order["unit_id"], type_name=order["type_name"])
-            )
-            produced += 1
+            # Production runs before the army check, so a wave that has just been
+            # wiped still queues its replacements on the sample that notices.
+            for order in sustain(sample, catalogue, reinforce):
+                channel.send_produce(
+                    produce_order(unit_id=order["unit_id"], type_name=order["type_name"])
+                )
+                produced += 1
 
-        if not army:
-            # Nothing left to fight with. Distinct from having cleared the
-            # field, and the run log has to be able to tell those apart.
-            outcome = "no_army"
-            break
-        if not targets:
-            outcome = "cleared"
-            break
+            if not army:
+                # Nothing left to fight with. Distinct from having cleared the
+                # field, and the run log has to be able to tell those apart.
+                outcome = "no_army"
+                break
+            if not targets:
+                outcome = "cleared"
+                break
 
-        # The target the army is already on is carried in, so the choice
-        # persists across samples instead of being remade every observation.
-        # Without it the whole army is re-tasked whenever its centre shifts.
-        current = engagements(sample, catalogue, holding)
-        holding = current[0]["target_id"] if current else None
-        for engagement in current:
-            attacker = engagement["attacker_id"]
-            target = engagement["target_id"]
-            if ordered.get(attacker) == target:
-                continue
-            ordered[attacker] = target
-            attacked.add(target)
-            channel.send_attack(attack_order(unit_id=attacker, target_id=target))
-            orders_sent += 1
+            # The target the army is already on is carried in, so the choice
+            # persists across samples instead of being remade every observation.
+            # Without it the whole army is re-tasked whenever its centre shifts.
+            current = engagements(sample, catalogue, holding)
+            holding = current[0]["target_id"] if current else None
+            for engagement in current:
+                attacker = engagement["attacker_id"]
+                target = engagement["target_id"]
+                if ordered.get(attacker) == target:
+                    continue
+                ordered[attacker] = target
+                attacked.add(target)
+                channel.send_attack(attack_order(unit_id=attacker, target_id=target))
+                orders_sent += 1
+        finally:
+            channel.send_ack()
 
     return Battle(
         produced=produced,

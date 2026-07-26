@@ -455,3 +455,22 @@ The land framing is deliberate and named in the field. A builder that does not t
 Two defects found on the way, both in shared files. `make wire-capture` and every other probe target had been failing with "unknown agent option discoverAtSeconds": a new option was added by opening a second if/else chain below the first, so every key handled by the first half fell through to the second half's else. Only typeFlagsPath escaped, by a `continue`. Merged back into one chain, with a self-check that parses an early key alongside a late one. And the pool record renderer had started reaching for a live engine, which broke the wire self-checks that exercise these shapes without a game; connectivity is passed in as an argument now.
 
 make check green: 430 tests, 100% statements and branches, guard 0 violations, agent-selftest passing.
+
+## [2026-07-26] mechanics | attack range for all 173 types, and the reason the old source had 90
+Artifacts: `wiki/sources/m18-reach/attack-range.txt`; `wiki/sources/m11-pools/type-flags.ndjson` regenerated (660, now carrying a `unitcombat` record per type)
+
+Notes: the threat model read reach from `-printunits` and treated an absent type as harmless. Checking that assumption is what started this, and the assumption was wrong in a way worth writing down.
+
+`-printunits` emits 90 of the engine's 173 registered types. The filter is in `ar.s()` itself: not an orderable unit, name starting with "bug", shadowed by another type, a custom type without its listing flag, one specific exclusion, and an explicit sixteen-name blocklist. So 83 types had no entry and 48 of those are armed -- every turret among them. A threat model reading that source calls them all harmless, which is the one direction it must never guess in.
+
+The fix is not a better default. The registry dump -- already one pass over one registry for placement flags -- now also asks each type for its attack range, read off the engine's prototype for that type, which is a map lookup rather than a construction, so nothing is spawned. Its own record kind rather than another field on the placement record: the two answer unrelated questions, and a type named for placement carrying an attack range is a lie the decoder then has to keep telling.
+
+The cross-check is the part that makes it trustworthy: on the 90 types both sources describe there are **zero** disagreements. The registry is a wider reading of the same fact, not a competing one. And `reach_of` now indexes the table instead of defaulting through a miss, so a stale dump fails loudly and names the type.
+
+The gap turned out to be reachable by ordinary play rather than by mods, which was the surprise. Twenty-seven buildable types are armed and missing from the old source, and most are the same unit in another mode -- the mode being the type name a live entity reports while in it. A deployed mech bunker at 240, a surfaced submarine at 240, a landed experimental gunship at 390, an amphibious jet underwater at 100. Plus the bug faction on any map with bug players, and the modular spider tree at up to 400.
+
+Measured honestly, it changed nothing on the sample to hand. Of 55 visible hostiles, 20 read as armed under either source and the pool survey was identical -- occupied 15, unreachable 12, exposed 1, same tile chosen. The five AI players had built only priced types by then. This closes a latent hole, not a firing one, and the log says so rather than claiming a save.
+
+Two smaller corrections fell out. The unit-catalogue page presented 90 as the catalogue, which reads as "the game's units" and is about half of them; it now says which 83 are missing and why. And the fifty `--- ERROR: running printForHelp()` lines in the printunits log are not errors -- they are a banner loop at the top of the printer.
+
+make check green: 436 tests, 100% statements and branches, guard 0 violations, agent-selftest passing. Live 7/8 on a 500-sample run with the wider table, which was the risk worth checking: 48 more armed types could have made every pool read as exposed, and did not.

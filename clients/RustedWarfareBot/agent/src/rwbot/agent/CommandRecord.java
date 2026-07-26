@@ -40,7 +40,18 @@ final class CommandRecord {
          * is still the target; a move to where it stood is a march to empty
          * ground (wiki: policy-combat).
          */
-        ATTACK
+        ATTACK,
+
+        /**
+         * The planner has finished with the current sample.
+         *
+         * <p>Not an order. It carries no subject, because it is about the
+         * exchange rather than about a unit: in lockstep the simulation is
+         * held after each sample until this arrives, so that the planner's
+         * think time cannot decide which frame its orders land on
+         * (wiki: policy-determinism).
+         */
+        ACK
     }
 
     private final Kind kind;
@@ -100,6 +111,9 @@ final class CommandRecord {
         java.util.Map<String, String> fields = Json.flatObject(line);
 
         String kindText = require(fields, "kind", line);
+        if ("ack".equals(kindText)) {
+            return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L);
+        }
         long unitId = requireLong(fields, "unit_id", line);
 
         // Required per verb rather than up front. A produce command has no
@@ -141,7 +155,7 @@ final class CommandRecord {
         }
         throw new IllegalArgumentException(
                 "unknown command kind '" + kindText
-                        + "'; expected move, build, produce or attack: " + line);
+                        + "'; expected move, build, produce, attack or ack: " + line);
     }
 
     /** Reads the unit-type field, which no verb that carries it may leave blank. */

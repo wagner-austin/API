@@ -27,6 +27,7 @@ final class AgentOptionsParser {
     private static final String STATE_OUT = "stateOutPath";
     private static final String TYPE_FLAGS_OUT = "typeFlagsPath";
     private static final String RANDOM_SEED = "randomSeed";
+    private static final String LOCKSTEP = "lockstepFrames";
     private static final String AI_ZONES = "aiZones";
     private static final String ORDER_AT = "orderMoveAtSeconds";
     private static final String ORDER_BY = "orderMoveBy";
@@ -56,6 +57,7 @@ final class AgentOptionsParser {
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
             return new AgentOptions(
+                    0,
                     0L,
                     new int[0],
                     false,
@@ -72,6 +74,7 @@ final class AgentOptionsParser {
                     DEFAULT_SAMPLE_MS);
         }
 
+        int lockstep = 0;
         long randomSeed = 0L;
         int[] discoverAt = new int[0];
         boolean exitAfter = false;
@@ -136,6 +139,8 @@ final class AgentOptionsParser {
                 buildType = value;
             } else if (CHANNEL_PORT.equals(key)) {
                 channelPort = parsePort(value);
+            } else if (LOCKSTEP.equals(key)) {
+                lockstep = parseLockstep(value);
             } else if (SAMPLE_MS.equals(key)) {
                 sampleIntervalMs = parseInterval(value);
             } else {
@@ -144,10 +149,11 @@ final class AgentOptionsParser {
                                 + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
                                 + TYPE_FLAGS_OUT + ", " + AI_ZONES + ", "
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
-                                + SAMPLE_MS);
+                                + SAMPLE_MS + ", " + RANDOM_SEED + ", " + LOCKSTEP);
             }
         }
         return new AgentOptions(
+                lockstep,
                 randomSeed,
                 discoverAt,
                 exitAfter,
@@ -162,6 +168,22 @@ final class AgentOptionsParser {
                 aiZones,
                 channelPort,
                 sampleIntervalMs);
+    }
+
+    /** Parses the lockstep frame interval, which must be a positive count. */
+    private static int parseLockstep(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    LOCKSTEP + " expects whole frames, got " + value, e);
+        }
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(
+                    LOCKSTEP + " expects a positive frame count, got " + parsed);
+        }
+        return parsed;
     }
 
     /**

@@ -15,6 +15,7 @@ package rwbot.agent;
  */
 final class AgentOptions {
 
+    private final int lockstepFrames;
     private final long randomSeed;
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
@@ -31,6 +32,7 @@ final class AgentOptions {
     private final int sampleIntervalMs;
 
     AgentOptions(
+            int lockstepFrames,
             long randomSeed,
             int[] discoverAtSeconds,
             boolean exitAfterDiscovery,
@@ -45,6 +47,7 @@ final class AgentOptions {
             boolean aiZones,
             int channelPort,
             int sampleIntervalMs) {
+        this.lockstepFrames = lockstepFrames;
         this.randomSeed = randomSeed;
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
@@ -175,6 +178,18 @@ final class AgentOptions {
      * run that silently became repeatable would be worse than one that visibly
      * is not (wiki: policy-combat).
      */
+    /**
+     * Engine frames between samples in lockstep, or zero for free-running.
+     *
+     * <p>Zero keeps the old behaviour: samples on a wall-clock timer and a
+     * simulation that never waits. Non-zero pauses the game after each sample
+     * until the planner acks, which is what makes a run repeat
+     * (wiki: policy-determinism).
+     */
+    int lockstepFrames() {
+        return lockstepFrames;
+    }
+
     long randomSeed() {
         return randomSeed;
     }
