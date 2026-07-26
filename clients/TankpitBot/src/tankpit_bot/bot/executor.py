@@ -19,8 +19,9 @@ from tankpit_bot.ledger.outcome._emit import transfer_pending_decision
 from tankpit_bot.ledger.outcome.teleport import (
     record_teleport_dispatch,
 )
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import RADAR_COST, teleport_cost
-from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic, emit_sync
 from tankpit_bot.sniffer.world_state import get_world_service
 
 # Combat equipment slots that get toggled based on behavior mode.
@@ -106,6 +107,25 @@ def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> b
     if command["cmd_type"] == "move":
         return bot.move_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_fuel":
+        # Dispatch-time headroom re-check: the planner gated on its
+        # tick's fuel belief, but a clamp-fill completing in the same
+        # wire batch can top the tank between plan and send — the
+        # server then answers 0x52 code 5 ("Tank full"). At the 1100
+        # cap every restock ends in a clamp, so the race fired ~15
+        # times in run bot-20260726-094309. A full tank means the
+        # fuel-collection goal is already achieved: report success
+        # without spending the wire round-trip on a guaranteed
+        # rejection.
+        ws = get_world_service()
+        self_state = ws.world_state["self_state"]
+        if self_state is not None and self_state["fuel"] >= fuel_capacity(self_state["rank"]):
+            emit_sync(
+                "skip pickup_fuel at (%d,%d): tank already at capacity %d",
+                command["target_x"],
+                command["target_y"],
+                self_state["fuel"],
+            )
+            return True
         return bot.pickup_fuel_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_equipment":
         return bot.pickup_equipment_to(command["target_x"], command["target_y"])

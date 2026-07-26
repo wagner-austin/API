@@ -270,6 +270,28 @@ class TestDispatchCommand:
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
 
+    def test_dispatch_pickup_fuel_skips_at_capacity(self, fake_env: FakeEnv) -> None:
+        """A full tank short-circuits the fuel click as achieved.
+
+        The planner gates on its tick's belief, but a clamp-fill
+        landing in the same wire batch can top the tank between plan
+        and send — run bot-20260726-094309 drew 15 0x52 code-5 ("Tank
+        full") rejections this way. Dispatch re-checks live fuel and
+        reports success without the wire round-trip.
+        """
+        from tankpit_bot.sniffer.world_state_tanks import (
+            update_world_state_from_move_response_full,
+        )
+
+        bot, fake_cdp = _make_bot(fake_env)
+        ws = get_world_service()
+        update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 1)
+        update_world_state_from_fuel_total(ws, 1100, "wire_0x44_fuel_gain")
+
+        result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
+        assert result is True
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+
     def test_dispatch_pickup_equipment(self, fake_env: FakeEnv) -> None:
         """Dispatches pickup_equipment command via bot.pickup_equipment_to."""
         bot, fake_cdp = _make_bot(fake_env)
