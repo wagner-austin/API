@@ -339,3 +339,45 @@ Two dispatch details worth copying. Committed groups re-issue every 800 ms rathe
 Page is `confidence: medium` on purpose. All of it is decompiled source, which is strong for what the code can do and weaker than a run for what it does, and the standing rule from M4 is that decompiled Java is a reconstruction. Nothing here has been confirmed by watching the AI do it, and the page says so along with the cheap check that would: log an opponent's unit count and engagement timing against these constants.
 
 Also corrected while linking: `index.md` claimed 17 content pages against an actual 19. Hub counts were right and there were no orphans, so the drift was in the total alone.
+
+## [2026-07-26] research | reading the AI we lose to, and one claim that did not survive checking
+Artifacts: none — this is a reading of `runs/decompiled`, which is derived and gitignored. New pages `engine-ai-zones`, `engine-ai-triggers`
+
+Notes: the bot has no spatial model and no notion of when a force is ready. The AI it plays against has both, and the code is right there: `com.corrodinggames.rts.game.a`, about 5,300 lines over 28 classes. No new decompilation was needed and no community source was consulted, deliberately — a page sourced from forum strategy could not be fact-checked against anything, and every other page here can be.
+
+The AI names itself. It draws a debug overlay over its own zones and those string literals survived ProGuard, so `unsafeBaseTimer`, `lastAttemptedBuilding`, `StagingForAttack`, `AttackDelay`, `Idle Builders` and the rest are the engine's own labels rather than inference. Two class names leak the same way: one calls itself PlainZone in a fallback log line, another TransporterGroup in a load-time complaint. Where a name had to be inferred the pages say so, and the state enums stayed obfuscated -- the overlay genuinely prints `State: a`.
+
+A zone is a circle that owns units. Five kinds, closed set, ids fixed by the save format. Two things in the base class are worth taking regardless of strategy: containment for a unit inflates the radius by that unit's own collision radius, and a unit carries a back-pointer to its zone so joining one detaches it from the last -- a unit belongs to exactly one zone, and assignment is the arbitration. The bot currently picks a producer per decision with nothing stopping two decisions picking the same builder.
+
+Placement is the sharpest contrast. Where the bot walks a fixed ring of eight offsets the engine can and does refuse, the AI rejection-samples: fifteen random points in the zone, each accepted only if the engine's own placement predicate accepts it, and null if none do. One unit type gets a search radius that grows 100 per failed attempt rather than giving up in place.
+
+Then the claim that did not survive. The pool-expansion seeding really is unreachable -- guarded by a once-only flag set before the work is attempted, gated on already owning an extractor, inside a test that only holds on the first tick, with the flag written once and read once in 1,910 lines. What was wrong was the conclusion drawn from it. Two other sites create base zones on recurring cooldowns, and the live one draws a resource pool **uniformly at random** from the same map list, on a 2,000 cooldown, capped at two concurrent claims. So the AI does expand onto pools; the dead branch is a vestigial bootstrap. Worth noting for our own selection: a nearest-pool helper sits directly beside the random draw and the expansion path does not call it.
+
+Its viability filter for a pool rejects a site within 300 of a hostile Command Center or 320 of an allied one -- the ally exclusion is the larger of the two -- and it uses the same alliance predicates the bot adopted yesterday, which is some independent evidence the right pair got picked.
+
+On triggers: buildings are priced rather than thresholded. A build delay resets to 270 plus the zone id modulo 15 -- the id used as a phase offset so several bases do not all build on the same tick, which is a one-token fix for a thundering herd the bot will need shortly -- and the gate is a six-rung credit ladder, 1,300 credits when the base is near capacity rising to 4,800 when it is nearly out of room. A refused attempt cuts the delay by 120 and retries sooner than a success does.
+
+Units come from a budget rather than a timer: a float that accumulates, fastest by a wide margin while the base is unsafe, cut sevenfold once two defensive groups exist, capped at 3.5 and clamped to 1.2 while poor and safe. It is spent in a burst -- up to twelve production attempts in one tick until the budget falls below 3.
+
+Attacks are fill-then-commit. A group is created empty with a target size and recruits until full: three units for the first wave, five for the next few, seven after that, and 14 rising to 18 on the hardest difficulty. Exactly one attack group at a time. Staging ends when no member is more than 170 world units from the centre -- a rendezvous test, not a timer -- with two early exits that are more interesting than the happy path: any member taking damage within the last 1,000 frames cancels staging outright (`"Not staging due to damage"`), and a 17,000 timeout attacks regardless. While attacking it re-issues every 800, drops members that cannot reach, aborts when none can, and 80% of the time attack-moves to the target's position rather than ordering against the unit.
+
+Both pages are `medium` and say why in the body: the timer constants are read but unobserved, and confirming any of them means watching an opponent's zone list over a live game. The agent reads its own team, not another player's AI object, so that is a real piece of work rather than a probe.
+
+make check: not re-run for this entry -- documentation only, no source touched. The gate was last green on the threat work; it is currently red on another session's in-flight combat files.
+
+## [2026-07-26] policy | continuous production, and the target churn it exposed
+Artifacts: `wiki/sources/m15-production/` — `before-after.txt` (50), `sustained-run.log` (1293)
+
+Notes: the third gap named by reading the opponents' code, and the one they said mattered most: they never stop producing, we stopped at the end of a list. Closing it was a new pure module rather than a change to the planner -- `production.sustain` decides what idle producers should start, `campaign.fight` sends it, and `build_order` is untouched.
+
+What to make is deliberately not a new judgement. Reinforcement repeats the units the goals already asked for, because ranking units by some invented notion of combat worth is a guess with a number attached. Two limits come free from the engine instead of being modelled here: an option reports itself unavailable at the unit cap and under tech gating, since the agent asks the engine's own predicate. Credits are budgeted across the batch, because two factories that can each afford a tank cannot always afford two, and issuing both would leave the second refused for a reason the log could not explain.
+
+Measured on the same map and opening. Without reinforcement: army 4 -> 0, phase over at 466 samples, nothing left. With it: army 4 -> 2, the phase ran its full 1500-sample budget, 45 reinforcements produced, engaged-targets-gone doubled from 7 to 14. It survives where it used to be wiped.
+
+It is still losing, and the numbers say so plainly -- losses outrun replacements and the opponents went 47 -> 142 over the same window. Reinforcement bought survival, not parity.
+
+The run also exposed a defect that was invisible while the army died early: 743 attack orders across 48 attacking units against only 24 distinct targets, about fifteen re-orders per unit. Targets are picked nearest-to-army-centre and that centre moves every time a unit dies or rolls out, so the whole army is re-tasked on a flip that may be a few world units wide. The engine's AI holds a target and refreshes on an 800 ms timer instead, which spends the same order volume on a stable choice. That is the next fix.
+
+Also written: `policy-combat`, which two committed source comments already referenced as `(wiki: policy-combat)` before the page existed. That dangling reference was mine, from the previous commit.
+
+make check green: guard 0 violations, ruff + mypy clean, 422 tests, 100% statements and branches, agent-selftest OK.

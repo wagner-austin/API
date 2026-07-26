@@ -44,7 +44,8 @@ public final class Premain {
                     options.inspectFields(),
                     options.findElementsUnder(),
                     options.stateOutPath(),
-                    options.typeFlagsPath());
+                    options.typeFlagsPath(),
+                    options.aiZones());
         }
         if (options.orderRequested()) {
             startOrderProbe(
@@ -73,7 +74,8 @@ public final class Premain {
             String[] inspectFields,
             String findElementsUnder,
             String stateOutPath,
-            String typeFlagsPath) {
+            String typeFlagsPath,
+            boolean aiZones) {
         Thread thread =
                 new Thread(
                         () -> {
@@ -82,7 +84,8 @@ public final class Premain {
                                     inspectFields,
                                     findElementsUnder,
                                     stateOutPath,
-                                    typeFlagsPath);
+                                    typeFlagsPath,
+                                    aiZones);
                             if (exitAfter) {
                                 Log.info("discovery complete; halting");
                                 Runtime.getRuntime().halt(0);
@@ -100,7 +103,8 @@ public final class Premain {
             String[] inspectFields,
             String findElementsUnder,
             String stateOutPath,
-            String typeFlagsPath) {
+            String typeFlagsPath,
+            boolean aiZones) {
         long started = System.nanoTime();
         boolean flagsWritten = false;
         for (int second : atSeconds) {
@@ -133,6 +137,12 @@ public final class Premain {
             if (!typeFlagsPath.isEmpty() && !flagsWritten) {
                 writeTypeFlags(typeFlagsPath);
                 flagsWritten = true;
+            }
+            // Every offset, unlike the placement flags: the whole point is to
+            // watch cooldowns and group sizes change, so one dump would answer
+            // nothing. Logged, never streamed -- see AiZones for why.
+            if (aiZones) {
+                Log.info(AiZones.describe(engine));
             }
         }
     }

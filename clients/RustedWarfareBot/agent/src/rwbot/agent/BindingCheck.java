@@ -154,6 +154,15 @@ final class BindingCheck {
         if (queue != null) {
             checkField(queue, EngineNames.QUEUE_ITEMS, problems);
         }
+
+        // The research probe. Checked like everything else, but note what a
+        // failure here does and does not mean: nothing the bot plays with
+        // depends on these, so a break costs a dump rather than a run.
+        Class<?> ai = checkClass(EngineNames.AI_CLASS, problems);
+        checkClass(EngineNames.ZONE_CLASS, problems);
+        if (ai != null) {
+            checkField(ai, EngineNames.AI_ZONES, problems);
+        }
         return problems;
     }
 

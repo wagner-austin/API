@@ -296,6 +296,35 @@ final class EngineNames {
      */
     static final String ACTION_APPLIES = "a";
 
+    /**
+     * The shipped AI, as a player subclass.
+     *
+     * <p>Only AI players are instances of it. The local human player is
+     * constructed as a different subclass entirely, which is why nothing built
+     * on this class can survive contact with a human opponent — see
+     * {@link AiZones} for why that makes it an instrument rather than a source.
+     */
+    static final String AI_CLASS = "com.corrodinggames.rts.game.a.a";
+
+    /**
+     * The AI's zone list.
+     *
+     * <p>A concurrent queue, which is what makes reading it from a probe
+     * thread the engine's own supported use rather than a race. The AI keeps a
+     * second plain-list copy of the same zones; this is the one safe to iterate
+     * from off the game thread.
+     */
+    static final String AI_ZONES = "bm";
+
+    /**
+     * Base class of every zone.
+     *
+     * <p>Pinned so the dump can reject anything else the list might hold. The
+     * element type is erased, and reading an unrelated object's fields as a
+     * zone would produce a plausible table of numbers (wiki: engine-ai-zones).
+     */
+    static final String ZONE_CLASS = "com.corrodinggames.rts.game.a.o";
+
     /** The engine's map instance. */
     static final String MAP = "bL";
 

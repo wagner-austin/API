@@ -1,0 +1,50 @@
+Continuous production, measured against the sortie it replaced
+==============================================================
+
+Same map, same opening goals, same sandbox skirmish against five AI opponents.
+The only difference is whether idle producers keep making the units the goals
+asked for once the plan is finished.
+
+WITHOUT reinforcement (wiki/sources/m14-ai era, runs/fight.log)
+  fight outcome  no_army
+  attack orders  29
+  army           4 -> 0
+  enemies seen   52 -> 86
+  engaged gone   7
+  samples seen   466        <- the run ended here because the army was gone
+
+WITH reinforcement (this run, sustained-run.log)
+  fight outcome  sample_limit
+  attack orders  743
+  reinforced     45
+  army           4 -> 2
+  enemies seen   47 -> 142
+  engaged gone   14
+  samples seen   1500       <- the run ended on the budget, not on defeat
+
+Read three things out of this.
+
+1. It survives. The army is no longer wiped: the phase ran to its 1500-sample
+   budget instead of ending at 466 with nothing left. Twice as many engaged
+   targets went missing (14 against 7).
+
+2. It is still losing. Army 4 -> 2 means losses outrun replacements, and the
+   opponents went 47 -> 142 over the same window. Reinforcement bought
+   survival, not parity.
+
+3. A new problem is now visible: target churn. 743 attack orders were issued
+   across 48 distinct attacking units against only 24 distinct targets --
+   roughly fifteen re-orders per unit. Targets are chosen as nearest-to-army-
+   centre, and that centre moves every time a unit dies or a new one rolls out,
+   so the whole army is re-tasked on a flip that may be a few world units wide.
+
+   The engine's own AI does not do this. It holds a target and refreshes on an
+   800 ms timer rather than on change (wiki: ai-opponent-strategy), which is
+   the same order volume spread over a stable choice instead of a thrashing
+   one.
+
+Counts verified from the run log:
+  produce orders dispatched  49   (4 from the build plan, 45 from reinforcement)
+  attack orders dispatched  743
+  distinct targets           24
+  distinct attackers         48

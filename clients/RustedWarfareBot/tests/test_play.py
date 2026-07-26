@@ -255,6 +255,7 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         # hostiles, so it clears immediately without an order.
         "fight outcome  cleared",
         "attack orders  0",
+        "reinforced     0",
         "army           4 -> 4",
         "enemies seen   0 -> 0",
         "engaged gone   0",
@@ -294,6 +295,7 @@ def test_the_sample_budget_defaults_when_not_given(
         "credits left   9000",
         "fight outcome  cleared",
         "attack orders  0",
+        "reinforced     0",
         "army           4 -> 4",
         "enemies seen   0 -> 0",
         "engaged gone   0",

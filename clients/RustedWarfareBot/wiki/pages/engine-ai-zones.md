@@ -15,6 +15,8 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:803"
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1492"
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1540"
+  - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:529"
+  - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1189"
   - "runs/decompiled/com/corrodinggames/rts/game/a/l.java:71"
   - "runs/decompiled/com/corrodinggames/rts/game/a/n.java:80"
   - "runs/decompiled/com/corrodinggames/rts/game/b/e.java:92"
@@ -86,9 +88,9 @@ The build-failure fields are the interesting half: `lastAttemptedBuilding`, `las
 
 When it has no base zone at all, it makes one at the first hit of a four-step fallback: an owned Command Center, then an owned unit of a builder type, then an owned orderable matching that set, then any owned unit answering a capability predicate.[^8] All four use radius 420.
 
-### How the AI picks expansions — and the bug in it
+### How the AI picks expansions
 
-Immediately after, once per game, it seeds candidate expansion zones **from the map's resource-pool list**.[^9] That list is the same one the bot reads: it is populated at map load from tiles carrying the `res_pool` flag, and the engine logs `resPools point:` when it dedupes one.[^11] So the AI expands to pools, from the same 46 tiles our scan finds on this map ([[mechanics-resource-pools]]).
+Immediately after, it tries once to seed candidate expansion zones **from the map's resource-pool list**.[^9] That list is the same one the bot reads: it is populated at map load from tiles carrying the `res_pool` flag, and the engine logs `resPools point:` when it dedupes one.[^11] So the AI expands to pools, from the same 46 tiles our scan finds on this map ([[mechanics-resource-pools]]).
 
 A candidate pool is rejected when any of these holds:[^12]
 
@@ -100,9 +102,16 @@ A candidate pool is rejected when any of these holds:[^12]
 
 Two things stand out. The ally exclusion is *larger* than the enemy one, so this is a don't-crowd-your-ally rule sitting in the same filter as the threat rule. And the hostile/allied split is the same pair of engine predicates the bot's own threat model now uses — `n.c` and `n.d` ([[policy-threat]]) — which is some evidence the bot picked the right pair.
 
-**The seeding appears to be dead on a cold start.** The whole block is guarded by a once-only flag that is set before the work is attempted, and the work is additionally gated on the AI already owning at least one extractor. On a fresh game it owns none, so the gate fails, the flag is set anyway, and the branch is never reachable again — the flag is written in exactly one place and read in one, with no reset anywhere in the class.[^9] If that reading is right, the AI never seeds pool expansions in a game that starts without an extractor, and whatever expansion it does after that comes from elsewhere in the class.
+**That block is unreachable in normal play, and it does not matter.** It is guarded by a once-only flag set *before* the work is attempted, and the work is additionally gated on the AI already owning an extractor. A fresh game owns none, so the gate fails, the flag is set anyway, and the branch never runs again — the flag is written in one place and read in one, with no reset in 1,910 lines, and the whole thing sits inside a `no base zones at all` test that only holds on the first tick.[^9]
 
-That is a strong claim from a static reading, and it is the main reason this page is `medium`. It has not been observed. Confirming it means watching an AI player's zone list over a live game, which the agent cannot currently do — it reads its own team, not an opponent's AI object.
+The reason it does not matter is that it is a vestigial bootstrap, not the expansion path. Two other sites create base zones on recurring cooldowns, and this page originally missed them:[^15]
+
+- **Expansion**, radius **360**: fires when a timer reaches zero, refuses if more than two zones are already in the claiming state, otherwise asks `an()` for a site and — if no zone covers it and the viability filter passes — claims it and sets the timer to 2,000. A blocked attempt retries at 300 instead.
+- A third kind, radius **310**, capped at three, on a 5,000 cooldown, sited from a *unit* rather than a point and screened by a different filter.
+
+And `an()` draws **a resource pool uniformly at random** from the same map list.[^16] So the AI does expand onto pools; it just gets there by the live path rather than the dead one. Worth noting for our own purposes: the class also carries a nearest-pool-to-a-point helper right beside it, and the expansion path does not use it. The AI expands at random and relies on the viability filter to reject bad draws.
+
+This correction is why the page is `medium` rather than `high`. The unreachability claim is narrow and static-verifiable — one flag, one write, one read. The cooldown figures and the caps are read but unobserved, and confirming them means watching an opponent's zone list over a live game, which the agent cannot do today: it reads its own team, not another player's AI object.
 
 ## The other three
 
@@ -144,3 +153,5 @@ And the cold-start reading above needs a live observation before it is a finding
 [^12]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:634` — `b(PointF)`, with the two counters it calls at `:1789` (allied, optionally buildings-only) and `:1802` (hostile). Both use `n.d` and `n.c` respectively, the alliance-group predicates.
 [^13]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:838`–`876` — the `instanceof g`, `instanceof n` and `instanceof l` arms of the overlay.
 [^14]: `runs/decompiled/com/corrodinggames/rts/game/a/l.java:71` — `this.c((am)y2) < 3600.0f`, a squared distance, so 60 world units; the self-delete at `:77`.
+[^15]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1189`–`1216` for the radius-360 expansion path, gated on a timer decayed each tick and capped by a count of zones in the claiming state, and `:1217`–`1241` for the radius-310 path, capped at three and screened by a different point filter than [^12].
+[^16]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:529` — `an()` returns `A.get(f.c(A.size()))` converted to world coordinates: a uniform random draw from the resource-pool list. The nearest-pool helper `a(float,float)` sits at `:541` and is not called by either expansion path.

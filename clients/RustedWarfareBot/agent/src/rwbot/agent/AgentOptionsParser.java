@@ -26,6 +26,7 @@ final class AgentOptionsParser {
     private static final String FIND_UNDER = "findElementsUnder";
     private static final String STATE_OUT = "stateOutPath";
     private static final String TYPE_FLAGS_OUT = "typeFlagsPath";
+    private static final String AI_ZONES = "aiZones";
     private static final String ORDER_AT = "orderMoveAtSeconds";
     private static final String ORDER_BY = "orderMoveBy";
     private static final String ORDER_INDEX = "orderMoveUnitIndex";
@@ -64,6 +65,7 @@ final class AgentOptionsParser {
                     "",
                     "",
                     "",
+                    false,
                     0,
                     DEFAULT_SAMPLE_MS);
         }
@@ -74,6 +76,7 @@ final class AgentOptionsParser {
         String findUnder = "";
         String stateOut = "";
         String typeFlagsOut = "";
+        boolean aiZones = false;
         int orderAt = 0;
         float[] orderBy = DEFAULT_MOVE_BY.clone();
         int orderIndex = 0;
@@ -95,7 +98,9 @@ final class AgentOptionsParser {
             if (DISCOVER_AT.equals(key)) {
                 discoverAt = parseSeconds(value);
             } else if (EXIT_AFTER.equals(key)) {
-                exitAfter = parseBoolean(value);
+                exitAfter = parseBoolean(value, EXIT_AFTER);
+            } else if (AI_ZONES.equals(key)) {
+                aiZones = parseBoolean(value, AI_ZONES);
             } else if (INSPECT_FIELDS.equals(key)) {
                 inspect = parseNames(value);
             } else if (STATE_OUT.equals(key)) {
@@ -132,7 +137,7 @@ final class AgentOptionsParser {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
                                 + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
-                                + TYPE_FLAGS_OUT + ", "
+                                + TYPE_FLAGS_OUT + ", " + AI_ZONES + ", "
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
                                 + SAMPLE_MS);
             }
@@ -148,6 +153,7 @@ final class AgentOptionsParser {
                 buildType,
                 stateOut,
                 typeFlagsOut,
+                aiZones,
                 channelPort,
                 sampleIntervalMs);
     }
@@ -244,16 +250,21 @@ final class AgentOptionsParser {
         return names;
     }
 
-    /** Parses a strict boolean; anything else is an error rather than false. */
-    private static boolean parseBoolean(String value) {
+    /**
+     * Parses a strict boolean; anything else is an error rather than false.
+     *
+     * @param value The text to parse.
+     * @param option The option it came from, for the failure message.
+     * @return The boolean.
+     */
+    private static boolean parseBoolean(String value, String option) {
         if ("true".equals(value)) {
             return true;
         }
         if ("false".equals(value)) {
             return false;
         }
-        throw new IllegalArgumentException(
-                EXIT_AFTER + " expects true or false, got " + value);
+        throw new IllegalArgumentException(option + " expects true or false, got " + value);
     }
 
     /** Parses a comma-separated list of positive second offsets. */

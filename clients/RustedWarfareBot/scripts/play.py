@@ -10,7 +10,7 @@ Run against a game started with ``-javaagent:...=channelPort=27200``.
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from rw_bot.control.channel import open_channel
@@ -105,6 +105,39 @@ def load_placements(path: Path) -> dict[str, TypePlacement]:
     return {place["type_name"]: place for place in decode_placements(lines)}
 
 
+def reinforcements(
+    goals: Sequence[str],
+    placements: Mapping[str, TypePlacement],
+) -> tuple[str, ...]:
+    """Return the goal types worth making again once the plan is finished.
+
+    The plan ends; wanting the units it asked for does not. So reinforcement
+    repeats the goals rather than ranking units by some invented notion of
+    combat worth -- a number attached to a guess is still a guess.
+
+    Structures are dropped. Rebuilding an extractor means choosing a resource
+    pool to put it on, which is the build policy's decision and not something
+    a producer queue can express ([[mechanics-resource-pools]]).
+
+    Duplicates are collapsed, keeping first appearance. Asking for four tanks
+    does not mean four preferences; it means one, wanted repeatedly.
+
+    Args:
+        goals: What the plan was asked for, in order.
+        placements: Placement rules by type name, for telling a structure from
+            a unit.
+
+    Returns:
+        Unit type names to keep making, in preference order.
+    """
+    wanted: list[str] = []
+    for name in goals:
+        if placements[name]["needs_pool"] or name in wanted:
+            continue
+        wanted.append(name)
+    return tuple(wanted)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Connect, play the plan, and report.
 
@@ -148,7 +181,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     # finished, because sending a half-built army at five opponents loses the
     # army and proves nothing.
     if card["outcome"] == "done":
-        for line in format_battle(fight(channel, catalogue, max_samples)):
+        battle = fight(
+            channel,
+            catalogue,
+            max_samples,
+            reinforce=reinforcements(DEFAULT_GOALS, placements),
+        )
+        for line in format_battle(battle):
             sys.stdout.write(f"{line}\n")
     channel.close()
 

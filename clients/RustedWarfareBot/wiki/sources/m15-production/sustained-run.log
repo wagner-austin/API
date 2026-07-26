@@ -1,0 +1,1293 @@
+2026-07-26 00:15:25.768: File logging started
+2026-07-26 00:15:25.768: Game arguments:
+2026-07-26 00:15:25.768: arg: -nodisplay
+2026-07-26 00:15:25.769: arg: -nosound
+2026-07-26 00:15:25.769: arg: -sandbox
+2026-07-26 00:15:25.769: arg: -width
+2026-07-26 00:15:25.769: arg: 800
+2026-07-26 00:15:25.769: arg: -height
+2026-07-26 00:15:25.769: arg: 600
+2026-07-26 00:15:25.769: arg: -log
+2026-07-26 00:15:25.769: arg: c:\users\test\projects\api\clients\rustedwarfarebot\runs\production.log
+2026-07-26 00:15:25.769: OS name: Windows 10
+2026-07-26 00:15:25.769: OS version: 10.0
+2026-07-26 00:15:25.779: LWJGL version: 2.9.3
+2026-07-26 00:15:25.779: Build Number: #28
+2026-07-26 00:15:25.779: Game Version: 1.15
+2026-07-26 00:15:25.779: Game Code: 176
+2026-07-26 00:15:25.785: Is 64bit: true
+2026-07-26 00:15:25.785: JVM maxMemory:1048576000
+2026-07-26 00:15:25.785: JVM totalMemory:534773760
+2026-07-26 00:15:25.785: JVM freeMemory:525336576
+2026-07-26 00:15:25.785: steam not requested
+corroding: nativePollOnce:100,0
+2026-07-26 00:15:25.800: --- ERROR: Skipping display mode call
+2026-07-26 00:15:25.801: screenHeight:800.0
+2026-07-26 00:15:25.801: screenWidth:600.0
+2026-07-26 00:15:25.801: Overriding width to:800
+2026-07-26 00:15:25.801: Overriding height to:600
+Sun Jul 26 00:15:25 PDT 2026 INFO:Slick Build #84
+Sun Jul 26 00:15:25 PDT 2026 INFO:LWJGL Version: 2.9.3
+Sun Jul 26 00:15:25 PDT 2026 INFO:OriginalDisplayMode: 1024 x 768 x 32 @60Hz
+Sun Jul 26 00:15:25 PDT 2026 INFO:TargetDisplayMode: 800 x 600 x 0 @0Hz
+[rw-agent] channel: planner connected
+[rw-agent] channel: planner disconnected
+[rw-agent] ERROR channel: could not write to the planner: java.net.SocketException: Socket is closed
+Sun Jul 26 00:15:26 PDT 2026 INFO:Starting display 800x600
+Sun Jul 26 00:15:26 PDT 2026 INFO:Use Java PNG Loader = true
+Sun Jul 26 00:15:27 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:27 PDT 2026 DEBUG:Creating FBO 32x32
+2026-07-26 00:15:27.570: --Now loading:displayModes
+2026-07-26 00:15:27.580: --Now loading:starting controllers
+2026-07-26 00:15:27.623: Disabling sound with NullSoundFactory
+2026-07-26 00:15:27.630: --Now loading:loading libRocket
+2026-07-26 00:15:27.630: start libRocket setup
+In Java with: Hello from C++
+2026-07-26 00:15:27.753: --Now loading:libRocket - fonts
+2026-07-26 00:15:28.469: NotoSansCJKsc start
+2026-07-26 00:15:28.775: NotoSansCJKsc end
+2026-07-26 00:15:28.775: end libRocket setup
+2026-07-26 00:15:28.775: --Now loading:GuiEngine
+2026-07-26 00:15:28.776: libRocket setup took:1145.706ms
+2026-07-26 00:15:28.776: --Now loading:GameEngine
+2026-07-26 00:15:28.779: GameEngine:GameEngine()
+2026-07-26 00:15:28.780: Created new gameEngine of:com.corrodinggames.rts.game.i
+2026-07-26 00:15:28.780: --- ----------------- ----
+2026-07-26 00:15:28.780: --- GameEngine:init() ----
+2026-07-26 00:15:28.780: --- ----------------- ----
+2026-07-26 00:15:28.781: Version:v1.15
+2026-07-26 00:15:28.787: --Now loading:Asset Index
+2026-07-26 00:15:28.788: densityScaleRaw*densityScaleMultiplier: 1.0
+2026-07-26 00:15:28.788: packageName:dedicatedServer
+2026-07-26 00:15:28.788: --Now loading:InputController
+2026-07-26 00:15:28.792: slickToAndroidCodes: Could not find keycode for: NUMLOCK, RWIN, CONVERT, STOP, AX, UNDERLINE, DELETE, NOCONVERT, APPS, DECIMAL, SCROLL, END, KANJI, NUMPADDECIMAL, LWIN, CIRCUMFLEX, UNLABELED, F14, F13, COLON, F15, CAPITAL, 
+2026-07-26 00:15:28.792: gdxToAndroidCodes: Could not find keycode for: END, META_ALT_LEFT_ON, COLON, ANY_KEY, META_SHIFT_RIGHT_ON, 
+2026-07-26 00:15:28.792: gdxToSlickCodes: Could not find keycode for: MEDIA_REWIND, MEDIA_PLAY_PAUSE, BUTTON_SELECT, CENTER, BUTTON_X, BUTTON_Z, BUTTON_Y, MEDIA_PREVIOUS, SWITCH_CHARSET, SEARCH, META_ALT_ON, CAMERA, SHIFT_LEFT, BUTTON_START, MUTE, CALL, PICTSYMBOLS, FOCUS, VOLUME_DOWN, ENVELOPE, BUTTON_L2, BUTTON_L1, META_SHIFT_ON, NUM, SOFT_RIGHT, NOTIFICATION, STAR, MENU, DPAD_CENTER, BUTTON_R2, BUTTON_R1, BUTTON_THUMBL, MEDIA_FAST_FORWARD, BUTTON_THUMBR, EXPLORER, BACKSPACE, ENDCALL, FORWARD_DEL, BUTTON_MODE, SYM, SOFT_LEFT, PLUS, MEDIA_NEXT, META_ALT_LEFT_ON, MEDIA_STOP, VOLUME_UP, POUND, META_SHIFT_LEFT_ON, DEL, ANY_KEY, BUTTON_C, SHIFT_RIGHT, BUTTON_B, BUTTON_A, HEADSETHOOK, META_SHIFT_RIGHT_ON, UNKNOWN, CLEAR, 
+2026-07-26 00:15:28.792: getControllerCount:0
+2026-07-26 00:15:28.793: --Now loading:SettingsEngine
+2026-07-26 00:15:28.794: loadFromFileSystem filepath: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-26 00:15:28.798: ------- createIndex -------
+2026-07-26 00:15:28.798: c:
+2026-07-26 00:15:28.801: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-26 00:15:28.803: densityScale(): 1.0
+2026-07-26 00:15:28.804: Locale: forceEnglish
+2026-07-26 00:15:28.816: Locale: Using Strings.properties as locale
+2026-07-26 00:15:28.816: Locale.init took:13.175ms
+2026-07-26 00:15:28.836: --Now loading:AudioEngine
+2026-07-26 00:15:28.837: AudioEngine took:1.538ms
+2026-07-26 00:15:28.837: --Now loading:MusicController
+2026-07-26 00:15:28.837: Null musicFactory - load
+2026-07-26 00:15:28.839: Loaded track:Cont-Edgen-6084.ogg
+2026-07-26 00:15:28.839: --Now loading:music
+2026-07-26 00:15:28.839: Loaded track:battletanks1B.ogg
+2026-07-26 00:15:28.839: --Now loading:music
+2026-07-26 00:15:28.839: Loaded track:sile-Justin_R-6891.ogg
+2026-07-26 00:15:28.839: --Now loading:music
+2026-07-26 00:15:28.840: Loaded track:Acti-Rudy_Ves-8657.ogg
+2026-07-26 00:15:28.840: --Now loading:music
+2026-07-26 00:15:28.840: Loaded track:Ove - Earth Is All We Have.ogg
+2026-07-26 00:15:28.840: --Now loading:music
+2026-07-26 00:15:28.840: Loaded track:[noloop]Ove Melaa - Theme Crystalized.ogg
+2026-07-26 00:15:28.840: --Now loading:music
+2026-07-26 00:15:28.840: Loaded track:[noloop]The Planets - Mars (Part A).ogg
+2026-07-26 00:15:28.840: --Now loading:music
+2026-07-26 00:15:28.841: Loaded track:[noloop]The Planets - Mars (Part B).ogg
+2026-07-26 00:15:28.841: --Now loading:music
+2026-07-26 00:15:28.841: Loaded track:Adama-Bobthede-11966.ogg
+2026-07-26 00:15:28.841: --Now loading:music
+2026-07-26 00:15:28.842: init(): using GraphicsSlick2d
+2026-07-26 00:15:28.842: --Now loading:graphics.init
+2026-07-26 00:15:28.846: Creating BitmapOrTextureAlias: 1024x1024
+Sun Jul 26 00:15:28 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:28 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-26 00:15:28.855: --Now loading:Fonts
+2026-07-26 00:15:28.855: New font:16 bold:false
+2026-07-26 00:15:28.985: loadGlyphs
+2026-07-26 00:15:28.985: New font:18 bold:false
+2026-07-26 00:15:29.027: loadGlyphs
+2026-07-26 00:15:29.028: --Now loading:effects.init
+2026-07-26 00:15:29.062: --Now loading:minimapHandler
+2026-07-26 00:15:29.064: We have an initial screen size, can do early setup of image buffers
+2026-07-26 00:15:29.064: --Now loading:Map Buffers
+2026-07-26 00:15:29.064: Density size changed now: 1.0, refreshing fonts
+2026-07-26 00:15:29.068: map:setupLayerBuffers for size:603
+2026-07-26 00:15:29.068: layerBufferSize:1024
+2026-07-26 00:15:29.068: layerBuffer:2x2 = 4 x2 for soft fade 
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 1024x1024
+2026-07-26 00:15:29.131: ----- layerBuffers create in:62.9751 ms
+2026-07-26 00:15:29.131: Creating minimap image buffers..
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 240x240
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 240x240
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 240x240
+2026-07-26 00:15:29.134: --Now loading:PathEngine
+2026-07-26 00:15:29.138: PathEngine:We have 24 cores, creating extra solvers
+2026-07-26 00:15:29.139: --Now loading:GroupController
+2026-07-26 00:15:29.139: --Now loading:CollisionEngine
+2026-07-26 00:15:29.139: --Now loading:InterfaceEngine
+2026-07-26 00:15:29.149: New font:16 bold:true
+2026-07-26 00:15:29.180: loadGlyphs
+2026-07-26 00:15:29.180: New font:14 bold:true
+2026-07-26 00:15:29.207: loadGlyphs
+2026-07-26 00:15:29.207: New font:34 bold:false
+2026-07-26 00:15:29.235: loadGlyphs
+2026-07-26 00:15:29.257: New font:20 bold:true
+2026-07-26 00:15:29.295: loadGlyphs
+2026-07-26 00:15:29.295: New font:18 bold:true
+2026-07-26 00:15:29.333: loadGlyphs
+2026-07-26 00:15:29.333: New font:12 bold:false
+2026-07-26 00:15:29.360: loadGlyphs
+2026-07-26 00:15:29.360: smallTextPaint size: 12.0
+2026-07-26 00:15:29.361: New font:10 bold:false
+2026-07-26 00:15:29.386: loadGlyphs
+2026-07-26 00:15:29.386: New font:8 bold:false
+2026-07-26 00:15:29.411: loadGlyphs
+2026-07-26 00:15:29.411: New font:20 bold:false
+2026-07-26 00:15:29.444: loadGlyphs
+2026-07-26 00:15:29.445: New font:14 bold:false
+2026-07-26 00:15:29.479: loadGlyphs
+2026-07-26 00:15:29.480: --Now loading:NetworkEngine
+2026-07-26 00:15:29.486: --Now loading:StatsHandler
+2026-07-26 00:15:29.491: --Now loading:ModEngine
+2026-07-26 00:15:29.492: disabledSteam - loadWorkshopMods
+2026-07-26 00:15:29.499: loading mod custom units at:/SD/mods/units
+2026-07-26 00:15:29.500: loading mod custom units at:builtin_mods
+2026-07-26 00:15:29.519: openAssetCached: Cache hit for: builtin_mods/mega_builders/mod-info.txt
+2026-07-26 00:15:29.521: loading mod custom units at:builtin_mods_enabled
+2026-07-26 00:15:29.521: ========= Mods ===========
+2026-07-26 00:15:29.521: Number of mods:1
+2026-07-26 00:15:29.521: Mod: 'Mega Builders
+2026-07-26 00:15:29.521: ================================
+2026-07-26 00:15:29.521: Loading mod selection
+2026-07-26 00:15:29.521: --Now loading:CommandController
+2026-07-26 00:15:29.522: --Now loading:GameSaver
+2026-07-26 00:15:29.524: --Now loading:ReplayEngine
+2026-07-26 00:15:29.525: --Now loading:UnitGeoIndex
+2026-07-26 00:15:29.526: --Now loading:Precalculating map fog
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 353x353
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 21x21
+2026-07-26 00:15:29.560: smoothFog load took:30.537ms
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 440x440
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 440x440
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 240x240
+Sun Jul 26 00:15:29 PDT 2026 INFO:Offscreen Buffers FBO=true PBUFFER=true PBUFFERRT=true
+Sun Jul 26 00:15:29 PDT 2026 DEBUG:Creating FBO 240x240
+2026-07-26 00:15:29.577: --Now loading:ScorchMark.load
+2026-07-26 00:15:29.582: --Now loading:Projectile.load
+2026-07-26 00:15:29.586: --Now loading:Emitter.load
+2026-07-26 00:15:29.586: --Now loading:Unit.loadAllUnits
+2026-07-26 00:15:29.602: Recreating image data from texture: res/drawable/extractor.png (1.198ms)
+2026-07-26 00:15:29.637: Recreating image data from texture: res/drawable/base.png (0.566ms)
+2026-07-26 00:15:29.677: Recreating image data from texture: res/drawable/ship.png (1.993ms)
+2026-07-26 00:15:29.691: Recreating image data from texture: res/drawable/laser_tank_base.png (1.003ms)
+2026-07-26 00:15:29.709: Recreating image data from texture: res/drawable/heavy_hover_tank.png (2.625ms)
+2026-07-26 00:15:29.729: Recreating image data from texture: res/drawable/unit_icon_building.png (1.891ms)
+2026-07-26 00:15:29.752: Recreating image data from texture: res/drawable/wall_v.png (1.744ms)
+2026-07-26 00:15:29.775: Recreating image data from texture: res/drawable/supply_depot.png (2.098ms)
+2026-07-26 00:15:29.788: loadAllUnits took:199.701ms
+2026-07-26 00:15:29.788: --Now loading:Loading custom unit data
+2026-07-26 00:15:29.788: disabledSteam - loadWorkshopMods
+2026-07-26 00:15:29.788: loading mod custom units at:/SD/mods/units
+2026-07-26 00:15:29.788: loading mod custom units at:builtin_mods
+2026-07-26 00:15:29.789: loading mod custom units at:builtin_mods_enabled
+2026-07-26 00:15:29.789: ========= Mods ===========
+2026-07-26 00:15:29.789: Number of mods:1
+2026-07-26 00:15:29.789: Mod: 'Mega Builders
+2026-07-26 00:15:29.789: ================================
+2026-07-26 00:15:30.884: Setting missingPlaceHolder
+2026-07-26 00:15:31.672: Disabled mod at:builtin_mods/mega_builders (name:Mega Builders)
+2026-07-26 00:15:31.672: ==Timing==
+2026-07-26 00:15:31.672: imageLoad: 108.556ms
+2026-07-26 00:15:31.672: imageLoadOrGet: 198.157ms
+2026-07-26 00:15:31.672: soundLoad: 0ms
+2026-07-26 00:15:31.672: soundLoadOrGet: 0.253ms
+2026-07-26 00:15:31.672: iniParse: 29.916ms
+2026-07-26 00:15:31.672: unitParse: 1799.801ms
+2026-07-26 00:15:31.672: iniOpen: 1251.350ms
+2026-07-26 00:15:31.672: iniClose: 0.164ms
+2026-07-26 00:15:31.672: iniSetup: 92.280ms
+2026-07-26 00:15:31.672: actionParse: 55.067ms
+2026-07-26 00:15:31.672: unitParsePartA: 375.111ms
+2026-07-26 00:15:31.672: unitParsePartB: 409.099ms
+2026-07-26 00:15:31.672: unitParsePartC: 497.465ms
+2026-07-26 00:15:31.672: unitParsePartD: 501.641ms
+2026-07-26 00:15:31.672: enableAll: 
+2026-07-26 00:15:31.692: Done loading custom units. image cacheHits:402 image cacheMisses:305 (in: 1902.5975ms)
+2026-07-26 00:15:31.692: ========= Mods data loaded ===========
+2026-07-26 00:15:31.692: Number of mods:1
+2026-07-26 00:15:31.693: Mod: 'Mega Builders' - Memory use:0.00 mb - disabled  (disabled)
+2026-07-26 00:15:31.693: ================================
+2026-07-26 00:15:31.714: --Now loading:getAllUnitsChecksum
+2026-07-26 00:15:31.714: CustomUnits took:1926.072ms
+2026-07-26 00:15:31.714: isOverLiquid called without map loaded
+2026-07-26 00:15:31.714: isOverLiquid called without map loaded
+2026-07-26 00:15:31.714: isOverLiquid called without map loaded
+2026-07-26 00:15:31.714: isOverLiquid called without map loaded
+2026-07-26 00:15:31.715: allUnitsChecksum took:0.910ms
+2026-07-26 00:15:31.724: Init completed
+2026-07-26 00:15:31.725: Loading took:2936.765ms
+2026-07-26 00:15:31.725: --Now loading:Loading map data
+2026-07-26 00:15:31.725: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-26 00:15:31.736: --- setStoppedIfNotInGameThread ---
+2026-07-26 00:15:31.736: --- setStopped ---
+2026-07-26 00:15:31.736: gameThread already null
+2026-07-26 00:15:31.749: enableAll: 
+2026-07-26 00:15:31.758:  --- Loading map ---
+2026-07-26 00:15:31.758: Mapfile: assets/maps/menu_background/menu3.tmx
+2026-07-26 00:15:31.767: ---- Loading map data ----
+2026-07-26 00:15:31.808: Map size: 120, 120
+2026-07-26 00:15:31.808: Setting up team fog..
+2026-07-26 00:15:32.074: MapLayer create: Ground
+2026-07-26 00:15:32.078: MapLayer create: Items
+2026-07-26 00:15:32.162: Map type: mission
+2026-07-26 00:15:32.164: New font:24 bold:true
+2026-07-26 00:15:32.196: loadGlyphs
+2026-07-26 00:15:32.200: Found 3 map triggers
+2026-07-26 00:15:32.200: global Seed: 77924849
+2026-07-26 00:15:32.200: getMapLevel for :maps/menu_background/menu3.tmx file:menu3.tmx
+2026-07-26 00:15:32.200: StateEngine: get(maps/menu_background/menu3.tmx)=null  (key=maps/menu_background/menu3.tmx)
+2026-07-26 00:15:32.200: PathEngine: Setting up map costs
+2026-07-26 00:15:32.221: PathEngine: Ready
+2026-07-26 00:15:32.223: selectAnyOnScreenBuilder: no builder found
+2026-07-26 00:15:32.298: loadAMenuMap took:572.996ms
+2026-07-26 00:15:32.298: --Now loading:Last setup
+2026-07-26 00:15:32.298: --Now loading:init complete
+2026-07-26 00:15:32.298: version: 1.15 176:#28
+2026-07-26 00:15:32.298: --- setRunning ---
+getNewTextureHolder: append:1
+2026-07-26 00:15:32.601: convertTexturePath for: drawable:title.png
+2026-07-26 00:15:32.606: ui[debug]: convertTextOnPage
+2026-07-26 00:15:32.606: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-26 00:15:32.606: converted key to:class
+2026-07-26 00:15:32.606: convertTextOnPage:_class: '${hideUnless(isIOS())}' to 'hide'
+2026-07-26 00:15:32.606: converted key to:class
+2026-07-26 00:15:32.606: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-26 00:15:32.606: converted key to:class
+2026-07-26 00:15:32.607: convertTextOnPage:_class: '${hideUnless(canResume())}' to 'hide'
+2026-07-26 00:15:32.607: converted key to:class
+2026-07-26 00:15:32.608: convertTextOnPage:_class: '${fullVersionOnlyStyle()}' to ''
+2026-07-26 00:15:32.608: converted key to:class
+2026-07-26 00:15:32.608: convertTextOnPage:_class: '${hideUnless(usingMods())}' to ''
+2026-07-26 00:15:32.608: converted key to:class
+2026-07-26 00:15:32.608: convertTextOnPage:_class: '${hideUnless(isDesktop())}' to ''
+2026-07-26 00:15:32.609: converted key to:class
+2026-07-26 00:15:32.609: ConvertText - { #1 = peak:2.93ms avg:2.93ms total:2.93ms }
+ScriptEngine:HandleEvent:onShowNewScreen();
+2026-07-26 00:15:32.649: --- setRunning ---
+2026-07-26 00:15:32.649: SlickContainer:setup
+2026-07-26 00:15:32.649: -----------------------------
+2026-07-26 00:15:32.649: ----- Game init finished in:5025.5947 ms
+2026-07-26 00:15:32.649: switching to sandbox
+2026-07-26 00:15:32.652: ai_debug(0):firstRun: no command center found
+2026-07-26 00:15:32.654: ai_debug(1):firstRun: no command center found
+2026-07-26 00:15:32.654: ai_debug(2):firstRun: no command center found
+2026-07-26 00:15:32.655: ai_debug(3):firstRun: no command center found
+2026-07-26 00:15:32.655: Not showing defeated message: Player - 4 had no starting units (Team: A)
+2026-07-26 00:15:32.655: ai_debug(4):firstRun: no command center found
+2026-07-26 00:15:32.655: Not showing defeated message: Player - 5 had no starting units (Team: E)
+2026-07-26 00:15:32.655: ai_debug(5):firstRun: no command center found
+2026-07-26 00:15:32.656: Not showing defeated message: Player - 6 had no starting units (Team: F)
+2026-07-26 00:15:32.656: ai_debug(6):firstRun: no command center found
+2026-07-26 00:15:32.656: Not showing defeated message: Player - 7 had no starting units (Team: G)
+2026-07-26 00:15:32.656: ai_debug(7):firstRun: no command center found
+2026-07-26 00:15:32.656: Not showing defeated message: Player - 8 had no starting units (Team: H)
+2026-07-26 00:15:32.656: ai_debug(8):firstRun: no command center found
+2026-07-26 00:15:32.656: Not showing defeated message: Player - 9 had no starting units (Team: I)
+2026-07-26 00:15:32.656: ai_debug(9):firstRun: no command center found
+2026-07-26 00:15:32.657: Not showing defeated message: Player - 10 had no starting units (Team: J)
+2026-07-26 00:15:32.673: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:2 to targetId:1 (#units:3)
+2026-07-26 00:15:32.673: MissionEngine:triggerLog:firstActivation: move at:50 for teamId:0 to targetId:2 (#units:6)
+2026-07-26 00:15:32.674: Building smoothFog_cache
+ScriptEngine:HandleEvent:open('sandboxOptions.rml', 'maps/skirmish/[z;p10]Crossing Large (10p).tmx'); loadConfigAndStartNewSandbox('maps/skirmish/[z;p10]Crossing Large (10p).tmx');
+getNewTextureHolder: append:2
+2026-07-26 00:15:33.061: alpha=0.8
+2026-07-26 00:15:33.061: convertTexturePath for: panel2.png
+getNewTextureHolder: append:3
+2026-07-26 00:15:33.064: convertTexturePath for: assets/gui/button_close_hover.png
+2026-07-26 00:15:33.064: convertTexturePath already had path:assets/gui/button_close_hover.png
+getNewTextureHolder: append:4
+2026-07-26 00:15:33.065: convertTexturePath for: assets/gui/button_close.png
+2026-07-26 00:15:33.065: convertTexturePath already had path:assets/gui/button_close.png
+getNewTextureHolder: append:5
+2026-07-26 00:15:33.067: convertTexturePath for: widgets.png
+2026-07-26 00:15:33.103: ui[debug]: convertTextOnPage
+2026-07-26 00:15:33.104: convertTextOnPage:_src: '${getMapThumbnail(mode)}' to 'thumbnail:assets:maps/skirmish/[z;p10]Crossing Large (10p)_map.png'
+2026-07-26 00:15:33.104: converted key to:src
+2026-07-26 00:15:33.104: ConvertText - { #1 = peak:0.95ms avg:0.95ms total:0.95ms }
+ScriptEngine:HandleEvent:setPageMinWidthAndHeight(700, 700); showLevelOptions(); onShowNewScreen();
+2026-07-26 00:15:33.140: setPageMinWidthAndHeight(700.0, 700.0)
+2026-07-26 00:15:33.144: --- setRunning ---
+2026-07-26 00:15:33.144: --- setRunning ---
+2026-07-26 00:15:33.144: openDocument - { #1 = peak:466.12ms avg:466.12ms total:466.12ms }
+2026-07-26 00:15:33.144: LoadResources - { #4 = peak:3.74ms avg:2.07ms total:8.28ms }
+2026-07-26 00:15:33.144: Starting sandbox from map: maps/skirmish/[z;p10]Crossing Large (10p).tmx
+2026-07-26 00:15:33.144: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-26 00:15:33.145: endGame: network disconnect
+2026-07-26 00:15:33.145: Disconnect: shutdownServer
+2026-07-26 00:15:33.195: --- setStoppedIfNotInGameThread ---
+2026-07-26 00:15:33.195: --- setStopped ---
+2026-07-26 00:15:33.195: gameThread already null
+2026-07-26 00:15:33.197: --- setStopped ---
+2026-07-26 00:15:33.197: gameThread already null
+2026-07-26 00:15:33.197: Max teams on map: maps/skirmish/[z;p10]Crossing Large (10p).tmx = 10
+2026-07-26 00:15:33.197: Allies: 0/0
+2026-07-26 00:15:33.198: --- setStoppedIfNotInGameThread ---
+2026-07-26 00:15:33.198: --- setStopped ---
+2026-07-26 00:15:33.198: gameThread already null
+2026-07-26 00:15:33.211: enableAll: 
+2026-07-26 00:15:33.215:  --- Loading map ---
+2026-07-26 00:15:33.215: Mapfile: assets/maps/skirmish/[z;p10]Crossing Large (10p).tmx
+2026-07-26 00:15:33.241: ---- Loading map data ----
+2026-07-26 00:15:33.245: Map size: 230, 230
+2026-07-26 00:15:33.245: Setting up team fog..
+2026-07-26 00:15:33.312: MapLayer create: Ground
+2026-07-26 00:15:33.318: MapLayer create: Items
+2026-07-26 00:15:33.321: MapLayer create: Units
+2026-07-26 00:15:33.321: map:skipping unit without player:commandCenter at: 208,47 team:2
+2026-07-26 00:15:33.321: map:skipping unit without player:builder at: 208,50 team:2
+2026-07-26 00:15:33.322: map:skipping unit without player:commandCenter at: 214,90 team:6
+2026-07-26 00:15:33.322: map:skipping unit without player:builder at: 214,93 team:6
+2026-07-26 00:15:33.322: map:skipping unit without player:commandCenter at: 47,103 team:9
+2026-07-26 00:15:33.322: map:skipping unit without player:commandCenter at: 186,104 team:8
+2026-07-26 00:15:33.322: map:skipping unit without player:builder at: 47,106 team:9
+2026-07-26 00:15:33.322: map:skipping unit without player:builder at: 186,107 team:8
+2026-07-26 00:15:33.322: map:skipping unit without player:commandCenter at: 213,170 team:4
+2026-07-26 00:15:33.322: map:skipping unit without player:builder at: 213,173 team:4
+2026-07-26 00:15:33.326: Recreating image data from texture: tilesets/shallowwater.png (2.890ms)
+2026-07-26 00:15:33.335: Recreating image data from texture: tilesets/longgrass2shallowwater_flat.png (4.824ms)
+2026-07-26 00:15:33.340: Recreating image data from texture: tilesets/longgrass.png (1.067ms)
+2026-07-26 00:15:33.342: Recreating image data from texture: tilesets/longgrass2longgrass_ridge.png (1.436ms)
+2026-07-26 00:15:33.343: Recreating image data from texture: tilesets/sand2longgrass_flat.png (1.064ms)
+2026-07-26 00:15:33.344: Recreating image data from texture: tilesets/sand.png (1.049ms)
+2026-07-26 00:15:33.357: Recreating image data from texture: tilesets/mountain2longgrass_flat.png (2.194ms)
+2026-07-26 00:15:33.359: Recreating image data from texture: tilesets/mountain.png (1.661ms)
+2026-07-26 00:15:33.364: Recreating image data from texture: tilesets/misc.png (3.796ms)
+2026-07-26 00:15:33.364: Map type: skirmish
+2026-07-26 00:15:33.365: Found 0 map triggers
+2026-07-26 00:15:33.365: global Seed: 644952181
+2026-07-26 00:15:33.365: there are 10 units on this map and 206 trees
+2026-07-26 00:15:33.365: getMapLevel for :maps/skirmish/[z;p10]Crossing Large (10p).tmx file:[z;p10]Crossing Large (10p).tmx
+2026-07-26 00:15:33.365: StateEngine: get(maps/skirmish/[z;p10]Crossing Large (10p).tmx)=null  (key=maps/skirmish/[z;p10]Crossing Large (10p).tmx)
+2026-07-26 00:15:33.365: PathEngine: Setting up map costs
+2026-07-26 00:15:33.387: PathEngine: Ready
+2026-07-26 00:15:33.387: selectAnyOnScreenBuilder: found builder
+2026-07-26 00:15:33.388: Building smoothFog_cache
+2026-07-26 00:15:33.449: --- setRunning ---
+2026-07-26 00:15:33.560: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+2026-07-26 00:15:33.562: Creating new debug editor
+2026-07-26 00:15:33.567: --setting up minimap--
+2026-07-26 00:15:33.567: Creating minimap image buffers..
+2026-07-26 00:15:33.575: Minimap map render took:8.669ms
+2026-07-26 00:15:33.582: --- Mouse API succeeded
+2026-07-26 00:15:33.602: Saving settings to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\preferences.ini
+[rw-agent] channel: planner connected
+[rw-agent] map scan: 46 resource pool(s)
+[rw-agent] fog: DISABLED on this map -- every visibility test passes
+[rw-agent] channel: build extractorT1 by 214 at (4070.0, 2610.0)
+[rw-agent] channel: build extractorT1 by 214 at (4470.0, 2610.0)
+[rw-agent] channel: build extractorT1 by 214 at (3690.0, 2370.0)
+[rw-agent] channel: build landFactory by 214 at (4050.0, 2430.0)
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 212 by 287
+[rw-agent] channel: attack 212 by 304
+[rw-agent] channel: attack 212 by 307
+[rw-agent] channel: attack 212 by 308
+[rw-agent] channel: attack 216 by 287
+[rw-agent] channel: attack 216 by 304
+[rw-agent] channel: attack 216 by 307
+[rw-agent] channel: attack 216 by 308
+[rw-agent] channel: attack 212 by 287
+[rw-agent] channel: attack 212 by 304
+[rw-agent] channel: attack 212 by 307
+[rw-agent] channel: attack 212 by 308
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 212 by 312
+[rw-agent] channel: attack 315 by 287
+[rw-agent] channel: attack 315 by 304
+[rw-agent] channel: attack 315 by 307
+[rw-agent] channel: attack 315 by 308
+[rw-agent] channel: attack 315 by 312
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 315 by 316
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 315 by 318
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 315 by 321
+[rw-agent] channel: attack 224 by 287
+[rw-agent] channel: attack 224 by 304
+[rw-agent] channel: attack 224 by 307
+[rw-agent] channel: attack 224 by 308
+[rw-agent] channel: attack 224 by 312
+[rw-agent] channel: attack 224 by 316
+[rw-agent] channel: attack 224 by 318
+[rw-agent] channel: attack 224 by 321
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 224 by 323
+[rw-agent] channel: attack 347 by 287
+[rw-agent] channel: attack 347 by 304
+[rw-agent] channel: attack 347 by 307
+[rw-agent] channel: attack 347 by 308
+[rw-agent] channel: attack 347 by 312
+[rw-agent] channel: attack 347 by 316
+[rw-agent] channel: attack 347 by 318
+[rw-agent] channel: attack 347 by 321
+[rw-agent] channel: attack 347 by 323
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 347 by 371
+[rw-agent] channel: attack 315 by 287
+[rw-agent] channel: attack 315 by 304
+[rw-agent] channel: attack 315 by 307
+[rw-agent] channel: attack 315 by 308
+[rw-agent] channel: attack 315 by 312
+[rw-agent] channel: attack 315 by 316
+[rw-agent] channel: attack 315 by 318
+[rw-agent] channel: attack 315 by 321
+[rw-agent] channel: attack 315 by 323
+[rw-agent] channel: attack 315 by 371
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 208 by 287
+[rw-agent] channel: attack 208 by 304
+[rw-agent] channel: attack 208 by 307
+[rw-agent] channel: attack 208 by 308
+[rw-agent] channel: attack 208 by 312
+[rw-agent] channel: attack 208 by 316
+[rw-agent] channel: attack 208 by 318
+[rw-agent] channel: attack 208 by 321
+[rw-agent] channel: attack 208 by 323
+[rw-agent] channel: attack 208 by 371
+[rw-agent] channel: attack 208 by 389
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 208 by 413
+[rw-agent] channel: attack 315 by 287
+[rw-agent] channel: attack 315 by 304
+[rw-agent] channel: attack 315 by 307
+[rw-agent] channel: attack 315 by 308
+[rw-agent] channel: attack 315 by 312
+[rw-agent] channel: attack 315 by 316
+[rw-agent] channel: attack 315 by 318
+[rw-agent] channel: attack 315 by 321
+[rw-agent] channel: attack 315 by 323
+[rw-agent] channel: attack 315 by 371
+[rw-agent] channel: attack 315 by 389
+[rw-agent] channel: attack 315 by 413
+[rw-agent] channel: attack 232 by 287
+[rw-agent] channel: attack 232 by 304
+[rw-agent] channel: attack 232 by 307
+[rw-agent] channel: attack 232 by 308
+[rw-agent] channel: attack 232 by 312
+[rw-agent] channel: attack 232 by 316
+[rw-agent] channel: attack 232 by 318
+[rw-agent] channel: attack 232 by 321
+[rw-agent] channel: attack 232 by 323
+[rw-agent] channel: attack 232 by 371
+[rw-agent] channel: attack 232 by 389
+[rw-agent] channel: attack 232 by 413
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 232 by 441
+[rw-agent] channel: attack 216 by 287
+[rw-agent] channel: attack 216 by 304
+[rw-agent] channel: attack 216 by 307
+[rw-agent] channel: attack 216 by 308
+[rw-agent] channel: attack 216 by 312
+[rw-agent] channel: attack 216 by 316
+[rw-agent] channel: attack 216 by 318
+[rw-agent] channel: attack 216 by 321
+[rw-agent] channel: attack 216 by 323
+[rw-agent] channel: attack 216 by 371
+[rw-agent] channel: attack 216 by 389
+[rw-agent] channel: attack 216 by 413
+[rw-agent] channel: attack 216 by 441
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 216 by 444
+[rw-agent] channel: attack 232 by 287
+[rw-agent] channel: attack 232 by 304
+[rw-agent] channel: attack 232 by 307
+[rw-agent] channel: attack 232 by 308
+[rw-agent] channel: attack 232 by 312
+[rw-agent] channel: attack 232 by 316
+[rw-agent] channel: attack 232 by 318
+[rw-agent] channel: attack 232 by 321
+[rw-agent] channel: attack 232 by 323
+[rw-agent] channel: attack 232 by 371
+[rw-agent] channel: attack 232 by 389
+[rw-agent] channel: attack 232 by 413
+[rw-agent] channel: attack 232 by 441
+[rw-agent] channel: attack 232 by 444
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 232 by 459
+[rw-agent] channel: attack 210 by 287
+[rw-agent] channel: attack 210 by 304
+[rw-agent] channel: attack 210 by 307
+[rw-agent] channel: attack 210 by 308
+[rw-agent] channel: attack 210 by 312
+[rw-agent] channel: attack 210 by 316
+[rw-agent] channel: attack 210 by 318
+[rw-agent] channel: attack 210 by 321
+[rw-agent] channel: attack 210 by 323
+[rw-agent] channel: attack 210 by 371
+[rw-agent] channel: attack 210 by 389
+[rw-agent] channel: attack 210 by 413
+[rw-agent] channel: attack 210 by 441
+[rw-agent] channel: attack 210 by 444
+[rw-agent] channel: attack 210 by 459
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 210 by 464
+[rw-agent] channel: attack 387 by 287
+[rw-agent] channel: attack 387 by 304
+[rw-agent] channel: attack 387 by 307
+[rw-agent] channel: attack 387 by 308
+[rw-agent] channel: attack 387 by 312
+[rw-agent] channel: attack 387 by 316
+[rw-agent] channel: attack 387 by 318
+[rw-agent] channel: attack 387 by 321
+[rw-agent] channel: attack 387 by 323
+[rw-agent] channel: attack 387 by 371
+[rw-agent] channel: attack 387 by 389
+[rw-agent] channel: attack 387 by 413
+[rw-agent] channel: attack 387 by 441
+[rw-agent] channel: attack 387 by 444
+[rw-agent] channel: attack 387 by 459
+[rw-agent] channel: attack 387 by 464
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 210 by 287
+[rw-agent] channel: attack 210 by 304
+[rw-agent] channel: attack 210 by 307
+[rw-agent] channel: attack 210 by 308
+[rw-agent] channel: attack 210 by 312
+[rw-agent] channel: attack 210 by 316
+[rw-agent] channel: attack 210 by 318
+[rw-agent] channel: attack 210 by 321
+[rw-agent] channel: attack 210 by 323
+[rw-agent] channel: attack 210 by 371
+[rw-agent] channel: attack 210 by 389
+[rw-agent] channel: attack 210 by 413
+[rw-agent] channel: attack 210 by 441
+[rw-agent] channel: attack 210 by 444
+[rw-agent] channel: attack 210 by 459
+[rw-agent] channel: attack 210 by 464
+[rw-agent] channel: attack 210 by 473
+[rw-agent] channel: attack 387 by 287
+[rw-agent] channel: attack 387 by 304
+[rw-agent] channel: attack 387 by 307
+[rw-agent] channel: attack 387 by 308
+[rw-agent] channel: attack 387 by 312
+[rw-agent] channel: attack 387 by 316
+[rw-agent] channel: attack 387 by 318
+[rw-agent] channel: attack 387 by 323
+[rw-agent] channel: attack 387 by 371
+[rw-agent] channel: attack 387 by 389
+[rw-agent] channel: attack 387 by 413
+[rw-agent] channel: attack 387 by 441
+[rw-agent] channel: attack 387 by 444
+[rw-agent] channel: attack 387 by 459
+[rw-agent] channel: attack 387 by 464
+[rw-agent] channel: attack 387 by 473
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 387 by 508
+[rw-agent] channel: attack 222 by 287
+[rw-agent] channel: attack 222 by 304
+[rw-agent] channel: attack 222 by 307
+[rw-agent] channel: attack 222 by 308
+[rw-agent] channel: attack 222 by 312
+[rw-agent] channel: attack 222 by 316
+[rw-agent] channel: attack 222 by 318
+[rw-agent] channel: attack 222 by 323
+[rw-agent] channel: attack 222 by 371
+[rw-agent] channel: attack 222 by 389
+[rw-agent] channel: attack 222 by 413
+[rw-agent] channel: attack 222 by 441
+[rw-agent] channel: attack 222 by 444
+[rw-agent] channel: attack 222 by 459
+[rw-agent] channel: attack 222 by 464
+[rw-agent] channel: attack 222 by 473
+[rw-agent] channel: attack 222 by 508
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 222 by 512
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 222 by 517
+[rw-agent] channel: attack 461 by 287
+[rw-agent] channel: attack 461 by 304
+[rw-agent] channel: attack 461 by 307
+[rw-agent] channel: attack 461 by 308
+[rw-agent] channel: attack 461 by 312
+[rw-agent] channel: attack 461 by 316
+[rw-agent] channel: attack 461 by 318
+[rw-agent] channel: attack 461 by 323
+[rw-agent] channel: attack 461 by 371
+[rw-agent] channel: attack 461 by 389
+[rw-agent] channel: attack 461 by 413
+[rw-agent] channel: attack 461 by 441
+[rw-agent] channel: attack 461 by 444
+[rw-agent] channel: attack 461 by 459
+[rw-agent] channel: attack 461 by 464
+[rw-agent] channel: attack 461 by 473
+[rw-agent] channel: attack 461 by 508
+[rw-agent] channel: attack 461 by 512
+[rw-agent] channel: attack 461 by 517
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 461 by 524
+[rw-agent] channel: attack 284 by 287
+[rw-agent] channel: attack 284 by 304
+[rw-agent] channel: attack 284 by 307
+[rw-agent] channel: attack 284 by 308
+[rw-agent] channel: attack 284 by 312
+[rw-agent] channel: attack 284 by 316
+[rw-agent] channel: attack 284 by 318
+[rw-agent] channel: attack 284 by 323
+[rw-agent] channel: attack 284 by 371
+[rw-agent] channel: attack 284 by 389
+[rw-agent] channel: attack 284 by 413
+[rw-agent] channel: attack 284 by 441
+[rw-agent] channel: attack 284 by 444
+[rw-agent] channel: attack 284 by 459
+[rw-agent] channel: attack 284 by 464
+[rw-agent] channel: attack 284 by 473
+[rw-agent] channel: attack 284 by 508
+[rw-agent] channel: attack 284 by 512
+[rw-agent] channel: attack 284 by 517
+[rw-agent] channel: attack 284 by 524
+2026-07-26 00:20:34.169: Saving game to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-07-26 00:20:34.169: GameSaver:saveCurrentMap took:0
+2026-07-26 00:20:34.172: TeamHistory(0): totalValues written:59
+2026-07-26 00:20:34.172: TeamHistory(1): totalValues written:56
+2026-07-26 00:20:34.172: TeamHistory(-1): totalValues written:0
+2026-07-26 00:20:34.172: TeamHistory(3): totalValues written:52
+2026-07-26 00:20:34.172: TeamHistory(-1): totalValues written:0
+2026-07-26 00:20:34.172: TeamHistory(5): totalValues written:58
+2026-07-26 00:20:34.172: TeamHistory(-1): totalValues written:0
+2026-07-26 00:20:34.172: TeamHistory(7): totalValues written:68
+2026-07-26 00:20:34.172: TeamHistory(-1): totalValues written:0
+2026-07-26 00:20:34.172: TeamHistory(-1): totalValues written:0
+2026-07-26 00:20:34.180: GameSaver:saveGame took:11
+2026-07-26 00:20:34.180: Finished writing save, renaming to final filename
+2026-07-26 00:20:34.180: renameFile: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave.tmp2 to:C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-07-26 00:20:34.180: Failed to rename to final file
+2026-07-26 00:20:34.180: Auto save failed: Failed to rename to final file. Check file permissions of storage.
+2026-07-26 00:20:34.181: Autosaved (11.897ms)
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 284 by 543
+[rw-agent] channel: attack 223 by 287
+[rw-agent] channel: attack 223 by 304
+[rw-agent] channel: attack 223 by 307
+[rw-agent] channel: attack 223 by 308
+[rw-agent] channel: attack 223 by 312
+[rw-agent] channel: attack 223 by 316
+[rw-agent] channel: attack 223 by 318
+[rw-agent] channel: attack 223 by 323
+[rw-agent] channel: attack 223 by 371
+[rw-agent] channel: attack 223 by 389
+[rw-agent] channel: attack 223 by 413
+[rw-agent] channel: attack 223 by 441
+[rw-agent] channel: attack 223 by 444
+[rw-agent] channel: attack 223 by 459
+[rw-agent] channel: attack 223 by 464
+[rw-agent] channel: attack 223 by 473
+[rw-agent] channel: attack 223 by 508
+[rw-agent] channel: attack 223 by 512
+[rw-agent] channel: attack 223 by 517
+[rw-agent] channel: attack 223 by 524
+[rw-agent] channel: attack 223 by 543
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 223 by 554
+[rw-agent] channel: attack 232 by 287
+[rw-agent] channel: attack 232 by 304
+[rw-agent] channel: attack 232 by 307
+[rw-agent] channel: attack 232 by 308
+[rw-agent] channel: attack 232 by 312
+[rw-agent] channel: attack 232 by 316
+[rw-agent] channel: attack 232 by 318
+[rw-agent] channel: attack 232 by 323
+[rw-agent] channel: attack 232 by 371
+[rw-agent] channel: attack 232 by 389
+[rw-agent] channel: attack 232 by 413
+[rw-agent] channel: attack 232 by 441
+[rw-agent] channel: attack 232 by 444
+[rw-agent] channel: attack 232 by 459
+[rw-agent] channel: attack 232 by 464
+[rw-agent] channel: attack 232 by 473
+[rw-agent] channel: attack 232 by 508
+[rw-agent] channel: attack 232 by 512
+[rw-agent] channel: attack 232 by 517
+[rw-agent] channel: attack 232 by 524
+[rw-agent] channel: attack 232 by 543
+[rw-agent] channel: attack 232 by 554
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 232 by 573
+[rw-agent] channel: attack 225 by 287
+[rw-agent] channel: attack 225 by 304
+[rw-agent] channel: attack 225 by 307
+[rw-agent] channel: attack 225 by 308
+[rw-agent] channel: attack 225 by 312
+[rw-agent] channel: attack 225 by 316
+[rw-agent] channel: attack 225 by 318
+[rw-agent] channel: attack 225 by 323
+[rw-agent] channel: attack 225 by 371
+[rw-agent] channel: attack 225 by 389
+[rw-agent] channel: attack 225 by 413
+[rw-agent] channel: attack 225 by 441
+[rw-agent] channel: attack 225 by 444
+[rw-agent] channel: attack 225 by 459
+[rw-agent] channel: attack 225 by 464
+[rw-agent] channel: attack 225 by 473
+[rw-agent] channel: attack 225 by 508
+[rw-agent] channel: attack 225 by 512
+[rw-agent] channel: attack 225 by 517
+[rw-agent] channel: attack 225 by 524
+[rw-agent] channel: attack 225 by 543
+[rw-agent] channel: attack 225 by 554
+[rw-agent] channel: attack 225 by 573
+[rw-agent] channel: attack 232 by 287
+[rw-agent] channel: attack 232 by 304
+[rw-agent] channel: attack 232 by 307
+[rw-agent] channel: attack 232 by 308
+[rw-agent] channel: attack 232 by 312
+[rw-agent] channel: attack 232 by 316
+[rw-agent] channel: attack 232 by 318
+[rw-agent] channel: attack 232 by 323
+[rw-agent] channel: attack 232 by 371
+[rw-agent] channel: attack 232 by 389
+[rw-agent] channel: attack 232 by 413
+[rw-agent] channel: attack 232 by 441
+[rw-agent] channel: attack 232 by 444
+[rw-agent] channel: attack 232 by 459
+[rw-agent] channel: attack 232 by 464
+[rw-agent] channel: attack 232 by 473
+[rw-agent] channel: attack 232 by 508
+[rw-agent] channel: attack 232 by 512
+[rw-agent] channel: attack 232 by 517
+[rw-agent] channel: attack 232 by 524
+[rw-agent] channel: attack 232 by 543
+[rw-agent] channel: attack 232 by 554
+[rw-agent] channel: attack 232 by 573
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 232 by 590
+[rw-agent] channel: attack 448 by 287
+[rw-agent] channel: attack 448 by 304
+[rw-agent] channel: attack 448 by 307
+[rw-agent] channel: attack 448 by 308
+[rw-agent] channel: attack 448 by 312
+[rw-agent] channel: attack 448 by 316
+[rw-agent] channel: attack 448 by 318
+[rw-agent] channel: attack 448 by 323
+[rw-agent] channel: attack 448 by 371
+[rw-agent] channel: attack 448 by 389
+[rw-agent] channel: attack 448 by 413
+[rw-agent] channel: attack 448 by 441
+[rw-agent] channel: attack 448 by 444
+[rw-agent] channel: attack 448 by 459
+[rw-agent] channel: attack 448 by 464
+[rw-agent] channel: attack 448 by 473
+[rw-agent] channel: attack 448 by 508
+[rw-agent] channel: attack 448 by 512
+[rw-agent] channel: attack 448 by 517
+[rw-agent] channel: attack 448 by 524
+[rw-agent] channel: attack 448 by 543
+[rw-agent] channel: attack 448 by 554
+[rw-agent] channel: attack 448 by 573
+[rw-agent] channel: attack 448 by 590
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 448 by 616
+[rw-agent] channel: attack 465 by 287
+[rw-agent] channel: attack 465 by 304
+[rw-agent] channel: attack 465 by 307
+[rw-agent] channel: attack 465 by 308
+[rw-agent] channel: attack 465 by 312
+[rw-agent] channel: attack 465 by 316
+[rw-agent] channel: attack 465 by 318
+[rw-agent] channel: attack 465 by 323
+[rw-agent] channel: attack 465 by 371
+[rw-agent] channel: attack 465 by 389
+[rw-agent] channel: attack 465 by 413
+[rw-agent] channel: attack 465 by 441
+[rw-agent] channel: attack 465 by 444
+[rw-agent] channel: attack 465 by 459
+[rw-agent] channel: attack 465 by 464
+[rw-agent] channel: attack 465 by 473
+[rw-agent] channel: attack 465 by 508
+[rw-agent] channel: attack 465 by 512
+[rw-agent] channel: attack 465 by 517
+[rw-agent] channel: attack 465 by 524
+[rw-agent] channel: attack 465 by 543
+[rw-agent] channel: attack 465 by 554
+[rw-agent] channel: attack 465 by 573
+[rw-agent] channel: attack 465 by 590
+[rw-agent] channel: attack 465 by 616
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 465 by 661
+[rw-agent] channel: attack 448 by 287
+[rw-agent] channel: attack 448 by 304
+[rw-agent] channel: attack 448 by 307
+[rw-agent] channel: attack 448 by 308
+[rw-agent] channel: attack 448 by 312
+[rw-agent] channel: attack 448 by 316
+[rw-agent] channel: attack 448 by 318
+[rw-agent] channel: attack 448 by 323
+[rw-agent] channel: attack 448 by 371
+[rw-agent] channel: attack 448 by 389
+[rw-agent] channel: attack 448 by 413
+[rw-agent] channel: attack 448 by 441
+[rw-agent] channel: attack 448 by 444
+[rw-agent] channel: attack 448 by 459
+[rw-agent] channel: attack 448 by 464
+[rw-agent] channel: attack 448 by 473
+[rw-agent] channel: attack 448 by 508
+[rw-agent] channel: attack 448 by 512
+[rw-agent] channel: attack 448 by 517
+[rw-agent] channel: attack 448 by 524
+[rw-agent] channel: attack 448 by 543
+[rw-agent] channel: attack 448 by 554
+[rw-agent] channel: attack 448 by 573
+[rw-agent] channel: attack 448 by 590
+[rw-agent] channel: attack 448 by 616
+[rw-agent] channel: attack 448 by 661
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 448 by 681
+[rw-agent] channel: attack 569 by 287
+[rw-agent] channel: attack 569 by 304
+[rw-agent] channel: attack 569 by 307
+[rw-agent] channel: attack 569 by 308
+[rw-agent] channel: attack 569 by 312
+[rw-agent] channel: attack 569 by 316
+[rw-agent] channel: attack 569 by 318
+[rw-agent] channel: attack 569 by 323
+[rw-agent] channel: attack 569 by 371
+[rw-agent] channel: attack 569 by 389
+[rw-agent] channel: attack 569 by 413
+[rw-agent] channel: attack 569 by 441
+[rw-agent] channel: attack 569 by 444
+[rw-agent] channel: attack 569 by 459
+[rw-agent] channel: attack 569 by 464
+[rw-agent] channel: attack 569 by 473
+[rw-agent] channel: attack 569 by 512
+[rw-agent] channel: attack 569 by 517
+[rw-agent] channel: attack 569 by 524
+[rw-agent] channel: attack 569 by 543
+[rw-agent] channel: attack 569 by 554
+[rw-agent] channel: attack 569 by 573
+[rw-agent] channel: attack 569 by 590
+[rw-agent] channel: attack 569 by 616
+[rw-agent] channel: attack 569 by 661
+[rw-agent] channel: attack 569 by 681
+[rw-agent] channel: attack 465 by 287
+[rw-agent] channel: attack 465 by 304
+[rw-agent] channel: attack 465 by 307
+[rw-agent] channel: attack 465 by 308
+[rw-agent] channel: attack 465 by 312
+[rw-agent] channel: attack 465 by 316
+[rw-agent] channel: attack 465 by 318
+[rw-agent] channel: attack 465 by 323
+[rw-agent] channel: attack 465 by 371
+[rw-agent] channel: attack 465 by 389
+[rw-agent] channel: attack 465 by 413
+[rw-agent] channel: attack 465 by 441
+[rw-agent] channel: attack 465 by 444
+[rw-agent] channel: attack 465 by 459
+[rw-agent] channel: attack 465 by 464
+[rw-agent] channel: attack 465 by 473
+[rw-agent] channel: attack 465 by 512
+[rw-agent] channel: attack 465 by 517
+[rw-agent] channel: attack 465 by 524
+[rw-agent] channel: attack 465 by 543
+[rw-agent] channel: attack 465 by 554
+[rw-agent] channel: attack 465 by 573
+[rw-agent] channel: attack 465 by 590
+[rw-agent] channel: attack 465 by 616
+[rw-agent] channel: attack 465 by 661
+[rw-agent] channel: attack 465 by 681
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 465 by 701
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 465 by 743
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 652 by 287
+[rw-agent] channel: attack 652 by 304
+[rw-agent] channel: attack 652 by 312
+[rw-agent] channel: attack 652 by 316
+[rw-agent] channel: attack 652 by 318
+[rw-agent] channel: attack 652 by 323
+[rw-agent] channel: attack 652 by 371
+[rw-agent] channel: attack 652 by 389
+[rw-agent] channel: attack 652 by 413
+[rw-agent] channel: attack 652 by 441
+[rw-agent] channel: attack 652 by 444
+[rw-agent] channel: attack 652 by 459
+[rw-agent] channel: attack 652 by 464
+[rw-agent] channel: attack 652 by 473
+[rw-agent] channel: attack 652 by 512
+[rw-agent] channel: attack 652 by 517
+[rw-agent] channel: attack 652 by 524
+[rw-agent] channel: attack 652 by 543
+[rw-agent] channel: attack 652 by 554
+[rw-agent] channel: attack 652 by 573
+[rw-agent] channel: attack 652 by 590
+[rw-agent] channel: attack 652 by 616
+[rw-agent] channel: attack 652 by 661
+[rw-agent] channel: attack 652 by 681
+[rw-agent] channel: attack 652 by 701
+[rw-agent] channel: attack 652 by 743
+[rw-agent] channel: attack 652 by 767
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 652 by 785
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 652 by 836
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 652 by 899
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 652 by 941
+[rw-agent] channel: attack 529 by 287
+[rw-agent] channel: attack 529 by 312
+[rw-agent] channel: attack 529 by 316
+[rw-agent] channel: attack 529 by 318
+[rw-agent] channel: attack 529 by 371
+[rw-agent] channel: attack 529 by 389
+[rw-agent] channel: attack 529 by 413
+[rw-agent] channel: attack 529 by 459
+[rw-agent] channel: attack 529 by 464
+[rw-agent] channel: attack 529 by 517
+[rw-agent] channel: attack 529 by 524
+[rw-agent] channel: attack 529 by 543
+[rw-agent] channel: attack 529 by 554
+[rw-agent] channel: attack 529 by 573
+[rw-agent] channel: attack 529 by 590
+[rw-agent] channel: attack 529 by 661
+[rw-agent] channel: attack 529 by 681
+[rw-agent] channel: attack 529 by 701
+[rw-agent] channel: attack 529 by 743
+[rw-agent] channel: attack 529 by 767
+[rw-agent] channel: attack 529 by 785
+[rw-agent] channel: attack 529 by 836
+[rw-agent] channel: attack 529 by 899
+[rw-agent] channel: attack 529 by 941
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 529 by 986
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 529 by 1035
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 664 by 389
+[rw-agent] channel: attack 664 by 413
+[rw-agent] channel: attack 664 by 464
+[rw-agent] channel: attack 664 by 554
+[rw-agent] channel: attack 664 by 590
+[rw-agent] channel: attack 664 by 661
+[rw-agent] channel: attack 664 by 681
+[rw-agent] channel: attack 664 by 701
+[rw-agent] channel: attack 664 by 743
+[rw-agent] channel: attack 664 by 767
+[rw-agent] channel: attack 664 by 785
+[rw-agent] channel: attack 664 by 836
+[rw-agent] channel: attack 664 by 899
+[rw-agent] channel: attack 664 by 941
+[rw-agent] channel: attack 664 by 986
+[rw-agent] channel: attack 664 by 1035
+[rw-agent] channel: attack 664 by 1134
+[rw-agent] channel: attack 529 by 389
+[rw-agent] channel: attack 529 by 413
+[rw-agent] channel: attack 529 by 464
+[rw-agent] channel: attack 529 by 554
+[rw-agent] channel: attack 529 by 590
+[rw-agent] channel: attack 529 by 661
+[rw-agent] channel: attack 529 by 681
+[rw-agent] channel: attack 529 by 701
+[rw-agent] channel: attack 529 by 743
+[rw-agent] channel: attack 529 by 767
+[rw-agent] channel: attack 529 by 785
+[rw-agent] channel: attack 529 by 836
+[rw-agent] channel: attack 529 by 899
+[rw-agent] channel: attack 529 by 941
+[rw-agent] channel: attack 529 by 986
+[rw-agent] channel: attack 529 by 1035
+[rw-agent] channel: attack 529 by 1134
+[rw-agent] channel: attack 664 by 389
+[rw-agent] channel: attack 664 by 464
+[rw-agent] channel: attack 664 by 554
+[rw-agent] channel: attack 664 by 590
+[rw-agent] channel: attack 664 by 661
+[rw-agent] channel: attack 664 by 681
+[rw-agent] channel: attack 664 by 701
+[rw-agent] channel: attack 664 by 743
+[rw-agent] channel: attack 664 by 767
+[rw-agent] channel: attack 664 by 785
+[rw-agent] channel: attack 664 by 836
+[rw-agent] channel: attack 664 by 899
+[rw-agent] channel: attack 664 by 941
+[rw-agent] channel: attack 664 by 986
+[rw-agent] channel: attack 664 by 1035
+[rw-agent] channel: attack 664 by 1134
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 664 by 1214
+[rw-agent] channel: attack 569 by 389
+[rw-agent] channel: attack 569 by 554
+[rw-agent] channel: attack 569 by 590
+[rw-agent] channel: attack 569 by 661
+[rw-agent] channel: attack 569 by 681
+[rw-agent] channel: attack 569 by 701
+[rw-agent] channel: attack 569 by 743
+[rw-agent] channel: attack 569 by 785
+[rw-agent] channel: attack 569 by 836
+[rw-agent] channel: attack 569 by 941
+[rw-agent] channel: attack 569 by 986
+[rw-agent] channel: attack 569 by 1035
+[rw-agent] channel: attack 569 by 1134
+[rw-agent] channel: attack 569 by 1214
+[rw-agent] channel: attack 403 by 389
+[rw-agent] channel: attack 403 by 554
+[rw-agent] channel: attack 403 by 590
+[rw-agent] channel: attack 403 by 661
+[rw-agent] channel: attack 403 by 681
+[rw-agent] channel: attack 403 by 701
+[rw-agent] channel: attack 403 by 743
+[rw-agent] channel: attack 403 by 785
+[rw-agent] channel: attack 403 by 836
+[rw-agent] channel: attack 403 by 941
+[rw-agent] channel: attack 403 by 986
+[rw-agent] channel: attack 403 by 1035
+[rw-agent] channel: attack 403 by 1134
+[rw-agent] channel: attack 403 by 1214
+[rw-agent] channel: attack 569 by 389
+[rw-agent] channel: attack 569 by 554
+[rw-agent] channel: attack 569 by 590
+[rw-agent] channel: attack 569 by 661
+[rw-agent] channel: attack 569 by 681
+[rw-agent] channel: attack 569 by 701
+[rw-agent] channel: attack 569 by 743
+[rw-agent] channel: attack 569 by 785
+[rw-agent] channel: attack 569 by 941
+[rw-agent] channel: attack 569 by 986
+[rw-agent] channel: attack 569 by 1035
+[rw-agent] channel: attack 569 by 1134
+[rw-agent] channel: attack 569 by 1214
+[rw-agent] channel: attack 575 by 389
+[rw-agent] channel: attack 575 by 554
+[rw-agent] channel: attack 575 by 590
+[rw-agent] channel: attack 575 by 661
+[rw-agent] channel: attack 575 by 681
+[rw-agent] channel: attack 575 by 701
+[rw-agent] channel: attack 575 by 743
+[rw-agent] channel: attack 575 by 785
+[rw-agent] channel: attack 575 by 941
+[rw-agent] channel: attack 575 by 986
+[rw-agent] channel: attack 575 by 1035
+[rw-agent] channel: attack 575 by 1134
+[rw-agent] channel: attack 575 by 1214
+[rw-agent] channel: attack 569 by 389
+[rw-agent] channel: attack 569 by 554
+[rw-agent] channel: attack 569 by 590
+[rw-agent] channel: attack 569 by 661
+[rw-agent] channel: attack 569 by 681
+[rw-agent] channel: attack 569 by 701
+[rw-agent] channel: attack 569 by 743
+[rw-agent] channel: attack 569 by 785
+[rw-agent] channel: attack 569 by 941
+[rw-agent] channel: attack 569 by 986
+[rw-agent] channel: attack 569 by 1035
+[rw-agent] channel: attack 569 by 1134
+[rw-agent] channel: attack 569 by 1214
+[rw-agent] channel: attack 403 by 389
+[rw-agent] channel: attack 403 by 554
+[rw-agent] channel: attack 403 by 590
+[rw-agent] channel: attack 403 by 681
+[rw-agent] channel: attack 403 by 701
+[rw-agent] channel: attack 403 by 743
+[rw-agent] channel: attack 403 by 785
+[rw-agent] channel: attack 403 by 941
+[rw-agent] channel: attack 403 by 986
+[rw-agent] channel: attack 403 by 1035
+[rw-agent] channel: attack 403 by 1134
+[rw-agent] channel: attack 403 by 1214
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 403 by 1269
+[rw-agent] channel: attack 465 by 389
+[rw-agent] channel: attack 465 by 785
+[rw-agent] channel: attack 465 by 941
+[rw-agent] channel: attack 465 by 986
+[rw-agent] channel: attack 465 by 1035
+[rw-agent] channel: attack 465 by 1134
+[rw-agent] channel: attack 465 by 1214
+[rw-agent] channel: attack 465 by 1269
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 465 by 1359
+[rw-agent] channel: attack 529 by 389
+[rw-agent] channel: attack 529 by 941
+[rw-agent] channel: attack 529 by 986
+[rw-agent] channel: attack 529 by 1035
+[rw-agent] channel: attack 529 by 1134
+[rw-agent] channel: attack 529 by 1214
+[rw-agent] channel: attack 529 by 1269
+[rw-agent] channel: attack 529 by 1359
+[rw-agent] channel: attack 574 by 389
+[rw-agent] channel: attack 574 by 941
+[rw-agent] channel: attack 574 by 1035
+[rw-agent] channel: attack 574 by 1134
+[rw-agent] channel: attack 574 by 1214
+[rw-agent] channel: attack 574 by 1269
+[rw-agent] channel: attack 574 by 1359
+[rw-agent] channel: attack 465 by 389
+[rw-agent] channel: attack 465 by 941
+[rw-agent] channel: attack 465 by 1035
+[rw-agent] channel: attack 465 by 1134
+[rw-agent] channel: attack 465 by 1214
+[rw-agent] channel: attack 465 by 1269
+[rw-agent] channel: attack 465 by 1359
+[rw-agent] channel: attack 574 by 389
+[rw-agent] channel: attack 574 by 941
+[rw-agent] channel: attack 574 by 1134
+[rw-agent] channel: attack 574 by 1214
+[rw-agent] channel: attack 574 by 1269
+[rw-agent] channel: attack 574 by 1359
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 574 by 1435
+[rw-agent] channel: attack 569 by 1134
+[rw-agent] channel: attack 569 by 1214
+[rw-agent] channel: attack 569 by 1269
+[rw-agent] channel: attack 569 by 1359
+[rw-agent] channel: attack 569 by 1435
+[rw-agent] channel: attack 574 by 1214
+[rw-agent] channel: attack 574 by 1269
+[rw-agent] channel: attack 574 by 1359
+[rw-agent] channel: attack 574 by 1435
+[rw-agent] channel: attack 689 by 1214
+[rw-agent] channel: attack 689 by 1269
+[rw-agent] channel: attack 689 by 1359
+[rw-agent] channel: attack 689 by 1435
+[rw-agent] channel: attack 403 by 1214
+[rw-agent] channel: attack 403 by 1269
+[rw-agent] channel: attack 403 by 1359
+[rw-agent] channel: attack 403 by 1435
+[rw-agent] channel: attack 574 by 1269
+[rw-agent] channel: attack 574 by 1359
+[rw-agent] channel: attack 574 by 1435
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 574 by 1466
+[rw-agent] channel: attack 403 by 1269
+[rw-agent] channel: attack 403 by 1359
+[rw-agent] channel: attack 403 by 1435
+[rw-agent] channel: attack 403 by 1466
+[rw-agent] channel: attack 574 by 1359
+[rw-agent] channel: attack 574 by 1435
+[rw-agent] channel: attack 574 by 1466
+[rw-agent] channel: attack 403 by 1359
+[rw-agent] channel: attack 403 by 1435
+[rw-agent] channel: attack 403 by 1466
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 403 by 1523
+[rw-agent] channel: attack 574 by 1435
+[rw-agent] channel: attack 574 by 1466
+[rw-agent] channel: attack 574 by 1523
+[rw-agent] channel: attack 403 by 1435
+[rw-agent] channel: attack 403 by 1466
+[rw-agent] channel: attack 403 by 1523
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 403 by 1544
+[rw-agent] channel: attack 574 by 1466
+[rw-agent] channel: attack 574 by 1523
+[rw-agent] channel: attack 574 by 1544
+[rw-agent] channel: attack 403 by 1466
+[rw-agent] channel: attack 403 by 1523
+[rw-agent] channel: attack 403 by 1544
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 403 by 1571
+2026-07-26 00:24:07.433: buildAndReplaceClearanceCost being skipped
+2026-07-26 00:24:07.433: buildAndReplaceClearanceCost being skipped
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 403 by 1618
+[rw-agent] produce: c_tank via action 'u_c_tank' on com.corrodinggames.rts.game.units.a.l [applies=true available=true locked=false room=true]
+[rw-agent] channel: produce c_tank by 279
+[rw-agent] channel: attack 574 by 1523
+[rw-agent] channel: attack 574 by 1659
+[rw-agent] channel: attack 403 by 1523
+[rw-agent] channel: attack 403 by 1659
+[rw-agent] channel: planner disconnected
+2026-07-26 00:25:34.333: Saving game to: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-07-26 00:25:34.333: GameSaver:saveCurrentMap took:0
+2026-07-26 00:25:34.334: TeamHistory(0): totalValues written:221
+2026-07-26 00:25:34.334: TeamHistory(1): totalValues written:164
+2026-07-26 00:25:34.334: TeamHistory(-1): totalValues written:0
+2026-07-26 00:25:34.334: TeamHistory(3): totalValues written:138
+2026-07-26 00:25:34.334: TeamHistory(-1): totalValues written:0
+2026-07-26 00:25:34.334: TeamHistory(5): totalValues written:126
+2026-07-26 00:25:34.334: TeamHistory(-1): totalValues written:0
+2026-07-26 00:25:34.334: TeamHistory(7): totalValues written:137
+2026-07-26 00:25:34.334: TeamHistory(-1): totalValues written:0
+2026-07-26 00:25:34.334: TeamHistory(-1): totalValues written:0
+2026-07-26 00:25:34.341: GameSaver:saveGame took:8
+2026-07-26 00:25:34.341: Finished writing save, renaming to final filename
+2026-07-26 00:25:34.341: renameFile: C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave.tmp2 to:C:\Users\Test\PROJECTS\API\clients\RustedWarfareBot\.game\saves\autosave.rwsave
+2026-07-26 00:25:34.342: Failed to rename to final file
+2026-07-26 00:25:34.342: Auto save failed: Failed to rename to final file. Check file permissions of storage.
+2026-07-26 00:25:34.342: Autosaved (9.072ms)

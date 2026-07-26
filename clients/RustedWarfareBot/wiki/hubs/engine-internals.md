@@ -22,3 +22,6 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 [The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- what each type can make, dumped from the registry; the static half the option stream cannot answer
 [Build Actions: Two Families, Two Verbs, Five Gates](../pages/mechanics-build-actions.md) -- placing and producing are one mechanism dispatched two ways, and the five conditions that stop an order, four of which say nothing
 [How the Built-in AI Plays](../pages/ai-opponent-strategy.md) -- the opponents' own code: a weighted unit mix, and attacks that delay, mass, then commit
+[The Shipped AI's Zone System](../pages/engine-ai-zones.md) -- the AI's unit of place: five zone kinds, one-unit-one-zone, and expansion sited on resource pools at random
+[The Shipped AI's Build and Attack Triggers](../pages/engine-ai-triggers.md) -- when it builds, makes units and commits: a credit ladder, a unit budget, and fill-then-commit attack groups of 3, 5, 7
+[Fighting: the Attack Verb, and Keeping an Army Alive](../pages/policy-combat.md) -- av.b is attack, proven by a target losing exactly the attacker's catalogued damage

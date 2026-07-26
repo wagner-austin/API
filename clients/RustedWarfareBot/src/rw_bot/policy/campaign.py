@@ -13,13 +13,14 @@ and in :mod:`rw_bot.policy.runner` and nowhere else.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.policy.combat import engagements, find_army, find_targets
-from rw_bot.wire.command import attack_order
+from rw_bot.policy.production import sustain
+from rw_bot.wire.command import attack_order, produce_order
 
 
 class Battle(TypedDict):
@@ -35,11 +36,13 @@ class Battle(TypedDict):
             visible. Not a kill count -- a target that retreated into fog reads
             the same way, which is why the field is named for what was observed
             rather than for what was concluded.
+        produced: Reinforcements ordered while the fight ran.
         samples_seen: World samples read during the phase.
         outcome: Why it stopped: ``"cleared"``, ``"no_army"``, or
             ``"sample_limit"``.
     """
 
+    produced: int
     orders_sent: int
     army_start: int
     army_end: int
@@ -54,18 +57,26 @@ def fight(
     channel: AgentChannel,
     catalogue: Mapping[str, UnitStats],
     max_samples: int,
+    reinforce: Sequence[str] = (),
 ) -> Battle:
-    """Send the army at the enemy until one side runs out.
+    """Send the army at the enemy, replacing losses as it goes.
 
     An order is re-sent only when a unit's target changes. The engine keeps
     executing a waypoint until it is replaced, so re-issuing the same attack
     every sample would replace an in-progress order with an identical one at
     ~300 Hz and the unit would never close the distance.
 
+    Reinforcement is what makes this a fight rather than a sortie. Without it
+    the bot commits a fixed force and is finished when that force is, which is
+    exactly how it lost 4 tanks to nothing: the opponents replace losses
+    continuously and we did not ([[ai-opponent-strategy]]).
+
     Args:
         channel: An open connection to the agent.
         catalogue: Unit stats by type name, for reading who is armed.
         max_samples: Stop after this many samples regardless.
+        reinforce: Type names idle producers should keep making. Empty means
+            fight with what exists and make nothing.
 
     Returns:
         The battle report.
@@ -78,6 +89,7 @@ def fight(
     attacked: set[int] = set()
     visible_now: set[int] = set()
     orders_sent = 0
+    produced = 0
     samples_seen = 0
     army_start = 0
     targets_seen = 0
@@ -97,6 +109,14 @@ def fight(
         if samples_seen == 1:
             army_start = army_end
             targets_seen = targets_end
+
+        # Production runs before the army check, so a wave that has just been
+        # wiped still queues its replacements on the sample that notices.
+        for order in sustain(sample, catalogue, reinforce):
+            channel.send_produce(
+                produce_order(unit_id=order["unit_id"], type_name=order["type_name"])
+            )
+            produced += 1
 
         if not army:
             # Nothing left to fight with. Distinct from having cleared the
@@ -118,6 +138,7 @@ def fight(
             orders_sent += 1
 
     return Battle(
+        produced=produced,
         orders_sent=orders_sent,
         army_start=army_start,
         army_end=army_end,
@@ -141,6 +162,7 @@ def format_battle(battle: Battle) -> tuple[str, ...]:
     return (
         f"fight outcome  {battle['outcome']}",
         f"attack orders  {battle['orders_sent']}",
+        f"reinforced     {battle['produced']}",
         f"army           {battle['army_start']} -> {battle['army_end']}",
         f"enemies seen   {battle['targets_seen']} -> {battle['targets_end']}",
         f"engaged gone   {battle['killed']}",

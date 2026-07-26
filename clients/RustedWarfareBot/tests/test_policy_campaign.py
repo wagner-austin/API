@@ -176,12 +176,38 @@ def test_an_engaged_target_that_disappears_is_counted() -> None:
     assert battle["outcome"] == "cleared"
 
 
+def test_losses_are_replaced_while_the_fight_runs() -> None:
+    """Without this the bot commits a fixed force and is finished when it is.
+
+    The opponents replace losses continuously; a sortie that cannot be
+    reinforced is how four tanks were lost to nothing.
+    """
+    factory = (300, "landFactory", True, 0.0)
+    option = (
+        '{"kind":"option","frame":1,"index":0,"unit_id":300,'
+        '"produces":"c_tank","action":1,"placed":false,"available":true}'
+    )
+    lines = _sample_lines(1, _TANK, _ENEMY, factory)
+    lines.insert(1, option)
+    lines[0] = lines[0].replace('"options":0', '"options":1')
+    peer = _ScriptedPeer(lines * 2)
+    battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=2, reinforce=("c_tank",))
+    assert battle["produced"] == 2
+    assert '{"kind":"produce","unit_id":300,"type":"c_tank"}' in peer.sent
+
+
+def test_nothing_is_reinforced_when_nothing_is_wanted() -> None:
+    peer = _ScriptedPeer(_sample_lines(1, _TANK, _ENEMY) * 2)
+    assert fight(AgentChannel(peer), _CATALOGUE, max_samples=2)["produced"] == 0
+
+
 def test_the_report_renders_every_figure() -> None:
     peer = _ScriptedPeer(_sample_lines(1, _TANK, _ENEMY) * 2)
     lines = format_battle(fight(AgentChannel(peer), _CATALOGUE, max_samples=2))
     assert lines == (
         "fight outcome  sample_limit",
         "attack orders  1",
+        "reinforced     0",
         "army           1 -> 1",
         "enemies seen   1 -> 1",
         "engaged gone   0",

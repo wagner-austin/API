@@ -21,6 +21,7 @@ final class AgentOptions {
     private final String findElementsUnder;
     private final String stateOutPath;
     private final String typeFlagsPath;
+    private final boolean aiZones;
     private final int orderMoveAtSeconds;
     private final float[] orderMoveBy;
     private final int orderMoveUnitIndex;
@@ -39,6 +40,7 @@ final class AgentOptions {
             String buildType,
             String stateOutPath,
             String typeFlagsPath,
+            boolean aiZones,
             int channelPort,
             int sampleIntervalMs) {
         this.discoverAtSeconds = discoverAtSeconds;
@@ -51,6 +53,7 @@ final class AgentOptions {
         this.buildType = buildType;
         this.stateOutPath = stateOutPath;
         this.typeFlagsPath = typeFlagsPath;
+        this.aiZones = aiZones;
         this.channelPort = channelPort;
         this.sampleIntervalMs = sampleIntervalMs;
     }
@@ -164,6 +167,21 @@ final class AgentOptions {
      */
     String typeFlagsPath() {
         return typeFlagsPath;
+    }
+
+    /**
+     * Whether to dump the shipped AI's zone objects at each discovery offset.
+     *
+     * <p>Off by default, and it stays a log dump rather than becoming a stream
+     * field. The distinction is not stylistic: a zone is the opposing AI's
+     * plan, which no human player can see, so it is research material and
+     * never an input to play. Keeping it off the wire means the planner cannot
+     * consume it even by mistake ({@link AiZones}).
+     *
+     * @return True when the dump was requested.
+     */
+    boolean aiZones() {
+        return aiZones;
     }
 
     /**
