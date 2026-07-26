@@ -64,6 +64,7 @@ def test_create_synthetic_correct_shapes() -> None:
 
     assert data["daily_values"].shape == (3 * 365, 2)
     assert data["day_of_year"].shape == (3 * 365,)
+    assert data["month_labels"].shape == (3 * 365,)
     assert data["year_labels"].shape == (3 * 365,)
 
 
@@ -78,6 +79,7 @@ def test_create_synthetic_correct_dtypes() -> None:
 
     assert data["daily_values"].dtype == np.float64
     assert data["day_of_year"].dtype == np.int64
+    assert data["month_labels"].dtype == np.int64
     assert data["year_labels"].dtype == np.int64
 
 
@@ -92,6 +94,71 @@ def test_create_synthetic_day_of_year_range() -> None:
 
     assert int(np.min(data["day_of_year"])) == 1
     assert int(np.max(data["day_of_year"])) == 365
+
+
+def test_create_synthetic_month_labels_follow_the_calendar() -> None:
+    """Month labels place each day-of-year in its non-leap calendar month.
+
+    The season restriction is driven entirely by these labels, so an
+    off-by-one here would shift which days the tail thresholds describe.
+    """
+    data = create_synthetic_daily_timeseries(
+        n_years=1,
+        n_locations=1,
+        n_harmonics=1,
+        seed=42,
+    )
+    months = data["month_labels"]
+
+    # Boundaries of each month on a 365-day calendar, as (day_of_year, month).
+    for day, expected in (
+        (1, 1),
+        (31, 1),
+        (32, 2),
+        (59, 2),
+        (60, 3),
+        (152, 6),
+        (181, 6),
+        (182, 7),
+        (213, 8),
+        (244, 9),
+        (334, 11),
+        (335, 12),
+        (365, 12),
+    ):
+        assert int(months.flat[day - 1]) == expected, f"day {day}"
+
+
+def test_create_synthetic_month_labels_cover_every_month() -> None:
+    """All twelve months appear, with the right number of days each."""
+    data = create_synthetic_daily_timeseries(
+        n_years=1,
+        n_locations=1,
+        n_harmonics=1,
+        seed=42,
+    )
+    months = data["month_labels"]
+
+    counts = [
+        sum(1 for i in range(int(months.shape[0])) if int(months.flat[i]) == month)
+        for month in range(1, 13)
+    ]
+    assert counts == [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    assert sum(counts) == 365
+
+
+def test_create_synthetic_month_labels_repeat_each_year() -> None:
+    """Every year carries the same month pattern, since no year is a leap year."""
+    data = create_synthetic_daily_timeseries(
+        n_years=3,
+        n_locations=1,
+        n_harmonics=1,
+        seed=42,
+    )
+    months = data["month_labels"]
+
+    np.testing.assert_array_equal(months[0:365], months[365:730])
+    np.testing.assert_array_equal(months[365:730], months[730:1095])
 
 
 def test_create_synthetic_year_labels() -> None:

@@ -21,6 +21,7 @@ from covenant_ml.datasets.loaders._netcdf_temporal import (
     fit_tail_thresholds,
     fit_temporal_features,
     remove_seasonal_cycle,
+    select_season,
     transform_temporal_features,
 )
 from covenant_ml.datasets.testing import create_synthetic_daily_timeseries
@@ -617,6 +618,7 @@ class TestFitTemporalFeatures:
         state = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
@@ -640,12 +642,14 @@ class TestFitTemporalFeatures:
         state1 = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
         state2 = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
@@ -670,12 +674,14 @@ class TestTransformTemporalFeatures:
         state = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
         result = transform_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             state,
         )
@@ -695,12 +701,14 @@ class TestTransformTemporalFeatures:
         state = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
         result = transform_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             state,
         )
@@ -726,12 +734,14 @@ class TestTransformTemporalFeatures:
         state = fit_temporal_features(
             train["daily_values"],
             train["day_of_year"],
+            train["month_labels"],
             train["year_labels"],
             config,
         )
         result = transform_temporal_features(
             test_data["daily_values"],
             test_data["day_of_year"],
+            test_data["month_labels"],
             test_data["year_labels"],
             state,
         )
@@ -751,12 +761,14 @@ class TestTransformTemporalFeatures:
         state = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
         result = transform_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             state,
         )
@@ -784,6 +796,265 @@ class TestBuildTemporalFeatureNames:
         assert len(names) == 8
 
 
+class TestSelectSeason:
+    """Tests for select_season, which is the pipeline's one restriction point."""
+
+    def test_selects_only_the_named_months(self) -> None:
+        """The mask is true exactly on the configured months."""
+        months = _i64([1, 5, 6, 7, 8, 9, 12])
+
+        mask = select_season(months, (6, 7, 8))
+
+        assert [bool(mask.flat[i]) for i in range(int(mask.shape[0]))] == [
+            False,
+            False,
+            True,
+            True,
+            True,
+            False,
+            False,
+        ]
+
+    def test_a_single_month_season_is_allowed(self) -> None:
+        """A season may be one month; nothing requires three."""
+        months = _i64([6, 7, 8])
+
+        mask = select_season(months, (7,))
+
+        assert [bool(mask.flat[i]) for i in range(int(mask.shape[0]))] == [False, True, False]
+
+    def test_empty_season_is_rejected(self) -> None:
+        """An empty season would fit the thresholds on nothing."""
+        with pytest.raises(ValueError, match="season_months is empty"):
+            select_season(_i64([6, 7, 8]), ())
+
+    def test_non_month_value_is_rejected(self) -> None:
+        """A month outside 1-12 is a mistake, not an empty selection."""
+        with pytest.raises(ValueError, match="non-months"):
+            select_season(_i64([6, 7, 8]), (6, 13))
+
+    def test_season_matching_no_observed_month_is_rejected(self) -> None:
+        """Winter months against summer data must fail, not select nothing.
+
+        Silently selecting nothing would reach fit_tail_thresholds with an
+        empty array and produce NaN thresholds, which compare false against
+        everything and so never flag an extreme.
+        """
+        with pytest.raises(ValueError, match="match none of the observed"):
+            select_season(_i64([6, 7, 8]), (12, 1, 2))
+
+
+class TestSeasonalCycleConditioning:
+    """A cycle that the observations cannot determine must be refused."""
+
+    def test_narrow_window_is_rejected(self) -> None:
+        """Summer days alone cannot determine an annual Fourier basis.
+
+        Over a 92-day window the harmonics of a 365-day period are nearly
+        collinear, so the solve returns coefficients around 1e5 that cancel
+        inside the window and diverge outside it. The fit looks excellent
+        exactly where it was fitted, so nothing downstream can notice.
+        """
+        summer_doy = _i64(list(range(152, 244)))
+        values = _f64_2d([[20.0 + 0.1 * day] for day in range(152, 244)])
+
+        with pytest.raises(ValueError, match="not determined by these observations"):
+            fit_seasonal_cycle(values, summer_doy, 5)
+
+    def test_rejection_names_the_span_and_the_remedy(self) -> None:
+        """The message must say what was too narrow and what to do instead."""
+        summer_doy = _i64(list(range(152, 244)))
+        values = _f64_2d([[20.0 + 0.1 * day] for day in range(152, 244)])
+
+        with pytest.raises(ValueError, match=r"span 92 of 365 days"):
+            fit_seasonal_cycle(values, summer_doy, 5)
+
+        with pytest.raises(ValueError, match="full year"):
+            fit_seasonal_cycle(values, summer_doy, 5)
+
+    def test_full_year_is_accepted(self) -> None:
+        """A year of daily observations determines the basis comfortably."""
+        data = create_synthetic_daily_timeseries(
+            n_years=2,
+            n_locations=1,
+            n_harmonics=5,
+            seed=11,
+        )
+
+        cycle = fit_seasonal_cycle(data["daily_values"], data["day_of_year"], 5)
+
+        assert len(cycle["cos_coefficients"]) == 5
+
+    def test_full_year_fit_stays_bounded_all_year(self) -> None:
+        """Reconstruction must be physical on every day, not just in season.
+
+        The streaming extractor accepts any day-of-year and evaluates the
+        fitted series directly. A fit that only holds inside the season
+        turns every off-season observation into an enormous anomaly, and so
+        into a critical alert.
+        """
+        data = create_synthetic_daily_timeseries(
+            n_years=3,
+            n_locations=1,
+            n_harmonics=5,
+            seed=12,
+            seasonal_amplitude=10.0,
+            mean_value=20.0,
+        )
+        cycle = fit_seasonal_cycle(data["daily_values"], data["day_of_year"], 5)
+
+        every_day = _i64(list(range(1, 366)))
+        single_column = _f64_2d([[0.0] for _ in range(365)])
+        reconstruction = single_column - remove_seasonal_cycle(single_column, every_day, cycle)
+
+        assert _max_abs(reconstruction) < 100.0
+
+
+class TestSeasonRestrictionInFit:
+    """The season selects which days the thresholds describe."""
+
+    def test_season_months_changes_the_thresholds(self) -> None:
+        """Two configs differing only in season must not agree.
+
+        season_months was declared, validated and serialized while no
+        computation read it, so this assertion held trivially in reverse:
+        every season produced identical thresholds.
+        """
+        data = create_synthetic_daily_timeseries(
+            n_years=5,
+            n_locations=2,
+            n_harmonics=3,
+            seed=42,
+        )
+        summer = TemporalFeatureConfig(
+            n_fourier_harmonics=3,
+            hot_cutoff_percentile=95.0,
+            cold_cutoff_percentile=5.0,
+            season="warm",
+            season_months=(6, 7, 8),
+            compute_ar1=False,
+        )
+        winter = TemporalFeatureConfig(
+            n_fourier_harmonics=3,
+            hot_cutoff_percentile=95.0,
+            cold_cutoff_percentile=5.0,
+            season="cold",
+            season_months=(12, 1, 2),
+            compute_ar1=False,
+        )
+
+        summer_state = fit_temporal_features(
+            data["daily_values"],
+            data["day_of_year"],
+            data["month_labels"],
+            data["year_labels"],
+            summer,
+        )
+        winter_state = fit_temporal_features(
+            data["daily_values"],
+            data["day_of_year"],
+            data["month_labels"],
+            data["year_labels"],
+            winter,
+        )
+
+        assert (
+            summer_state["thresholds"]["hot_threshold"]
+            != winter_state["thresholds"]["hot_threshold"]
+        )
+
+    def test_seasonal_cycle_does_not_depend_on_the_season(self) -> None:
+        """The cycle is fitted on the whole year, so the season cannot move it."""
+        data = create_synthetic_daily_timeseries(
+            n_years=5,
+            n_locations=2,
+            n_harmonics=3,
+            seed=42,
+        )
+        summer = _make_config(compute_ar1=False)
+        winter = TemporalFeatureConfig(
+            n_fourier_harmonics=3,
+            hot_cutoff_percentile=95.0,
+            cold_cutoff_percentile=5.0,
+            season="cold",
+            season_months=(12, 1, 2),
+            compute_ar1=False,
+        )
+
+        summer_state = fit_temporal_features(
+            data["daily_values"],
+            data["day_of_year"],
+            data["month_labels"],
+            data["year_labels"],
+            summer,
+        )
+        winter_state = fit_temporal_features(
+            data["daily_values"],
+            data["day_of_year"],
+            data["month_labels"],
+            data["year_labels"],
+            winter,
+        )
+
+        assert summer_state["seasonal_cycle"] == winter_state["seasonal_cycle"]
+
+    def test_thresholds_match_a_hand_restricted_fit(self) -> None:
+        """The orchestrator restricts exactly where the primitives would.
+
+        Spelling the chain out by hand pins which stages see the whole year
+        and which see one season, so a future edit that moves the boundary
+        fails here rather than shifting every threshold quietly.
+        """
+        data = create_synthetic_daily_timeseries(
+            n_years=5,
+            n_locations=2,
+            n_harmonics=3,
+            seed=42,
+        )
+        config = _make_config(compute_ar1=False)
+
+        state = fit_temporal_features(
+            data["daily_values"],
+            data["day_of_year"],
+            data["month_labels"],
+            data["year_labels"],
+            config,
+        )
+
+        cycle = fit_seasonal_cycle(data["daily_values"], data["day_of_year"], 3)
+        anomalies = remove_seasonal_cycle(data["daily_values"], data["day_of_year"], cycle)
+        in_season = select_season(data["month_labels"], (6, 7, 8))
+        medians, years = compute_within_season_medians(
+            anomalies[in_season], data["year_labels"][in_season]
+        )
+        residuals = compute_residuals(
+            anomalies[in_season], data["year_labels"][in_season], medians, years
+        )
+        expected: TailThresholds = fit_tail_thresholds(residuals, 95.0, 5.0)
+
+        assert state["thresholds"] == expected
+
+    def test_season_absent_from_the_data_is_rejected(self) -> None:
+        """A season the observations never cover cannot be fitted."""
+        data = create_synthetic_daily_timeseries(
+            n_years=2,
+            n_locations=1,
+            n_harmonics=3,
+            seed=7,
+        )
+        january_only = _i64([1] * int(data["month_labels"].shape[0]))
+        config = _make_config(compute_ar1=False)
+
+        with pytest.raises(ValueError, match="match none of the observed"):
+            fit_temporal_features(
+                data["daily_values"],
+                data["day_of_year"],
+                january_only,
+                data["year_labels"],
+                config,
+            )
+
+
 class TestEndToEndPipeline:
     """Integration tests for the full temporal feature pipeline."""
 
@@ -801,6 +1072,7 @@ class TestEndToEndPipeline:
         state = fit_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             config,
         )
@@ -818,6 +1090,7 @@ class TestEndToEndPipeline:
         result = transform_temporal_features(
             data["daily_values"],
             data["day_of_year"],
+            data["month_labels"],
             data["year_labels"],
             state,
         )

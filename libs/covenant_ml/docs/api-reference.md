@@ -914,9 +914,17 @@ TypedDicts for model manifest serialization:
 | `compute_residuals(residuals, medians, year_labels)` | Subtract within-season medians from residuals |
 | `fit_tail_thresholds(residuals, config)` | Compute hot/cold percentile thresholds |
 | `compute_heat_metrics(residuals, year_labels, thresholds, config)` | Compute all 9 heat metrics |
-| `fit_temporal_features(values, doy, year_labels, config)` | Fit complete pipeline, return state |
-| `transform_temporal_features(values, doy, year_labels, state)` | Transform using fitted state |
+| `select_season(month_labels, season_months)` | Mask the days the thresholds are fitted on |
+| `fit_temporal_features(values, doy, month_labels, year_labels, config)` | Fit complete pipeline, return state |
+| `transform_temporal_features(values, doy, month_labels, year_labels, state)` | Transform using fitted state |
 | `build_temporal_feature_names(config)` | Build ordered list of feature names |
+
+Pass `fit_temporal_features` and `transform_temporal_features` the full
+calendar year. They fit the seasonal cycle across all of it and restrict to
+`config["season_months"]` themselves for the medians and tail thresholds.
+Handing them pre-filtered season days puts a ~92-day sample against a
+365-day Fourier basis; `fit_seasonal_cycle` raises rather than returning the
+coefficients that produces.
 
 ## Rank-Trend Hypothesis Testing (McKinnon PNAS 2024, Steps 4-7)
 

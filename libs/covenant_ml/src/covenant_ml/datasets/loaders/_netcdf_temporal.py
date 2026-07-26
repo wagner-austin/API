@@ -7,7 +7,14 @@ of change of summertime temperature extremes").
 All functions operate on multi-location data with shapes:
 - daily_values: (n_days, n_locations)
 - day_of_year: (n_days,)
+- month_labels: (n_days,)
 - year_labels: (n_days,)
+
+Give fit and transform the whole calendar year. The two halves of the
+pipeline need different spans: the Fourier basis has annual period and is
+only determined by observations covering the year, while the medians and
+tail thresholds are defined within one season. select_season is the single
+place that boundary is drawn, driven by config["season_months"].
 
 Internal module - used by the future netcdf_loader.
 """
@@ -56,13 +63,58 @@ class _PercentileProtocol(Protocol):
     def __call__(self, a: NDArray[np.float64], q: float) -> float: ...
 
 
+class _CondProtocol(Protocol):
+    """Protocol for numpy.linalg.cond returning float."""
+
+    def __call__(self, x: NDArray[np.float64]) -> float: ...
+
+
+class _IntReduceProtocol(Protocol):
+    """Protocol for numpy reductions over int64 arrays returning a scalar."""
+
+    def __call__(self, a: NDArray[np.int64]) -> np.int64: ...
+
+
+class _IntEqualProtocol(Protocol):
+    """Protocol for numpy.equal comparing an int64 array against a scalar."""
+
+    def __call__(self, x1: NDArray[np.int64], x2: int) -> NDArray[np.bool_]: ...
+
+
+class _BoolBinaryProtocol(Protocol):
+    """Protocol for numpy elementwise boolean combination."""
+
+    def __call__(self, x1: NDArray[np.bool_], x2: NDArray[np.bool_]) -> NDArray[np.bool_]: ...
+
+
+class _UniqueIntProtocol(Protocol):
+    """Protocol for numpy.unique over an int64 array."""
+
+    def __call__(self, ar: NDArray[np.int64]) -> NDArray[np.int64]: ...
+
+
 _numpy_mod = __import__("numpy")
-_linalg_mod = __import__("numpy.linalg", fromlist=["solve"])
+_linalg_mod = __import__("numpy.linalg", fromlist=["solve", "cond"])
 _linalg_solve: _LinalgSolveProtocol = _linalg_mod.solve
+_linalg_cond: _CondProtocol = _linalg_mod.cond
 _np_cos: _TrigProtocol = _numpy_mod.cos
 _np_sin: _TrigProtocol = _numpy_mod.sin
 _np_median: _MedianProtocol = _numpy_mod.median
 _np_percentile: _PercentileProtocol = _numpy_mod.percentile
+_np_amin: _IntReduceProtocol = _numpy_mod.amin
+_np_amax: _IntReduceProtocol = _numpy_mod.amax
+_np_equal: _IntEqualProtocol = _numpy_mod.equal
+_np_logical_or: _BoolBinaryProtocol = _numpy_mod.logical_or
+_np_unique: _UniqueIntProtocol = _numpy_mod.unique
+
+# Largest condition number of the normal-equations matrix that still leaves
+# the fitted coefficients meaningful. The solve is beta = (X^T X)^-1 X^T Y,
+# and forming X^T X squares the conditioning, so float64's ~16 significant
+# digits are eroded by log10(cond) of them. At 1e8 half the digits survive,
+# which is ample; a full-year daily fit sits near 2. Anything beyond this is
+# not a precision nuisance but a statement that the sample cannot determine
+# the basis -- most often a day-of-year range far narrower than the period.
+_MAX_DESIGN_CONDITION = 1.0e8
 
 
 def _build_fourier_basis(
@@ -120,7 +172,9 @@ def fit_seasonal_cycle(
         SeasonalCycleCoefficients with fitted Fourier coefficients per location.
 
     Raises:
-        ValueError: If input arrays have mismatched shapes or are empty.
+        ValueError: If input arrays have mismatched shapes or are empty, or
+            if the observed days do not span enough of the period to
+            determine the requested harmonics.
     """
     if len(daily_values.shape) != 2:
         raise ValueError(f"daily_values must be 2D, got shape {daily_values.shape}")
@@ -136,6 +190,24 @@ def fit_seasonal_cycle(
 
     # OLS: beta = (X^T X)^{-1} X^T Y, beta shape (n_cols, n_locations)
     xtx: NDArray[np.float64] = basis.T @ basis
+
+    # Over a narrow slice of the year the harmonics are nearly collinear, so
+    # the solve still returns coefficients -- enormous ones that cancel
+    # within the observed days and diverge everywhere else. Nothing
+    # downstream can detect that, because the fit looks excellent exactly
+    # where it was fitted. Refusing here is the only place the caller can
+    # still be told what went wrong.
+    condition: float = _linalg_cond(xtx)
+    if condition > _MAX_DESIGN_CONDITION:
+        span = int(_np_amax(day_of_year)) - int(_np_amin(day_of_year)) + 1
+        raise ValueError(
+            f"Seasonal cycle is not determined by these observations: design "
+            f"matrix condition {condition:.3e} exceeds {_MAX_DESIGN_CONDITION:.0e}. "
+            f"The {n_days} observations span {span} of {n_days_per_year} days, "
+            f"which is too narrow to fit {n_harmonics} harmonics of that period. "
+            f"Fit the cycle on the full year and restrict the season afterwards."
+        )
+
     xty: NDArray[np.float64] = basis.T @ daily_values
     beta: NDArray[np.float64] = _linalg_solve(xtx, xty)
 
@@ -197,6 +269,48 @@ def remove_seasonal_cycle(
     seasonal: NDArray[np.float64] = basis @ beta
     anomalies: NDArray[np.float64] = daily_values - seasonal
     return anomalies
+
+
+def select_season(
+    month_labels: NDArray[np.int64],
+    season_months: tuple[int, ...],
+) -> NDArray[np.bool_]:
+    """Select the days belonging to the configured season.
+
+    The seasonal cycle is fitted across the whole year, but the medians,
+    residuals and tail thresholds describe one season, so exactly one stage
+    of the pipeline restricts its input and this is where it happens.
+
+    Args:
+        month_labels: Calendar month, 1-12, for each day, shape (n_days,).
+        season_months: Month numbers defining the season, e.g. (6, 7, 8).
+
+    Returns:
+        Boolean mask of shape (n_days,), true on days within the season.
+
+    Raises:
+        ValueError: If season_months is empty, contains a value outside
+            1-12, or selects no day in the input.
+    """
+    if not season_months:
+        raise ValueError("season_months is empty; the season selects no days")
+    invalid = tuple(month for month in season_months if month < 1 or month > 12)
+    if invalid:
+        raise ValueError(f"season_months contains non-months: {invalid}")
+
+    mask: NDArray[np.bool_] = np.zeros(month_labels.shape[0], dtype=np.bool_)
+    for month in season_months:
+        matched: NDArray[np.bool_] = _np_equal(month_labels, month)
+        mask = _np_logical_or(mask, matched)
+
+    if not bool(mask.any()):
+        distinct: NDArray[np.int64] = _np_unique(month_labels)
+        observed = tuple(int(distinct.flat[index]) for index in range(int(distinct.shape[0])))
+        raise ValueError(
+            f"Season months {season_months} match none of the observed "
+            f"months {observed}; the thresholds would be fitted on no data"
+        )
+    return mask
 
 
 def compute_within_season_medians(
@@ -441,28 +555,42 @@ def compute_heat_metrics(
 def fit_temporal_features(
     daily_values: NDArray[np.float64],
     day_of_year: NDArray[np.int64],
+    month_labels: NDArray[np.int64],
     year_labels: NDArray[np.int64],
     config: TemporalFeatureConfig,
 ) -> TemporalFeatureState:
     """Fit temporal feature extraction state from training data.
 
     Orchestrates the full McKinnon pipeline on training data:
-    1. Fit Fourier seasonal cycle per location
-    2. Remove seasonal cycle to get anomalies
-    3. Compute within-season medians per year per location
-    4. Compute residuals (anomalies minus medians)
-    5. Fit tail thresholds from residuals per location
+    1. Fit Fourier seasonal cycle per location, across the whole year
+    2. Remove seasonal cycle to get anomalies, across the whole year
+    3. Restrict to config["season_months"]
+    4. Compute within-season medians per year per location
+    5. Compute residuals (anomalies minus medians)
+    6. Fit tail thresholds from residuals per location
 
-    The returned state is used by transform_temporal_features() on new data.
+    Pass the full calendar year. The two stages need different spans and
+    the split is what this function is for: a Fourier basis of annual period
+    is only determined by observations covering the year, while the medians
+    and tail thresholds are defined within one season and would otherwise
+    describe the annual distribution. Handing this function pre-filtered
+    summer days puts a 92-day sample against a 365-day basis, which
+    fit_seasonal_cycle rejects.
 
     Args:
         daily_values: Daily temperature values, shape (n_days, n_locations).
         day_of_year: Day-of-year for each observation, shape (n_days,).
+        month_labels: Calendar month, 1-12, for each day, shape (n_days,).
         year_labels: Year label for each day, shape (n_days,).
-        config: Temporal feature configuration.
+        config: Temporal feature configuration, whose season_months selects
+            the days the thresholds are fitted on.
 
     Returns:
         TemporalFeatureState containing all fitted parameters.
+
+    Raises:
+        ValueError: If the observations do not determine the seasonal cycle,
+            or if season_months selects no day in the input.
     """
     n_locations = int(daily_values.shape[1])
 
@@ -473,8 +601,13 @@ def fit_temporal_features(
     )
 
     anomalies = remove_seasonal_cycle(daily_values, day_of_year, seasonal_cycle)
-    medians, unique_years = compute_within_season_medians(anomalies, year_labels)
-    residuals = compute_residuals(anomalies, year_labels, medians, unique_years)
+
+    in_season = select_season(month_labels, config["season_months"])
+    season_anomalies: NDArray[np.float64] = anomalies[in_season]
+    season_years: NDArray[np.int64] = year_labels[in_season]
+
+    medians, unique_years = compute_within_season_medians(season_anomalies, season_years)
+    residuals = compute_residuals(season_anomalies, season_years, medians, unique_years)
 
     thresholds = fit_tail_thresholds(
         residuals,
@@ -503,16 +636,22 @@ def fit_temporal_features(
 def transform_temporal_features(
     daily_values: NDArray[np.float64],
     day_of_year: NDArray[np.int64],
+    month_labels: NDArray[np.int64],
     year_labels: NDArray[np.int64],
     state: TemporalFeatureState,
 ) -> NDArray[np.float64]:
     """Transform daily values into heat metrics using fitted state.
 
     Applies the fitted temporal feature extraction pipeline:
-    1. Remove seasonal cycle using fitted coefficients
-    2. Compute within-season medians for these years
-    3. Compute residuals
-    4. Compute heat metrics using fitted thresholds
+    1. Remove seasonal cycle using fitted coefficients, across the whole year
+    2. Restrict to the season the state was fitted for
+    3. Compute within-season medians for these years
+    4. Compute residuals
+    5. Compute heat metrics using fitted thresholds
+
+    Takes the full calendar year, as fit does, and restricts at the same
+    stage. Passing pre-filtered season days instead would leave the metrics
+    unchanged but silently reintroduces the asymmetry that fit forbids.
 
     The output is flattened from (n_years, n_locations, n_metrics) to
     (n_years * n_locations, n_metrics) for feature matrix consumption.
@@ -520,20 +659,29 @@ def transform_temporal_features(
     Args:
         daily_values: Daily temperature values, shape (n_days, n_locations).
         day_of_year: Day-of-year for each observation, shape (n_days,).
+        month_labels: Calendar month, 1-12, for each day, shape (n_days,).
         year_labels: Year label for each day, shape (n_days,).
         state: Previously fitted temporal feature state.
 
     Returns:
         Feature matrix of shape (n_years * n_locations, n_metrics).
+
+    Raises:
+        ValueError: If the state's season_months selects no day in the input.
     """
     anomalies = remove_seasonal_cycle(daily_values, day_of_year, state["seasonal_cycle"])
-    medians, unique_years = compute_within_season_medians(anomalies, year_labels)
-    residuals = compute_residuals(anomalies, year_labels, medians, unique_years)
+
+    in_season = select_season(month_labels, state["config"]["season_months"])
+    season_anomalies: NDArray[np.float64] = anomalies[in_season]
+    season_years: NDArray[np.int64] = year_labels[in_season]
+
+    medians, unique_years = compute_within_season_medians(season_anomalies, season_years)
+    residuals = compute_residuals(season_anomalies, season_years, medians, unique_years)
 
     # (n_years, n_locations, n_metrics)
     metrics_3d = compute_heat_metrics(
         residuals,
-        year_labels,
+        season_years,
         state["thresholds"],
         state["config"]["compute_ar1"],
     )
@@ -575,5 +723,6 @@ __all__ = [
     "fit_tail_thresholds",
     "fit_temporal_features",
     "remove_seasonal_cycle",
+    "select_season",
     "transform_temporal_features",
 ]

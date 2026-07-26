@@ -240,6 +240,9 @@ class SyntheticTemporalData(TypedDict, total=True):
         daily_values: Daily temperature values, shape (n_days, n_locations).
         day_of_year: Day-of-year for each observation, shape (n_days,).
             Values 1-365 (no leap years).
+        month_labels: Calendar month, 1-12, for each day, shape (n_days,).
+            Derived from day_of_year on a non-leap calendar, so the fitted
+            season restriction can be exercised on this data.
         year_labels: Year label for each day, shape (n_days,).
         true_mean: Ground-truth mean per location, shape (n_locations,).
         true_cos_coefficients: Ground-truth cosine coefficients,
@@ -254,6 +257,7 @@ class SyntheticTemporalData(TypedDict, total=True):
 
     daily_values: NDArray[np.float64]
     day_of_year: NDArray[np.int64]
+    month_labels: NDArray[np.int64]
     year_labels: NDArray[np.int64]
     true_mean: tuple[float, ...]
     true_cos_coefficients: tuple[tuple[float, ...], ...]
@@ -264,28 +268,44 @@ class SyntheticTemporalData(TypedDict, total=True):
     noise_std: float
 
 
+# Length of each calendar month on a non-leap year, which is the calendar
+# this generator produces.
+_MONTH_LENGTHS: tuple[int, ...] = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+# Month of each day-of-year, expanded once so the lookup is a plain index.
+# Indexing rather than searching also means a day-of-year outside the
+# calendar raises immediately instead of being folded into December.
+_MONTH_BY_DAY_OF_YEAR: tuple[int, ...] = tuple(
+    month for month, length in enumerate(_MONTH_LENGTHS, start=1) for _ in range(length)
+)
+
+
 def _build_temporal_labels(
     n_years: int,
     n_days_per_year: int,
-) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """Build day-of-year and year label arrays.
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """Build day-of-year, month and year label arrays.
 
     Args:
         n_years: Number of years.
         n_days_per_year: Days per year (365).
 
     Returns:
-        Tuple of (day_of_year, year_labels).
+        Tuple of (day_of_year, month_labels, year_labels).
     """
     doy_list: list[int] = []
+    month_list: list[int] = []
     yr_list: list[int] = []
     for year_idx in range(n_years):
         for day in range(1, n_days_per_year + 1):
             doy_list.append(day)
+            month_list.append(_MONTH_BY_DAY_OF_YEAR[day - 1])
             yr_list.append(2000 + year_idx)
     day_of_year: NDArray[np.int64] = np.array(doy_list, dtype=np.int64)
+    month_labels: NDArray[np.int64] = np.array(month_list, dtype=np.int64)
     year_labels: NDArray[np.int64] = np.array(yr_list, dtype=np.int64)
-    return day_of_year, year_labels
+    return day_of_year, month_labels, year_labels
 
 
 def _build_location_coefficients(
@@ -420,7 +440,7 @@ def create_synthetic_daily_timeseries(
     n_days_per_year = 365
     n_total_days = n_years * n_days_per_year
 
-    day_of_year, year_labels = _build_temporal_labels(n_years, n_days_per_year)
+    day_of_year, month_labels, year_labels = _build_temporal_labels(n_years, n_days_per_year)
     cos_coeffs, sin_coeffs, means = _build_location_coefficients(
         n_harmonics,
         n_locations,
@@ -446,6 +466,7 @@ def create_synthetic_daily_timeseries(
     return SyntheticTemporalData(
         daily_values=daily_values,
         day_of_year=day_of_year,
+        month_labels=month_labels,
         year_labels=year_labels,
         true_mean=tuple(means),
         true_cos_coefficients=tuple(cos_coeffs),
