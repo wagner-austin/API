@@ -42,11 +42,11 @@ final class StateStream {
      */
     static String sample(Object engine) {
         StringBuilder out = new StringBuilder();
-        java.util.List<Object> visible = Orders.visibleEntities(engine);
-        int frame = Orders.readIntField(engine, FRAME_FIELD);
-        int clock = Orders.readIntField(engine, CLOCK_FIELD);
+        java.util.List<Object> visible = Perception.visibleEntities(engine);
+        int frame = EngineBindings.readIntField(engine, FRAME_FIELD);
+        int clock = EngineBindings.readIntField(engine, CLOCK_FIELD);
 
-        out.append(frameRecord(frame, clock, visible.size(), Orders.creditsOf(engine)))
+        out.append(frameRecord(frame, clock, visible.size(), Perception.creditsOf(engine)))
                 .append('\n');
         for (int index = 0; index < visible.size(); index++) {
             out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
@@ -81,8 +81,8 @@ final class StateStream {
      * dispatched against.
      */
     static String entityRecord(int frame, int index, Object entity, Object engine) {
-        float[] at = Orders.positionOf(entity);
-        float[] health = Orders.healthOf(entity);
+        float[] at = Perception.positionOf(entity);
+        float[] health = Perception.healthOf(entity);
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "entity");
@@ -91,9 +91,9 @@ final class StateStream {
         out.append(',');
         appendInt(out, "index", index);
         out.append(',');
-        appendLong(out, "id", Orders.idOf(entity));
+        appendLong(out, "id", Perception.idOf(entity));
         out.append(',');
-        appendString(out, "type", Orders.typeNameOf(entity));
+        appendString(out, "type", Perception.typeNameOf(entity));
         out.append(',');
         appendString(out, "class", entity.getClass().getName());
         out.append(',');
@@ -101,9 +101,9 @@ final class StateStream {
         out.append(',');
         appendFloat(out, "y", at[1]);
         out.append(',');
-        appendInt(out, "team", Orders.teamOf(entity));
+        appendInt(out, "team", Perception.teamOf(entity));
         out.append(',');
-        appendBool(out, "mine", Orders.isOwnedByLocalPlayer(engine, entity));
+        appendBool(out, "mine", Perception.isOwnedByLocalPlayer(engine, entity));
         out.append(',');
         appendFloat(out, "hp", health[0]);
         out.append(',');

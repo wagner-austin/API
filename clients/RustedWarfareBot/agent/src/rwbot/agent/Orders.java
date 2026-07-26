@@ -1,22 +1,22 @@
 package rwbot.agent;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
  * Issues real orders through the engine's own command queue.
  *
- * <p>This is the dispatch half of the agent, and it is deliberately the only
- * place that writes to the simulation. It chooses nothing: which unit and which
+ * <p>The dispatch half of the agent, and deliberately the only place that
+ * writes to the simulation. It chooses nothing: which unit and which
  * destination arrive as arguments. Selection is the planner's job (wiki:
- * runtime-split-java-agent-python-brain).
+ * runtime-split-java-agent-python-brain). Reading is {@link Perception}; the
+ * obfuscated names are {@link EngineBindings}.
  *
  * <p><b>Why a command and not a field write.</b> Setting a unit's position
  * directly would work in single player and desync every peer in multiplayer,
  * because no other client saw a command that would produce that state. The
- * engine's own AI takes the same route this does -- {@code cf.a(team)}, then
- * add units, then set a target -- so a bot using it is issuing the same class
- * of input a player does (wiki: multiplayer-portability-invariants).
+ * engine's own AI takes the same route this does — {@code cf.a(team)}, then add
+ * units, then set a target — so a bot using it is issuing the same class of
+ * input a player does (wiki: multiplayer-portability-invariants).
  *
  * <p><b>Why the script queue.</b> Commands are enqueued into a plain
  * {@code ArrayList} and drained by the tick, so writing from a probe thread
@@ -25,62 +25,11 @@ import java.lang.reflect.Method;
  * thread that marks itself as the main script thread. It is the engine's own
  * answer to "run this on the game thread", so the agent uses it rather than
  * inventing a second one.
- *
- * <p><b>Pinned to Rusted Warfare 1.15 (code 176, build #28).</b> Every name
- * below is obfuscated and moves between releases. {@link #verifyBindings()}
- * checks all of them against the jar and is run by {@code make check}, so a
- * game update fails at the gate rather than in a live run.
  */
 final class Orders {
 
-    private static final String ENTITY_CLASS = "com.corrodinggames.rts.game.units.am";
-    private static final String TREE_CLASS = "com.corrodinggames.rts.game.units.al";
-    private static final String ORDERABLE_CLASS = "com.corrodinggames.rts.game.units.y";
-    private static final String TEAM_CLASS = "com.corrodinggames.rts.game.n";
-    private static final String COMMAND_CLASS = "com.corrodinggames.rts.gameFramework.e";
-    private static final String CONTROLLER_CLASS = "com.corrodinggames.rts.gameFramework.c";
-    private static final String SCRIPTS_CLASS = "com.corrodinggames.librocket.scripts.ScriptEngine";
-    /** The unit-type interface a placement command carries. */
-    private static final String TYPE_CLASS = "com.corrodinggames.rts.game.units.as";
-    /** Holds the by-name unit-type lookup. */
-    private static final String TYPE_REGISTRY_CLASS = "com.corrodinggames.rts.game.units.ar";
-
-    /** Static master entity list on the entity base class; holds units and trees alike. */
-    private static final String ENTITY_LIST = "bE";
-    /** Owning player on an entity. */
-    private static final String OWNER = "bX";
-    /** World position on an entity. */
-    private static final String POS_X = "eo";
-    private static final String POS_Y = "ep";
-    /** The engine's current player. */
-    private static final String LOCAL_TEAM = "bs";
-    /** Team number on a player, as the engine prints it in its own AI warnings. */
-    private static final String TEAM_ID = "k";
-    /** Current and maximum hit points on an entity. */
-    private static final String HP = "cu";
-    private static final String MAX_HP = "cv";
-
-    /**
-     * The engine's own per-player visibility test, {@code am.d(n)}.
-     *
-     * <p>Its body fog-tests the entity's cell against the asking player's fog
-     * grid and returns false when the cell reads as hidden. Own units short out
-     * before the test. Using it is what keeps perception legitimate: the master
-     * entity list holds every unit on the map, so enumerating that directly
-     * would give the bot perfect information and stop it playing the same game a
-     * human plays (wiki: multiplayer-portability-invariants).
-     */
-    private static final String VISIBLE_TO = "d";
-    /** The engine's CommandController instance. */
-    private static final String CONTROLLER = "cf";
-    /** Credits held by a player. Sits beside the engine's own note to modders. */
-    private static final String CREDITS = "o";
-    /** Engine-assigned object identity, set once at construction. */
-    private static final String ENTITY_ID = "eh";
-    /** Entity accessor returning its unit type. */
-    private static final String TYPE_ACCESSOR = "r";
-    /** Unit-type accessor returning its readable name. */
-    private static final String TYPE_NAME_ACCESSOR = "i";
+    private Orders() {
+    }
 
     /**
      * Build-action selector meaning "any action that builds this type".
@@ -91,9 +40,6 @@ final class Orders {
      */
     static final int ANY_BUILD_ACTION = -1;
 
-    private Orders() {
-    }
-
     /**
      * Runs a task on the engine's game thread.
      *
@@ -102,219 +48,19 @@ final class Orders {
      *     means the pinned names moved.
      */
     static void onGameThread(Runnable task) {
-        Class<?> scripts = pinnedClass(SCRIPTS_CLASS);
-        Object instance = invokeStatic(scripts, "getInstance");
+        Class<?> scripts = EngineBindings.pinnedClass(EngineBindings.SCRIPTS_CLASS);
+        Object instance = EngineBindings.invokeStatic(scripts, "getInstance");
         if (instance == null) {
             throw new IllegalStateException(
                     "rw-agent: ScriptEngine.getInstance() returned null; the engine has not"
                             + " finished starting");
         }
-        Method enqueue = pinnedMethod(scripts, "addRunnableToQueue", Runnable.class);
+        Method enqueue = EngineBindings.pinnedMethod(scripts, "addRunnableToQueue", Runnable.class);
         try {
             enqueue.invoke(instance, task);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("rw-agent: could not queue work on the game thread", e);
         }
-    }
-
-    /**
-     * Lists every order-taking entity the engine's current player owns.
-     *
-     * <p>Trees are entities too, so the tree subclass is excluded explicitly
-     * rather than by hoping the first hit is a unit -- a size coincidence
-     * between a sprite list and the unit count has already produced one wrong
-     * answer on this codebase (wiki: engine-entity-model).
-     *
-     * <p>Buildings are deliberately kept. They take orders too (rally points,
-     * build queues), and filtering them here would put a mobility judgement in
-     * the dispatch layer. The roster is reported in list order so a caller can
-     * address a unit by index.
-     *
-     * @param engine The live engine instance.
-     * @return The owned entities, in entity-list order. Empty when the player
-     *     owns nothing or there is no current player.
-     */
-    static java.util.List<Object> ownedUnits(Object engine) {
-        java.util.List<Object> owned = new java.util.ArrayList<Object>();
-        Object team = readField(engine, LOCAL_TEAM);
-        if (team == null) {
-            return owned;
-        }
-        Class<?> treeClass = pinnedClass(TREE_CLASS);
-        Class<?> orderableClass = pinnedClass(ORDERABLE_CLASS);
-        for (Object entity : entities()) {
-            if (entity == null || treeClass.isInstance(entity) || !orderableClass.isInstance(entity)) {
-                continue;
-            }
-            if (readField(entity, OWNER) == team) {
-                owned.add(entity);
-            }
-        }
-        return owned;
-    }
-
-    /**
-     * Lists every entity the current player can legitimately see.
-     *
-     * <p>Own units plus enemy units the engine reports as visible, judged by
-     * the engine's own fog test rather than by reading the master list
-     * directly. That distinction is the whole point: {@code am.bE} holds every
-     * unit on the map, so a bot enumerating it would have perfect information
-     * and would no longer be playing the game a human plays (wiki:
-     * multiplayer-portability-invariants).
-     *
-     * <p>Trees are excluded, as in {@link #ownedUnits}. Buildings are kept:
-     * they are legitimate targets and legitimate order-takers, and filtering
-     * them here would put a judgement in the perception layer.
-     *
-     * @param engine The live engine instance.
-     * @return The visible entities, in entity-list order. Empty when there is
-     *     no current player.
-     */
-    static java.util.List<Object> visibleEntities(Object engine) {
-        java.util.List<Object> visible = new java.util.ArrayList<Object>();
-        Object team = readField(engine, LOCAL_TEAM);
-        if (team == null) {
-            return visible;
-        }
-        Class<?> treeClass = pinnedClass(TREE_CLASS);
-        Class<?> orderableClass = pinnedClass(ORDERABLE_CLASS);
-        Class<?> entityClass = pinnedClass(ENTITY_CLASS);
-        Method visibleTo = pinnedMethod(entityClass, VISIBLE_TO, pinnedClass(TEAM_CLASS));
-        for (Object entity : entities()) {
-            if (entity == null || treeClass.isInstance(entity) || !orderableClass.isInstance(entity)) {
-                continue;
-            }
-            Object seen = invoke(visibleTo, entity, team);
-            if (Boolean.TRUE.equals(seen)) {
-                visible.add(entity);
-            }
-        }
-        return visible;
-    }
-
-    /**
-     * Reports whether an entity belongs to the engine's current player.
-     *
-     * @param engine The live engine instance.
-     * @param entity The entity to test.
-     * @return True when the entity's owner is the current player.
-     */
-    static boolean isOwnedByLocalPlayer(Object engine, Object entity) {
-        return readField(entity, OWNER) == readField(engine, LOCAL_TEAM);
-    }
-
-    /**
-     * Returns an entity's owning team number, or -1 when it has no owner.
-     *
-     * @param entity The entity to read.
-     * @return The team number the engine uses in its own AI warnings.
-     */
-    static int teamOf(Object entity) {
-        Object owner = readField(entity, OWNER);
-        if (owner == null) {
-            return -1;
-        }
-        return readIntField(owner, TEAM_ID);
-    }
-
-    /**
-     * Returns current and maximum hit points.
-     *
-     * @param entity The entity to read.
-     * @return ``{current, maximum}``.
-     */
-    static float[] healthOf(Object entity) {
-        return new float[] {readFloat(entity, HP), readFloat(entity, MAX_HP)};
-    }
-
-    /**
-     * Returns the current player's team number and credit balance.
-     *
-     * @param engine The live engine instance.
-     * @return ``{team, credits}``, or null when there is no current player.
-     */
-    static double[] localPlayerState(Object engine) {
-        Object team = readField(engine, LOCAL_TEAM);
-        if (team == null) {
-            return null;
-        }
-        return new double[] {readIntField(team, TEAM_ID), readDoubleField(team, CREDITS)};
-    }
-
-    /**
-     * Lists every entity the current player owns, with the movement fields that
-     * decide whether it can be sent anywhere.
-     *
-     * <p>Written after ordering a Command Center to move and watching nothing
-     * happen. "First owned unit" is not a useful selection when the roster is
-     * unknown, and the engine will accept an order for an immobile building
-     * without complaint -- so the roster has to be legible before selection can
-     * be. Reports max-speed and the movement-kind field alongside the class so
-     * mobility is read rather than inferred from a package name.
-     *
-     * @param engine The live engine instance.
-     * @return A multi-line report, one line per owned entity.
-     */
-    static String describeOwned(Object engine) {
-        StringBuilder out = new StringBuilder();
-        out.append("=== owned entities ===\n");
-        Object team = readField(engine, LOCAL_TEAM);
-        if (team == null) {
-            out.append("no current player\n");
-            return out.toString();
-        }
-        Class<?> treeClass = pinnedClass(TREE_CLASS);
-        int index = 0;
-        for (Object entity : entities()) {
-            if (entity == null || treeClass.isInstance(entity)) {
-                continue;
-            }
-            if (readField(entity, OWNER) != team) {
-                continue;
-            }
-            float[] at = positionOf(entity);
-            out.append('[').append(index++).append("] ")
-                    .append(entity.getClass().getName())
-                    .append(" at (").append(at[0]).append(", ").append(at[1]).append(')')
-                    .append(describeMobility(entity))
-                    .append('\n');
-        }
-        if (index == 0) {
-            out.append("player owns nothing\n");
-        }
-        return out.toString();
-    }
-
-    /**
-     * Renders whatever float fields on an entity look like movement capability.
-     *
-     * <p>Named fields would be better, but the movement field has not been
-     * identified yet and inventing a name would be the guess this method exists
-     * to avoid. Reporting every non-zero float on the entity's own class is
-     * cheap and lets one run settle it.
-     *
-     * @param entity The entity to inspect.
-     * @return A parenthesised list of non-zero float fields, or empty.
-     */
-    private static String describeMobility(Object entity) {
-        StringBuilder out = new StringBuilder();
-        for (Field field : entity.getClass().getDeclaredFields()) {
-            if (field.getType() != float.class || java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                continue;
-            }
-            field.setAccessible(true);
-            float value;
-            try {
-                value = field.getFloat(entity);
-            } catch (IllegalAccessException e) {
-                continue;
-            }
-            if (value != 0.0f) {
-                out.append(' ').append(field.getName()).append('=').append(value);
-            }
-        }
-        return out.length() == 0 ? "" : " {" + out.toString().trim() + "}";
     }
 
     /**
@@ -330,26 +76,26 @@ final class Orders {
      *     command cannot be constructed.
      */
     static void moveTo(Object engine, Object unit, float x, float y) {
-        Object team = readField(engine, LOCAL_TEAM);
+        Object team = EngineBindings.readField(engine, EngineBindings.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to order for");
         }
-        Object controller = readField(engine, CONTROLLER);
+        Object controller = EngineBindings.readField(engine, EngineBindings.CONTROLLER);
         if (controller == null) {
             throw new IllegalStateException("rw-agent: engine has no CommandController yet");
         }
 
-        Method create = pinnedMethod(controller.getClass(), "a", pinnedClass(TEAM_CLASS));
-        Object command = invoke(create, controller, team);
+        Method create = EngineBindings.pinnedMethod(controller.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.TEAM_CLASS));
+        Object command = EngineBindings.invoke(create, controller, team);
         if (command == null) {
             throw new IllegalStateException("rw-agent: CommandController returned no command");
         }
 
-        Method addUnit = pinnedMethod(command.getClass(), "a", pinnedClass(ORDERABLE_CLASS));
-        invoke(addUnit, command, unit);
+        Method addUnit = EngineBindings.pinnedMethod(command.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.ORDERABLE_CLASS));
+        EngineBindings.invoke(addUnit, command, unit);
 
-        Method setPoint = pinnedMethod(command.getClass(), "a", float.class, float.class);
-        invoke(setPoint, command, Float.valueOf(x), Float.valueOf(y));
+        Method setPoint = EngineBindings.pinnedMethod(command.getClass(), "a", float.class, float.class);
+        EngineBindings.invoke(setPoint, command, Float.valueOf(x), Float.valueOf(y));
     }
 
     /**
@@ -381,11 +127,11 @@ final class Orders {
      *     name is absent.
      */
     static void buildAt(Object engine, Object builder, String typeName, float x, float y) {
-        Object team = readField(engine, LOCAL_TEAM);
+        Object team = EngineBindings.readField(engine, EngineBindings.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to build for");
         }
-        Object controller = readField(engine, CONTROLLER);
+        Object controller = EngineBindings.readField(engine, EngineBindings.CONTROLLER);
         if (controller == null) {
             throw new IllegalStateException("rw-agent: engine has no CommandController yet");
         }
@@ -393,27 +139,27 @@ final class Orders {
         Object type = resolveType(typeName);
         if (type == null) {
             throw new IllegalStateException(
-                    "rw-agent: no unit type named '" + typeName + "' in the registry" + PIN);
+                    "rw-agent: no unit type named '" + typeName + "' in the registry" + EngineBindings.PIN);
         }
 
-        Method create = pinnedMethod(controller.getClass(), "a", pinnedClass(TEAM_CLASS));
-        Object command = invoke(create, controller, team);
+        Method create = EngineBindings.pinnedMethod(controller.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.TEAM_CLASS));
+        Object command = EngineBindings.invoke(create, controller, team);
         if (command == null) {
             throw new IllegalStateException("rw-agent: CommandController returned no command");
         }
 
-        Method addUnit = pinnedMethod(command.getClass(), "a", pinnedClass(ORDERABLE_CLASS));
-        invoke(addUnit, command, builder);
+        Method addUnit = EngineBindings.pinnedMethod(command.getClass(), "a", EngineBindings.pinnedClass(EngineBindings.ORDERABLE_CLASS));
+        EngineBindings.invoke(addUnit, command, builder);
 
         Method place =
-                pinnedMethod(
+                EngineBindings.pinnedMethod(
                         command.getClass(),
                         "a",
                         float.class,
                         float.class,
-                        pinnedClass(TYPE_CLASS),
+                        EngineBindings.pinnedClass(EngineBindings.TYPE_CLASS),
                         int.class);
-        invoke(
+        EngineBindings.invoke(
                 place,
                 command,
                 Float.valueOf(x),
@@ -436,351 +182,7 @@ final class Orders {
      * @return The unit type, or null when no type carries that name.
      */
     static Object resolveType(String typeName) {
-        Method lookup = pinnedMethod(pinnedClass(TYPE_REGISTRY_CLASS), "a", String.class);
-        return invoke(lookup, null, typeName);
-    }
-
-    /**
-     * Reads an entity's world position.
-     *
-     * @param entity The entity to read.
-     * @return Its x and y, in that order.
-     */
-    static float[] positionOf(Object entity) {
-        return new float[] {readFloat(entity, POS_X), readFloat(entity, POS_Y)};
-    }
-
-    /**
-     * Renders an entity for a log line: its class and position.
-     *
-     * @param entity The entity to describe.
-     * @return A short identifying string.
-     */
-    static String describe(Object entity) {
-        if (entity == null) {
-            return "none";
-        }
-        float[] at = positionOf(entity);
-        return entity.getClass().getName() + " at (" + at[0] + ", " + at[1] + ")";
-    }
-
-    /**
-     * Checks every pinned name the order path depends on.
-     *
-     * <p>Runs without a live game -- the jar alone is enough -- so a game update
-     * that moves an obfuscated name fails at {@code make check} rather than
-     * during a run. Reports every problem rather than the first, because after
-     * an update it is more useful to see the whole surface at once.
-     *
-     * @return One message per broken binding; empty when all resolve.
-     */
-    static java.util.List<String> verifyBindings() {
-        java.util.List<String> problems = new java.util.ArrayList<String>();
-
-        Class<?> entity = checkClass(ENTITY_CLASS, problems);
-        Class<?> team = checkClass(TEAM_CLASS, problems);
-        Class<?> orderable = checkClass(ORDERABLE_CLASS, problems);
-        Class<?> command = checkClass(COMMAND_CLASS, problems);
-        Class<?> controller = checkClass(CONTROLLER_CLASS, problems);
-        Class<?> scripts = checkClass(SCRIPTS_CLASS, problems);
-        Class<?> type = checkClass(TYPE_CLASS, problems);
-        Class<?> registry = checkClass(TYPE_REGISTRY_CLASS, problems);
-        checkClass(TREE_CLASS, problems);
-
-        if (entity != null) {
-            checkField(entity, ENTITY_ID, problems);
-            checkMethod(entity, TYPE_ACCESSOR, problems);
-            checkField(entity, ENTITY_LIST, problems);
-            checkField(entity, OWNER, problems);
-            checkField(entity, POS_X, problems);
-            checkField(entity, POS_Y, problems);
-            checkField(entity, HP, problems);
-            checkField(entity, MAX_HP, problems);
-        }
-        if (entity != null && team != null) {
-            // The fog test. Losing this name silently would not break a build --
-            // it would make the bot omniscient, which is worse than a crash
-            // because nothing would look wrong.
-            checkMethod(entity, VISIBLE_TO, problems, team);
-        }
-        if (team != null) {
-            checkField(team, TEAM_ID, problems);
-        }
-        if (controller != null && team != null) {
-            checkMethod(controller, "a", problems, team);
-        }
-        if (team != null) {
-            checkField(team, CREDITS, problems);
-        }
-        if (command != null && orderable != null) {
-            checkMethod(command, "a", problems, orderable);
-            checkMethod(command, "a", problems, float.class, float.class);
-        }
-        if (scripts != null) {
-            checkMethod(scripts, "getInstance", problems);
-            checkMethod(scripts, "addRunnableToQueue", problems, Runnable.class);
-        }
-        if (registry != null) {
-            checkMethod(registry, "a", problems, String.class);
-        }
-        if (type != null) {
-            checkMethod(type, TYPE_NAME_ACCESSOR, problems);
-        }
-        if (command != null && type != null) {
-            checkMethod(command, "a", problems, float.class, float.class, type, int.class);
-        }
-        return problems;
-    }
-
-    // -----------------------------------------------------------------
-    // Reflection helpers. Each failure names the pinned build, because the
-    // overwhelmingly likely cause is a game update rather than a code bug.
-    // -----------------------------------------------------------------
-
-    private static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
-
-    private static Iterable<?> entities() {
-        Class<?> entityClass = pinnedClass(ENTITY_CLASS);
-        Field field = pinnedField(entityClass, ENTITY_LIST);
-        Object value;
-        try {
-            value = field.get(null);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("rw-agent: cannot read " + ENTITY_LIST + PIN, e);
-        }
-        if (!(value instanceof Iterable)) {
-            throw new IllegalStateException(
-                    "rw-agent: " + ENTITY_CLASS + "." + ENTITY_LIST + " is not iterable" + PIN);
-        }
-        return (Iterable<?>) value;
-    }
-
-    private static Class<?> pinnedClass(String binaryName) {
-        try {
-            return Class.forName(binaryName, false, Orders.class.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException("rw-agent: class " + binaryName + " not found" + PIN, e);
-        }
-    }
-
-    private static Field pinnedField(Class<?> owner, String name) {
-        for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
-            try {
-                Field field = type.getDeclaredField(name);
-                field.setAccessible(true);
-                return field;
-            } catch (NoSuchFieldException e) {
-                continue;
-            }
-        }
-        throw new IllegalStateException(
-                "rw-agent: field " + name + " not found on " + owner.getName() + PIN);
-    }
-
-    private static Method pinnedMethod(Class<?> owner, String name, Class<?>... parameters) {
-        for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
-            try {
-                Method method = type.getDeclaredMethod(name, parameters);
-                method.setAccessible(true);
-                return method;
-            } catch (NoSuchMethodException e) {
-                continue;
-            }
-        }
-        throw new IllegalStateException(
-                "rw-agent: method "
-                        + name
-                        + java.util.Arrays.toString(parameters)
-                        + " not found on "
-                        + owner.getName()
-                        + PIN);
-    }
-
-    private static Object readField(Object target, String name) {
-        try {
-            return pinnedField(target.getClass(), name).get(target);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException("rw-agent: cannot read " + name + PIN, e);
-        }
-    }
-
-    /**
-     * Reads an {@code int} field through the same pinned-name machinery as
-     * every other engine read, so a moved name fails identically here.
-     *
-     * @param target Object to read from.
-     * @param name Obfuscated field name, pinned to the recorded build.
-     * @return The field value.
-     * @throws IllegalStateException When the field is absent or not an int.
-     */
-    static int readIntField(Object target, String name) {
-        try {
-            return pinnedField(target.getClass(), name).getInt(target);
-        } catch (IllegalAccessException | IllegalArgumentException e) {
-            throw new IllegalStateException("rw-agent: cannot read int " + name + PIN, e);
-        }
-    }
-
-    /**
-     * Reads a {@code long} field through the same pinned-name machinery.
-     *
-     * @param target Object to read from.
-     * @param name Obfuscated field name, pinned to the recorded build.
-     * @return The field value.
-     * @throws IllegalStateException When the field is absent or not a long.
-     */
-    static long readLongField(Object target, String name) {
-        try {
-            return pinnedField(target.getClass(), name).getLong(target);
-        } catch (IllegalAccessException | IllegalArgumentException e) {
-            throw new IllegalStateException("rw-agent: cannot read long " + name + PIN, e);
-        }
-    }
-
-    /**
-     * Returns an entity's engine-assigned identity.
-     *
-     * <p>Assigned once at construction, guarded by an "ID for GameObject is
-     * already set" throw, and used by the engine itself for network identity.
-     * That makes it the only stable handle for addressing a unit across
-     * frames: roster position renumbers whenever anything is built or dies.
-     *
-     * @param entity The entity to identify.
-     * @return Its identity.
-     */
-    /**
-     * Returns the current player's credits, rounded down to whole currency.
-     *
-     * <p>The engine holds this as a double and spends it in whole units, so a
-     * planner comparing against a unit price wants the floor rather than the
-     * raw value: 99.97 credits does not buy a 100-credit structure.
-     *
-     * @param engine The live engine instance.
-     * @return Credits, or 0 when there is no current player.
-     */
-    static int creditsOf(Object engine) {
-        Object team = readField(engine, LOCAL_TEAM);
-        if (team == null) {
-            return 0;
-        }
-        return (int) Math.floor(readDoubleField(team, CREDITS));
-    }
-
-    static long idOf(Object entity) {
-        return readLongField(entity, ENTITY_ID);
-    }
-
-    /**
-     * Returns an entity's readable type name, e.g. {@code "builder"}.
-     *
-     * <p>The engine reaches this as {@code entity.r().i()} -- the unit type,
-     * then its name. Both hops are obfuscated; the name they yield is not, and
-     * it is the same string the type registry accepts when building.
-     *
-     * @param entity The entity to name.
-     * @return Its type name.
-     */
-    static String typeNameOf(Object entity) {
-        Object type = invoke(pinnedMethod(entity.getClass(), TYPE_ACCESSOR), entity);
-        if (type == null) {
-            throw new IllegalStateException("rw-agent: entity has no unit type" + PIN);
-        }
-        Object name = invoke(pinnedMethod(type.getClass(), TYPE_NAME_ACCESSOR), type);
-        if (!(name instanceof String)) {
-            throw new IllegalStateException("rw-agent: unit type name is not a String" + PIN);
-        }
-        return (String) name;
-    }
-
-    /**
-     * Finds an owned entity by its engine identity.
-     *
-     * @param engine The live engine instance.
-     * @param id The identity to find.
-     * @return The entity, or null when the current player owns no entity with
-     *     that identity -- which is the normal answer for a unit that has died.
-     */
-    static Object findOwnedById(Object engine, long id) {
-        for (Object entity : ownedUnits(engine)) {
-            if (idOf(entity) == id) {
-                return entity;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Reads a {@code double} field through the same pinned-name machinery.
-     *
-     * @param target Object to read from.
-     * @param name Obfuscated field name, pinned to the recorded build.
-     * @return The field value.
-     * @throws IllegalStateException When the field is absent or not a double.
-     */
-    static double readDoubleField(Object target, String name) {
-        try {
-            return pinnedField(target.getClass(), name).getDouble(target);
-        } catch (IllegalAccessException | IllegalArgumentException e) {
-            throw new IllegalStateException("rw-agent: cannot read double " + name + PIN, e);
-        }
-    }
-
-    private static float readFloat(Object target, String name) {
-        try {
-            return pinnedField(target.getClass(), name).getFloat(target);
-        } catch (IllegalAccessException | IllegalArgumentException e) {
-            throw new IllegalStateException("rw-agent: cannot read float " + name + PIN, e);
-        }
-    }
-
-    private static Object invoke(Method method, Object target, Object... arguments) {
-        try {
-            return method.invoke(target, arguments);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("rw-agent: call to " + method.getName() + " failed", e);
-        }
-    }
-
-    private static Object invokeStatic(Class<?> owner, String name) {
-        return invoke(pinnedMethod(owner, name), null);
-    }
-
-    private static Class<?> checkClass(String binaryName, java.util.List<String> problems) {
-        try {
-            return Class.forName(binaryName, false, Orders.class.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            problems.add("class missing: " + binaryName);
-            return null;
-        }
-    }
-
-    private static void checkField(Class<?> owner, String name, java.util.List<String> problems) {
-        for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
-            try {
-                type.getDeclaredField(name);
-                return;
-            } catch (NoSuchFieldException e) {
-                continue;
-            }
-        }
-        problems.add("field missing: " + owner.getName() + "." + name);
-    }
-
-    private static void checkMethod(
-            Class<?> owner, String name, java.util.List<String> problems, Class<?>... parameters) {
-        for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
-            try {
-                type.getDeclaredMethod(name, parameters);
-                return;
-            } catch (NoSuchMethodException e) {
-                continue;
-            }
-        }
-        problems.add(
-                "method missing: "
-                        + owner.getName()
-                        + "."
-                        + name
-                        + java.util.Arrays.toString(parameters));
+        Method lookup = EngineBindings.pinnedMethod(EngineBindings.pinnedClass(EngineBindings.TYPE_REGISTRY_CLASS), "a", String.class);
+        return EngineBindings.invoke(lookup, null, typeName);
     }
 }

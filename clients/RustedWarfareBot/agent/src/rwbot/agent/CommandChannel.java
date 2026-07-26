@@ -164,7 +164,7 @@ final class CommandChannel {
     /** Applies one parsed order. Runs on the game thread. */
     private void apply(CommandRecord command) {
         Object engine = EngineHandle.current();
-        Object unit = Orders.findOwnedById(engine, command.unitId());
+        Object unit = Perception.findOwnedById(engine, command.unitId());
         if (unit == null) {
             Log.error(
                     "channel: no owned unit with id "

@@ -204,7 +204,7 @@ public final class SelfTest {
      * failing mid-run with a reflection error nobody sees until they read a log.
      */
     private static int checkOrderBindings() {
-        java.util.List<String> problems = Orders.verifyBindings();
+        java.util.List<String> problems = EngineBindings.verifyBindings();
         for (String problem : problems) {
             System.out.println("FAIL order binding: " + problem);
         }

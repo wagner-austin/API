@@ -173,8 +173,8 @@ public final class Premain {
         Orders.onGameThread(
                 () -> {
                     Object engine = EngineHandle.current();
-                    Log.info(Orders.describeOwned(engine));
-                    java.util.List<Object> roster = Orders.ownedUnits(engine);
+                    Log.info(Perception.describeOwned(engine));
+                    java.util.List<Object> roster = Perception.ownedUnits(engine);
                     if (unitIndex >= roster.size()) {
                         Log.error(
                                 "order: roster["
@@ -185,10 +185,10 @@ public final class Premain {
                         return;
                     }
                     Object unit = roster.get(unitIndex);
-                    float[] from = Orders.positionOf(unit);
+                    float[] from = Perception.positionOf(unit);
                     float toX = from[0] + moveBy[0];
                     float toY = from[1] + moveBy[1];
-                    Log.info("order: subject " + Orders.describe(unit));
+                    Log.info("order: subject " + Perception.describe(unit));
                     if (buildType.isEmpty()) {
                         Log.info("order: moving to (" + toX + ", " + toY + ")");
                         Orders.moveTo(engine, unit, toX, toY);
@@ -218,8 +218,8 @@ public final class Premain {
                         if (unit == null) {
                             return;
                         }
-                        Log.info("order: t+" + elapsed + "s " + Orders.describe(unit));
-                        Log.info(Orders.describeOwned(EngineHandle.current()));
+                        Log.info("order: t+" + elapsed + "s " + Perception.describe(unit));
+                        Log.info(Perception.describeOwned(EngineHandle.current()));
                     });
         }
     }
