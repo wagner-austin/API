@@ -10,6 +10,7 @@ from tankpit_bot.action_lab.density_probe import (
     format_density_probe_summary,
     run_density_probe,
 )
+from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 
 log = get_logger(__name__)
@@ -31,13 +32,18 @@ def main() -> int:
 
     load_dotenv()
     script_hooks.setup_rich_logging(level="INFO")
-    configure_probe_runtime_logging("density")
+    stamp = make_run_stamp()
+    configure_probe_runtime_logging("density", stamp)
 
     if _test_hooks.sync_playwright is None:
         _test_hooks.sync_playwright = _test_hooks.get_sync_playwright()
 
     target_url = _test_hooks.get_env("TANKPIT_URL") or "https://tankpit.com/play"
-    output_path = _test_hooks.get_env("TANKPIT_DENSITY_OUTPUT") or "density_probe.json"
+    # Per-run archive (2026-07-25 incident rule): a fixed output path
+    # let earlier runs overwrite their own capture evidence.
+    output_path = (
+        _test_hooks.get_env("TANKPIT_DENSITY_OUTPUT") or f"runs/probe/density-{stamp}.json"
+    )
     headless = _parse_bool_env(_test_hooks.get_env("TANKPIT_HEADLESS"))
     max_extras = int(_test_hooks.get_env("TANKPIT_DENSITY_MAX_EXTRAS") or "12")
     initial_sync_timeout_ms = int(

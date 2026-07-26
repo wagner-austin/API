@@ -115,14 +115,11 @@ def test_main_uses_defaults_and_initializes_sync_playwright(_restore_script_hook
 
     assert density_script.main() == 0
     assert factory_calls == ["factory"]
-    assert captured == [
-        "https://tankpit.com/play",
-        "density_probe.json",
-        False,
-        True,
-        12,
-        10000,
-    ]
+    assert captured[0] == "https://tankpit.com/play"
+    output = str(captured[1])
+    assert output.startswith("runs/probe/density-")
+    assert output.endswith(".json")
+    assert captured[2:] == [False, True, 12, 10000]
     assert callable(core_hooks.sync_playwright)
 
 

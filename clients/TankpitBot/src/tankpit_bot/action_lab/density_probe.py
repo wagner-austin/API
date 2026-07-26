@@ -40,7 +40,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.protocol.commands import build_toggle_equipment_command
+from tankpit_bot.protocol.commands import build_quit_command, build_toggle_equipment_command
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
@@ -221,6 +221,23 @@ class DensityProbe(ProbeBase):
             raise ProbeError("extra radars still enabled after restore toggle")
         log.info("Density probe: slot 5 restored to disabled")
         return 1
+
+    def _quit_to_lobby(self) -> None:
+        """Send the graceful quit so the tank never lingers in-world.
+
+        Standing rule from the 2026-07-25 incident: an unattended
+        probe tank is a target in a PvP world (player 2596 killed the
+        immobilized tank and the user lost a rank). Every probe end —
+        normal or marooned — exits the room deliberately instead of
+        leaving the tank standing until the socket drops.
+        """
+        from tankpit_bot.action_lab import _test_hooks as action_hooks
+
+        self._send_bytes(build_quit_command(), "quit_game")
+        page = self._require_page()
+        page.wait_for_timeout(float(_SETTLE_MS))
+        action_hooks.drain_buffered_messages(self)
+        log.info("Density probe: quit to lobby sent")
 
     def _current_fuel(self) -> tuple[int, int, int]:
         """Return the tank's live (fuel, x, y).
@@ -418,6 +435,18 @@ class DensityProbe(ProbeBase):
             pickups += picks
             if not landed:
                 skipped += 1
+                fuel, _, _ = self._current_fuel()
+                if fuel < _FUEL_RESERVE:
+                    # Marooned: unreachable site AND broke after every
+                    # funding path. Grinding on is exactly how the
+                    # 2026-07-25 tank became a sitting duck — stop the
+                    # sweep now; the caller quits to the lobby.
+                    log.info(
+                        "Density probe: marooned at fuel %d after %d sites - aborting sweep",
+                        fuel,
+                        scanned,
+                    )
+                    break
                 continue
             self.use_radar()
             scanned += 1
@@ -445,6 +474,7 @@ class DensityProbe(ProbeBase):
             toggles += self._restore_extras_state(was_enabled)
             extras_after, _ = self._read_extras()
             fuel_after, _, _ = self._current_fuel()
+            self._quit_to_lobby()
             envelope = build_probe_session_envelope(
                 self,
                 context=context,

@@ -439,6 +439,49 @@ def test_sweep_sites_skips_unreached_sites_without_spending_extras() -> None:
     assert probe.radar_calls == 1
 
 
+def test_sweep_aborts_when_marooned_and_broke() -> None:
+    """An unreachable site with an empty tank ends the sweep at once —
+    the 2026-07-25 sitting-duck rule."""
+
+    class _StuckBroke(_DensityHarness):
+        def teleport_to(self, x: int, y: int) -> bool:
+            self.teleports.append((x, y))
+            return True
+
+    probe = _StuckBroke()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe.fuel = 0
+    get_world_service().inventory_state = _inventory(radar_count=10, radar_enabled=True)
+    get_world_service().map_fuel_dots = ()
+
+    scanned, _, _, skipped = probe._sweep_sites(8)
+    assert scanned == 0
+    assert skipped == 1
+    assert probe.radar_calls == 0
+
+
+def test_quit_to_lobby_sends_the_graceful_quit() -> None:
+    """The quit frame is the plain '-' with its length header."""
+
+    class _QuitRecorder(_DensityHarness):
+        def __init__(self) -> None:
+            super().__init__()
+            self.sent_frames: list[tuple[bytes, str]] = []
+
+        def _send_bytes(self, data: bytes, cmd_name: str) -> bool:
+            self.sent_frames.append((data, cmd_name))
+            return True
+
+    probe = _QuitRecorder()
+    action_hooks.get_current_time_ms = probe._clock
+    _install_noop_drain()
+    probe._quit_to_lobby()
+    data, label = probe.sent_frames[0]
+    assert label == "quit_game"
+    assert data.endswith(b"-")
+
+
 def test_current_fuel_raises_without_self_state() -> None:
     class _Blind(_DensityHarness):
         def get_self_state(self) -> SelfStateDict | None:
@@ -635,6 +678,9 @@ class _ExecuteHarness(StubbedBootstrapMixin, WorldStateOverrideMixin, DensityPro
         self.phases.append("read")
         return 10, False
 
+    def _quit_to_lobby(self) -> None:
+        self.phases.append("quit")
+
 
 def test_execute_probe_builds_session_envelope() -> None:
     clock = ReplayClock(1000)
@@ -670,7 +716,7 @@ def test_execute_probe_builds_session_envelope() -> None:
     finally:
         core_hooks.sync_playwright = original_sync_playwright
 
-    assert probe.phases == ["fuel", "enable", "sweep:12", "restore:False", "read", "fuel"]
+    assert probe.phases == ["fuel", "enable", "sweep:12", "restore:False", "read", "fuel", "quit"]
     assert session["max_extras"] == 12
     assert session["sites_scanned"] == 12
     assert session["refuel_hops"] == 3
