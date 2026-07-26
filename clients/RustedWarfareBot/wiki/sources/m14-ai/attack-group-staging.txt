@@ -1,0 +1,80 @@
+# Excerpt: com/corrodinggames/rts/game/a/g.java:448-524 (attack group: delay, staging, commit)
+# Rusted Warfare 1.15 (code 176, build #28), CFR 0.152 over the pinned game-lib.jar
+
+    public void e(float f2) {
+        l l2 = com.corrodinggames.rts.gameFramework.l.B();
+        if (!this.v) {
+            if (this.l == 0.0f) {
+                this.v = true;
+                this.q = true;
+            }
+        } else {
+            if (this.w == null || !this.w.bT() || this.w.bV || !this.r) {
+                this.w = this.R.as();
+                if (this.w != null && !this.a(this.w, true)) {
+                    this.w = null;
+                }
+            }
+            if (this.w != null) {
+                if (this.q) {
+                    this.u += f2;
+                    if (!this.r) {
+                        this.t = com.corrodinggames.rts.gameFramework.f.a(this.t, f2);
+                        if (this.t == 0.0f) {
+                            this.t = 20.0f;
+                            this.h();
+                        }
+                    } else {
+                        boolean bl2 = false;
+                        for (com.corrodinggames.rts.game.units.y y2 : this.F) {
+                            if (!(this.c(y2) > 28900.0f)) continue;
+                            bl2 = true;
+                        }
+                        if (!bl2) {
+                            this.q = false;
+                        }
+                        for (com.corrodinggames.rts.game.units.y y2 : this.F) {
+                            if (y2.bs <= l2.by - 1000) continue;
+                            this.q = false;
+                            this.a("Not staging due to damage");
+                        }
+                    }
+                    if (this.u > 17000.0f) {
+                        this.q = false;
+                        this.a("attacking target");
+                    }
+                } else {
+                    this.o += f2;
+                    if (this.z == 0.0f) {
+                        this.z = 800.0f;
+                        boolean bl3 = false;
+                        m m2 = new m();
+                        for (com.corrodinggames.rts.game.units.y y3 : this.F) {
+                            boolean bl4 = true;
+                            if (this.w != null) {
+                                if (!this.R.a((am)y3, this.w)) {
+                                    bl4 = false;
+                                }
+                                if (bl4 && !aq.a(y3, this.w)) {
+                                    bl4 = false;
+                                }
+                            }
+                            if (!bl4) continue;
+                            bl3 = true;
+                            m2.add(y3);
+                        }
+                        if (!bl3) {
+                            this.q = false;
+                            this.a("cannot reach main target");
+                        } else {
+                            e e2 = l2.cf.a(this.R);
+                            e2.a(m2);
+                            boolean bl5 = true;
+                            if (this.w != null && com.corrodinggames.rts.gameFramework.f.a(0, 100) < 80) {
+                                e2.a(this.w.eo, this.w.ep, bl5);
+                            } else {
+                                e2.a(this.w, bl5);
+                            }
+                            this.a("attacking main target");
+                        }
+                    }

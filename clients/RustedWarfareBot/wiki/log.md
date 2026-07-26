@@ -295,3 +295,47 @@ Then the question that had never been asked: what does it do afterwards? Every r
 That is the next thing, and it is not a planner gap: the planner does what it is asked. There is no policy for what to do with what it built.
 
 make check green: guard 0 violations, ruff + mypy clean, 363 tests, 100% statements and branches, agent-selftest OK.
+
+## [2026-07-25] policy | pools chosen by who can shoot the way there, and the produce diagnostic corrected
+Artifacts: `wiki/sources/m6-wire/world-sample.ndjson` regenerated (567, entity records now carry `hostile`); new pages `policy-threat`, `mechanics-build-actions`
+
+Notes: the planner picked resource pools by distance and nothing else. That is the whole answer on an empty map, and this one is not empty — an earlier run sent a builder 4,293 units out through two opponents' bases and it was killed before arriving. The pool was legal, unoccupied and the nearest one left.
+
+Screening destinations would not have fixed it. The builder died in transit and the pool it was walking to was fine, so the test had to be applied to the walk: a pool is rejected when a visible hostile's attack range covers any point of the straight line from the builder to it. Because the pool is that line's endpoint, a pool inside a turret's field of fire falls out of the same test and needs no separate check.
+
+Two origins, deliberately. Exposure is measured from the builder, because the builder is what gets shot and starts wherever it is standing. Distance is still measured from the anchor, because the economy should grow outward from the base rather than trail whichever pool the builder last walked past. One origin for both would answer one of the two questions wrong.
+
+Hostility is the engine's, not the negation of ownership. `n.c(n)` compares alliance *group* rather than the team number the wire already carried, and returns false whenever either side is the neutral team — so an ally's tank and a neutral map object are both non-threats, and "everything that is not mine" gets both wrong. That flag now rides on every entity record. Reach comes from the catalogue's declared attack range, so no radius in the module is invented; an unarmed hostile has none, because an enemy builder on the route is an obstacle rather than a gun.
+
+The refusal had to learn to say which refusal it was. "Every pool in sight is occupied" was the only sentence available, and it becomes a lie exactly on the runs where the reason matters — pools all built on is progress, pools all covered is losing ground. Both remain waits rather than blocks: a killed enemy stops covering a route the same way a destroyed extractor frees a pool.
+
+Then the produce diagnostic, which was investigated on the suspicion that it ran on every order rather than only on failure. It does, it has to, and it was wrong about something else.
+
+There is no failure to hang it on. The engine's two complaints on the dispatch path go through a logger whose rate limiter is a static counter that is never reset — four messages for the lifetime of the process, then it returns early forever. The other three conditions were never logged at all. So the reading must happen before dispatch or not at all.
+
+The comment claiming the queue-add path "checks three predicates" was wrong on the count and on which. It checks five: the action resolves, it is available, it applies, the player is under the unit cap, and the cost is paid. The unit cap was missing entirely and is the one nothing else reveals — the engine's own count is `unitCountExcludingBuildingsIncludingQueued`, so a factory with a full queue is at the cap before any of it has rolled out, and the refusal that follows is indistinguishable from an order that never arrived. It is reported now.
+
+The fifth gate cannot be reported, and finding out why was the useful part. `B().c(unit)` is check-*then-charge*: asking it deducts the cost. So a diagnostic can read four gates and must not touch the fifth, and an order passing everything the agent can read may still be refused at the till — stated rather than papered over. The same trap sits one argument away in the first gate, where `applies(unit, true)` routes affordability through the charging helper while `applies(unit, false)` routes it through a pure read. Every call site pins the false, and the reason now lives where the name is declared.
+
+Reading gates and then dispatching anyway was the remaining half-measure. A closed gate now stops the order in the agent, logged as an error naming which one, rather than sending a command the engine drops in silence. It refuses rather than throws: being at the unit cap or short of credits is an ordinary state of a game in progress and clears on its own, where a missing action cannot and still throws.
+
+One defect found in the build itself, and it had been lying for some time. `make agent` catches a failure to replace the jar and reports which cause to look for, but `Move-Item` fails non-terminatingly by default: PowerShell printed the error, skipped the catch, left the failure flag empty, and the target reported a successful build over a jar it never replaced. Observed directly — a running game held the jar open and `make agent` exited 0 with a stale artifact. `make check` was never affected, since the self-checks compile to a per-invocation directory and never touch the jar, which is also why this survived so long.
+
+make check green: guard 0 violations, ruff + mypy clean, 380 tests, 100% statements and branches, agent-selftest OK.
+
+## [2026-07-26] research | reading the opponent's own code instead of reading about strategy
+Artifacts: `wiki/sources/m14-ai/` — `attack-group-staging.txt` (80), `unit-mix.txt` (73), `ai-state-dump.txt` (52)
+
+Notes: prompted by "should we research strategies". The answer was no to external strategy writing and yes to one primary source, because the bot's losses are not caused by picking the wrong plan -- they are caused by building four tanks and stopping. Knowing an optimal build order does not help something with no continuous production. The binding constraint was mechanism, not knowledge.
+
+The source worth reading ships in the jar. `com.corrodinggames.rts.game.a` is the AI package and identifies itself: two error strings begin `"AI: "`, and it draws its own state over the map with labels naming its fields -- `attackingCount`, `Turtling`, `StagingForAttack`, `AttackDelay`, `StagingTimer`, `UnitsWanted`. Those labels are what made the rest legible; nothing here was inferred from obfuscated field names alone.
+
+Production is a weighted mix rather than a build order. Every registered type is offered to a predicate, admitted types get a weight (10.0 by default), and picking is weighted-random filtered by movement class and tech level. It never finishes, so it never needs to decide what comes next -- a different shape of decision from our ordered list entirely.
+
+Attacking is delayed, then staged, then committed. A group's attack delay starts at 1000; when it expires the group masses and will not commit while any member is more than 170 world units from the rally point (28900 squared). Staging ends three ways: everyone gathered, seventeen seconds elapsed, or **any member taking damage within the last second** -- the engine logs "Not staging due to damage" and attacks at once. That last one is a reaction we have no equivalent of.
+
+Two dispatch details worth copying. Committed groups re-issue every 800 ms rather than only on change, so a stale waypoint cannot outlive the world moving under it. And the AI attacks the *ground* four times in five: it rolls 0-99 and below 80 targets the position rather than the unit. A position attack does not chase, so a formation stays together; a unit attack follows a target that may be running and pulls the group apart.
+
+Page is `confidence: medium` on purpose. All of it is decompiled source, which is strong for what the code can do and weaker than a run for what it does, and the standing rule from M4 is that decompiled Java is a reconstruction. Nothing here has been confirmed by watching the AI do it, and the page says so along with the cheap check that would: log an opponent's unit count and engagement timing against these constants.
+
+Also corrected while linking: `index.md` claimed 17 content pages against an actual 19. Hub counts were right and there were no orphans, so the drift was in the total alone.

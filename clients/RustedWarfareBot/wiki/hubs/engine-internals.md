@@ -21,3 +21,4 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 [Resource Pools and the Placement Rule](../pages/mechanics-resource-pools.md) -- credits come from a tileset property: `res_pool` tiles, the `placeOnlyOnResPool` flag, and where an extractor may stand
 [The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- what each type can make, dumped from the registry; the static half the option stream cannot answer
 [Build Actions: Two Families, Two Verbs, Five Gates](../pages/mechanics-build-actions.md) -- placing and producing are one mechanism dispatched two ways, and the five conditions that stop an order, four of which say nothing
+[How the Built-in AI Plays](../pages/ai-opponent-strategy.md) -- the opponents' own code: a weighted unit mix, and attacks that delay, mass, then commit

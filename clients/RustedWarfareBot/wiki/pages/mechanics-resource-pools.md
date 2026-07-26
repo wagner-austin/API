@@ -7,6 +7,7 @@ related:
   - "[[mechanics-unit-catalogue]]"
   - "[[perception-visibility]]"
   - "[[wire-contract-ndjson]]"
+  - "[[policy-threat]]"
 source_paths:
   - "wiki/sources/m11-pools/type-flags.ndjson:1"
   - "wiki/sources/m11-pools/type-flags.ndjson:85"

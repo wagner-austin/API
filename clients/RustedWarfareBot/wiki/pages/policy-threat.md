@@ -11,12 +11,13 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/n.java:1096"
   - "runs/decompiled/com/corrodinggames/rts/game/n.java:1103"
   - "wiki/sources/m6-wire/world-sample.ndjson:2"
+  - "wiki/sources/m14-threat/threat-survey.txt"
   - "src/rw_bot/policy/threat.py"
   - "src/rw_bot/policy/build_order.py"
   - "agent/src/rwbot/agent/Perception.java"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-25"
-confidence: medium
+confidence: high
 hubs: [bot-architecture, game-mechanics]
 ---
 
@@ -46,6 +47,18 @@ When every visible pool is occupied or covered, the policy waits rather than bui
 
 The stall detector bounds all three. None of them is `blocked`, because the world can leave each of them on its own — fog lifts as units move, a destroyed extractor frees its pool, and a killed enemy stops covering the route to one.
 
+## What it does on the real map
+
+The bot's own runs never exercise the rule, because its base is far from every opponent and the pools it reaches for are clear — so the filter had to be measured rather than inferred from a green run. Connecting to a live game after a completed plan and asking the survey what it would say, without sending anything:[^8]
+
+Tile (12, 52) — the pool from the recorded death, 4,272 units out and the farthest on the map — reads exposed, and independently of being occupied: the straight route to it passes through fire whether or not something is standing on it. Eleven free pools are rejected for threat in that sample and fourteen survive.
+
+The near picks are untouched. Old rule and new rule choose the same tile at 694 units, because the ground around the base is clear, so the filter costs nothing in the opening and only starts removing options once the near pools are taken — which is exactly when the old rule began reaching across the map.
+
+The counts drift between samples because the opponents are playing; an earlier probe on the same map read 2 rejected and 27 safe. What reproduces is the shape rather than the numbers: near picks unaffected, far pools falling out, and the pool from the death always among them.
+
+**It does not cap distance.** Fourteen pools were free and safe in that sample and the farthest was 2,518 units out. Distance still only ranks the survivors, so a long walk remains possible whenever every nearer pool is gone. Whether that wants a cap is an open question — a cap is a number with no derivation behind it, which is why there is not one here.
+
 ## What this deliberately does not model
 
 **The route is a straight line and the engine's pathfinder does not walk straight lines.** It steers around terrain, so the real path can enter danger this misses and can avoid danger this reports. Both directions of error are live; closing the gap means measuring the engine's own paths rather than approximating them.
@@ -54,7 +67,9 @@ The stall detector bounds all three. None of them is `blocked`, because the worl
 
 **Reachability is still missing**, and it is a separate problem from threat. On a map where the nearest free pool is across water, this module happily reports it safe and the land builder cannot get there at all.[^1] That wants a movement-layer model, not a wider radius here.
 
-What the straight-line test does catch is the case that actually killed a builder: a fixed enemy base sitting between the bot and the pool it wanted. Confidence on this page is `medium` for that reason — the rule is derived from engine truth at every point where it reads the world, and the geometry it applies on top is an approximation that has been argued for rather than measured.
+What the straight-line test does catch is the case that actually killed a builder: a fixed enemy base sitting between the bot and the pool it wanted, which the live survey confirms it now rejects.[^8]
+
+Confidence here is `high` on the claims and deliberately narrow on the scope. Every point where the rule reads the world is engine truth — hostility from the engine's own predicate, reach from the engine's own catalogue — and what it does with that has been measured on a live map rather than argued from a green run. What is *not* claimed is that a pool this rule accepts is safe. It is a filter against a specific, observed way of dying, not a model of danger.
 
 [^1]: `wiki/pages/mechanics-resource-pools.md` — the open-questions section and its footnote 13, recording the 4,293-unit order at tile (12, 52), the builder still walking at sample 370 at `(498, 1198)` against opposing bases at roughly `(370, 2430)` and `(590, 1690)`, and gone from the roster by sample 480.
 [^2]: `runs/decompiled/com/corrodinggames/rts/game/n.java:1096` — `public final boolean c(n n2) { if (n2 == i || this == i) { return false; } return this.r != n2.r; }`, where `i` is the neutral team and `r` the alliance group. Note it compares `r`, not the team number `k` the wire already carried.
@@ -63,3 +78,4 @@ What the straight-line test does catch is the case that actually killed a builde
 [^5]: `wiki/sources/m6-wire/world-sample.ndjson:2` — `…"team":5,"mine":false,"hostile":true,…`. Across the capture the field partitions cleanly: 9 records at `team:0, mine:true, hostile:false` and 48 across teams 1, 3, 5 and 7 at `mine:false, hostile:true`. The map is a free-for-all, so it does not exercise the allied case; that the predicate distinguishes it is read from the engine, not from this capture. Written by `Perception.isHostileToLocalPlayer`, whose binding `make check` verifies against the jar.
 [^6]: `src/rw_bot/policy/threat.py` — `reach_of`, reading `UnitStats.weapon.attack_range` from the `-printunits` catalogue ([[mechanics-unit-catalogue]]). A type the catalogue does not describe is treated as harmless, on the grounds that there is no honest range to invent for it.
 [^7]: `src/rw_bot/policy/build_order.py` — `survey_pools` returns the chosen pool with the counts behind the choice, and `_no_pool_reason` turns them into the wait reason.
+[^8]: `wiki/sources/m14-threat/threat-survey.txt` — one sample taken over the agent channel after a 700-sample run on `[z;p10]Crossing Large (10p)`, with the survey run against it and no order sent. The file carries the hostility partition, the per-pool table and the old-rule/new-rule comparison, plus the drift note against an earlier probe.

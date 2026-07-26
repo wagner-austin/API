@@ -1,0 +1,61 @@
+Threat filter measured against a live map
+========================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28), -nodisplay -nosound -sandbox,
+map [z;p10]Crossing Large (10p), agent attached on channelPort=7712.
+Taken after a 700-sample run in which the bot completed its plan and the five
+opposing AI players expanded: enemies seen went 48 -> 107 over the run.
+
+Method: connect over the agent channel, take one sample, send nothing, and run
+the planner's own survey against it. This asks the rule what it would say
+about the real map from the builder's real position, rather than acting on it.
+
+--- hostility partition ---
+visible=129 mine=11 hostile=118 neither=0
+mine teams   : [0]
+hostile teams: [1, 3, 5, 7]
+both mine and hostile: []
+  hostile commandCenter team=5 at (410,990)
+  hostile builder team=5 at (1706,2535)
+
+--- pool survey from the builder ---
+builder at (3970,2418)
+   dist         tile  occupied exposed
+    190   (203, 130)      True   False
+    228   (223, 130)      True   False
+    588   (184, 118)      True   False
+  ...
+   4080     (8, 124)      True    True
+   4139    (10, 172)      True    True
+   4142      (9, 86)      True    True
+   4272     (12, 52)      True    True
+
+free pools rejected for threat: 11
+free and safe: 14, farthest of them 2518 units out
+old rule would pick tile (205, 93) at 694
+new rule picks     tile (205, 93) at 694
+
+armed hostiles: 58, max reach 320
+
+Reading:
+
+Tile (12, 52) is the pool that got a builder killed -- 4,272 units from the
+anchor, the farthest on the map. It now reads exposed as well as occupied, and
+the two are independent: the straight route to it passes through fire whether
+or not something is standing on it.
+
+The filter costs nothing in the opening. Old rule and new rule pick the same
+tile at 694 units, because the ground near the base is clear. It only starts
+removing options once the near pools are taken, which is exactly when the old
+rule started reaching across the map.
+
+It does not cap distance. Fourteen pools are free and safe here and the
+farthest is 2,518 units out, so a long walk is still permitted -- it is only
+chosen when every nearer pool is gone, since distance still ranks the
+survivors.
+
+The counts drift while the sample is being taken, because the opponents are
+playing. An earlier probe on the previous run of the same map read 2 rejected
+and 27 safe at 34,673 frames; this one reads 11 and 14. What reproduces across
+both is the shape: the near picks are unaffected, the far pools are the ones
+that fall out, and the pool from the recorded death is always among them.

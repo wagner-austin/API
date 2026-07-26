@@ -30,7 +30,17 @@ final class CommandRecord {
          * <p>Carries no position, because there is nowhere to choose: the unit
          * appears at the building that made it (wiki: mechanics-build-actions).
          */
-        PRODUCE
+        PRODUCE,
+
+        /**
+         * Send a unit to attack another unit.
+         *
+         * <p>Addresses the target by engine identity rather than by position,
+         * which is the whole difference from a move. A target that walks away
+         * is still the target; a move to where it stood is a march to empty
+         * ground (wiki: policy-combat).
+         */
+        ATTACK
     }
 
     private final Kind kind;
@@ -38,13 +48,16 @@ final class CommandRecord {
     private final float x;
     private final float y;
     private final String buildType;
+    private final long targetId;
 
-    private CommandRecord(Kind kind, long unitId, float x, float y, String buildType) {
+    private CommandRecord(
+            Kind kind, long unitId, float x, float y, String buildType, long targetId) {
         this.kind = kind;
         this.unitId = unitId;
         this.x = x;
         this.y = y;
         this.buildType = buildType;
+        this.targetId = targetId;
     }
 
     Kind kind() {
@@ -65,6 +78,11 @@ final class CommandRecord {
     }
 
     /** Unit-type name to build; empty for a move. */
+    /** Engine object identity of the unit to attack. Zero unless ATTACK. */
+    long targetId() {
+        return targetId;
+    }
+
     String buildType() {
         return buildType;
     }
@@ -94,7 +112,8 @@ final class CommandRecord {
                     unitId,
                     requireFloat(fields, "x", line),
                     requireFloat(fields, "y", line),
-                    "");
+                    "",
+                    0L);
         }
         if ("build".equals(kindText)) {
             return new CommandRecord(
@@ -102,16 +121,27 @@ final class CommandRecord {
                     unitId,
                     requireFloat(fields, "x", line),
                     requireFloat(fields, "y", line),
-                    requireType(fields, "build", line));
+                    requireType(fields, "build", line),
+                    0L);
         }
         if ("produce".equals(kindText)) {
             reject(fields, "x", line);
             reject(fields, "y", line);
-            return new CommandRecord(Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line));
+            return new CommandRecord(
+                    Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line), 0L);
+        }
+        if ("attack".equals(kindText)) {
+            // No position and no type: the target's identity is the whole of
+            // the order, and a coordinate here would be a number nothing reads.
+            reject(fields, "x", line);
+            reject(fields, "y", line);
+            reject(fields, "type", line);
+            return new CommandRecord(
+                    Kind.ATTACK, unitId, 0.0f, 0.0f, "", requireLong(fields, "target_id", line));
         }
         throw new IllegalArgumentException(
-                "unknown command kind '" + kindText + "'; expected move, build or produce: "
-                        + line);
+                "unknown command kind '" + kindText
+                        + "'; expected move, build, produce or attack: " + line);
     }
 
     /** Reads the unit-type field, which no verb that carries it may leave blank. */

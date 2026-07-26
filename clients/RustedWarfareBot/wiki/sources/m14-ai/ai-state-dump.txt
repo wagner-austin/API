@@ -1,0 +1,52 @@
+# Excerpt: com/corrodinggames/rts/game/a/a.java:760-775 (AI base state dump, naming its own fields)
+# Rusted Warfare 1.15 (code 176, build #28), CFR 0.152 over the pinned game-lib.jar
+
+            f6 = am2.ep - l2.cx - 60.0f;
+            this.bp.b(Color.a(0, 255, 0));
+            if (am2 instanceof com.corrodinggames.rts.game.units.d.e) {
+                f6 -= 80.0f;
+                object = (String)object + "Base ( Team:" + this.k + " )";
+                object = (String)object + "\nuseTransportsOnThisMap: " + this.ai();
+                object = (String)object + "\nuseHoverTransportsOnThisMap: " + this.aj();
+                object = (String)object + "\nattackingCount: " + this.ba;
+                object = (String)object + "\ndefendingCount: " + this.bb;
+                object = (String)object + "\nnumOfUnitsNeedingTransport: " + this.ao();
+                object = (String)object + "\ntransport: " + this.aG;
+                if (this.ae()) {
+                    object = (String)object + "\nTurtling: true";
+                }
+                this.bp.b(Color.a(255, 255, 255));
+            }
+
+# and the per-group dump at a.java:840-870
+                }
+                string2 = string2 + "\n" + (((g)object3).b() ? "Defensive Type" : "Attack Type");
+                string2 = string2 + "\nUnits: " + ((g)object3).F.size() + " / " + ((g)object3).A;
+                string2 = string2 + "\nStagingForAttack: " + ((g)object3).q;
+                string2 = string2 + "\nAttackDelay: " + ((g)object3).l;
+                if (((g)object3).u != 0.0f) {
+                    string2 = string2 + "\nStagingTimer: " + ((g)object3).u;
+                }
+                string2 = string2 + "\nStagingTargetFound: " + ((g)object3).r;
+                if (((g)object3).o != 0.0f) {
+                    string2 = string2 + "\nattackingFor: " + ((g)object3).o;
+                }
+                string2 = string2 + "\ncommonMovement: " + ((g)object3).i().name();
+                if (((g)object3).B) {
+                    string2 = string2 + " (seaGroup)";
+                }
+                if (((g)object3).G.size() > 0) {
+                    string2 = string2 + "\nunitsNeedingTransport:" + ((g)object3).G.size();
+                }
+                if (((g)object3).b != null) {
+                    string2 = string2 + "\nlast action:" + ((g)object3).b;
+                }
+                if (!((g)object3).v && !((g)object3).q) {
+                    string2 = string2 + "\nnext move:" + (int)this.k(((g)object3).n) + "s";
+                }
+            }
+            if (o2 instanceof com.corrodinggames.rts.game.a.n) {
+                object3 = (com.corrodinggames.rts.game.a.n)o2;
+                string2 = string2 + "\nUnitsWanted: " + ((com.corrodinggames.rts.game.a.n)object3).l;
+                string2 = string2 + "\nunits: " + ((com.corrodinggames.rts.game.a.n)object3).F.size();
+                string2 = string2 + "\nreadyToMoveOut: " + ((com.corrodinggames.rts.game.a.n)object3).q;

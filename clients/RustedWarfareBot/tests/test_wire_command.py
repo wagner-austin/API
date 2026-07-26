@@ -11,7 +11,9 @@ import pytest
 
 from rw_bot.wire.command import (
     CommandError,
+    attack_order,
     build_order,
+    encode_attack,
     encode_build,
     encode_move,
     encode_produce,
@@ -58,6 +60,30 @@ def test_a_produce_type_the_flat_format_cannot_carry_is_rejected(hostile: str) -
     with pytest.raises(CommandError) as caught:
         produce_order(unit_id=213, type_name=hostile)
     assert caught.value.code == "RW-CMD-001"
+
+
+def test_attack_encodes_to_the_exact_agent_format() -> None:
+    line = encode_attack(attack_order(unit_id=276, target_id=216))
+    assert line == '{"kind":"attack","unit_id":276,"target_id":216}'
+
+
+def test_an_attack_carries_no_position() -> None:
+    """The target's identity is the whole of the order.
+
+    A move sends a unit to where the target stood; naming the target is what
+    makes the engine follow it as it moves, so a coordinate here would be a
+    number nothing reads.
+    """
+    line = encode_attack(attack_order(unit_id=1, target_id=2))
+    assert '"x"' not in line
+    assert '"y"' not in line
+
+
+def test_a_unit_cannot_be_ordered_to_attack_itself() -> None:
+    """The engine accepts it and then cannot act on it."""
+    with pytest.raises(CommandError) as caught:
+        attack_order(unit_id=7, target_id=7)
+    assert caught.value.code == "RW-CMD-003"
 
 
 def test_a_move_never_carries_a_build_type() -> None:

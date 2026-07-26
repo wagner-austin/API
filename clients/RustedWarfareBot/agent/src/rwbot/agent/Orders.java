@@ -216,6 +216,59 @@ final class Orders {
      * @throws IllegalStateException When the producer has no action making that
      *     type, naming what it can make instead.
      */
+    /**
+     * Orders one unit to attack another.
+     *
+     * <p>The same command path as a move, in a different target mode. A move
+     * sets a waypoint to a point; this sets one to a unit, and the engine
+     * follows the target as it moves rather than sending the attacker to where
+     * it used to be. That distinction is the reason this is a verb of its own
+     * rather than a move at the target's current position.
+     *
+     * <p>The waypoint mode is the engine's own {@code av.b}. Six setters on the
+     * command take a unit and each selects a different mode, so which one
+     * attacks was not obvious from their shapes; the engine's waypoint renderer
+     * draws this one red and the build mode blue, which is what singled it out,
+     * and a live run confirmed it by taking a target's hit points down (wiki:
+     * policy-combat).
+     *
+     * <p>Must be called on the game thread; see {@link #onGameThread}.
+     *
+     * @param engine The live engine instance.
+     * @param attacker The unit to order. Must be owned by the current player.
+     * @param target The unit to attack.
+     * @throws IllegalStateException When any pinned name is absent or the
+     *     command cannot be constructed.
+     */
+    static void attack(Object engine, Object attacker, Object target) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        if (team == null) {
+            throw new IllegalStateException("rw-agent: engine has no current player to order for");
+        }
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
+        if (controller == null) {
+            throw new IllegalStateException("rw-agent: engine has no CommandController yet");
+        }
+
+        Method create =
+                EngineAccess.pinnedMethod(
+                        controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
+        if (command == null) {
+            throw new IllegalStateException("rw-agent: CommandController returned no command");
+        }
+
+        Method addUnit =
+                EngineAccess.pinnedMethod(
+                        command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, attacker);
+
+        Method setTarget =
+                EngineAccess.pinnedMethod(
+                        command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS));
+        EngineAccess.invoke(setTarget, command, target);
+    }
+
     static void produce(Object engine, Object producer, String typeName) {
         Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
         if (team == null) {

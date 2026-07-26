@@ -18,9 +18,11 @@ from rw_bot import RwBotError
 from rw_bot.control import _test_hooks
 from rw_bot.validation import require_int
 from rw_bot.wire.command import (
+    AttackOrder,
     BuildOrder,
     MoveOrder,
     ProduceOrder,
+    encode_attack,
     encode_build,
     encode_move,
     encode_produce,
@@ -117,6 +119,17 @@ class AgentChannel:
             OSError: When the write fails.
         """
         self._connection.send_line(encode_produce(order))
+
+    def send_attack(self, order: AttackOrder) -> None:
+        """Send one attack order.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_attack(order))
 
     def close(self) -> None:
         """Release the connection."""

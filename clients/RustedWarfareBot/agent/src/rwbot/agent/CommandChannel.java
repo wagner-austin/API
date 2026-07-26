@@ -184,6 +184,24 @@ final class CommandChannel {
                             + ")");
             return;
         }
+        if (command.kind() == CommandRecord.Kind.ATTACK) {
+            // The target is looked up among what is visible rather than what is
+            // owned, and it is looked up now rather than trusted from the
+            // sample: a target can die or slip back into fog between the
+            // planner deciding and the order arriving, and an attack on a
+            // stale identity is a command the engine would drop silently.
+            Object target = Perception.findVisibleById(engine, command.targetId());
+            if (target == null) {
+                Log.error(
+                        "channel: no visible unit with id "
+                                + command.targetId()
+                                + "; the target died or left sight since the sample");
+                return;
+            }
+            Orders.attack(engine, unit, target);
+            Log.info("channel: attack " + command.targetId() + " by " + command.unitId());
+            return;
+        }
         if (command.kind() == CommandRecord.Kind.PRODUCE) {
             Orders.produce(engine, unit, command.buildType());
             Log.info(

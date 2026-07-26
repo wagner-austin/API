@@ -92,6 +92,8 @@ _EXPANDED = (
     "landFactory",
     "c_tank",
     "c_tank",
+    "c_tank",
+    "c_tank",
 )
 
 
@@ -181,7 +183,15 @@ class _StubbedConnect:
 def test_the_real_catalogue_prices_every_goal() -> None:
     """A goal the catalogue cannot price blocks the run at once."""
     catalogue = load_catalogue(_CATALOGUE_PATH)
-    assert [catalogue[name]["price"] for name in DEFAULT_GOALS] == [700, 700, 700, 350, 350]
+    assert [catalogue[name]["price"] for name in DEFAULT_GOALS] == [
+        700,
+        700,
+        700,
+        350,
+        350,
+        350,
+        350,
+    ]
 
 
 def test_the_real_dump_rules_every_goal() -> None:
@@ -191,6 +201,8 @@ def test_the_real_dump_rules_every_goal() -> None:
         True,
         True,
         True,
+        False,
+        False,
         False,
         False,
     ]
@@ -215,26 +227,38 @@ def test_the_goals_name_no_factory_but_the_plan_has_one() -> None:
 
 def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 2)
+    # Three reads: one for expansion, one for the build loop, one for the
+    # fight phase that a completed plan triggers.
+    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "5"]) == EXIT_OK
     # The world already holds a finished Land Factory, so expansion inserts
     # nothing -- the goals are reachable as written. That is the same rule the
     # insertion cases exercise, seen from the other side.
     assert capsys.readouterr().out.splitlines() == [
-        "goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank",
-        "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank",
+        "goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
+        "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
         "  extractorT1 costs 700, goes on a resource pool",
         "  extractorT1 costs 700, goes on a resource pool",
         "  extractorT1 costs 700, goes on a resource pool",
         "  c_tank costs 350, goes on the ring",
         "  c_tank costs 350, goes on the ring",
-        "outcome        done (all 5 plan entries satisfied)",
-        "completed      5/5",
+        "  c_tank costs 350, goes on the ring",
+        "  c_tank costs 350, goes on the ring",
+        "outcome        done (all 7 plan entries satisfied)",
+        "completed      7/7",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
         "credits left   9000",
+        # The plan finished, so the fight phase runs. This world holds no
+        # hostiles, so it clears immediately without an order.
+        "fight outcome  cleared",
+        "attack orders  0",
+        "army           4 -> 4",
+        "enemies seen   0 -> 0",
+        "engaged gone   0",
+        "samples seen   1",
     ]
 
 
@@ -242,9 +266,9 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
     peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER) * 2)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[8:] == [
+    assert capsys.readouterr().out.splitlines()[10:] == [
         "outcome        sample_limit (extractorT1 needs a resource pool and none is visible yet)",
-        "completed      0/6",
+        "completed      0/8",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -256,16 +280,24 @@ def test_the_sample_budget_defaults_when_not_given(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 2)
+    # Three reads: one for expansion, one for the build loop, one for the
+    # fight phase that a completed plan triggers.
+    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
     with _StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
-    assert capsys.readouterr().out.splitlines()[7:] == [
-        "outcome        done (all 5 plan entries satisfied)",
-        "completed      5/5",
+    assert capsys.readouterr().out.splitlines()[9:] == [
+        "outcome        done (all 7 plan entries satisfied)",
+        "completed      7/7",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
         "credits left   9000",
+        "fight outcome  cleared",
+        "attack orders  0",
+        "army           4 -> 4",
+        "enemies seen   0 -> 0",
+        "engaged gone   0",
+        "samples seen   1",
     ]
 
 

@@ -174,4 +174,6 @@ def test_the_expanded_default_plan_is_reachable_from_the_opening_roster() -> Non
         "landFactory",
         "c_tank",
         "c_tank",
+        "c_tank",
+        "c_tank",
     )

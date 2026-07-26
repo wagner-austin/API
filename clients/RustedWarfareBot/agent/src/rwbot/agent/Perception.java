@@ -435,4 +435,29 @@ final class Perception {
         }
         return null;
     }
+
+    /**
+     * Finds a currently visible entity by its engine identity.
+     *
+     * <p>The counterpart of {@link #findOwnedById} for the other side. An
+     * attack order names a target the player does not own, so the owned list
+     * cannot resolve it -- but the search still runs over what the player can
+     * legitimately see rather than the master entity list, or the bot could
+     * order an attack on something it has no way of knowing is there (wiki:
+     * multiplayer-portability-invariants).
+     *
+     * @param engine The live engine instance.
+     * @param id The identity to find.
+     * @return The entity, or null when nothing visible carries that identity --
+     *     the normal answer for a target that has died or slipped back into
+     *     fog since the sample was taken.
+     */
+    static Object findVisibleById(Object engine, long id) {
+        for (Object entity : visibleEntities(engine)) {
+            if (idOf(entity) == id) {
+                return entity;
+            }
+        }
+        return null;
+    }
 }

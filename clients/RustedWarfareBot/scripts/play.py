@@ -17,6 +17,7 @@ from rw_bot.control.channel import open_channel
 from rw_bot.mechanics.build_tree import decode_build_tree
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
 from rw_bot.mechanics.placement import TypePlacement, decode_placements
+from rw_bot.policy.campaign import fight, format_battle
 from rw_bot.policy.expand import expand
 from rw_bot.policy.runner import format_scorecard, run
 
@@ -37,6 +38,8 @@ DEFAULT_GOALS: tuple[str, ...] = (
     "extractorT1",
     "extractorT1",
     "extractorT1",
+    "c_tank",
+    "c_tank",
     "c_tank",
     "c_tank",
 )
@@ -138,10 +141,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(f"  {name} costs {catalogue[name]['price']}, goes {site}\n")
 
     card = run(channel, plan, catalogue, placements, max_samples)
-    channel.close()
-
     for line in format_scorecard(card):
         sys.stdout.write(f"{line}\n")
+
+    # Building is not playing. The fight phase only runs on a plan that
+    # finished, because sending a half-built army at five opponents loses the
+    # army and proves nothing.
+    if card["outcome"] == "done":
+        for line in format_battle(fight(channel, catalogue, max_samples)):
+            sys.stdout.write(f"{line}\n")
+    channel.close()
+
     return EXIT_OK if card["outcome"] == "done" else EXIT_INCOMPLETE
 
 

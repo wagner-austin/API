@@ -23,3 +23,4 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- goals in, executable plan out: prerequisites derived rather than hand-written
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership
+[How the Built-in AI Plays](../pages/ai-opponent-strategy.md) -- what the bot is losing to, read from the jar rather than reasoned about

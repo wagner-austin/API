@@ -18,7 +18,7 @@ from rw_bot.control.channel import (
     ChannelError,
     open_channel,
 )
-from rw_bot.wire.command import build_order, move_order, produce_order
+from rw_bot.wire.command import attack_order, build_order, move_order, produce_order
 from rw_bot.wire.state import WireError
 
 _FRAME_3 = (
@@ -212,6 +212,12 @@ def test_a_produce_order_leaves_in_the_agent_format() -> None:
     peer = _ScriptedPeer([])
     AgentChannel(peer).send_produce(produce_order(unit_id=213, type_name="scout"))
     assert peer.sent == ['{"kind":"produce","unit_id":213,"type":"scout"}']
+
+
+def test_an_attack_order_leaves_in_the_agent_format() -> None:
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_attack(attack_order(unit_id=276, target_id=216))
+    assert peer.sent == ['{"kind":"attack","unit_id":276,"target_id":216}']
 
 
 def test_closing_releases_the_connection() -> None:

@@ -25,6 +25,7 @@ from rw_bot import RwBotError
 
 _BLANK_TYPE = "RW-CMD-001"
 _NOT_FINITE = "RW-CMD-002"
+_SELF_TARGET = "RW-CMD-003"
 
 
 class CommandError(RwBotError):
@@ -86,6 +87,58 @@ class ProduceOrder(TypedDict):
     kind: Literal["produce"]
     unit_id: int
     type_name: str
+
+
+class AttackOrder(TypedDict):
+    """Send one unit to attack another.
+
+    Attributes:
+        kind: Discriminator, always ``"attack"``.
+        unit_id: Engine identity of the attacker.
+        target_id: Engine identity of the unit to attack.
+    """
+
+    kind: Literal["attack"]
+    unit_id: int
+    target_id: int
+
+
+def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
+    """Build a validated attack order.
+
+    Carries no position, and that is the point of the verb rather than an
+    omission. A move sends a unit to where the target stood; this names the
+    target itself, so the engine follows it as it moves.
+
+    Args:
+        unit_id: Engine identity of the attacker.
+        target_id: Engine identity of the unit to attack.
+
+    Returns:
+        The order.
+
+    Raises:
+        CommandError: ``RW-CMD-003`` when a unit is ordered to attack itself,
+            which the engine accepts and then cannot act on.
+    """
+    if unit_id == target_id:
+        raise CommandError(
+            _SELF_TARGET,
+            f"unit {unit_id} cannot be ordered to attack itself",
+        )
+    return AttackOrder(kind="attack", unit_id=unit_id, target_id=target_id)
+
+
+def encode_attack(order: AttackOrder) -> str:
+    """Render an attack order as one wire line.
+
+    Args:
+        order: The order to encode.
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return f'{{"kind":"attack","unit_id":{order["unit_id"]},"target_id":{order["target_id"]}}}'
 
 
 def move_order(*, unit_id: int, x: float, y: float) -> MoveOrder:
@@ -231,11 +284,14 @@ def _require_finite(value: float, field: str) -> None:
 
 
 __all__ = [
+    "AttackOrder",
     "BuildOrder",
     "CommandError",
     "MoveOrder",
     "ProduceOrder",
+    "attack_order",
     "build_order",
+    "encode_attack",
     "encode_build",
     "encode_move",
     "encode_produce",
