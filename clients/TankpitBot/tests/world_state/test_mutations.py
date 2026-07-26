@@ -20,10 +20,46 @@ from tankpit_bot.state import (
     set_self_rank,
     update_container_from_radar,
     update_self_from_movement_response,
+    update_self_rank,
     update_terrain_from_viewport,
 )
 from tankpit_bot.state.types import make_self_state
 from tests.world_state.helpers import get_self_state
+
+
+class TestUpdateSelfRank:
+    """Tests for update_self_rank (the mid-session promotion mutation)."""
+
+    def _state_with_self(self, rank: int) -> WorldStateDict:
+        return update_self_from_movement_response(
+            make_empty_world_state(),
+            tank_id=1301,
+            x=100,
+            y=100,
+            team=TEAM_BLUE,
+            rank=rank,
+            leaderboard_position=1,
+            timestamp_ms=500,
+        )
+
+    def test_applies_a_promotion(self) -> None:
+        """A wire rank change lands in self_state (the promoting-kill flip)."""
+        state = self._state_with_self(rank=0)
+        updated = update_self_rank(state, 1, 1000, "wire_0x2E_tank_status_sync")
+        self_state = get_self_state(updated)
+        assert self_state["rank"] == 1
+        assert self_state["x"] == 100
+        assert updated["timestamp_ms"] == 1000
+
+    def test_same_rank_is_a_no_op(self) -> None:
+        """An unchanged rank returns the state untouched."""
+        state = self._state_with_self(rank=1)
+        assert update_self_rank(state, 1, 1000, "wire_0x3D_movement") is state
+
+    def test_no_self_state_is_a_no_op(self) -> None:
+        """Rank cannot precede join."""
+        state = make_empty_world_state()
+        assert update_self_rank(state, 1, 1000, "wire_0x47_movement") is state
 
 
 class TestUpdateSelfFromMovementResponse:

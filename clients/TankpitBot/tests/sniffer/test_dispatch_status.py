@@ -229,6 +229,66 @@ class TestDispatchSelfStatus:
         # Damage update still applies regardless of promo branch.
         assert ws.world_state["tanks"]["1301"]["damage_state"] == 0
 
+    def test_dispatch_self_status_applies_a_mid_session_promotion(self) -> None:
+        """The 0x2E rank field promotes self_state the tick it flips.
+
+        Measured bot-20260725-211120: the promoting kill flipped the
+        0x2E rank 0 -> 1 at t+31.7s with NO 0x2B all session — the
+        status sync is the promotion's earliest wire signal, and the
+        rank-derived readiness bars read self_state["rank"] live.
+        """
+        from tankpit_bot.protocol import TankStatusSyncDict as _Sync
+        from tankpit_bot.sniffer.world_state_tanks import (
+            update_world_state_from_move_response_full,
+        )
+
+        ws = get_world_service()
+        update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 0)
+
+        msg = _Sync(
+            msg_type=0x2E,
+            subtype=2,
+            tank_id=1301,
+            damage_state=0,
+            rank=1,
+            lb_score=151,
+            promo_state=0,
+            fuel=1100,
+        )
+        dispatch_world_state_update(ws, msg)
+
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should exist after move response")
+        assert self_state["rank"] == 1
+
+    def test_dispatch_other_tank_status_leaves_self_rank_alone(self) -> None:
+        """Another tank's 0x2E rank never touches self_state."""
+        from tankpit_bot.protocol import TankStatusSyncDict as _Sync
+        from tankpit_bot.sniffer.world_state_tanks import (
+            update_world_state_from_move_response_full,
+        )
+
+        ws = get_world_service()
+        update_world_state_from_move_response_full(ws, 1301, 100, 100, 2, 0)
+
+        msg = _Sync(
+            msg_type=0x2E,
+            subtype=1,
+            tank_id=511,
+            damage_state=2,
+            rank=5,
+            lb_score=0,
+            promo_state=0,
+            fuel=None,
+        )
+        dispatch_world_state_update(ws, msg)
+
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should exist after move response")
+        assert self_state["rank"] == 0
+
 
 class TestDispatchSupervisor:
     """Tests for dispatching Supervisor (0x52) command error messages."""

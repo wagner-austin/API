@@ -171,6 +171,7 @@ def update_world_state_from_move_response_full(
         )
     elif self_state["tank_id"] == tank_id:
         ws.update_world_state_from_position(x, y)
+        ws.update_world_state_from_rank(rank, "wire_0x3D_movement")
 
     obs = make_tank_observation(
         tank_id=tank_id,

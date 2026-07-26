@@ -30,6 +30,7 @@ from tankpit_bot.state.mutations import (
     set_tank_last_aim,
     update_self_from_movement_response,
     update_self_position,
+    update_self_rank,
     update_terrain_from_viewport,
 )
 from tankpit_bot.state.renderer import (
@@ -182,6 +183,7 @@ __all__ = [
     "update_container_from_radar",
     "update_self_from_movement_response",
     "update_self_position",
+    "update_self_rank",
     "update_terrain_from_viewport",
     "viewport_scan_key",
 ]

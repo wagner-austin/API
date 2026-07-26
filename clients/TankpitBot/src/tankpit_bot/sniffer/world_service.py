@@ -30,6 +30,7 @@ from tankpit_bot.state import (
     WorldStateDict,
     make_empty_world_state,
     update_self_position,
+    update_self_rank,
     viewport_scan_key,
 )
 from tankpit_bot.state.viewport_geometry import (
@@ -279,6 +280,26 @@ class WorldService:
         """
         self.world_state = update_self_position(
             self.world_state, x, y, get_current_time_ms(), fact_source
+        )
+
+    def update_world_state_from_rank(self, rank: int, fact_source: FactSource) -> None:
+        """Apply a wire-observed self rank to world state.
+
+        A mid-session promotion flips the rank field of self-addressed
+        0x2E/0x47/0x3D statements the same tick as the promoting kill
+        (measured bot-20260725-211120); every rank-derived readiness
+        bar and capacity reads ``self_state["rank"]``, so the update
+        must land the tick it arrives.
+
+        Args:
+            rank: Wire-observed rank of the self tank.
+            fact_source: Wire channel the rank arrived on.
+        """
+        current = self.world_state["self_state"]
+        if current is not None and current["rank"] != rank:
+            log.info("RANK: self rank %d -> %d (%s)", current["rank"], rank, fact_source)
+        self.world_state = update_self_rank(
+            self.world_state, rank, get_current_time_ms(), fact_source
         )
 
     # -----------------------------------------------------------------

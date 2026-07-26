@@ -400,8 +400,15 @@ def _dispatch_resource_update(ws: WorldService, decoded: protocol.BinaryMessage)
         True if the message was handled, False otherwise.
     """
     match decoded:
-        case {"msg_type": 0x2E, "fuel": int(fuel)} if fuel is not None:
+        case {"msg_type": 0x2E, "fuel": int(fuel), "rank": int(rank)} if fuel is not None:
+            # The long (fuel-bearing) form is per-recipient — it is
+            # ALWAYS the self tank, and it is the form the live
+            # promotion arrived on (bot-20260725-211120: rank 0 -> 1
+            # in the fuel-bearing 0x2E at the kill tick). Apply the
+            # rank alongside the fuel so a mid-session promotion
+            # reaches the rank-derived bars the tick it lands.
             update_world_state_from_fuel_total(ws, fuel, "wire_0x2E_tank_status_sync")
+            ws.update_world_state_from_rank(rank, "wire_0x2E_tank_status_sync")
             return True
         case {
             "msg_type": 0x44,
@@ -491,23 +498,28 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             "tank_id": int(tid),
             "damage_state": int(dmg),
             "promo_state": int(promo),
+            "rank": int(rank),
         }:
             update_world_state_from_tank_damage(ws, tid, dmg)
-            # promo_state is the per-tank promotion-eligibility byte
-            # (0 = no pending promotion, > 0 indicates eligibility per
-            # JS Og.h ``g`` field). For OWN tank, this lets the AI
-            # know "I'm about to rank up if I get one more kill", which
-            # could influence aggression. For enemy tanks, it's a
-            # marker that a player is on a hot streak. The promo banner
-            # itself fires separately as 0x2B Promotion; this is the
-            # passive eligibility signal that precedes it.
+            # promo_state is a live promotion-PROGRESS counter (JS
+            # Og.h ``g`` field): it climbs with damage dealt and
+            # RESETS to 0 at the promoting kill, at which tick the
+            # rank field itself flips (measured bot-20260725-211120:
+            # promo_state 0->3->5->6->0 and rank 0->1 at t+31.7s, the
+            # first kill). The 0x2E is the promotion's earliest wire
+            # signal — no 0x2B arrived that session — so the self
+            # rank must be applied HERE for the rank-derived
+            # readiness bars and capacities to follow a mid-session
+            # promotion.
             self_state = ws.world_state["self_state"]
-            if self_state is not None and self_state["tank_id"] == tid and promo > 0:
-                emit_diagnostic(
-                    diagnostic_kind="self_promo_eligible",
-                    tank_id=tid,
-                    promo_state=promo,
-                )
+            if self_state is not None and self_state["tank_id"] == tid:
+                ws.update_world_state_from_rank(rank, "wire_0x2E_tank_status_sync")
+                if promo > 0:
+                    emit_diagnostic(
+                        diagnostic_kind="self_promo_eligible",
+                        tank_id=tid,
+                        promo_state=promo,
+                    )
             return True
         case {"msg_type": 0x2E, "tank_id": int(tid), "damage_state": int(dmg)}:
             update_world_state_from_tank_damage(ws, tid, dmg)

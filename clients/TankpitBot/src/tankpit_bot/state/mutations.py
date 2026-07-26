@@ -139,6 +139,58 @@ def update_self_position(
     )
 
 
+def update_self_rank(
+    state: WorldStateDict,
+    rank: int,
+    timestamp_ms: int,
+    fact_source: FactSource,
+) -> WorldStateDict:
+    """Apply a wire-observed self rank, preserving everything else.
+
+    A mid-session promotion flips the rank field of the self-addressed
+    0x2E/0x47/0x3D statements the same tick as the promoting kill
+    (measured bot-20260725-211120: 0x2E rank 0 -> 1 at t+31.7s, the
+    kill tick), and every rank-derived readiness bar and capacity
+    reads ``self_state["rank"]`` — dropping the update left the bot
+    believing its old caps for the rest of that session.
+
+    Args:
+        state: Current world state.
+        rank: Wire-observed rank of the self tank.
+        timestamp_ms: Message timestamp.
+        fact_source: Wire channel the rank arrived on.
+
+    Returns:
+        New WorldStateDict with the rank applied, or ``state``
+        unchanged when there is no self state yet or the rank already
+        matches.
+    """
+    current = state["self_state"]
+    if current is None or current["rank"] == rank:
+        return state
+    new_self = make_self_state(
+        tank_id=current["tank_id"],
+        x=current["x"],
+        y=current["y"],
+        team=current["team"],
+        rank=rank,
+        fuel=current["fuel"],
+        leaderboard_position=current["leaderboard_position"],
+        observed_ms=timestamp_ms,
+        provenance=make_provenance(fact_source, []),
+    )
+    return WorldStateDict(
+        self_state=new_self,
+        tanks=state["tanks"],
+        containers=state["containers"],
+        mines=state["mines"],
+        terrain=state["terrain"],
+        viewport=state["viewport"],
+        scanned_tiles=state["scanned_tiles"],
+        timestamp_ms=timestamp_ms,
+    )
+
+
 # update_tank_from_registry and update_tank_damage were deleted
 # 2026-06-19 with the freshness-model refactor. Every tank-state
 # mutation now flows through apply_tank_observation, which enforces the
@@ -430,6 +482,11 @@ def set_self_rank(
 ) -> WorldStateDict:
     """Set self rank to absolute value from a Promotion message (0x2B Rf).
 
+    Delegates to :func:`update_self_rank` with the 0x2B provenance —
+    the 0x2B banner is one of FOUR self-rank channels; the
+    0x2E/0x3D/0x47 rank fields flip at the promoting kill and can
+    arrive first (bot-20260725-211120 carried no 0x2B at all).
+
     Args:
         state: Current world state.
         rank: New rank index (0-8 per the JS rank table).
@@ -437,33 +494,10 @@ def set_self_rank(
 
     Returns:
         New WorldStateDict with updated self rank, or unchanged if no
-        self_state has been established yet (rank can't precede join).
+        self_state has been established yet (rank can't precede join)
+        or the rank already matches.
     """
-    if state["self_state"] is None:
-        return state
-
-    new_self = make_self_state(
-        tank_id=state["self_state"]["tank_id"],
-        x=state["self_state"]["x"],
-        y=state["self_state"]["y"],
-        team=state["self_state"]["team"],
-        rank=rank,
-        fuel=state["self_state"]["fuel"],
-        leaderboard_position=state["self_state"]["leaderboard_position"],
-        observed_ms=timestamp_ms,
-        provenance=make_provenance("wire_0x2B_promotion", []),
-    )
-
-    return WorldStateDict(
-        self_state=new_self,
-        tanks=state["tanks"],
-        containers=state["containers"],
-        mines=state["mines"],
-        terrain=state["terrain"],
-        viewport=state["viewport"],
-        scanned_tiles=state["scanned_tiles"],
-        timestamp_ms=timestamp_ms,
-    )
+    return update_self_rank(state, rank, timestamp_ms, "wire_0x2B_promotion")
 
 
 def _set_tank_liveness(
@@ -671,5 +705,6 @@ __all__ = [
     "set_tank_last_aim",
     "update_self_from_movement_response",
     "update_self_position",
+    "update_self_rank",
     "update_terrain_from_viewport",
 ]

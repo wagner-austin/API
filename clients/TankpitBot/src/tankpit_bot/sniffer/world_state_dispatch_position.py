@@ -76,6 +76,7 @@ def _dispatch_protocol_movement_update(
     start_y: int,
     waypoints: list[tuple[int, int]],
     path_tiles: int,
+    rank: int,
 ) -> bool:
     """Dispatch one decoded protocol ``0x47`` movement message.
 
@@ -86,6 +87,8 @@ def _dispatch_protocol_movement_update(
         start_y: Absolute movement start y.
         waypoints: Absolute waypoint tuples from the protocol decoder.
         path_tiles: True wire step count of the commanded path.
+        rank: Wire rank of the moving tank (live — a mid-session
+            promotion flips it the kill tick, bot-20260725-211120).
 
     Returns:
         True after handling the movement.
@@ -95,6 +98,7 @@ def _dispatch_protocol_movement_update(
     if is_self:
         final_x, final_y = _resolve_waypoint_destination(start_x, start_y, waypoints)
         ws.update_world_state_from_position(final_x, final_y, "wire_0x47_movement")
+        ws.update_world_state_from_rank(rank, "wire_0x47_movement")
         if path_tiles > 0:
             record_fuel_entry(book=ws.fuel_book, kind="walk", lo=-path_tiles, hi=0)
         render_ascii_if_available(ws, "SelfMovement")
@@ -162,8 +166,9 @@ def _dispatch_position_update(ws: WorldService, decoded: protocol.BinaryMessage)
             "start_y": int(sy),
             "waypoints": list(wps),
             "path_tiles": int(path_tiles),
+            "rank": int(rank),
         }:
-            return _dispatch_protocol_movement_update(ws, tid, sx, sy, wps, path_tiles)
+            return _dispatch_protocol_movement_update(ws, tid, sx, sy, wps, path_tiles, rank)
         case {
             "msg_type": 0x3D,
             "tank_id": int(tid),
