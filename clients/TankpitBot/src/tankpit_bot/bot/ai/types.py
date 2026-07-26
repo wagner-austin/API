@@ -429,6 +429,9 @@ class AIStateDict(TypedDict):
         last_shoot_ms: Timestamp of last shot fired (milliseconds).
         last_map_open_ms: Timestamp of last map open command (milliseconds).
         combat_target_id: Tank ID of current combat target (-1 if none).
+        wind_down: True in the session's final stretch — no new
+            engagements; disengage, top off, and exit cleanly
+            (``session_complete``) once fully stocked.
         combat_target_x: X coordinate of combat target.
         combat_target_y: Y coordinate of combat target.
         killed_tank_ids: Tank IDs on kill cooldown {str(tank_id): timestamp_ms}.
@@ -482,6 +485,7 @@ class AIStateDict(TypedDict):
     last_shoot_ms: int
     last_map_open_ms: int
     combat_target_id: int
+    wind_down: bool
     combat_target_x: int
     combat_target_y: int
     killed_tank_ids: dict[str, int]
@@ -522,6 +526,7 @@ def make_initial_ai_state(
         last_shoot_ms=0,
         last_map_open_ms=0,
         combat_target_id=-1,
+        wind_down=False,
         combat_target_x=0,
         combat_target_y=0,
         killed_tank_ids={},

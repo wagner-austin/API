@@ -38,6 +38,7 @@ SessionExitReason = Literal[
     "out_of_fuel",
     "no_productive_collect",
     "deactivated",
+    "session_complete",
 ]
 
 

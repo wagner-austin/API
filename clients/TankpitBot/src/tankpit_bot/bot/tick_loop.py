@@ -125,10 +125,28 @@ def run_tick_loop(
             graceful shutdown.
     """
     max_ticks = session_seconds * 1000 // TICK_RATE_MS if session_seconds > 0 else 0
+    # Wind-down: in the final stretch of a bounded run the AI stops
+    # opening engagements, disengages, and tops off so the session
+    # ends CLEANLY (``session_complete``) instead of the tick budget
+    # cutting it mid-action (user request 2026-07-26) — and the next
+    # session boots combat-ready on the leftover stock. Sessions of
+    # two windows or less skip it (short diagnostic runs must still
+    # exercise the full loop).
+    wind_down_at = (
+        max_ticks - _WIND_DOWN_SECONDS * 1000 // TICK_RATE_MS
+        if session_seconds > 2 * _WIND_DOWN_SECONDS
+        else 0
+    )
     ticks_done = 0
     while True:
         _publish_tick_context(bot, ticks_done + 1)
         _apply_pending_mode_override(bot)
+        if wind_down_at > 0 and ticks_done >= wind_down_at and not bot._ai_state["wind_down"]:
+            bot._ai_state["wind_down"] = True
+            log.info(
+                "Session wind-down (final %ds): disengaging and topping off for a clean exit",
+                _WIND_DOWN_SECONDS,
+            )
         try:
             _tick_once(bot)
         except TargetClosedError:
@@ -308,6 +326,10 @@ _WS_READY_STATE_OPEN = 1
 #: exits at a clean tick boundary, writing the session scorecard +
 #: index row before the process dies. Reset to ``False`` by
 #: :func:`reset_interrupt_flag` so consecutive sessions start clean.
+# Final-stretch length of a bounded session spent disengaging and
+# topping off for the clean ``session_complete`` exit.
+_WIND_DOWN_SECONDS = 60
+
 _INTERRUPT_REQUESTED: bool = False
 
 

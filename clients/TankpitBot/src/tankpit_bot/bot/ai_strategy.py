@@ -27,6 +27,7 @@ from tankpit_bot.bot.ai.mode_controller import (
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.combat_feedback import CombatFeedback
+from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.runtime_logging import emit_ai
@@ -85,6 +86,13 @@ def decide(
                 timestamp_ms,
             )
             return apply_dispatch_counters(owned)
+        if ctx.ai_state["wind_down"]:
+            # Winding down and nothing left to collect: ending early
+            # and clean beats idling out the clock or re-engaging.
+            raise SessionExitError(
+                "session_complete",
+                f"wound down; collect exhausted at fuel={ctx.fuel}",
+            )
         # Collection exhausted with healthy fuel: the tank is stocked,
         # so this tick belongs to the hunt owner (fall through).
         emit_ai("collect owner yielded, handing tick to hunt owner")
@@ -157,12 +165,33 @@ def _select_owner_mode(ctx: DecideCtx) -> AIMode:
     bot while collecting is safe -- bots never initiate, they only
     return fire ([[enemy-bot-behavior]]).
 
+    During session wind-down (``ai_state["wind_down"]``, set by the
+    tick loop in the final stretch of a bounded run) HUNT is closed
+    entirely — held or not — and the session ends with
+    ``session_complete`` the moment the tank is fully stocked (user
+    request 2026-07-26: "run and then collect and exit cleanly,
+    instead of the program killing it mid action"). Ending stocked is
+    also what makes the NEXT session open combat-ready (run
+    bot-20260726-002554 scored its first kill at t+30 s on the prior
+    session's leftover stock).
+
     Args:
         ctx: Decision context.
 
     Returns:
         Durable top-level owner for the current tick.
+
+    Raises:
+        SessionExitError: ``session_complete`` when winding down and
+            fully stocked — the clean exit.
     """
+    if ctx.ai_state["wind_down"]:
+        if should_exit_collect(ctx):
+            raise SessionExitError(
+                "session_complete",
+                f"wound down fully stocked at fuel={ctx.fuel}",
+            )
+        return "COLLECT"
     current_mode = ctx.mode
     if current_mode == "COLLECT" and not should_exit_collect(ctx):
         return "COLLECT"

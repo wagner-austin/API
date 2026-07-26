@@ -447,6 +447,100 @@ class TestEquipmentSearchHopFallback:
 
         assert decision["behavior"]["mode"] == "HUNT"
 
+    def test_wind_down_fully_stocked_exits_session_complete(self) -> None:
+        """Winding down at full bars ends the session cleanly.
+
+        User request 2026-07-26: "run and then collect and exit
+        cleanly, instead of the program killing it mid action" — the
+        tick loop raises the flag in the final stretch and the mode
+        selector converts fully-stocked into ``session_complete``.
+        """
+        import pytest
+
+        from tankpit_bot.bot.session_exit import SessionExitError
+
+        world, self_state = _make_world(fuel=1100, scanned=True)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+                "wind_down": True,
+            }
+        )
+        inventory = _make_inventory(default_count=25, radar_count=25)
+
+        with pytest.raises(SessionExitError) as exc_info:
+            decide(
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                100000,
+                None,
+                map_fuel_dots=((250, 100),),
+            )
+
+        assert exc_info.value.reason == "session_complete"
+
+    def test_wind_down_breaks_a_held_hunt_and_collects(self) -> None:
+        """Winding down below full bars disengages HUNT into COLLECT."""
+        world, self_state = _make_world(fuel=550, scanned=True)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "wind_down": True,
+            }
+        )
+        inventory = _make_inventory(default_count=20, radar_count=15)
+
+        decision = decide(
+            world,
+            self_state,
+            ai_state,
+            inventory,
+            100000,
+            None,
+            map_fuel_dots=((150, 100),),
+        )
+
+        assert decision["behavior"]["mode"] == "COLLECT"
+
+    def test_wind_down_with_collect_exhausted_exits_session_complete(self) -> None:
+        """Winding down with nothing collectable ends the session early-clean."""
+        import pytest
+
+        from tankpit_bot.bot.session_exit import SessionExitError
+
+        world, self_state = _make_world(fuel=550, scanned=True)
+        ai_state = AIStateDict(
+            **{
+                **_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "ENGAGE",
+                "mode_started_ms": 90000,
+                "wind_down": True,
+            }
+        )
+        inventory = _make_inventory(default_count=20, radar_count=15)
+
+        with pytest.raises(SessionExitError) as exc_info:
+            decide(
+                world,
+                self_state,
+                ai_state,
+                inventory,
+                100000,
+                None,
+                map_fuel_dots=((250, 100),),
+            )
+
+        assert exc_info.value.reason == "session_complete"
+
     def test_exhausted_collect_under_armed_raises_no_productive_collect(self) -> None:
         """An exhausted COLLECT cascade with under-armed inventory ends the session.
 

@@ -132,6 +132,40 @@ class TestStopFileDetection:
         assert removed_files == [stop_path]
 
 
+class TestWindDown:
+    """Tests for the session wind-down flag."""
+
+    def test_bounded_session_raises_wind_down_flag_in_final_stretch(self) -> None:
+        """A >2-window session flips ``wind_down`` 60 s before the budget.
+
+        User request 2026-07-26: "run and then collect and exit
+        cleanly, instead of the program killing it mid action."
+        """
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        run_tick_loop(
+            bot,
+            _FakePage(),
+            session_seconds=126,
+            stop_file_path=Path("C:/tmp/absent.sentinel"),
+        )
+        assert bot._ai_state["wind_down"] is True
+
+    def test_short_diagnostic_session_never_winds_down(self) -> None:
+        """Sessions of two windows or less keep the full loop active."""
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        run_tick_loop(
+            bot,
+            _FakePage(),
+            session_seconds=120,
+            stop_file_path=Path("C:/tmp/absent.sentinel"),
+        )
+        assert bot._ai_state["wind_down"] is False
+
+
 class TestExtractStampFromArchivePath:
     """Tests for ``_extract_stamp_from_archive_path``."""
 
