@@ -11,7 +11,7 @@ source_paths:
   - "runs/bot/bot-20260620-191622.capture_session.json"
   - "src/tankpit_bot/state"
 source_git_blobs:
-  "src/tankpit_bot/state": "127e544920887dda30e12050424682529e603048"
+  "src/tankpit_bot/state": "474b28f74ce32e4b0409d6694cfe8a1757c1b525"
 fact_checked: "2026-06-20"
 confidence: high
 hubs: [architecture]
