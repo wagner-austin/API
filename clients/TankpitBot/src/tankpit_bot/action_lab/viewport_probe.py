@@ -289,17 +289,31 @@ class ViewportProbe(ProbeBase):
             fuel_before, _, _ = self._current_fuel()
             phase_started_ms = action_hooks.get_current_time_ms()
             ack_states: list[bool] = []
+            toggles = 1
+            # Normalize to OFF. The initial state is unknowable without
+            # a press (no query carries the flag), and the first live
+            # run proved it cannot be assumed: a fresh browser session
+            # started ON despite the user's own client showing OFF —
+            # the flag looks client-local, not server-persisted. The
+            # first press both reveals and flips the state.
+            state = self._toggle_autoscroll()
+            ack_states.append(state)
+            if state:
+                state = self._toggle_autoscroll()
+                ack_states.append(state)
+                toggles += 1
+                if state:
+                    raise ProbeError("autoscroll still enabled after the normalization press")
             walks_off, longs_off = self._run_phase()
             enabled = self._toggle_autoscroll()
             ack_states.append(enabled)
+            toggles += 1
             if not enabled:
-                raise ProbeError(
-                    "autoscroll acked DISABLED after the first press - the account "
-                    "was not in the expected OFF state at probe start"
-                )
+                raise ProbeError("autoscroll acked DISABLED when switching to the ON phase")
             walks_on, longs_on = self._run_phase()
             restored = self._toggle_autoscroll()
             ack_states.append(restored)
+            toggles += 1
             if restored:
                 raise ProbeError("autoscroll still enabled after the restore press")
             self.quit_to_lobby()
@@ -325,7 +339,7 @@ class ViewportProbe(ProbeBase):
                 longs_sent_off=longs_off,
                 walks_sent_on=walks_on,
                 longs_sent_on=longs_on,
-                toggles_sent=2,
+                toggles_sent=toggles,
                 ack_states=ack_states,
                 fuel_before=fuel_before,
                 fuel_after=fuel_after,

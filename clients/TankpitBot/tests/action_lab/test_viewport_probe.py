@@ -469,10 +469,13 @@ def _boot_recorded(probe: _ExecuteHarness) -> None:
     action_hooks.wait_for_initial_self_state = _wait_initial
 
 
-def test_execute_probe_runs_both_phases_and_restores_off() -> None:
+def test_execute_probe_normalizes_from_on_then_runs_both_phases() -> None:
+    """The first live run's lesson: a fresh browser session can start
+    ON regardless of the user's own client — the first press reveals
+    and flips the state, and an ON start costs one extra press."""
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    probe = _ExecuteHarness(ack_script=[True, False])
+    probe = _ExecuteHarness(ack_script=[True, False, True, False])
     original_sync_playwright = core_hooks.sync_playwright
     _boot_recorded(probe)
     try:
@@ -480,22 +483,58 @@ def test_execute_probe_runs_both_phases_and_restores_off() -> None:
     finally:
         core_hooks.sync_playwright = original_sync_playwright
 
-    assert probe.phases == ["fuel", "phase", "toggle", "phase", "toggle", "fuel"]
+    assert probe.phases == [
+        "fuel",
+        "toggle",
+        "toggle",
+        "phase",
+        "toggle",
+        "phase",
+        "toggle",
+        "fuel",
+    ]
     assert probe.quits == 1
-    assert session["walks_sent_off"] == 16
-    assert session["walks_sent_on"] == 16
-    assert session["ack_states"] == [True, False]
-    assert session["toggles_sent"] == 2
+    assert session["ack_states"] == [True, False, True, False]
+    assert session["toggles_sent"] == 4
 
 
-def test_execute_probe_refuses_an_unexpected_initial_state() -> None:
+def test_execute_probe_runs_directly_when_the_first_press_lands_off() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    probe = _ExecuteHarness(ack_script=[False])
+    probe = _ExecuteHarness(ack_script=[False, True, False])
     original_sync_playwright = core_hooks.sync_playwright
     _boot_recorded(probe)
     try:
-        with pytest.raises(ProbeError, match="was not in the expected OFF state"):
+        session = probe.execute_probe(initial_sync_timeout_ms=10000)
+    finally:
+        core_hooks.sync_playwright = original_sync_playwright
+
+    assert probe.phases == ["fuel", "toggle", "phase", "toggle", "phase", "toggle", "fuel"]
+    assert session["ack_states"] == [False, True, False]
+    assert session["toggles_sent"] == 3
+
+
+def test_execute_probe_refuses_a_stuck_normalization() -> None:
+    clock = ReplayClock(1000)
+    action_hooks.get_current_time_ms = clock
+    probe = _ExecuteHarness(ack_script=[True, True])
+    original_sync_playwright = core_hooks.sync_playwright
+    _boot_recorded(probe)
+    try:
+        with pytest.raises(ProbeError, match="after the normalization press"):
+            probe.execute_probe(initial_sync_timeout_ms=10000)
+    finally:
+        core_hooks.sync_playwright = original_sync_playwright
+
+
+def test_execute_probe_refuses_a_failed_on_switch() -> None:
+    clock = ReplayClock(1000)
+    action_hooks.get_current_time_ms = clock
+    probe = _ExecuteHarness(ack_script=[False, False])
+    original_sync_playwright = core_hooks.sync_playwright
+    _boot_recorded(probe)
+    try:
+        with pytest.raises(ProbeError, match="when switching to the ON phase"):
             probe.execute_probe(initial_sync_timeout_ms=10000)
     finally:
         core_hooks.sync_playwright = original_sync_playwright
@@ -504,7 +543,7 @@ def test_execute_probe_refuses_an_unexpected_initial_state() -> None:
 def test_execute_probe_refuses_a_failed_restore() -> None:
     clock = ReplayClock(1000)
     action_hooks.get_current_time_ms = clock
-    probe = _ExecuteHarness(ack_script=[True, True])
+    probe = _ExecuteHarness(ack_script=[False, True, True])
     original_sync_playwright = core_hooks.sync_playwright
     _boot_recorded(probe)
     try:
