@@ -22,7 +22,12 @@ from collections.abc import Sequence
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
-from rw_bot.validation import require_finite_float, require_int, require_non_empty_str
+from rw_bot.validation import (
+    require_bool,
+    require_finite_float,
+    require_int,
+    require_non_empty_str,
+)
 from rw_bot.wire.ndjson import parse_object
 
 KIND_FRAME: Final = "frame"
@@ -62,6 +67,13 @@ class Entity(TypedDict):
             recorded build.
         x: World x coordinate.
         y: World y coordinate.
+        team: Owning team number. Present for every visible entity, friend or
+            not.
+        mine: Whether the local player owns it. The stream carries enemies too,
+            so a consumer that skips this check would credit an opponent's
+            buildings to itself.
+        hp: Current health.
+        max_hp: Health at full.
     """
 
     index: int
@@ -70,6 +82,10 @@ class Entity(TypedDict):
     class_name: str
     x: float
     y: float
+    team: int
+    mine: bool
+    hp: float
+    max_hp: float
 
 
 class Sample(TypedDict):
@@ -78,11 +94,18 @@ class Sample(TypedDict):
     Attributes:
         frame: The engine's frame counter at the moment of the read.
         clock_ms: The engine's millisecond clock at the same moment.
-        entities: The owned roster, in the order the agent enumerated it.
+        credits: The current player's credits, floored to whole currency. The
+            engine spends in whole units, so a planner comparing against a unit
+            price wants the floor: 99 credits does not buy a 100-credit
+            structure.
+        entities: Every visible entity, in the order the agent enumerated it.
+            Includes entities the local player does not own; check
+            :attr:`Entity.mine`.
     """
 
     frame: int
     clock_ms: int
+    credits: int
     entities: tuple[Entity, ...]
 
 
@@ -109,6 +132,7 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
     frame: int = 0
     clock_ms: int = 0
     declared: int = 0
+    credits: int = 0
     entities: list[Entity] = []
     started = False
 
@@ -120,10 +144,11 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
 
         if kind == KIND_FRAME:
             if started:
-                samples.append(_close(frame, clock_ms, declared, entities))
+                samples.append(_close(frame, clock_ms, credits, declared, entities))
             frame = require_int(record, "frame")
             clock_ms = require_int(record, "clock_ms")
-            declared = require_int(record, "owned")
+            declared = require_int(record, "visible")
+            credits = require_int(record, "credits")
             entities = []
             started = True
             continue
@@ -150,6 +175,10 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                     class_name=require_non_empty_str(record, "class"),
                     x=require_finite_float(record, "x"),
                     y=require_finite_float(record, "y"),
+                    team=require_int(record, "team"),
+                    mine=require_bool(record, "mine"),
+                    hp=require_finite_float(record, "hp"),
+                    max_hp=require_finite_float(record, "max_hp"),
                 )
             )
             continue
@@ -157,11 +186,13 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
         raise WireError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
 
     if started:
-        samples.append(_close(frame, clock_ms, declared, entities))
+        samples.append(_close(frame, clock_ms, credits, declared, entities))
     return tuple(samples)
 
 
-def _close(frame: int, clock_ms: int, declared: int, entities: list[Entity]) -> Sample:
+def _close(
+    frame: int, clock_ms: int, credits: int, declared: int, entities: list[Entity]
+) -> Sample:
     """Finish a sample, checking it against its own declared count.
 
     Args:
@@ -182,7 +213,7 @@ def _close(frame: int, clock_ms: int, declared: int, entities: list[Entity]) -> 
             f"frame {frame} declared {declared} owned entities but carried "
             f"{len(entities)}; the capture is truncated or interleaved",
         )
-    return Sample(frame=frame, clock_ms=clock_ms, entities=tuple(entities))
+    return Sample(frame=frame, clock_ms=clock_ms, credits=credits, entities=tuple(entities))
 
 
 def encode_sample(sample: Sample) -> tuple[str, ...]:
@@ -200,7 +231,8 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
     frame = sample["frame"]
     lines = [
         f'{{"kind":"{KIND_FRAME}","frame":{frame},'
-        f'"clock_ms":{sample["clock_ms"]},"owned":{len(sample["entities"])}}}'
+        f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
+        f'"credits":{sample["credits"]}}}'
     ]
     for entity in sample["entities"]:
         name = _escape(entity["class_name"])
@@ -208,7 +240,9 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         lines.append(
             f'{{"kind":"{KIND_ENTITY}","frame":{frame},"index":{entity["index"]},'
             f'"id":{entity["unit_id"]},"type":"{type_name}",'
-            f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r}}}'
+            f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
+            f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
+            f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r}}}'
         )
     return tuple(lines)
 

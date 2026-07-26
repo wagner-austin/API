@@ -1,0 +1,10 @@
+plan: landFactory -> landFactory -> landFactory
+  landFactory costs 700
+  landFactory costs 700
+  landFactory costs 700
+outcome        done (all 3 structures built)
+completed      3/3
+orders sent    3
+samples seen   13
+frames elapsed 3603
+credits left   2831

@@ -463,9 +463,16 @@ public final class SelfTest {
     private static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 4000);
+        // Pinned byte-for-byte on purpose. This is a wire contract, and the
+        // consumer parses it strictly, so a field appearing, vanishing or being
+        // renamed must fail here rather than at the far end of a socket. That
+        // is the opposite of pinning an observed value like a frame counter,
+        // which changes every capture and carries no contract.
         failures += expect(
-                frame.equals("{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,\"owned\":3}"),
+                frame.equals(
+                        "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
+                                + "\"visible\":3,\"credits\":4000}"),
                 "frame record is exact");
 
         // The consumer splits on newlines before parsing, so a newline inside
@@ -479,7 +486,7 @@ public final class SelfTest {
                 "a record is exactly one object");
 
         failures += expect(
-                StateStream.frameRecord(0, 0, 0).contains("\"owned\":0"),
+                StateStream.frameRecord(0, 0, 0, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
         return failures;
     }

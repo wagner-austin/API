@@ -1,0 +1,10 @@
+plan: landFactory -> landFactory -> laboratory
+  landFactory costs 700
+  landFactory costs 700
+  laboratory costs 4000
+outcome        sample_limit (building laboratory (3 of 3))
+completed      2/3
+orders sent    3
+samples seen   300
+frames elapsed 89290
+credits left   11258

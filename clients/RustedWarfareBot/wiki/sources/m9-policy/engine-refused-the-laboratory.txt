@@ -1,0 +1,5 @@
+[rw-agent] channel: build landFactory by 214 at (4450.0, 2730.0)
+[rw-agent] channel: build landFactory by 214 at (4180.5474, 2808.3157)
+[rw-agent] channel: build laboratory by 214 at (4447.8823, 2647.4194)
+2026-07-25 17:14:18.513: Unit 'builder' can not queue build:laboratory
+2026-07-25 17:14:18.513: isValidNewWaypoint==false on: builder(pos:4247,2767 id:214 t:0)

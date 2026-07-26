@@ -113,6 +113,25 @@ New validator `require_absolute_path` (`RW-DECODE-005`). It also closed an exist
 
 `make check` now chains `agent-selftest`, so a patcher regression or an obfuscated name that moved in a game update fails at the gate. `make check` green: guard 0 violations, ruff clean, mypy strict clean, 88 tests (was 61), 100% statements and branches, agent-selftest OK.
 
+## [2026-07-25] milestone | M9 — the policy loop; the bot plays a build order unattended
+Pages written: policy-loop
+Pages updated: index (14 pages), hubs/bot-architecture, hubs/game-mechanics
+Artifacts: `wiki/sources/m9-policy/` — `plan-completed.txt` (10), `plan-stalled-on-laboratory.txt` (10), `engine-refused-the-laboratory.txt` (5), `visible-includes-opponents.ndjson` (4)
+
+Notes: three structures, three orders, no waste — `done (all 3 structures built)` in 13 samples and 3,603 frames, credits managed the whole way. The deciding half is a pure function of a sample, a plan and the catalogue, so the playing logic is tested exhaustively without a game; the loop around it only reads, asks, acts and repeats.
+
+Credits had to reach the wire first: `n.o`, sitting beside the engine's own note to modders about not cheating in multiplayer. Floored to whole currency, because the engine spends in whole units and 99 credits does not buy a 100-credit structure.
+
+Two ownership traps were closed before they could bite. The stream now carries every visible entity, not just the player's — 19 across five teams in one capture, of which three were ours — so without an ownership check an opponent's factory would have advanced our plan and an enemy builder could have been selected to receive an order. The frame count was also renamed `owned` to `visible`, because it had stopped being the former the moment enemies were included and a consumer reading it as a roster size would have been silently wrong.
+
+The run that taught the most failed. A plan ending in a laboratory ran 300 samples and 89,290 frames, banked 11,258 credits, and reported "building laboratory (3 of 3)" throughout. Nothing was wrong with credits, placement or the channel: the engine had refused the order outright and said so only in its own log — `Unit 'builder' can not queue build:laboratory`. A builder cannot construct one, which is not derivable from the catalogue (prices and stats, no build lists) and produces no roster change the planner can see. Ordering each plan slot at most once protects against double-spend and, on its own, turns a refusal into a bot that looks busy forever. The loop now reports `stalled` after a bounded number of samples with no progress, naming what it waited on.
+
+Scoring exists so runs can be compared: outcome, completed against planned, orders sent, samples, frames elapsed, credits left. `orders sent` against `completed` is the sharp one — equal means nothing was wasted, higher is the shape a refusal makes.
+
+`make check` green: guard 0 violations, ruff + mypy clean, 266 tests, 100% statements and branches, agent-selftest OK.
+
+Not a player yet in any full sense. It executes a fixed sequence against five opponents who scout, expand and fight, and it has no notion of winning. What it has is the shape: observe, decide, act, verify, score, and fail loudly when the world disagrees.
+
 ## [2026-07-25] milestone | M7 — the command channel; orders now originate in Python
 Pages written: command-channel
 Pages updated: index (12 pages), hubs/bot-architecture, hubs/engine-internals

@@ -145,7 +145,7 @@ def _complete_or_none(lines: Sequence[str]) -> Sample | None:
         WireError: When the records cannot form a valid sample.
         DecodeError: When a record is missing a field or mistyped.
     """
-    declared = require_int(parse_object(lines[0]), "owned")
+    declared = require_int(parse_object(lines[0]), "visible")
     if len(lines) < declared + 1:
         return None
     return decode_samples(list(lines))[0]
