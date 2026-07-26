@@ -48,7 +48,7 @@ The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specif
 
 | Action | Fuel cost | Notes |
 |---|---|---|
-| Walk one tile | **1** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8). Re-confirmed 2026-07-20: six clean SelfMovement segments, exact at 1/tile (7→7, 14→14, 5→5, 3→3, 2→2, 1→1). Billed IN FULL at the echo tick — server movement is instant, see [[walk-mechanics]] (2026-07-21: 200/200 archive episodes) |
+| Walk one tile | **1, clamped to remaining fuel** | Verified by 0x47 Movement Manhattan distance vs 0x2E fuel delta (4-tile walks → −4, 5-tile → −5, 8-tile → −8). Re-confirmed 2026-07-20: six clean SelfMovement segments, exact at 1/tile (7→7, 14→14, 5→5, 3→3, 2→2, 1→1). Billed IN FULL at the echo tick — server movement is instant, see [[walk-mechanics]] (2026-07-21: 200/200 archive episodes). Fuel never REJECTS a walk: at fuel 0 multi-tile walks were repeatedly accepted and executed in full (density runs 2-3, 2026-07-25 — the radar-analog clamp; the sim mirrors it) |
 | Single shot (`weapon=0`) | **6** | Systematic isolation 2026-07-20: 62 clean windows exactly −6 across the 204-capture archive (window = consecutive absolute fuel readings containing only our 0x53 echoes, no movement/radar/pickups/enemy fire). Consumes NO ammo |
 | Dual shot (`weapon=1`) | **10** | Same isolation: **589 clean windows exactly −10**. Consumes 1 dual per LANDED shot (0x49 count snapshots: 49 windows of one dual fired → dual −1) |
 | Homing shot (`weapon=3`) | **10** | Same isolation: 398 clean windows exactly −10, plus 124 at −5 — the homing debit sometimes lands in two −5 steps across sync boundaries; total per shot is 10. Consumes 1 homing per LANDED shot |

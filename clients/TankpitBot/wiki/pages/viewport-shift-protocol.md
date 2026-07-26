@@ -121,6 +121,10 @@ The bound is **the window, not a self-centered radius** — the earlier "Chebysh
 
 **Walking is NOT a travel mechanism** (user ruling, verbatim, 2026-07-25: *"walking is too slow... we teleport for a reason. we walk for equipment and fuel pickups in the same viewport. but no we're not walking across the map or to enemies."*).[^10] The wire supports window-following traversal under autoscroll ON, but each step costs a full server round-trip (~2 s/tile measured in the probe runs[^8]) — crossing the map would take minutes where a teleport is instant. The bot contract stays: **teleport to travel, walk only for in-viewport pickups.** The measured laws above matter for correctness (what the server accepts and when the window moves), not as a traversal strategy.
 
+## Sim as-built (2026-07-25)
+
+The fake server enforces these laws (`sim/viewport_window.py`): the client holds a stored window set at join and teleport landings only; walking never recenters it and never re-emits 0x5A (the dynamic-layer patch refresh is event-driven — ferry/block changes); client moves and pickups outside the window reject with 0x52 code 0; extra radar covers exactly the stored 16×16 window and free radar clips to it; visibility (0x58 exits / 0x3D entries) runs on the window. The pre-2026-07-25 sim recentered on every walk — autoscroll-ON behavior the bot never plays under.[^8]
+
 ## Rest-state law (corpus-swept 2026-07-22)
 
 3,387 bot-session samples pairing every 0x5A origin with the self
