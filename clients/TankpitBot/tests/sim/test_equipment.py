@@ -29,7 +29,7 @@ from tankpit_bot.sim.world import (
 )
 from tankpit_bot.sniffer.world_state import get_world_service
 from tests.in_memory_terrain_map import InMemoryTerrainMap
-from tests.sim.seam import boot_seam
+from tests.sim.seam import RICH_CONTAINERS, boot_seam
 
 
 def _arena(counts: list[int]) -> SimWorldDict:
@@ -232,6 +232,7 @@ def test_production_bot_restocks_ammo_over_the_seam() -> None:
     """
     bot, server, link, _table = boot_seam(
         counts=(25, 25, 25, 25, 8),
+        containers=RICH_CONTAINERS,
         equipment=((103, 103), (98, 98)),
     )
     start_extras = 8

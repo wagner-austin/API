@@ -37,7 +37,7 @@ from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode, ReasonKind
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
+from tankpit_bot.state.scan_coverage import is_viewport_untouched
 from tankpit_bot.state.types import coord_key
 
 
@@ -80,8 +80,13 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
 
     Hard gates (physics only): the dot is not the bot's own tile, its
     landing tile is passable, the teleport is fuel-affordable, and the
-    landing viewport has no fresh scan coverage (the user's "clean" --
-    fresh intel worth a radar).
+    landing viewport is CLEAN — zero overlap with live scan coverage
+    (user ruling, verbatim, 2026-07-26: "when i say it should collect
+    on clean viewports, that means zero overlap"; the 2026-07-18
+    implementation inverted this to "any unscanned tile counts as
+    fresh" and run bot-20260725-235637 spent a third of every radar
+    re-scanning old ground). Coverage marks age out on the forage TTL
+    (180 s), so scanned ground becomes clean again.
 
     Qualifying dots are RANKED, not filtered, by hop value (user
     contract 2026-07-18: "the rule was to prioritize viewports with
@@ -137,7 +142,7 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             continue
         landing_left = target_x - half_w
         landing_top = target_y - half_h
-        if is_viewport_fully_covered(
+        if not is_viewport_untouched(
             ctx.world["scanned_tiles"],
             landing_left,
             landing_top,

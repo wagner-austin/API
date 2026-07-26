@@ -137,6 +137,42 @@ def free_radar_revealed_tiles(
     return [(x, y) for y in range(top, bottom + 1) for x in range(left, right + 1)]
 
 
+def is_viewport_untouched(
+    scanned_tiles: dict[str, int],
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+) -> bool:
+    """Return True when NO tile in the viewport carries a live scan mark.
+
+    The collect hop's "clean viewport" test (user ruling, verbatim,
+    2026-07-26: "when i say it should collect on clean viewports,
+    that means zero overlap"). A single live-scanned tile inside the
+    bounds makes the viewport dirty — the 2026-07-18 hop gate had the
+    polarity inverted (any unscanned tile counted as fresh), which
+    made consecutive hops overlap ~35% of their scans (run
+    bot-20260725-235637: mean 89/256 shared tiles).
+
+    Args:
+        scanned_tiles: Coverage map.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        True when zero viewport tiles carry a live scan mark.
+    """
+    for y in range(viewport_top, viewport_bottom + 1):
+        for x in range(viewport_left, viewport_right + 1):
+            if is_tile_covered(scanned_tiles, x, y, now_ms):
+                return False
+    return True
+
+
 def is_viewport_fully_covered(
     scanned_tiles: dict[str, int],
     viewport_left: int,
@@ -326,6 +362,7 @@ __all__ = [
     "free_radar_revealed_tiles",
     "is_tile_covered",
     "is_viewport_fully_covered",
+    "is_viewport_untouched",
     "record_scanned_tiles",
     "select_best_free_radar_position",
     "tile_key",

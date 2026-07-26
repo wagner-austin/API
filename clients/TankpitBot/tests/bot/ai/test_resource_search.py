@@ -141,6 +141,54 @@ class TestMakeResourceSearchHop:
         assert command["target_x"] == 160
         assert command["target_y"] == 100
 
+    def test_skips_dot_whose_viewport_overlaps_scanned_ground(self) -> None:
+        """ONE live-scanned tile in the landing viewport disqualifies the dot.
+
+        User ruling (verbatim, 2026-07-26): "when i say it should
+        collect on clean viewports, that means zero overlap" — the
+        2026-07-18 gate inverted this (any unscanned tile counted as
+        fresh) and run bot-20260725-235637 re-scanned ~35% old ground
+        per hop.
+        """
+        ctx = _ctx(map_fuel_dots=((130, 100), (160, 100)))
+        # A single covered tile at the EDGE of the near dot's landing
+        # viewport (130±8 → columns 122..137): tile (122, 100).
+        ctx.world["scanned_tiles"]["122,100"] = ctx.timestamp_ms
+
+        decision = make_resource_search_hop(
+            ctx,
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the clean far dot")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 160
+        assert command["target_y"] == 100
+
+    def test_expired_scan_marks_make_a_viewport_clean_again(self) -> None:
+        """Coverage past the forage TTL no longer dirties the viewport."""
+        from tankpit_bot.state.scan_coverage import FORAGE_COVERAGE_TTL_MS
+
+        ctx = _ctx(map_fuel_dots=((130, 100),))
+        ctx.world["scanned_tiles"]["130,100"] = ctx.timestamp_ms - FORAGE_COVERAGE_TTL_MS - 1
+
+        decision = make_resource_search_hop(
+            ctx,
+            mode="COLLECT",
+            score=900,
+            reason="search_collect_local",
+        )
+
+        if decision is None:
+            raise AssertionError("expected the dot once its scan mark expired")
+        command = decision["command"]
+        assert command["cmd_type"] == "teleport"
+        assert command["target_x"] == 130
+
     def test_skips_impassable_dot(self) -> None:
         """A dot whose landing tile is water is skipped."""
         terrain = InMemoryTerrainMap(terrain_data={(130, 100): "W"})

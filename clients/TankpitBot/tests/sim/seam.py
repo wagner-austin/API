@@ -52,6 +52,17 @@ RICH_CONTAINERS: tuple[tuple[int, int, int], ...] = (
     (100, 108, 400),
     (92, 103, 300),
     (105, 92, 300),
+    # Spread satellites >= 16 tiles apart so the zero-overlap clean-
+    # viewport hop rule (user ruling 2026-07-26) always has fresh
+    # ground within teleport range — the real field's 620 dots span
+    # the whole 256x256 map; a single 17-tile cluster is the
+    # unrealistic case that starves the cascade.
+    (130, 100, 400),
+    (100, 130, 400),
+    (70, 100, 400),
+    (100, 70, 300),
+    (132, 132, 300),
+    (68, 132, 300),
 )
 
 
