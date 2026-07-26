@@ -13,14 +13,34 @@ from typing import TypedDict
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.build_order import Decision, completed_count, decide
+from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.policy.build_order import Decision, completed_count, decide, find_builder
 from rw_bot.wire.command import build_order
 from rw_bot.wire.state import Sample
 
-#: Samples an unchanged plan position may persist before the run is called
-#: stalled. Generous enough that a slow structure is not mistaken for a refused
-#: one: the laboratory that exposed this took longer than any completed build.
+#: Samples a *stationary* builder may persist without progress before the run
+#: is called stalled.
+#:
+#: Stationary is the important word, and it was not always there. The window
+#: used to run from the moment an order was sent, which quietly capped how far
+#: the bot could build: at a measured 11.7 world units per sample, 45 samples
+#: reach 527 units, and a perfectly good order to a resource pool 588 units away
+#: was declared refused while the builder was still walking to it. It completed
+#: seconds after the run gave up.
+#:
+#: Timing one far build settled the shape of the fix. Ordering an extractor 609
+#: units away, the builder travelled for 52 samples and the structure appeared
+#: on the very sample it stopped moving -- construction itself cost nothing
+#: measurable. So travel is the whole of the delay, and a builder that is still
+#: moving is an order still in flight. The clock therefore only runs while the
+#: builder stands still, which needs no speed constant, no frame rate, and no
+#: assumption about map size (wiki: mechanics-resource-pools).
 DEFAULT_STALL_SAMPLES = 45
+
+#: World-unit displacement between samples below which a builder counts as
+#: stationary. A parked unit reports byte-identical coordinates, so this only
+#: has to survive float noise rather than distinguish slow movement.
+_MOVEMENT_EPSILON = 0.5
 
 
 class Scorecard(TypedDict):
@@ -53,6 +73,7 @@ def run(
     channel: AgentChannel,
     plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
+    placements: Mapping[str, TypePlacement],
     max_samples: int,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
 ) -> Scorecard:
@@ -68,14 +89,22 @@ def run(
     so a once-only order would leave the run reporting "building X" forever
     while nothing happened. Observed for real: a builder cannot construct a
     laboratory, and the engine says so only in its own log. After
-    ``stall_samples`` observations with no progress, the run stops and says it
-    stalled.
+    ``stall_samples`` observations of a stationary builder making no progress,
+    the run stops and says it stalled.
+
+    The stall clock restarts on every sample in which the ordered builder has
+    moved, because walking to the site is the order being carried out rather
+    than the order failing (see :data:`DEFAULT_STALL_SAMPLES`). The run-level
+    ``max_samples`` is what bounds a builder that somehow never settles.
 
     Args:
         channel: An open connection to the agent.
         plan: Structures to build, in order.
         catalogue: Unit stats by type name, for prices.
+        placements: Placement rules by type name, for where each may stand.
         max_samples: Stop after this many samples regardless of progress.
+        stall_samples: Observations of a stationary builder without progress
+            before the run is called stalled.
 
     Returns:
         The scorecard.
@@ -89,6 +118,7 @@ def run(
     first_frame = 0
     ordered_positions: set[int] = set()
     ordered_at = 0
+    builder_was: tuple[float, float] | None = None
     sample: Sample | None = None
     decision: Decision | None = None
 
@@ -98,7 +128,15 @@ def run(
             first_frame = sample["frame"]
         samples_seen += 1
 
-        decision = decide(sample, plan, catalogue)
+        # Read before deciding, and unconditionally. The builder's travel is
+        # what the stall clock measures, so it has to be sampled on every
+        # observation rather than only on the ones that reach an order.
+        builder = find_builder(sample)
+        builder_now = None if builder is None else (builder["x"], builder["y"])
+        moved = _has_moved(builder_was, builder_now)
+        builder_was = builder_now
+
+        decision = decide(sample, plan, catalogue, placements)
         if decision["action"] in ("done", "blocked", "stalled"):
             break
         if decision["action"] == "wait":
@@ -106,7 +144,9 @@ def run(
 
         position = completed_count(sample, plan)
         if position in ordered_positions:
-            if samples_seen - ordered_at >= stall_samples:
+            if moved:
+                ordered_at = samples_seen
+            elif samples_seen - ordered_at >= stall_samples:
                 decision = _stalled(decision, stall_samples)
                 break
             continue
@@ -125,6 +165,25 @@ def run(
     return _score(sample, decision, plan, orders_sent, samples_seen, first_frame)
 
 
+def _has_moved(before: tuple[float, float] | None, after: tuple[float, float] | None) -> bool:
+    """Report whether the builder moved between two samples.
+
+    A builder that has died, or that was not in the roster to begin with, has
+    not moved. Treating a missing builder as movement would keep the stall clock
+    permanently reset and turn a lost builder into an infinite wait.
+
+    Args:
+        before: Position at the previous sample, if it was there.
+        after: Position now, if it is there.
+
+    Returns:
+        True when both positions are known and differ by more than float noise.
+    """
+    if before is None or after is None:
+        return False
+    return abs(after[0] - before[0]) + abs(after[1] - before[1]) > _MOVEMENT_EPSILON
+
+
 def _stalled(decision: Decision | None, stall_samples: int) -> Decision:
     """Convert the pending decision into a stalled one.
 
@@ -140,7 +199,8 @@ def _stalled(decision: Decision | None, stall_samples: int) -> Decision:
         action="stalled",
         reason=(
             f"{waiting_on} was ordered but never appeared after {stall_samples}"
-            " samples; the engine refused it silently"
+            " samples with the builder standing still; the engine refused it"
+            " silently"
         ),
         type_name="",
         unit_id=0,

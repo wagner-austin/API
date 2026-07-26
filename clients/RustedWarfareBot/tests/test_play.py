@@ -18,6 +18,7 @@ from scripts.play import (
     EXIT_INCOMPLETE,
     EXIT_OK,
     load_catalogue,
+    load_placements,
     main,
 )
 
@@ -25,6 +26,7 @@ from rw_bot.control import _test_hooks
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CATALOGUE_PATH = _PROJECT_ROOT / "wiki" / "sources" / "m0-probe" / "printunits.log"
+_PLACEMENT_PATH = _PROJECT_ROOT / "wiki" / "sources" / "m11-pools" / "type-flags.ndjson"
 
 
 def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
@@ -35,13 +37,28 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
     )
 
 
-def _sample_lines(frame: int, credits: int, *entities: tuple[int, str]) -> list[str]:
+def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
+    return (
+        f'{{"kind":"pool","frame":{frame},"index":{index},'
+        f'"tile_x":{tile_x},"tile_y":{tile_y},'
+        f'"x":{tile_x * 20 + 10}.0,"y":{tile_y * 20 + 10}.0}}'
+    )
+
+
+def _sample_lines(
+    frame: int,
+    credits: int,
+    *entities: tuple[int, str],
+    pools: tuple[tuple[int, int], ...] = (),
+) -> list[str]:
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
-        f'"visible":{len(entities)},"credits":{credits}}}'
+        f'"visible":{len(entities)},"pools":{len(pools)},"credits":{credits}}}'
     ]
     for index, (unit_id, type_name) in enumerate(entities):
         lines.append(_entity_line(frame, index, unit_id, type_name))
+    for index, (tile_x, tile_y) in enumerate(pools):
+        lines.append(_pool_line(frame, index, tile_x, tile_y))
     return lines
 
 
@@ -134,21 +151,40 @@ class _StubbedConnect:
 def test_the_real_catalogue_prices_the_whole_plan() -> None:
     """Every planned structure must be priceable, or the run blocks at once."""
     catalogue = load_catalogue(_CATALOGUE_PATH)
-    assert [catalogue[name]["price"] for name in DEFAULT_PLAN] == [700, 700, 700]
+    assert [catalogue[name]["price"] for name in DEFAULT_PLAN] == [700, 700, 700, 700, 700]
+
+
+def test_the_real_dump_rules_every_planned_structure() -> None:
+    """A plan entry the placement dump does not cover blocks the run at once."""
+    placements = load_placements(_PLACEMENT_PATH)
+    assert [placements[name]["needs_pool"] for name in DEFAULT_PLAN] == [
+        True,
+        True,
+        False,
+        True,
+        False,
+    ]
+
+
+def test_the_plan_opens_with_the_structures_that_pay_for_the_rest() -> None:
+    """An extractor generates credits; a factory spends them."""
+    assert DEFAULT_PLAN[0] == "extractorT1"
 
 
 def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    built = [(300 + i, "landFactory") for i in range(len(DEFAULT_PLAN))]
+    built = [(300 + i, name) for i, name in enumerate(DEFAULT_PLAN)]
     peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
     with _StubbedConnect(peer):
-        assert main(["27200", str(_CATALOGUE_PATH), "5"]) == EXIT_OK
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "5"]) == EXIT_OK
     assert capsys.readouterr().out.splitlines() == [
-        "plan: landFactory -> landFactory -> landFactory",
-        "  landFactory costs 700",
-        "  landFactory costs 700",
-        "  landFactory costs 700",
-        "outcome        done (all 3 structures built)",
-        "completed      3/3",
+        "plan: extractorT1 -> extractorT1 -> landFactory -> extractorT1 -> landFactory",
+        "  extractorT1 costs 700, goes on a resource pool",
+        "  extractorT1 costs 700, goes on a resource pool",
+        "  landFactory costs 700, goes on the ring",
+        "  extractorT1 costs 700, goes on a resource pool",
+        "  landFactory costs 700, goes on the ring",
+        "outcome        done (all 5 structures built)",
+        "completed      5/5",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -159,10 +195,11 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
 def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) -> None:
     peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER))
     with _StubbedConnect(peer):
-        assert main(["27200", str(_CATALOGUE_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[4:] == [
-        "outcome        sample_limit (landFactory costs 700, holding 10)",
-        "completed      0/3",
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
+    assert capsys.readouterr().out.splitlines()[6:] == [
+        "outcome        sample_limit (extractorT1 needs a resource pool and every one"
+        " of the 0 in sight is occupied)",
+        "completed      0/5",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -173,13 +210,13 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
 def test_the_sample_budget_defaults_when_not_given(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    built = [(300 + i, "landFactory") for i in range(len(DEFAULT_PLAN))]
+    built = [(300 + i, name) for i, name in enumerate(DEFAULT_PLAN)]
     peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built))
     with _StubbedConnect(peer):
-        assert main(["27200", str(_CATALOGUE_PATH)]) == EXIT_OK
-    assert capsys.readouterr().out.splitlines()[4:] == [
-        "outcome        done (all 3 structures built)",
-        "completed      3/3",
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
+    assert capsys.readouterr().out.splitlines()[6:] == [
+        "outcome        done (all 5 structures built)",
+        "completed      5/5",
         "orders sent    0",
         "samples seen   1",
         "frames elapsed 0",
@@ -187,12 +224,14 @@ def test_the_sample_budget_defaults_when_not_given(
     ]
 
 
-@pytest.mark.parametrize("args", [[], ["27200"], ["a", "b", "c", "d"]])
+@pytest.mark.parametrize("args", [[], ["27200"], ["a", "b", "c", "d", "e"]])
 def test_a_bad_argument_count_prints_usage(
     args: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(args) == EXIT_BAD_USAGE
-    assert capsys.readouterr().out == "usage: play <port> <catalogue-path> [max-samples]\n"
+    assert capsys.readouterr().out == (
+        "usage: play <port> <catalogue-path> <placement-path> [max-samples]\n"
+    )
 
 
 def test_module_entry_point_exits_with_the_run_result(
@@ -208,4 +247,6 @@ def test_module_entry_point_exits_with_the_run_result(
         sys.argv = original_argv
         sys.modules["scripts.play"] = already_imported
     assert caught.value.code == EXIT_BAD_USAGE
-    assert capsys.readouterr().out == "usage: play <port> <catalogue-path> [max-samples]\n"
+    assert capsys.readouterr().out == (
+        "usage: play <port> <catalogue-path> <placement-path> [max-samples]\n"
+    )

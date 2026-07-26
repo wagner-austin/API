@@ -6,13 +6,15 @@ related:
   - "[[engine-entity-model]]"
   - "[[multiplayer-portability-invariants]]"
   - "[[mechanics-unit-catalogue]]"
+  - "[[mechanics-resource-pools]]"
 source_paths:
   - "wiki/sources/m9-perception/perception-widened.txt:9"
   - "wiki/sources/m9-perception/perception-widened.txt:11"
   - "wiki/sources/m9-perception/perception-widened.txt:14"
   - "wiki/sources/m9-perception/perception-widened.txt:15"
   - "wiki/sources/m9-perception/perception-widened.txt:5"
-  - "agent/src/rwbot/agent/Orders.java"
+  - "wiki/sources/m11-pools/pool-build-run.log:402"
+  - "agent/src/rwbot/agent/Perception.java"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-25"
 confidence: medium
@@ -39,16 +41,19 @@ Perception went from 3 entities to 15 on the same map and moment.[^1] Across thr
 
 ## What this does not establish
 
-**Fog filtering is not demonstrated.** The map sets up team fog[^7], yet all four opposing teams are visible in every sample.[^1] The engine's test returns true whenever fog is disabled for the asking player or that player has no fog grid, so a plausible reading is that `-sandbox` does not apply fog to the local player — in which case a human in the same mode would also see everything and nothing improper is happening. That is a reading, not a finding: it has not been confirmed, and no capture yet shows the test hiding anything.
+**Fog filtering is not demonstrated, and now the reason is known rather than guessed.** The map sets up team fog[^7], yet all four opposing teams are visible in every sample.[^1] This page previously offered "`-sandbox` does not apply fog to the local player" as a plausible reading and said plainly that it was a reading rather than a finding. It has since been settled by asking the engine directly: the agent reads the map's fog-enabled flag and the player's fog grid and reports what it finds, and on this map the answer is **fog disabled**.[^8]
 
-The consequence is bounded and worth stating plainly.[^7] The *mechanism* is legitimate by construction, because it is the engine's own per-player test. The *behaviour under fog* is untested, so the claim "the bot sees only what a player sees" is currently supported by how the code is written rather than by observation. Establishing it needs a mode where the local player has a fog grid, and a capture showing an entity present in `am.bE` and absent from the stream.
+That is worth having as a permanent signal rather than a one-off check, which is why it is logged on every map scan. Both visibility tests — the entity one and the tile one that resource pools use ([[mechanics-resource-pools]]) — short out silently when there is no fog, and silence is the problem: a run in which everything happened to be visible is otherwise indistinguishable from a run in which the filter was working, and only one of those tells you the bot is playing fairly.
 
-Confidence on this page is therefore `medium` rather than `high`, and it is the visibility claim specifically that holds it there — every other claim here is observed in a capture.[^1] The invariant it serves is stated in [[multiplayer-portability-invariants]].
+The consequence is bounded and unchanged. The *mechanism* is legitimate by construction, because it is the engine's own per-player test in both cases. The *behaviour under fog* remains untested, so the claim "the bot sees only what a player sees" is supported by how the code is written and by the flag it consults, not by an observation of anything being hidden. Establishing that still needs a mode where the local player has a fog grid, and a capture showing an entity present in `am.bE` and absent from the stream.
+
+Confidence on this page is therefore still `medium`, and it is the visibility claim specifically that holds it there — every other claim here is observed in a capture.[^1] What changed is that the gap is now measured rather than suspected. The invariant it serves is stated in [[multiplayer-portability-invariants]].
 
 [^1]: `wiki/sources/m9-perception/perception-widened.txt:9` — `{"kind":"frame","frame":1348,"clock_ms":4555,"visible":15,"credits":4121}`, the first of three samples.
 [^2]: `wiki/sources/m9-perception/perception-widened.txt:11` — the third sample at `visible:19, credits:4445`, with the second at `:10` reading `visible:18, credits:4283`.
 [^3]: `wiki/sources/m9-perception/perception-widened.txt:14` — an owned entity carrying `"team":0,"mine":true,"hp":4000.0,"max_hp":4000.0`.
 [^4]: `wiki/sources/m9-perception/perception-widened.txt:15` — an opposing entity at `"team":5,"mine":false`, at `(410.0, 990.0)` against our base at `(4250.0, 2550.0)`.
 [^5]: `agent/src/rwbot/agent/StateStream.java` — the record shapes; hit points come from `Orders.healthOf`, which reads the pair the engine itself divides for a health fraction (`cu / cv`).
-[^6]: `agent/src/rwbot/agent/Orders.java` — `visibleEntities` calls the pinned `am.d(n)` per entity, and `verifyBindings` checks that method against the jar so a moved name fails at `make check`.
-[^7]: `wiki/sources/m9-perception/perception-widened.txt:5` — `Setting up team fog..` from the engine log of the same run.
+[^6]: `agent/src/rwbot/agent/Perception.java` — `visibleEntities` calls the pinned `am.d(n)` per entity; the name lives in `EngineNames.VISIBLE_TO` and `EngineNames.verifyBindings` checks that method against the jar so a moved name fails at `make check`.
+[^7]: `wiki/sources/m9-perception/perception-widened.txt:5` — `Setting up team fog..` from the engine log of the same run. The line is emitted during map load whether or not the map then has fog, which is why it was never evidence either way.
+[^8]: `wiki/sources/m11-pools/pool-build-run.log:402` — `[rw-agent] fog: DISABLED on this map -- every visibility test passes`, emitted beside the map scan at `:401`. Produced by `MapTiles.describeFog`, which reads the map's fog-enabled flag and the player's fog grid through the same pinned-name machinery as everything else.

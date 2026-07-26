@@ -1,0 +1,17 @@
+﻿# builder travel timing -- Rusted Warfare 1.15 (code 176, build #28)
+# map: Crossing Large (10p), sandbox, sample interval 250 ms
+# builder id 214 at (4250.0, 2610.0)
+# catalogue speed for 'builder' is 0.6 (see wiki/sources/m0-probe/printunits.log)
+# target pool tile (184, 118) at (3690.0, 2370.0), 609.3 world units away
+ordering extractorT1
+sample  10 builder at ( 4173.3,  2610.0)
+sample  20 builder at ( 4068.5,  2567.9)
+sample  30 builder at ( 3983.2,  2483.1)
+sample  40 builder at ( 3898.2,  2398.2)
+sample  50 builder at ( 3787.4,  2370.1)
+sample  52 extractor appeared
+RESULT travel_samples=52 total_samples=52
+RESULT construction_samples=0
+RESULT distance=609.3 travelled=535.7
+RESULT units_per_sample=11.72
+RESULT units_per_second=46.9

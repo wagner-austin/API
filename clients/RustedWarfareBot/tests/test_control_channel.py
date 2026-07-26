@@ -21,8 +21,8 @@ from rw_bot.control.channel import (
 from rw_bot.wire.command import build_order, move_order
 from rw_bot.wire.state import WireError
 
-_FRAME_3 = '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"credits":4000}'
-_FRAME_1 = '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"credits":4000}'
+_FRAME_3 = '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"credits":4000}'
+_FRAME_1 = '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"pools":0,"credits":4000}'
 
 
 def _entity(index: int, unit_id: int, type_name: str) -> str:
@@ -153,7 +153,7 @@ def test_an_immediately_closed_stream_is_reported() -> None:
 
 
 def test_a_sample_declaring_no_entities_completes_on_its_frame_line() -> None:
-    empty = '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"credits":4000}'
+    empty = '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"credits":4000}'
     assert AgentChannel(_ScriptedPeer([empty])).next_sample()["entities"] == ()
 
 
@@ -164,7 +164,7 @@ def test_successive_samples_are_read_in_order() -> None:
             '{"kind":"entity","frame":9,"index":0,"id":1,"type":"builder",'
             '"class":"u","x":0.0,"y":0.0,"team":0,"mine":true,'
             '"hp":1.0,"max_hp":1.0}',
-            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"credits":4000}',
+            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"credits":4000}',
         ]
     )
     channel = AgentChannel(peer)

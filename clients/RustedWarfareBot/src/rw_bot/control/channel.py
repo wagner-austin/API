@@ -49,10 +49,10 @@ class AgentChannel:
     def next_sample(self) -> Sample:
         """Read lines until one whole world sample has arrived.
 
-        A sample is a frame record followed by the entity records it declares,
-        so this accumulates until the count is satisfied rather than returning
-        a partial roster. A planner acting on a roster it cannot fully see is
-        the failure this prevents.
+        A sample is a frame record followed by the entity and pool records it
+        declares, so this accumulates until both counts are satisfied rather
+        than returning a partial world. A planner acting on a world it cannot
+        fully see is the failure this prevents.
 
         Returns:
             The next complete sample.
@@ -129,23 +129,24 @@ def open_channel(
 def _complete_or_none(lines: Sequence[str]) -> Sample | None:
     """Return the sample these lines form, or None while it is still partial.
 
-    The frame record states how many entity records follow, so completeness is
-    known before parsing the whole thing. Decoding is left to
-    :func:`~rw_bot.wire.state.decode_samples`, which re-checks that count and
+    The frame record states how many entity and pool records follow, so
+    completeness is known before parsing the whole thing. Decoding is left to
+    :func:`~rw_bot.wire.state.decode_samples`, which re-checks both counts and
     rejects a mismatch — this only decides when to stop reading.
 
     Args:
         lines: Lines accumulated since the last complete sample.
 
     Returns:
-        The sample once the declared entity count is satisfied, otherwise None.
+        The sample once both declared counts are satisfied, otherwise None.
 
     Raises:
         NdjsonError: When a line does not parse.
         WireError: When the records cannot form a valid sample.
         DecodeError: When a record is missing a field or mistyped.
     """
-    declared = require_int(parse_object(lines[0]), "visible")
+    opening = parse_object(lines[0])
+    declared = require_int(opening, "visible") + require_int(opening, "pools")
     if len(lines) < declared + 1:
         return None
     return decode_samples(list(lines))[0]

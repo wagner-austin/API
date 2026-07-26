@@ -17,7 +17,7 @@ source_paths:
   - "wiki/sources/m4-commands/engine-tick-decompiled.txt:6"
   - "wiki/sources/m4-commands/engine-tick-decompiled.txt:17"
   - "agent/src/rwbot/agent/EngineHandle.java"
-  - "agent/src/rwbot/agent/Discovery.java"
+  - "agent/src/rwbot/agent/Snapshot.java"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-25"
 confidence: high

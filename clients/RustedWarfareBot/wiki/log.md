@@ -226,3 +226,30 @@ Worth recording how it was found: not by review. `make check` was green and the 
 
 ## [2026-07-25] structure | evidence moved out of runs/
 Notes: probe artifacts relocated `runs/m0-probe/` → `wiki/sources/m0-probe/` and all citations repointed. Cause: the api monorepo's root `.gitignore` excludes `**/runs/` as a DIRECTORY, and git cannot re-include a path below an excluded directory — so cited evidence under `runs/` could never be versioned, and every citation would have failed `source-path-exists` anywhere but this machine. `wiki/sources/` also matches the archive convention the workspace's registered wikis already use. The root `*.log` file-pattern exclusion is negated locally via `!wiki/sources/**`, which works precisely because it is a file pattern rather than a directory one.
+
+## [2026-07-25] build | extractors on resource pools, and a stall window that was measuring the wrong thing
+Artifacts: `wiki/sources/m11-pools/` — `type-flags.ndjson` (173), `pool-build-run.log` (414); `wiki/sources/m6-wire/world-sample.ndjson` regenerated (195)
+
+Notes: the bot could build factories and had no economy, because the one structure that makes credits may only stand on a resource pool and the bot could not see one. Pools are terrain, so they are in no entity list, and the rule is in no stat dump.
+
+Both gaps were closed by reading the engine rather than around it. A pool is a tile whose tileset declares `res_pool`; the loader turns that into a boolean on the tile and the extractor placement check reads that same boolean, and each link of that chain was read out of the decompiled loader rather than assumed. The placement rule comes from `placeOnlyOnResPool` in the extractor's shipped `.ini`, which the loader stores on the unit type; `make type-flags` now asks every registered type for its own predicate and dumps the answers. 173 types, exactly eight pool-bound.
+
+Deliberately not parsed: the sentence "Can only be built on resource pools" in `Strings.properties`. It is hand-written per language and has no connection to the flag the engine enforces — the same words appear untranslated in the Japanese bundle. A bot reading it would be parsing marketing copy.
+
+The tile scan cross-validates. The agent walks the live grid reflectively and reports 46 pools; decompressing the map's `Items` layer and counting the marked gid gives 46 at the same coordinates, tile (115, 6) both ways. Two unrelated routes to one answer is what makes the binding trustworthy.
+
+One engine asymmetry worth remembering: a type's reported name does not always resolve back through the registry. One built-in reports `marker` while the registry matches built-ins on their enum constant name, so `ar.a("marker")` returns null. The dump asks each type object directly instead of round-tripping its name.
+
+Then the live run failed, and the failure was not about pools. Three extractors and two factories were ordered; the third extractor was declared refused and the run stopped at 3/5. It had not been refused — it completed seconds later, and the roster afterwards showed it standing exactly on the pool tile it was sent to. The stall window ran from the moment of the order, so at a measured 12.4 world units per sample, 45 samples reached 558 units and silently capped how far the bot could build. The two near pools are within 230 units; the third is 588.
+
+Timing one far build fixed the shape of it rather than the number. Ordering an extractor 622 units out, the builder travelled 50 samples and the structure appeared on the very sample it stopped moving — construction costs nothing measurable at this rate, travel is the whole delay. So the clock only runs while the builder stands still, which needs no speed constant, no frame rate and no assumption about map size. Raising the constant instead would have bought the same run and the same bug on a bigger map.
+
+Also calibrated in passing: the catalogue's `speed` is not world units per frame. The builder is listed at 0.6 and measures about 50 world units per second.
+
+Verified: 5/5 structures, 5 orders, no waste, reproduced twice. Three extractors on pool tile centres (203,130), (223,130) and (184,118), all three confirmed `res_pool` in the map file; two factories on ring offsets from the Command Center.
+
+Wiki: new page `mechanics-resource-pools`. `wire-contract-ndjson` corrected — it still documented an `owned` count renamed to `visible` at M9 and quoted a capture line that no longer existed. `policy-loop` and `perception-visibility` updated.
+
+Fog: settled rather than assumed. `perception-visibility` had offered "`-sandbox` does not apply fog" as an explicitly-labelled reading; the agent now reads the map's fog flag and the player's grid and reports the answer on every map scan. It is **disabled** on this map, so both visibility filters have been passing everything all along. The mechanism stays legitimate by construction; the behaviour under fog stays untested. The page keeps `medium` — what changed is that the gap is measured rather than suspected.
+
+make check green: guard 0 violations, ruff + mypy clean, 100% statements and branches, agent-selftest OK.

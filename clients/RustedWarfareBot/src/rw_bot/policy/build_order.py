@@ -10,6 +10,11 @@ The policy is small on purpose. It executes a fixed sequence of structures,
 waiting when it cannot afford the next one and stopping when it cannot make
 progress at all. It does not fight, expand, or react to an opponent. What it
 demonstrates is a loop that observes, chooses, acts, and can be scored.
+
+Placement is the one part that is not simple, because the engine's rules are
+not. Most structures go on a ring around the base. Extractors go on resource
+pools and nowhere else, and which types those are is read from the engine
+rather than assumed ([[mechanics-resource-pools]]).
 """
 
 from __future__ import annotations
@@ -18,9 +23,24 @@ from collections.abc import Mapping, Sequence
 from typing import Literal, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.wire.state import Entity, Sample
+from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.wire.state import Entity, ResourcePool, Sample
 
 BUILDER_TYPE = "builder"
+
+#: World-unit radius within which an entity is treated as occupying a pool.
+#:
+#: A pool is one tile, tiles are 20 world units across, and an extractor's own
+#: collision radius is 18 — so anything standing within a tile of the centre is
+#: on it. Measured from the map rather than guessed: the tile grid is 20x20 and
+#: the extractor's ``radius`` is declared in its unit definition.
+#:
+#: This is deliberately not the engine's own occupancy test, because the engine
+#: has none to ask. Its placement check answers "is this tile a pool", not "is
+#: this pool taken"; a second extractor on an occupied pool fails later, on the
+#: ordinary overlap rule. So occupancy is the planner's judgement, and it is
+#: made here where it can be read and changed.
+POOL_OCCUPIED_RADIUS = 20.0
 
 #: World-space offsets from the builder at which successive structures are
 #: placed. A ring rather than a line: buildings occupy space, and walking the
@@ -162,6 +182,73 @@ def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | 
     return oldest
 
 
+def find_free_pool(
+    sample: Sample, anchor: Entity, catalogue: Mapping[str, UnitStats]
+) -> ResourcePool | None:
+    """Return the nearest visible resource pool with no structure on it.
+
+    Nearest to the anchor rather than to the builder, so the economy grows out
+    from the base instead of trailing whichever pool the builder last walked
+    past. Distance is squared and left squared: the ordering is all that
+    matters and a square root would only cost precision.
+
+    Args:
+        sample: One observation of the world.
+        anchor: The structure to measure distance from.
+        catalogue: Unit stats by type name, for the speed field.
+
+    Returns:
+        The nearest free pool, or None when every visible pool is taken — which
+        is also the answer when none is visible at all.
+    """
+    best: ResourcePool | None = None
+    best_distance = 0.0
+    for pool in sample["pools"]:
+        if _is_occupied(sample, pool, catalogue):
+            continue
+        distance = (pool["x"] - anchor["x"]) ** 2 + (pool["y"] - anchor["y"]) ** 2
+        if best is None or distance < best_distance:
+            best = pool
+            best_distance = distance
+    return best
+
+
+def _is_occupied(sample: Sample, pool: ResourcePool, catalogue: Mapping[str, UnitStats]) -> bool:
+    """Report whether a structure is standing on a pool.
+
+    Only immobile entities count. A builder walking across a pool — or parked
+    on one, which is exactly where it stands after building there — does not
+    stop anything being built on it, and counting it would make the pool the
+    bot just used look permanently taken.
+
+    Ownership does not matter. An opponent's extractor holds a pool exactly as
+    firmly as ours does, and ordering onto it would spend the credits and
+    produce nothing.
+
+    A type the catalogue does not know is treated as not occupying. The two
+    errors are not symmetric: guessing "free" wrongly costs one order the
+    engine refuses, which the stall detector already catches, while guessing
+    "occupied" wrongly hides the pool for the rest of the run.
+
+    Args:
+        sample: One observation of the world.
+        pool: The pool to test.
+        catalogue: Unit stats by type name, for the speed field.
+
+    Returns:
+        True when an immobile visible entity is within
+        :data:`POOL_OCCUPIED_RADIUS` of the pool's centre.
+    """
+    limit = POOL_OCCUPIED_RADIUS**2
+    for entity in sample["entities"]:
+        stats = catalogue.get(entity["type_name"])
+        if stats is None or stats["speed"] != 0.0:
+            continue
+        if (entity["x"] - pool["x"]) ** 2 + (entity["y"] - pool["y"]) ** 2 <= limit:
+            return True
+    return False
+
+
 def find_builder(sample: Sample) -> Entity | None:
     """Return a builder from the roster, or None when the player owns none.
 
@@ -184,6 +271,7 @@ def decide(
     sample: Sample,
     plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
+    placements: Mapping[str, TypePlacement],
 ) -> Decision:
     """Choose the next action from one observation.
 
@@ -191,6 +279,8 @@ def decide(
         sample: One observation of the world.
         plan: Structures to build, in order.
         catalogue: Unit stats by type name, for prices.
+        placements: Placement rules by type name, for where a structure may
+            stand.
 
     Returns:
         The decision.
@@ -207,6 +297,12 @@ def decide(
             "blocked",
             f"{target!r} is not in the unit catalogue, so its price is unknown",
         )
+    placement = placements.get(target)
+    if placement is None:
+        return _decision(
+            "blocked",
+            f"{target!r} is not in the placement dump, so where it may stand is unknown",
+        )
 
     builder = find_builder(sample)
     if builder is None:
@@ -219,21 +315,69 @@ def decide(
     # every building should still be able to rebuild.
     anchor = find_anchor(sample, catalogue) or builder
 
+    site = _site_for(sample, index, placement, anchor, catalogue)
+    if site is None:
+        # Not "blocked". Every pool in sight being taken is a state the world
+        # can leave on its own -- fog lifts as units move, and a destroyed
+        # extractor frees its pool -- so this is a wait, and the stall detector
+        # is what stops it waiting forever.
+        return _decision(
+            "wait",
+            f"{target} needs a resource pool and every one of the "
+            f"{len(sample['pools'])} in sight is occupied",
+        )
+
     if sample["credits"] < stats["price"]:
         return _decision(
             "wait",
             f"{target} costs {stats['price']}, holding {sample['credits']}",
         )
 
-    offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
     return Decision(
         action="build",
         reason=f"building {target} ({built + 1} of {len(plan)})",
         type_name=target,
         unit_id=builder["unit_id"],
-        x=anchor["x"] + offset[0],
-        y=anchor["y"] + offset[1],
+        x=site[0],
+        y=site[1],
     )
+
+
+def _site_for(
+    sample: Sample,
+    index: int,
+    placement: TypePlacement,
+    anchor: Entity,
+    catalogue: Mapping[str, UnitStats],
+) -> tuple[float, float] | None:
+    """Choose where to put the next structure.
+
+    Two placement rules, because the engine has two. A structure bound to a
+    resource pool has exactly as many legal sites as there are free pools, and
+    the ring is irrelevant to it — offering a ring position would produce an
+    order the engine refuses without saying so. Everything else takes the next
+    ring position around the anchor.
+
+    Args:
+        sample: One observation of the world.
+        index: The structure's position in the plan, which selects the ring
+            offset.
+        placement: The engine's placement rule for it.
+        anchor: The structure ring offsets are measured from.
+        catalogue: Unit stats by type name, for judging pool occupancy.
+
+    Returns:
+        The world point to build at, or None when the structure needs a pool
+        and no free one is visible.
+    """
+    if placement["needs_pool"]:
+        pool = find_free_pool(sample, anchor, catalogue)
+        if pool is None:
+            return None
+        return pool["x"], pool["y"]
+
+    offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
+    return anchor["x"] + offset[0], anchor["y"] + offset[1]
 
 
 def _decision(
@@ -254,10 +398,12 @@ def _decision(
 __all__ = [
     "BUILDER_TYPE",
     "PLACEMENT_RING",
+    "POOL_OCCUPIED_RADIUS",
     "Decision",
     "completed_count",
     "decide",
     "find_anchor",
     "find_builder",
+    "find_free_pool",
     "next_unsatisfied_index",
 ]
