@@ -38,16 +38,23 @@ Wiki: [[game-economy]]#deposit-floor."""
 def fuel_capacity(rank: int) -> int:
     """Return the tank's fuel capacity at the given rank.
 
+    Recruits share the private-tier cap: the first rank-0 live
+    session (bot-20260725-211120) carried 31 wire readings at exactly
+    1100 and zero above it, including a pickup landing 943 -> 1100 —
+    falsifying the old ``1000 + 100 * rank`` extrapolation at the one
+    rank the 2026-07-06 deposit verifications (ranks 1/3/6/7) could
+    not discriminate.
+
     Wiki: [[game-economy]]#fuel-capacity.
 
     Args:
         rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
 
     Returns:
-        Fuel capacity ``1000 + 100 * rank``: 1000 at recruit, 1100 at
-        private, ..., 1800 at general.
+        Fuel capacity ``1000 + 100 * max(rank, 1)``: 1100 at recruit
+        AND private, 1200 at corporal, ..., 1800 at general.
     """
-    return 1000 + 100 * rank
+    return 1000 + 100 * max(rank, 1)
 
 
 def damage_tier(fuel: int, rank: int) -> int:
@@ -93,11 +100,15 @@ def free_radar_radius(rank: int) -> int:
 def inventory_capacity(rank: int) -> int:
     """Return the per-slot inventory capacity at the given rank.
 
-    The tankpit.com official rules table (recruit 20, +5 per rank) is
-    the source. Each of ``dual_shots``, ``missile_shots``,
-    ``homing_shots``, ``extra_radars``, and ``armor_shields`` shares
-    the same rank-derived cap; the server refuses further pickup with
-    ``0x52`` code-7 when a slot would exceed the cap.
+    Recruits share the private-tier cap: the first rank-0 live
+    session (bot-20260725-211120) sustained 0x49 snapshots at exactly
+    25 in four slots at once — including slots the kill mercy bundle
+    never touches — and never above 25, falsifying the tankpit.com
+    rules-table's "recruit 20" at the wire. Each of ``dual_shots``,
+    ``missile_shots``, ``homing_shots``, ``extra_radars``, and
+    ``armor_shields`` shares the same rank-derived cap; the server
+    refuses further pickup with ``0x52`` code-7 when a slot would
+    exceed the cap.
 
     Wiki: [[game-economy]]#inventory-capacity.
 
@@ -105,11 +116,11 @@ def inventory_capacity(rank: int) -> int:
         rank: Wire rank field, ``0`` (recruit) through ``8`` (general).
 
     Returns:
-        Per-slot cap ``20 + 5 * rank``: 20 at recruit, 25 at private,
-        30 at corporal, 35 at sergeant, 40 at lieutenant, 45 at
-        captain, 50 at major, 55 at colonel, 60 at general.
+        Per-slot cap ``20 + 5 * max(rank, 1)``: 25 at recruit AND
+        private, 30 at corporal, 35 at sergeant, 40 at lieutenant, 45
+        at captain, 50 at major, 55 at colonel, 60 at general.
     """
-    return 20 + 5 * rank
+    return 20 + 5 * max(rank, 1)
 
 
 __all__ = [

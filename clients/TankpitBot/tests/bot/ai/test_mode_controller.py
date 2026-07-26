@@ -254,12 +254,13 @@ def test_hunt_fuel_floor_is_the_rank_fuel_capacity() -> None:
 
     User ruling 2026-07-25: "just determine max fuel based on the
     tank rank". A recruit is hunt-ready at their genuine full tank
-    of 1000; rank 2 needs its full 1200. An unreachable fixed floor
-    would trap low ranks in COLLECT forever.
+    of 1100 (the private-tier cap recruits share — measured
+    bot-20260725-211120); rank 2 needs its full 1200. An unreachable
+    fixed floor would trap low ranks in COLLECT forever.
     """
-    recruit_ctx = _make_ctx(fuel=1000)
+    recruit_ctx = _make_ctx(fuel=1100)
     recruit_ctx.self_state["rank"] = 0
-    assert hunt_fuel_floor(recruit_ctx) == 1000
+    assert hunt_fuel_floor(recruit_ctx) == 1100
     assert should_enter_hunt(recruit_ctx) is True
     assert hunt_fuel_floor(_make_ctx(fuel=1200)) == 1200
 

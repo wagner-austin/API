@@ -418,8 +418,9 @@ class TestEquipmentSearchHopFallback:
 
         Same marooned setup but fuel 550 > ``fuel_low_threshold``
         (200) AND inventory at combat-ready (Bug 0.4: recruit needs
-        duals/homings at ``inventory_capacity(0) = 20`` and radars at
-        least ``combat_radar_min(0) = 15``): the tank is stocked, so
+        duals/homings at ``inventory_capacity(0) = 25`` — the
+        private-tier cap recruits share — and radars at least
+        ``combat_radar_min(0) = 20``): the tank is stocked, so
         instead of a bogus ``out_of_fuel`` exit (live run 2026-07-06
         exited at fuel 1100 this way) the tick falls through to the
         hunt owner.
@@ -433,7 +434,7 @@ class TestEquipmentSearchHopFallback:
                 "mode_started_ms": 90000,
             }
         )
-        inventory = _make_inventory(default_count=20, radar_count=15)
+        inventory = _make_inventory(default_count=25, radar_count=20)
 
         decision = decide(
             world,
