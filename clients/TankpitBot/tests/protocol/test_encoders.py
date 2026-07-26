@@ -47,6 +47,7 @@ from tankpit_bot.protocol.decoders import (
     decode_tank_status_sync,
     decode_terrain_update,
     decode_viewport_update,
+    try_decode_plaintext_ack,
 )
 from tankpit_bot.protocol.decoders.session_events import (
     decode_connection_lost,
@@ -56,6 +57,7 @@ from tankpit_bot.protocol.decoders.session_events import (
 from tankpit_bot.protocol.encoders import (
     encode_envelope_body,
     encode_message_payload,
+    encode_plaintext_ack,
 )
 from tankpit_bot.protocol.helpers import EncodeError, pack16, pack24, x16, x24
 
@@ -220,10 +222,14 @@ def test_cache_update_roundtrip_with_equipment_sentinel() -> None:
 
 
 def test_chat_ack_roundtrip() -> None:
-    """The 1-byte 0x43 chat-ack re-encodes its flag byte."""
-    message = decode_cache_update(bytes([1]))
-    assert message["msg_type"] == "chat_ack"
-    assert encode_message_payload(message) == bytes([1])
+    """The plaintext 0x43 chat ack round-trips its raw two-byte body."""
+    for raw in (b"C0", b"C1"):
+        message = try_decode_plaintext_ack(raw)
+        if message is None:
+            raise AssertionError("expected the raw chat ack to decode")
+        assert message["msg_type"] == "chat_ack"
+        assert message["enabled"] is (raw == b"C1")
+        assert encode_plaintext_ack(message) == raw
 
 
 def test_overlay_and_terrain_update_roundtrip() -> None:
@@ -412,8 +418,16 @@ def test_encode_message_payload_rejects_container_only_messages() -> None:
 
 
 def test_autoscroll_ack_roundtrip() -> None:
-    """The short 0x41 autoscroll-ack re-encodes its flag byte."""
-    message = decode_deactivation(bytes([1]))
-    assert message["msg_type"] == "autoscroll_ack"
-    assert message["enabled"] is True
-    assert encode_message_payload(message) == bytes([1])
+    """The plaintext 0x41 autoscroll ack round-trips its raw two-byte body.
+
+    Wire truth from the 2026-07-24 key-probe capture: the ack is the
+    server's un-XORed echo of the plaintext toggle — raw ``4130``
+    (``"A0"``), never a binary flag byte.
+    """
+    for raw in (b"A0", b"A1"):
+        message = try_decode_plaintext_ack(raw)
+        if message is None:
+            raise AssertionError("expected the raw autoscroll ack to decode")
+        assert message["msg_type"] == "autoscroll_ack"
+        assert message["enabled"] is (raw == b"A1")
+        assert encode_plaintext_ack(message) == raw

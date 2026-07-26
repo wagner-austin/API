@@ -20,8 +20,16 @@ from pathlib import Path
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.logging import get_logger
 
-from tankpit_bot.protocol import is_text_message, try_decode_binary_message
-from tankpit_bot.protocol.encoders import encode_envelope_body, encode_message_payload
+from tankpit_bot.protocol import (
+    is_text_message,
+    try_decode_binary_message,
+    try_decode_plaintext_ack,
+)
+from tankpit_bot.protocol.encoders import (
+    encode_envelope_body,
+    encode_message_payload,
+    encode_plaintext_ack,
+)
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
@@ -60,6 +68,26 @@ class _Tally:
                 self.first_diff[family] = f"want={wire.hex()} got={encoded.hex()}"
 
 
+def _record_plaintext_ack(tally: _Tally, body: bytes) -> bool:
+    """Round-trip a plaintext toggle ack, or return False when not one.
+
+    The acks travel un-XORed (raw ``"A0"``-style echoes), so the raw
+    two-byte body is compared against the raw-frame encoder.
+
+    Args:
+        tally: Accumulator shared across sessions.
+        body: Raw frame body, NOT XOR-decoded.
+
+    Returns:
+        True if the body was a plaintext ack and was recorded.
+    """
+    ack = try_decode_plaintext_ack(body)
+    if ack is None:
+        return False
+    tally.record(str(ack["msg_type"]), body, encode_plaintext_ack(ack))
+    return True
+
+
 def _roundtrip_session(session: CaptureSession, tally: _Tally) -> None:
     """Round-trip every received binary message of one session.
 
@@ -76,27 +104,40 @@ def _roundtrip_session(session: CaptureSession, tally: _Tally) -> None:
         if msg["direction"] != "received":
             continue
         for body in _split_frame_bodies(msg["payload"]):
-            msg_type = body[0]
-            if msg_type not in MSG_MIN_LENGTHS or is_text_message(msg_type):
-                continue
-            payload = xor_decode(body)
-            if len(payload) < MSG_MIN_LENGTHS[msg_type]:
-                tally.invalid_frames += 1
-                continue
-            try:
-                message = try_decode_binary_message(msg_type, payload)
-            except DecodeError as error:
-                log.debug("roundtrip: undecodable 0x%02X frame: %s", msg_type, error)
-                tally.invalid_frames += 1
-                continue
-            if message is None:
-                tally.invalid_frames += 1
-                continue
-            if msg_type == _ENVELOPE_TYPE:
-                encoded = encode_envelope_body(message)
-            else:
-                encoded = encode_message_payload(message)
-            tally.record(str(message["msg_type"]), payload, encoded)
+            _roundtrip_body(body, tally)
+
+
+def _roundtrip_body(body: bytes, tally: _Tally) -> None:
+    """Round-trip one received frame body into the tally.
+
+    Args:
+        body: Raw frame body (msg_type byte + XOR-encoded rest, or a
+            plaintext ack).
+        tally: Accumulator shared across sessions.
+    """
+    msg_type = body[0]
+    if _record_plaintext_ack(tally, body):
+        return
+    if msg_type not in MSG_MIN_LENGTHS or is_text_message(msg_type):
+        return
+    payload = xor_decode(body)
+    if len(payload) < MSG_MIN_LENGTHS[msg_type]:
+        tally.invalid_frames += 1
+        return
+    try:
+        message = try_decode_binary_message(msg_type, payload)
+    except DecodeError as error:
+        log.debug("roundtrip: undecodable 0x%02X frame: %s", msg_type, error)
+        tally.invalid_frames += 1
+        return
+    if message is None:
+        tally.invalid_frames += 1
+        return
+    if msg_type == _ENVELOPE_TYPE:
+        encoded = encode_envelope_body(message)
+    else:
+        encoded = encode_message_payload(message)
+    tally.record(str(message["msg_type"]), payload, encoded)
 
 
 def collect_roundtrip_evidence(runs_root: Path) -> list[ClaimEvidenceDict]:

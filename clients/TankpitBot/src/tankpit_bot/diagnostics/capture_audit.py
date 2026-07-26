@@ -30,6 +30,7 @@ from tankpit_bot import protocol
 from tankpit_bot.capture.xor import build_xor_table, decode_base64_safe, load_xor_static_key
 from tankpit_bot.diagnostics.event_stream import scan_diagnostic_records
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
+from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.runtime_logging import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
@@ -91,6 +92,29 @@ def _iter_frames(payload: str) -> list[bytes]:
     return bodies
 
 
+def _replay_frame_bodies(capture: CaptureSession) -> list[bytes]:
+    """Collect the received frame bodies the XOR replay should decode.
+
+    Plaintext toggle acks travel un-XORed and carry no replay-relevant
+    state — they are discriminated here, pre-XOR, so they never reach
+    the decoder as garbage.
+
+    Args:
+        capture: Decoded capture session.
+
+    Returns:
+        Raw frame bodies in capture order, acks excluded.
+    """
+    bodies: list[bytes] = []
+    for message in capture["messages"]:
+        if message["direction"] != "received":
+            continue
+        for body in _iter_frames(message["payload"]):
+            if try_decode_plaintext_ack(body) is None:
+                bodies.append(body)
+    return bodies
+
+
 def _replay_received(
     capture: CaptureSession, table: bytes
 ) -> tuple[list[tuple[int, int]], list[int], dict[int, int], int]:
@@ -112,40 +136,37 @@ def _replay_received(
     supervisor_codes: list[int] = []
     unknown_subtypes: dict[int, int] = {}
     decode_errors = 0
-    for message in capture["messages"]:
-        if message["direction"] != "received":
+    for body in _replay_frame_bodies(capture):
+        decoded_data = _xor_with_table(body, table)
+        if len(decoded_data) == 0:
             continue
-        for body in _iter_frames(message["payload"]):
-            decoded_data = _xor_with_table(body, table)
-            if len(decoded_data) == 0:
-                continue
-            # Mirror the live router: only types the sniffer itself
-            # would decode go through the decoder. Everything else is
-            # outside the bot's decode surface by design (text routes,
-            # lobby traffic) and is not a replay finding.
-            min_len = MSG_MIN_LENGTHS.get(body[0])
-            if min_len is None or len(decoded_data) < min_len:
-                continue
-            try:
-                result = protocol.decode_message(body[0], decoded_data)
-            except DecodeError as error:
-                log.warning(
-                    "replay decode failure: type=0x%02X len=%d: %s",
-                    body[0],
-                    len(decoded_data),
-                    error,
-                )
-                decode_errors += 1
-                continue
-            match result:
-                case {"msg_type": 0x41, "victim_id": int(victim_id), "killer_id": int(killer_id)}:
-                    deactivations.append((victim_id, killer_id))
-                case {"msg_type": 0x52, "error_code": int(error_code)}:
-                    supervisor_codes.append(error_code)
-                case {"msg_type": "unknown_container", "subtype": int(subtype)}:
-                    unknown_subtypes[subtype] = unknown_subtypes.get(subtype, 0) + 1
-                case _:
-                    pass
+        # Mirror the live router: only types the sniffer itself
+        # would decode go through the decoder. Everything else is
+        # outside the bot's decode surface by design (text routes,
+        # lobby traffic) and is not a replay finding.
+        min_len = MSG_MIN_LENGTHS.get(body[0])
+        if min_len is None or len(decoded_data) < min_len:
+            continue
+        try:
+            result = protocol.decode_message(body[0], decoded_data)
+        except DecodeError as error:
+            log.warning(
+                "replay decode failure: type=0x%02X len=%d: %s",
+                body[0],
+                len(decoded_data),
+                error,
+            )
+            decode_errors += 1
+            continue
+        match result:
+            case {"msg_type": 0x41, "victim_id": int(victim_id), "killer_id": int(killer_id)}:
+                deactivations.append((victim_id, killer_id))
+            case {"msg_type": 0x52, "error_code": int(error_code)}:
+                supervisor_codes.append(error_code)
+            case {"msg_type": "unknown_container", "subtype": int(subtype)}:
+                unknown_subtypes[subtype] = unknown_subtypes.get(subtype, 0) + 1
+            case _:
+                pass
     return (deactivations, supervisor_codes, unknown_subtypes, decode_errors)
 
 

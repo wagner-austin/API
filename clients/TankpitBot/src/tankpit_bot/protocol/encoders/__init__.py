@@ -16,6 +16,7 @@ from tankpit_bot.protocol.encoders.combat import (
 from tankpit_bot.protocol.encoders.envelope import (
     encode_envelope_body,
     encode_message_payload,
+    encode_plaintext_ack,
 )
 from tankpit_bot.protocol.encoders.map_data import encode_map_data
 from tankpit_bot.protocol.encoders.movement import (
@@ -91,6 +92,7 @@ __all__ = [
     "encode_movement_response",
     "encode_overlay_update",
     "encode_ping_response",
+    "encode_plaintext_ack",
     "encode_promotion",
     "encode_radar_container",
     "encode_radar_mine",

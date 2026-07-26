@@ -67,6 +67,7 @@ from tankpit_bot.protocol.decoders.text import (
     decode_join_confirm,
     decode_text_message,
     decode_world_info,
+    try_decode_plaintext_ack,
 )
 from tankpit_bot.protocol.decoders.world import (
     decode_cache_update,
@@ -250,6 +251,7 @@ __all__ = [
     "supervisor_is_insufficient_fuel",
     "try_decode_binary_message",
     "try_decode_message",
+    "try_decode_plaintext_ack",
     "viewport_entity_has_equipment_cache",
     "viewport_entity_has_fuel_cache",
     "viewport_entity_has_no_cache",

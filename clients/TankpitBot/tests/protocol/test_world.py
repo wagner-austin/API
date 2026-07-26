@@ -669,7 +669,12 @@ class TestDecode0x2eMessage:
         assert result["obstacle_type"] == 2
 
 
-def test_cache_update_one_byte_is_the_chat_toggle_ack() -> None:
-    """The overloaded 0x43: a single flag byte is the chat-ack, not tiles."""
-    assert decode_cache_update(bytes([1])) == {"msg_type": "chat_ack", "enabled": True}
-    assert decode_cache_update(bytes([0])) == {"msg_type": "chat_ack", "enabled": False}
+def test_cache_update_rejects_partial_entries() -> None:
+    """0x43 tile patches are whole 4-byte entries; a lone byte raises.
+
+    The overloaded plaintext chat ack never reaches this decoder — it
+    travels un-XORed and is discriminated at the framing layer by
+    ``try_decode_plaintext_ack``.
+    """
+    with pytest.raises(DecodeError):
+        decode_cache_update(bytes([1]))

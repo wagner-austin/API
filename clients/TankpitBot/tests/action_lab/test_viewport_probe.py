@@ -59,8 +59,12 @@ def _make_world(timestamp_ms: int, x: int, y: int, fuel: int) -> WorldStateDict:
 
 
 def _ack_message(enabled: bool) -> CapturedMessage:
-    """One received frame batch holding the short 0x41 autoscroll ack."""
-    frame = bytes([0x02, 0x00, 0x41, 0x01 if enabled else 0x00])
+    """One received frame batch holding the plaintext autoscroll ack.
+
+    The real ack is the server's un-XORed echo of the toggle command:
+    raw ``"A1"``/``"A0"`` (key-probe capture 2026-07-24).
+    """
+    frame = bytes([0x02, 0x00]) + (b"A1" if enabled else b"A0")
     return CapturedMessage(
         timestamp_ms=1000,
         direction="received",
@@ -525,6 +529,7 @@ def test_execute_probe_refuses_a_stuck_normalization() -> None:
             probe.execute_probe(initial_sync_timeout_ms=10000)
     finally:
         core_hooks.sync_playwright = original_sync_playwright
+    assert probe.quits == 1
 
 
 def test_execute_probe_refuses_a_failed_on_switch() -> None:
@@ -538,6 +543,7 @@ def test_execute_probe_refuses_a_failed_on_switch() -> None:
             probe.execute_probe(initial_sync_timeout_ms=10000)
     finally:
         core_hooks.sync_playwright = original_sync_playwright
+    assert probe.quits == 1
 
 
 def test_execute_probe_refuses_a_failed_restore() -> None:
@@ -551,3 +557,4 @@ def test_execute_probe_refuses_a_failed_restore() -> None:
             probe.execute_probe(initial_sync_timeout_ms=10000)
     finally:
         core_hooks.sync_playwright = original_sync_playwright
+    assert probe.quits == 1

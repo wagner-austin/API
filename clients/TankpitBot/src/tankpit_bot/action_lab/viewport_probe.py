@@ -44,8 +44,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.capture.xor import decode_base64_safe
-from tankpit_bot.protocol import decode_message
-from tankpit_bot.sniffer.xor import xor_decode
+from tankpit_bot.protocol import try_decode_plaintext_ack
 
 log = get_logger(__name__)
 
@@ -148,6 +147,10 @@ class ViewportProbe(ProbeBase):
     def _read_autoscroll_ack(self, start_index: int) -> bool:
         """Read the autoscroll ack from frames captured after a press.
 
+        The ack is the server's PLAINTEXT two-byte echo of the toggle
+        (raw ``"A0"``/``"A1"``, un-XORed) — it must be read from the
+        raw frame body, never through the XOR decode path.
+
         Args:
             start_index: Capture index at the moment of the key press.
 
@@ -172,11 +175,9 @@ class ViewportProbe(ProbeBase):
                     break
                 body = data[offset : offset + length]
                 offset += length
-                if body[0] != 0x41:
-                    continue
-                decoded = decode_message(body[0], xor_decode(body))
-                if decoded["msg_type"] == "autoscroll_ack":
-                    return decoded["enabled"]
+                ack = try_decode_plaintext_ack(body)
+                if ack is not None and ack["msg_type"] == "autoscroll_ack":
+                    return ack["enabled"]
         raise ProbeError("no autoscroll ack after the 'a' press; toggle unverified")
 
     def _toggle_autoscroll(self) -> bool:
@@ -290,32 +291,40 @@ class ViewportProbe(ProbeBase):
             phase_started_ms = action_hooks.get_current_time_ms()
             ack_states: list[bool] = []
             toggles = 1
-            # Normalize to OFF. The initial state is unknowable without
-            # a press (no query carries the flag), and the first live
-            # run proved it cannot be assumed: a fresh browser session
-            # started ON despite the user's own client showing OFF —
-            # the flag looks client-local, not server-persisted. The
-            # first press both reveals and flips the state.
-            state = self._toggle_autoscroll()
-            ack_states.append(state)
-            if state:
+            # An aborted probe must still leave the room — an
+            # unattended tank is a target in a PvP world (the
+            # 2026-07-25 density-probe tank was killed and the
+            # account lost a rank).
+            try:
+                # Normalize to OFF. The initial state is unknowable without
+                # a press (no query carries the flag), and the first live
+                # run proved it cannot be assumed: a fresh browser session
+                # started ON despite the user's own client showing OFF —
+                # the flag looks client-local, not server-persisted. The
+                # first press both reveals and flips the state.
                 state = self._toggle_autoscroll()
                 ack_states.append(state)
-                toggles += 1
                 if state:
-                    raise ProbeError("autoscroll still enabled after the normalization press")
-            walks_off, longs_off = self._run_phase()
-            enabled = self._toggle_autoscroll()
-            ack_states.append(enabled)
-            toggles += 1
-            if not enabled:
-                raise ProbeError("autoscroll acked DISABLED when switching to the ON phase")
-            walks_on, longs_on = self._run_phase()
-            restored = self._toggle_autoscroll()
-            ack_states.append(restored)
-            toggles += 1
-            if restored:
-                raise ProbeError("autoscroll still enabled after the restore press")
+                    state = self._toggle_autoscroll()
+                    ack_states.append(state)
+                    toggles += 1
+                    if state:
+                        raise ProbeError("autoscroll still enabled after the normalization press")
+                walks_off, longs_off = self._run_phase()
+                enabled = self._toggle_autoscroll()
+                ack_states.append(enabled)
+                toggles += 1
+                if not enabled:
+                    raise ProbeError("autoscroll acked DISABLED when switching to the ON phase")
+                walks_on, longs_on = self._run_phase()
+                restored = self._toggle_autoscroll()
+                ack_states.append(restored)
+                toggles += 1
+                if restored:
+                    raise ProbeError("autoscroll still enabled after the restore press")
+            except ProbeError:
+                self.quit_to_lobby()
+                raise
             self.quit_to_lobby()
             fuel_after, _, _ = self._current_fuel()
             envelope = build_probe_session_envelope(

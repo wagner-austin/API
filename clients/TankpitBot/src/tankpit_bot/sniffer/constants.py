@@ -69,7 +69,7 @@ TEXT_MESSAGE_TYPES: frozenset[int] = frozenset({0x3D, 0x2B, 0x24, 0x2A, 0x25, 0x
 # Message type -> minimum data length (from protocol.py _require_* calls)
 MSG_MIN_LENGTHS: dict[int, int] = {
     ord("S"): 12,  # ShootEvent
-    ord("A"): 5,  # Deactivation
+    ord("A"): 6,  # Deactivation (status, victim u16, promo flag, killer u16)
     ord("B"): 9,  # BuildPickup (Jg: tank_id, src x/y, drop x/y, direction, obstacle_type, flag)
     ord("K"): 4,  # MinePlacement
     ord("L"): 2,  # MapData (Ig: u16 RLE count + RLE bytes + 5-byte tank entries)

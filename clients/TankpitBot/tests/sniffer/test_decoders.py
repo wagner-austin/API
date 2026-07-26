@@ -175,6 +175,18 @@ def test_process_received_message_respects_protocol_frame_logging(
     assert any("[RECEIVED] RESPONSE: $1|0" in record.message for record in caplog.records)
 
 
+def test_process_received_message_logs_plaintext_chat_ack(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The raw "C0" body is logged as the plaintext chat ack, not XOR-routed."""
+    payload = make_payload(b"C0")
+
+    set_protocol_frame_logging(True)
+    with caplog.at_level(logging.INFO):
+        process_received_message(payload)
+    assert any("ChatAck" in record.message for record in caplog.records)
+
+
 # =============================================================================
 # Plus Message Tests
 # =============================================================================
@@ -454,6 +466,17 @@ class TestTryDecodeReceived:
         if result is None:
             raise AssertionError("Expected non-None result")
         assert "[RECEIVED]" in result
+
+    def test_try_decode_received_plaintext_autoscroll_ack(self) -> None:
+        """The raw "A1" body decodes as the plaintext autoscroll ack, not XOR."""
+        from tankpit_bot.sniffer.decoders import try_decode_received
+
+        payload = base64.b64encode(len(b"A1").to_bytes(2, "little") + b"A1").decode()
+        result = try_decode_received(payload)
+        if result is None:
+            raise AssertionError("Expected non-None result")
+        assert "[RECEIVED]" in result
+        assert "AutoscrollAck" in result
 
     def test_try_decode_received_binary_empty_decoded(self) -> None:
         """Test try_decode_received returns EMPTY for 1-byte binary body."""

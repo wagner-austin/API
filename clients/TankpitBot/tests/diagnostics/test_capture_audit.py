@@ -269,6 +269,19 @@ def test_unknown_container_subtype_is_the_blind_spot_canary(
     ]
 
 
+def test_plaintext_acks_are_not_replay_findings(fake_fs: FakeFileSystem) -> None:
+    """The un-XORed toggle acks are skipped before the XOR replay.
+
+    Raw "A0"/"C1" bodies (key-probe 2026-07-24) would XOR-decode into
+    garbage; the audit must discriminate them pre-XOR, never counting
+    them as decode errors.
+    """
+    ack_frames = [bytes([2, 0]) + b"A0", bytes([2, 0]) + b"C1"]
+    capture = _capture([_received(*ack_frames)])
+    findings = audit_capture(capture, [])
+    assert _by_check(findings, "decode_error") == []
+
+
 def test_decoder_crash_is_critical(fake_fs: FakeFileSystem) -> None:
     """A frame the current decoder raises on is a critical finding."""
     # RadarScanResult (0x4F 'O'): remaining bytes after the u16 count

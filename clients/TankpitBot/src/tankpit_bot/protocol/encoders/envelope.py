@@ -25,6 +25,7 @@ from tankpit_bot.container.encoders import (
     encode_teleport_landed,
     encode_unknown_container,
 )
+from tankpit_bot.protocol.constants import MSG_CACHE_UPDATE, MSG_DEACTIVATE
 from tankpit_bot.protocol.encoders.combat import encode_deactivation, encode_shoot_event
 from tankpit_bot.protocol.encoders.map_data import encode_map_data
 from tankpit_bot.protocol.encoders.movement import (
@@ -74,7 +75,7 @@ from tankpit_bot.protocol.encoders.world import (
     encode_viewport_update,
 )
 from tankpit_bot.protocol.helpers import EncodeError
-from tankpit_bot.protocol.types import BinaryMessage
+from tankpit_bot.protocol.types import AutoscrollAckDict, BinaryMessage, ChatAckDict
 
 
 def _pair_tank(message: BinaryMessage) -> tuple[int, bytes] | None:
@@ -132,10 +133,6 @@ def _pair_world(message: BinaryMessage) -> tuple[int, bytes] | None:
         return 0x40, encode_overlay_update(message)
     if message["msg_type"] == 0x43:
         return 0x43, encode_cache_update(message)
-    if message["msg_type"] == "chat_ack":
-        return 0x43, bytes([1 if message["enabled"] else 0])
-    if message["msg_type"] == "autoscroll_ack":
-        return 0x41, bytes([1 if message["enabled"] else 0])
     if message["msg_type"] == 0x4A:
         return 0x4A, encode_terrain_update(message)
     if message["msg_type"] == 0x52:
@@ -253,6 +250,26 @@ def encode_message_payload(message: BinaryMessage) -> bytes:
     return _require_protocol_pair(message)[1]
 
 
+def encode_plaintext_ack(message: AutoscrollAckDict | ChatAckDict) -> bytes:
+    """Encode a plaintext toggle ack as its full raw wire body.
+
+    The inverse of
+    :func:`~tankpit_bot.protocol.decoders.text.try_decode_plaintext_ack`:
+    the two-byte un-XORed echo (``"A0"``/``"A1"``/``"C0"``/``"C1"``)
+    the server sends for the plaintext client toggles. Returns the
+    WHOLE body including the type byte — this frame never splits into
+    a type byte plus XOR-encoded payload.
+
+    Args:
+        message: Decoded autoscroll or chat ack.
+
+    Returns:
+        The raw two-byte frame body.
+    """
+    letter = MSG_DEACTIVATE if message["msg_type"] == "autoscroll_ack" else MSG_CACHE_UPDATE
+    return bytes([letter, ord("1") if message["enabled"] else ord("0")])
+
+
 def encode_envelope_body(message: BinaryMessage) -> bytes:
     """Encode a message as a 0x2E container-frame body.
 
@@ -274,4 +291,5 @@ def encode_envelope_body(message: BinaryMessage) -> bytes:
 __all__ = [
     "encode_envelope_body",
     "encode_message_payload",
+    "encode_plaintext_ack",
 ]

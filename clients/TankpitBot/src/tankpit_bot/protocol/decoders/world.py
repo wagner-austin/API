@@ -13,7 +13,6 @@ from tankpit_bot.protocol.constants import (
 from tankpit_bot.protocol.helpers import DecodeError, require_min_length, x16
 from tankpit_bot.protocol.types import (
     CacheUpdateDict,
-    ChatAckDict,
     OverlayUpdateDict,
     SupervisorDict,
     SupervisorTextDict,
@@ -53,26 +52,26 @@ def _decode_cache_value(low: int, high: int) -> int:
     return raw_value
 
 
-def decode_cache_update(data: bytes) -> CacheUpdateDict | ChatAckDict:
-    """Decode a 0x43 frame: cache tile patch OR chat-toggle ack.
+def decode_cache_update(data: bytes) -> CacheUpdateDict:
+    """Decode a 0x43 CacheUpdate (4-byte tile patch entries).
 
-    The 0x43 type byte is overloaded on this wire: tile patches come
-    as 4-byte entries, and the server acknowledges a client chat
-    toggle with a single flag byte (live key-probe discovery,
-    2026-07-24 — the official client mis-parses the short form
-    silently).
+    The 0x43 type byte is overloaded on the wire: XOR-encoded tile
+    patches vs the two-byte PLAINTEXT chat ack (``"C0"``/``"C1"``,
+    un-XORed — the official client mis-parses it silently). The ack
+    must be discriminated at the framing layer before any XOR decode
+    — see
+    :func:`~tankpit_bot.protocol.decoders.text.try_decode_plaintext_ack`.
+    This decoder handles only the binary tile-patch form.
 
     Args:
         data: XOR-decoded message body (without 0x43 prefix).
 
     Returns:
-        Decoded cache update entries, or the chat-toggle ack.
+        Decoded cache update entries.
 
     Raises:
-        DecodeError: If payload length matches neither form.
+        DecodeError: If the payload is not whole 4-byte entries.
     """
-    if len(data) == 1:
-        return ChatAckDict(msg_type="chat_ack", enabled=data[0] == 1)
     if len(data) % 4 != 0:
         raise DecodeError(f"CacheUpdate: expected 4-byte entries, got {len(data)} bytes")
     updates: list[tuple[int, int, int]] = []

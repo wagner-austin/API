@@ -45,9 +45,10 @@ def _green_session() -> CaptureSession:
     """Build a session whose every binary message round-trips exactly.
 
     Includes skipped traffic (a sent command, a lobby text frame, an
-    unknown outer type) and three invalid-but-counted frames: an
-    undecodable top-level 0x45, a 0x43 cache body with a torn record,
-    and a 0x53 shorter than its minimum.
+    unknown outer type), the two plaintext toggle acks (un-XORed raw
+    echoes, round-tripped against the raw-frame encoder), and three
+    invalid-but-counted frames: an undecodable top-level 0x45, a 0x43
+    cache body with a torn record, and a 0x53 shorter than its minimum.
     """
     messages = [
         identity_message(1000, SELF_ID),
@@ -59,6 +60,8 @@ def _green_session() -> CaptureSession:
         tank_remove_message(4000, 9),
         sent_command_message(4500, 112, 5, 6),
         frame_message(5000, b"=1|Jan. 08, 2013|Artax|1|9", "received"),
+        frame_message(5200, b"A1", "received"),
+        frame_message(5400, b"C0", "received"),
         frame_message(5500, bytes([0x99, 1, 2, 3]), "received"),
         frame_message(6000, xor_encode_body(0x45, bytes([40, 41])), "received"),
         frame_message(6500, xor_encode_body(0x43, bytes([1, 2, 3])), "received"),
@@ -95,6 +98,8 @@ def test_green_tree_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert rc == 0
     assert "FAIL" not in out
     assert "roundtrip-33" in out
+    assert "roundtrip-autoscroll_ack" in out
+    assert "roundtrip-chat_ack" in out
     assert "invalid-frames  skipped=3" in out
     assert "0 mismatches" in out
 

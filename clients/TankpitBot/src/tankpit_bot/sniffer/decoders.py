@@ -15,6 +15,7 @@ from tankpit_bot import _test_hooks, protocol
 from tankpit_bot.capture.xor import decode_base64_safe
 from tankpit_bot.parser import is_room_info_text
 from tankpit_bot.protocol.constants import MSG_PROMOTION, RANK_NAMES
+from tankpit_bot.protocol.decoders import try_decode_plaintext_ack
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS, TEXT_MESSAGE_TYPES
 from tankpit_bot.sniffer.formatters import format_decoded_message
 from tankpit_bot.sniffer.world_state import (
@@ -142,6 +143,13 @@ def try_decode_received(payload: str) -> str | None:
     body = data[2:]
     msg_type = body[0]
 
+    # Plaintext toggle acks (un-XORed two-byte echoes) — discriminated
+    # before the XOR route because their letters are overloaded with
+    # binary frames.
+    ack = try_decode_plaintext_ack(body)
+    if ack is not None:
+        return "[RECEIVED] " + format_decoded_message(msg_type, ack)
+
     # Text messages (not XOR encoded)
     if _is_text_route(msg_type, body):
         text = body.decode("utf-8", errors="replace")
@@ -190,6 +198,14 @@ def _process_single_message(body: bytes) -> None:
             The frame parser guarantees msg_len > 0 before calling.
     """
     msg_type = body[0]
+
+    # Plaintext toggle acks (un-XORed two-byte echoes) — discriminated
+    # before the XOR route because their letters are overloaded with
+    # binary frames. Acks carry no world state; log only.
+    ack = try_decode_plaintext_ack(body)
+    if ack is not None:
+        _log_protocol_line(f"[RECEIVED] {format_decoded_message(msg_type, ack)}")
+        return
 
     # Text messages — log only.
     if _is_text_route(msg_type, body):

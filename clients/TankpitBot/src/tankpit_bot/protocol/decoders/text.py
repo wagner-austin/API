@@ -6,13 +6,55 @@ join confirmation and world info.
 
 from __future__ import annotations
 
-from tankpit_bot.protocol.constants import MSG_PROMOTION, MSG_TANK_POS
+from tankpit_bot.protocol.constants import (
+    MSG_CACHE_UPDATE,
+    MSG_DEACTIVATE,
+    MSG_PROMOTION,
+    MSG_TANK_POS,
+)
 from tankpit_bot.protocol.helpers import (
     DecodeError,
     require_parts,
     require_prefix,
 )
-from tankpit_bot.protocol.types import JoinConfirmDict, WorldInfoDict
+from tankpit_bot.protocol.types import (
+    AutoscrollAckDict,
+    ChatAckDict,
+    JoinConfirmDict,
+    WorldInfoDict,
+)
+
+_ACK_FLAG_DISABLED = ord("0")
+_ACK_FLAG_ENABLED = ord("1")
+
+
+def try_decode_plaintext_ack(raw_body: bytes) -> AutoscrollAckDict | ChatAckDict | None:
+    """Decode a plaintext toggle ack, or None when the body is not one.
+
+    The server acknowledges the plaintext client toggles (``A{flag}``
+    autoscroll, ``C{flag}`` chat) by echoing the two-byte command back
+    un-XORed — raw ``41 30``/``41 31``/``43 30``/``43 31`` on the wire
+    (key-probe capture 2026-07-24: autoscroll ack ``4130`` = ``"A0"``,
+    chat ack ``4331`` = ``"C1"``). Both letters are overloaded with
+    XOR-encoded binary frames (0x41 Deactivation, 0x43 CacheUpdate),
+    so the discrimination must happen here, BEFORE any XOR decode:
+    exactly two raw bytes with an ASCII ``0``/``1`` flag.
+
+    Args:
+        raw_body: Raw message body including type byte, NOT XOR-decoded.
+
+    Returns:
+        The decoded ack, or None when the body is not a plaintext ack
+        (and should take the XOR-decoded binary route instead).
+    """
+    if len(raw_body) != 2 or raw_body[1] not in (_ACK_FLAG_DISABLED, _ACK_FLAG_ENABLED):
+        return None
+    enabled = raw_body[1] == _ACK_FLAG_ENABLED
+    if raw_body[0] == MSG_DEACTIVATE:
+        return AutoscrollAckDict(msg_type="autoscroll_ack", enabled=enabled)
+    if raw_body[0] == MSG_CACHE_UPDATE:
+        return ChatAckDict(msg_type="chat_ack", enabled=enabled)
+    return None
 
 
 def decode_join_confirm(data: bytes) -> JoinConfirmDict:
@@ -100,4 +142,5 @@ __all__ = [
     "decode_join_confirm",
     "decode_text_message",
     "decode_world_info",
+    "try_decode_plaintext_ack",
 ]

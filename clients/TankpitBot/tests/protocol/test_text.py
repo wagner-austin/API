@@ -12,6 +12,7 @@ from tankpit_bot.protocol import (
     decode_join_confirm,
     decode_text_message,
     decode_world_info,
+    try_decode_plaintext_ack,
 )
 
 
@@ -106,3 +107,36 @@ class TestDecodeTextMessage:
         with pytest.raises(DecodeError) as exc:
             decode_text_message(b"X unknown")
         assert "unknown type" in str(exc.value)
+
+
+class TestTryDecodePlaintextAck:
+    """Tests for try_decode_plaintext_ack function."""
+
+    def test_decodes_autoscroll_ack(self) -> None:
+        """Raw "A0"/"A1" decode to the autoscroll ack (key probe 2026-07-24)."""
+        assert try_decode_plaintext_ack(b"A0") == {
+            "msg_type": "autoscroll_ack",
+            "enabled": False,
+        }
+        assert try_decode_plaintext_ack(b"A1") == {
+            "msg_type": "autoscroll_ack",
+            "enabled": True,
+        }
+
+    def test_decodes_chat_ack(self) -> None:
+        """Raw "C0"/"C1" decode to the chat ack (key probe 2026-07-24)."""
+        assert try_decode_plaintext_ack(b"C0") == {"msg_type": "chat_ack", "enabled": False}
+        assert try_decode_plaintext_ack(b"C1") == {"msg_type": "chat_ack", "enabled": True}
+
+    def test_returns_none_on_wrong_length(self) -> None:
+        """Bodies that are not exactly two bytes are not acks."""
+        assert try_decode_plaintext_ack(b"A") is None
+        assert try_decode_plaintext_ack(b"A10") is None
+
+    def test_returns_none_on_non_ascii_flag(self) -> None:
+        """A two-byte 0x41 body with a binary flag byte is not an ack."""
+        assert try_decode_plaintext_ack(bytes([0x41, 0x01])) is None
+
+    def test_returns_none_on_other_letter(self) -> None:
+        """Two-byte bodies of non-toggle letters are not acks."""
+        assert try_decode_plaintext_ack(b"V1") is None
