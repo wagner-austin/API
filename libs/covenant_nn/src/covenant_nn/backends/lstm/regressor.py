@@ -889,6 +889,52 @@ class _LSTMRegressorPrepared:
             preds: TensorProtocol = logits.select(1, 0)
             return preds.cpu().numpy().astype(np.float64)
 
+    def compute_regression_gradients(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Compute gradients of the prediction w.r.t. input features.
+
+        Flat features are reshaped to pseudo-sequences for the forward pass,
+        so the gradients come back shaped (n_samples, seq_len,
+        features_per_step) and are flattened, then trimmed to the original
+        feature count -- the reshape zero-pads up to a multiple of
+        sequence_length, and those padding columns are not real features.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Gradients with shape (n_samples, n_features).
+        """
+        torch_mod = _import_torch()
+        tensor: _TensorCtor = torch_mod.tensor
+        float32: DTypeProtocol = torch_mod.float32
+
+        m = self._model
+        m.eval()
+
+        n_samples = int(x.shape[0])
+        n_features = int(x.shape[1])
+        x_seq: NDArray[np.float64] = reshape_flat_to_pseudo_sequences(x, self._sequence_length)
+
+        x_tensor: TensorProtocol = tensor(x_seq, dtype=float32)
+        x_tensor = x_tensor.requires_grad_(True)
+
+        with torch_mod.enable_grad():
+            logits: TensorProtocol = m(x_tensor)
+            preds: TensorProtocol = logits.select(1, 0)
+            scalar_output: TensorProtocol = preds.sum()
+            scalar_output.backward()
+
+        grad_tensor = x_tensor.grad
+        assert grad_tensor is not None, "Gradient tensor should not be None after backward()"
+        grad_cpu: TensorProtocol = grad_tensor.cpu()
+        grad_seq: NDArray[np.float64] = grad_cpu.numpy().astype(np.float64)
+
+        seq_len = int(grad_seq.shape[1])
+        features_per_step = int(grad_seq.shape[2])
+        grad_flat: NDArray[np.float64] = grad_seq.reshape(n_samples, seq_len * features_per_step)
+        gradients: NDArray[np.float64] = grad_flat[:, :n_features]
+        return gradients
+
 
 # =============================================================================
 # Backend class
@@ -1122,8 +1168,13 @@ class LSTMRegressorBackend:
             "LSTMRegressorBackend.save not supported; use RegressionTrainOutcome.model_path."
         )
 
-    def load(self, *, path: str) -> PreparedRegressor:
+    def load(self, *, path: str) -> _LSTMRegressorPrepared:
         """Load a trained LSTM regressor from saved state dict and metadata.
+
+        The concrete type is declared rather than PreparedRegressor so callers
+        can reach compute_regression_gradients, which the gradient explainers
+        require and which the tree regressors do not have. Narrowing a return
+        type still satisfies the RegressorBackend protocol.
 
         Expects a JSON metadata file alongside the .pt file at the same
         path with a .json extension. The metadata contains architecture

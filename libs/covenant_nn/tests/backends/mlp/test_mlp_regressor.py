@@ -20,6 +20,7 @@ from covenant_ml.types import (
     TrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml.explainers.protocol import RegressionGradientModelProtocol
 
 from covenant_nn.backends.mlp.regressor import (
     MLP_REGRESSOR_CAPABILITIES,
@@ -690,3 +691,50 @@ class _FakeRegressor:
     def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict zeros for testing."""
         return np.zeros(x.shape[0], dtype=np.float64)
+
+
+def test_mlp_regressor_compute_regression_gradients(tmp_path: Path) -> None:
+    """The prepared regressor supports the gradient explainers.
+
+    The regression gradient and integrated_gradients explainers call
+    compute_regression_gradients through getattr, and are declared compatible
+    with mlp_reg, but it was never implemented: both raised AttributeError,
+    leaving permutation as the only explainer that worked for this backend.
+    """
+    backend = MLPRegressorBackend()
+    x, y = _make_regression_data(120, n_features=5)
+    config = _make_mlp_regressor_config(n_epochs=5)
+
+    outcome = _invoke_mlp_regressor_train(
+        backend, x, y, ["a", "b", "c", "d", "e"], config, tmp_path
+    )
+    # Typed against the protocol the gradient explainers require, so the
+    # test fails to type-check if the backend stops satisfying it.
+    loaded: RegressionGradientModelProtocol = backend.load(path=outcome["model_path"])
+
+    grads = loaded.compute_regression_gradients(x[:8])
+
+    assert grads.shape == (8, 5)
+    assert int(np.count_nonzero(np.isfinite(grads))) == grads.size
+
+
+def test_mlp_regressor_gradients_are_not_all_zero(tmp_path: Path) -> None:
+    """Gradients carry signal, so an explanation ranks features.
+
+    An all-zero result would satisfy shape and finiteness while telling a
+    caller nothing.
+    """
+    backend = MLPRegressorBackend()
+    x, y = _make_regression_data(120, n_features=5)
+    config = _make_mlp_regressor_config(n_epochs=10)
+
+    outcome = _invoke_mlp_regressor_train(
+        backend, x, y, ["a", "b", "c", "d", "e"], config, tmp_path
+    )
+    # Typed against the protocol the gradient explainers require, so the
+    # test fails to type-check if the backend stops satisfying it.
+    loaded: RegressionGradientModelProtocol = backend.load(path=outcome["model_path"])
+
+    grads = loaded.compute_regression_gradients(x[:8])
+
+    assert int(np.count_nonzero(grads)) > 0

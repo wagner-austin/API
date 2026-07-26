@@ -309,6 +309,18 @@ class TestFakeTorchModule:
         with torch.no_grad():
             pass  # Should not raise
 
+    def test_enable_grad(self) -> None:
+        """Test enable_grad returns context manager.
+
+        The gradient explainers run their forward pass inside it, so the fake
+        has to provide it for the same reason it provides no_grad.
+        """
+        torch = FakeTorchModule()
+        entered = False
+        with torch.enable_grad():
+            entered = True
+        assert entered
+
     def test_save(self) -> None:
         """Test save does nothing."""
         torch = FakeTorchModule()

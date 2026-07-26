@@ -760,6 +760,41 @@ class _MLPRegressorPrepared:
             preds: TensorProtocol = logits.select(1, 0)
             return preds.cpu().numpy().astype(np.float64)
 
+    def compute_regression_gradients(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Compute gradients of the prediction w.r.t. input features.
+
+        Used by the regression gradient explainers. There is no target class
+        to select: the model has a single output neuron, so the prediction
+        itself is the scalar differentiated.
+
+        Args:
+            x: Input features with shape (n_samples, n_features).
+
+        Returns:
+            Gradients with shape (n_samples, n_features).
+        """
+        torch = _import_torch()
+        tensor: _TensorCtor = torch.tensor
+        float32: DTypeProtocol = torch.float32
+
+        m = self._model
+        m.eval()
+
+        x_tensor: TensorProtocol = tensor(x, dtype=float32)
+        x_tensor = x_tensor.requires_grad_(True)
+
+        with torch.enable_grad():
+            logits: TensorProtocol = m(x_tensor)
+            preds: TensorProtocol = logits.select(1, 0)
+            scalar_output: TensorProtocol = preds.sum()
+            scalar_output.backward()
+
+        grad_tensor = x_tensor.grad
+        assert grad_tensor is not None, "Gradient tensor should not be None after backward()"
+        grad_cpu: TensorProtocol = grad_tensor.cpu()
+        gradients: NDArray[np.float64] = grad_cpu.numpy().astype(np.float64)
+        return gradients
+
 
 # =============================================================================
 # Backend class
@@ -980,8 +1015,13 @@ class MLPRegressorBackend:
             "MLPRegressorBackend.save not supported; use RegressionTrainOutcome.model_path."
         )
 
-    def load(self, *, path: str) -> PreparedRegressor:
+    def load(self, *, path: str) -> _MLPRegressorPrepared:
         """Load a trained MLP regressor from saved state dict and metadata.
+
+        The concrete type is declared rather than PreparedRegressor so callers
+        can reach compute_regression_gradients, which the gradient explainers
+        require and which the tree regressors do not have. Narrowing a return
+        type still satisfies the RegressorBackend protocol.
 
         Expects a JSON metadata file alongside the .pt file at the same
         path with a .json extension. The metadata contains architecture

@@ -348,6 +348,26 @@ class FakeTensor:
         return self
 
 
+class FakeEnableGradContext:
+    """Fake enable_grad context manager.
+
+    The mirror of FakeNoGradContext. Gradient-based explainers need
+    torch.enable_grad, so the protocol declares it and this double has to
+    provide it.
+    """
+
+    def __enter__(self) -> None:
+        pass
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        pass
+
+
 class FakeNoGradContext:
     """Fake no_grad context manager."""
 
@@ -450,6 +470,9 @@ class FakeTorchModule:
     def no_grad(self) -> FakeNoGradContext:
         return FakeNoGradContext()
 
+    def enable_grad(self) -> FakeEnableGradContext:
+        return FakeEnableGradContext()
+
     def save(self, obj: dict[str, TensorProtocol], f: str) -> None:
         pass
 
@@ -495,6 +518,7 @@ __all__ = [
     "FakeCudaModule",
     "FakeDType",
     "FakeDevice",
+    "FakeEnableGradContext",
     "FakeNoGradContext",
     "FakeTensor",
     "FakeTorchModule",

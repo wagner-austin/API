@@ -26,6 +26,23 @@ class _NoGradContext(Protocol):
     ) -> None: ...
 
 
+class _EnableGradContext(Protocol):
+    """Protocol for torch.enable_grad() context manager.
+
+    The mirror of _NoGradContext. Gradient-based explainers need it, and its
+    absence from _TorchModuleProtocol meant any caller typed against that
+    protocol had to reach for an untyped __import__("torch") instead.
+    """
+
+    def __enter__(self) -> None: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None: ...
+
+
 class _TorchModuleProtocol(Protocol):
     """Protocol for torch module."""
 
@@ -56,6 +73,7 @@ class _TorchModuleProtocol(Protocol):
 
     # Context managers
     def no_grad(self) -> _NoGradContext: ...
+    def enable_grad(self) -> _EnableGradContext: ...
 
     # Serialization.
     # `load` mirrors torch.load's keyword-only `weights_only`. Without it on

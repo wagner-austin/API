@@ -19,6 +19,7 @@ from covenant_ml.types import (
     TrainConfig,
 )
 from numpy.typing import NDArray
+from platform_ml.explainers.protocol import RegressionGradientModelProtocol
 
 from covenant_nn.backends.lstm.regressor import (
     LSTM_REGRESSOR_CAPABILITIES,
@@ -799,3 +800,50 @@ class _FakeRegressor:
     def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict zeros for testing."""
         return np.zeros(x.shape[0], dtype=np.float64)
+
+
+def test_lstm_regressor_compute_regression_gradients(tmp_path: Path) -> None:
+    """The prepared regressor supports the gradient explainers.
+
+    The regression gradient and integrated_gradients explainers call
+    compute_regression_gradients through getattr, and are declared compatible
+    with lstm_reg, but it was never implemented: both raised AttributeError,
+    leaving permutation as the only explainer that worked for this backend.
+
+    7 features over sequence_length 4 is deliberate. The reshape zero-pads up
+    to a multiple of the sequence length, so the gradient comes back wider
+    than the input and has to be trimmed; a divisible count would not notice.
+    """
+    backend = LSTMRegressorBackend()
+    x, y = _make_regression_data(120, n_features=7)
+    config = _make_lstm_regressor_config(n_epochs=5, sequence_length=4)
+
+    outcome = _invoke_lstm_regressor_train(
+        backend, x, y, ["a", "b", "c", "d", "e", "f", "g"], config, tmp_path
+    )
+    # Typed against the protocol the gradient explainers require, so the
+    # test fails to type-check if the backend stops satisfying it.
+    loaded: RegressionGradientModelProtocol = backend.load(path=outcome["model_path"])
+
+    grads = loaded.compute_regression_gradients(x[:8])
+
+    assert grads.shape == (8, 7)
+    assert int(np.count_nonzero(np.isfinite(grads))) == grads.size
+
+
+def test_lstm_regressor_gradients_are_not_all_zero(tmp_path: Path) -> None:
+    """Gradients carry signal, so an explanation ranks features."""
+    backend = LSTMRegressorBackend()
+    x, y = _make_regression_data(120, n_features=8)
+    config = _make_lstm_regressor_config(n_epochs=10, sequence_length=4)
+
+    outcome = _invoke_lstm_regressor_train(
+        backend, x, y, ["a", "b", "c", "d", "e", "f", "g", "h"], config, tmp_path
+    )
+    # Typed against the protocol the gradient explainers require, so the
+    # test fails to type-check if the backend stops satisfying it.
+    loaded: RegressionGradientModelProtocol = backend.load(path=outcome["model_path"])
+
+    grads = loaded.compute_regression_gradients(x[:8])
+
+    assert int(np.count_nonzero(grads)) > 0
