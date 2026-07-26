@@ -11,7 +11,7 @@ source_paths:
   - "src/tankpit_bot/sniffer"
   - "runs/bot/latest.events.jsonl"
 source_git_blobs:
-  "src/tankpit_bot/bot": "a75e70d0d8e85a9350e83610162a182a37964d27"
+  "src/tankpit_bot/bot": "f0951c84f2ce60752a858fca07dbabc55a11c23a"
   "src/tankpit_bot/sniffer": "7468802eda20c30878d5693c3f8d06848c33d872"
 fact_checked: "2026-07-25"
 confidence: high
