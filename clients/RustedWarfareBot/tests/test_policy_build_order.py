@@ -12,9 +12,9 @@ from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.policy.build_order import (
     PLACEMENT_RING,
     completed_count,
-    next_unsatisfied_index,
     decide,
     find_builder,
+    next_unsatisfied_index,
 )
 from rw_bot.wire.state import Entity, Sample
 
@@ -209,7 +209,7 @@ def test_a_plan_naming_a_starting_unit_does_not_skip_earlier_entries() -> None:
     ``("landFactory", "builder")`` counted as one-satisfied, jumped to index 1,
     built a second builder and never built the factory at all.
     """
-    world = _sample(entities=(_entity(0, "builder"),), credits=10_000)
+    world = _sample(_entity(214, "builder"), credits=10_000)
     plan = ("landFactory", "builder")
 
     assert completed_count(world, plan) == 1
@@ -221,13 +221,11 @@ def test_a_plan_naming_a_starting_unit_does_not_skip_earlier_entries() -> None:
 
 
 def test_the_first_unsatisfied_entry_is_found_past_a_satisfied_one() -> None:
-    world = _sample(
-        entities=(_entity(0, "builder"), _entity(1, "landFactory")), credits=10_000
-    )
+    world = _sample(_entity(214, "builder"), _entity(300, "landFactory"), credits=10_000)
     assert next_unsatisfied_index(world, ("landFactory", "builder")) == 2
     assert next_unsatisfied_index(world, ("landFactory", "builder", "landFactory")) == 2
 
 
 def test_an_enemy_unit_never_satisfies_a_plan_entry() -> None:
-    world = _sample(entities=(_entity(0, "landFactory", mine=False),), credits=10_000)
+    world = _sample(_entity(900, "landFactory", mine=False), credits=10_000)
     assert next_unsatisfied_index(world, ("landFactory",)) == 0
