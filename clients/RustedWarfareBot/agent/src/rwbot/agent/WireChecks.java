@@ -1,0 +1,156 @@
+package rwbot.agent;
+
+/**
+ * Checks for everything that crosses the wire: the outbound world stream, the
+ * inbound command parser, channel backpressure, and log prefixing.
+ *
+ * <p>Grouped because they share one property — the far end parses this text
+ * strictly and cannot fall back on a lenient library, so malformed output is a
+ * broken contract rather than a cosmetic defect. The frame record is pinned
+ * byte-for-byte on purpose: a field appearing, vanishing or being renamed must
+ * fail here rather than at the far end of a socket.
+ */
+final class WireChecks {
+
+    private WireChecks() {
+    }
+
+    /**
+     * Exercises the NDJSON writer. The consumer parses these lines strictly and
+     * cannot fall back on a lenient JSON library, so malformed output here is a
+     * broken contract rather than cosmetic.
+     */
+    static int checkStateStream() {
+        int failures = 0;
+
+        String frame = StateStream.frameRecord(1918, 6461, 3, 4000);
+        // Pinned byte-for-byte on purpose. This is a wire contract, and the
+        // consumer parses it strictly, so a field appearing, vanishing or being
+        // renamed must fail here rather than at the far end of a socket. That
+        // is the opposite of pinning an observed value like a frame counter,
+        // which changes every capture and carries no contract.
+        failures += Check.expect(
+                frame.equals(
+                        "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
+                                + "\"visible\":3,\"credits\":4000}"),
+                "frame record is exact");
+
+        // The consumer splits on newlines before parsing, so a newline inside
+        // a record would silently become two malformed ones. Code points
+        // rather than character literals: 10 is LF, 13 is CR.
+        failures += Check.expect(
+                frame.indexOf(10) < 0 && frame.indexOf(13) < 0,
+                "a record never contains a newline");
+        failures += Check.expect(
+                frame.startsWith("{") && frame.endsWith("}"),
+                "a record is exactly one object");
+
+        failures += Check.expect(
+                StateStream.frameRecord(0, 0, 0, 0).contains("\"visible\":0"),
+                "an empty roster is still a record");
+        return failures;
+    }
+
+    /** Exercises the inbound order format, including every rejection. */
+    static int checkCommandParsing() {
+        int failures = 0;
+
+        CommandRecord move =
+                CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":214,\"x\":4550.0,\"y\":2610.5}");
+        failures += Check.expect(move.kind() == CommandRecord.Kind.MOVE, "move verb parsed");
+        failures += Check.expect(move.unitId() == 214L, "move unit id parsed");
+        failures += Check.expect(move.x() == 4550.0f && move.y() == 2610.5f, "move target parsed");
+        failures += Check.expect(move.buildType().isEmpty(), "a move carries no build type");
+
+        CommandRecord build =
+                CommandRecord.parse(
+                        "{\"kind\":\"build\",\"unit_id\":215,\"x\":1.0,\"y\":2.0,"
+                                + "\"type\":\"landFactory\"}");
+        failures += Check.expect(build.kind() == CommandRecord.Kind.BUILD, "build verb parsed");
+        failures += Check.expect("landFactory".equals(build.buildType()), "build type parsed");
+
+        failures += Check.expect(
+                CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()
+                        == -3.0f,
+                "an integer coordinate is accepted as a float");
+
+        // A field that belongs to another verb is rejected rather than ignored:
+        // silently dropping it would let a mistyped build read as a move.
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":1,\"y\":2,\"type\":\"landFactory\"}",
+                "a move carrying a build type");
+        failures += expectBadCommand("{\"kind\":\"fly\",\"unit_id\":1,\"x\":1,\"y\":2}", "unknown verb");
+        failures += expectBadCommand("{\"kind\":\"move\",\"x\":1,\"y\":2}", "missing unit id");
+        failures += expectBadCommand("{\"kind\":\"move\",\"unit_id\":1,\"y\":2}", "missing x");
+        failures += expectBadCommand(
+                "{\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2}", "build with no type");
+        failures += expectBadCommand(
+                "{\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2,\"type\":\"\"}",
+                "build with a blank type");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":NaN,\"y\":2}", "a non-finite coordinate");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":\"lots\",\"x\":1,\"y\":2}",
+                "a non-numeric unit id");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":1,\"y\":2}extra", "trailing text");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"unit_id\":1,\"x\":{\"v\":1},\"y\":2}", "a nested value");
+        failures += expectBadCommand(
+                "{\"kind\":\"move\",\"kind\":\"build\",\"unit_id\":1,\"x\":1,\"y\":2}",
+                "a duplicate key");
+        failures += expectBadCommand("not json at all", "text that is not an object");
+        return failures;
+    }
+
+    /** Asserts one command line is rejected. */
+    static int expectBadCommand(String line, String what) {
+        try {
+            CommandRecord.parse(line);
+        } catch (IllegalArgumentException e) {
+            return Check.expect(true, "rejects " + what);
+        }
+        return Check.expect(false, "rejects " + what);
+    }
+
+    /**
+     * A slow planner must never stall the simulation.
+     *
+     * <p>The outbox drops its oldest sample when full rather than blocking the
+     * game thread. Asserted rather than commented, because the failure mode --
+     * a paused match whenever the planner is busy -- would be attributed to the
+     * game long before it was attributed to the queue.
+     */
+    static int checkChannelBackpressure() {
+        int failures = 0;
+        CommandChannel channel = new CommandChannel(0, 250);
+        for (int i = 0; i < 4; i++) {
+            failures += Check.expect(channel.offer("sample " + i), "sample " + i + " queued without a drop");
+        }
+        failures += Check.expect(!channel.offer("sample 4"), "the fifth sample reports a drop");
+        failures += Check.expect(channel.queued() == 4, "the outbox stays bounded at its depth");
+        return failures;
+    }
+
+    /** The engine captures stdout, so every emitted line must carry the prefix. */
+    static int checkLogPrefixing() {
+        java.io.PrintStream original = System.out;
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(captured, true));
+        try {
+            Log.info("first\nsecond\nthird");
+        } finally {
+            System.setOut(original);
+        }
+        String[] lines = captured.toString().split("\\R");
+        int prefixed = 0;
+        for (String line : lines) {
+            if (line.startsWith("[rw-agent] ")) {
+                prefixed++;
+            }
+        }
+        return Check.expect(
+                lines.length == 3 && prefixed == 3,
+                "every line of a multi-line message is prefixed");
+    }
+}
