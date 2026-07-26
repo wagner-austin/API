@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/bot"
   - "runs/bot"
 source_git_blobs:
-  "src/tankpit_bot/bot": "012f907aad43446928b1f85f0e628a390d00fdb4"
+  "src/tankpit_bot/bot": "662e187dc6b6b94342aa4e58b5f207e87b1949f8"
 fact_checked: "2026-07-17"
 confidence: high
 hubs: [architecture]
