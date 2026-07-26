@@ -1,12 +1,13 @@
 """Typed world state decoded from the agent's NDJSON stream.
 
 The stream is a sequence of records discriminated by ``kind``. A ``frame``
-record opens a sample and declares how many ``entity`` records follow; those
-entity records carry the sample's owned roster. Folding them back into whole
-samples is this module's job.
+record opens a sample and declares how many ``entity`` and ``pool`` records
+follow; the entity records carry the visible roster and the pool records the
+visible resource pools. Folding them back into whole samples is this module's
+job.
 
-The declared count is checked rather than trusted. A sample that promises three
-entities and delivers two is a truncated capture — the ordinary result of
+The declared counts are checked rather than trusted. A sample that promises
+three entities and delivers two is a truncated capture — the ordinary result of
 reading a stream while the agent is still writing it — and silently yielding the
 short sample would let a planner make decisions on a roster it cannot see all
 of.
@@ -18,7 +19,7 @@ replay corpus without a branch between them.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
@@ -34,12 +35,16 @@ KIND_FRAME: Final = "frame"
 """``kind`` value opening a sample."""
 
 KIND_ENTITY: Final = "entity"
-"""``kind`` value of a record inside a sample."""
+"""``kind`` value of an entity record inside a sample."""
+
+KIND_POOL: Final = "pool"
+"""``kind`` value of a resource-pool record inside a sample."""
 
 _UNKNOWN_KIND = "RW-WIRE-001"
-_ENTITY_BEFORE_FRAME = "RW-WIRE-002"
+_RECORD_BEFORE_FRAME = "RW-WIRE-002"
 _COUNT_MISMATCH = "RW-WIRE-003"
 _FRAME_MISMATCH = "RW-WIRE-004"
+_POOL_COUNT_MISMATCH = "RW-WIRE-005"
 
 
 class WireError(RwBotError):
@@ -88,6 +93,33 @@ class Entity(TypedDict):
     max_hp: float
 
 
+class ResourcePool(TypedDict):
+    """One resource pool the local player can currently see.
+
+    Pools are terrain rather than units: they appear in no entity list, and a
+    planner reading only the roster cannot see them at all. They matter because
+    an extractor is the one structure the engine refuses to place anywhere else.
+
+    Both coordinate systems are carried because they answer different
+    questions. The tile coordinate identifies the pool — integral, fixed for the
+    life of the map, and the unit the engine's own placement check works in. The
+    world point is where a build order has to be addressed.
+
+    Attributes:
+        index: Position in the sample's pool list. Enumeration order only.
+        tile_x: Tile column.
+        tile_y: Tile row.
+        x: World x of the tile's centre.
+        y: World y of the tile's centre.
+    """
+
+    index: int
+    tile_x: int
+    tile_y: int
+    x: float
+    y: float
+
+
 class Sample(TypedDict):
     """One coherent observation of the world.
 
@@ -101,12 +133,16 @@ class Sample(TypedDict):
         entities: Every visible entity, in the order the agent enumerated it.
             Includes entities the local player does not own; check
             :attr:`Entity.mine`.
+        pools: Every resource pool currently visible, in scan order. Fog-filtered
+            by the engine's own per-tile test, so this grows as the map is
+            explored rather than listing the whole map from the first frame.
     """
 
     frame: int
     clock_ms: int
     credits: int
     entities: tuple[Entity, ...]
+    pools: tuple[ResourcePool, ...]
 
 
 def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
@@ -124,16 +160,19 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
         NdjsonError: When a line does not parse.
         DecodeError: When a record is missing a field or carries a wrong type.
         WireError: ``RW-WIRE-001`` on an unknown ``kind``, ``RW-WIRE-002`` when
-            an entity precedes any frame, ``RW-WIRE-003`` when a sample's entity
-            count disagrees with its declared count, ``RW-WIRE-004`` when an
-            entity's frame disagrees with the sample it falls in.
+            an entity or pool precedes any frame, ``RW-WIRE-003`` when a
+            sample's entity count disagrees with its declared count,
+            ``RW-WIRE-004`` when a record's frame disagrees with the sample it
+            falls in, ``RW-WIRE-005`` when the pool count disagrees.
     """
     samples: list[Sample] = []
     frame: int = 0
     clock_ms: int = 0
-    declared: int = 0
+    declared_entities: int = 0
+    declared_pools: int = 0
     credits: int = 0
     entities: list[Entity] = []
+    pools: list[ResourcePool] = []
     started = False
 
     for line in lines:
@@ -144,29 +183,42 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
 
         if kind == KIND_FRAME:
             if started:
-                samples.append(_close(frame, clock_ms, credits, declared, entities))
+                samples.append(
+                    _close(
+                        frame,
+                        clock_ms,
+                        credits,
+                        declared_entities,
+                        declared_pools,
+                        entities,
+                        pools,
+                    )
+                )
             frame = require_int(record, "frame")
             clock_ms = require_int(record, "clock_ms")
-            declared = require_int(record, "visible")
+            declared_entities = require_int(record, "visible")
+            declared_pools = require_int(record, "pools")
             credits = require_int(record, "credits")
             entities = []
+            pools = []
             started = True
             continue
 
+        if kind == KIND_POOL:
+            _require_inside_sample(started, kind, frame, record)
+            pools.append(
+                ResourcePool(
+                    index=require_int(record, "index"),
+                    tile_x=require_int(record, "tile_x"),
+                    tile_y=require_int(record, "tile_y"),
+                    x=require_finite_float(record, "x"),
+                    y=require_finite_float(record, "y"),
+                )
+            )
+            continue
+
         if kind == KIND_ENTITY:
-            if not started:
-                raise WireError(
-                    _ENTITY_BEFORE_FRAME,
-                    "an entity record appeared before any frame record; the stream "
-                    "does not begin at a sample boundary",
-                )
-            entity_frame = require_int(record, "frame")
-            if entity_frame != frame:
-                raise WireError(
-                    _FRAME_MISMATCH,
-                    f"entity reports frame {entity_frame} inside the sample for frame "
-                    f"{frame}; the records have been interleaved",
-                )
+            _require_inside_sample(started, kind, frame, record)
             entities.append(
                 Entity(
                     index=require_int(record, "index"),
@@ -186,34 +238,91 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
         raise WireError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
 
     if started:
-        samples.append(_close(frame, clock_ms, credits, declared, entities))
+        samples.append(
+            _close(frame, clock_ms, credits, declared_entities, declared_pools, entities, pools)
+        )
     return tuple(samples)
 
 
+def _require_inside_sample(
+    started: bool,
+    kind: str,
+    frame: int,
+    record: Mapping[str, str | int | float | bool],
+) -> None:
+    """Check that a record falls inside the sample it claims to.
+
+    Args:
+        started: Whether a frame record has opened a sample.
+        kind: The record's ``kind``, for the message.
+        frame: The open sample's frame counter.
+        record: The record being placed.
+
+    Raises:
+        WireError: ``RW-WIRE-002`` when no sample is open, ``RW-WIRE-004`` when
+            the record's own frame disagrees with the open one.
+    """
+    if not started:
+        raise WireError(
+            _RECORD_BEFORE_FRAME,
+            f"a {kind} record appeared before any frame record; the stream does "
+            "not begin at a sample boundary",
+        )
+    reported = require_int(record, "frame")
+    if reported != frame:
+        raise WireError(
+            _FRAME_MISMATCH,
+            f"{kind} reports frame {reported} inside the sample for frame {frame}; "
+            "the records have been interleaved",
+        )
+
+
 def _close(
-    frame: int, clock_ms: int, credits: int, declared: int, entities: list[Entity]
+    frame: int,
+    clock_ms: int,
+    credits: int,
+    declared_entities: int,
+    declared_pools: int,
+    entities: list[Entity],
+    pools: list[ResourcePool],
 ) -> Sample:
-    """Finish a sample, checking it against its own declared count.
+    """Finish a sample, checking it against its own declared counts.
 
     Args:
         frame: The sample's frame counter.
         clock_ms: The sample's millisecond clock.
-        declared: The entity count the frame record promised.
+        credits: The sample's credit balance.
+        declared_entities: The entity count the frame record promised.
+        declared_pools: The pool count the frame record promised.
         entities: The entity records actually seen.
+        pools: The pool records actually seen.
 
     Returns:
         The completed sample.
 
     Raises:
-        WireError: ``RW-WIRE-003`` when the counts disagree.
+        WireError: ``RW-WIRE-003`` when the entity counts disagree,
+            ``RW-WIRE-005`` when the pool counts do.
     """
-    if len(entities) != declared:
+    if len(entities) != declared_entities:
         raise WireError(
             _COUNT_MISMATCH,
-            f"frame {frame} declared {declared} owned entities but carried "
+            f"frame {frame} declared {declared_entities} visible entities but carried "
             f"{len(entities)}; the capture is truncated or interleaved",
         )
-    return Sample(frame=frame, clock_ms=clock_ms, credits=credits, entities=tuple(entities))
+    if len(pools) != declared_pools:
+        raise WireError(
+            _POOL_COUNT_MISMATCH,
+            f"frame {frame} declared {declared_pools} visible resource pools but carried "
+            f"{len(pools)}; the capture is truncated or interleaved",
+        )
+    return Sample(
+        frame=frame,
+        clock_ms=clock_ms,
+        credits=credits,
+        entities=tuple(entities),
+        pools=tuple(pools),
+    )
 
 
 def encode_sample(sample: Sample) -> tuple[str, ...]:
@@ -226,12 +335,15 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         sample: The sample to encode.
 
     Returns:
-        One frame line followed by one line per entity.
+        One frame line, then one line per entity, then one line per pool — the
+        order the agent writes them in, which is what makes the round trip
+        byte-for-byte rather than merely equivalent.
     """
     frame = sample["frame"]
     lines = [
         f'{{"kind":"{KIND_FRAME}","frame":{frame},'
         f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
+        f'"pools":{len(sample["pools"])},'
         f'"credits":{sample["credits"]}}}'
     ]
     for entity in sample["entities"]:
@@ -243,6 +355,12 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
             f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
             f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r}}}'
+        )
+    for pool in sample["pools"]:
+        lines.append(
+            f'{{"kind":"{KIND_POOL}","frame":{frame},"index":{pool["index"]},'
+            f'"tile_x":{pool["tile_x"]},"tile_y":{pool["tile_y"]},'
+            f'"x":{pool["x"]!r},"y":{pool["y"]!r}}}'
         )
     return tuple(lines)
 
@@ -276,7 +394,9 @@ def _escape(text: str) -> str:
 __all__ = [
     "KIND_ENTITY",
     "KIND_FRAME",
+    "KIND_POOL",
     "Entity",
+    "ResourcePool",
     "Sample",
     "WireError",
     "decode_samples",

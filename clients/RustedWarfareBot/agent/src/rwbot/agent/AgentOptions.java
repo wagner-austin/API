@@ -16,6 +16,7 @@ final class AgentOptions {
     private static final String INSPECT_FIELDS = "inspectFields";
     private static final String FIND_UNDER = "findElementsUnder";
     private static final String STATE_OUT = "stateOutPath";
+    private static final String TYPE_FLAGS_OUT = "typeFlagsPath";
     private static final String ORDER_AT = "orderMoveAtSeconds";
     private static final String ORDER_BY = "orderMoveBy";
     private static final String ORDER_INDEX = "orderMoveUnitIndex";
@@ -28,6 +29,7 @@ final class AgentOptions {
     private final String[] inspectFields;
     private final String findElementsUnder;
     private final String stateOutPath;
+    private final String typeFlagsPath;
     private final int orderMoveAtSeconds;
     private final float[] orderMoveBy;
     private final int orderMoveUnitIndex;
@@ -45,6 +47,7 @@ final class AgentOptions {
             int orderMoveUnitIndex,
             String buildType,
             String stateOutPath,
+            String typeFlagsPath,
             int channelPort,
             int sampleIntervalMs) {
         this.discoverAtSeconds = discoverAtSeconds;
@@ -56,6 +59,7 @@ final class AgentOptions {
         this.orderMoveUnitIndex = orderMoveUnitIndex;
         this.buildType = buildType;
         this.stateOutPath = stateOutPath;
+        this.typeFlagsPath = typeFlagsPath;
         this.channelPort = channelPort;
         this.sampleIntervalMs = sampleIntervalMs;
     }
@@ -158,6 +162,20 @@ final class AgentOptions {
     }
 
     /**
+     * Absolute path the unit-type placement flags are written to, or empty when
+     * not requested.
+     *
+     * <p>Written once, at the first discovery offset, because the answer cannot
+     * change during a match: unit types are loaded with the assets and the mod
+     * set is fixed at boot. Shares the discovery schedule for the same reason
+     * the state dump does -- both need a loaded game and neither needs its own
+     * timer.
+     */
+    String typeFlagsPath() {
+        return typeFlagsPath;
+    }
+
+    /**
      * Engine field names whose elements to expand, in declaration order.
      *
      * <p>A whole-object snapshot reports that a collection holds eleven things;
@@ -217,6 +235,7 @@ final class AgentOptions {
                     0,
                     "",
                     "",
+                    "",
                     0,
                     DEFAULT_SAMPLE_MS);
         }
@@ -226,6 +245,7 @@ final class AgentOptions {
         String[] inspect = new String[0];
         String findUnder = "";
         String stateOut = "";
+        String typeFlagsOut = "";
         int orderAt = 0;
         float[] orderBy = DEFAULT_MOVE_BY.clone();
         int orderIndex = 0;
@@ -255,6 +275,11 @@ final class AgentOptions {
                     throw new IllegalArgumentException(STATE_OUT + " expects a path");
                 }
                 stateOut = value;
+            } else if (TYPE_FLAGS_OUT.equals(key)) {
+                if (value.isEmpty()) {
+                    throw new IllegalArgumentException(TYPE_FLAGS_OUT + " expects a path");
+                }
+                typeFlagsOut = value;
             } else if (FIND_UNDER.equals(key)) {
                 if (value.isEmpty()) {
                     throw new IllegalArgumentException(FIND_UNDER + " expects a package prefix");
@@ -279,6 +304,7 @@ final class AgentOptions {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
                                 + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
+                                + TYPE_FLAGS_OUT + ", "
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
                                 + SAMPLE_MS);
             }
@@ -293,6 +319,7 @@ final class AgentOptions {
                 orderIndex,
                 buildType,
                 stateOut,
+                typeFlagsOut,
                 channelPort,
                 sampleIntervalMs);
     }

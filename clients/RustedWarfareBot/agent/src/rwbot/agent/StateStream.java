@@ -17,10 +17,16 @@ package rwbot.agent;
  * what lets the consumer stay fully typed.
  *
  * <p>Records are discriminated by {@code kind}. A {@code frame} record opens a
- * sample and states how many entity records follow; each {@code entity} record
- * carries one owned entity. Fields are limited to what has been verified
- * against the engine -- frame counter, millisecond clock, class, position --
- * rather than everything reachable.
+ * sample and states how many records of each kind follow; each {@code entity}
+ * record carries one visible entity and each {@code pool} record one visible
+ * resource pool. Fields are limited to what has been verified against the
+ * engine -- frame counter, millisecond clock, class, position -- rather than
+ * everything reachable.
+ *
+ * <p>Pools are terrain rather than units and so appear in no entity list, but
+ * they are carried in the same sample rather than sent once at connect time.
+ * That keeps a sample self-contained, which is what lets a captured session
+ * replay through the planner with nothing else alongside it.
  */
 final class StateStream {
 
@@ -43,19 +49,30 @@ final class StateStream {
     static String sample(Object engine) {
         StringBuilder out = new StringBuilder();
         java.util.List<Object> visible = Perception.visibleEntities(engine);
+        java.util.List<MapTiles.Pool> pools = MapTiles.visiblePools(engine);
         int frame = EngineBindings.readIntField(engine, FRAME_FIELD);
         int clock = EngineBindings.readIntField(engine, CLOCK_FIELD);
 
-        out.append(frameRecord(frame, clock, visible.size(), Perception.creditsOf(engine)))
+        out.append(
+                        frameRecord(
+                                frame,
+                                clock,
+                                visible.size(),
+                                pools.size(),
+                                Perception.creditsOf(engine)))
                 .append('\n');
         for (int index = 0; index < visible.size(); index++) {
             out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
+        }
+        for (int index = 0; index < pools.size(); index++) {
+            out.append(poolRecord(frame, index, pools.get(index))).append('\n');
         }
         return out.toString();
     }
 
     /** Renders the record that opens a sample. */
-    static String frameRecord(int frame, int clockMs, int visibleCount, int credits) {
+    static String frameRecord(
+            int frame, int clockMs, int visibleCount, int poolCount, int credits) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "frame");
@@ -66,7 +83,38 @@ final class StateStream {
         out.append(',');
         appendInt(out, "visible", visibleCount);
         out.append(',');
+        appendInt(out, "pools", poolCount);
+        out.append(',');
         appendInt(out, "credits", credits);
+        out.append('}');
+        return out.toString();
+    }
+
+    /**
+     * Renders one visible resource pool.
+     *
+     * <p>Carries the tile coordinate and the world point at the tile's centre.
+     * The tile coordinate is the pool's identity: it is integral, it never
+     * moves, and it is the unit the engine's own placement check works in. The
+     * world point is what a build order needs, because orders are addressed in
+     * world space.
+     */
+    static String poolRecord(int frame, int index, MapTiles.Pool pool) {
+        StringBuilder out = new StringBuilder();
+        out.append('{');
+        appendString(out, "kind", "pool");
+        out.append(',');
+        appendInt(out, "frame", frame);
+        out.append(',');
+        appendInt(out, "index", index);
+        out.append(',');
+        appendInt(out, "tile_x", pool.tileX());
+        out.append(',');
+        appendInt(out, "tile_y", pool.tileY());
+        out.append(',');
+        appendFloat(out, "x", pool.x());
+        out.append(',');
+        appendFloat(out, "y", pool.y());
         out.append('}');
         return out.toString();
     }

@@ -43,7 +43,8 @@ public final class Premain {
                     options.exitAfterDiscovery(),
                     options.inspectFields(),
                     options.findElementsUnder(),
-                    options.stateOutPath());
+                    options.stateOutPath(),
+                    options.typeFlagsPath());
         }
         if (options.orderRequested()) {
             startOrderProbe(
@@ -71,11 +72,17 @@ public final class Premain {
             boolean exitAfter,
             String[] inspectFields,
             String findElementsUnder,
-            String stateOutPath) {
+            String stateOutPath,
+            String typeFlagsPath) {
         Thread thread =
                 new Thread(
                         () -> {
-                            runDiscovery(atSeconds, inspectFields, findElementsUnder, stateOutPath);
+                            runDiscovery(
+                                    atSeconds,
+                                    inspectFields,
+                                    findElementsUnder,
+                                    stateOutPath,
+                                    typeFlagsPath);
                             if (exitAfter) {
                                 Log.info("discovery complete; halting");
                                 Runtime.getRuntime().halt(0);
@@ -92,8 +99,10 @@ public final class Premain {
             int[] atSeconds,
             String[] inspectFields,
             String findElementsUnder,
-            String stateOutPath) {
+            String stateOutPath,
+            String typeFlagsPath) {
         long started = System.nanoTime();
+        boolean flagsWritten = false;
         for (int second : atSeconds) {
             long targetNanos = started + second * 1_000_000_000L;
             long remaining = targetNanos - System.nanoTime();
@@ -107,15 +116,23 @@ public final class Premain {
                 }
             }
             Object engine = EngineHandle.current();
-            Log.info(Discovery.describe(engine, "t=" + second + "s"));
+            Log.info(Snapshot.describe(engine, "t=" + second + "s"));
             for (String fieldName : inspectFields) {
-                Log.info(Discovery.describeElements(engine, fieldName));
+                Log.info(Snapshot.describeElements(engine, fieldName));
             }
             if (!findElementsUnder.isEmpty()) {
-                Log.info(Discovery.findCollections(engine, findElementsUnder, 4, 20000));
+                Log.info(GraphSearch.findCollections(engine, findElementsUnder, 4, 20000));
             }
             if (!stateOutPath.isEmpty()) {
                 writeSample(engine, stateOutPath);
+            }
+            // Once, not once per offset. The placement flags are fixed for the
+            // life of the process -- unit types load with the assets and the
+            // mod set is decided at boot -- so a second dump could only ever
+            // repeat the first.
+            if (!typeFlagsPath.isEmpty() && !flagsWritten) {
+                writeTypeFlags(typeFlagsPath);
+                flagsWritten = true;
             }
         }
     }
@@ -279,10 +296,63 @@ public final class Premain {
      * @param path Absolute path to append to.
      */
     private static void writeSample(Object engine, String path) {
-        // onGameThread enqueues and returns; it does not run the task. Reading
-        // the result straight after would always see nothing, so the render is
-        // awaited explicitly. The wait is bounded and fails loudly rather than
-        // hanging a probe against a stalled game.
+        String rendered = renderOnGameThread(() -> StateStream.sample(engine), "state sample");
+        if (rendered == null) {
+            Log.error("state sample was not produced");
+            return;
+        }
+        try (java.io.Writer writer =
+                new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(path, true),
+                        java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(rendered);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("rw-agent: cannot append state to " + path, e);
+        }
+        Log.info("state sample appended to " + path);
+    }
+
+    /**
+     * Writes the unit-type placement flags.
+     *
+     * <p>Truncating rather than appending, which is the opposite of the state
+     * stream and deliberate: the stream is a growing corpus of observations,
+     * while this is one complete answer to a question with one answer.
+     * Appending would produce a file with the same types listed twice.
+     *
+     * @param path Absolute path to write.
+     */
+    private static void writeTypeFlags(String path) {
+        String rendered = renderOnGameThread(TypeFlags::dump, "type flags");
+        if (rendered == null) {
+            Log.error("type flags were not produced");
+            return;
+        }
+        try (java.io.Writer writer =
+                new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(path, false),
+                        java.nio.charset.StandardCharsets.UTF_8)) {
+            writer.write(rendered);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("rw-agent: cannot write type flags to " + path, e);
+        }
+        Log.info("type flags written to " + path);
+    }
+
+    /**
+     * Runs a read against the live simulation and returns what it rendered.
+     *
+     * <p>{@code onGameThread} enqueues and returns; it does not run the task.
+     * Reading the result straight after would always see nothing, so the render
+     * is awaited explicitly. The wait is bounded and fails loudly rather than
+     * hanging a probe against a stalled game.
+     *
+     * @param render The read, which runs on the game thread.
+     * @param what Name of the read, for the failure message.
+     * @return What it rendered, or null when it produced nothing.
+     */
+    private static String renderOnGameThread(
+            java.util.function.Supplier<String> render, String what) {
         final java.util.concurrent.atomic.AtomicReference<String> rendered =
                 new java.util.concurrent.atomic.AtomicReference<String>();
         final java.util.concurrent.atomic.AtomicReference<RuntimeException> failure =
@@ -293,7 +363,7 @@ public final class Premain {
         Orders.onGameThread(
                 () -> {
                     try {
-                        rendered.set(StateStream.sample(engine));
+                        rendered.set(render.get());
                     } catch (RuntimeException e) {
                         failure.set(e);
                     } finally {
@@ -306,11 +376,11 @@ public final class Premain {
             completed = done.await(10, java.util.concurrent.TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("rw-agent: interrupted awaiting a state sample", e);
+            throw new IllegalStateException("rw-agent: interrupted awaiting a " + what, e);
         }
         if (!completed) {
             throw new IllegalStateException(
-                    "rw-agent: the game thread did not render a state sample within 10s");
+                    "rw-agent: the game thread did not render a " + what + " within 10s");
         }
         // Carried across the thread boundary rather than swallowed there, so a
         // failure surfaces with its original stack on the probe thread.
@@ -318,18 +388,7 @@ public final class Premain {
         if (thrown != null) {
             throw thrown;
         }
-        if (rendered.get() == null) {
-            Log.error("state sample was not produced");
-            return;
-        }
-        try (java.io.Writer writer =
-                new java.io.OutputStreamWriter(
-                        new java.io.FileOutputStream(path, true),
-                        java.nio.charset.StandardCharsets.UTF_8)) {
-            writer.write(rendered.get());
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("rw-agent: cannot append state to " + path, e);
-        }
-        Log.info("state sample appended to " + path);
+        return rendered.get();
     }
+
 }

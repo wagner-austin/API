@@ -38,8 +38,24 @@ final class EngineBindings {
     /** The unit-type interface a placement command carries. */
     static final String TYPE_CLASS = "com.corrodinggames.rts.game.units.as";
 
-    /** Holds the by-name unit-type lookup. */
+    /** Holds the by-name unit-type lookup. Also the built-in unit-type enum. */
     static final String TYPE_REGISTRY_CLASS = "com.corrodinggames.rts.game.units.ar";
+
+    /**
+     * An asset-defined unit type, as opposed to a built-in enum constant.
+     *
+     * <p>Most of what the game ships is defined this way: {@code assets/units/}
+     * holds an {@code .ini} per unit and the loader turns each into one of
+     * these. Both kinds implement {@link #TYPE_CLASS}, so once enumerated they
+     * are read identically.
+     */
+    static final String CUSTOM_TYPE_CLASS = "com.corrodinggames.rts.game.units.custom.l";
+
+    /** The map: terrain grid, tile layers, and the per-tile fog test. */
+    static final String MAP_CLASS = "com.corrodinggames.rts.game.b.b";
+
+    /** One map tile, carrying the flags its tileset declared. */
+    static final String TILE_CLASS = "com.corrodinggames.rts.game.b.g";
 
     /** Static master entity list on the entity base class; holds units and trees alike. */
     static final String ENTITY_LIST = "bE";
@@ -89,6 +105,61 @@ final class EngineBindings {
 
     /** Unit-type accessor returning its readable name. */
     static final String TYPE_NAME_ACCESSOR = "i";
+
+    /**
+     * Unit-type predicate: true when the type may only be placed on a resource
+     * pool.
+     *
+     * <p>This is the engine's own placement rule, not a reading of the unit's
+     * blurb. The chain is: an {@code .ini} declares
+     * {@code placeOnlyOnResPool: true}, the loader stores it, this accessor
+     * reports it, and the placement check consults it before anything else
+     * (wiki: mechanics-resource-pools).
+     */
+    static final String TYPE_NEEDS_POOL = "p";
+
+    /** The engine's map instance. */
+    static final String MAP = "bL";
+
+    /** Map size in tiles. Positions are world units; these are not. */
+    static final String MAP_TILES_X = "C";
+
+    static final String MAP_TILES_Y = "D";
+
+    /** Tile size in world units. 20 on desktop, and read rather than assumed. */
+    static final String TILE_WIDTH = "n";
+
+    static final String TILE_HEIGHT = "o";
+
+    /** Offset from a tile's origin to its centre, which is where a building goes. */
+    static final String TILE_CENTRE_X = "p";
+
+    static final String TILE_CENTRE_Y = "q";
+
+    /**
+     * Map accessor returning the item-layer tile at a tile coordinate.
+     *
+     * <p>The item layer, not the ground layer: resource pools are items. This
+     * is the same accessor the engine's own extractor-placement check calls,
+     * which is why it is this one and not the ground-layer sibling.
+     */
+    static final String TILE_AT = "e";
+
+    /**
+     * The engine's per-tile fog test, {@code b.a(int, int, n)}.
+     *
+     * <p>The tile counterpart of {@link #VISIBLE_TO}, and the same predicate:
+     * the entity test converts a position to a tile and applies exactly this
+     * comparison against the asking player's fog grid. Using it is what stops
+     * the bot reading pools through fog it has not lifted.
+     */
+    static final String TILE_VISIBLE_TO = "a";
+
+    /** Tile flag set by the tileset property {@code res_pool}. */
+    static final String TILE_IS_POOL = "i";
+
+    /** Static list of every asset-defined unit type. */
+    static final String CUSTOM_TYPE_LIST = "d";
 
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 
@@ -209,6 +280,22 @@ final class EngineBindings {
         }
     }
 
+    /**
+     * Reads a {@code boolean} field through the same pinned-name machinery.
+     *
+     * @param target Object to read from.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @return The field value.
+     * @throws IllegalStateException When the field is absent or not a boolean.
+     */
+    static boolean readBooleanField(Object target, String name) {
+        try {
+            return pinnedField(target.getClass(), name).getBoolean(target);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException("rw-agent: cannot read boolean " + name + PIN, e);
+        }
+    }
+
     static float readFloat(Object target, String name) {
         try {
             return pinnedField(target.getClass(), name).getFloat(target);
@@ -293,6 +380,34 @@ final class EngineBindings {
         }
         if (command != null && type != null) {
             checkMethod(command, "a", problems, float.class, float.class, type, int.class);
+        }
+
+        Class<?> map = checkClass(MAP_CLASS, problems);
+        Class<?> tile = checkClass(TILE_CLASS, problems);
+        Class<?> customType = checkClass(CUSTOM_TYPE_CLASS, problems);
+        if (map != null) {
+            checkField(map, MAP_TILES_X, problems);
+            checkField(map, MAP_TILES_Y, problems);
+            checkField(map, TILE_WIDTH, problems);
+            checkField(map, TILE_HEIGHT, problems);
+            checkField(map, TILE_CENTRE_X, problems);
+            checkField(map, TILE_CENTRE_Y, problems);
+            checkMethod(map, TILE_AT, problems, int.class, int.class);
+        }
+        if (map != null && team != null) {
+            // The tile fog test. Losing this name has the same shape of
+            // consequence as losing the entity one: not a crash, but a bot that
+            // reads resource pools through fog it never lifted.
+            checkMethod(map, TILE_VISIBLE_TO, problems, int.class, int.class, team);
+        }
+        if (tile != null) {
+            checkField(tile, TILE_IS_POOL, problems);
+        }
+        if (type != null) {
+            checkMethod(type, TYPE_NEEDS_POOL, problems);
+        }
+        if (customType != null) {
+            checkField(customType, CUSTOM_TYPE_LIST, problems);
         }
         return problems;
     }

@@ -23,7 +23,7 @@ final class WireChecks {
     static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3, 4000);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 4000);
         // Pinned byte-for-byte on purpose. This is a wire contract, and the
         // consumer parses it strictly, so a field appearing, vanishing or being
         // renamed must fail here rather than at the far end of a socket. That
@@ -32,8 +32,35 @@ final class WireChecks {
         failures += Check.expect(
                 frame.equals(
                         "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
-                                + "\"visible\":3,\"credits\":4000}"),
+                                + "\"visible\":3,\"pools\":2,\"credits\":4000}"),
                 "frame record is exact");
+
+        // Pinned for the same reason, and separately: the consumer counts these
+        // off the frame record, so the two must agree about what a sample
+        // contains.
+        String pool = StateStream.poolRecord(1918, 0, new MapTiles.Pool(115, 6, 2310.0f, 130.0f));
+        failures += Check.expect(
+                pool.equals(
+                        "{\"kind\":\"pool\",\"frame\":1918,\"index\":0,\"tile_x\":115,"
+                                + "\"tile_y\":6,\"x\":2310.0,\"y\":130.0}"),
+                "pool record is exact");
+        failures += Check.expect(
+                pool.indexOf(10) < 0 && pool.indexOf(13) < 0,
+                "a pool record never contains a newline");
+
+        // The placement flags are a separate stream with the same constraint.
+        failures += Check.expect(
+                TypeFlags.record(4, "extractorT1", true)
+                        .equals(
+                                "{\"kind\":\"unittype\",\"index\":4,\"name\":\"extractorT1\","
+                                        + "\"needs_pool\":true}"),
+                "unit-type record is exact");
+        failures += Check.expect(
+                TypeFlags.record(0, "landFactory", false).endsWith("\"needs_pool\":false}"),
+                "a type that needs no pool says so rather than being omitted");
+        failures += Check.expect(
+                TypeFlags.record(0, "a\"b", false).contains("\"name\":\"a\\\"b\""),
+                "a quote in a mod's type name is escaped");
 
         // The consumer splits on newlines before parsing, so a newline inside
         // a record would silently become two malformed ones. Code points
@@ -46,8 +73,11 @@ final class WireChecks {
                 "a record is exactly one object");
 
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0).contains("\"visible\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
+        failures += Check.expect(
+                StateStream.frameRecord(0, 0, 0, 0, 0).contains("\"pools\":0"),
+                "a map with no pool in sight is still a record");
         return failures;
     }
 

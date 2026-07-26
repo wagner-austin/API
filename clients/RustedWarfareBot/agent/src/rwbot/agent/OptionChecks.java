@@ -57,6 +57,14 @@ final class OptionChecks {
         float[] moveBy = AgentOptions.parse("orderMoveBy=300,-40").orderMoveBy();
         failures += Check.expect(
                 moveBy[0] == 300.0f && moveBy[1] == -40.0f, "orderMoveBy parsed as x,y");
+        failures += Check.expect(
+                AgentOptions.parse("discoverAtSeconds=5").typeFlagsPath().isEmpty(),
+                "typeFlagsPath defaults empty");
+        failures += Check.expect(
+                "C:/flags.ndjson".equals(
+                        AgentOptions.parse("typeFlagsPath=C:/flags.ndjson").typeFlagsPath()),
+                "typeFlagsPath parsed");
+        failures += expectRejected("typeFlagsPath=", "blank type-flags path");
         failures += expectRejected("orderMoveAtSeconds=0", "zero order time");
         failures += expectRejected("orderMoveUnitIndex=-1", "negative roster index");
         failures += expectRejected("orderMoveBy=300", "one-component offset");

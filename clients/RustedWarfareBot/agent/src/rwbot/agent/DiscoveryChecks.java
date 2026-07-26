@@ -17,9 +17,9 @@ final class DiscoveryChecks {
     /** Exercises the reflective snapshot against an object whose shape is known here. */
     static int checkDiscovery() {
         int failures = 0;
-        failures += Check.expect(Discovery.describe(null, "t=0s").contains("target is null"), "null target");
+        failures += Check.expect(Snapshot.describe(null, "t=0s").contains("target is null"), "null target");
 
-        String report = Discovery.describe(new DiscoverySample(), "t=1s");
+        String report = Snapshot.describe(new DiscoverySample(), "t=1s");
         failures += Check.expect(report.contains("=== discovery t=1s ==="), "snapshot is labelled");
         failures += Check.expect(report.contains("DiscoverySample"), "declaring class named");
         failures += Check.expect(report.contains("size=3"), "collection size reported");
@@ -31,19 +31,19 @@ final class DiscoveryChecks {
 
         DiscoverySample sample = new DiscoverySample();
         failures += Check.expect(
-                Discovery.describeElements(null, "names").contains("target is null"),
+                Snapshot.describeElements(null, "names").contains("target is null"),
                 "element expansion handles a null target");
         failures += Check.expect(
-                Discovery.describeElements(sample, "nope").contains("no field named nope"),
+                Snapshot.describeElements(sample, "nope").contains("no field named nope"),
                 "element expansion names an absent field");
         failures += Check.expect(
-                Discovery.describeElements(sample, "text").contains("not a collection"),
+                Snapshot.describeElements(sample, "text").contains("not a collection"),
                 "element expansion rejects a non-collection");
         failures += Check.expect(
-                Discovery.describeElements(sample, "absent").contains("field is null"),
+                Snapshot.describeElements(sample, "absent").contains("field is null"),
                 "element expansion handles a null field");
 
-        String elements = Discovery.describeElements(sample, "names");
+        String elements = Snapshot.describeElements(sample, "names");
         failures += Check.expect(elements.contains("[0] java.lang.String"), "elements indexed and typed");
         failures += Check.expect(elements.contains("[2] "), "every element expanded");
         failures += Check.expect(
@@ -52,7 +52,7 @@ final class DiscoveryChecks {
 
         // A subclass whose identifying state lives on its base must not read as
         // featureless -- the failure mode that sold an earlier wrong finding.
-        String inherited = Discovery.describeElements(new SubclassHolder(), "items");
+        String inherited = Snapshot.describeElements(new SubclassHolder(), "items");
         failures += Check.expect(inherited.contains("ownField"), "element's own field listed");
         failures += Check.expect(inherited.contains("baseField"), "element's INHERITED field listed");
 
@@ -61,32 +61,32 @@ final class DiscoveryChecks {
         // list type extends AbstractList -- so a game object's JDK superclass is
         // the common case, not an edge one. Reflecting its internals warns on
         // JDK 13 and is denied later.
-        String overJdk = Discovery.describe(new ExtendsPlatform(), "t=2s");
+        String overJdk = Snapshot.describe(new ExtendsPlatform(), "t=2s");
         failures += Check.expect(overJdk.contains("gameField"), "own field listed over a JDK base");
         failures += Check.expect(!overJdk.contains("priority"), "JDK superclass field NOT reflected");
         failures += Check.expect(!overJdk.contains("eetop"), "JDK superclass internals NOT reflected");
 
         String overJdkGraph =
-                Discovery.findCollections(new ExtendsPlatformHolder(), "java.lang.String", 4, 500);
+                GraphSearch.findCollections(new ExtendsPlatformHolder(), "java.lang.String", 4, 500);
         failures += Check.expect(
                 !overJdkGraph.contains(".eetop") && !overJdkGraph.contains(".priority"),
                 "graph search does not climb into a JDK superclass");
 
         failures += Check.expect(
-                Discovery.findCollections(null, "com.x", 3, 100).contains("root is null"),
+                GraphSearch.findCollections(null, "com.x", 3, 100).contains("root is null"),
                 "graph search handles a null root");
-        String found = Discovery.findCollections(sample, "java.lang.String", 3, 500);
+        String found = GraphSearch.findCollections(sample, "java.lang.String", 3, 500);
         failures += Check.expect(found.contains(".names"), "graph search finds a matching collection");
         failures += Check.expect(found.contains("visited "), "graph search reports its budget");
         failures += Check.expect(
-                !Discovery.findCollections(sample, "no.such.pkg", 3, 500).contains(".names"),
+                !GraphSearch.findCollections(sample, "no.such.pkg", 3, 500).contains(".names"),
                 "graph search filters by element package");
 
         // A container must be traversed by its elements, never by its declared
         // fields. Reflecting into java.util internals warns on JDK 13 and is
         // denied in later releases, so these names appearing in a path would be
         // a regression to a route that stops working rather than a style point.
-        String deep = Discovery.findCollections(new NestedSample(), "java.lang.String", 4, 500);
+        String deep = GraphSearch.findCollections(new NestedSample(), "java.lang.String", 4, 500);
         failures += Check.expect(
                 deep.contains(".holder[0].tag"),
                 "graph search descends through a collection by element index");
