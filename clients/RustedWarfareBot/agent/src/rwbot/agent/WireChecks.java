@@ -38,11 +38,11 @@ final class WireChecks {
         // Pinned for the same reason, and separately: the consumer counts these
         // off the frame record, so the two must agree about what a sample
         // contains.
-        String pool = StateStream.poolRecord(1918, 0, new MapTiles.Pool(115, 6, 2310.0f, 130.0f));
+        String pool = StateStream.poolRecord(1918, 0, new MapTiles.Pool(115, 6, 2310.0f, 130.0f), 4);
         failures += Check.expect(
                 pool.equals(
                         "{\"kind\":\"pool\",\"frame\":1918,\"index\":0,\"tile_x\":115,"
-                                + "\"tile_y\":6,\"x\":2310.0,\"y\":130.0}"),
+                                + "\"tile_y\":6,\"x\":2310.0,\"y\":130.0,\"group_land\":4}"),
                 "pool record is exact");
         failures += Check.expect(
                 pool.indexOf(10) < 0 && pool.indexOf(13) < 0,

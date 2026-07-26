@@ -381,3 +381,77 @@ The run also exposed a defect that was invisible while the army died early: 743 
 Also written: `policy-combat`, which two committed source comments already referenced as `(wiki: policy-combat)` before the page existed. That dangling reference was mine, from the previous commit.
 
 make check green: guard 0 violations, ruff + mypy clean, 422 tests, 100% statements and branches, agent-selftest OK.
+
+## [2026-07-26] research | a probe for the opposing AI's zones, built so the planner cannot use it
+Artifacts: `wiki/sources/m15-ai-zones/zone-dump.txt` (75, distilled from a 4,601-line run); new page `engine-ai-probe`
+
+Notes: both AI pages were `medium` for the same reason -- the constants were read from the decompile and never watched. Watching them means reading the opposing AI's zone objects, which is trivially possible and would be cheating if the planner ever saw it. So the probe exists and the constraints are the design.
+
+Three reasons the planner must never see it, in increasing order of weight. A zone is intent rather than observation -- where the AI plans to expand, how big a group must be before it commits -- and a human infers that from units instead, so there is no observable counterpart to launder it through. Zones carry no visibility model at all: every entity has the engine's own per-player fog test, and the zone base class has containment and distance helpers and nothing resembling one, so reading zones does not stretch the fog rule but steps around it. And it would not work anyway -- zones exist only on AI players, the local human is constructed as a different subclass entirely, so a policy resting on this would beat the shipped AI and silently do nothing against a person. That is the objection that matters: not that it is unsporting, but that it produces a bot which cannot be evaluated against anything but itself.
+
+Discipline is not a mechanism, so the separation is structural. The dump goes to the agent log and the planner reads the NDJSON stream and nothing else, so the Python side cannot consume it -- not does not, cannot; wiring it in would need a record kind, a decoder and a validator, which is a diff rather than a slip. And it is a boolean option defaulting off, with a self-check asserting the default, so an archived capture cannot quietly contain it.
+
+Two choices inside the probe earned themselves immediately. Players are reached through the entities they own rather than through the engine's player table, which held the new pinned surface to three names. And fields are rendered generically rather than by pinned name -- for a probe whose job is to confirm what the obfuscated letters mean, a dump that applied the current reading could only ever agree with it.
+
+Which is how the first run caught a wrong claim. Four AI players at 40, 90 and 150 seconds: radii confirmed at 420 and 360, expansion zones confirmed arriving over time on the cooldown path rather than at bootstrap -- so the dead one-shot bootstrap really does cost nothing -- and the capacity ratio confirmed bounded in [0,1], which had been the shakiest inference on the page. The unit budget turned out to start at -1.0 and range negative, which the source reading missed: it is a debt-then-credit counter, not a stock. And the reading that a shipped AI opens with an attack group of three is **not supported** -- every attack group observed targets five, from the first sample on. That is marked unsupported rather than quietly corrected, because the branch selecting 3 is really in the source and the discrepancy is unexplained.
+
+Still unobserved: the third zone kind at radius 310 never appeared in 150 seconds, and no group reached its target size, so staging, the damage abort and the 17,000 timeout remain source-only. One limitation of the probe itself -- enum fields render as their class name, because the shared renderer deliberately calls toString on nothing but strings, primitives and wrappers, so the zone state the AI's own overlay prints by name still cannot be read from a dump. Naming enum constants is safe and is the next change to it.
+
+agent-selftest green: bindings resolve including the three new names, and the option checks cover the default-off case. Python untouched.
+
+## [2026-07-26] policy | target commitment, a Makefile target for playing, and a variance lesson
+Artifacts: `wiki/sources/m15-production/` — `target-churn.txt` (33), `committed-run.log`
+
+Notes: prompted by a fair question -- how come ours seems dumb? The answer was not that we needed to read more of the opponents' code. We already had the operative fact. Ours was dumb architecturally: the combat policy was a pure function of one sample with no memory, so it recomputed "nearest enemy to the army centre" every observation and never committed to anything. Their AI holds a target in a group object. The mistake was mine and it was conceptual -- I had conflated *pure* with *stateless*, when the build loop next door had been passing its own prior progress in as an argument all along.
+
+Fix: the previously chosen target is an argument to `choose_target`, kept while it remains visible and hostile. Re-orders per attacking unit fell from 15.5 to between 2.2 and 5.9 across two runs.
+
+The outcome did not follow, and that is the more useful finding. Two runs of identical code gave army 4 -> 0 at 1013 samples and army 4 -> 7 over the full 1500 -- the worst and the best the bot has produced. The opponents' unit mix is weighted-random by construction, so no two runs are the same experiment. Two runs cannot separate a regression from noise, and the page says so rather than picking whichever run flattered the change. The churn claim stands because it is a direct consequence of the change and holds in both runs.
+
+Also added: `make play`. Every live run so far has been a hand-assembled PowerShell incantation, and one of them quietly reintroduced a bug `make agent` had already fixed -- writing the jar in place while a game held it open. The target builds a per-invocation jar and deliberately does not depend on `agent`, because a jar held by any running game cannot be replaced, including one started by another agent in the same tree.
+
+Two bugs found while writing it, both worth recording. `PLAY_PORT ?= $(shell ...)` is recursively expanded, so the random port was regenerated on every reference: the game bound one port, the readiness poll watched a second, the planner dialled a third, and the failure message named a fourth. `:=` expands once and fixes it. And Windows will not let a jar be replaced while a JVM has it attached, which is why the per-invocation build is not merely tidy.
+
+make check green: guard 0 violations, ruff + mypy clean, 426 tests, 100% statements and branches, agent-selftest OK.
+
+## [2026-07-26] research | the probe corrects itself twice, and every enum in the jar turns out to name itself
+Artifacts: `wiki/sources/m15-ai-zones/zone-dump-330s.txt` (74), `wiki/sources/m16-enums/enum-names.txt` (69, regenerable from the jar alone)
+
+Notes: two things the probe reported that nobody asked it for changed conclusions, which is the argument for dumping every field rather than the ones the pages care about.
+
+The first was a retraction that was itself wrong. Yesterday's dump showed every attack-flagged group targeting five where the source says the first wave is three, and the triggers page recorded the escalation ladder as unsupported. The dump also carried `B`, a flag no page mentioned: every one of those groups had it set, and it marks a sea group, whose target is five by a different branch entirely -- and this map is a water map. A longer run to 330 seconds caught the real thing, a fourth group appearing with A=3, h=true, B=false. A probe rendering only the fields the pages cared about would have shown two indistinguishable fives and left a correct claim retracted. The trace of that mistake is kept on the page rather than tidied away.
+
+The second: the unit-production accumulator initialises to -1.0 and ranges negative, so it is a debt counter rather than a stock. A new zone owes a unit's worth of accumulation before it may make anything. The source reading had it filling toward a cap.
+
+Then the enum rendering, which started as a probe limitation and ended somewhere much larger. The renderer printed enums as their class, losing the values; it now calls Enum.name(), which is safe under the rule it sits beside -- name() is final on java.lang.Enum and returns a stored string, so no engine code runs on the probe thread. The zone state and kind immediately read as words.
+
+They read as words because **ProGuard renamed the enum fields and left the constant name strings alone**. The decompile shows `enum j { a, b, c; }`; the bytecode still carries `Pre`, `Prepare`, `Active`. That is a second naming oracle for the whole jar, needing no running game and no decompiler -- `javap -p -c | grep '// String '` recovers the constants of all 53 game enums, and the sweep is archived.
+
+Several are worth more than the class names the oracle page was originally written about. `units.ao` is `NONE LAND BUILDING AIR WATER HOVER OVER_CLIFF OVER_CLIFF_WATER` -- the movement-layer model that mechanics-resource-pools records as the missing half of the reachability problem, sitting in the jar the whole time. `units.av` is the complete order vocabulary, seventeen verbs. `units.a` is the attack stances. `units.a.t` and `a.u` are the action taxonomy behind the two build verbs.
+
+For the AI specifically: kind is `Main`, `ResourceOutpost`, `ForwardOutpost`, and state is `Pre`, `Prepare`, `Active`. So the radius-360 expansions are resource outposts by the engine's own name, and the unobserved radius-310 third kind is a forward outpost -- which explains why it is sited from a unit rather than a map point and screened by an aggressive filter rather than an economic one. Observed lifecycle: a fresh outpost reads Pre and an established one Active; Prepare has not been caught.
+
+The general rule this leaves: before inferring what an obfuscated enum means, check whether the value already says. Between the constant strings and the debug-overlay literals, most of what the engine calls its own concepts is recoverable without guessing.
+
+make check green: 426 tests, 100% statements and branches, guard 0 violations, agent-selftest passing with enum rendering covered.
+
+## [2026-07-26] mechanics | reachability closes, and it was a comparison rather than a search
+Artifacts: `wiki/sources/m17-movement/reachability.txt` (regenerable from the archived capture); `wiki/sources/m6-wire/world-sample.ndjson` recaptured (564, entity records now carry `movement` and `group`, pool records `group_land`); new page `mechanics-movement-layers`
+
+Notes: the pool selector knew how far a pool was and who could shoot the way there, and had no idea whether the builder could get there. The pools page recorded that as wanting "a movement-layer model the planner does not have". It was in the jar.
+
+`units.ao` is NONE, LAND, BUILDING, AIR, WATER, HOVER, OVER_CLIFF, OVER_CLIFF_WATER -- recovered through the enum-name oracle, since the decompile shows only a..h. And the engine precomputes connected components per layer, so its own reachability predicate, which names itself pathPossible in a log line, is: air and none answer true unconditionally, everything else compares two component ids for equality. Exact, free, and the same answer its AI uses to decide whether a group can reach a target.
+
+Negatives are not ids: -1 impassable, -2 off the map, -3 grids never built. The engine rejects the first two then compares, which leaves a hole -- two -3s compare equal and answer true. The bot rejects every negative, which is more conservative and costs at most a site it might have allowed.
+
+One thing nearly sank it. The first capture read group_land -1 for **all forty-six** pools: a resource-pool tile is not walkable ground, so taken literally every pool was unreachable and the economy would have stopped dead. What matters is whether a builder can stand beside it, so the four neighbouring tiles are sampled when the centre has none -- which is exactly what the engine's own AI does for the same reason, testing a zone centre and then four points around it. Tile step read from the map, not assumed.
+
+With that, the map has something worth knowing: 34 of the 46 pools are in component 1, the mainland, and the other 12 sit in six two-pool components -- six island pairs on a symmetric ten-player map -- that no land unit can walk to. So the filter is not theoretical. Distance-only selection would have aimed a builder at one of those twelve as soon as the near ground filled.
+
+Two sentinels confirmed themselves from units whose situation was already known. The Command Center reads NONE / -3: a building does not move, so no layer grid covers it. The map editor's placeholder, parked at (-1000, -1000), reads LAND / -2 -- precisely the off-map sentinel, from the one unit independently known to be off the map.
+
+The land framing is deliberate and named in the field. A builder that does not travel on land is not judged at all rather than judged wrongly: its component indexes a different grid, so the comparison would be a confident wrong answer. Occupancy and threat still apply to it.
+
+Two defects found on the way, both in shared files. `make wire-capture` and every other probe target had been failing with "unknown agent option discoverAtSeconds": a new option was added by opening a second if/else chain below the first, so every key handled by the first half fell through to the second half's else. Only typeFlagsPath escaped, by a `continue`. Merged back into one chain, with a self-check that parses an early key alongside a late one. And the pool record renderer had started reaching for a live engine, which broke the wire self-checks that exercise these shapes without a game; connectivity is passed in as an argument now.
+
+make check green: 430 tests, 100% statements and branches, guard 0 violations, agent-selftest passing.

@@ -7,6 +7,8 @@ related:
   - "[[policy-loop]]"
   - "[[engine-entity-model]]"
   - "[[building-structures]]"
+  - "[[engine-ai-probe]]"
+  - "[[engine-name-oracle]]"
 source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/o.java"
   - "runs/decompiled/com/corrodinggames/rts/game/a/h.java"
@@ -20,6 +22,9 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/l.java:71"
   - "runs/decompiled/com/corrodinggames/rts/game/a/n.java:80"
   - "runs/decompiled/com/corrodinggames/rts/game/b/e.java:92"
+  - "wiki/sources/m15-ai-zones/zone-dump.txt"
+  - "wiki/sources/m15-ai-zones/zone-dump-330s.txt"
+  - "wiki/sources/m16-enums/enum-names.txt"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-26"
 confidence: medium
@@ -111,7 +116,30 @@ The reason it does not matter is that it is a vestigial bootstrap, not the expan
 
 And `an()` draws **a resource pool uniformly at random** from the same map list.[^16] So the AI does expand onto pools; it just gets there by the live path rather than the dead one. Worth noting for our own purposes: the class also carries a nearest-pool-to-a-point helper right beside it, and the expansion path does not use it. The AI expands at random and relies on the viability filter to reject bad draws.
 
-This correction is why the page is `medium` rather than `high`. The unreachability claim is narrow and static-verifiable — one flag, one write, one read. The cooldown figures and the caps are read but unobserved, and confirming them means watching an opponent's zone list over a live game, which the agent cannot do today: it reads its own team, not another player's AI object.
+The unreachability claim is narrow and static-verifiable — one flag, one write, one read. The rest has now been watched directly.
+
+## Watched live
+
+A probe dumps every zone of every AI player to the agent log ([[engine-ai-probe]]). It is an instrument and never touches the wire, for reasons that page sets out. Sampling four AI players at 40, 90 and 150 seconds:[^17]
+
+The **radii are exactly as read**: one zone at 420 per player, and 360 for every later one. The expansion path is unambiguously live — at 40s each player holds only its home zone; by 90s one 360 zone has appeared; by 150s there are three, with ids 13, 17 and 24 climbing the same counter. That settles it: the dead bootstrap costs nothing, because expansions arrive on the cooldown path instead.
+
+The **capacity ratio is real and bounded in [0, 1]**, which was the shakiest inference on this page. The home zone reads 0.55, 0.8 and 0.39 across the three samples; every fresh expansion reads 0.0.
+
+The **build delay confirms the capacity penalties** by arithmetic. Fresh expansions sit at capacity 0.0, which should attract both +180 penalties on top of a ~270 reset, and the observed values top out at 643, 639, 568 and 557 — a ~630 ceiling, where the unpenalised reset alone would cap near 285.
+
+One thing this run did **not** show: the third zone kind at radius 310 never appeared in 150 seconds, so its cap and cooldown remain unobserved.
+
+### The states and kinds have names
+
+The enums looked obfuscated — the decompile shows `enum j { a, b, c; }` — but only their *fields* were renamed. The constant name strings survived in the bytecode and `javap` reads them straight out ([[engine-name-oracle]]):[^18]
+
+- **kind** is `Main`, `ResourceOutpost`, `ForwardOutpost`
+- **state** is `Pre`, `Prepare`, `Active`
+
+So the engine's own vocabulary confirms the reading and improves on it. The radius-420 home zone is `Main`; every radius-360 expansion is a `ResourceOutpost`, which settles what the pool-sited expansions are *for*; and the unobserved radius-310 third kind is a **`ForwardOutpost`** — an aggressive forward position, which explains why it is sited from a unit rather than a map point and screened by a different filter than the economic one.
+
+The lifecycle is visible too. A freshly claimed outpost reads `Pre`, and by the next sample an established one reads `Active`.[^19] `Prepare` sits between them and has not been caught.
 
 ## The other three
 
@@ -155,3 +183,6 @@ And the cold-start reading above needs a live observation before it is a finding
 [^14]: `runs/decompiled/com/corrodinggames/rts/game/a/l.java:71` — `this.c((am)y2) < 3600.0f`, a squared distance, so 60 world units; the self-delete at `:77`.
 [^15]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1189`–`1216` for the radius-360 expansion path, gated on a timer decayed each tick and capped by a count of zones in the claiming state, and `:1217`–`1241` for the radius-310 path, capped at three and screened by a different point filter than [^12].
 [^16]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:529` — `an()` returns `A.get(f.c(A.size()))` converted to world coordinates: a uniform random draw from the resource-pool list. The nearest-pool helper `a(float,float)` sits at `:541` and is not called by either expansion path.
+[^17]: `wiki/sources/m15-ai-zones/zone-dump.txt` — four AI players sampled at 40, 90 and 150 seconds of a headless sandbox run, distilled from a 4,600-line dump of every declared field of every zone.
+[^18]: `wiki/sources/m16-enums/enum-names.txt` — `com.corrodinggames.rts.game.a.j = Pre Prepare Active` and `com.corrodinggames.rts.game.a.k = Main ResourceOutpost ForwardOutpost`, read from each class's `<clinit>` with `javap`.
+[^19]: `wiki/sources/m15-ai-zones/zone-dump-330s.txt` — at 180s one player holds a 360 zone at `j.Pre` and another at `j.Active`, both `k.ResourceOutpost`, against its 420 `k.Main`.

@@ -195,6 +195,14 @@ final class ObjectView {
         if (value instanceof Number || value instanceof Boolean || value instanceof Character) {
             return value.toString();
         }
+        // Enums by constant name. This does not break the no-engine-toString
+        // rule: Enum.name() is final on java.lang.Enum and returns the stored
+        // constant name, so no engine code runs. Without it a state field
+        // renders as its class and the value -- the whole point of reading it
+        // -- is lost, which is exactly what the first AI zone dump hit.
+        if (value instanceof Enum) {
+            return value.getClass().getSimpleName() + "." + ((Enum<?>) value).name();
+        }
         if (value instanceof java.util.Collection) {
             java.util.Collection<?> collection = (java.util.Collection<?>) value;
             return value.getClass().getSimpleName() + " size=" + collection.size() + firstElement(collection);

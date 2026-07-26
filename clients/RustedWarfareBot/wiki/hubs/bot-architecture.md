@@ -25,3 +25,5 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership
 [How the Built-in AI Plays](../pages/ai-opponent-strategy.md) -- what the bot is losing to, read from the jar rather than reasoned about
 [Fighting: the Attack Verb, and Keeping an Army Alive](../pages/policy-combat.md) -- how the bot attacks, why it reinforces, and the target churn that is left
+[The AI Zone Probe, and Why It Is Not Perception](../pages/engine-ai-probe.md) -- reading the opposing AI's plans is research, never perception: why, and the two structural guarantees that keep it that way
+[Movement Layers and Reachability](../pages/mechanics-movement-layers.md) -- eight layers named by the engine, reachability as a component comparison, and the twelve pools no land builder can reach

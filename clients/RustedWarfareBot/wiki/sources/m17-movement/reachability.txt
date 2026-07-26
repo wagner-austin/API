@@ -1,0 +1,34 @@
+Land connectivity of the archived map's resource pools
+=====================================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28), map [z;p10]Crossing Large (10p).
+Derived from wiki/sources/m6-wire/world-sample.ndjson, which carries the
+engine's own connectivity component per entity and per pool. Regenerable from
+that capture alone -- no running game.
+
+The engine precomputes connected components per movement layer and reduces
+reachability to comparing two component ids. Negative ids are not ids: -1 is
+impassable, -2 is off the map, -3 is 'the grids were never built for this
+layer'.
+
+builder movement=LAND group=1
+pools by land component: 1:34, 16:2, 17:2, 18:2, 19:2, 22:2, 24:2
+reachable by this builder: 34/46
+cut off: (115, 6), (133, 18), (90, 40), (102, 46), (142, 60), (133, 65), (90, 158), (101, 165), (143, 187), (135, 191), (98, 217), (84, 223)
+  owned commandCenter    movement=NONE     group=-3
+  owned builder          movement=LAND     group=1
+  owned editorOrBuilder  movement=LAND     group=-2
+
+Reading:
+
+Twelve of the forty-six pools sit in six two-pool components the mainland
+cannot walk to. On a symmetric ten-player map that reads as six island pairs.
+Distance-only selection would have sent a land builder at one of them as soon
+as the near ground filled up, and the order would have been accepted and never
+completed.
+
+Two independent confirmations of the sentinel meanings fall out of the same
+sample. The Command Center reports movement NONE and group -3: a building does
+not move, so no layer grid covers it. The map editor's placeholder is parked at
+(-1000, -1000) and reports LAND with group -2 -- exactly the off-map sentinel,
+from a unit independently known to be off the map.

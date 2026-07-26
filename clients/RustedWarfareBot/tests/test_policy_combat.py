@@ -78,6 +78,8 @@ def _entity(
         team=0 if mine else 1,
         mine=mine,
         hostile=hostile,
+        movement="LAND",
+        group=1,
         hp=100.0,
         max_hp=100.0,
         complete=complete,
@@ -164,6 +166,37 @@ def test_the_target_is_nearest_to_the_army_not_to_one_unit() -> None:
     near_to_one = _entity(9, "c_tank", 0.0, 400.0, mine=False, hostile=True)
     near_to_centre = _entity(10, "c_tank", 500.0, 0.0, mine=False, hostile=True)
     assert choose_target(army, (near_to_one, near_to_centre)) == near_to_centre
+
+
+def test_the_current_target_is_kept_while_it_lives() -> None:
+    """Commitment, and the whole reason the churn happened.
+
+    Nearest is measured from the army centre, and that centre shifts whenever a
+    unit dies or a new one rolls out. Re-choosing every sample re-tasked the
+    whole army on a flip that could be a few world units wide.
+    """
+    held = _entity(9, "c_tank", 900.0, 0.0, mine=False, hostile=True)
+    nearer = _entity(10, "c_tank", 10.0, 0.0, mine=False, hostile=True)
+    army = (_entity(1, "c_tank", 0.0, 0.0),)
+    assert choose_target(army, (held, nearer), holding=9) == held
+    assert choose_target(army, (held, nearer)) == nearer
+
+
+def test_a_target_that_is_gone_is_replaced() -> None:
+    """Holding is not clinging: a dead target frees the army to re-commit."""
+    nearer = _entity(10, "c_tank", 10.0, 0.0, mine=False, hostile=True)
+    army = (_entity(1, "c_tank", 0.0, 0.0),)
+    assert choose_target(army, (nearer,), holding=9) == nearer
+
+
+def test_the_held_target_carries_through_engagements() -> None:
+    world = _sample(
+        _entity(1, "c_tank", 0.0, 0.0),
+        _entity(9, "c_tank", 900.0, 0.0, mine=False, hostile=True),
+        _entity(10, "c_tank", 10.0, 0.0, mine=False, hostile=True),
+    )
+    assert engagements(world, _CATALOGUE, holding=9)[0]["target_id"] == 9
+    assert engagements(world, _CATALOGUE)[0]["target_id"] == 10
 
 
 def test_no_army_produces_no_orders() -> None:

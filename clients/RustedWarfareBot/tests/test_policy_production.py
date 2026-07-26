@@ -44,6 +44,8 @@ def _entity(unit_id: int, type_name: str, *, queued: int = 0, complete: bool = T
         team=0,
         mine=True,
         hostile=False,
+        movement="LAND",
+        group=1,
         hp=100.0,
         max_hp=100.0,
         complete=complete,

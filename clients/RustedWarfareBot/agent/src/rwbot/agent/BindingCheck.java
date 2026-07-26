@@ -158,6 +158,23 @@ final class BindingCheck {
         // The research probe. Checked like everything else, but note what a
         // failure here does and does not mean: nothing the bot plays with
         // depends on these, so a break costs a dump rather than a run.
+        // Terrain connectivity. Losing this fails quietly in the worst
+        // direction: every pool would read as unreachable and the economy
+        // would stop, which looks like a planner bug rather than a binding one.
+        Class<?> pathing = checkClass(EngineNames.PATHING_CLASS, problems);
+        Class<?> movement = checkClass(EngineNames.MOVEMENT_CLASS, problems);
+        if (pathing != null && movement != null) {
+            checkMethod(
+                    pathing, EngineNames.PATH_GROUP_AT, problems,
+                    float.class, float.class, movement);
+        }
+        if (entity != null) {
+            checkMethod(entity, EngineNames.ENTITY_MOVEMENT, problems);
+        }
+        if (movement != null && movement.getEnumConstants() == null) {
+            problems.add("not an enum: " + EngineNames.MOVEMENT_CLASS);
+        }
+
         Class<?> ai = checkClass(EngineNames.AI_CLASS, problems);
         checkClass(EngineNames.ZONE_CLASS, problems);
         if (ai != null) {

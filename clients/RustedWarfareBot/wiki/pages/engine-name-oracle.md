@@ -3,11 +3,14 @@ title: Engine Name Oracle
 tags: [engine, obfuscation, mapping, boot, reverse-engineering]
 related:
   - "[[harness-nodisplay]]"
+  - "[[engine-ai-zones]]"
+  - "[[mechanics-build-actions]]"
 source_paths:
   - "wiki/sources/m0-probe/nodisplay-boot.log:45"
   - "wiki/sources/m0-probe/jar-classes.txt:380"
+  - "wiki/sources/m16-enums/enum-names.txt"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: "2026-07-26"
 confidence: high
 hubs: [engine-internals]
 ---
@@ -34,6 +37,28 @@ More usefully, at least one line prints the readable name and the obfuscated cla
 
 So the mapping strategy is: run the game, read the narration, and use the construction order plus the printed mapping to anchor a decompiler pass — rather than decompiling first and guessing what each single-letter class does.[^9]
 
+## A second oracle: every enum names itself
+
+The obfuscator renamed enum **fields** and left their **constant names** alone. An enum's constant name is the string passed to the `Enum` constructor in the class's own static initialiser, and ProGuard did not rewrite those strings — so a decompile that shows nothing but `enum j { a, b, c; }` sits on a class whose bytecode still carries `Pre`, `Prepare`, `Active`.[^11]
+
+Recovering them needs no running game and no decompiler:
+
+```
+javap -p -c -cp game-lib.jar com.corrodinggames.rts.game.a.j | grep '// String '
+```
+
+Fifty-three enums across `com.corrodinggames.*` yield to this, and the result is archived.[^12] Several are worth more than the class names this page was written about:
+
+- `game.units.ao` — **`NONE LAND BUILDING AIR WATER HOVER OVER_CLIFF OVER_CLIFF_WATER`**. The movement-layer model, which [[mechanics-resource-pools]] records as the missing half of the reachability problem. It was in the jar the whole time.
+- `game.units.av` — the full order vocabulary: `move attack build repair loadInto unloadAt reclaim attackMove loadUp patrol guard guardAt touchTarget follow …`, which bounds what a command can ever ask for ([[issuing-orders]]).
+- `game.units.a` — attack stances: `outOfRange onlyInRange returnFire holdFire guardArea aggressive mixed`.
+- `game.units.a.t` and `a.u` — the action taxonomy behind the two build verbs: `none rally upgrade queueUnit building action infoOnly …` and `none placeBuilding popupQueue setRally reclaimTarget repairTarget targetGround attackMove …` ([[mechanics-build-actions]]).
+- `game.a.j` and `game.a.k` — the AI's zone state and kind: `Pre Prepare Active`, and `Main ResourceOutpost ForwardOutpost` ([[engine-ai-zones]]).
+
+**This is a strictly better oracle than the boot log for the things it covers.** The boot log names classes the engine happens to announce; this names every constant of every enum, from the jar alone, reproducibly, with no game running. It found the movement layers that three pages had recorded as unavailable.
+
+It generalises to a rule worth applying before inferring anything about an obfuscated enum: **check whether the value already tells you what it is.** The same trick is why the AI's debug overlay is readable — string literals survived wholesale — and the two together cover most of what the engine calls its own concepts.
+
 ## Why this expires
 
 Every name recovered this way is a fact about build 1.15, game code 176, build #28 — the version the probe run reports.[^10] Obfuscators reassign letters on each release, so `game.i` is meaningless in 1.16 and nothing will error; the agent simply binds to the wrong class. This is why the working copy is pinned at `.game/` outside Steam's update path, and why every page here carries `game_version` ([[harness-nodisplay]]).
@@ -54,3 +79,5 @@ The narration names subsystems, not methods. Knowing `GameEngine` is `game.i` do
 [^8]: https://github.com/TapeRTS/Tape — repository description "Rusted Warfare RTS mappings, free to use for everyone", CC0, with per-version directories (0.80, 1.09, 1.12b). Last pushed 2023-02-19; no 1.15 directory. Retrieved 2026-07-25.
 [^9]: [synthesis] — conclusion drawn from the printed mapping at `wiki/sources/m0-probe/nodisplay-boot.log:45` plus the subsystem narration at `:60`–`:186`; no separate source.
 [^10]: `wiki/sources/m0-probe/nodisplay-boot.log:12` — "Game Version: 1.15", with "Build Number: #28" at `:11` and "Game Code: 176" at `:13`.
+[^11]: `runs/decompiled/com/corrodinggames/rts/game/a/j.java` shows `enum j { a, b, c; }`, while `javap -p -c` on the same class emits `ldc // String Pre`, `// String Prepare` and `// String Active` from its `<clinit>`.
+[^12]: `wiki/sources/m16-enums/enum-names.txt` — 53 enums with their constants, and the one-line command that regenerates the file from the jar.

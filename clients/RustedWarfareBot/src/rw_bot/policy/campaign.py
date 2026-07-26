@@ -85,6 +85,7 @@ def fight(
         ChannelError: When the agent closes the connection mid-phase.
         OSError: When the connection fails.
     """
+    holding: int | None = None
     ordered: dict[int, int] = {}
     attacked: set[int] = set()
     visible_now: set[int] = set()
@@ -127,7 +128,12 @@ def fight(
             outcome = "cleared"
             break
 
-        for engagement in engagements(sample, catalogue):
+        # The target the army is already on is carried in, so the choice
+        # persists across samples instead of being remade every observation.
+        # Without it the whole army is re-tasked whenever its centre shifts.
+        current = engagements(sample, catalogue, holding)
+        holding = current[0]["target_id"] if current else None
+        for engagement in current:
             attacker = engagement["attacker_id"]
             target = engagement["target_id"]
             if ordered.get(attacker) == target:

@@ -29,10 +29,13 @@ _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson
 _FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"credits":4000}'
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
-    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,'
+    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,'
     '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0}'
 )
-_POOL = '{"kind":"pool","frame":7,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}'
+_POOL = (
+    '{"kind":"pool","frame":7,"index":0,"tile_x":115,"tile_y":6,'
+    '"x":2310.0,"y":130.0,"group_land":1}'
+)
 
 
 def _capture_lines() -> list[str]:
@@ -288,13 +291,15 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 team=3,
                 mine=False,
                 hostile=True,
+                movement="LAND",
+                group=1,
                 hp=1.5,
                 max_hp=2.5,
                 complete=True,
                 queued=0,
             ),
         ),
-        pools=(ResourcePool(index=0, tile_x=115, tile_y=6, x=2310.0, y=130.0),),
+        pools=(ResourcePool(index=0, tile_x=115, tile_y=6, x=2310.0, y=130.0, group_land=1),),
         options=(
             BuildOption(
                 index=0,

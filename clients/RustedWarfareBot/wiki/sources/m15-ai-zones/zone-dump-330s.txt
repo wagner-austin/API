@@ -1,0 +1,80 @@
+AI zone dump with enum constants resolved
+=========================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28), -nodisplay -nosound -sandbox,
+map [z;p10]Crossing Large (10p). aiZones=true with discoverAtSeconds=60,180,330
+and exitAfterDiscovery=true. Four AI players.
+
+Taken after the probe learned to render enum constants by name, which is why
+the state and kind columns read as words here and as class names in the
+earlier dump. Field letters: Q=zone id, U=radius, b=state, c=kind, A=target
+group size, F=members, h=attack, B=seaGroup, q=staging, l=attackDelay.
+
+--- t=60s : {'i': 4, 'g': 8, 'n': 12} ---
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=  -0.5216198 e=  95.91994 f= 0.55
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   1.5683295 e=  95.91994 f= 0.48
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=         1.2 e=  95.91994 f= 0.48
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   1.6957542 e=  95.91994 f= 0.39
+  g  Q=  2 A=8 members=0 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=0 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=1 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=0 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=1 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=0 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=0 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=0 h=true  seaGroup=true  q=false l=1000.0
+
+--- t=180s : {'i': 16, 'g': 8, 'n': 12} ---
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=       0.245 e= 120.99994 f= 0.39
+  i  Q= 13 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   1.2225002 e= 42.999786 f=  0.0
+  i  Q= 17 U= 360.0 state=j.Active   kind=k.ResourceOutpost d=  0.50997233 e=  46.99991 f= 0.39
+  i  Q= 24 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=  -0.1374998 e= 488.99997 f=  0.0
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=  0.25999087 e= 120.99994 f= 0.39
+  i  Q= 13 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=  0.39499414 e=     568.0 f=  0.0
+  i  Q= 17 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d= -0.17499983 e= 481.99997 f=  0.0
+  i  Q= 23 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d= -0.32499987 e= 37.999786 f=  0.0
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=  0.45250058 e= 120.99994 f= 0.39
+  i  Q= 13 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   1.3025011 e= 267.99988 f=  0.0
+  i  Q= 19 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=-0.009999821 e= 483.99997 f=  0.0
+  i  Q= 24 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d= -0.57249993 e= 38.999786 f=  0.0
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=  0.55250096 e= 120.99994 f= 0.39
+  i  Q= 13 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   0.8075003 e= 42.999786 f=  0.0
+  i  Q= 19 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=-0.024999732 e=     559.0 f= 0.39
+  i  Q= 24 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=  -0.4899999 e= 488.99997 f=  0.0
+  g  Q=  2 A=8 members=2 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=1 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=4 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=0 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=3 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=1 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=2 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=2 h=true  seaGroup=true  q=false l=1000.0
+
+--- t=330s : {'i': 17, 'g': 9, 'n': 12, 'l': 1} ---
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   0.1448527 e= 120.99994 f= 0.39
+  i  Q= 17 U= 360.0 state=j.Active   kind=k.ResourceOutpost d=   1.2075001 e=     272.0 f= 0.39
+  i  Q= 29 U= 360.0 state=j.Active   kind=k.ResourceOutpost d=   0.2825063 e= 133.99994 f= 0.39
+  i  Q= 38 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=  -0.5549979 e= 127.99994 f= 0.55
+  i  Q= 45 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d= -0.52500385 e=104.999825 f=  0.0
+  i  Q= 49 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=        -1.0 e=       0.0 f=  0.0
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   0.8725892 e=     271.0 f=  0.3
+  i  Q= 23 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=         1.2 e= 202.99997 f= 0.55
+  i  Q= 38 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=         1.2 e= 37.999786 f= 0.98
+  i  Q= 45 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d= -0.30500177 e=     555.0 f= 0.46
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   0.6917928 e=  70.95993 f= 0.22
+  i  Q= 19 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   0.5300003 e=     274.0 f= 0.98
+  i  Q= 36 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   1.9874799 e=   35.9998 f=  0.0
+  i  Q=  1 U= 420.0 state=j.Active   kind=k.Main           d=   0.7640439 e=     271.0 f=  0.3
+  i  Q= 19 U= 360.0 state=j.Active   kind=k.ResourceOutpost d=         1.2 e=     274.0 f= 0.22
+  i  Q= 37 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   0.5625444 e= 186.99985 f=  0.0
+  i  Q= 41 U= 360.0 state=j.Pre      kind=k.ResourceOutpost d=   0.4550004 e= 490.99997 f=  0.0
+  g  Q=  2 A=8 members=6 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=1 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=8 h=false seaGroup=false q=false l=0.0
+  g  Q=  3 A=5 members=2 h=true  seaGroup=true  q=false l=1000.0
+  g  Q= 37 A=3 members=1 h=true  seaGroup=false q=false l=1000.0
+  g  Q=  2 A=8 members=5 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=2 h=true  seaGroup=true  q=false l=1000.0
+  g  Q=  2 A=8 members=5 h=false seaGroup=false q=false l=1000.0
+  g  Q=  3 A=5 members=2 h=true  seaGroup=true  q=false l=1000.0
+

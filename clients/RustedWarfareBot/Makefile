@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play
 
 help:
 	@Write-Host ""
@@ -25,6 +25,11 @@ help:
 	@Write-Host "  make type-flags                  placement rules from the live type registry"
 	@Write-Host "  make wire-capture                regenerate the archived world-stream fixture"
 	@Write-Host "  make sandbox-probe               live skirmish with the agent attached"
+	@Write-Host ""
+	@Write-Host "Play:" -ForegroundColor Yellow
+	@Write-Host "  make play                        start a game, play a whole match, stop it"
+	@Write-Host "                                   PLAY_SAMPLES=1500 PLAY_SEED=0 PLAY_LOG=runs/play.log"
+	@Write-Host "                                   PLAY_SEED pins the opponents' RNG so runs are comparable"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
 	@Write-Host "  make agent                       compile + jar the javaagent"
@@ -232,3 +237,44 @@ unit-dump:
 	@Write-Host "==> unit-dump (-printunits stat catalogue)" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force "runs" | Out-Null
 	$$log = (Resolve-Path -LiteralPath ".").Path + "\\runs\\printunits.log"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -printunits -log $$log } finally { Pop-Location }
+
+# Play a whole match: start a headless game with the channel open, run the
+# planner against it, then stop the game.
+#
+# This exists because the alternative was a 400-character PowerShell
+# incantation retyped every run, and one of those quietly reintroduced a bug
+# the agent target had already fixed -- writing the jar in place while a game
+# held it open. A target that is easy to run correctly is the fix for that.
+#
+# The agent is built into a per-invocation jar rather than reusing the shared
+# one, and this target deliberately does not depend on `agent`. A jar held open
+# by a running game cannot be replaced, so depending on the shared build makes
+# playing impossible whenever any game is already up -- including one started by
+# another agent working in the same tree. PLAY_PORT is per-invocation for the
+# same reason.
+# ":=" and not "?=", which cost a debugging round. A "?=" variable is
+# recursively expanded, so $(shell ...) re-runs on every single reference: the
+# game bound one port, the readiness poll watched a second, the planner dialled
+# a third, and the error message named a fourth. Expanding once is the whole
+# fix. A command-line override still wins over ":=".
+PLAY_PORT := $(shell python -c "import random; print(random.randint(27600, 27999))")
+# Pin the engine's generator so repeated runs face the same opponent choices.
+# 0 leaves it alone, which is the honest default: a run that silently became
+# repeatable would be worse than one that visibly is not.
+PLAY_SEED ?= 0
+PLAY_SAMPLES ?= 1500
+PLAY_SETTLE ?= 22
+# The game writes its own log here; the agent writes to stdout, which is a
+# different stream and is captured beside it as <PLAY_LOG>.agent. Conflating
+# the two cost a wrong conclusion once: a seed that had applied perfectly well
+# was reported as never firing, because the confirmation was grepped for in the
+# game's file rather than the agent's.
+PLAY_LOG ?= runs/play.log
+CATALOGUE := wiki/sources/m0-probe/printunits.log
+TYPE_DUMP := wiki/sources/m11-pools/type-flags.ndjson
+
+play:
+	@Write-Host ""
+	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
+	New-Item -ItemType Directory -Force "runs" | Out-Null
+	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList @("-Xmx1000M", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound", "-sandbox", "-width", "800", "-height", "600", "-log", "$$log") -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python scripts/play.py $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_SAMPLES) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }

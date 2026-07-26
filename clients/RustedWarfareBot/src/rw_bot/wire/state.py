@@ -87,6 +87,15 @@ class Entity(TypedDict):
             alliance comparison rather than derived here, because a planner that
             treats every unowned unit as a threat cannot cross its own ally's
             territory.
+        movement: Engine name of the layer this entity travels on, e.g.
+            ``"LAND"``, ``"AIR"``, ``"HOVER"``. The engine keeps a separate
+            connectivity grid per layer, so this says which grid ``group``
+            belongs to.
+        group: Connectivity component this entity stands in, on its own layer.
+            Two things can reach each other exactly when their components match
+            and both are non-negative — a negative is the engine's way of
+            saying the point has no component at all
+            ([[mechanics-movement-layers]]).
         hp: Current health.
         max_hp: Health at full.
         complete: Whether construction has finished. A building joins the roster
@@ -107,6 +116,8 @@ class Entity(TypedDict):
     team: int
     mine: bool
     hostile: bool
+    movement: str
+    group: int
     hp: float
     max_hp: float
     complete: bool
@@ -131,6 +142,12 @@ class ResourcePool(TypedDict):
         tile_y: Tile row.
         x: World x of the tile's centre.
         y: World y of the tile's centre.
+        group_land: Connectivity component of this tile on the **land** layer,
+            or a negative when it has none. Compare against a land unit's
+            ``group`` to decide whether it can walk here at all. Land
+            specifically: every builder in the base game travels on land, and
+            naming the layer keeps a mismatched comparison from looking like an
+            answer ([[mechanics-movement-layers]]).
     """
 
     index: int
@@ -138,6 +155,7 @@ class ResourcePool(TypedDict):
     tile_y: int
     x: float
     y: float
+    group_land: int
 
 
 class BuildOption(TypedDict):
@@ -289,6 +307,7 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                     tile_y=require_int(record, "tile_y"),
                     x=require_finite_float(record, "x"),
                     y=require_finite_float(record, "y"),
+                    group_land=require_int(record, "group_land"),
                 )
             )
             continue
@@ -306,6 +325,8 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                     team=require_int(record, "team"),
                     mine=require_bool(record, "mine"),
                     hostile=require_bool(record, "hostile"),
+                    movement=require_non_empty_str(record, "movement"),
+                    group=require_int(record, "group"),
                     hp=require_finite_float(record, "hp"),
                     max_hp=require_finite_float(record, "max_hp"),
                     complete=require_bool(record, "complete"),
@@ -456,6 +477,7 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
             f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
             f'"hostile":{str(entity["hostile"]).lower()},'
+            f'"movement":"{entity["movement"]}","group":{entity["group"]},'
             f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r},'
             f'"complete":{str(entity["complete"]).lower()},'
             f'"queued":{entity["queued"]}}}'
@@ -464,7 +486,8 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         lines.append(
             f'{{"kind":"{KIND_POOL}","frame":{frame},"index":{pool["index"]},'
             f'"tile_x":{pool["tile_x"]},"tile_y":{pool["tile_y"]},'
-            f'"x":{pool["x"]!r},"y":{pool["y"]!r}}}'
+            f'"x":{pool["x"]!r},"y":{pool["y"]!r},'
+            f'"group_land":{pool["group_land"]}}}'
         )
     for option in sample["options"]:
         produces = _escape(option["produces"])

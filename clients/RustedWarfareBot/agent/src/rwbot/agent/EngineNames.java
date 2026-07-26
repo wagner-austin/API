@@ -325,6 +325,50 @@ final class EngineNames {
      */
     static final String ZONE_CLASS = "com.corrodinggames.rts.game.a.o";
 
+    /**
+     * The engine's terrain-connectivity utility.
+     *
+     * <p>Holds the answer to "can this thing get there", which the bot
+     * otherwise has no way to compute: it precomputes connected components per
+     * movement layer and reduces reachability to comparing two component ids
+     * (wiki: mechanics-movement-layers).
+     */
+    static final String PATHING_CLASS = "com.corrodinggames.rts.gameFramework.utility.y";
+
+    /**
+     * Connectivity lookup: the component id of a world point on one layer.
+     *
+     * <p>Negative values are not ids. The engine's own reachability predicate
+     * treats -1 as impassable and -2 as off-map, and logs -3 as "no
+     * isolatedGroups found". Everything here rejects every negative, which is
+     * strictly more conservative than the engine — its predicate compares two
+     * -3s for equality and answers true.
+     */
+    static final String PATH_GROUP_AT = "b";
+
+    /**
+     * The movement-layer enum: NONE, LAND, BUILDING, AIR, WATER, HOVER,
+     * OVER_CLIFF, OVER_CLIFF_WATER.
+     *
+     * <p>Its constants are resolved by name rather than by field, because the
+     * obfuscator renamed the fields and left the names intact
+     * (wiki: engine-name-oracle). Matching on {@code "LAND"} therefore survives
+     * a reordering that matching on a field letter would not.
+     */
+    static final String MOVEMENT_CLASS = "com.corrodinggames.rts.game.units.ao";
+
+    /** Layer a land unit travels on, by its engine name. */
+    static final String MOVEMENT_LAND = "LAND";
+
+    /**
+     * Entity accessor returning its movement layer.
+     *
+     * <p>Abstract on the entity base, so every unit answers it, and it is what
+     * the engine's own reachability check reads to decide which component grid
+     * applies.
+     */
+    static final String ENTITY_MOVEMENT = "h";
+
     /** The engine's map instance. */
     static final String MAP = "bL";
 
@@ -380,6 +424,24 @@ final class EngineNames {
 
     /** Static list of every asset-defined unit type. */
     static final String CUSTOM_TYPE_LIST = "d";
+
+    /**
+     * Holds the engine's general-purpose generator and its maths helpers.
+     *
+     * <p>Not the lockstep path. Anything that must agree between peers goes
+     * through a deterministic hash of the match seed and frame counter in the
+     * same class; this field is the plain generator everything else uses.
+     */
+    static final String RANDOM_HOLDER_CLASS = "com.corrodinggames.rts.gameFramework.f";
+
+    /**
+     * The unseeded {@code java.util.Random} the opponents' choices draw from.
+     *
+     * <p>Constructed with no seed, so it takes one from the system clock and
+     * every run differs. Seeding it is what makes a measurement repeatable
+     * (wiki: policy-combat).
+     */
+    static final String RANDOM_FIELD = "a";
 
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 }

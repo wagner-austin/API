@@ -65,6 +65,24 @@ final class OptionChecks {
                         AgentOptionsParser.parse("typeFlagsPath=C:/flags.ndjson").typeFlagsPath()),
                 "typeFlagsPath parsed");
         failures += expectRejected("typeFlagsPath=", "blank type-flags path");
+        // Off unless asked for, and the default is the load-bearing half: an
+        // archived capture must not be able to contain the AI dump by accident.
+        failures += Check.expect(
+                !AgentOptionsParser.parse("discoverAtSeconds=5").aiZones(),
+                "aiZones defaults off");
+        failures += Check.expect(
+                AgentOptionsParser.parse("aiZones=true").aiZones(), "aiZones parsed");
+        failures += expectRejected("aiZones=yes", "non-boolean aiZones");
+        // One dispatch chain, not two. When the chain was split in half every
+        // key handled by the first half fell through to the second half's
+        // else and was rejected as unknown -- which took out every probe
+        // target at once, because they all pass discoverAtSeconds.
+        failures += Check.expect(
+                AgentOptionsParser.parse("discoverAtSeconds=5;randomSeed=7")
+                                .discoverAtSeconds()
+                                .length
+                        == 1,
+                "an early key still parses alongside a late one");
         failures += expectRejected("orderMoveAtSeconds=0", "zero order time");
         failures += expectRejected("orderMoveUnitIndex=-1", "negative roster index");
         failures += expectRejected("orderMoveBy=300", "one-component offset");

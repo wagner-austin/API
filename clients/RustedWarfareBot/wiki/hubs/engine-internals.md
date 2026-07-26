@@ -25,3 +25,4 @@ Every page here is pinned to a specific game build. An obfuscated class name is 
 [The Shipped AI's Zone System](../pages/engine-ai-zones.md) -- the AI's unit of place: five zone kinds, one-unit-one-zone, and expansion sited on resource pools at random
 [The Shipped AI's Build and Attack Triggers](../pages/engine-ai-triggers.md) -- when it builds, makes units and commits: a credit ladder, a unit budget, and fill-then-commit attack groups of 3, 5, 7
 [Fighting: the Attack Verb, and Keeping an Army Alive](../pages/policy-combat.md) -- av.b is attack, proven by a target losing exactly the attacker's catalogued damage
+[The AI Zone Probe, and Why It Is Not Perception](../pages/engine-ai-probe.md) -- reading the opposing AI's plans is research, never perception: why, and the two structural guarantees that keep it that way

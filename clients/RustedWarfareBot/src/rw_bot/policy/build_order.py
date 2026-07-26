@@ -31,6 +31,14 @@ from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 
 BUILDER_TYPE = "builder"
 
+#: Engine name of the movement layer a land unit travels on.
+#:
+#: Matched against :attr:`~rw_bot.wire.state.Entity.movement`. Only a unit on
+#: this layer can be judged against a pool's ``group_land``; comparing a hover
+#: unit's component id to a land grid would produce a confident wrong answer,
+#: so the check refuses rather than guesses ([[mechanics-movement-layers]]).
+LAND_MOVEMENT = "LAND"
+
 #: Type name of the map editor's placeholder unit.
 #:
 #: An owned entity in every sample, parked off-map at (-1000, -1000) with
@@ -225,12 +233,14 @@ class PoolSurvey(TypedDict):
         pool: The pool to build on, or None when none qualifies.
         visible: How many pools the sample carries.
         occupied: How many already have a structure standing on them.
+        unreachable: How many the builder cannot walk to at all.
         exposed: How many were reachable only through hostile fire.
     """
 
     pool: ResourcePool | None
     visible: int
     occupied: int
+    unreachable: int
     exposed: int
 
 
@@ -269,11 +279,15 @@ def survey_pools(
     best: ResourcePool | None = None
     best_distance = 0.0
     occupied = 0
+    unreachable = 0
     exposed = 0
     origin = (builder["x"], builder["y"])
     for pool in sample["pools"]:
         if _is_occupied(sample, pool, catalogue):
             occupied += 1
+            continue
+        if not _can_walk_to(builder, pool):
+            unreachable += 1
             continue
         if route_is_exposed(sample, catalogue, origin, (pool["x"], pool["y"])):
             exposed += 1
@@ -282,7 +296,48 @@ def survey_pools(
         if best is None or distance < best_distance:
             best = pool
             best_distance = distance
-    return PoolSurvey(pool=best, visible=len(sample["pools"]), occupied=occupied, exposed=exposed)
+    return PoolSurvey(
+        pool=best,
+        visible=len(sample["pools"]),
+        occupied=occupied,
+        unreachable=unreachable,
+        exposed=exposed,
+    )
+
+
+def _can_walk_to(builder: Entity, pool: ResourcePool) -> bool:
+    """Report whether the builder can reach a pool over land at all.
+
+    The engine precomputes connected components per movement layer and reduces
+    reachability to comparing two component ids, which is the whole of this
+    function ([[mechanics-movement-layers]]). Both ids ride on the wire, so no
+    search happens here.
+
+    Negative ids are rejected rather than compared. The engine uses them for
+    "impassable", "off the map" and "the grids were never built", and its own
+    predicate has a hole -- it compares two of the last kind for equality and
+    answers true. Refusing every negative is strictly more conservative than the
+    engine, and costs at most a pool it might have allowed.
+
+    A builder that does not travel on land is answered True, which is a refusal
+    to guess rather than an optimistic default: its component id belongs to a
+    different grid, so comparing it against ``group_land`` would be meaningless.
+    Reachability simply does not apply to it, while occupancy and threat still
+    do.
+
+    Args:
+        builder: The unit that would walk there.
+        pool: The pool it would walk to.
+
+    Returns:
+        True when the pool is known reachable, or when this builder's layer
+        cannot be judged against a land grid.
+    """
+    if builder["movement"] != LAND_MOVEMENT:
+        return True
+    if builder["group"] < 0 or pool["group_land"] < 0:
+        return False
+    return builder["group"] == pool["group_land"]
 
 
 def _is_occupied(sample: Sample, pool: ResourcePool, catalogue: Mapping[str, UnitStats]) -> bool:
@@ -579,8 +634,8 @@ def _no_pool_reason(target: str, survey: PoolSurvey) -> str:
         return f"{target} needs a resource pool and none is visible yet"
     return (
         f"{target} needs a resource pool: of the {survey['visible']} in sight, "
-        f"{survey['occupied']} are built on and {survey['exposed']} can only be "
-        "reached through enemy fire"
+        f"{survey['occupied']} are built on, {survey['unreachable']} cannot be "
+        f"walked to and {survey['exposed']} can only be reached through enemy fire"
     )
 
 
@@ -601,6 +656,7 @@ def _decision(
 
 __all__ = [
     "BUILDER_TYPE",
+    "LAND_MOVEMENT",
     "PLACEHOLDER_TYPE",
     "PLACEMENT_RING",
     "POOL_OCCUPIED_RADIUS",

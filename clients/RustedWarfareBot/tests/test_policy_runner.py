@@ -76,7 +76,8 @@ def _entity_line(
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{at[0]},"y":{at[1]},'
-        f'"team":{0 if mine else 1},"mine":{str(mine).lower()},"hostile":{str(not mine).lower()},'
+        f'"team":{0 if mine else 1},"mine":{str(mine).lower()},'
+        f'"hostile":{str(not mine).lower()},"movement":"LAND","group":1,'
         f'"hp":100.0,"max_hp":100.0,"complete":{str(complete).lower()},"queued":{queued}}}'
     )
 
@@ -85,7 +86,7 @@ def _pool_line(frame: int, index: int, tile_x: int, tile_y: int) -> str:
     return (
         f'{{"kind":"pool","frame":{frame},"index":{index},'
         f'"tile_x":{tile_x},"tile_y":{tile_y},'
-        f'"x":{tile_x * 20 + 10}.0,"y":{tile_y * 20 + 10}.0}}'
+        f'"x":{tile_x * 20 + 10}.0,"y":{tile_y * 20 + 10}.0,"group_land":1}}'
     )
 
 

@@ -1,0 +1,33 @@
+Target churn, before and after committing to a target
+=====================================================
+
+Same map, same opening goals, same sandbox skirmish against five AI opponents.
+Counts are `channel: attack` lines from each run log, with distinct attacker
+and target ids taken as sorted-unique from those lines.
+
+                        orders  targets  attackers  orders/attacker
+  no commitment            743       24         48             15.5
+  commitment, run 1         72        5         33              2.2
+  commitment, run 2        282       16         48              5.9
+
+The churn result is unambiguous. Re-choosing nearest-to-army-centre every
+sample re-tasked the whole army whenever that centre moved, which it does every
+time a unit dies or a new one rolls out. Holding a target until it is gone cuts
+re-orders per unit by between three and seven times.
+
+The OUTCOME result is not unambiguous, and the two committed runs are why:
+
+  no commitment       army 4 -> 2   survived 1500 samples   engaged gone 14
+  commitment, run 1   army 4 -> 0   died at 1013 samples    engaged gone  4
+  commitment, run 2   army 4 -> 7   survived 1500 samples   engaged gone 15
+
+Identical code, opposite results. Run 2 is the best the bot has ever done --
+the first time it finished a fight with more units than it started -- and run 1
+is the worst since reinforcement was added.
+
+So the honest reading is that outcome variance between runs is larger than any
+effect measured here. The opponents' unit mix is weighted-random by
+construction (wiki: ai-opponent-strategy), so the map is not the same
+experiment twice. Two runs cannot separate a real regression from noise, and
+nothing in this file should be read as saying commitment helped or hurt the
+outcome. What it demonstrably did is stop the thrash.

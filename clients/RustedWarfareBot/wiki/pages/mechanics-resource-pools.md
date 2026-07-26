@@ -8,6 +8,7 @@ related:
   - "[[perception-visibility]]"
   - "[[wire-contract-ndjson]]"
   - "[[policy-threat]]"
+  - "[[mechanics-movement-layers]]"
 source_paths:
   - "wiki/sources/m11-pools/type-flags.ndjson:1"
   - "wiki/sources/m11-pools/type-flags.ndjson:85"
@@ -80,7 +81,7 @@ Pools were chosen by distance from the base and nothing else, and that was too l
 
 **Half of that is now answered.** A pool is rejected when a visible hostile's attack range covers any point of the walk to it, hostility read from the engine's own alliance test rather than from ownership, and the survivors ranked by distance as before ([[policy-threat]]). The route is what is tested rather than the destination, because the builder in [^13] died in transit and the pool it was walking to was fine.
 
-Reachability is untouched and remains the open half. Nothing the planner reads knows that water is between it and a pool, so the same order across a channel still goes out and still fails — now with the threat check reporting the far shore perfectly safe.
+**And now the other half.** The engine precomputes connected components per movement layer, so reachability is a comparison rather than a search, and the planner rejects a pool whose land component the builder's does not match ([[mechanics-movement-layers]]). On this map that is not a corner case: twelve of the forty-six pools sit in six island components no land unit can walk to, and distance-only selection would have aimed a builder at one of them as soon as the near ground filled.
 
 Extractors are also never upgraded. The catalogue prices a T2 and T3 tier for each, and the engine treats an upgrade as a distinct action from a build; nothing in the order path exercises it yet ([[building-structures]]).
 

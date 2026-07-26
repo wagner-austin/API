@@ -26,6 +26,7 @@ final class AgentOptionsParser {
     private static final String FIND_UNDER = "findElementsUnder";
     private static final String STATE_OUT = "stateOutPath";
     private static final String TYPE_FLAGS_OUT = "typeFlagsPath";
+    private static final String RANDOM_SEED = "randomSeed";
     private static final String AI_ZONES = "aiZones";
     private static final String ORDER_AT = "orderMoveAtSeconds";
     private static final String ORDER_BY = "orderMoveBy";
@@ -55,6 +56,7 @@ final class AgentOptionsParser {
     static AgentOptions parse(String argument) {
         if (argument == null || argument.trim().isEmpty()) {
             return new AgentOptions(
+                    0L,
                     new int[0],
                     false,
                     new String[0],
@@ -70,6 +72,7 @@ final class AgentOptionsParser {
                     DEFAULT_SAMPLE_MS);
         }
 
+        long randomSeed = 0L;
         int[] discoverAt = new int[0];
         boolean exitAfter = false;
         String[] inspect = new String[0];
@@ -113,6 +116,8 @@ final class AgentOptionsParser {
                     throw new IllegalArgumentException(TYPE_FLAGS_OUT + " expects a path");
                 }
                 typeFlagsOut = value;
+            } else if (RANDOM_SEED.equals(key)) {
+                randomSeed = parseSeed(value);
             } else if (FIND_UNDER.equals(key)) {
                 if (value.isEmpty()) {
                     throw new IllegalArgumentException(FIND_UNDER + " expects a package prefix");
@@ -143,6 +148,7 @@ final class AgentOptionsParser {
             }
         }
         return new AgentOptions(
+                randomSeed,
                 discoverAt,
                 exitAfter,
                 inspect,
@@ -156,6 +162,29 @@ final class AgentOptionsParser {
                 aiZones,
                 channelPort,
                 sampleIntervalMs);
+    }
+
+    /**
+     * Parses the engine-random seed.
+     *
+     * <p>Zero is rejected rather than accepted as a seed, because zero is what
+     * "no seed asked for" means everywhere else in the options. Accepting it
+     * would make a run that silently stayed unrepeatable indistinguishable from
+     * one that was pinned.
+     */
+    private static long parseSeed(String value) {
+        long parsed;
+        try {
+            parsed = Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    RANDOM_SEED + " expects a whole number, got " + value, e);
+        }
+        if (parsed == 0L) {
+            throw new IllegalArgumentException(
+                    RANDOM_SEED + " of 0 is indistinguishable from no seed; use any other value");
+        }
+        return parsed;
     }
 
     /** Parses a single positive whole-second offset. */

@@ -7,6 +7,7 @@ related:
   - "[[mechanics-build-actions]]"
   - "[[mechanics-unit-catalogue]]"
   - "[[policy-threat]]"
+  - "[[engine-ai-probe]]"
 source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/i.java:1029"
   - "runs/decompiled/com/corrodinggames/rts/game/a/i.java:1045"
@@ -17,6 +18,7 @@ source_paths:
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1611"
   - "runs/decompiled/com/corrodinggames/rts/game/a/a.java:1620"
   - "runs/decompiled/com/corrodinggames/rts/game/n.java:1088"
+  - "wiki/sources/m15-ai-zones/zone-dump.txt"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-26"
 confidence: medium
@@ -64,6 +66,8 @@ It fills from three sources: a flat **+0.015 per tick while the base is unsafe**
 
 Two clamps: hard ceiling **3.5**, and a much lower ceiling of **1.2** whenever the AI holds under 800 credits and is not under threat. So a poor, safe AI is held to roughly one pending unit; a rich or frightened one banks up to three and a half.
 
+The budget also **starts and goes negative** — the field initialises to −1.0 and the live dump shows values from −1.0 to 1.79 across zones.[^11] So it is a debt-then-credit counter rather than a stock: a new zone owes a unit's worth of accumulation before it may make anything.
+
 Spending is a burst: the production routine is called up to **12 times in one tick**, breaking out as soon as the budget drops below 3.0.[^6] Normally that is one unit per tick. An AI sitting on a full budget empties it in a single frame.
 
 This is the mechanism our bot most obviously lacks. It produces when the plan's next entry is affordable, with no notion of a reserve, no reaction to being attacked, and no burst.
@@ -77,7 +81,11 @@ A combat group is created **empty with a target size** and recruits until it is 
 - **Sea groups: 5**, or 10 on hard, one at a time, and only when the map's water area exceeds a threshold.
 - **Transport groups**: up to three, each wanting one unit.
 
-So the first thing a shipped AI ever attacks with is three units, and it will not send them until it has three.
+So the AI will not attack until a group is full, and the first land attack group targets **three**.
+
+That last claim went wrong once and is worth keeping the trace of. A first dump showed every `h=true` group targeting 5, never 3, and this page briefly recorded the escalation ladder as unsupported. It was the reading of the dump that was wrong, not the reading of the source: those groups all carried `B=true`, the **sea-group** flag, and a sea group's target is 5 by a different branch entirely.[^11] A longer run caught the real thing — a fourth group appearing at 330 seconds with `A=3`, `h=true`, `B=false`.[^12] The generic field dump is what made that visible; a probe rendering only the fields this page cared about would have shown two indistinguishable fives.
+
+The same runs confirm fill-then-commit as a mechanism. Membership climbs while the target stays fixed, staging stays false on every group that has not reached its size, and the attack delay sits at a flat 1,000 until a group fills — the one defensive group observed reaching 8 of 8 is also the only one whose delay had reached 0.[^12]
 
 Once a group is full, the cycle is:[^9]
 
@@ -104,7 +112,9 @@ The build side transfers less directly, because the capacity ratio driving the c
 
 The capacity ratio is read but not named — the overlay does not print it, so its definition is inferred from use rather than from the engine saying so. Everything that depends on it is therefore shape-correct and scale-uncertain.
 
-None of the timer constants have been observed. They are read from the source and the units are the engine's own tick accumulator, not seconds; converting them to wall-clock needs a live measurement against the frame rate already established for this build ([[engine-tick-and-clock]]). That is the main reason this page is `medium`, and it is the same gap as [[engine-ai-zones]]: confirming any of it means watching an opponent's AI object over a live game, which the agent cannot do today.
+The group sizes and the budget range have now been watched ([[engine-ai-probe]]), and one of them contradicted the reading, which is recorded above rather than quietly fixed. The **timer constants still have not been**: they are in the engine's own tick accumulator rather than seconds, and converting them to wall-clock needs a measurement against the frame rate established for this build ([[engine-tick-and-clock]]). Nothing here has been observed firing — no group reached its target size within 150 seconds, so staging, the damage abort and the 17,000 timeout are all still source-only.
+
+The capacity ratio is confirmed to be bounded in [0, 1] by the same dump, and the build-delay values are consistent with the two penalties, but the ladder thresholds themselves remain unobserved.
 
 The target chooser itself is deliberately out of scope here — this page covers when a force commits, not what it picks.
 
@@ -118,3 +128,5 @@ The target chooser itself is deliberately out of scope here — this page covers
 [^8]: `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1611`–`1646` — four creation branches setting `A` to 8/10, 3/5/7/14/18, 5/10 and a transport group wanting 1, each with its own concurrency cap.
 [^9]: `runs/decompiled/com/corrodinggames/rts/game/a/g.java:448` — `e(float)`, the group cycle. The rendezvous test at `:474` is `c(y2) > 28900.0f`, a squared distance, so 170 world units. The damage abort is at `:481`, comparing the member's last-hit frame against the current frame minus 1,000. The timeout is at `:486`.
 [^10]: `runs/decompiled/com/corrodinggames/rts/game/a/g.java:490`–`520` — the 800 re-issue interval, the reachability filter, the `"cannot reach main target"` abort, and `f.a(0, 100) < 80` selecting the position-targeted command over the unit-targeted one.
+[^11]: `wiki/sources/m15-ai-zones/zone-dump.txt` — the first run, four AI players at 40, 90 and 150 seconds, where every `A=5` group is also `B=true`. The sea-group branch is at `runs/decompiled/com/corrodinggames/rts/game/a/a.java:1636`, gated on the map's water area.
+[^12]: `wiki/sources/m15-ai-zones/zone-dump-330s.txt` — a longer run at 60, 180 and 330 seconds. At 330s one player holds `Q=37 A=3 h=true B=false`, the first land attack group, and a defensive group at 8 of 8 with `l=0.0`.

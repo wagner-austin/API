@@ -67,7 +67,14 @@ final class StateStream {
             out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
         }
         for (int index = 0; index < pools.size(); index++) {
-            out.append(poolRecord(frame, index, pools.get(index))).append('\n');
+            MapTiles.Pool pool = pools.get(index);
+            out.append(
+                            poolRecord(
+                                    frame,
+                                    index,
+                                    pool,
+                                    Perception.landPathGroupAt(pool.x(), pool.y())))
+                    .append('\n');
         }
         for (int index = 0; index < options.size(); index++) {
             out.append(optionRecord(frame, index, options.get(index))).append('\n');
@@ -139,8 +146,13 @@ final class StateStream {
      * moves, and it is the unit the engine's own placement check works in. The
      * world point is what a build order needs, because orders are addressed in
      * world space.
+     *
+     * <p>Connectivity arrives as an argument rather than being looked up here.
+     * It needs a live engine, and a record renderer that reached for one could
+     * not be exercised without a running game -- which is exactly how the wire
+     * self-checks test these shapes.
      */
-    static String poolRecord(int frame, int index, MapTiles.Pool pool) {
+    static String poolRecord(int frame, int index, MapTiles.Pool pool, int groupLand) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "pool");
@@ -156,6 +168,8 @@ final class StateStream {
         appendFloat(out, "x", pool.x());
         out.append(',');
         appendFloat(out, "y", pool.y());
+        out.append(',');
+        appendInt(out, "group_land", groupLand);
         out.append('}');
         return out.toString();
     }
@@ -195,6 +209,10 @@ final class StateStream {
         appendBool(out, "mine", Perception.isOwnedByLocalPlayer(engine, entity));
         out.append(',');
         appendBool(out, "hostile", Perception.isHostileToLocalPlayer(engine, entity));
+        out.append(',');
+        appendString(out, "movement", Perception.movementOf(entity));
+        out.append(',');
+        appendInt(out, "group", Perception.pathGroupOf(entity));
         out.append(',');
         appendFloat(out, "hp", health[0]);
         out.append(',');

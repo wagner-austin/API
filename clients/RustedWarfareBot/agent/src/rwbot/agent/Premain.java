@@ -37,6 +37,12 @@ public final class Premain {
                             + " them against this jar and update Targets.");
         }
 
+        // Before anything else that could draw from it. Seeding after the
+        // engine has already made choices would pin only the tail of a run.
+        if (options.seedRequested()) {
+            EngineRandom.seed(options.randomSeed());
+        }
+
         if (options.discoveryRequested()) {
             startDiscovery(
                     options.discoverAtSeconds(),

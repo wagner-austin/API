@@ -27,6 +27,10 @@ final class DiscoveryChecks {
         failures += Check.expect(report.contains("int[] len=2"), "array length reported");
         failures += Check.expect(report.contains("null"), "null field reported");
         failures += Check.expect(report.contains("\"hello\""), "string value reported");
+        // By constant name, not by class. A state field that renders as its
+        // enum class carries no information at all, which is what the first
+        // AI zone dump ran into.
+        failures += Check.expect(report.contains("Mood.CALM"), "enum value reported by name");
         failures += Check.expect(report.contains("static "), "static field marked");
 
         DiscoverySample sample = new DiscoverySample();
@@ -132,7 +136,13 @@ final class DiscoveryChecks {
         final java.util.List<String> names = java.util.Arrays.asList("a", "b", "c");
         final int[] counts = {1, 2};
         final String text = "hello";
+        final Mood mood = Mood.CALM;
         final Object absent = null;
+    }
+
+    /** Stands in for the engine's obfuscated state enums. */
+    private enum Mood {
+        CALM
     }
 
     /** A non-platform object reachable only by descending through a collection. */

@@ -52,7 +52,7 @@ def _entity_line(
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":0.0,'
         f'"team":{0 if mine else 1},"mine":{str(mine).lower()},'
-        f'"hostile":{str(not mine).lower()},'
+        f'"hostile":{str(not mine).lower()},"movement":"LAND","group":1,'
         f'"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
@@ -122,6 +122,21 @@ def test_an_order_already_in_flight_is_not_re_issued() -> None:
     battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=20)
     assert battle["orders_sent"] == 1
     assert battle["samples_seen"] == 20
+
+
+def test_a_nearer_enemy_does_not_pull_the_army_off_its_target() -> None:
+    """Commitment across samples, which is what stopped the churn.
+
+    A closer enemy appearing is not a reason to abandon a target already being
+    shot at; re-choosing on every sample spent 743 orders on 24 targets.
+    """
+    peer = _ScriptedPeer(
+        _sample_lines(1, _TANK, _ENEMY)
+        + _sample_lines(2, _TANK, _ENEMY, (10, "c_tank", False, 5.0)) * 5
+    )
+    battle = fight(AgentChannel(peer), _CATALOGUE, max_samples=6)
+    assert peer.sent == ['{"kind":"attack","unit_id":1,"target_id":9}']
+    assert battle["orders_sent"] == 1
 
 
 def test_a_new_target_earns_a_new_order() -> None:

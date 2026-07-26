@@ -1,0 +1,75 @@
+AI zone dump, distilled from a live headless run
+===============================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28), -nodisplay -nosound -sandbox,
+map [z;p10]Crossing Large (10p). Agent option aiZones=true with
+discoverAtSeconds=40,90,150 and exitAfterDiscovery=true.
+
+Four AI players, symmetric start. The full dump is 4,600 lines of every
+declared field of every zone; this is the subset the wiki pages cite. Fields
+are rendered generically by the probe, deliberately -- a dump that applied the
+wiki's reading of the obfuscated letters could only ever agree with it.
+
+Field letters, per the AI's own debug overlay: Q=zone id, U=radius,
+A=target group size, F=members, h=attack(true)/defensive(false), q=staging,
+l=attackDelay, d=allowedUnits, e=buildBuildingDelay, f=capacity ratio,
+J=builders, K=idle builders, C/D=build attempts/failures.
+
+--- t=40s : 24 zones across 4 AI players : {'i': 4, 'g': 8, 'n': 12} ---
+  i  Q=  1 U= 420.0 d=  0.71750075 e= 120.99994 f= 0.55 J=2 K=0 C/D=3/0
+  i  Q=  1 U= 420.0 d=  0.11000048 e= 120.99994 f=  0.8 J=2 K=0 C/D=4/0
+  i  Q=  1 U= 420.0 d=        -1.0 e= 120.99994 f=  0.8 J=2 K=2 C/D=2/0
+  i  Q=  1 U= 420.0 d=        -1.0 e= 120.99994 f=  0.8 J=2 K=0 C/D=2/0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+
+--- t=90s : 28 zones across 4 AI players : {'i': 8, 'g': 8, 'n': 12} ---
+  i  Q=  1 U= 420.0 d=        1.69 e= 120.99994 f= 0.39 J=2 K=2 C/D=5/0
+  i  Q= 13 U= 360.0 d= -0.05499978 e= 42.999794 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d=  0.56250143 e= 120.99994 f= 0.39 J=2 K=2 C/D=5/0
+  i  Q= 13 U= 360.0 d= 0.042500332 e= 117.99982 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d=   1.3400003 e= 120.99994 f= 0.39 J=2 K=1 C/D=4/0
+  i  Q= 13 U= 360.0 d=   0.0550283 e=     643.0 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d=    1.522502 e= 120.99994 f= 0.39 J=2 K=1 C/D=6/0
+  i  Q= 13 U= 360.0 d=   0.0525683 e= 42.999794 f=  0.0 J=0 K=0 C/D=0/0
+  g  Q=  2 A=8 members=1 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=1 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=1 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=0 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=1 h=true q=false l=1000.0 u=0.0 o=0.0
+
+--- t=150s : 36 zones across 4 AI players : {'i': 16, 'g': 8, 'n': 12} ---
+  i  Q=  1 U= 420.0 d=   1.5650003 e= 120.99994 f= 0.39 J=2 K=2 C/D=5/0
+  i  Q= 13 U= 360.0 d=      1.2525 e= 132.99994 f= 0.98 J=1 K=1 C/D=1/0
+  i  Q= 17 U= 360.0 d=  0.90747243 e= 31.999802 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q= 24 U= 360.0 d=  -0.6675279 e= 263.99988 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d=   0.4125021 e= 120.99994 f= 0.39 J=2 K=2 C/D=5/0
+  i  Q= 13 U= 360.0 d=  0.61250037 e=     568.0 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q= 17 U= 360.0 d=     -0.7525 e=     557.0 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q= 24 U= 360.0 d=        -1.0 e= 113.99982 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d= 0.102500856 e= 120.99994 f= 0.39 J=2 K=0 C/D=5/0
+  i  Q= 13 U= 360.0 d=   1.7925013 e= 417.99994 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q= 17 U= 360.0 d=   0.3924323 e= 406.99994 f=  0.0 J=1 K=0 C/D=0/0
+  i  Q= 24 U= 360.0 d=   -0.747544 e=     639.0 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q=  1 U= 420.0 d=   0.4850022 e= 120.99994 f= 0.39 J=2 K=1 C/D=6/0
+  i  Q= 13 U= 360.0 d=         1.2 e= 492.99997 f=  0.0 J=0 K=0 C/D=0/0
+  i  Q= 17 U= 360.0 d=  0.20750028 e= 31.999802 f=  0.0 J=1 K=0 C/D=0/0
+  i  Q= 24 U= 360.0 d=  -0.7524999 e= 263.99988 f=  0.0 J=0 K=0 C/D=0/0
+  g  Q=  2 A=8 members=1 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=4 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=3 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=0 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=3 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=2 h=true q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  2 A=8 members=4 h=false q=false l=1000.0 u=0.0 o=0.0
+  g  Q=  3 A=5 members=2 h=true q=false l=1000.0 u=0.0 o=0.0
+

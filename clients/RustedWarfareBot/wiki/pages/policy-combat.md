@@ -10,6 +10,8 @@ related:
 source_paths:
   - "wiki/sources/m15-production/before-after.txt"
   - "wiki/sources/m15-production/sustained-run.log"
+  - "wiki/sources/m15-production/target-churn.txt"
+  - "wiki/sources/m15-production/committed-run.log"
   - "wiki/sources/m13-expand/idle-after-plan.txt"
   - "agent/src/rwbot/agent/Orders.java"
   - "src/rw_bot/policy/combat.py"
@@ -55,9 +57,19 @@ Measured on the same map and opening: **army 4 → 2, the phase ran its full 1,5
 
 Reinforcement bought survival, not parity. Losses still outrun replacements — 4 → 2 — and the opponents went from 47 to 142 visible units over the same window.[^7]
 
-And a new defect is now visible in the numbers. **743 attack orders were issued across 48 attacking units against only 24 distinct targets** — about fifteen re-orders per unit.[^8] Nearest-to-centre is recomputed every sample, and the centre moves whenever a unit dies or a new one rolls out, so the whole army is re-tasked on a flip that may be a few world units wide.
+## Churn, and the commitment that fixed it
 
-The engine's AI does not thrash like this: it holds a target and refreshes on an 800 ms timer rather than on change ([[ai-opponent-strategy]]). That is the same order volume spent on a stable choice instead of an unstable one, and it is the next thing to fix.
+Reinforcement exposed a defect that was invisible while the army died early: **743 attack orders across 48 attacking units against only 24 distinct targets** — about fifteen re-orders each.[^8] Nearest-to-centre was recomputed every sample, and the centre moves whenever a unit dies or a new one rolls out, so the whole army was re-tasked on a flip that could be a few world units wide.
+
+The cause was architectural rather than tactical. The combat policy was a pure function of one sample with **no memory**, so it never committed to anything — while the engine's AI holds a target in a group object and refreshes on a timer ([[ai-opponent-strategy]]). Purity was not the problem; conflating *pure* with *stateless* was. The prior choice is now an argument, exactly as the build loop already passes its own progress in, and the function is still a value in and a value out.[^4]
+
+Holding a target until it is gone cuts re-orders per unit **from 15.5 to between 2.2 and 5.9**.[^9]
+
+## What two runs cannot tell you
+
+The outcome did not follow the churn, and the two committed runs are why: identical code gave **army 4 → 0 at 1,013 samples** and **army 4 → 7 over the full 1,500** — the worst and the best results the bot has produced.[^9]
+
+Outcome variance between runs is therefore larger than anything measured here. The opponents' unit mix is weighted-random by construction ([[ai-opponent-strategy]]), so no two runs are the same experiment, and two of them cannot separate a regression from noise. The churn reduction is safe to claim because it is a direct consequence of the code change and holds in both runs; nothing here says commitment helped or hurt the fight.
 
 [^1]: `agent/src/rwbot/agent/Orders.java` — `attack` adds the subject through the orderable setter and then calls the entity-taking setter, which is the `av.b` waypoint mode. The six candidate setters are listed in the decompiled command class; `av.c` is the build mode already pinned by [[issuing-orders]].
 [^2]: `wiki/sources/m15-production/before-after.txt` [synthesis] — the probe is described in the session log for 2026-07-26; the target's fall from 1200 to 1183 was observed live against a Scout whose catalogue `direct_damage` is 17.
@@ -66,4 +78,5 @@ The engine's AI does not thrash like this: it holds a target and refreshes on an
 [^5]: `src/rw_bot/policy/production.py` — `sustain` and `idle_producers`, also pure.
 [^6]: `src/rw_bot/policy/campaign.py` — `fight` reads samples, orders reinforcements, and dispatches attacks; production runs before the army check so a wiped wave still queues its replacements.
 [^7]: `wiki/sources/m15-production/before-after.txt` — the two scorecards side by side, with the counts re-derived from the run log at the foot of the file.
+[^9]: `wiki/sources/m15-production/target-churn.txt` — the three runs side by side, with the counts derived from each run log and the variance caveat stated in the file itself.
 [^8]: `wiki/sources/m15-production/sustained-run.log` — 743 `channel: attack` lines and 49 `channel: produce` lines; the distinct target and attacker counts are the sorted-unique ids from those lines.

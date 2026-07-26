@@ -15,6 +15,7 @@ package rwbot.agent;
  */
 final class AgentOptions {
 
+    private final long randomSeed;
     private final int[] discoverAtSeconds;
     private final boolean exitAfterDiscovery;
     private final String[] inspectFields;
@@ -30,6 +31,7 @@ final class AgentOptions {
     private final int sampleIntervalMs;
 
     AgentOptions(
+            long randomSeed,
             int[] discoverAtSeconds,
             boolean exitAfterDiscovery,
             String[] inspectFields,
@@ -43,6 +45,7 @@ final class AgentOptions {
             boolean aiZones,
             int channelPort,
             int sampleIntervalMs) {
+        this.randomSeed = randomSeed;
         this.discoverAtSeconds = discoverAtSeconds;
         this.exitAfterDiscovery = exitAfterDiscovery;
         this.inspectFields = inspectFields;
@@ -165,6 +168,22 @@ final class AgentOptions {
      * the state dump does -- both need a loaded game and neither needs its own
      * timer.
      */
+    /**
+     * The seed to pin the engine's generator to, or zero to leave it alone.
+     *
+     * <p>Zero means "do not touch it" rather than "seed with zero", because a
+     * run that silently became repeatable would be worse than one that visibly
+     * is not (wiki: policy-combat).
+     */
+    long randomSeed() {
+        return randomSeed;
+    }
+
+    /** Whether a seed was asked for at all. */
+    boolean seedRequested() {
+        return randomSeed != 0L;
+    }
+
     String typeFlagsPath() {
         return typeFlagsPath;
     }

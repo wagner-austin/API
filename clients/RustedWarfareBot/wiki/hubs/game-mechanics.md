@@ -19,3 +19,4 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership
 [The Shipped AI's Zone System](../pages/engine-ai-zones.md) -- the AI's unit of place: five zone kinds, one-unit-one-zone, and expansion sited on resource pools at random
 [The Shipped AI's Build and Attack Triggers](../pages/engine-ai-triggers.md) -- when it builds, makes units and commits: a credit ladder, a unit budget, and fill-then-commit attack groups of 3, 5, 7
+[Movement Layers and Reachability](../pages/mechanics-movement-layers.md) -- eight layers named by the engine, reachability as a component comparison, and the twelve pools no land builder can reach

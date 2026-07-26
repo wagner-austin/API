@@ -122,14 +122,35 @@ def find_targets(sample: Sample) -> tuple[Entity, ...]:
     return tuple(entity for entity in sample["entities"] if entity["hostile"])
 
 
-def choose_target(army: Sequence[Entity], targets: Sequence[Entity]) -> Entity | None:
-    """Pick the target the army should commit to.
+def choose_target(
+    army: Sequence[Entity],
+    targets: Sequence[Entity],
+    holding: int | None = None,
+) -> Entity | None:
+    """Pick the target the army should commit to, keeping the current one.
 
-    Nearest to the army's centre, so a split force converges rather than each
-    unit wandering to its own closest enemy. Concentrating fire is the one
-    tactic that matters at this scale: two tanks on one target kill it in half
-    the time and take half the return fire, while two tanks on two targets kill
-    neither quickly.
+    **Commitment is the point of the ``holding`` argument.** Choosing afresh
+    every sample is what made the bot look busy and achieve little: nearest is
+    measured from the army's centre, that centre shifts whenever a unit dies or
+    a new one rolls out, and the whole army was re-tasked on a flip that could
+    be a few world units wide. One measured run spent 743 attack orders across
+    48 units on 24 targets -- about fifteen re-orders each
+    ([[policy-combat]]).
+
+    So a target already being attacked is kept while it remains visible and
+    hostile, and a new one is chosen only when it is not. The engine's own AI
+    reaches the same place from the other direction: it holds a target and
+    refreshes on a timer rather than on a change of mind
+    ([[ai-opponent-strategy]]).
+
+    Purity is not lost by this. The prior choice is an argument rather than
+    hidden state, exactly as the build loop passes its own progress in, so the
+    function is still a value in and a value out.
+
+    Nearest is measured to the army's centre rather than per unit, so a split
+    force converges instead of each unit wandering to its own closest enemy.
+    Concentrating fire is the one tactic that matters at this scale: two tanks
+    on one target kill it in half the time and take half the return fire.
 
     Distance is squared and left squared -- only the ordering is used, and a
     square root would cost precision for nothing.
@@ -137,12 +158,16 @@ def choose_target(army: Sequence[Entity], targets: Sequence[Entity]) -> Entity |
     Args:
         army: The units available to fight.
         targets: The hostile entities to choose between.
+        holding: Engine identity of the target already being attacked, if any.
 
     Returns:
         The chosen target, or None when either side is empty.
     """
     if not army or not targets:
         return None
+    for target in targets:
+        if target["unit_id"] == holding:
+            return target
     centre_x = sum(unit["x"] for unit in army) / len(army)
     centre_y = sum(unit["y"] for unit in army) / len(army)
 
@@ -156,22 +181,28 @@ def choose_target(army: Sequence[Entity], targets: Sequence[Entity]) -> Entity |
     return best
 
 
-def engagements(sample: Sample, catalogue: Mapping[str, UnitStats]) -> tuple[Engagement, ...]:
+def engagements(
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    holding: int | None = None,
+) -> tuple[Engagement, ...]:
     """Decide who attacks what this sample.
 
-    The whole army is sent at one target rather than spread across several, for
-    the reason given in :func:`choose_target`.
+    The whole army is sent at one target rather than spread across several, and
+    that target persists across samples, both for the reasons given in
+    :func:`choose_target`.
 
     Args:
         sample: One observation of the world.
         catalogue: Unit stats by type name.
+        holding: Engine identity of the target already being attacked, if any.
 
     Returns:
         One engagement per available unit, empty when there is no army or
         nothing hostile in sight.
     """
     army = find_army(sample, catalogue)
-    target = choose_target(army, find_targets(sample))
+    target = choose_target(army, find_targets(sample), holding)
     if target is None:
         return ()
     return tuple(

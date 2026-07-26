@@ -11,6 +11,7 @@ import pytest
 from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.build_order import (
+    LAND_MOVEMENT,
     PLACEMENT_RING,
     POOL_OCCUPIED_RADIUS,
     completed_count,
@@ -92,6 +93,18 @@ _PLACEMENTS = {
 }
 
 
+#: Connectivity component every land fixture shares.
+#:
+#: The engine hands these out per map; the value is arbitrary and only equality
+#: matters. Defaulting builders and pools to the same one keeps every test that
+#: is not about reachability from having to restate it, and a test that *is*
+#: about reachability puts one of them somewhere else.
+_MAINLAND = 1
+
+#: A component id no fixture shares, for the far side of water.
+_ISLAND = 2
+
+
 def _pool(index: int, tile_x: int, tile_y: int) -> ResourcePool:
     """Build a pool record at a tile, with the world centre the agent computes."""
     return ResourcePool(
@@ -100,6 +113,7 @@ def _pool(index: int, tile_x: int, tile_y: int) -> ResourcePool:
         tile_y=tile_y,
         x=tile_x * 20.0 + 10.0,
         y=tile_y * 20.0 + 10.0,
+        group_land=_MAINLAND,
     )
 
 
@@ -112,6 +126,8 @@ def _entity(
     mine: bool = True,
     complete: bool = True,
     hostile: bool | None = None,
+    movement: str = LAND_MOVEMENT,
+    group: int = _MAINLAND,
 ) -> Entity:
     """Build an entity record.
 
@@ -130,6 +146,8 @@ def _entity(
         team=0 if mine else 1,
         mine=mine,
         hostile=(not mine) if hostile is None else hostile,
+        movement=movement,
+        group=group,
         hp=100.0,
         max_hp=100.0,
         complete=complete,
@@ -584,6 +602,7 @@ def test_an_enemy_extractor_holds_a_pool_just_as_firmly() -> None:
         "pool": None,
         "visible": 1,
         "occupied": 1,
+        "unreachable": 0,
         "exposed": 0,
     }
 
@@ -619,6 +638,57 @@ def test_a_type_the_catalogue_does_not_know_leaves_the_pool_free() -> None:
     assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["pool"] == pool
 
 
+def test_a_pool_across_water_is_not_offered_to_a_land_builder() -> None:
+    """The failure the whole reachability check exists for.
+
+    Twelve of the forty-six pools on the archived map sit in components the
+    mainland cannot walk to ([[mechanics-movement-layers]]). Distance alone
+    would send a builder at one of them the moment the near ground filled up.
+    """
+    here = _pool(0, 220, 130)
+    across = _pool(1, 12, 52)
+    across["group_land"] = _ISLAND
+    world = _sample(_ANCHOR, _BUILDER, pools=(across, here), credits=10_000)
+    survey = survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)
+    assert survey["pool"] == here
+    assert survey["unreachable"] == 1
+
+
+def test_a_pool_with_no_land_component_at_all_is_not_offered() -> None:
+    """A negative id is the engine saying there is no component, not an id.
+
+    Comparing two of them for equality is how the engine's own predicate
+    answers true for a point it could not place at all; refusing every negative
+    is the more conservative reading.
+    """
+    nowhere = _pool(0, 220, 130)
+    nowhere["group_land"] = -1
+    world = _sample(_ANCHOR, _BUILDER, pools=(nowhere,), credits=10_000)
+    assert survey_pools(world, _ANCHOR, _BUILDER, _CATALOGUE)["unreachable"] == 1
+
+
+def test_a_builder_off_the_land_grid_is_not_offered_a_pool_it_cannot_be_judged_for() -> None:
+    """Its own component id belongs to a different grid, so it has none here."""
+    stranded = _entity(214, "builder", 4250.0, 2610.0, group=-1)
+    world = _sample(_ANCHOR, stranded, pools=(_pool(0, 220, 130),), credits=10_000)
+    assert survey_pools(world, _ANCHOR, stranded, _CATALOGUE)["unreachable"] == 1
+
+
+def test_a_builder_that_does_not_travel_on_land_is_not_judged_at_all() -> None:
+    """A refusal to guess, not an optimistic default.
+
+    A hover unit's component id indexes the hover grid, so comparing it against
+    a pool's land component would be a confident wrong answer. Reachability
+    stops applying; occupancy and threat still do.
+    """
+    hover = _entity(214, "builder", 4250.0, 2610.0, movement="HOVER", group=99)
+    pool = _pool(0, 220, 130)
+    world = _sample(_ANCHOR, hover, pools=(pool,), credits=10_000)
+    survey = survey_pools(world, _ANCHOR, hover, _CATALOGUE)
+    assert survey["pool"] == pool
+    assert survey["unreachable"] == 0
+
+
 def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
     pool = _pool(0, 220, 130)
     turret = _entity(900, "turret", pool["x"] + 50.0, pool["y"], mine=False)
@@ -627,6 +697,7 @@ def test_a_pool_inside_an_enemy_gun_is_not_offered() -> None:
         "pool": None,
         "visible": 1,
         "occupied": 0,
+        "unreachable": 0,
         "exposed": 1,
     }
 
@@ -706,8 +777,8 @@ def test_an_extractor_with_every_pool_taken_waits_rather_than_blocking() -> None
     decision = decide(world, ("extractorT1", "extractorT1"), _CATALOGUE, _PLACEMENTS)
     assert decision["action"] == "wait"
     assert decision["reason"] == (
-        "extractorT1 needs a resource pool: of the 1 in sight, 1 are built on and "
-        "0 can only be reached through enemy fire"
+        "extractorT1 needs a resource pool: of the 1 in sight, 1 are built on, "
+        "0 cannot be walked to and 0 can only be reached through enemy fire"
     )
 
 
@@ -721,8 +792,8 @@ def test_the_wait_reason_separates_a_taken_pool_from_a_covered_one() -> None:
     decision = decide(world, ("extractorT1", "extractorT1"), _ARMED, _PLACEMENTS)
     assert decision["action"] == "wait"
     assert decision["reason"] == (
-        "extractorT1 needs a resource pool: of the 2 in sight, 1 are built on and "
-        "1 can only be reached through enemy fire"
+        "extractorT1 needs a resource pool: of the 2 in sight, 1 are built on, "
+        "0 cannot be walked to and 1 can only be reached through enemy fire"
     )
 
 

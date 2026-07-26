@@ -1,0 +1,70 @@
+Every enum in the pinned jar, by constant name
+==============================================
+
+Game: Rusted Warfare 1.15 (code 176, build #28), game-lib.jar.
+
+Method: find every enum in the CFR decompile, then read its constant names out
+of the class's own <clinit> with javap:
+
+  javap -p -c -cp game-lib.jar <class> | grep '// String '
+
+ProGuard renamed the enum FIELDS but not the name strings passed to the Enum
+constructor, so `javap` recovers every constant name even where the decompile
+shows only `a, b, c`. 53 enums, all of com.corrodinggames.*; the bundled
+Steamworks enums were never obfuscated and are excluded.
+
+Regenerable from the jar alone -- no running game, no live state.
+
+com.corrodinggames.rts.appFramework.e = singleThreadedSurface singleThreadedSurfaceIfHardware multiThreadedSurface multiThreadedNonSurface opengl dynamicDefault 
+com.corrodinggames.rts.game.a.b = include exclude 
+com.corrodinggames.rts.game.a.j = Pre Prepare Active 
+com.corrodinggames.rts.game.a.k = Main ResourceOutpost ForwardOutpost 
+com.corrodinggames.rts.game.m = normal nuke 
+com.corrodinggames.rts.game.o = pureGreen hueAdd hueNew hueShift disabled 
+com.corrodinggames.rts.game.q = own ally allyNotOwn enemy neutral any notOwn 
+com.corrodinggames.rts.game.units.a = outOfRange onlyInRange returnFire holdFire guardArea aggressive mixed 
+com.corrodinggames.rts.game.units.a.k = normal attack defend nuke build upgrade ok no happy sad retreat 
+com.corrodinggames.rts.game.units.a.t = none rally upgrade queueUnit building action infoOnly infoOnlyNoBox infoOnlyStockpile 
+com.corrodinggames.rts.game.units.a.u = none placeBuilding popupQueue setRally reclaimTarget repairTarget targetGround attackMove infoOnly pingMap directToAction guardUnit patrol 
+com.corrodinggames.rts.game.units.ab = verysmall small normal large largeUnit building buildingNoShockwaveOrSmoke verylargeBuilding 
+com.corrodinggames.rts.game.units.ag = attack move newSelection 
+com.corrodinggames.rts.game.units.ao = NONE LAND BUILDING AIR WATER HOVER OVER_CLIFF OVER_CLIFF_WATER 
+com.corrodinggames.rts.game.units.av = move attack build repair loadInto unloadAt reclaim attackMove loadUp patrol guard guardAt touchTarget follow triggerAction triggerActionWhenInRange setPassiveTarget 
+com.corrodinggames.rts.game.units.b = normal strafing moveaway bomber 
+com.corrodinggames.rts.game.units.custom.a.e = auto disabled upgrade movementChange sameAsBuilding launch launchAmmo 
+com.corrodinggames.rts.game.units.custom.a.f = build convert none 
+com.corrodinggames.rts.game.units.custom.ad = emptyResourcePools_asNeutral emptyOrOccupiedResourcePools_asNeutral mapCenter_asNeutral mapCenter_eachActiveTeam spawnPoint_eachActiveTeam 
+com.corrodinggames.rts.game.units.custom.af = created completeAndActive destroyed killedAnyUnit queuedUnitFinished queueItemAdded queueItemCancelled teleported touchTargetSuccess newWaypointGivenByPlayer teamChanged transportingNewUnit transportUnloadedOrRemovedUnit tookDamage enteredTransport leftTransport newMessage attachmentRemoved 
+com.corrodinggames.rts.game.units.custom.ah = imageLoad imageLoadOrGet soundLoad soundLoadOrGet iniParse unitParse iniOpen iniClose iniSetup actionParse unitParsePartA unitParsePartB unitParsePartC unitParsePartD 
+com.corrodinggames.rts.game.units.custom.az = small medium large smoke shockwave largeExplosion smallExplosion resourcePoolSmoke noneExplosion 
+com.corrodinggames.rts.game.units.custom.b.f = shadow beforeBody afterBody onTop beforeUI inactive 
+com.corrodinggames.rts.game.units.custom.d = frame scale legX legY legDir legHeight turretX turretY event legAlpha 
+com.corrodinggames.rts.game.units.custom.e.b = none space comma 
+com.corrodinggames.rts.game.units.custom.logicBooleans.LogicBoolean$ReturnType = undefined voidReturn bool number unit string point boolArray numberArray unitArray 
+com.corrodinggames.rts.game.units.custom.logicBooleans.VariableScope$CachedWriter$Operator = set add subtract 
+com.corrodinggames.rts.game.units.custom.s = everyFrame every4Frames every8Frames 
+com.corrodinggames.rts.gameFramework.b.a.a = A_Position a_Position A_TexCoordinate a_TexCoordinate 
+com.corrodinggames.rts.gameFramework.bj = income armyValue buildingValue totalValue 
+com.corrodinggames.rts.gameFramework.d.d = custom smoke teleport hitGround playerLand playerJump gemCollect keyDoorOpen blood 
+com.corrodinggames.rts.gameFramework.d.h = verylow low high veryhigh critical 
+com.corrodinggames.rts.gameFramework.f.a.d = mouseMove mouseClick mouseUp mouseDown 
+com.corrodinggames.rts.gameFramework.f.a.i = normal hovered 
+com.corrodinggames.rts.gameFramework.f.a.m = none vertical horizontal 
+com.corrodinggames.rts.gameFramework.f.ac = overallStats A incomeChart B armyValueChart C buildingValueChart D totalValueChart E 
+com.corrodinggames.rts.gameFramework.f.h = yes no more 
+com.corrodinggames.rts.gameFramework.f.i = none zoomButton unselectAllButton 
+com.corrodinggames.rts.gameFramework.f.r = base unit nuke message 
+com.corrodinggames.rts.gameFramework.f.z = absolute relative 
+com.corrodinggames.rts.gameFramework.g.c = player allyGroup combinedPlayerAndGroup 
+com.corrodinggames.rts.gameFramework.g.f = none income armyValue buildingValue totalValue credits 
+com.corrodinggames.rts.gameFramework.h = Windows MacOS Linux Other 
+com.corrodinggames.rts.gameFramework.j.am = layout_2sides layout_3sides layout_ffa layout_spectators 
+com.corrodinggames.rts.gameFramework.j.m = expected warn 
+com.corrodinggames.rts.gameFramework.j.x = wrongPassword unknown 
+com.corrodinggames.rts.gameFramework.m.d = Normal Rect 
+com.corrodinggames.rts.gameFramework.m.w = normal copy additive 
+com.corrodinggames.rts.gameFramework.n.h = normal 
+com.corrodinggames.rts.gameFramework.n.l = none allUnitsAndBuildings allBuildings mainBuildings commandCenter noConstructionOrTech requiredObjectives 
+com.corrodinggames.rts.gameFramework.s = menu normal normalSave 
+com.corrodinggames.rts.gameFramework.u = gameImage gameImageCreate gameImageColor gameImageFogBuffer gameFont gameSound uiImage 
+com.corrodinggames.rts.gameFramework.utility.q = add remove 
