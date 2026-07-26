@@ -8,6 +8,8 @@ related:
   - "[[issuing-orders]]"
   - "[[perception-visibility]]"
   - "[[mechanics-resource-pools]]"
+  - "[[mechanics-build-actions]]"
+  - "[[policy-threat]]"
 source_paths:
   - "wiki/sources/m6-wire/world-sample.ndjson:1"
   - "wiki/sources/m6-wire/world-sample.ndjson:2"
@@ -36,13 +38,15 @@ The agent publishes what it sees as newline-delimited JSON and the planner decod
 Records are discriminated by `kind`. A `frame` record opens a sample and declares how many records of each following kind it carries; each `entity` record is one visible unit or building, carrying the engine id an order is dispatched against ([[issuing-orders]]); each `pool` record is one visible resource pool ([[mechanics-resource-pools]]); and each `option` record is one thing an owned unit can currently make.[^1][^2][^7][^9]
 
 ```
-{"kind":"frame","frame":3725,"clock_ms":12488,"visible":19,"pools":46,"options":123,"credits":4333}
-{"kind":"entity","frame":3725,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hp":4000.0,"max_hp":4000.0}
-{"kind":"pool","frame":3725,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}
-{"kind":"option","frame":3725,"index":5,"unit_id":214,"produces":"landFactory","action":1,"placed":true,"available":true}
+{"kind":"frame","frame":3521,"clock_ms":11822,"visible":19,"pools":46,"options":123,"credits":4315}
+{"kind":"entity","frame":3521,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hostile":true,"hp":4000.0,"max_hp":4000.0,"complete":true,"queued":0}
+{"kind":"pool","frame":3521,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}
+{"kind":"option","frame":3521,"index":5,"unit_id":214,"produces":"landFactory","action":1,"placed":true,"available":true}
 ```
 
 `frame` and `clock_ms` are the engine's own counters, read from the same fields measured at ~300 Hz and 1 kHz ([[engine-tick-and-clock]]). Fields are limited to what has been verified against the engine rather than everything reachable ([[engine-entity-model]]).
+
+Three of the entity fields exist because they cannot be derived on the reading side. `hostile` is not `not mine` — the engine compares alliance group and excludes the neutral team, so an ally is neither ([[policy-threat]]). `complete` is not presence — a building joins the roster when construction *starts*. And `queued` is the only immediate evidence that a production order was accepted, because a queued unit changes no roster until it is finished ([[mechanics-build-actions]]).
 
 The counts have grown three times, and each time a count rather than a terminator. `owned` became `visible` when the stream widened past the player's own units ([[perception-visibility]]); `pools` joined it when terrain that no entity list can express had to reach the planner; and `options` joined when what a unit can make turned out to be answerable only by asking the unit. A count in the opening record is what lets the reader know a sample is complete before parsing all of it, which is the property the channel frames on.[^8]
 
@@ -78,7 +82,7 @@ A JSONL stream is itself a corpus. Decoding is a pure function of the lines it i
 
 [^1]: `wiki/sources/m6-wire/world-sample.ndjson:1` — the opening frame record of a real capture from a live headless skirmish, declaring 19 visible entities, 46 pools and 123 build options.
 [^2]: `wiki/sources/m6-wire/world-sample.ndjson:2` — the entity record at index 0, an opposing team's `commandCenter` carrying `"mine":false`.
-[^3]: `wiki/sources/m6-wire/world-sample.ndjson:190` and `:379` — the second and third frame records, 3646 at 12237 ms and 3945 at 13238 ms; 299 frames across 1001 ms is 298.7 per second.
+[^3]: `wiki/sources/m6-wire/world-sample.ndjson:190` and `:379` — the second and third frame records, 3814 at 12810 ms and 4114 at 13810 ms; 300 frames across 1000 ms is 300.0 per second.
 [^7]: `wiki/sources/m6-wire/world-sample.ndjson:21` — the first pool record, tile (115, 6) at world (2310.0, 130.0).
 [^8]: `src/rw_bot/control/channel.py` — `_complete_or_none` reads the opening record's counts and waits for `1 + visible + pools + options` lines before decoding.
 [^9]: `wiki/sources/m6-wire/world-sample.ndjson:67` and `:72` — the Command Center's first option (`builder`, `"placed":false`) and the Builder's `landFactory` (`"placed":true`); `agent/src/rwbot/agent/BuildOptions.java` is the producer, and the predicate that reads as "makes something" is `a.s.g()`, false on `a.v` (build a structure) and true on `a.l` (produce a unit).
