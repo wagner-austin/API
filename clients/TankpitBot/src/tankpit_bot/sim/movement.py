@@ -101,13 +101,16 @@ class MoveOutcomeDict(TypedDict):
     """Everything one processed move command changed.
 
     ``kind`` is ``moved`` on success; ``cant_go`` when no route exists
-    (impassable destination or fully blocked paths);
-    ``insufficient_fuel`` when the routed cost exceeds the tank's
-    fuel. ``mine_positions`` lists enemy mines detonated by the
-    arrival (at most one — the destination tile).
+    (impassable destination or fully blocked paths). Fuel never
+    rejects a walk: the debit clamps to remaining fuel, and fuel-0
+    walks execute in full (density runs 2-3, 2026-07-25 — repeated
+    accepted multi-tile walks at fuel 0; wiki [[game-economy]]:
+    "walking and scanning are both free at fuel 0").
+    ``mine_positions`` lists enemy mines detonated by the arrival
+    (at most one — the destination tile).
     """
 
-    kind: Literal["moved", "cant_go", "insufficient_fuel"]
+    kind: Literal["moved", "cant_go"]
     tank_id: int
     start_x: int
     start_y: int
@@ -283,10 +286,9 @@ def process_move(
     walked, final_x, final_y = _truncate_at_transition(
         world, terrain, start_x, start_y, start_surface, path
     )
-    cost = WALK_COST_PER_TILE * len(walked)
-    if cost > tank["fuel"]:
-        outcome["kind"] = "insufficient_fuel"
-        return outcome
+    # The debit clamps to remaining fuel (radar-analog law): the walk
+    # itself never rejects for fuel — fuel-0 walks executed live.
+    cost = min(WALK_COST_PER_TILE * len(walked), tank["fuel"])
     tank["x"] = final_x
     tank["y"] = final_y
     tank["fuel"] -= cost

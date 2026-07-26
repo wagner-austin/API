@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
     SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
@@ -129,12 +130,18 @@ def test_move_tick_emits_echo_then_fuel_sync() -> None:
 
 
 def test_rejected_moves_emit_supervisor_errors() -> None:
-    """cant_go and insufficient_fuel surface as 0x52 messages."""
+    """Out-of-window and cant_go rejections surface as 0x52 messages.
+
+    The client's window is [2, 18) x [2, 18) (centered on (10, 10),
+    map-clamped): a target one column past the edge draws code 0
+    (CANT_DO) — the measured acceptance boundary
+    ([[viewport-shift-protocol]]) — and an occupied in-window tile
+    draws code 1 (CANT_GO).
+    """
     server = _server()
-    server.world["tanks"][9]["fuel"] = 2
-    server.queue_command(9, _move(20, 10))
-    insufficient = _supervisors(server.advance_tick())
-    assert [record["error_code"] for record in insufficient] == [SUPERVISOR_ERROR_INSUFFICIENT_FUEL]
+    server.queue_command(9, _move(18, 10))
+    outside = _supervisors(server.advance_tick())
+    assert [record["error_code"] for record in outside] == [SUPERVISOR_ERROR_CANT_DO]
     server.queue_command(9, _move(15, 10))
     occupied = _supervisors(server.advance_tick())
     assert [record["error_code"] for record in occupied] == [SUPERVISOR_ERROR_CANT_GO]
@@ -147,7 +154,7 @@ def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
     server.world["mines"].append(SimMineDict(x=11, y=10, team=1))
     server.queue_command(9, _move(11, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, 0x45, "container_pickup", 0x5A, 0x2E, 0x2E]
+    assert _kinds(messages) == [0x47, 0x45, "container_pickup", 0x2E, 0x2E]
     pickup = messages[2]
     assert pickup["msg_type"] == "container_pickup"
     assert pickup["pickups"][0]["remaining_volume"] == 0
@@ -257,7 +264,7 @@ def test_corpse_window_closes_with_0x58_after_exactly_22_seconds() -> None:
     closing = server.advance_tick()
     removes = [m for m in closing if m["msg_type"] == 0x58]
     assert [m["tank_id"] for m in removes] == [11]
-    assert server._removed_at == {}
+    assert server._viewport.removed_at == {}
 
 
 def test_kill_emits_deactivation_and_skips_the_deads_commands() -> None:
@@ -429,4 +436,4 @@ def test_pickup_click_routes_through_the_move_law() -> None:
     server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30, dotted=True))
     server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, "container_pickup", 0x5A, 0x2E, 0x2E]
+    assert _kinds(messages) == [0x47, "container_pickup", 0x2E, 0x2E]

@@ -121,6 +121,13 @@ def test_practice_client_seeding_fails_loudly_on_sealed_ground() -> None:
         seed_practice_client(_world(), sealed, PRACTICE_LAYOUTS[0], 9)
 
 
+def test_practice_room_rejects_a_roster_tile_far_at_sea() -> None:
+    """A mined position with no open tile within 16 is bad layout data."""
+    sealed = InMemoryTerrainMap(default=InMemoryTerrainMap.WATER)
+    with pytest.raises(RuntimeError, match="no open tile within 16"):
+        PracticeRoomDriver(_world(), sealed, 9, ((510, 1, 0, 101, 100),))
+
+
 def test_practice_room_notes_hits_and_returns_fire() -> None:
     """A landed 0x53 on a roster bot queues its shot-for-shot return
     and the next ``decide_all`` emits it (plus sighted team aggro)."""

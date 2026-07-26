@@ -6,6 +6,14 @@ boundaries; every wire message a tick produces flushes as one batch
 costs bill one tick AFTER the shot (measured charge latency); victim
 damage bills instantly inside :mod:`tankpit_bot.sim.combat`.
 
+The server here is routing and orchestration only. Each concern owns
+its module: :mod:`tankpit_bot.sim.viewport_window` (the client's
+stored 0x5A window, patch memory, and visibility diffs),
+:mod:`tankpit_bot.sim.combat_emissions` (shots, kill rewards, the
+deferred-debit and corpse-window clocks),
+:mod:`tankpit_bot.sim.emissions` (per-command wire emission), and
+:mod:`tankpit_bot.sim.wire_statements` (pure message builders).
+
 The processor emits decoded ``BinaryMessage`` dicts; the transport
 layer (build step c) turns them into wire bytes via
 ``protocol.encoders.encode_envelope_body``.
@@ -14,88 +22,39 @@ layer (build step c) turns them into wire bytes via
 from __future__ import annotations
 
 from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
-from tankpit_bot.container.types import (
-    ContainerPickupDict,
-    ContainerPickupRecordDict,
-    MineDetonationDict,
-    MinePlacementDict,
-    TeleportLandedDict,
-)
-from tankpit_bot.physics.capacity import damage_tier
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_DO,
-    SUPERVISOR_ERROR_CANT_GO,
     SUPERVISOR_ERROR_EMPTY_CONTAINER,
-    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
-    SUPERVISOR_ERROR_INVENTORY_FULL,
 )
 from tankpit_bot.protocol.types import (
     BinaryMessage,
-    BuildPickupDict,
-    DeactivationDict,
-    EquipmentGainDict,
-    EquipmentToggleDict,
     FuelGainDict,
     InventoryDict,
-    MovementDict,
-    MovementResponseDict,
-    RadarResultDict,
-    RadarScanResultDict,
-    ShootEventDict,
     SupervisorDict,
-    TankInfoDict,
-    TankRemoveDict,
-    TankStatusSyncDict,
-    TerrainUpdateDict,
-    ViewportEntityDict,
-    ViewportUpdateDict,
 )
-from tankpit_bot.sim.actions import (
-    MINE_PRESS_FUEL_COST,
-    RADAR_FUEL_COST,
-    VIEWPORT_RADIUS,
-    build_map_data,
-    process_mine_press,
-    process_radar,
-    process_teleport,
-)
-from tankpit_bot.sim.blocks import block_tile_value, process_block_press
+from tankpit_bot.sim.actions import build_map_data
 from tankpit_bot.sim.bot_policy import reactivate_practice_bot
-from tankpit_bot.sim.combat import process_shot
+from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS, CombatLedger
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
-from tankpit_bot.sim.equipment import (
-    MERCY_BUNDLE,
-    RADAR_SLOT,
-    kill_grants_mercy,
-    resolve_equipment_pickup,
+from tankpit_bot.sim.emissions import (
+    emit_block_action,
+    emit_equipment_pickup,
+    emit_equipment_toggle,
+    emit_mine_press,
+    emit_move,
+    emit_radar,
+    emit_teleport,
 )
-from tankpit_bot.sim.movement import MoveOutcomeDict, process_move
+from tankpit_bot.sim.movement import process_move
+from tankpit_bot.sim.viewport_window import ViewportTracker
+from tankpit_bot.sim.wire_statements import (
+    identity_statement,
+    position_statement,
+    queued_tank_id,
+    status_sync,
+)
 from tankpit_bot.sim.world import SimWorldDict
-
-# TeleportLanded's 1-byte body observed in production captures.
-_TELEPORT_LANDED_SUBTYPE = 0x0C
-
-# The visible viewport is a 16x16 window (0x5A ViewportUpdate is the
-# ONLY message that sets it — [[viewport-shift-protocol]]). The sim
-# centers it on the client; the real window scrolls, so the center is
-# a documented approximation.
-_VIEWPORT_SPAN = 16
-_MAP_SPAN = 256
-
-# Wire terrain vocabulary shared by 0x42/0x4A/0x5A ([[movable-blocks]]):
-# ferries patch as 5; a vacated ferry tile reverts by patching 0
-# (ground), which the client's composition resolves back to the
-# static map value (water under a ferry).
-_WIRE_TERRAIN_FERRY = 5
-_WIRE_TERRAIN_REVERT = 0
-_OVERLAY_NO_MINE = 8
-
-# The corpse window: a killed tank's 0x58 TankRemove arrives EXACTLY
-# 22 s after its 0x41 (corpus-swept 2026-07-22: 37 kill->remove
-# pairs, min = median = 22.0 s; the tail is id-reuse pairing noise).
-# 11 ticks at the 2 s cadence.
-CORPSE_WINDOW_TICKS = 11
 
 _SUPPORTED_KINDS = frozenset(
     {
@@ -112,78 +71,6 @@ _SUPPORTED_KINDS = frozenset(
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
-
-
-def _queued_tank_id(entry: tuple[int, ClientCommandDict]) -> int:
-    """The round-order sort key: the queued command's tank id.
-
-    Args:
-        entry: One ``(tank_id, command)`` queue entry.
-
-    Returns:
-        The tank id — within-round resolution is ascending tank id.
-    """
-    return entry[0]
-
-
-def _movement_echo(world: SimWorldDict, outcome: MoveOutcomeDict) -> MovementDict:
-    """Build the 0x47 echo for one processed move.
-
-    Args:
-        world: Simulated world (post-move).
-        outcome: The move's outcome.
-
-    Returns:
-        The movement echo carrying the full routed path.
-    """
-    tank = world["tanks"][outcome["tank_id"]]
-    path = outcome["path"]
-    x, y = tank["x"], tank["y"]
-    return MovementDict(
-        msg_type=0x47,
-        tank_id=tank["tank_id"],
-        start_x=outcome["start_x"],
-        start_y=outcome["start_y"],
-        direction=0,
-        damage_state=damage_tier(tank["fuel"], tank["rank"]),
-        lb_score=0,
-        rank=tank["rank"],
-        flag=1,
-        is_carrying=False,
-        waypoints=[(x, y)] if path else [],
-        path_tiles=len(path),
-        path=path,
-    )
-
-
-def _status_sync(tank_id: int, world: SimWorldDict, include_fuel: bool) -> TankStatusSyncDict:
-    """Build a 0x2E status sync for one tank.
-
-    The real wire carries the fuel field ONLY on the recipient's own
-    tank (per-recipient long form); other tanks sync short-form. The
-    production dispatcher treats any fuel-bearing 0x2E as self fuel,
-    so emitting long-form for a victim would corrupt the client's own
-    belief — caught by the step-(c) wire integration.
-
-    Args:
-        tank_id: The synced tank.
-        world: Simulated world.
-        include_fuel: True only for the connected client's tank.
-
-    Returns:
-        The status sync (long form with fuel, or short form).
-    """
-    tank = world["tanks"][tank_id]
-    return TankStatusSyncDict(
-        msg_type=0x2E,
-        subtype=tank["team"],
-        tank_id=tank_id,
-        damage_state=damage_tier(tank["fuel"], tank["rank"]),
-        rank=tank["rank"],
-        lb_score=0,
-        promo_state=0,
-        fuel=tank["fuel"] if include_fuel else None,
-    )
 
 
 class SimServer:
@@ -203,12 +90,6 @@ class SimServer:
     ) -> None:
         """Bind the server to a world, its terrain, and the client tank.
 
-        Viewport membership is computed at construction: other living
-        tanks within :data:`VIEWPORT_RADIUS` of the client are visible
-        from the first tick; later transitions emit 0x58 TankRemove on
-        exit (starting the law-4 reroute clock) and a 0x3D position
-        statement on re-entry.
-
         Args:
             world: Simulated world (owned and mutated by the server).
             terrain: Static terrain for the world's field.
@@ -223,91 +104,9 @@ class SimServer:
         self.client_id = client_id
         self._roster_ids = roster_ids
         self._queue: list[tuple[int, ClientCommandDict]] = []
-        self._pending_debits: list[tuple[int, int]] = []
-        self._removed_at: dict[int, int] = {}
-        self._died_at: dict[int, int] = {}
         self._pending_announcements: list[BinaryMessage] = []
-        self._patched_dynamic_tiles: dict[tuple[int, int], int] = {}
-        self._visible: set[int] = {
-            tank_id
-            for tank_id, tank in world["tanks"].items()
-            if tank_id != client_id and tank["alive"] and self._in_viewport(tank_id)
-        }
-
-    def _viewport_update(self) -> ViewportUpdateDict:
-        """Build the client's 0x5A viewport statement.
-
-        The origin centers the 16x16 window on the client (clamped at
-        the map edge). Entities enumerate the VISIBLE dynamic-terrain
-        layer only: in-window ferry tiles (wire terrain 5,
-        [[ferry-mechanics]]) and resting movable blocks (1/2/3 by
-        context, [[movable-blocks]]) plus explicit reverts (wire
-        terrain 0) for previously patched tiles the entity has left.
-        Hidden-layer entities (containers, mines) stay absent by
-        design: they reveal only by radar, and the production
-        reset-then-apply sweep explicitly SPARES radar-sourced
-        entries on silent tiles.
-
-        Returns:
-            The viewport update for the client's current position.
-        """
-        client = self.world["tanks"][self.client_id]
-        left = min(max(client["x"] - VIEWPORT_RADIUS, 0), _MAP_SPAN - _VIEWPORT_SPAN)
-        top = min(max(client["y"] - VIEWPORT_RADIUS, 0), _MAP_SPAN - _VIEWPORT_SPAN)
-
-        def in_patch(x: int, y: int) -> bool:
-            """Report whether a tile sits inside the 18x18 patch grid.
-
-            The wire patch grid carries a one-tile border around the
-            16x16 window: ``col = x - left + 1`` (production
-            ``viewport_patch_world_coords`` subtracts the border).
-            """
-            return left - 1 <= x < left + _VIEWPORT_SPAN + 1 and (
-                top - 1 <= y < top + _VIEWPORT_SPAN + 1
-            )
-
-        def entity(x: int, y: int, terrain_type: int) -> ViewportEntityDict:
-            """Build one patch entity for an absolute tile."""
-            return ViewportEntityDict(
-                col=x - left + 1,
-                row=y - top + 1,
-                cache_value=0,
-                overlay_value=_OVERLAY_NO_MINE,
-                terrain_type=terrain_type,
-            )
-
-        current: dict[tuple[int, int], int] = {
-            (ferry["x"], ferry["y"]): _WIRE_TERRAIN_FERRY for ferry in self.world["ferries"]
-        }
-        for block in self.world["blocks"]:
-            tile = (block["x"], block["y"])
-            current[tile] = block_tile_value(self.world, self.terrain, tile[0], tile[1])
-        entities: list[ViewportEntityDict] = []
-        for x, y in sorted(set(self._patched_dynamic_tiles) - set(current)):
-            if in_patch(x, y):
-                entities.append(entity(x, y, _WIRE_TERRAIN_REVERT))
-                del self._patched_dynamic_tiles[(x, y)]
-        for (x, y), value in sorted(current.items()):
-            if in_patch(x, y) and self._patched_dynamic_tiles.get((x, y)) != value:
-                entities.append(entity(x, y, value))
-                self._patched_dynamic_tiles[(x, y)] = value
-        return ViewportUpdateDict(
-            msg_type=0x5A, viewport_left=left, viewport_top=top, entities=entities
-        )
-
-    def _in_viewport(self, tank_id: int) -> bool:
-        """Report whether a tank sits inside the client's viewport.
-
-        Args:
-            tank_id: The tank to test.
-
-        Returns:
-            True when the tank is within the Chebyshev viewport radius
-            of the client's current position.
-        """
-        client = self.world["tanks"][self.client_id]
-        tank = self.world["tanks"][tank_id]
-        return max(abs(tank["x"] - client["x"]), abs(tank["y"] - client["y"])) <= VIEWPORT_RADIUS
+        self._viewport = ViewportTracker(world, terrain, client_id)
+        self._combat = CombatLedger(world, terrain, client_id)
 
     def handshake(self) -> list[BinaryMessage]:
         """Build the session-start burst the client receives on join.
@@ -329,9 +128,9 @@ class SimServer:
         """
         client = self.world["tanks"][self.client_id]
         messages: list[BinaryMessage] = [
-            self._identity(self.client_id),
-            self._position_statement(self.client_id),
-            self._viewport_update(),
+            identity_statement(self.world, self.client_id),
+            position_statement(self.world, self.client_id),
+            self._viewport.build_update(),
             FuelGainDict(msg_type=0x44, fuel_total=client["fuel"], is_free=False, flag=1),
             InventoryDict(
                 msg_type=0x49,
@@ -345,29 +144,10 @@ class SimServer:
             tank = self.world["tanks"][tank_id]
             if tank_id == self.client_id or not tank["alive"]:
                 continue
-            messages.append(self._identity(tank_id))
-            if tank_id in self._visible:
-                messages.append(self._position_statement(tank_id))
+            messages.append(identity_statement(self.world, tank_id))
+            if tank_id in self._viewport.visible:
+                messages.append(position_statement(self.world, tank_id))
         return messages
-
-    def _identity(self, tank_id: int) -> TankInfoDict:
-        """Build the 0x21 identity broadcast for one tank.
-
-        Args:
-            tank_id: The announced tank.
-
-        Returns:
-            The identity message.
-        """
-        tank = self.world["tanks"][tank_id]
-        return TankInfoDict(
-            msg_type=0x21,
-            tank_id=tank_id,
-            team=tank["team"],
-            decoration_state=bytes(4),
-            persistent_tank_id=0,
-            name=f"sim-{tank_id}",
-        )
 
     def announce_tank(self, tank_id: int) -> None:
         """Queue a mid-session 0x21 identity broadcast (an activation).
@@ -380,30 +160,7 @@ class SimServer:
         Args:
             tank_id: The newly activated tank.
         """
-        self._pending_announcements.append(self._identity(tank_id))
-
-    def _position_statement(self, tank_id: int) -> MovementResponseDict:
-        """Build a 0x3D position statement for one tank.
-
-        Args:
-            tank_id: The positioned tank.
-
-        Returns:
-            The movement response carrying the tank's current tile.
-        """
-        tank = self.world["tanks"][tank_id]
-        return MovementResponseDict(
-            msg_type=0x3D,
-            team=tank["team"],
-            tank_id=tank_id,
-            x=tank["x"],
-            y=tank["y"],
-            direction=0,
-            damage_state=damage_tier(tank["fuel"], tank["rank"]),
-            rank=tank["rank"],
-            lb_score=0,
-            carrying=0,
-        )
+        self._pending_announcements.append(identity_statement(self.world, tank_id))
 
     def queue_command(self, tank_id: int, command: ClientCommandDict) -> None:
         """Queue one command for the next tick.
@@ -437,264 +194,6 @@ class SimServer:
             raise SimError(f"no living tank {tank_id} to command")
         self._queue.append((tank_id, command))
 
-    def _apply_pending_debits(self) -> None:
-        """Bill last tick's firing costs (measured charge latency)."""
-        for tank_id, debit in self._pending_debits:
-            tank = self.world["tanks"][tank_id]
-            tank["fuel"] = max(0, tank["fuel"] - debit)
-        self._pending_debits = []
-
-    def _emit_move(self, outcome: MoveOutcomeDict, messages: list[BinaryMessage]) -> None:
-        """Emit the wire consequences of one processed move.
-
-        Supervisor rejections (0x52) are PER-CONNECTION on the real
-        wire — the client only ever sees its own. Another tank's
-        rejected command must not leak into the client's stream
-        (same per-recipient discipline as the fuel-sync fix).
-
-        Args:
-            outcome: The move's outcome.
-            messages: This tick's outgoing batch (appended).
-        """
-        if outcome["kind"] == "cant_go":
-            if outcome["tank_id"] == self.client_id:
-                messages.append(
-                    SupervisorDict(
-                        msg_type=0x52,
-                        reset_action=1,
-                        close_map=0,
-                        error_code=SUPERVISOR_ERROR_CANT_GO,
-                    )
-                )
-            return
-        if outcome["kind"] == "insufficient_fuel":
-            if outcome["tank_id"] == self.client_id:
-                messages.append(
-                    SupervisorDict(
-                        msg_type=0x52,
-                        reset_action=1,
-                        close_map=0,
-                        error_code=SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
-                    )
-                )
-            return
-        messages.append(_movement_echo(self.world, outcome))
-        for x, y in outcome["mine_positions"]:
-            messages.append(MineDetonationDict(msg_type=0x45, positions=[(x, y)]))
-        if outcome["pickups"]:
-            messages.append(
-                ContainerPickupDict(
-                    msg_type="container_pickup",
-                    pickups=tuple(
-                        ContainerPickupRecordDict(
-                            x=p["x"], y=p["y"], remaining_volume=p["remaining_volume"]
-                        )
-                        for p in outcome["pickups"]
-                    ),
-                )
-            )
-
-    def _emit_shot(
-        self,
-        shooter_team: int,
-        outcome_messages: list[BinaryMessage],
-        ammo_changed: set[int],
-        tank_id: int,
-        command: ClientCommandDict,
-        moved: frozenset[int],
-    ) -> None:
-        """Process one shoot command and emit its wire consequences.
-
-        Args:
-            shooter_team: The shooter's team (for the 0x53 echo).
-            outcome_messages: This tick's outgoing batch (appended).
-            ammo_changed: Accumulator of tanks whose counts moved.
-            tank_id: The firing tank.
-            command: The shoot command.
-            moved: Tanks that moved earlier this tick.
-        """
-        target_id = command["target_id"]
-        removed_tick = self._removed_at.get(target_id)
-        departed_age_ms = (
-            None if removed_tick is None else (self.world["tick"] - removed_tick) * TICK_RATE_MS
-        )
-        outcome = process_shot(
-            self.world,
-            self.terrain,
-            tank_id,
-            command["x"],
-            command["y"],
-            moved,
-            target_id,
-            departed_age_ms,
-        )
-        outcome_messages.append(
-            ShootEventDict(
-                msg_type=0x53,
-                team=shooter_team,
-                shooter_id=tank_id,
-                source_x=outcome["source_x"],
-                source_y=outcome["source_y"],
-                target_x=outcome["impact_x"],
-                target_y=outcome["impact_y"],
-                aim_x=outcome["aim_x"],
-                aim_y=outcome["aim_y"],
-                weapon=outcome["weapon"],
-            )
-        )
-        self._pending_debits.append((tank_id, outcome["shooter_debit"]))
-        if outcome["ammo_slot"] is not None:
-            ammo_changed.add(tank_id)
-        if outcome["shields_consumed"] > 0 and outcome["victim_id"] is not None:
-            ammo_changed.add(outcome["victim_id"])
-        for packet in outcome["mine_cascade"]:
-            outcome_messages.append(MineDetonationDict(msg_type=0x45, positions=packet))
-        if outcome["victim_deactivated"] and outcome["victim_id"] is not None:
-            outcome_messages.append(
-                DeactivationDict(
-                    msg_type=0x41,
-                    status=1,
-                    victim_id=outcome["victim_id"],
-                    promo_eligible=False,
-                    killer_id=tank_id,
-                    is_mine_kill=False,
-                )
-            )
-            self._maybe_emit_kill_mercy_bundle(tank_id, outcome_messages, ammo_changed)
-            self._died_at[outcome["victim_id"]] = self.world["tick"]
-
-    def _maybe_emit_kill_mercy_bundle(
-        self,
-        killer_id: int,
-        messages: list[BinaryMessage],
-        ammo_changed: set[int],
-    ) -> None:
-        """Apply the radar-zero kill reward (archive-cracked 2026-07-22).
-
-        A kill scored while the killer's extra-radar count is ZERO
-        grants a silent (``show_message=False``) multi-slot bundle —
-        deterministic in the corpus: 5/5 radar-zero kills granted,
-        0/254 kills at radar > 0 granted, no exceptions. Measured
-        amounts: dual +1..4, homing exactly +1, radar +1..2, and the
-        bundle may OVERFILL past the 25 cap (one sample landed dual
-        at 26). The sim grants the deterministic medians (+2/+1/+1).
-        Per-recipient: only the client's own bundle rides the wire.
-
-        Args:
-            killer_id: The killing tank.
-            messages: This tick's outgoing batch (appended).
-            ammo_changed: Accumulator of tanks whose counts moved.
-        """
-        killer = self.world["tanks"][killer_id]
-        if not kill_grants_mercy(killer["counts"][RADAR_SLOT]):
-            return
-        gained = list(MERCY_BUNDLE)
-        for slot, amount in enumerate(gained):
-            killer["counts"][slot] += amount
-        ammo_changed.add(killer_id)
-        if killer_id == self.client_id:
-            messages.append(
-                EquipmentGainDict(msg_type=0x67, show_message=False, gained=list(gained))
-            )
-
-    def _emit_teleport(
-        self,
-        tank_id: int,
-        command: ClientCommandDict,
-        messages: list[BinaryMessage],
-    ) -> bool:
-        """Process one teleport command and emit its wire consequences.
-
-        Args:
-            tank_id: The teleporting tank.
-            command: The teleport command.
-            messages: This tick's outgoing batch (appended).
-
-        Returns:
-            True when the hop landed (the tank counts as a mover).
-        """
-        outcome = process_teleport(self.world, self.terrain, tank_id, command["x"], command["y"])
-        if outcome["kind"] != "landed":
-            code = (
-                SUPERVISOR_ERROR_INSUFFICIENT_FUEL
-                if outcome["kind"] == "insufficient_fuel"
-                else SUPERVISOR_ERROR_CANT_GO
-            )
-            if tank_id == self.client_id:
-                messages.append(
-                    SupervisorDict(msg_type=0x52, reset_action=1, close_map=1, error_code=code)
-                )
-            return False
-        messages.append(
-            TeleportLandedDict(msg_type="teleport_landed", subtype=_TELEPORT_LANDED_SUBTYPE)
-        )
-        messages.append(self._position_statement(tank_id))
-        if outcome["pickups"]:
-            messages.append(
-                ContainerPickupDict(
-                    msg_type="container_pickup",
-                    pickups=tuple(
-                        ContainerPickupRecordDict(
-                            x=p["x"], y=p["y"], remaining_volume=p["remaining_volume"]
-                        )
-                        for p in outcome["pickups"]
-                    ),
-                )
-            )
-        return True
-
-    def _emit_radar(
-        self,
-        tank_id: int,
-        messages: list[BinaryMessage],
-        ammo_changed: set[int],
-    ) -> None:
-        """Process one radar command and emit its wire consequences.
-
-        Args:
-            tank_id: The scanning tank.
-            messages: This tick's outgoing batch (appended).
-            ammo_changed: Accumulator of tanks whose counts moved.
-        """
-        outcome = process_radar(self.world, tank_id)
-        tank = self.world["tanks"][tank_id]
-        tank["fuel"] = max(0, tank["fuel"] - RADAR_FUEL_COST)
-        if outcome["consumed_extra"]:
-            ammo_changed.add(tank_id)
-        messages.append(
-            RadarScanResultDict(
-                msg_type=0x4F,
-                containers=outcome["containers"],
-                mines=outcome["mines"],
-                mine_clears=[],
-            )
-        )
-        messages.append(
-            RadarResultDict(msg_type=0x46, detection_type=0, found=outcome["enemy_found"])
-        )
-
-    def _emit_mine_press(self, tank_id: int, messages: list[BinaryMessage]) -> None:
-        """Process one mine press and emit its wire consequences.
-
-        Args:
-            tank_id: The placing tank.
-            messages: This tick's outgoing batch (appended).
-        """
-        outcome = process_mine_press(self.world, self.terrain, tank_id)
-        tank = self.world["tanks"][tank_id]
-        tank["fuel"] = max(0, tank["fuel"] - MINE_PRESS_FUEL_COST)
-        if outcome["placed"]:
-            messages.append(
-                MinePlacementDict(
-                    msg_type=0x4B,
-                    mine_type=outcome["mine_type"],
-                    tank_id=tank_id,
-                    positions=outcome["placed"],
-                )
-            )
-        if outcome["detonated"]:
-            messages.append(MineDetonationDict(msg_type=0x45, positions=outcome["detonated"]))
-
     def _process_command(
         self,
         tank_id: int,
@@ -717,29 +216,38 @@ class SimServer:
             self._process_move_command(tank_id, kind, command, messages, ammo_changed, moved)
             return
         if kind == "shoot":
-            self._emit_shot(
+            self._combat.emit_shot(
                 self.world["tanks"][tank_id]["team"],
                 messages,
                 ammo_changed,
                 tank_id,
                 command,
                 frozenset(moved),
+                self._viewport.removed_at.get(command["target_id"]),
             )
             return
         if kind == "teleport":
             self._process_teleport_command(tank_id, command, messages, ammo_changed, moved)
             return
         if kind == "radar":
-            self._emit_radar(tank_id, messages, ammo_changed)
+            emit_radar(
+                self.world, self.client_id, self._viewport.window, tank_id, messages, ammo_changed
+            )
             return
         if kind == "mine":
-            self._emit_mine_press(tank_id, messages)
+            emit_mine_press(self.world, self.terrain, tank_id, messages)
             return
         if kind == "toggle_equipment":
-            self._emit_equipment_toggle(tank_id, command["slot"], messages)
+            emit_equipment_toggle(self.world, tank_id, command["slot"], messages)
             return
         if kind == "block":
-            self._emit_block_action(tank_id, command, messages)
+            if (
+                emit_block_action(
+                    self.world, self.terrain, self.client_id, tank_id, command, messages
+                )
+                and tank_id == self.client_id
+            ):
+                messages.append(self._viewport.build_update())
             return
         messages.append(build_map_data(self.world))
 
@@ -754,9 +262,15 @@ class SimServer:
     ) -> None:
         """Route one move-family command (move / pickup clicks).
 
-        Pickup clicks validate their destination first (empty-container
-        rejection); a successful relocation updates the client's
-        viewport and resolves any equipment container on arrival.
+        The client's destination must lie inside its stored 0x5A
+        window — the real router rejects any target outside it with
+        0x52 code 0, at exactly the boundary column (measured
+        2026-07-25, [[viewport-shift-protocol]]); the check precedes
+        the container validation because the server never answers for
+        a coordinate it does not consider actionable. Pickup clicks
+        then validate their destination (empty-container rejection).
+        A successful walk does NOT re-emit 0x5A: with autoscroll OFF
+        the window is static between teleports.
 
         Args:
             tank_id: The commanding tank.
@@ -766,6 +280,16 @@ class SimServer:
             ammo_changed: Accumulator of tanks whose counts moved.
             moved: Accumulator of tanks that relocated this tick.
         """
+        if tank_id == self.client_id and not self._viewport.in_window(command["x"], command["y"]):
+            messages.append(
+                SupervisorDict(
+                    msg_type=0x52,
+                    reset_action=1,
+                    close_map=0,
+                    error_code=SUPERVISOR_ERROR_CANT_DO,
+                )
+            )
+            return
         if not self._pickup_target_stocked(kind, command["x"], command["y"]):
             if tank_id == self.client_id:
                 messages.append(
@@ -780,11 +304,9 @@ class SimServer:
         outcome = process_move(self.world, self.terrain, tank_id, command["x"], command["y"])
         if outcome["kind"] == "moved":
             moved.add(tank_id)
-        self._emit_move(outcome, messages)
+        emit_move(self.world, self.client_id, outcome, messages)
         if outcome["kind"] == "moved":
-            if tank_id == self.client_id:
-                messages.append(self._viewport_update())
-            self._emit_equipment_pickup(tank_id, kind, messages, ammo_changed)
+            emit_equipment_pickup(self.world, self.client_id, tank_id, kind, messages, ammo_changed)
 
     def _process_teleport_command(
         self,
@@ -798,8 +320,9 @@ class SimServer:
 
         Teleport while towing a block is refused with the measured
         0x52 code 0 ("You can't do this") — three-for-three in the
-        2026-07-20 capture. A landed hop refreshes the client's
-        viewport and resolves equipment on arrival.
+        2026-07-20 capture. A landed client hop is the ONE window
+        recenter under autoscroll OFF ([[viewport-shift-protocol]])
+        and resolves equipment on arrival.
 
         Args:
             tank_id: The hopping tank.
@@ -819,11 +342,14 @@ class SimServer:
                     )
                 )
             return
-        if self._emit_teleport(tank_id, command, messages):
+        if emit_teleport(self.world, self.terrain, self.client_id, tank_id, command, messages):
             moved.add(tank_id)
             if tank_id == self.client_id:
-                messages.append(self._viewport_update())
-            self._emit_equipment_pickup(tank_id, "teleport", messages, ammo_changed)
+                self._viewport.recenter()
+                messages.append(self._viewport.build_update())
+            emit_equipment_pickup(
+                self.world, self.client_id, tank_id, "teleport", messages, ammo_changed
+            )
 
     def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
         """Validate a pickup click's destination before any movement.
@@ -850,154 +376,6 @@ class SimServer:
             return any((e["x"], e["y"]) == (x, y) for e in self.world["equipment"])
         return True
 
-    def _emit_equipment_pickup(
-        self,
-        tank_id: int,
-        kind: str,
-        messages: list[BinaryMessage],
-        ammo_changed: set[int],
-    ) -> None:
-        """Resolve an equipment container under an arriving tank.
-
-        A grant emits the 0x67 gained array (the following 0x49 rides
-        the ``ammo_changed`` snapshot — the archive shows every 0x67
-        immediately followed by its inventory sync). A full-inventory
-        attempt on an explicit ``pickup_equipment`` click answers with
-        the measured 0x52 error 7 and leaves the container; incidental
-        arrivals at full inventory are silent. Both 0x67 and the 0x52
-        are PER-RECIPIENT: production treats any 0x67 as a SELF gain,
-        so another tank's grant resolves silently server-side.
-
-        Args:
-            tank_id: The arriving tank.
-            kind: The command kind that caused the arrival.
-            messages: This tick's outgoing batch (appended).
-            ammo_changed: Accumulator of tanks whose counts moved.
-        """
-        grant = resolve_equipment_pickup(self.world, tank_id)
-        if grant is None:
-            return
-        if grant["kind"] == "granted":
-            if tank_id == self.client_id:
-                messages.append(
-                    EquipmentGainDict(msg_type=0x67, show_message=True, gained=grant["gained"])
-                )
-            ammo_changed.add(tank_id)
-            return
-        if kind == "pickup_equipment" and tank_id == self.client_id:
-            messages.append(
-                SupervisorDict(
-                    msg_type=0x52,
-                    reset_action=1,
-                    close_map=0,
-                    error_code=SUPERVISOR_ERROR_INVENTORY_FULL,
-                )
-            )
-
-    def _emit_block_action(
-        self,
-        tank_id: int,
-        command: ClientCommandDict,
-        messages: list[BinaryMessage],
-    ) -> None:
-        """Resolve one 'b' press and emit its wire consequences.
-
-        Success emits the 0x42 BuildPickup event plus the 0x4A tile
-        update carrying the tile's post-action value; failures answer
-        the client with the measured 0x52 code 1. Block operations
-        are FREE (zero fuel delta measured across seven pick/drop
-        pairs).
-
-        Args:
-            tank_id: The pressing tank.
-            command: The block command.
-            messages: This tick's outgoing batch (appended).
-        """
-        outcome = process_block_press(self.world, self.terrain, tank_id, command["x"], command["y"])
-        if outcome["kind"] in ("out_of_reach", "refused"):
-            if tank_id == self.client_id:
-                messages.append(
-                    SupervisorDict(
-                        msg_type=0x52,
-                        reset_action=1,
-                        close_map=0,
-                        error_code=SUPERVISOR_ERROR_CANT_GO,
-                    )
-                )
-            return
-        tank = self.world["tanks"][tank_id]
-        messages.append(
-            BuildPickupDict(
-                msg_type=0x42,
-                tank_id=tank_id,
-                source_x=tank["x"],
-                source_y=tank["y"],
-                drop_x=outcome["x"],
-                drop_y=outcome["y"],
-                direction=outcome["direction"],
-                obstacle_type=outcome["tile_value"],
-                flag=0,
-            )
-        )
-        messages.append(
-            TerrainUpdateDict(
-                msg_type=0x4A,
-                updates=[(outcome["x"], outcome["y"], outcome["tile_value"])],
-            )
-        )
-        if tank_id == self.client_id:
-            messages.append(self._viewport_update())
-
-    def _emit_equipment_toggle(
-        self, tank_id: int, slot: int, messages: list[BinaryMessage]
-    ) -> None:
-        """Flip one equipment slot and answer with the 0x74 state.
-
-        The toggle is free and server-authoritative: the response
-        carries all five enabled flags (the wire's documented
-        ``t + 5 bytes`` shape).
-
-        Args:
-            tank_id: The toggling tank.
-            slot: Equipment slot, 1-5 (out-of-range presses are the
-                client's problem and are ignored like the real UI).
-            messages: This tick's outgoing batch (appended).
-        """
-        tank = self.world["tanks"][tank_id]
-        if 1 <= slot <= len(tank["enabled"]):
-            tank["enabled"][slot - 1] = not tank["enabled"][slot - 1]
-        messages.append(EquipmentToggleDict(msg_type=0x74, enabled=list(tank["enabled"])))
-
-    def _emit_viewport_transitions(self, messages: list[BinaryMessage]) -> None:
-        """Diff viewport membership after this tick's relocations.
-
-        A living tank leaving the client's viewport emits 0x58
-        TankRemove and starts the law-4 reroute clock; one entering
-        emits a 0x3D position statement (positions are
-        viewport-scoped on the real wire). Deactivated tanks simply
-        drop from the visible set — their exit is announced by 0x41,
-        not 0x58.
-
-        Args:
-            messages: This tick's outgoing batch (appended).
-        """
-        for tank_id in sorted(self.world["tanks"]):
-            tank = self.world["tanks"][tank_id]
-            if tank_id == self.client_id:
-                continue
-            if not tank["alive"]:
-                self._visible.discard(tank_id)
-                continue
-            inside = self._in_viewport(tank_id)
-            if inside and tank_id not in self._visible:
-                self._visible.add(tank_id)
-                self._removed_at.pop(tank_id, None)
-                messages.append(self._position_statement(tank_id))
-            elif not inside and tank_id in self._visible:
-                self._visible.discard(tank_id)
-                self._removed_at[tank_id] = self.world["tick"]
-                messages.append(TankRemoveDict(msg_type=0x58, tank_id=tank_id))
-
     def advance_tick(self) -> list[BinaryMessage]:
         """Process the queue and return this tick's outgoing batch.
 
@@ -1022,7 +400,7 @@ class SimServer:
         messages: list[BinaryMessage] = list(self._pending_announcements)
         self._pending_announcements = []
         ammo_changed: set[int] = set()
-        self._apply_pending_debits()
+        self._combat.apply_pending_debits()
         moved: set[int] = set()
         # Within-round resolution order is ASCENDING TANK ID — the
         # measured law (2026-07-25, `analysis_scripts/mine_round_order.py`:
@@ -1030,29 +408,32 @@ class SimServer:
         # only ordering; bots 500-535 always resolve before players).
         # The sort is stable, so one tank's own commands keep arrival
         # order.
-        for tank_id, command in sorted(self._queue, key=_queued_tank_id):
+        for tank_id, command in sorted(self._queue, key=queued_tank_id):
             if not self.world["tanks"][tank_id]["alive"]:
                 continue
             self._process_command(tank_id, command, messages, ammo_changed, moved)
         self._queue = []
-        for tank_id in sorted(self._died_at):
-            if self.world["tick"] - self._died_at[tank_id] >= CORPSE_WINDOW_TICKS:
-                # The corpse window closes: 0x58 removes the corpse
-                # exactly 22 s after the 0x41. NOT a departure — the
-                # law-4 reroute clock only runs for living exits.
-                messages.append(TankRemoveDict(msg_type=0x58, tank_id=tank_id))
-                del self._died_at[tank_id]
-                if tank_id in self._roster_ids:
-                    # Roster bots come back the same tick their corpse
-                    # clears: same id, full fuel, respawned FAR from
-                    # the corpse — the viewport diff below announces
-                    # them if the landing is in view, and the sync
-                    # loop resumes their tier-3 cadence either way.
-                    reactivate_practice_bot(self.world, self.terrain, tank_id)
-        self._emit_viewport_transitions(messages)
+        for tank_id in self._combat.expire_corpses(messages):
+            if tank_id in self._roster_ids:
+                # Roster bots come back the same tick their corpse
+                # clears: same id, full fuel, respawned FAR from
+                # the corpse — the viewport diff below announces
+                # them if the landing is in view, and the sync
+                # loop resumes their tier-3 cadence either way.
+                reactivate_practice_bot(self.world, self.terrain, tank_id)
+        self._viewport.emit_transitions(messages)
+        # Dynamic-layer refresh is EVENT-driven, never walk-driven:
+        # the client's window is static between teleports (autoscroll
+        # OFF, [[viewport-shift-protocol]] — 16+ probed walks drew
+        # zero 0x5A), but a ferry or block moving inside the patch
+        # grid repaints it (the 2026-07-20 block captures show 0x5A
+        # after block operations). An empty patch is not sent.
+        refresh = self._viewport.build_update()
+        if refresh["entities"]:
+            messages.append(refresh)
         for tank_id in sorted(self.world["tanks"]):
             if self.world["tanks"][tank_id]["alive"]:
-                messages.append(_status_sync(tank_id, self.world, tank_id == self.client_id))
+                messages.append(status_sync(tank_id, self.world, tank_id == self.client_id))
         if self.client_id in ammo_changed:
             client = self.world["tanks"][self.client_id]
             messages.append(
@@ -1070,6 +451,7 @@ class SimServer:
 TICK_MS = TICK_RATE_MS
 
 __all__ = [
+    "CORPSE_WINDOW_TICKS",
     "TICK_MS",
     "SimServer",
 ]

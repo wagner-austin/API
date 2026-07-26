@@ -42,12 +42,21 @@ def test_impassable_destination_is_cant_go() -> None:
     assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (10, 10)
 
 
-def test_route_cost_above_fuel_is_insufficient() -> None:
-    """A path longer than the tank's fuel is refused, not partial."""
+def test_walk_debit_clamps_to_remaining_fuel() -> None:
+    """Fuel never rejects a walk: the full path executes, billed
+    min(cost, fuel) — fuel-0 walks were repeatedly accepted live
+    (density runs 2-3, 2026-07-25)."""
     world = _world_with_tank(fuel=3)
     outcome = process_move(world, InMemoryTerrainMap(), 9, 15, 10)
-    assert outcome["kind"] == "insufficient_fuel"
-    assert world["tanks"][9]["fuel"] == 3
+    assert outcome["kind"] == "moved"
+    assert (world["tanks"][9]["x"], world["tanks"][9]["y"]) == (15, 10)
+    assert world["tanks"][9]["fuel"] == 0
+
+    zero = _world_with_tank(fuel=0)
+    outcome = process_move(zero, InMemoryTerrainMap(), 9, 13, 10)
+    assert outcome["kind"] == "moved"
+    assert (zero["tanks"][9]["x"], zero["tanks"][9]["y"]) == (13, 10)
+    assert zero["tanks"][9]["fuel"] == 0
 
 
 def test_arrival_pickup_respects_capacity() -> None:

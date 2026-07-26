@@ -47,9 +47,11 @@ class PracticeRoomDriver:
         """Seed the roster into the world and initialize states.
 
         Each bot lands on the nearest open tile to its mined
-        ``(x, y)`` position (a sealed position falls back to the
-        exact mined tile — real positions are passable on the real
-        map, so this only matters for artificial test terrains). Bots
+        ``(x, y)`` position. Mined positions are NOT always passable
+        ground: an archive snapshot can catch a bot afloat on a ferry
+        (layout bot-20260706-223721 holds tank 511 at (38,1), open
+        sea, nearest land 11 tiles away) — the sim seeds no ferry
+        there, so the bot lands on the nearest coast instead. Bots
         boot at their rank's full fuel — the reactivation law's
         full-tank state, the only fuel level the archive pins for a
         bot at a known moment.
@@ -60,16 +62,25 @@ class PracticeRoomDriver:
             client_id: The connected client's tank id (never seeded).
             roster: ``(tank_id, team, rank, x, y)`` rows, absolute
                 map positions (see ``sim.world_seed.PRACTICE_LAYOUTS``).
+
+        Raises:
+            RuntimeError: If no open tile exists within the search
+                radius of a mined position — a layout that far at sea
+                is bad data, not a placement problem.
         """
         del client_id
         self.states: dict[int, PracticeBotStateDict] = {}
         for tank_id, team, rank, seed_x, seed_y in roster:
             landing = find_open_tile_near(
-                world, terrain, seed_x, seed_y, world["tick"], min_radius=0, max_radius=4
+                world, terrain, seed_x, seed_y, world["tick"], min_radius=0, max_radius=16
             )
-            spot = landing if landing is not None else (seed_x, seed_y)
+            if landing is None:
+                raise RuntimeError(
+                    f"practice roster tank {tank_id} at ({seed_x},{seed_y}) has no "
+                    "open tile within 16 — bad layout data"
+                )
             world["tanks"][tank_id] = make_sim_tank(
-                tank_id, team, rank, spot[0], spot[1], fuel_capacity(rank)
+                tank_id, team, rank, landing[0], landing[1], fuel_capacity(rank)
             )
             self.states[tank_id] = make_practice_bot_state()
 

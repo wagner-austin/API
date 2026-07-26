@@ -100,7 +100,9 @@ def test_pickup_walk_emits_gain_and_snapshot() -> None:
     """The wire shape: 0x47 echo, 0x67 gained, syncs, then the 0x49.
 
     The archive shows every 0x67 immediately followed by its
-    inventory snapshot — the sim batch carries both.
+    inventory snapshot — the sim batch carries both. No 0x5A: a walk
+    never re-emits the window (autoscroll OFF,
+    [[viewport-shift-protocol]]).
     """
     world = _arena([25, 12, 25, 20, 15])
     world["equipment"][0] = SimEquipmentDict(x=12, y=10)
@@ -108,11 +110,11 @@ def test_pickup_walk_emits_gain_and_snapshot() -> None:
     server.queue_command(9, _pickup_equipment(12, 10))
     messages = server.advance_tick()
     kinds = [m["msg_type"] for m in messages]
-    assert kinds == [0x47, 0x5A, 0x67, 0x2E, 0x49]
-    gain = messages[2]
+    assert kinds == [0x47, 0x67, 0x2E, 0x49]
+    gain = messages[1]
     assert gain["msg_type"] == 0x67
     assert gain["gained"] == [0, WEAPON_STACK, 0, 0, 0]
-    snapshot = messages[4]
+    snapshot = messages[3]
     assert snapshot["msg_type"] == 0x49
     assert snapshot["counts"][SLOT_DUAL] == 12 + WEAPON_STACK
 

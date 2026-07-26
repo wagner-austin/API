@@ -148,19 +148,28 @@ def process_teleport(
     return outcome
 
 
-def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
+def process_radar(
+    world: SimWorldDict, tank_id: int, window: tuple[int, int] | None = None
+) -> RadarOutcomeDict:
     """Process one radar command (law 8, scan side).
 
     An available extra radar is consumed and covers the full viewport;
-    otherwise the rank-scaled built-in radius applies. The scan
-    reveals containers (fuel by volume, equipment as the wire's
-    ``0xFFFF -> -1`` cache marker) and mines in the square radius and
-    reports whether any living enemy sits inside it. The 10-fuel cost
-    is billed by the caller.
+    otherwise the rank-scaled built-in radius applies, intersected
+    with the viewport (production ``scan_coverage``: free radar =
+    5x5 around the tank clipped to the viewport). The scan reveals
+    containers (fuel by volume, equipment as the wire's
+    ``0xFFFF -> -1`` cache marker) and mines in the covered tiles and
+    reports whether any living enemy sits inside them. The 10-fuel
+    cost is billed by the caller.
 
     Args:
         world: Simulated world (mutated: extra-radar consumption).
         tank_id: The scanning tank.
+        window: The tank's current 0x5A window origin ``(left, top)``,
+            or None for a window centered on the tank (server-driven
+            roster bots act from rest, where the two coincide; the
+            client's window can drift from its position by walking —
+            autoscroll OFF never recenters, [[viewport-shift-protocol]]).
 
     Returns:
         The typed scan result.
@@ -174,9 +183,15 @@ def process_radar(world: SimWorldDict, tank_id: int) -> RadarOutcomeDict:
     else:
         radius = free_radar_radius(tank["rank"])
     cx, cy = tank["x"], tank["y"]
+    span = 2 * VIEWPORT_RADIUS
+    left, top = window if window is not None else (cx - VIEWPORT_RADIUS, cy - VIEWPORT_RADIUS)
 
     def inside(x: int, y: int) -> bool:
-        """Report whether a tile lies inside the scan square."""
+        """Report whether a tile lies inside the scan coverage."""
+        if not (left <= x < left + span and top <= y < top + span):
+            return False
+        if consumed:
+            return True
         return abs(x - cx) <= radius and abs(y - cy) <= radius
 
     containers = []

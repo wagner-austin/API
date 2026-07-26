@@ -104,28 +104,43 @@ def test_teleport_insufficient_fuel_and_landing_pickup() -> None:
     assert world["tanks"][9]["fuel"] == 800 - landed["cost"] + 100
 
 
-def test_radar_consumes_extra_for_viewport_radius() -> None:
-    """An available extra covers radius 8 and is consumed.
+def test_radar_consumes_extra_for_the_viewport_window() -> None:
+    """An available extra covers exactly the 16x16 window and is consumed.
 
-    Volume-0 containers ARE reported — the wire's cache value 0 is
-    the client's "tile is empty" removal signal (323 zero-volume
-    reveals in the archive); tiles outside the radius stay dark.
+    The window spans [x-8, x+8) for a centered tank — column x+8 is
+    OUTSIDE it (the acceptance-boundary measurement,
+    [[viewport-shift-protocol]]). Volume-0 containers ARE reported —
+    the wire's cache value 0 is the client's "tile is empty" removal
+    signal (323 zero-volume reveals in the archive).
     """
     world = _world()
     world["tanks"][9]["counts"][SLOT_RADAR] = 2
     world["containers"].append(SimContainerDict(x=108, y=100, volume=50, dotted=True))
-    world["containers"].append(SimContainerDict(x=109, y=100, volume=50, dotted=True))
     world["containers"].append(SimContainerDict(x=107, y=100, volume=0, dotted=True))
-    world["mines"].append(SimMineDict(x=100, y=108, team=1))
+    world["containers"].append(SimContainerDict(x=92, y=100, volume=70, dotted=True))
+    world["containers"].append(SimContainerDict(x=91, y=100, volume=70, dotted=True))
+    world["mines"].append(SimMineDict(x=100, y=107, team=1))
     outcome = process_radar(world, 9)
     assert outcome["consumed_extra"] is True
     assert world["tanks"][9]["counts"][SLOT_RADAR] == 1
     assert [(c["x"], c["y"], c["volume"]) for c in outcome["containers"]] == [
-        (108, 100, 50),
         (107, 100, 0),
+        (92, 100, 70),
     ]
-    assert [(m["x"], m["y"], m["team"]) for m in outcome["mines"]] == [(100, 108, 1)]
+    assert [(m["x"], m["y"], m["team"]) for m in outcome["mines"]] == [(100, 107, 1)]
     assert outcome["enemy_found"] is False
+
+
+def test_radar_window_override_covers_the_stored_window() -> None:
+    """A drifted window (the tank walked; autoscroll OFF never
+    recenters) scans the WINDOW's tiles, not the tank's surroundings."""
+    world = _world()
+    world["tanks"][9]["counts"][SLOT_RADAR] = 1
+    world["containers"].append(SimContainerDict(x=85, y=100, volume=60, dotted=True))
+    world["containers"].append(SimContainerDict(x=108, y=100, volume=60, dotted=True))
+    outcome = process_radar(world, 9, (84, 92))
+    assert outcome["consumed_extra"] is True
+    assert [(c["x"], c["y"], c["volume"]) for c in outcome["containers"]] == [(85, 100, 60)]
 
 
 def test_radar_exposure_dots_large_hidden_fuel() -> None:
