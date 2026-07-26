@@ -40,7 +40,7 @@ from tankpit_bot.action_lab.probe_session import build_probe_session_envelope
 from tankpit_bot.action_lab.types import TeleportStartupTimingDict
 from tankpit_bot.action_lab.types_codecs import encode_teleport_startup_timing
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.protocol.commands import build_quit_command, build_toggle_equipment_command
+from tankpit_bot.protocol.commands import build_toggle_equipment_command
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 
@@ -223,17 +223,10 @@ class DensityProbe(ProbeBase):
         return 1
 
     def _quit_to_lobby(self) -> None:
-        """Send the graceful quit so the tank never lingers in-world.
-
-        Standing rule from the 2026-07-25 incident: an unattended
-        probe tank is a target in a PvP world (player 2596 killed the
-        immobilized tank and the user lost a rank). Every probe end —
-        normal or marooned — exits the room deliberately instead of
-        leaving the tank standing until the socket drops.
-        """
+        """Send the base graceful quit and drain the goodbye traffic."""
         from tankpit_bot.action_lab import _test_hooks as action_hooks
 
-        self._send_bytes(build_quit_command(), "quit_game")
+        self.quit_to_lobby()
         page = self._require_page()
         page.wait_for_timeout(float(_SETTLE_MS))
         action_hooks.drain_buffered_messages(self)

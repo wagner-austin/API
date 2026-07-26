@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -35,6 +35,7 @@ help:
 	@Write-Host "  make key-probe                   press physical keys, map real key bindings"
 	@Write-Host "  make radar-watch                 free-radar spawn watch (extras stay stocked)"
 	@Write-Host "  make density-probe               budgeted extra-radar density sweep (grid sites)"
+	@Write-Host "  make viewport-probe              edge walks + boundary moves, autoscroll off/on"
 	@Write-Host "  make fuel-probe                  3 fuel pickups via 9 attempts"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
 	@Write-Host "  make equipment-probe             3 equipment pickups via 9 attempts"
@@ -183,6 +184,11 @@ density-probe: install
 	@Write-Host ""
 	@Write-Host "==> density-probe (account; budgeted extra-radar sweep of grid-spread sites)" -ForegroundColor Cyan
 	poetry run tankpit-density-probe
+
+viewport-probe: install
+	@Write-Host ""
+	@Write-Host "==> viewport-probe (account; edge walks + boundary moves, autoscroll off/on, restored)" -ForegroundColor Cyan
+	poetry run tankpit-viewport-probe
 
 key-probe: install
 	@Write-Host ""

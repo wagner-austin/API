@@ -95,6 +95,22 @@ class ProbeBase(SessionBase):
 
         return self._send_bytes(build_query_command(CMD_MAP_OPEN), "map_open")
 
+    def quit_to_lobby(self) -> bool:
+        """Send the graceful quit so the tank never lingers in-world.
+
+        Standing rule from the 2026-07-25 incident: an unattended
+        probe tank is a target in a PvP world (an immobilized tank
+        was killed and the account lost a rank). Every probe end —
+        normal or aborted — exits the room deliberately instead of
+        leaving the tank standing until the socket drops.
+
+        Returns:
+            True if the command was sent.
+        """
+        from tankpit_bot.protocol.commands import build_quit_command
+
+        return self._send_bytes(build_quit_command(), "quit_game")
+
     def teleport_to(self, x: int, y: int) -> bool:
         """Send teleport command. Map must already be open.
 
