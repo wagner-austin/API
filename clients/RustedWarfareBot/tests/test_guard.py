@@ -136,10 +136,11 @@ def test_find_monorepo_root_locates_the_real_repository() -> None:
 
 
 def test_find_monorepo_root_raises_when_no_libs_directory_exists() -> None:
-    # Deliberately not pytest's tmp_path: the suite's basetemp is .pytest_tmp
-    # inside this project, so walking upward from it finds the monorepo's real
-    # libs/ and the search succeeds. The system temp directory has no such
-    # ancestor.
+    # Deliberately explicit about being outside the repository. The search
+    # walks upward for a libs/ directory, so any temporary directory with the
+    # monorepo as an ancestor would find the real one and the search would
+    # succeed. pytest's default tmp_path is already outside, but saying so here
+    # keeps the test correct if that ever changes.
     with tempfile.TemporaryDirectory() as outside_repo, pytest.raises(RuntimeError) as caught:
         _test_hooks.find_monorepo_root(Path(outside_repo))
     assert str(caught.value) == "monorepo root with 'libs' directory not found"
