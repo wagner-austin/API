@@ -19,14 +19,16 @@ from tankpit_bot.physics.capacity import (
 class TestFuelCapacity:
     """Capacity formula ``1000 + 100 * rank``, verified at ranks 1/3/6/7."""
 
-    def test_recruit_capacity_is_1100(self) -> None:
-        """Rank 0 (recruit) holds 1100 — the private cap.
+    def test_recruit_capacity_is_1000(self) -> None:
+        """Rank 0 (recruit) holds 1000 fuel.
 
-        First rank-0 live session (bot-20260725-211120): 31 wire
-        readings at exactly 1100, zero above, pickup landed
-        943 -> 1100. The old 1000 extrapolation was never measured.
+        Formula plus the login-full-tank observation (viewport probe
+        20260725-190352: fuel_before exactly 1000 on the freshly
+        deactivated recruit account). The 2026-07-25 over-1000
+        readings at wire rank 0 were a MID-SESSION PROMOTION to
+        private, not a recruit cap ([[game-economy]]).
         """
-        assert fuel_capacity(0) == 1100
+        assert fuel_capacity(0) == 1000
 
     def test_private_capacity_is_1100(self) -> None:
         """Rank 1 (private) holds 1100 fuel.
@@ -146,14 +148,13 @@ class TestFreeRadarRadius:
 class TestInventoryCapacity:
     """Per-slot cap ``20 + 5 * rank`` from the official rules table."""
 
-    def test_recruit_cap_is_25(self) -> None:
-        """Rank 0 (recruit) caps each slot at 25 — the private cap.
+    def test_recruit_cap_is_20(self) -> None:
+        """Rank 0 (recruit) caps each slot at 20 (rules table).
 
-        First rank-0 live session (bot-20260725-211120): sustained
-        0x49 snapshots at exactly 25 in four slots at once, never
-        above; the rules-table's "recruit 20" is wrong at the wire.
+        The 2026-07-25 over-20 counts at wire rank 0 were a
+        mid-session promotion to private, not a recruit cap.
         """
-        assert inventory_capacity(0) == 25
+        assert inventory_capacity(0) == 20
 
     def test_private_cap_is_25(self) -> None:
         """Rank 1 (private) caps each slot at 25.

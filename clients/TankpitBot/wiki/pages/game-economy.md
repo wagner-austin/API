@@ -26,11 +26,11 @@ Empirically measured fuel costs, damage values, and capacity limits — derived 
 
 ## Tank capacity
 
-**Fuel capacity = 1000 + 100 × max(rank, 1)** — recruits share the private cap (2026-07-06, recruit corrected 2026-07-25). Not sent on the wire — the client derives it from rank in the fuel-gauge draw (`Gc` in tpclient.js: fill width `7·fuel/100` px against a capacity region of `7·(10+rank)` px, equal iff `fuel = 100·(10+rank)` — for recruits the gauge region under-draws the true server cap). Rank IS on the wire (`self_state["rank"]`), so the bot can compute capacity at tick 1 with no probe pickup.[^2]
+**Fuel capacity = 1000 + 100 × rank** (2026-07-06). Not sent on the wire — the client derives it from rank in the fuel-gauge draw (`Gc` in tpclient.js: fill width `7·fuel/100` px against a capacity region of `7·(10+rank)` px, equal iff `fuel = 100·(10+rank)`). Rank IS on the wire (`self_state["rank"]`), so the bot can compute capacity at tick 1 — **but see the mid-session promotion law below: the wire rank field can go stale.**[^2]
 
 | Rank | Capacity | Verified |
 |---|---|---|
-| **recruit (0)** | **1100** | first rank-0 session bot-20260725-211120: 31 wire readings at exactly 1100, zero above, pickup landed 943→1100 — the old 1000 extrapolation is falsified (ranks 1/3/6/7 deposits could not discriminate `1000+100·rank` from `1000+100·max(rank,1)`)[^11] |
+| recruit (0) | 1000 | formula; login-full-tank observation at exactly 1000 (viewport probe 20260725-190352 `fuel_before=1000` on the freshly deactivated recruit account) |
 | **private (1)** | **1100** | wire 0x52 code-5 tank-full at exactly 1100 (2026-07-06 run); 7+ pickup caps at 1100 (2026-06-20); max deposit 1000 = 1100−100 |
 | corporal (2) | 1200 | formula only |
 | **sergeant (3)** | **1300** | max deposit 1200 = 1300−100 (user, 2026-07-06) |
@@ -44,7 +44,9 @@ The cap is enforced by the server on pickup — if the picker's tank can only ho
 
 The earlier "Max fuel cap = 1100" entry on this page was correct but rank-specific: all 2026-06-20 measurements were taken on a private. A 2026-06-11 learned-watermark of 2010 exceeds even a general's 1800 and was a polluted scrape read (the same run tank-full'd at 1100), not evidence against the formula.[^2]
 
-**Per-slot inventory capacity = 20 + 5 × max(rank, 1)** — recruits share the private cap here too. The tankpit.com rules table says "recruit 20", but the same first rank-0 session sustained 0x49 snapshots at exactly 25 in four slots at once — including slots the radar-zero kill mercy bundle never grants — and never above 25.[^11] Ranks 1+ keep the rules-table values (25 at private through 60 at general), and the server still refuses over-cap pickups with 0x52 code 7.
+**Per-slot inventory capacity = 20 + 5 × rank** — the tankpit.com rules table (recruit 20, +5 per rank), live-confirmed at private (sustained 25s, over-cap pickups refused with 0x52 code 7).
+
+**Mid-session promotion law (measured 2026-07-25):** a promotion applies its new caps INSTANTLY at the promoting kill and is otherwise SILENT on the wire. Session bot-20260725-211120 started as a recruit (stats panel "recruit", wire rank 0, login full tank exactly 1000) and was promoted to private at kill #1 (user ground truth — the account is a private after the run; the user was the only player): the first over-cap fuel reading (exactly 1100) landed 2 s after the promoting 0x41 (`promo_eligible=True`, t+31.7s), slot counts first crossed 20 only after it, and both new caps (1100 fuel, 25/slot) held for the rest of the session. Meanwhile **no binary 0x2B Promotion frame ever arrived and the 0x3D/0x47 rank field stayed 0 to the session's end** — the raised caps were the promotion's only wire signature. Consequence for the bot: after a mid-session promotion its rank-derived readiness bars are stale-LOW (it believes the old, smaller caps) until the next login — it under-fills but never over-believes, so the error is safe but suboptimal. Detecting promotion from cap evidence (a fuel reading above the believed cap) is an open policy item.[^11]
 
 ## Cost per player action
 
@@ -310,9 +312,9 @@ to follow (and vice versa).
     {
       "id": "fuel-capacity",
       "code": "tankpit_bot.physics.capacity:fuel_capacity",
-      "formula": "1000 + 100 * max(rank, 1)",
+      "formula": "1000 + 100 * rank",
       "probes": [
-        {"args": [0], "expect": 1100},
+        {"args": [0], "expect": 1000},
         {"args": [1], "expect": 1100},
         {"args": [7], "expect": 1700},
         {"args": [8], "expect": 1800}
@@ -321,9 +323,9 @@ to follow (and vice versa).
     {
       "id": "inventory-capacity",
       "code": "tankpit_bot.physics.capacity:inventory_capacity",
-      "formula": "20 + 5 * max(rank, 1) per slot",
+      "formula": "20 + 5 * rank per slot",
       "probes": [
-        {"args": [0], "expect": 25},
+        {"args": [0], "expect": 20},
         {"args": [1], "expect": 25},
         {"args": [8], "expect": 60}
       ]
@@ -352,7 +354,7 @@ Each value above is matched 1:1 between a user-declared action and a measurable 
 [^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
 [^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots). SUPERSEDED 2026-07-25: the diffs were exposure events, see [^9].
 [^9]: `analysis_scripts/mine_map_dot_semantics.py` + `analysis_scripts/mine_dot_appearances.py` (standing, 2026-07-25) over 223 archive sessions; wiki-log entry "[2026-07-25] LAW FALSIFIED + LAW MEASURED | Map dots are team-exposure memory of >=500-volume fuel".
-[^11]: `runs/bot/bot-20260725-211120.capture_session.json` + events — the first rank-0 archive session (the account deactivated to recruit 2026-07-25). Fuel: 31 wire readings at exactly 1100, max-below-cap 1098, zero above; pickup `Fuel: 943 -> 1100`. Inventory: 45 decoded 0x49 snapshots, per-slot maxima all 25, e.g. sustained `(25, 18, 25, 25, 25)`.
+[^11]: `runs/bot/bot-20260725-211120.capture_session.json` — kill timeline (all killer=1301, all `promo_eligible=True`): t+31.7s victim 504, then 502/500/513/505; first 0x44 over the old cap (`fuel_total=1100`) at t+33.7s; first 0x49 count over 20 (`[20,23,20,19,13]`) at t+85.7s; 31 readings at exactly 1100, none above; per-slot 0x49 maxima all 25 (sustained `(25,18,25,25,25)`); zero binary 0x2B frames (the only 0x2B bodies are lobby text room lists); final 0x3D/0x47 rank field still 0. User ground truth 2026-07-25: "its a private... it was during [the run]. you're the only one playing." The same-day "recruits share private caps" mis-correction (commit d0d17ff2) is REVERTED by this entry.
 [^10]: density probe `make density-probe` (action_lab/density_probe.py) + `analysis_scripts/analyze_density_probe.py` over `runs/probe/density-20260725-171318.capture_session.json`; session JSON alongside it records extras 20→12, fuel 917→615, 0 skipped sites.
 [^8]: live watches: `radar_watch_probe.capture_session.json`,
 `radar_watch_nomap_probe.capture_session.json`,
