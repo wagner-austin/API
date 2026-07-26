@@ -2,6 +2,8 @@
 title: Issuing Orders
 tags: [engine, commands, dispatch, agent, threading]
 related:
+  - "[[policy-loop]]"
+  - "[[command-channel]]"
   - "[[engine-entity-model]]"
   - "[[engine-tick-and-clock]]"
   - "[[multiplayer-portability-invariants]]"
@@ -24,7 +26,9 @@ hubs: [engine-internals, bot-architecture]
 
 # Issuing Orders
 
-The bot can now play. A unit was ordered across the map through the engine's own command queue and pathfound to the destination, which closes the last of the three prerequisites [[engine-name-oracle]] named.
+A unit was ordered across the map through the engine's own command queue and pathfound to the destination, which closes the last of the three prerequisites [[engine-name-oracle]] named.
+
+This page originally opened by claiming the bot could now play. It could not: one hardcoded order, fired by a wall-clock timer at a roster index typed on the command line, is a working dispatch path and nothing more. Playing needed a perception loop, a policy, and something to score it — see [[policy-loop]] for what that took and [[command-channel]] for the half in between.
 
 ## The path
 

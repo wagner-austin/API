@@ -41,7 +41,7 @@ The engine's own post-load census settles the model in six lines: it iterates `a
 
 ## Why the first two answers were wrong
 
-This page exists because two earlier readings were confidently wrong, and both failures are instructive.
+This page exists because two earlier readings were confidently wrong, and both failures are instructive.[^7]
 
 A sprite registry was read as the unit list because its size, eleven, sat plausibly next to the ten units the map reported.[^7] Size coincidence is not identification. A graph node class was then read as the unit class because its query methods had the right shape. Neither survived contact with the decompiled census.
 

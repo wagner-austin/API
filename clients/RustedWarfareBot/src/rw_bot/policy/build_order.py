@@ -124,6 +124,43 @@ def next_unsatisfied_index(sample: Sample, plan: Sequence[str]) -> int:
     return len(plan)
 
 
+def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | None:
+    """Return the fixed structure that placement offsets are measured from.
+
+    The offsets in :data:`PLACEMENT_RING` describe a ring around a base, and a
+    ring only spreads if its centre holds still. Measuring from the builder does
+    not work, because the builder walks to each site it is sent to: by the third
+    structure it is standing next to the first one, and the third offset lands
+    on top of it. Observed directly — factory one at ``(4450, 2730)`` and the
+    third order at ``(4451, 2646)``, 84 world units apart on a grid where a land
+    factory is wider than that, which the engine silently refused.
+
+    The anchor is the oldest owned immobile entity: lowest engine id among
+    entities the catalogue gives a speed of zero. Lowest id is the oldest
+    because ids are assigned once at construction, so the anchor is the Command
+    Center at the start of a match and stays the same structure as more are
+    built. Immobility is read from the catalogue rather than assumed by type
+    name ([[mechanics-unit-catalogue]]).
+
+    Args:
+        sample: One observation of the world.
+        catalogue: Unit stats by type name, for the speed field.
+
+    Returns:
+        The anchor entity, or None when the player owns no immobile structure.
+    """
+    immobile = [
+        entity
+        for entity in sample["entities"]
+        if entity["mine"]
+        and entity["type_name"] in catalogue
+        and catalogue[entity["type_name"]]["speed"] == 0.0
+    ]
+    if not immobile:
+        return None
+    return min(immobile, key=lambda entity: entity["unit_id"])
+
+
 def find_builder(sample: Sample) -> Entity | None:
     """Return a builder from the roster, or None when the player owns none.
 
@@ -174,6 +211,13 @@ def decide(
     if builder is None:
         return _decision("blocked", "the player owns no builder")
 
+    anchor = find_anchor(sample, catalogue)
+    if anchor is None:
+        return _decision(
+            "blocked",
+            "the player owns no immobile structure to place buildings around",
+        )
+
     if sample["credits"] < stats["price"]:
         return _decision(
             "wait",
@@ -186,8 +230,8 @@ def decide(
         reason=f"building {target} ({built + 1} of {len(plan)})",
         type_name=target,
         unit_id=builder["unit_id"],
-        x=builder["x"] + offset[0],
-        y=builder["y"] + offset[1],
+        x=anchor["x"] + offset[0],
+        y=anchor["y"] + offset[1],
     )
 
 
@@ -212,6 +256,7 @@ __all__ = [
     "Decision",
     "completed_count",
     "decide",
+    "find_anchor",
     "find_builder",
     "next_unsatisfied_index",
 ]

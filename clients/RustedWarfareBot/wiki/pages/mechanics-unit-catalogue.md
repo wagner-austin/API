@@ -39,7 +39,7 @@ That number is the catalogue-level explanation for a failure already recorded fr
 
 **Tested, not merely asserted.** The same order and the same offset were issued to both roster entries on a fresh run. The Command Center, at catalogue speed 0, held position through all three samples; the Builder, at catalogue speed 0.6, moved and arrived 2.5 world units from its destination.[^8] The prediction could have failed in either direction and did not.
 
-What that establishes is a correlation confirmed on two units, one of each kind — not a law over all 90. Nothing here rules out speed being merely correlated with some other property that decides mobility, and the 38 zero-speed units have not been individually ordered. It is enough to select on and not enough to assert as mechanism.
+What that establishes is a correlation confirmed on two units, one of each kind — not a law over all 90.[^8] Nothing here rules out speed being merely correlated with some other property that decides mobility, and the 38 zero-speed units have not been individually ordered. It is enough to select on and not enough to assert as mechanism.
 
 Keeping that predicate in the planner rather than the agent is deliberate: a mobility test embedded in the dispatch layer would be exactly the decision logic the agent must not carry ([[issuing-orders]]).
 
@@ -49,7 +49,7 @@ Prices span from $250 for the Light Gun Ship to $90,000 for the Modular Spider �
 
 ## Two shapes that had to be modelled, not flattened
 
-**A unit is armed only if the engine prints an attack range**, which 61 of 90 do. Damage of a kind that is not printed is zero — that is a fact about the unit, not a missing reading.
+**A unit is armed only if the engine prints an attack range**, which 61 of 90 do.[^1] Damage of a kind that is not printed is zero — that is a fact about the unit, not a missing reading.
 
 **Per-shot and per-volley damage are separate figures and neither derives from the other.** The engine writes `Direct Damage: 12 (total:24.0)` for multi-barrel weapons.[^4] The ratio is not fixed: observed values include 2x, 4x, 6x and one unit at 1.84x.[^6] A decoder that assumed a barrel count, or that kept only one of the two numbers, would be wrong for most multi-barrel units — so both are recorded.
 

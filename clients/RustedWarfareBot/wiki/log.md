@@ -113,6 +113,21 @@ New validator `require_absolute_path` (`RW-DECODE-005`). It also closed an exist
 
 `make check` now chains `agent-selftest`, so a patcher regression or an obfuscated name that moved in a game update fails at the gate. `make check` green: guard 0 violations, ruff clean, mypy strict clean, 88 tests (was 61), 100% statements and branches, agent-selftest OK.
 
+## [2026-07-25] audit | staleness sweep across all 14 pages
+Pages updated: multiplayer-portability-invariants (medium -> high), harness-nodisplay, issuing-orders, engine-entity-model, mechanics-unit-catalogue, perception-visibility
+
+Notes: the pages were written as each milestone landed, and several had been overtaken by later ones. Four real corrections, none cosmetic.
+
+`multiplayer-portability-invariants` was written at `medium` confidence and named its own falsification test: read `CommandController`'s dispatch path. M5 did exactly that, and the dispatch path confirms both halves of the lockstep model — every command is stamped with the `by` millisecond clock at construction, and the enqueue forks on network role with a server-side check on one arm only. A single-player engine with no notion of peers would need neither. Raised to `high`; the four invariants are unchanged, because they were written to be correct either way. Invariant 3 also stopped being theoretical: the stream now carries opponents, so ownership is a per-entity fact the planner must consult.
+
+`issuing-orders` opened with "The bot can now play." It could not, and I said so at the time without fixing the page. One hardcoded order fired by a wall-clock timer at a roster index typed on the command line is a working dispatch path and nothing else. The claim is now stated as what it was, pointing at `policy-loop` for what playing actually took.
+
+`harness-nodisplay` still listed "starting a skirmish headless has not been done" as an open question, and described `-sandbox` and the software-rendering flags as never run — all false for a while. The resolved question is now written up as resolved and the exercised-flag count corrected from five to nine. Two footnotes orphaned by the rewrite were removed rather than left dangling.
+
+Three pages carried uncited prose paragraphs, which the `paragraph-citation` family flags as advisory today and is slated to make fatal.
+
+Verified after: 14 pages, 0 uncited paragraphs, 0 dangling footnote references, 0 unused definitions, every `source_paths` entry resolving with line anchors in bounds, every wikilink resolving.
+
 ## [2026-07-25] milestone | M9 — the policy loop; the bot plays a build order unattended
 Pages written: policy-loop
 Pages updated: index (14 pages), hubs/bot-architecture, hubs/game-mechanics

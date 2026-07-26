@@ -3,11 +3,14 @@ title: "Headless Mode (`-nodisplay`)"
 tags: [harness, headless, cli, boot]
 related:
   - "[[engine-name-oracle]]"
+  - "[[agent-render-callback-noop]]"
+  - "[[issuing-orders]]"
   - "[[multiplayer-portability-invariants]]"
 source_paths:
   - "wiki/sources/m0-probe/nodisplay-boot.log:309"
   - "wiki/sources/m0-probe/main-strings.txt:264"
   - "wiki/sources/m0-probe/printunits.log:1511"
+  - "wiki/sources/m1-sandbox/sandbox-crash.log"
   - ".game/fallback64.bat"
 game_version: "1.15 (code 176, build #28)"
 fact_checked: "2026-07-25"
@@ -29,7 +32,7 @@ The process logs `steam not requested` and runs to completion with no Steam clie
 
 ## What still initialises
 
-`-nodisplay` is not a no-OpenGL mode. Slick2D still opens a display — at 10×10 — and creates framebuffer objects during boot.[^7] On a desktop with a GPU that costs nothing. On a headless Linux CI box it would still need Xvfb or one of the software-rendering flags (`-allowsoftwarerender`, `-canvasgl`), both present in the argument table and both untested.
+`-nodisplay` is not a no-OpenGL mode. Slick2D still opens a display — at 10×10 — and creates framebuffer objects during boot.[^7] On a desktop with a GPU that costs nothing. On a headless Linux CI box it would still need Xvfb or one of the software-rendering flags (`-allowsoftwarerender`, `-canvasgl`). Both were later tried against the in-game render crash and neither avoided it, so neither is a substitute for the agent's patch ([[agent-render-callback-noop]]).
 
 Music tracks load and the font/glyph pipeline runs even under `-nosound` — the engine substitutes a null sound factory rather than skipping the load.[^11] Both are cheap and not worth suppressing.
 
@@ -37,7 +40,7 @@ Music tracks load and the font/glyph pipeline runs even under `-nosound` — the
 
 Thirty-five flags appear as string constants in `Main.class`, archived at `wiki/sources/m0-probe/main-strings.txt`: `-nodisplay`,[^8] `-sandbox`, `-printunits`, `-outputunitimages`, `-debug`, `-debugscript`, `-devdebug`, `-replay_debug`, `-oldreplays`, `-nomods`, `-noresources`, `-nosound`, `-nomusic`, `-safemode`, `-extrasafemode`, `-canvasgl`, `-allowsoftwarerender`, `-disable_vbos`, `-force_vbos`, `-disable_atlas`, `-disabletextureread`, `-nopostprocessing`, `-noteamshaders`, `-postprocessing`, `-teamshaders`, `-nobackground`, `-lang`, `-log`, `-nologfile`, `-logcolor`, `-width`, `-height`, `-fullscreen`, `-steam`, `-nopreferipv4`.
 
-Five have been exercised: `-nodisplay`, `-nosound`, `-printunits`, `-log`, `-nologfile`. The remaining thirty are inventory — the string exists in the parser, nothing more. `-sandbox` and `-debugscript` are the two most likely to matter next, and neither has been run.[^12]
+Nine have been exercised: `-nodisplay`, `-nosound`, `-printunits`, `-log`, `-nologfile`, `-width`, `-height`, `-sandbox`, and the render flags noted above. `-sandbox` proved the most consequential of them and is now the standard way a session starts.[^12] The rest are inventory — the string exists in the parser, nothing more.
 
 ## `-printunits` as a stat oracle
 
@@ -47,11 +50,11 @@ Five have been exercised: `-nodisplay`, `-nosound`, `-printunits`, `-log`, `-nol
 
 Every run rewrites `preferences.ini` in the directory it launches from — the engine saves settings twice during boot and once more after the menu map loads.[^10] Two consequences follow: a run mutates its own game tree, and a Steam-managed install would drift and could be re-verified out from under a pinned build. Mitigation in place: the game is copied to `.game/` and every run launches from there, never from the Steam install.
 
-## What is not yet known
+## Open questions, and one that closed
 
-Three questions are open, each with a concrete test that would settle it ([[engine-name-oracle]]).
+Starting a skirmish headless was the first question here, and `-sandbox` closed it: the engine loads `maps/skirmish/[z;p10]Crossing Large (10p).tmx` with no human, the same default the single-player menu wires to that button.[^13] It needs an explicit `-width`/`-height`, because the 10x10 display `-nodisplay` selects on its own fails once in-game UI renders ([[agent-render-callback-noop]]). The route this section originally proposed — driving the libRocket script bindings — turned out to be unnecessary for starting a game, though the same surface later supplied the order path and `Root.hostStart(boolean)` ([[issuing-orders]]).
 
-Starting a skirmish headless has not been done. The menu loads and the script engine processes `onShowNewScreen()`, but nothing has driven it further.[^13] The test: invoke the libRocket script bindings directly (see [[engine-name-oracle]]), or run `-sandbox`, or load a save through GameSaver, and check whether the boot log reaches a real map rather than the menu background it loads today.[^14]
+Two remain, each with a concrete test ([[engine-name-oracle]]).
 
 Clean self-termination has not been observed — the 35-second run was killed externally.[^2] The test: run a mission that can end, and check the process exit code.
 
@@ -67,8 +70,7 @@ Faster-than-realtime ticking has not been attempted. The engine exposes `slower`
 [^8]: `wiki/sources/m0-probe/main-strings.txt:264` — "-nodisplay". The file is the sorted, deduplicated set of printable string constants extracted from `com/corrodinggames/rts/java/Main.class` inside `.game/game-lib.jar`; `-printunits` at `:297` and `-sandbox` at `:306`.
 [^9]: `wiki/sources/m0-probe/printunits.log:1509` — "<h4>Experimental Spider</h4>", with "<pre>Price: $70000" at `:1511` and the HP/speed/mass/range block immediately following.
 [^11]: `wiki/sources/m0-probe/nodisplay-boot.log:33` — "Disabling sound with NullSoundFactory"; the music-track load lines follow at `:75`–`:93`.
-[^12]: `wiki/sources/m0-probe/main-strings.txt:306` — "-sandbox", with "-debugscript" at `:160`. Presence in the parser's string table is all this establishes; no run has exercised either.
-[^13]: `wiki/sources/m0-probe/nodisplay-boot.log:305` — "ScriptEngine:HandleEvent:onShowNewScreen();", the last engine-driven event before the run entered its loop.
-[^14]: `wiki/sources/m0-probe/nodisplay-boot.log:262` — "Mapfile: assets/maps/menu_background/menu2.tmx", the map the unattended process loads on its own.
+[^12]: `wiki/sources/m0-probe/main-strings.txt:306` — "-sandbox", with "-debugscript" at `:160`. The former is exercised by every session since; the latter is still only a string in the parser.
+[^13]: `wiki/sources/m1-sandbox/sandbox-crash.log` — `Mapfile: assets/maps/skirmish/[z;p10]Crossing Large (10p).tmx` under `-sandbox`, against `assets/maps/menu_background/menu2.tmx` at `wiki/sources/m0-probe/nodisplay-boot.log:262` without it.
 [^15]: `.game/preferences.ini:148` — `slower:DEFAULT,DEFAULT`, with `faster:DEFAULT,DEFAULT` at `:149`, both in the `[keys]` section.
 [^10]: `wiki/sources/m0-probe/nodisplay-boot.log:62` — "Saving settings to: C:\Program Files (x86)\Steam\steamapps\common\Rusted Warfare\preferences.ini", repeated at `:256` and `:334` — three writes in a single boot. The probe ran against the Steam install before the `.game/` copy existed.

@@ -41,9 +41,9 @@ Perception went from 3 entities to 15 on the same map and moment.[^1] Across thr
 
 **Fog filtering is not demonstrated.** The map sets up team fog[^7], yet all four opposing teams are visible in every sample.[^1] The engine's test returns true whenever fog is disabled for the asking player or that player has no fog grid, so a plausible reading is that `-sandbox` does not apply fog to the local player — in which case a human in the same mode would also see everything and nothing improper is happening. That is a reading, not a finding: it has not been confirmed, and no capture yet shows the test hiding anything.
 
-The consequence is bounded and worth stating plainly. The *mechanism* is legitimate by construction, because it is the engine's own per-player test. The *behaviour under fog* is untested, so the claim "the bot sees only what a player sees" is currently supported by how the code is written rather than by observation. Establishing it needs a mode where the local player has a fog grid, and a capture showing an entity present in `am.bE` and absent from the stream.
+The consequence is bounded and worth stating plainly.[^7] The *mechanism* is legitimate by construction, because it is the engine's own per-player test. The *behaviour under fog* is untested, so the claim "the bot sees only what a player sees" is currently supported by how the code is written rather than by observation. Establishing it needs a mode where the local player has a fog grid, and a capture showing an entity present in `am.bE` and absent from the stream.
 
-Confidence on this page is therefore `medium` rather than `high`, and it is the visibility claim specifically that holds it there.
+Confidence on this page is therefore `medium` rather than `high`, and it is the visibility claim specifically that holds it there — every other claim here is observed in a capture.[^1] The invariant it serves is stated in [[multiplayer-portability-invariants]].
 
 [^1]: `wiki/sources/m9-perception/perception-widened.txt:9` — `{"kind":"frame","frame":1348,"clock_ms":4555,"visible":15,"credits":4121}`, the first of three samples.
 [^2]: `wiki/sources/m9-perception/perception-widened.txt:11` — the third sample at `visible:19, credits:4445`, with the second at `:10` reading `visible:18, credits:4283`.
