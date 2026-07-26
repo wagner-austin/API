@@ -7,7 +7,7 @@ A sample goes in and orders come out. What sends them is
 from __future__ import annotations
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.production import idle_producers, sustain
+from rw_bot.policy.production import idle_producers, production_bound, sustain
 from rw_bot.wire.state import BuildOption, Entity, Sample
 
 
@@ -79,6 +79,9 @@ def _sample(
         frame=1,
         clock_ms=10,
         credits=credits,
+        defeated=False,
+        wiped=False,
+        players_left=6,
         entities=entities,
         pools=(),
         options=options,
@@ -191,3 +194,49 @@ def test_an_idle_unit_that_offers_nothing_is_skipped() -> None:
     world = _sample((builder, _FACTORY), (_option(300, "c_tank"),))
     assert idle_producers(world) == (214, 300)
     assert [o["unit_id"] for o in sustain(world, _CATALOGUE, ("c_tank",))] == [300]
+
+
+#: The engine saying unit 300 can make a tank, which is what makes it a producer.
+_MAKES_TANKS = (_option(300, "c_tank", placed=False),)
+
+
+def test_spare_capacity_means_another_factory_would_only_idle() -> None:
+    """An idle producer is throughput nobody is using; adding one adds nothing."""
+    world = _sample((_entity(300, "landFactory"),), _MAKES_TANKS, credits=100_000)
+    assert production_bound(world, _CATALOGUE, "landFactory") is False
+
+
+def test_every_producer_busy_and_money_spare_is_the_bound_case() -> None:
+    """The state that banked 7,013 credits: the queue is the constraint."""
+    world = _sample((_entity(300, "landFactory", queued=1),), _MAKES_TANKS, credits=100_000)
+    assert production_bound(world, _CATALOGUE, "landFactory") is True
+
+
+def test_an_idle_building_that_makes_nothing_is_not_spare_capacity() -> None:
+    """The bug this rule shipped with.
+
+    A Command Center and a builder both sit with empty queues, and counting
+    them as producers meant the constraint never read as reached and the rule
+    never fired. Only what the engine lists as able to make a unit counts.
+    """
+    world = _sample(
+        (_entity(213, "commandCenter"), _entity(300, "landFactory", queued=1)),
+        _MAKES_TANKS,
+        credits=100_000,
+    )
+    assert production_bound(world, _CATALOGUE, "landFactory") is True
+
+
+def test_nothing_that_can_produce_at_all_is_a_build_order_problem() -> None:
+    world = _sample((_entity(213, "commandCenter"),), (), credits=100_000)
+    assert production_bound(world, _CATALOGUE, "landFactory") is False
+
+
+def test_busy_but_broke_is_not_worth_a_factory() -> None:
+    world = _sample((_entity(300, "landFactory", queued=1),), _MAKES_TANKS, credits=0)
+    assert production_bound(world, _CATALOGUE, "landFactory") is False
+
+
+def test_a_factory_the_catalogue_cannot_price_is_not_proposed() -> None:
+    world = _sample((_entity(300, "landFactory", queued=1),), _MAKES_TANKS, credits=100_000)
+    assert production_bound(world, _CATALOGUE, "someModFactory") is False

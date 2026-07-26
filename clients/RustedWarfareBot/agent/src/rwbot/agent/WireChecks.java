@@ -23,7 +23,7 @@ final class WireChecks {
     static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 4000);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 4000, false, false, 6);
         // Pinned byte-for-byte on purpose. This is a wire contract, and the
         // consumer parses it strictly, so a field appearing, vanishing or being
         // renamed must fail here rather than at the far end of a socket. That
@@ -32,7 +32,8 @@ final class WireChecks {
         failures += Check.expect(
                 frame.equals(
                         "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
-                                + "\"visible\":3,\"pools\":2,\"options\":5,\"credits\":4000}"),
+                                + "\"visible\":3,\"pools\":2,\"options\":5,\"credits\":4000,"
+                                + "\"defeated\":false,\"wiped\":false,\"players_left\":6}"),
                 "frame record is exact");
 
         // Pinned for the same reason, and separately: the consumer counts these
@@ -96,13 +97,13 @@ final class WireChecks {
                 "a record is exactly one object");
 
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"visible\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"pools\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"pools\":0"),
                 "a map with no pool in sight is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0).contains("\"options\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"options\":0"),
                 "a player who can make nothing is still a record");
         return failures;
     }

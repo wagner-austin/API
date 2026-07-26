@@ -8,12 +8,17 @@ from __future__ import annotations
 
 from rw_bot.mechanics.catalogue import UnitStats, Weapon
 from rw_bot.policy.combat import (
+    RALLY_RADIUS,
+    WAVE_SIZES,
     choose_target,
     engagements,
     find_army,
     find_targets,
     is_armed,
     is_mobile,
+    muster,
+    rally,
+    wave_size,
 )
 from rw_bot.wire.state import Entity, Sample
 
@@ -92,6 +97,9 @@ def _sample(*entities: Entity) -> Sample:
         frame=1,
         clock_ms=10,
         credits=4000,
+        defeated=False,
+        wiped=False,
+        players_left=6,
         entities=tuple(entities),
         pools=(),
         options=(),
@@ -218,3 +226,88 @@ def test_the_engagement_reason_names_both_sides() -> None:
         _entity(9, "commandCenter", 50.0, 0.0, mine=False, hostile=True),
     )
     assert engagements(world, _CATALOGUE)[0]["reason"] == "c_tank -> commandCenter 9"
+
+
+def _wave(size: int) -> tuple[Entity, ...]:
+    return tuple(_entity(unit_id, "c_tank") for unit_id in range(1, size + 1))
+
+
+def test_the_wave_ladder_is_the_engines() -> None:
+    """Three, then five, then seven, the last rung repeating."""
+    assert [wave_size(n) for n in range(8)] == [3, 3, 5, 5, 5, 7, 7, 7]
+
+
+def test_a_reserve_short_of_a_wave_releases_nobody() -> None:
+    state = muster(_wave(2), frozenset(), 0)
+    assert state["released"] == frozenset()
+    assert state["gathering"] == 2
+    assert state["wanted"] == 3
+    assert state["waves"] == 0
+
+
+def test_a_full_reserve_is_released_as_one_wave() -> None:
+    state = muster(_wave(3), frozenset(), 0)
+    assert state["released"] == frozenset({1, 2, 3})
+    assert state["gathering"] == 0
+    assert state["waves"] == 1
+    assert state["reason"] == "wave 1 of 3 released"
+
+
+def test_reinforcements_gather_instead_of_joining_the_fight_alone() -> None:
+    """The failure the membership model exists for.
+
+    A plain "have we started" flag latched on the first wave and let every
+    later unit walk in one at a time -- 45 reinforcements for a net army growth
+    of one, measured over 1,500 samples.
+    """
+    state = muster(_wave(4), frozenset({1, 2, 3}), 1)
+    assert state["released"] == frozenset({1, 2, 3})
+    assert state["gathering"] == 1
+    assert state["wanted"] == 3
+
+
+def test_the_second_wave_needs_its_own_full_reserve() -> None:
+    state = muster(_wave(6), frozenset({1, 2, 3}), 1)
+    assert state["released"] == frozenset({1, 2, 3, 4, 5, 6})
+    assert state["waves"] == 2
+    assert state["wanted"] == WAVE_SIZES[2]
+
+
+def test_survivors_keep_their_clearance_through_losses() -> None:
+    """They do not turn round to wait; abandoning an attack in range is worse."""
+    survivors = muster((_entity(2, "c_tank"),), frozenset({1, 2, 3}), 1)
+    assert survivors["released"] == frozenset({2})
+    assert survivors["gathering"] == 0
+
+
+def test_a_wiped_wave_leaves_nothing_released() -> None:
+    """And the next reserve then re-gathers rather than trickling in."""
+    assert muster((), frozenset({1, 2, 3}), 1)["released"] == frozenset()
+
+
+def test_a_scattered_reserve_is_sent_to_the_rally_point() -> None:
+    """Units that rolled out of a factory are wherever the factory is."""
+    scattered = (_entity(4, "c_tank", 900.0, 0.0), _entity(5, "c_tank", 0.0, 900.0))
+    moves = rally(scattered, (0.0, 0.0))
+    assert [m["unit_id"] for m in moves] == [4, 5]
+    assert {(m["x"], m["y"]) for m in moves} == {(0.0, 0.0)}
+
+
+def test_a_unit_already_at_the_rally_point_is_not_re_ordered() -> None:
+    """The engine runs a waypoint until it is replaced.
+
+    Re-issuing every sample would reset the walk at the sampling rate and
+    nothing would ever arrive -- the failure the attack path already learned.
+    """
+    assert rally((_entity(4, "c_tank", 10.0, 10.0),), (0.0, 0.0)) == ()
+
+
+def test_the_rally_boundary_is_the_engines_own_arrival_test() -> None:
+    """Sixty world units, which is where its rally group drops a member."""
+    just_outside = _entity(4, "c_tank", RALLY_RADIUS + 0.5, 0.0)
+    just_inside = _entity(5, "c_tank", RALLY_RADIUS - 0.5, 0.0)
+    assert [m["unit_id"] for m in rally((just_outside, just_inside), (0.0, 0.0))] == [4]
+
+
+def test_an_empty_reserve_is_sent_nowhere() -> None:
+    assert rally((), (0.0, 0.0)) == ()

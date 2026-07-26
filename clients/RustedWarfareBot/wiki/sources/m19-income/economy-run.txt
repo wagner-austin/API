@@ -1,0 +1,77 @@
+Continuous expansion, first live run
+====================================
+
+runs/econ1.planner, unseeded, 1500-sample fight phase, sandbox skirmish against
+five AI opponents. Same map and same opening goals as every run before it.
+
+BUILD PHASE
+  outcome        done (all 8 plan entries satisfied)
+  completed      8/8
+  orders sent    8
+  samples seen   531
+  credits left   6975
+
+FIGHT PHASE
+  fight outcome  sample_limit
+  attack orders  135
+  reinforced     47
+  army           4 -> 10
+  enemies seen   49 -> 153
+  engaged gone   9
+  extractors     3 -> 9
+  expansions     10
+  expand note    extractorT1 already going up
+  samples seen   1500
+
+
+WHAT THIS DEMONSTRATES
+----------------------
+
+The economy is no longer fixed. extractors 3 -> 9 is a thing the bot could not
+previously do at all: `sustain` refuses placed structures and `reinforcements`
+drops anything needing a pool, both correctly, so before this change no code
+path existed that could take a fourth pool. Ten expansion orders produced six
+finished extractors, with a seventh going up when the sample budget ran out.
+
+At the measured 12.01 credits/s per extractor (measured-rates.txt), going from
+three to nine raised income from 63 to 135 credits/s including the Command
+Center's 27 -- slightly more than double.
+
+
+WHAT THIS DOES NOT DEMONSTRATE
+------------------------------
+
+That it wins more, or even that it fields a bigger army. It is ONE unseeded
+run, and the honest comparison is against the three committed lockstep runs
+that preceded it, which had the same combat code and the old fixed economy:
+
+  seed 777     army 4 -> 14
+  seed 4242    army 4 ->  6
+  seed 31337   army 4 ->  3
+  this run     army 4 -> 10   (unseeded, so not the same experiment as any of them)
+
+4 -> 10 sits inside a range that already spanned 3 to 14 without any economy
+change at all. Nothing here separates the effect from the noise, and the
+opponents' unit mix is weighted-random by construction, so no two unseeded runs
+are the same experiment ([[ai-opponent-strategy]]).
+
+The 743-order churn baseline in m15-production is NOT the right comparison
+either: target commitment landed between then and now, and it alone cut orders
+to 178-200. This run's 135 continues that, and says nothing about the economy.
+
+What is needed to make an outcome claim is the seeded A/B that was already
+built for the commitment question: three seeds, expansion on and off, six
+runs. Until that exists the claim stops at "the economy now grows, and the
+growth is worth 12 credits/s per pool".
+
+
+AN OPEN PROBLEM THIS RUN SURFACED
+---------------------------------
+
+The build phase ended holding 6,975 credits, and the run banked further. Nine
+extractors of income at 135 credits/s against a single Land Factory means
+credits arrive faster than one producer can spend them: a c_tank at 350 costs
+about 2.6 seconds of income, and a factory cannot start one every 2.6 seconds.
+
+Income is no longer the binding constraint. Production throughput is. Fixing
+the economy moved the bottleneck rather than removing it.

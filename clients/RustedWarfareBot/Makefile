@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play income
 
 help:
 	@Write-Host ""
@@ -30,6 +30,8 @@ help:
 	@Write-Host "  make play                        start a game, play a whole match, stop it"
 	@Write-Host "                                   PLAY_SAMPLES=1500 PLAY_SEED=0 PLAY_LOG=runs/play.log"
 	@Write-Host "                                   PLAY_SEED pins the opponents' RNG; PLAY_LOCKSTEP locks the tick"
+	@Write-Host "  make income                      measure extractor credits/s and payback time"
+	@Write-Host "                                   INCOME_STAGES=4 INCOME_IDLE=200 INCOME_LOG=runs/income.log"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
 	@Write-Host "  make agent                       compile + jar the javaagent"
@@ -65,12 +67,26 @@ lint:
 	@Write-Host ""
 	@Write-Host "[lint] passed" -ForegroundColor Green
 
+# Coverage data goes to a per-run path, not the default fixed ``.coverage``.
+#
+# The same reasoning as the absent ``--basetemp`` in pyproject, and it cost a
+# confusing hour to rediscover: this working tree is used by more than one agent
+# at a time, coverage writes one SQLite file at a fixed path, and two concurrent
+# runs corrupt it. The reader then fails with "no such table: arc" and reports
+# 0.00% while every one of the 520 tests passes -- a green suite presented as a
+# coverage failure, which reads as a code problem and is not one.
+#
+# Per-run paths cannot collide, so no lock is needed. Fragments land beside the
+# combined file: xdist writes ``.coverage-<id>.<host>.<pid>.<rand>`` per worker
+# and coverage combines them, so the cleanup globs rather than naming one file.
+# Under runs/ because that is where untracked run output already lives.
 test:
 	@Write-Host ""
 	@Write-Host "==> test" -ForegroundColor Cyan
 	poetry lock
 	poetry install --with dev
-	poetry run python -m pytest --cov=src --cov=scripts --cov-branch --cov-report=term-missing
+	New-Item -ItemType Directory -Force "runs" | Out-Null
+	$$env:COVERAGE_FILE = (Resolve-Path -LiteralPath ".").Path + "\runs\.coverage-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$code = 0; try { poetry run python -m pytest --cov=src --cov=scripts --cov-branch --cov-report=term-missing; $$code = $$LASTEXITCODE } finally { Get-ChildItem -Path "runs" -Filter ".coverage-*" -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Remove-Item Env:\COVERAGE_FILE -ErrorAction SilentlyContinue }; if ($$code -ne 0) { exit $$code }
 	@Write-Host ""
 	@Write-Host "[test] passed" -ForegroundColor Green
 
@@ -277,8 +293,34 @@ PLAY_LOG ?= runs/play.log
 CATALOGUE := wiki/sources/m0-probe/printunits.log
 TYPE_DUMP := wiki/sources/m11-pools/type-flags.ndjson
 
+# Which planner the harness drives, and what to pass it after the three paths
+# every planner takes. Parameterised so a probe reuses this recipe rather than
+# copying it: bringing the game up headless, waiting for the channel, letting
+# the map settle and tearing the process down again is the fiddly part, and a
+# second copy of it would drift from this one.
+# Invoked as a module, not a path. A planner that imports another planner's
+# loaders needs the repository root on sys.path, and running a file by path puts
+# its own directory there instead -- so "python scripts/income.py" cannot see
+# "scripts.play" at all. "python -m" is what `make lint` already uses for the
+# guard, so this is the form the tree is known to support.
+PLAY_MODULE ?= scripts.play
+PLAY_ARGS ?= $(PLAY_SAMPLES)
+
+# How many extractors the income probe builds, and how long it stands still
+# between each one. Target-specific variables rather than a recursive $(MAKE):
+# the argument list contains a space, and quoting it through a sub-make under
+# PowerShell splits it into a stray target.
+INCOME_STAGES ?= 4
+INCOME_IDLE ?= 200
+INCOME_LOG ?= runs/income.log
+
 play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; if ($(PLAY_LOCKSTEP) -ne 0) { $$agentArgs = $$agentArgs + ";lockstepFrames=$(PLAY_LOCKSTEP)"; Write-Host "[play] lockstep every $(PLAY_LOCKSTEP) frames" -ForegroundColor DarkGray }; $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList @("-Xmx1000M", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound", "-sandbox", "-width", "800", "-height", "600", "-log", "$$log") -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python scripts/play.py $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_SAMPLES) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }
+	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; if ($(PLAY_LOCKSTEP) -ne 0) { $$agentArgs = $$agentArgs + ";lockstepFrames=$(PLAY_LOCKSTEP)"; Write-Host "[play] lockstep every $(PLAY_LOCKSTEP) frames" -ForegroundColor DarkGray }; $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList @("-Xmx1000M", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound", "-sandbox", "-width", "800", "-height", "600", "-log", "$$log") -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python -m $(PLAY_MODULE) $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_ARGS) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }
+
+income: PLAY_MODULE = scripts.income
+income: PLAY_ARGS = $(INCOME_STAGES) $(INCOME_IDLE)
+income: PLAY_LOG = $(INCOME_LOG)
+income: play

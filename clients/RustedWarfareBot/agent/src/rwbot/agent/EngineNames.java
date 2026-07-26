@@ -472,5 +472,34 @@ final class EngineNames {
      */
     static final String RANDOM_FIELD = "a";
 
+    /**
+     * Player flag: defeated.
+     *
+     * <p>Set when a player still has units but none that can build or hold
+     * ground. The engine names it itself -- the notification it fires on this
+     * transition prints "<player> was defeated" -- which is the whole
+     * derivation; nothing here is inferred from the letter.
+     */
+    static final String PLAYER_DEFEATED = "F";
+
+    /**
+     * Player flag: wiped out.
+     *
+     * <p>Set when a player has no units left and no ally holding any. Its
+     * notification prints "<player> has been wiped out", and separately "had
+     * no starting units" when it happens in the first ten frames.
+     */
+    static final String PLAYER_WIPED = "G";
+
+    /**
+     * Static count of players still in the match.
+     *
+     * <p>Counts players that are neither absent, nor {@link #PLAYER_DEFEATED},
+     * nor {@link #PLAYER_WIPED}. The engine prints it as "N players remaining"
+     * and calls its own end-of-match hook when it reaches one, so this is the
+     * engine's verdict rather than our arithmetic (wiki: policy-grading).
+     */
+    static final String PLAYERS_REMAINING = "g";
+
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 }

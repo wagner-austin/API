@@ -1,0 +1,169 @@
+Community research on Rusted Warfare strategy, and what it did and did not
+settle
+=========================================================================
+
+Conducted 2026-07-26. Rusted Warfare is niche and most surviving material is
+Steam Community guides of unstated version. Everything below is marked with its
+confidence, and NOTHING here outranks the shipped INI files or the decompiled
+1.15 (code 176, build #28) engine -- those are the pinned build we actually run.
+
+Access note: steamcommunity.com returned HTTP 429 and rustedwarfare.fandom.com
+returned HTTP 402 to direct fetches during this session, so several sources
+below are quoted via search-engine extraction rather than a full page read.
+That is weaker sourcing than reading the page and is flagged per item.
+
+
+CONFIRMED INDEPENDENTLY -- economy: spread, do not upgrade
+----------------------------------------------------------
+
+Steam guide "A scientific approach to the economy system (kind of)" by Ionics,
+posted 2020-05-14, game version unstated.
+https://steamcommunity.com/sharedfiles/filedetails/?id=2095871975
+(steamcommunity.com 429s on a bare fetch; appending &l=english succeeded)
+
+  *** CONTENT-SET WARNING, added after reading the guide in full ***
+  The guide tabulates "credit factories" at 25,000 / 47,500 / 70,000 credits
+  generating 35 / 60 / 85 per tick. NO SUCH BUILDING EXISTS IN THIS BUILD. A
+  grep of .game/assets/units/ finds `generation_resources` on exactly eight
+  files -- the five extractors and the three fabricators -- and nothing in the
+  tree is priced between 20,000 and 30,000. The guide is describing a mod or
+  much older content.
+
+  So it corroborates the METHOD (cost per unit of income, marginal, ignoring
+  build time) and its extractor conclusion, and NONE of its numbers may be
+  used. Everything numeric below and in measured-rates.txt comes from our own
+  INI reads and live measurement.
+
+  "Extractors are the clear winners because they are very cost effective. At
+   the beginning, where most resource pools are still free, it is smarter to
+   build more T1 extractors instead of fewer T2 or T3 extractors."
+
+  "...fabricators become a viable option late-game after all resource pools
+   have been occupied and upgraded."
+
+This is the same conclusion measured-rates.txt reaches from the shipped INIs
+and a live measurement, by an unrelated route. Our figures: a new T1 extractor
+costs 87.5 credits per +1 generation, an upgrade costs 350-800, a fabricator
+1100. Confidence: HIGH, two independent sources agreeing.
+
+The guide's own caveat is worth carrying: it "focuses primarily on the cost per
+income ratio and ignores build times". Ours ignores builder travel time, which
+is the same blind spot -- a distant pool costs a walk that an in-base upgrade
+does not.
+
+Its fabricator conclusions DO hold for this build, which is a point in favour of
+its reasoning even though its unit table is from elsewhere. The guide says T2
+fabricators beat both T1 and T3, and that adding a new T2 beats upgrading an
+existing one to T3. Our INI arithmetic, cost per +1 generation:
+
+  upgrade fabricatorT1 -> T2    4400 / +5   =  880   <- cheapest
+  new fabricatorT2              6600 /  7   =  943
+  new fabricatorT3             14100 / 14   = 1007
+  upgrade fabricatorT2 -> T3    7500 / +7   = 1071
+  new fabricatorT1              2200 /  2   = 1100   <- worst
+
+Both claims check out: 943 beats 1100 and 1007, and 943 beats 1071. All of it
+is academic while a pool is free, though -- a new extractor is 87.5.
+
+
+THE OPPONENTS ARE ON MEDIUM, AND MEDIUM DOES NOT CHEAT
+-------------------------------------------------------
+
+Community claim, repeated across several Steam discussion threads and via
+search extraction (not read in full):
+
+  "The normal AI doesn't cheat, but hard to impossible AIs get a multiplier
+   boost to their income... easy AIs have an income multiplier handicap."
+  "on higher difficulties the AI's behaviour is also different, it attacks with
+   bigger groups of units and uses experimentals."
+  "stats of individual units are never affected by difficulty changes."
+
+  https://steamcommunity.com/app/647960/discussions/0/1678063648167735993/
+  https://steamcommunity.com/app/647960/discussions/0/1628538707069444336/
+
+Verified locally, which matters more:
+
+  .game/assets/translations/Strings.properties lines 55-61 give the enum --
+    -2 Very Easy, -1 Easy, 0 Medium, 1 Hard, 2 Very Hard, 3 Impossible
+
+  .game/preferences.ini line 2 -- aiDifficulty:0
+
+  .decompiled/com/corrodinggames/rts/gameFramework/j/ah.java -- the room
+    settings object carries `incomeMultiplier` (field h) defaulting to 1.0f
+    alongside startingCredits, aiDifficulty, startingUnits and randomSeed.
+
+So our sandbox skirmishes run against five **Medium** opponents at an income
+multiplier of 1.0. There is no handicap to blame. Every run this bot has lost
+was lost on equal income against the baseline difficulty.
+
+NOT verified: no per-difficulty income multiplier table was found anywhere in
+the decompiled tree. Greps for handicap/multiplier/difficulty-scaled resource
+terms returned only `addResourcesScaledByAIHandicaps`, a mod-facing INI key on
+unit actions, not a global income model. The community claim may be true and
+implemented somewhere this search missed, may be version-drifted, or may be
+folk knowledge. It does not affect us either way at difficulty 0.
+
+
+UNCONFIRMED -- opening and attack timing
+-----------------------------------------
+
+Several guides describe an aggressive opening. Via search extraction only:
+
+  "If there's a land connection, rush your tanks to approximately midway, then
+   frantically try to get a foothold on the middle of the map with some
+   turrets, claim the extractors, and build up advanced units at your base."
+
+  "First find your Extractor Mines and place an Extractor on top of it. With
+   your remaining Combat Engineers, build 2 Anti Airs and 3 ground turrets."
+
+  https://steamcommunity.com/sharedfiles/filedetails/?id=1858207046
+  https://steamcommunity.com/sharedfiles/filedetails/?id=1449760671
+
+Confidence: LOW. No version stated, written for human multiplayer, and the
+"combat engineers" opening does not match our sandbox start (one Builder, one
+Command Center). Contest-the-middle advice is about map control on specific
+maps, and our bot plays one fixed map.
+
+Worth noting only because it agrees with the shipped AI's own configuration on
+static defence, which we can read directly and therefore trust more: turrets at
+buildPriority ~0.2 with maxEachBase 3-5, anti-air included. Our bot builds
+zero of either.
+
+
+UNCONFIRMED -- unit composition
+--------------------------------
+
+  "Rusted Warfare has a rock-paper-scissors-like system... Sturdy tanks can
+   soak up damage but are vulnerable to anti-armor units, and powerful
+   artillery can decimate enemy bases from afar but needs protection."
+  "mass T1 Land Units... then build one or two Mobile Turrets buffered by
+   smaller units, as the AOE damage, range, and firing rate of the mobile
+   turrets will destroy large groups of smaller units."
+
+  https://steamcommunity.com/sharedfiles/filedetails/?id=1858207046
+
+Confidence: LOW-MEDIUM, and untested here. Our bot builds only c_tank. The
+claim that a small number of AOE units breaks up massed cheap units is
+plausible and testable against our own A/B harness, which is the right way to
+settle it rather than taking a guide's word.
+
+
+QUESTIONS THE RESEARCH DID NOT ANSWER
+--------------------------------------
+
+1. No community build order exists for our actual situation -- a scripted bot,
+   one fixed map, five Medium AI opponents, sandbox mode. Everything found is
+   human-multiplayer advice.
+2. No numeric attack-timing benchmark. Nothing says "attack at N minutes" or
+   "expand until N extractors".
+3. Whether static defence pays for itself in skirmish was not settled. Guides
+   recommend it; the shipped AI builds it; neither is evidence about our bot,
+   which loses field battles rather than base assaults.
+4. No per-difficulty income multiplier values, as above.
+5. Nothing on tech timing that distinguishes T1-only play from teching, at any
+   difficulty.
+
+The honest summary: the web confirmed the one thing we had already proven from
+primary sources, and supplied nothing decisive about anything else. The
+remaining questions are all answerable with the seeded A/B harness we already
+have, which is a better instrument for them than a ten-year-old forum post.

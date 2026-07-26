@@ -127,4 +127,55 @@ def sustain(
     return tuple(orders)
 
 
+def production_bound(sample: Sample, catalogue: Mapping[str, UnitStats], factory_type: str) -> bool:
+    """Report whether the player has money it has nowhere to spend.
+
+    The bot banked 7,013 credits over a 1,500-sample run while producing 46
+    units. That was not a spending rule that failed to fire: :func:`sustain`
+    already budgets across every idle producer. It was arithmetic. Ten
+    extractors of income and one factory to spend it through means credits pile
+    up no matter how willing the spender is.
+
+    So the question is not "should I buy something" but "can I buy *faster*",
+    and it is answered from observed state rather than a threshold. Every
+    producer busy means the queue is the constraint; affording another factory
+    means the bank is not. Both together mean building one converts idle money
+    into throughput, and neither alone does.
+
+    **A producer is something the engine says can make a unit**, not merely an
+    owned building with an empty queue. :func:`idle_producers` answers the
+    looser question and is right to -- its caller cross-references the option
+    list anyway -- but reusing it here read the Command Center and the builder
+    as spare capacity, so this never fired at all. The option list is the
+    engine's own answer to who can produce ([[mechanics-build-actions]]).
+
+    Args:
+        sample: One observation of the world.
+        catalogue: Unit stats by type name, for the factory's price.
+        factory_type: Type name of the producer to add.
+
+    Returns:
+        True when every producer is busy and another factory is affordable.
+    """
+    stats = catalogue.get(factory_type)
+    if stats is None:
+        return False
+    producers = {option["unit_id"] for option in sample["options"] if not option["placed"]}
+    if not producers:
+        # Nothing can make a unit at all. That is a build-order problem, and
+        # adding a factory is the build plan's job rather than a reaction to a
+        # queue that does not exist yet.
+        return False
+    busy = {
+        entity["unit_id"]
+        for entity in sample["entities"]
+        if entity["mine"] and entity["queued"] > 0
+    }
+    if producers - busy:
+        # Spare capacity already. Another factory would idle beside the ones
+        # that are idling, which spends the bank without raising throughput.
+        return False
+    return sample["credits"] >= stats["price"]
+
+
 __all__ = ["ProductionOrder", "idle_producers", "sustain"]

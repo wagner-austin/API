@@ -547,6 +547,71 @@ final class Perception {
     }
 
     /**
+     * Reports whether the current player has been defeated.
+     *
+     * <p>The engine's own verdict, not a count of what is left standing. It
+     * fires a notification reading "&lt;player&gt; was defeated" on the same
+     * transition, which is what pins the flag (wiki: policy-grading).
+     *
+     * @param engine The live engine instance.
+     * @return True when the current player is out of the match.
+     */
+    static boolean isDefeated(Object engine) {
+        return playerFlag(engine, EngineNames.PLAYER_DEFEATED);
+    }
+
+    /**
+     * Reports whether the current player has been wiped out.
+     *
+     * <p>Stronger than defeat: nothing owned is left at all, and no ally holds
+     * anything either. Its notification reads "&lt;player&gt; has been wiped
+     * out".
+     *
+     * @param engine The live engine instance.
+     * @return True when the current player holds nothing.
+     */
+    static boolean isWipedOut(Object engine) {
+        return playerFlag(engine, EngineNames.PLAYER_WIPED);
+    }
+
+    /** Reads one boolean flag off the current player. */
+    private static boolean playerFlag(Object engine, String field) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        if (team == null) {
+            return false;
+        }
+        Object value = EngineAccess.readField(team, field);
+        if (!(value instanceof Boolean)) {
+            throw new IllegalStateException(
+                    "rw-agent: player field " + field + " is not a boolean" + EngineNames.PIN);
+        }
+        return ((Boolean) value).booleanValue();
+    }
+
+    /**
+     * Returns how many players are still in the match.
+     *
+     * <p>Asked of the engine rather than counted here. It excludes absent,
+     * defeated and wiped-out players, prints the same figure as "N players
+     * remaining", and calls its own end-of-match hook when it reaches one -- so
+     * this is the engine's scoreboard, and a reimplementation could disagree
+     * with the thing that actually ends the game.
+     *
+     * @return The count of players still playing.
+     */
+    static int playersRemaining() {
+        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        Object value =
+                EngineAccess.invokeStatic(teamClass, EngineNames.PLAYERS_REMAINING);
+        if (!(value instanceof Integer)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.PLAYERS_REMAINING
+                            + "() did not return an int" + EngineNames.PIN);
+        }
+        return ((Integer) value).intValue();
+    }
+
+    /**
      * Finds an owned entity by its engine identity.
      *
      * @param engine The live engine instance.

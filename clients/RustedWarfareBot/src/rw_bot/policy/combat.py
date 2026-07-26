@@ -26,6 +26,158 @@ from rw_bot.wire.state import Entity, Sample
 PLACEHOLDER_TYPE = "editorOrBuilder"
 
 
+#: Units each successive wave waits for, in order.
+#:
+#: The shipped AI's ladder: three for the first attack, five for the next few,
+#: seven thereafter. Its groups are created empty with a target size and recruit
+#: until full before they move, and the size climbs with the number of groups it
+#: has already sent ([[engine-ai-triggers]]).
+WAVE_SIZES = (3, 3, 5, 5, 5, 7)
+
+
+def wave_size(waves_sent: int) -> int:
+    """Return how many units the next wave waits for.
+
+    Args:
+        waves_sent: Waves already released.
+
+    Returns:
+        The size the next one needs, the last rung repeating thereafter.
+    """
+    return WAVE_SIZES[min(waves_sent, len(WAVE_SIZES) - 1)]
+
+
+class Muster(TypedDict):
+    """Who may attack this sample, and who is still gathering.
+
+    Attributes:
+        released: Engine ids cleared to attack.
+        gathering: Units waiting to form the next wave.
+        wanted: How many the next wave needs.
+        waves: Waves released so far, including any released this sample.
+        reason: Human-readable justification, for the run log.
+    """
+
+    released: frozenset[int]
+    gathering: int
+    wanted: int
+    waves: int
+    reason: str
+
+
+def muster(army: Sequence[Entity], released: frozenset[int], waves: int) -> Muster:
+    """Decide which units are cleared to attack, and which keep gathering.
+
+    Fill, then commit. Attacking with whatever exists feeds units in one at a
+    time and loses each of them separately; the same units sent together are a
+    wave. That is the shipped AI's rule ([[engine-ai-triggers]]).
+
+    **Membership, not a flag.** A boolean "have we started" was the first
+    attempt and it was worse than nothing: it latched on the first wave and
+    every reinforcement thereafter walked into the fight alone, which is the
+    trickle the rule exists to prevent. Measured over 1,500 samples it produced
+    45 reinforcements for a net army growth of one. So a unit is either in a
+    released wave or in the reserve, and only the reserve gathers.
+
+    Survivors of a released wave keep their clearance. They do not turn round
+    to wait for reinforcements — abandoning an attack while still in range of
+    it is the worst of both behaviours, and it is why the reserve is counted
+    separately rather than the whole army being re-tested against the
+    threshold.
+
+    Args:
+        army: Units available to fight, as :func:`find_army` reports them.
+        released: Engine ids already cleared by an earlier wave.
+        waves: Waves released so far.
+
+    Returns:
+        The decision, carrying the state the next call needs.
+    """
+    alive = {unit["unit_id"] for unit in army}
+    survivors = alive & released
+    reserve = alive - released
+    wanted = wave_size(waves)
+
+    if len(reserve) >= wanted:
+        return Muster(
+            released=frozenset(alive),
+            gathering=0,
+            wanted=wave_size(waves + 1),
+            waves=waves + 1,
+            reason=f"wave {waves + 1} of {len(reserve)} released",
+        )
+    return Muster(
+        released=frozenset(survivors),
+        gathering=len(reserve),
+        wanted=wanted,
+        waves=waves,
+        reason=f"{len(survivors)} committed, mustering {len(reserve)}/{wanted}",
+    )
+
+
+#: How close counts as arrived at the rally point, in world units.
+#:
+#: The engine's own rally group drops a member once it is within this of the
+#: centre — a squared 3,600 in its tick, so 60 ([[engine-ai-zones]]). Reused
+#: rather than guessed because the question is identical: when has a unit
+#: finished gathering.
+RALLY_RADIUS = 60.0
+
+
+class Deployment(TypedDict):
+    """One unit ordered to a position.
+
+    Attributes:
+        unit_id: Engine identity of the unit to order.
+        x: Destination world x.
+        y: Destination world y.
+        reason: Why, for the run log.
+    """
+
+    unit_id: int
+    x: float
+    y: float
+    reason: str
+
+
+def rally(reserve: Sequence[Entity], point: tuple[float, float]) -> tuple[Deployment, ...]:
+    """Send the units still gathering to the place they gather.
+
+    The wave gate created a reserve and gave it nowhere to be. Units that are
+    not yet cleared to attack sit wherever they rolled out of the factory,
+    which spreads the next wave across the map and means it arrives piecemeal
+    even after the gate releases it — the trickle again, one step earlier.
+
+    Rallying them at a point solves that and doubles as the only defensive
+    posture the bot has: units waiting near the base are units standing between
+    an attacker and the base.
+
+    Already-arrived units are not re-ordered. The engine runs a waypoint until
+    it is replaced, so re-issuing every sample would reset the walk at the
+    sampling rate and nothing would ever arrive — the same failure the attack
+    path already learned ([[policy-combat]]).
+
+    Args:
+        reserve: Units still gathering, which is the army minus the released
+            wave.
+        point: Where to gather, as world x and y.
+
+    Returns:
+        One deployment per unit not yet within :data:`RALLY_RADIUS`.
+    """
+    limit = RALLY_RADIUS**2
+    return tuple(
+        Deployment(
+            unit_id=unit["unit_id"],
+            x=point[0],
+            y=point[1],
+            reason=f"{unit['type_name']} rallying",
+        )
+        for unit in reserve
+        if (unit["x"] - point[0]) ** 2 + (unit["y"] - point[1]) ** 2 > limit
+    )
+
+
 class Engagement(TypedDict):
     """One unit ordered onto one target.
 
@@ -159,6 +311,10 @@ def choose_target(
         army: The units available to fight.
         targets: The hostile entities to choose between.
         holding: Engine identity of the target already being attacked, if any.
+        fighting: The units cleared to attack. ``None`` means the whole army,
+            which is what a caller with no wave discipline wants; a caller that
+            musters passes the released wave so reinforcements still gathering
+            are not ordered in alone ([[engine-ai-triggers]]).
 
     Returns:
         The chosen target, or None when either side is empty.
@@ -185,6 +341,7 @@ def engagements(
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
     holding: int | None = None,
+    fighting: Sequence[Entity] | None = None,
 ) -> tuple[Engagement, ...]:
     """Decide who attacks what this sample.
 
@@ -201,7 +358,7 @@ def engagements(
         One engagement per available unit, empty when there is no army or
         nothing hostile in sight.
     """
-    army = find_army(sample, catalogue)
+    army = find_army(sample, catalogue) if fighting is None else tuple(fighting)
     target = choose_target(army, find_targets(sample), holding)
     if target is None:
         return ()
@@ -217,11 +374,18 @@ def engagements(
 
 __all__ = [
     "PLACEHOLDER_TYPE",
+    "RALLY_RADIUS",
+    "WAVE_SIZES",
+    "Deployment",
     "Engagement",
+    "Muster",
     "choose_target",
     "engagements",
     "find_army",
     "find_targets",
     "is_armed",
     "is_mobile",
+    "muster",
+    "rally",
+    "wave_size",
 ]

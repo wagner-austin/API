@@ -69,7 +69,8 @@ def _sample_lines(
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
         f'"visible":{len(entities)},"pools":{len(pools)},'
-        f'"options":{len(options)},"credits":{credits}}}'
+        f'"options":{len(options)},'
+        f'"credits":{credits},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name) in enumerate(entities):
         lines.append(_entity_line(frame, index, unit_id, type_name))
@@ -259,6 +260,11 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         "army           4 -> 4",
         "enemies seen   0 -> 0",
         "engaged gone   0",
+        # No pool rides on this scripted world, so expansion has nothing to
+        # claim and says so rather than reporting a bare zero.
+        "extractors     3 -> 3",
+        "expansions     0",
+        "expand note    no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
         "samples seen   1",
     ]
 
@@ -299,6 +305,9 @@ def test_the_sample_budget_defaults_when_not_given(
         "army           4 -> 4",
         "enemies seen   0 -> 0",
         "engaged gone   0",
+        "extractors     3 -> 3",
+        "expansions     0",
+        "expand note    no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
         "samples seen   1",
     ]
 

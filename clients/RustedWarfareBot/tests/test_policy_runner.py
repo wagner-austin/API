@@ -147,7 +147,8 @@ def _sample_lines(
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
         f'"visible":{len(entities)},"pools":{len(pools)},'
-        f'"options":{len(options)},"credits":{credits}}}'
+        f'"options":{len(options)},'
+        f'"credits":{credits},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name, mine) in enumerate(entities):
         lines.append(

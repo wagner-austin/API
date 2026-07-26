@@ -1,0 +1,125 @@
+What an extractor is worth, measured live and cross-checked against the
+engine's own unit definitions
+===========================================================================
+
+Two independent sources, agreeing to within 0.1%.
+
+
+1. MEASURED (make income INCOME_STAGES=4 INCOME_IDLE=200)
+---------------------------------------------------------
+
+One match. The bot builds one extractor at a time and stands completely still
+for 200 samples between each, ordering nothing, so every window's credit slope
+is income and nothing else. Readings archived beside this file as
+income-windows.ndjson (1000 of them).
+
+  window  extractors  readings   span_ms   gained   credits/s
+       0           0       200     49904     1345       26.95
+       1           1       200     49897     1946       39.00
+       2           2       200     49821     2545       51.08
+       3           3       200     49929     3150       63.09
+       4           4       200     49822     3737       75.01
+
+  per extractor  12.01 credits/s
+  payback        58.3s at 700 credits
+
+The successive differences are +12.05, +12.08, +12.01, +11.92. Linear to the
+limit of the measurement, which is what a fixed per-unit generation rate should
+look like and is the main reason to trust it.
+
+The 26.95/s at zero extractors is the Command Center. It is a built-in engine
+unit rather than a shipped .ini, so its rate is not readable as text -- but
+26.95 / 1.5 = 17.97, i.e. a generation value of 18 under the conversion derived
+below.
+
+
+2. THE ENGINE'S OWN DEFINITIONS (.game/assets/units/)
+------------------------------------------------------
+
+Extractors and fabricators are plain INI files shipped with the game, not
+obfuscated bytecode. The generation figure is stated outright:
+
+  extractor/extractor.ini              price:   700   generation_resources: credits=8
+  extractor/extractorT2.ini            price:  2100   generation_resources: credits=12
+  extractor/extractorT3.ini            price:  6100   generation_resources: credits=20
+  extractor/extractorT3_reinforced.ini price: 10100   generation_resources: credits=20
+  extractor/extractorT3_overclocked.ini price:14100   generation_resources: credits=30
+  fabricator/fabricatorT1.ini          price:  2200   generation_resources: credits=2
+  fabricator/fabricatorT2.ini          price:  6600   generation_resources: credits=7
+  fabricator/fabricatorT3.ini          price: 14100   generation_resources: credits=14
+
+The conversion to credits per second follows from the measurement: 8 generation
+units measured 12.01 credits/s, so
+
+  credits per second = generation_resources x 1.5
+
+That 1.5 is not arbitrary. The parser defaults `generation_delay` to 40 ticks
+and scales by `40.0f / generation_delay`
+(.decompiled/com/corrodinggames/rts/game/units/custom/ag.java:1500-1506), so a
+simulation ticking 60 times a second yields exactly 60/40 = 1.5. The 60 is
+inferred from that arithmetic rather than read directly, but every measured
+rate in the table above fits it.
+
+
+3. THE DECISION THIS SETTLES: SPREAD, DO NOT UPGRADE
+-----------------------------------------------------
+
+Marginal cost per unit of income -- what each option costs to buy one more
+credit of generation:
+
+  action                        cost   +generation   cost per +1   payback
+  ----------------------------------------------------------------------
+  build a new extractorT1        700           +8          87.5      58.3s
+  upgrade T1 -> T2              1400           +4         350.0     233.3s
+  upgrade T2 -> T3              4000           +8         500.0     333.3s
+  upgrade T3 -> overclocked     8000          +10         800.0     533.3s
+  build a new fabricatorT1      2200           +2        1100.0     733.3s
+
+A new T1 extractor is FOUR TIMES more credit-efficient than upgrading one, and
+TWELVE AND A HALF TIMES more efficient than a fabricator.
+
+This is not a reading imposed on the data -- it is how the game's own authors
+annotated these files. Their comments, left in the shipped INIs:
+
+  extractor.ini                  "#price per credit: $87"
+  extractorT3.ini (overclocked)  "#price per credit: $800 (+10)"
+  fabricatorT1.ini               "#price per credit: $1100"
+
+$87.50, $800 and $1100 are exactly the marginal figures in the table.
+
+So: take every free pool before upgrading anything, and never build a
+fabricator while a pool is free. Fabricators and upgrades are what you buy when
+the map runs out of pools -- the fabricator does not need one, which is the
+whole of its value.
+
+Caveat worth keeping: the reinforced T3 buys no income at all (20 -> 20) for
+3000 credits. It buys hit points, 2000 -> 4700. It is a survivability purchase
+and does not belong in this table's logic.
+
+
+4. WHAT THE SHIPPED AI DOES
+----------------------------
+
+From extractor_common.ini, the [ai] block the opponents are driven by:
+
+  buildPriority: 0.4
+  recommendedInEachBasePriorityIfUnmet: 0.55
+  recommendedInEachBaseNum: 2
+  noneInBaseExtraPriority: 0.43
+  maxEachBase: 99
+
+maxEachBase is 99. The opponents are not aiming at a fixed number of
+extractors; they take what they can reach. A bot capped at three was not
+playing a different strategy, it was playing no economic strategy at all.
+
+
+5. WHAT THIS MEANS FOR THE RUN LENGTH WE ACTUALLY PLAY
+-------------------------------------------------------
+
+200 samples spanned 49.9 seconds, so a sample is about 0.25s and the standard
+1500-sample fight phase is roughly 375 seconds.
+
+An extractor bought at the start of that phase pays for itself in 58 seconds
+and then returns 12 credits/s for the remaining ~317, netting about 3,800
+credits -- eleven more tanks at 350 each. Expansion is not a marginal call at
+this time scale; it is the dominant one.

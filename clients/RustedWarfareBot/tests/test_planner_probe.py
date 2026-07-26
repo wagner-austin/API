@@ -35,7 +35,8 @@ def _entity(index: int, unit_id: int, type_name: str, x: float, y: float) -> str
 def _sample_lines(*entities: str) -> list[str]:
     frame = (
         f'{{"kind":"frame","frame":1,"clock_ms":10,'
-        f'"visible":{len(entities)},"pools":0,"options":0,"credits":4000}}'
+        f'"visible":{len(entities)},"pools":0,"options":0,'
+        f'"credits":4000,"defeated":false,"wiped":false,"players_left":6}}'
     )
     return [frame, *entities]
 

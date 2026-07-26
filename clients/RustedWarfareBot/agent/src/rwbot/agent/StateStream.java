@@ -62,7 +62,10 @@ final class StateStream {
                                 visible.size(),
                                 pools.size(),
                                 options.size(),
-                                Perception.creditsOf(engine)))
+                                Perception.creditsOf(engine),
+                                Perception.isDefeated(engine),
+                                Perception.isWipedOut(engine),
+                                Perception.playersRemaining()))
                 .append('\n');
         for (int index = 0; index < visible.size(); index++) {
             out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
@@ -90,7 +93,10 @@ final class StateStream {
             int visibleCount,
             int poolCount,
             int optionCount,
-            int credits) {
+            int credits,
+            boolean defeated,
+            boolean wiped,
+            int playersLeft) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "frame");
@@ -106,6 +112,12 @@ final class StateStream {
         appendInt(out, "options", optionCount);
         out.append(',');
         appendInt(out, "credits", credits);
+        out.append(',');
+        appendBool(out, "defeated", defeated);
+        out.append(',');
+        appendBool(out, "wiped", wiped);
+        out.append(',');
+        appendInt(out, "players_left", playersLeft);
         out.append('}');
         return out.toString();
     }

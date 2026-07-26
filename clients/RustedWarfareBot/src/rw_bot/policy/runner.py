@@ -15,6 +15,7 @@ from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.build_order import Decision, completed_count, decide, find_builder
+from rw_bot.policy.observation import has_moved, is_rising, position_of
 from rw_bot.wire.command import build_order, produce_order
 from rw_bot.wire.state import Sample
 
@@ -36,11 +37,6 @@ from rw_bot.wire.state import Sample
 #: builder stands still, which needs no speed constant, no frame rate, and no
 #: assumption about map size (wiki: mechanics-resource-pools).
 DEFAULT_STALL_SAMPLES = 45
-
-#: World-unit displacement between samples below which a builder counts as
-#: stationary. A parked unit reports byte-identical coordinates, so this only
-#: has to survive float noise rather than distinguish slow movement.
-_MOVEMENT_EPSILON = 0.5
 
 
 class Scorecard(TypedDict):
@@ -139,8 +135,8 @@ def run(
             # what the stall clock measures, so it has to be sampled on every
             # observation rather than only on the ones that reach an order.
             builder = find_builder(sample)
-            builder_now = None if builder is None else (builder["x"], builder["y"])
-            moved = _has_moved(builder_was, builder_now)
+            builder_now = position_of(builder)
+            moved = has_moved(builder_was, builder_now)
             builder_was = builder_now
 
             decision = decide(sample, plan, catalogue, placements, reaches)
@@ -220,7 +216,7 @@ def _in_flight(sample: Sample, decision: Decision, moved: bool) -> bool:
         True while there is evidence the order is still being carried out.
     """
     if decision["action"] == "build":
-        return moved or _rising(sample, decision["type_name"])
+        return moved or is_rising(sample, decision["type_name"])
     for entity in sample["entities"]:
         if entity["unit_id"] == decision["unit_id"]:
             return entity["queued"] > 0
@@ -228,44 +224,6 @@ def _in_flight(sample: Sample, decision: Decision, moved: bool) -> bool:
     # being made, so the clock runs and the run stops rather than waiting on a
     # building that no longer exists.
     return False
-
-
-def _rising(sample: Sample, type_name: str) -> bool:
-    """Report whether an unfinished structure of this type is going up.
-
-    Ownership is checked, or an opponent's half-built factory in view would
-    keep this run's clock alive indefinitely.
-
-    Args:
-        sample: The current observation.
-        type_name: The type that was ordered.
-
-    Returns:
-        True when the player owns an unfinished entity of that type.
-    """
-    for entity in sample["entities"]:
-        if entity["mine"] and not entity["complete"] and entity["type_name"] == type_name:
-            return True
-    return False
-
-
-def _has_moved(before: tuple[float, float] | None, after: tuple[float, float] | None) -> bool:
-    """Report whether the builder moved between two samples.
-
-    A builder that has died, or that was not in the roster to begin with, has
-    not moved. Treating a missing builder as movement would keep the stall clock
-    permanently reset and turn a lost builder into an infinite wait.
-
-    Args:
-        before: Position at the previous sample, if it was there.
-        after: Position now, if it is there.
-
-    Returns:
-        True when both positions are known and differ by more than float noise.
-    """
-    if before is None or after is None:
-        return False
-    return abs(after[0] - before[0]) + abs(after[1] - before[1]) > _MOVEMENT_EPSILON
 
 
 def _stalled(decision: Decision | None, stall_samples: int) -> Decision:

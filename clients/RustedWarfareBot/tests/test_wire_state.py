@@ -26,7 +26,10 @@ from rw_bot.wire.state import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
-_FRAME = '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"credits":4000}'
+_FRAME = (
+    '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,'
+    '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+)
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
     '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,'
@@ -134,7 +137,8 @@ def test_blank_lines_are_skipped() -> None:
 
 def test_a_sample_with_no_entities_is_valid() -> None:
     empty = (
-        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"credits":4000}'
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,'
+        '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     samples = decode_samples([empty])
     assert samples[0]["entities"] == ()
@@ -178,7 +182,8 @@ def test_a_pool_before_any_frame_is_rejected() -> None:
 
 def test_a_sample_short_of_its_declared_pools_is_rejected() -> None:
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,"credits":4000}'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,'
+        '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     with pytest.raises(WireError) as caught:
         decode_samples([short, _POOL])
@@ -194,7 +199,8 @@ def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
     and the planner would answer that by declaring the plan dead.
     """
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,"credits":4000}'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,'
+        '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     option = (
         '{"kind":"option","frame":7,"index":0,"unit_id":214,'
@@ -224,7 +230,7 @@ def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
     with pytest.raises(WireError) as caught:
         short = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,'
-            '"pools":0,"options":0,"credits":4000}'
+            '"pools":0,"options":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([short, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -235,7 +241,7 @@ def test_a_long_sample_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
         long_frame = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,'
-            '"pools":0,"options":0,"credits":4000}'
+            '"pools":0,"options":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([long_frame, _ENTITY, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -280,6 +286,9 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
         frame=1,
         clock_ms=0,
         credits=4000,
+        defeated=False,
+        wiped=False,
+        players_left=6,
         entities=(
             Entity(
                 index=0,

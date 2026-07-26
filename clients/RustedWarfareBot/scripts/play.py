@@ -154,6 +154,31 @@ def reinforcements(
     return tuple(wanted)
 
 
+def expansion_reserve(
+    reinforce: Sequence[str],
+    catalogue: Mapping[str, UnitStats],
+) -> int:
+    """Return the credits to hold back for the army before claiming a pool.
+
+    The most expensive thing the bot keeps making, so expansion never leaves it
+    unable to replace a single loss. That is a deliberately shallow reserve: an
+    extractor pays back over the rest of the match and a bank does not, and the
+    run that banked 21,164 credits while its army was ground down is what the
+    shallow end of this trade-off is guarding against ([[policy-economy]]).
+
+    Nothing to reinforce means nothing to protect, so the reserve is zero and
+    every spare credit goes into the economy.
+
+    Args:
+        reinforce: Type names the bot keeps making.
+        catalogue: Unit stats by type name, for prices.
+
+    Returns:
+        Credits to leave unspent.
+    """
+    return max((catalogue[name]["price"] for name in reinforce), default=0)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Connect, play the plan, and report.
 
@@ -203,11 +228,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     # finished, because sending a half-built army at five opponents loses the
     # army and proves nothing.
     if card["outcome"] == "done":
+        reinforce = reinforcements(DEFAULT_GOALS, placements)
         battle = fight(
             channel,
             catalogue,
             max_samples,
-            reinforce=reinforcements(DEFAULT_GOALS, placements),
+            reinforce=reinforce,
+            reaches=reaches,
+            reserve=expansion_reserve(reinforce, catalogue),
         )
         for line in format_battle(battle):
             sys.stdout.write(f"{line}\n")

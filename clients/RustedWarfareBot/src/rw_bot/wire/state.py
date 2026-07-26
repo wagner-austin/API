@@ -214,6 +214,9 @@ class Sample(TypedDict):
     frame: int
     clock_ms: int
     credits: int
+    defeated: bool
+    wiped: bool
+    players_left: int
     entities: tuple[Entity, ...]
     pools: tuple[ResourcePool, ...]
     options: tuple[BuildOption, ...]
@@ -246,6 +249,9 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
     declared_pools: int = 0
     declared_options: int = 0
     credits: int = 0
+    defeated: bool = False
+    wiped: bool = False
+    players_left: int = 0
     entities: list[Entity] = []
     pools: list[ResourcePool] = []
     options: list[BuildOption] = []
@@ -264,6 +270,9 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                         frame,
                         clock_ms,
                         credits,
+                        defeated,
+                        wiped,
+                        players_left,
                         declared_entities,
                         declared_pools,
                         declared_options,
@@ -278,6 +287,9 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
             declared_pools = require_int(record, "pools")
             declared_options = require_int(record, "options")
             credits = require_int(record, "credits")
+            defeated = require_bool(record, "defeated")
+            wiped = require_bool(record, "wiped")
+            players_left = require_int(record, "players_left")
             entities = []
             pools = []
             options = []
@@ -343,6 +355,9 @@ def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
                 frame,
                 clock_ms,
                 credits,
+                defeated,
+                wiped,
+                players_left,
                 declared_entities,
                 declared_pools,
                 declared_options,
@@ -391,6 +406,9 @@ def _close(
     frame: int,
     clock_ms: int,
     credits: int,
+    defeated: bool,
+    wiped: bool,
+    players_left: int,
     declared_entities: int,
     declared_pools: int,
     declared_options: int,
@@ -441,6 +459,9 @@ def _close(
         frame=frame,
         clock_ms=clock_ms,
         credits=credits,
+        defeated=defeated,
+        wiped=wiped,
+        players_left=players_left,
         entities=tuple(entities),
         pools=tuple(pools),
         options=tuple(options),
@@ -466,7 +487,10 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         f'{{"kind":"{KIND_FRAME}","frame":{frame},'
         f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
         f'"pools":{len(sample["pools"])},"options":{len(sample["options"])},'
-        f'"credits":{sample["credits"]}}}'
+        f'"credits":{sample["credits"]},'
+        f'"defeated":{str(sample["defeated"]).lower()},'
+        f'"wiped":{str(sample["wiped"]).lower()},'
+        f'"players_left":{sample["players_left"]}}}'
     ]
     for entity in sample["entities"]:
         name = _escape(entity["class_name"])
