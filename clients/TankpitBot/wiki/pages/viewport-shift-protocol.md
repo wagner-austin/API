@@ -10,7 +10,7 @@ related:
 source_paths:
   - "runs/bot"
   - "runs/sniff"
-fact_checked: "2026-07-17"
+fact_checked: "2026-07-25"
 confidence: high
 hubs: [protocol]
 ---
@@ -25,7 +25,11 @@ The server sends a fresh `0x5A ViewportUpdate` (see [[viewport-update-algorithm]
 
 1. **Teleport landing** — `0x74`-family teleport command lands the tank, server recenters the viewport on the new position and sends `0x5A`.
 2. **Client scope command** — client sends `Rb` (`"Z"`) or `Sb` (`"z"`) requesting a shift; server confirms with `0x5A`.
-3. **Server-side auto-shift** — when autoscroll is enabled (via `Ia` text control), the server sends `0x5A` **only when the tank walks onto a viewport-edge tile** (not on every walk step). The shift then **recenters the viewport on the tank** — the tank's post-shift position is at (or near) the center of the new 16×16 frame.[^user] Behaviour paired 1:1 with `0x3D MovementResponse` in the corpus.[^5] User corroboration (verbatim, 2026-07-24): *"autoscroll makes it so that when you get to the edge of the viewport it re centers on you. otherwise the viewport is fixed and only centers on teleport."* **The setting is SERVER-PERSISTED per account** — the 2026-07-24 key probe's 'a' press sent `A0` and the account's autoscroll stayed off in later sessions (restore = one more 'a' press sending `A1`), the same cross-session persistence the equipment toggles showed (a radar-watch session opened with slot 5 already disabled from the previous session's toggle).
+3. **Server-side auto-shift** — when autoscroll is enabled (via `Ia` text control), the server sends `0x5A` **only when the tank walks onto a viewport-edge tile** (not on every walk step). The shift then **recenters the viewport on the tank** at exactly `(x−8, y−8)`.[^user] **Measured live 2026-07-25 as a controlled OFF/ON pair** (viewport probe runs 20260725-190352 and -192738):[^8]
+   - **ON**: the tank walked east from window `(138,116)`; the step onto the edge column 153 (`138+15`) delivered — in the same wire tick as its `0x47` echo — a fresh `0x5A window=(145,116)` with `145 = 153−8`, no teleport involved.
+   - **OFF (control)**: the tank walked onto the edge column 168 of window `(153,121)` and **no `0x5A` ever came** — the window is static; only a teleport recenters it.
+
+   User corroboration (verbatim, 2026-07-24): *"autoscroll makes it so that when you get to the edge of the viewport it re centers on you. otherwise the viewport is fixed and only centers on teleport."*[^user] **The setting is SERVER-PERSISTED per account** — run 20260725-192738 opened in exactly the OFF state run 20260725-190352's restore press had left (fresh browser + fresh login between them).[^8] The mystery of runs opening ON that day traces to the 2026-07-24 key probe's "restore" press, which — under the then-inverted constant understanding — actually sent the ON toggle and left the account ON for a day.[^9]
 
 ## The three client-side commands
 
@@ -39,6 +43,8 @@ Persistent server-side setting toggled by the client. Text encoding: `"A" + Numb
 |---|---|
 | `"A1"` | Autoscroll **ON** — server auto-sends `0x5A` on walk edge-crossings |
 | `"A0"` | Autoscroll **OFF** — `0x5A` only fires on teleport / explicit scope command |
+
+The server **acks the toggle with the same plaintext two-byte echo, un-XORed** — raw `41 30`/`41 31` on the wire (and `43 30`/`43 31` for the chat toggle).[^9] The 0x41/0x43 letters are overloaded with XOR-encoded binary frames (Deactivation, CacheUpdate), so the ack must be discriminated **before** any XOR decode: exactly two raw bytes with an ASCII `0`/`1` flag (`protocol.decoders.text.try_decode_plaintext_ack`). The first decoder read the flag byte *after* XOR corruption and tested `== 1`, so a true ON ack decoded as False — both 2026-07-25 viewport-probe aborts were this bug, not game behavior (fixed in the same day's `protocol:` commit).
 
 ### `Rb` — Scope extend (binary, 3 bytes)
 
@@ -96,6 +102,21 @@ This is a **bot configuration choice, not a game limit** — and a deliberate on
 [^6]: State 13 documented in [[js-source-map]] §"State Machine (s field)". Handler at tpclient.pretty.js:1648-1662 dispatches `Rb` (line 1661) or `Sb` (line 1654) based on the pending scope Y and the `ga` flag.
 [^7]: `src/tankpit_bot/state/scan_coverage.py:29` — "the bot teleports the viewport is fixed until the next teleport"; `src/tankpit_bot/bot/ai/hunt_mode.py:52-53` — "viewport shifting is OFF, so walking to an edge reveals no new [tiles]".
 [^user]: user (Austin), 2026-07-17 — "auto shift doesnt center on bot every walk. it only shifts when the bot walks to a tile on the edge of the viewport. and then it recenters on bot btw." Reaffirmed: "when you walk to the edge, with auto scroll on, it will center the viewport on the bot."
+[^8]: Viewport probe captures `runs/probe/viewport-20260725-190352.capture_session.json` (OFF-phase edge walk to column 168, out-of-window rejects at 169+, ON-phase degenerate) and `runs/probe/viewport-20260725-192738.capture_session.json` (ON-phase edge arrival at column 153 → same-tick `0x5A (145,116)`); offline pairing via `analysis_scripts/analyze_viewport_probe.py`.
+[^9]: Raw short frames extracted from `key_probe.capture_session.json` (2026-07-24): autoscroll ack `4130` = ASCII `"A0"`, chat ack `4331` = ASCII `"C1"` — pre-XOR bytes, matching the plaintext `Ia`/`Ka` command encodings byte-for-byte. The inverted-restore inference: the key probe's restore press, decoded through the then-broken `== 1` test, reported OFF while actually leaving ON — consistent with viewport-probe runs -175629 through -190352 all opening ON and run -192738 (after -190352's verified OFF restore) opening OFF.
+
+## Acceptance boundary (measured 2026-07-25)
+
+The viewport probe paired every sent move with its response across both autoscroll states:[^8]
+
+| Move target | Server response |
+|---|---|
+| Inside the current `0x5A` window | **Accepted**: `0x47` echo with a server-computed path — the server pathfinds around rock/water, up to 15 tiles observed (`path='nwwwsssswwwwnnn'`), so an accepted move is a path, not a straight line |
+| Outside the current window (by even 1 column) | **Rejected**: `0x52 Supervisor err=0` (`CANT_DO`) — observed at exactly the boundary: target `x=168` (edge column) accepted, `x=169` rejected, window `(153,121)` |
+| Unreachable / no path (e.g. water target) | **Rejected**: `0x52 err=1` (`CANT_GO`) |
+| Re-sent while already walking to it | **Rejected**: `0x52 err=6` (`ALREADY_THERE`) |
+
+The bound is **the window, not a self-centered radius** — the earlier "Chebyshev ≤ 8" reading from the teleport probe was the same law seen from a freshly centered window (where window edge and self ± 8 coincide). Consequence with autoscroll ON: the window follows the walker, so a bot can traverse the map by walking alone — walking costs no fuel and executes instantly at fuel 0 ([[fuel-system]]) — where an autoscroll-OFF bot must spend teleport fuel to move its window.
 
 ## Rest-state law (corpus-swept 2026-07-22)
 

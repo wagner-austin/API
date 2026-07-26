@@ -19,7 +19,7 @@ source_paths:
 source_git_blobs:
   "src/tankpit_bot/physics": "17831e6496a9c7f10ba2ea6ba18c2726390480c6"
   "src/tankpit_bot/sim": "0ddbf0acaeede0d363ac8254ba477fbb898c82d4"
-  "src/tankpit_bot/validate": "d7f5c60b9d2048cab60968f95214be039f70e599"
+  "src/tankpit_bot/validate": "0f9542f68581853517832736b3a063b0bab9f8c2"
 fact_checked: "2026-07-20"
 confidence: high
 hubs: [architecture]

@@ -12,7 +12,7 @@ source_paths:
   - "runs/bot/latest.events.jsonl"
 source_git_blobs:
   "src/tankpit_bot/bot": "f110d2f3864c383c0bfb6d788f60c9a9ad070499"
-  "src/tankpit_bot/sniffer": "99740fb5502b4e821158626fe9ef0da41707357f"
+  "src/tankpit_bot/sniffer": "2866c633dff0647557ab60b2d05b069f8459b0d2"
 fact_checked: "2026-07-25"
 confidence: high
 verified: 2026-06-20 (anchored to specific code paths + integration tests)

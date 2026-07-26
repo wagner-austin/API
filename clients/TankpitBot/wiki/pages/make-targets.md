@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "5516745cd75473bbe1a92cbd77d814dc9290dcff"
+  "Makefile": "0028709fcb5e5441825d11323cc87e75e55f85b4"
 fact_checked: "2026-07-25"
 confidence: high
 hubs: [codebase]
@@ -53,6 +53,7 @@ hubs: [codebase]
 | `make radar-watch` | Stationary spawn-law watch on the account: slot-5 extras toggled off (verified via wire state; stock preserved), free built-in 5×5 scan per 15 s + free map open per 30 s + 1-tile walk shuffle per beat (immune to the ~12-min never-playing disconnect). |
 | `make density-probe` | Budgeted extra-radar density sweep (2026-07-25): teleport a 4×4 map-spread site grid, map-open before every hop, verify each landing before spending an extra, one full-viewport scan per landed site. Funds itself (viewport pickups → dot hops → blind dot-walks), aborts + quits to lobby when marooned, restores the slot-5 enable state, archives per run under `runs/probe/density-<stamp>`. Knobs: `TANKPIT_DENSITY_*`. Run-5 measurement in [[game-economy]]. |
 | `make bot-watch` | Teleport adjacent to a practice bot, then dwell 10 min at a 1.5 s walk-shuffle heartbeat (2026-07-24: query heartbeats were falsified — only real gameplay actions hold the push stream open, ~40 fuel/min; each beat drains the CDP buffer then walks 1 tile). See [[server-push-gating]] for the law and the seven-run proof. |
+| `make viewport-probe` | Autoscroll/viewport law probe (2026-07-25): normalize autoscroll to OFF via wire-verified 'a' presses (plaintext `A0`/`A1` acks), then per phase (OFF, ON) anchor-teleport with landing verification, walk terrain-routed steps to the window's east edge, attempt one crossing step, and fire long boundary moves. Quits to lobby on success AND abort. Measured the edge-recentering + acceptance-boundary laws in [[viewport-shift-protocol]]. Knobs: `TANKPIT_VIEWPORT_*`. |
 
 ## Offline analysis (safe, reads capture files)
 

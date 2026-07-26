@@ -107,9 +107,9 @@ These are sent as text strings (not binary), during connection and lobby.[^1]
 | 0x26 | `&` | Ca | **Error report** | `&{error_code}{error_message_xor}` |
 | 0x5E | `^` | Ea | **Fatal error** | `^{error_code}{error_message_xor}` |
 | 0x56 | `V` | Ha | **Volume change** | `V{enabled}{volume}` |
-| 0x41 | `A` | Ia | **Autoscroll toggle** | `A{enabled}` — the server ACKS with a short 0x41 frame (overloaded with Deactivation; length-discriminated `autoscroll_ack` decode, key probe 2026-07-24) |
+| 0x41 | `A` | Ia | **Autoscroll toggle** | `A{enabled}` — the server ACKS by echoing the two-byte command back **plaintext, un-XORed** (raw `4130`/`4131`; overloaded with the XOR-encoded Deactivation, discriminated PRE-XOR by `try_decode_plaintext_ack`; key probe 2026-07-24, corrected 2026-07-25 after the first decoder read the flag post-XOR-corruption) |
 | 0x4F | `O` | Ja | **Overall series** | `O{enabled}` |
-| 0x43 | `C` | Ka | **Chat toggle** | `C{enabled}` — the server ACKS with a 1-byte 0x43 frame (overloaded with CacheUpdate; length-discriminated `chat_ack` decode — this frame CRASHED the first key-probe run and the official client mis-parses it silently) |
+| 0x43 | `C` | Ka | **Chat toggle** | `C{enabled}` — the server ACKS by echoing the two-byte command back **plaintext, un-XORed** (raw `4330`/`4331`; overloaded with the XOR-encoded CacheUpdate, discriminated PRE-XOR by `try_decode_plaintext_ack` — this frame CRASHED the first key-probe run and the official client mis-parses it silently; corrected 2026-07-25) |
 | 0x53 | `S` | La | **Scale change** | `S{scale_percent}` |
 | 0x50 | `P` | Ma | **Sprites change** | `P{sprite_indices}` |
 | 0x48 | `H` | Na | **Hotkey map** | `H{key1,action1,key2,action2,...}` |
