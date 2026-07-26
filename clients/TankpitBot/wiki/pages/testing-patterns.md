@@ -8,7 +8,7 @@ source_paths:
   - "tests"
   - "scripts/guard.py"
 source_git_blobs:
-  "tests": "5cc69192fb1122eca5885cf1d528d8bfde819482"
+  "tests": "f231a85a1c3200ca676da90599a3aed8fb640f27"
   "scripts/guard.py": "508e6328c73be452a042fd00162168a921d7b1b9"
 fact_checked: "2026-06-16"
 confidence: high

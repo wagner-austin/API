@@ -152,15 +152,27 @@ and the archive confirms it exactly
 sessions ever witnessed one. The sim ([[physics-module-roadmap]])
 implements the honest model as of the same day: the runtime spawner
 is DELETED (`sim/spawn.py` keeps only the deterministic tile
-pickers) and `sim/world_seed.py` seeds a static population — ~620
-dotted containers (2 in 5 stocked, matching the ~40% dot-hold rate),
-900 hidden fuel on the measured volume distribution (~1-in-6 below
-500), 450 hidden equipment (population sizes are documented
-calibrated assumptions) — with radar exposure dotting ≥500 reveals
-permanently (`MAP_DOT_MIN_VOLUME`, machine-checked claim below).
-The exposure miner run against a sim practice capture shows the
-same signature as the archive: 18/18 dot appearances
-exposure-preceded, zero unpreceded.
+pickers) and `sim/world_seed.py` seeds a static population with
+radar exposure dotting ≥500 reveals permanently
+(`MAP_DOT_MIN_VOLUME`, machine-checked claim below). The exposure
+miner run against a sim practice capture shows the same signature
+as the archive: 18/18 dot appearances exposure-preceded, zero
+unpreceded.
+
+**Hidden-population density MEASURED (2026-07-25 density probe,
+run 5 — `runs/probe/density-20260725-171318`):** 8 verified
+extra-radar sweeps of fresh map-spread viewports (1,792 tiles, 7
+with reveals; teleport landings verified before each extra was
+spent). Results, now the sim's seeded constants: **hidden fuel
+≈ 0.0128/tile ≈ 840 map-wide** (23 reveals; 12 stocked / 11 drained
+— about half empty), **stocked hidden mix 5-of-12 below 500**
+(fresh ground carries more small fuel than the archive's
+visited-area reveal mix), **hidden equipment ≈ 0.0028/tile ≈ 180
+map-wide** (5 reveals), live atlas census 641 dots, and ~11 EXPOSED
+containers visible per 0x5A landing — the field is mostly exposure
+history with a sparse hidden layer. Small-n caveat: Poisson error
+~30% on fuel, ~45% on equipment; more sweeps refine it for free
+with the standing probe.[^10]
 
 **First equipment measurements (radar-reveal mining, 2026-07-24):**
 since equipment never appears on the map, the mining works from
@@ -338,6 +350,7 @@ Each value above is matched 1:1 between a user-declared action and a measurable 
 [^3]: wiki-log entries "[2026-07-21] measurement | Victim costs closed (missile=45, homing=45), armor cracked, and the pathfinder is DETERMINISTIC" and "[2026-07-21] refactor | Victim-cost session folded through the whole pipeline — 11/11 claims, armor modeled live"; the shield-absorb constant is machine-checked by the `armor-absorb-per-shield` claim below.
 [^4]: wiki-log entry "[2026-07-22] discovery+feature | The world replenishes and players return — spawn dynamics cracked from 0x4C atlas diffs"; the numbers are re-derivable by re-running the atlas-diff mining over the `runs/` corpus (212 sessions with 2+ 0x4C snapshots). SUPERSEDED 2026-07-25: the diffs were exposure events, see [^9].
 [^9]: `analysis_scripts/mine_map_dot_semantics.py` + `analysis_scripts/mine_dot_appearances.py` (standing, 2026-07-25) over 223 archive sessions; wiki-log entry "[2026-07-25] LAW FALSIFIED + LAW MEASURED | Map dots are team-exposure memory of >=500-volume fuel".
+[^10]: density probe `make density-probe` (action_lab/density_probe.py) + `analysis_scripts/analyze_density_probe.py` over `runs/probe/density-20260725-171318.capture_session.json`; session JSON alongside it records extras 20→12, fuel 917→615, 0 skipped sites.
 [^8]: live watches: `radar_watch_probe.capture_session.json`,
 `radar_watch_nomap_probe.capture_session.json`,
 `radar_watch_fast_probe.capture_session.json` (0 reveals each; the

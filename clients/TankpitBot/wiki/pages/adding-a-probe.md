@@ -9,7 +9,7 @@ related:
 source_paths:
   - "src/tankpit_bot/action_lab"
 source_git_blobs:
-  "src/tankpit_bot/action_lab": "c73d96969ae7f737f4cba6cf6cb957201fc63aac"
+  "src/tankpit_bot/action_lab": "c0ce738d8a70afcb29d38524f82365b8157cbc3d"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [codebase]
