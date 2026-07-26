@@ -1,12 +1,21 @@
 """Protocol definitions for pluggable domain implementations.
 
 Defines the contracts that domain implementations must satisfy to plug into
-the multi-domain streaming platform. The GenericStreamingWorker (Phase 2)
-will consume these protocols.
+the multi-domain streaming platform. GenericStreamingWorker consumes these
+protocols and holds no domain-specific logic of its own.
 
 Protocols:
-- FeatureExtractorProtocol: Extracts ML features from base input events.
-- DomainProtocol: Full domain implementation with config, extraction, codecs.
+- ModelProtocol: Predicts class probabilities from a feature array.
+- DomainProtocol: Full domain implementation with config, codecs, and the
+  combined decode-and-extract step.
+
+Decoding and feature extraction are one operation rather than two. A domain's
+extractor reads its own event type -- WeatherFeatureExtractor takes a
+WeatherEventV1, not a BaseInputEventV1 -- and a protocol method declared to
+accept the base type cannot be satisfied by one accepting a narrower type.
+Splitting the step forced a cast at the boundary to bridge them. Combining it
+lets each domain decode to its own type internally and hand back the base
+event alongside the features, with no cast anywhere.
 
 Strict typing: no Any, no casts, no type: ignore.
 """
@@ -107,58 +116,6 @@ class ModelProtocol(Protocol):
 
 
 # =============================================================================
-# Feature Extractor Protocol
-# =============================================================================
-
-
-class FeatureExtractorProtocol(Protocol):
-    """Protocol for extracting ML features from base input events.
-
-    Domain implementations satisfy this protocol to transform decoded
-    input events into numeric feature vectors for ML prediction.
-
-    The generic worker calls extract() with BaseInputEventV1 instances.
-    Domain adapters (Phase 2) bridge domain-specific event types to
-    this interface by wrapping domain-specific extractors.
-    """
-
-    @property
-    def feature_names(self) -> tuple[str, ...]:
-        """Return ordered tuple of feature names."""
-        ...
-
-    @property
-    def n_features(self) -> int:
-        """Return number of features produced."""
-        ...
-
-    def extract(self, event: BaseInputEventV1) -> NDArray[np.float64]:
-        """Extract feature vector from a single input event.
-
-        Args:
-            event: Base input event decoded from Kafka.
-
-        Returns:
-            1D numpy array of shape (n_features,) with dtype float64.
-        """
-        ...
-
-    def extract_batch(
-        self,
-        events: list[BaseInputEventV1],
-    ) -> NDArray[np.float64]:
-        """Extract features from multiple input events.
-
-        Args:
-            events: List of base input events.
-
-        Returns:
-            2D numpy array of shape (n_events, n_features) with dtype float64.
-        """
-        ...
-
-
-# =============================================================================
 # Domain Protocol
 # =============================================================================
 
@@ -177,18 +134,37 @@ class DomainProtocol(Protocol):
         ...
 
     @property
-    def feature_extractor(self) -> FeatureExtractorProtocol:
-        """Return feature extractor for this domain."""
+    def feature_names(self) -> tuple[str, ...]:
+        """Return the ordered feature names this domain produces."""
         ...
 
-    def decode_input_event(self, payload: str) -> BaseInputEventV1:
-        """Decode a domain-specific input event from JSON payload.
+    @property
+    def n_features(self) -> int:
+        """Return how many features decode_and_extract produces."""
+        ...
+
+    def decode_and_extract(
+        self,
+        payload: str,
+    ) -> tuple[BaseInputEventV1, NDArray[np.float64]]:
+        """Decode a domain event and extract its feature vector.
+
+        One step rather than two, because the extractor reads the domain's
+        own event type and the worker only ever sees the base type. Decoding
+        separately would hand the worker a BaseInputEventV1 that no
+        domain-specific extractor can accept without a cast.
 
         Args:
             payload: Raw JSON string from Kafka.
 
         Returns:
-            Decoded BaseInputEventV1 with at minimum the base fields.
+            The event narrowed to its base fields, and a 1D float64 array of
+            shape (n_features,).
+
+        Raises:
+            JSONTypeError: If a required field is missing or has the wrong
+                type.
+            InvalidJsonError: If the payload is not valid JSON.
         """
         ...
 
@@ -223,7 +199,6 @@ class DomainProtocol(Protocol):
 __all__ = [
     "DomainConfig",
     "DomainProtocol",
-    "FeatureExtractorProtocol",
     "ModelProtocol",
     "make_domain_config",
 ]

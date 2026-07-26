@@ -4,208 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
+from platform_core.json_utils import dump_json_str
 
-from covenant_radar_api.domains.base_schemas import (
-    BaseInputEventV1,
-    BasePredictionEventV1,
-    encode_base_prediction_event,
-    make_base_input_event,
-)
 from covenant_radar_api.domains.protocols import (
-    DomainConfig,
     DomainProtocol,
-    FeatureExtractorProtocol,
     ModelProtocol,
     make_domain_config,
 )
-
-# =============================================================================
-# Fake Implementations (for structural Protocol satisfaction)
-# =============================================================================
-
-
-class FakeFeatureExtractor:
-    """Fake feature extractor satisfying FeatureExtractorProtocol."""
-
-    def __init__(self, names: tuple[str, ...]) -> None:
-        """Initialize with feature names.
-
-        Args:
-            names: Ordered tuple of feature names.
-        """
-        self._names: tuple[str, ...] = names
-
-    @property
-    def feature_names(self) -> tuple[str, ...]:
-        """Return ordered tuple of feature names."""
-        return self._names
-
-    @property
-    def n_features(self) -> int:
-        """Return number of features produced."""
-        return len(self._names)
-
-    def extract(self, event: BaseInputEventV1) -> NDArray[np.float64]:
-        """Extract feature vector returning zeros.
-
-        Args:
-            event: Base input event.
-
-        Returns:
-            1D numpy array of shape (n_features,).
-        """
-        return np.zeros(len(self._names), dtype=np.float64)
-
-    def extract_batch(
-        self,
-        events: list[BaseInputEventV1],
-    ) -> NDArray[np.float64]:
-        """Extract features from multiple events returning zeros.
-
-        Args:
-            events: List of base input events.
-
-        Returns:
-            2D numpy array of shape (n_events, n_features).
-        """
-        return np.zeros((len(events), len(self._names)), dtype=np.float64)
-
-
-class FakeDomain:
-    """Fake domain satisfying DomainProtocol."""
-
-    def __init__(self, name: str) -> None:
-        """Initialize with domain name.
-
-        Args:
-            name: Domain identifier.
-        """
-        self._config: DomainConfig = make_domain_config(
-            name=name,
-            display_name=f"Fake {name}",
-            input_topic=f"{name}.input.v1",
-            prediction_topic=f"{name}.predictions.v1",
-            alert_topic=f"{name}.alerts.v1",
-            alert_threshold=0.8,
-        )
-        self._extractor: FakeFeatureExtractor = FakeFeatureExtractor(
-            ("feature_a", "feature_b"),
-        )
-
-    @property
-    def config(self) -> DomainConfig:
-        """Return domain configuration."""
-        return self._config
-
-    @property
-    def feature_extractor(self) -> FeatureExtractorProtocol:
-        """Return feature extractor for this domain."""
-        return self._extractor
-
-    def decode_input_event(self, payload: str) -> BaseInputEventV1:
-        """Decode input event from JSON payload.
-
-        Args:
-            payload: Raw JSON string.
-
-        Returns:
-            Decoded BaseInputEventV1.
-        """
-        from covenant_radar_api.domains.base_schemas import decode_base_input_event
-
-        return decode_base_input_event(payload)
-
-    def encode_prediction_event(self, event: BasePredictionEventV1) -> str:
-        """Encode prediction event to JSON string.
-
-        Args:
-            event: Base prediction event.
-
-        Returns:
-            JSON string.
-        """
-        return encode_base_prediction_event(event)
-
-    def generate_alert_context(
-        self,
-        entity_id: str,
-        prediction_value: float,
-    ) -> dict[str, str]:
-        """Generate alert context dictionary.
-
-        Args:
-            entity_id: Primary entity identifier.
-            prediction_value: Prediction value that triggered alert.
-
-        Returns:
-            Context dictionary for Gemini prompt.
-        """
-        return {
-            "domain": self._config["name"],
-            "entity_id": entity_id,
-            "prediction_value": f"{prediction_value:.2f}",
-        }
-
-
-# =============================================================================
-# Tests: FeatureExtractorProtocol
-# =============================================================================
-
-
-class TestFeatureExtractorProtocol:
-    """Tests for FeatureExtractorProtocol structural satisfaction."""
-
-    def test_fake_satisfies_protocol(self) -> None:
-        """FakeFeatureExtractor satisfies FeatureExtractorProtocol."""
-        extractor: FeatureExtractorProtocol = FakeFeatureExtractor(("a", "b"))
-        assert extractor.n_features == 2
-
-    def test_extract_returns_1d_array(self) -> None:
-        """Extract returns 1D array of correct shape."""
-        extractor: FeatureExtractorProtocol = FakeFeatureExtractor(("x", "y", "z"))
-        event = make_base_input_event(
-            type="test.v1",
-            event_id="e1",
-            entity_id="ent1",
-            timestamp="2025-01-01T00:00:00Z",
-        )
-
-        result = extractor.extract(event)
-
-        assert result.shape == (3,)
-        assert result.dtype == np.float64
-
-    def test_extract_batch_returns_2d_array(self) -> None:
-        """Extract batch returns 2D array of correct shape."""
-        extractor: FeatureExtractorProtocol = FakeFeatureExtractor(("a", "b"))
-        events = [
-            make_base_input_event(
-                type="test.v1",
-                event_id=f"e{i}",
-                entity_id=f"ent{i}",
-                timestamp="2025-01-01T00:00:00Z",
-            )
-            for i in range(4)
-        ]
-
-        result = extractor.extract_batch(events)
-
-        assert result.shape == (4, 2)
-        assert result.dtype == np.float64
-
-    def test_n_features_matches_feature_names(self) -> None:
-        """n_features equals length of feature_names."""
-        extractor: FeatureExtractorProtocol = FakeFeatureExtractor(
-            ("f1", "f2", "f3", "f4"),
-        )
-        assert extractor.n_features == len(extractor.feature_names)
-        assert extractor.n_features == 4
-
-    def test_feature_names_returns_tuple(self) -> None:
-        """feature_names returns a tuple."""
-        extractor: FeatureExtractorProtocol = FakeFeatureExtractor(("a",))
-        assert type(extractor.feature_names) is tuple
-
+from tests.domains._test_domain_fixtures import make_fake_domain
 
 # =============================================================================
 # Tests: DomainConfig
@@ -256,12 +62,12 @@ class TestDomainProtocol:
 
     def test_fake_satisfies_protocol(self) -> None:
         """FakeDomain satisfies DomainProtocol."""
-        domain: DomainProtocol = FakeDomain("test")
+        domain: DomainProtocol = make_fake_domain("test")
         assert domain.config["name"] == "test"
 
     def test_config_returns_domain_config(self) -> None:
         """Config property returns DomainConfig with correct fields."""
-        domain: DomainProtocol = FakeDomain("covenant")
+        domain: DomainProtocol = make_fake_domain("covenant")
         config = domain.config
         assert config["name"] == "covenant"
         assert config["display_name"] == "Fake covenant"
@@ -270,17 +76,20 @@ class TestDomainProtocol:
         assert config["alert_topic"] == "covenant.alerts.v1"
         assert config["alert_threshold"] == 0.8
 
-    def test_feature_extractor_returns_protocol(self) -> None:
-        """feature_extractor returns FeatureExtractorProtocol."""
-        domain: DomainProtocol = FakeDomain("weather")
-        extractor: FeatureExtractorProtocol = domain.feature_extractor
-        assert extractor.n_features == 2
+    def test_feature_names_and_count_agree(self) -> None:
+        """n_features is the length of feature_names, not a second source."""
+        domain: DomainProtocol = make_fake_domain("weather")
 
-    def test_decode_input_event_returns_base_event(self) -> None:
-        """decode_input_event parses JSON to BaseInputEventV1."""
-        domain: DomainProtocol = FakeDomain("test")
-        from platform_core.json_utils import dump_json_str
+        assert domain.n_features == len(domain.feature_names)
 
+    def test_decode_and_extract_returns_event_and_features(self) -> None:
+        """decode_and_extract yields the base event and its feature vector.
+
+        One step rather than two: the domain decodes to its own type and
+        extracts from it, so the worker never holds an event that a
+        domain-specific extractor cannot accept.
+        """
+        domain: DomainProtocol = make_fake_domain("test")
         payload = dump_json_str(
             {
                 "type": "test.input.v1",
@@ -290,13 +99,31 @@ class TestDomainProtocol:
             }
         )
 
-        event = domain.decode_input_event(payload)
+        event, features = domain.decode_and_extract(payload)
+
         assert event["type"] == "test.input.v1"
         assert event["entity_id"] == "ent1"
+        assert features.shape == (domain.n_features,)
+
+    def test_decode_and_extract_feature_width_matches_declared_count(self) -> None:
+        """The vector width matches n_features, which the model relies on."""
+        domain: DomainProtocol = make_fake_domain("weather")
+        payload = dump_json_str(
+            {
+                "type": "weather.input.v1",
+                "event_id": "e2",
+                "entity_id": "station-7",
+                "timestamp": "2025-01-01T00:00:00Z",
+            }
+        )
+
+        _, features = domain.decode_and_extract(payload)
+
+        assert int(features.shape[0]) == domain.n_features
 
     def test_encode_prediction_event_returns_string(self) -> None:
         """encode_prediction_event returns JSON string."""
-        domain: DomainProtocol = FakeDomain("test")
+        domain: DomainProtocol = make_fake_domain("test")
         from covenant_radar_api.domains.base_schemas import make_base_prediction_event
 
         prediction = make_base_prediction_event(
@@ -316,13 +143,16 @@ class TestDomainProtocol:
 
     def test_generate_alert_context_returns_dict(self) -> None:
         """generate_alert_context returns dict[str, str]."""
-        domain: DomainProtocol = FakeDomain("weather")
+        domain: DomainProtocol = make_fake_domain("weather")
 
         context = domain.generate_alert_context("station-1", 0.92)
 
         assert context["domain"] == "weather"
         assert context["entity_id"] == "station-1"
-        assert context["prediction_value"] == "0.92"
+        # The value must survive as a number the prompt can state, not a
+        # particular decimal width -- pinning the format would test the fake's
+        # formatting rather than the contract.
+        assert float(context["prediction_value"]) == 0.92
 
 
 # =============================================================================

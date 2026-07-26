@@ -176,8 +176,7 @@ class GenericStreamingWorker:
     """Domain-agnostic streaming worker for ML prediction.
 
     Delegates all domain-specific logic through DomainProtocol:
-    - Event decoding via domain.decode_input_event()
-    - Feature extraction via domain.feature_extractor.extract()
+    - Decoding and feature extraction via domain.decode_and_extract()
     - Event encoding via domain.encode_prediction_event()
     - Alert context via domain.generate_alert_context()
     - Topic routing via domain.config
@@ -232,11 +231,10 @@ class GenericStreamingWorker:
         """
         start: float = _hooks.perf_counter()
 
-        # Decode input event through domain
-        event = self._domain.decode_input_event(payload)
+        # Decode and extract in one step: the domain reads its own event type
+        event, features = self._domain.decode_and_extract(payload)
 
-        # Extract features and reshape for model
-        features: NDArray[np.float64] = self._domain.feature_extractor.extract(event)
+        # Reshape for the model, which expects (n_samples, n_features)
         features_2d: NDArray[np.float64] = features.reshape(1, -1)
 
         # Run ML prediction

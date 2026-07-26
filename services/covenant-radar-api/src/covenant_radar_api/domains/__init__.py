@@ -23,7 +23,6 @@ from .base_schemas import (
 from .protocols import (
     DomainConfig,
     DomainProtocol,
-    FeatureExtractorProtocol,
     ModelProtocol,
     make_domain_config,
 )
@@ -37,7 +36,6 @@ __all__ = [
     "DomainConfig",
     "DomainProtocol",
     "DomainRegistry",
-    "FeatureExtractorProtocol",
     "ModelProtocol",
     "decode_base_alert_event",
     "decode_base_input_event",
