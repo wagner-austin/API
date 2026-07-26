@@ -9,15 +9,17 @@ Strict typing only: no Any, no casts, no type: ignore, no stubs.
 
 from __future__ import annotations
 
-from typing import Protocol, TypedDict
+from typing import Protocol, TypedDict, runtime_checkable
 
 import numpy as np
 from cleargbm.types import GradientBoostingModel
 from numpy.typing import NDArray
 from platform_ml.explainers import (
+    BoosterModelProtocol,
     FeatureExplainer,
     PermutationConfig,
     ShapTreeWrapper,
+    TreeModelProtocol,
     create_permutation_explainer,
 )
 from platform_ml.explainers.protocol import PredictorProtocol
@@ -567,8 +569,14 @@ class _ShapTreeAdapter:
                 for exp in cgbm_explanations
             ]
         else:
-            # Use standard ShapTreeWrapper for XGBoost/LightGBM
-            tree_wrapper = ShapTreeWrapper(model)
+            # SHAP introspects the native model, so any prepared form that
+            # is a wrapper must hand over what it wraps. XGBoost's prepared
+            # model is already native and yields None here.
+            native = try_extract_native_tree_model(model)
+            tree_model: TreeModelProtocol | BoosterModelProtocol = (
+                model if native is None else native
+            )
+            tree_wrapper = ShapTreeWrapper(tree_model)
             tree_explanations = tree_wrapper.explain_local(x_data, feature_names)
             raw_explanations = [
                 _LocalExplanation(
@@ -648,6 +656,40 @@ def _create_integrated_gradients_factory() -> ExplainerFactory:
     return factory
 
 
+@runtime_checkable
+class _HasNativeModel(Protocol):
+    """A prepared classifier that can surrender its native model handle.
+
+    SHAP TreeExplainer reads a model's tree structure and rejects anything it
+    does not recognise, so every backend whose prepared form is a wrapper has
+    to expose what it wraps. Declaring that once here, rather than adding an
+    extractor per backend, means a backend added later works by implementing
+    the property.
+    """
+
+    @property
+    def raw_model(self) -> TreeModelProtocol | BoosterModelProtocol:
+        """The native model SHAP can introspect."""
+        ...
+
+
+def try_extract_native_tree_model(
+    prepared: PredictorProtocol,
+) -> TreeModelProtocol | BoosterModelProtocol | None:
+    """Return the native model behind a prepared classifier, if it exposes one.
+
+    Args:
+        prepared: Prepared model from any backend.
+
+    Returns:
+        The native handle when the prepared model wraps one, else None. None
+        means the prepared model is already native, as XGBoost's is.
+    """
+    if isinstance(prepared, _HasNativeModel):
+        return prepared.raw_model
+    return None
+
+
 def _create_shap_tree_factory() -> ExplainerFactory:
     """Create factory for SHAP tree explainer.
 
@@ -706,12 +748,15 @@ def default_explainer_registry() -> ExplainerRegistry:
         ),
     )
 
-    # SHAP Tree: tree-based backends (XGBoost, LightGBM, ClearGBM)
+    # SHAP Tree: every tree-based backend. random_forest was omitted, though
+    # shap.TreeExplainer accepts sklearn ensembles directly -- what it rejects
+    # is the prepared wrapper, which is now unwrapped before it is handed over.
+    # logreg is excluded because it is not a tree model at all.
     reg.register(
         "shap_tree",
         ExplainerRegistration(
             factory=_create_shap_tree_factory(),
-            compatible_backends=frozenset(["xgboost", "lightgbm", "cleargbm"]),
+            compatible_backends=frozenset(["xgboost", "lightgbm", "cleargbm", "random_forest"]),
             requires_gradients=False,
         ),
     )

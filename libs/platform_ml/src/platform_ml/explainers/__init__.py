@@ -54,6 +54,7 @@ from .regression_permutation import (
     create_regression_permutation_explainer,
 )
 from .tree import (
+    BoosterModelProtocol,
     LocalExplanation,
     ShapTreeWrapper,
     TreeModelProtocol,
@@ -73,6 +74,7 @@ __all__ = [
     "INTEGRATED_GRADIENTS_CAPABILITIES",
     "PERMUTATION_CAPABILITIES",
     "REGRESSION_PERMUTATION_CAPABILITIES",
+    "BoosterModelProtocol",
     "ComputationalCost",
     "ExplainerCapabilities",
     "ExplainerName",

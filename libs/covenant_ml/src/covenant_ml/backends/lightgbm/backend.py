@@ -133,6 +133,18 @@ class _LGBMBoosterPrepared:
     def __init__(self, booster: _BoosterProtocol) -> None:
         self._booster = booster
 
+    @property
+    def raw_model(self) -> _BoosterProtocol:
+        """Return the underlying LightGBM Booster.
+
+        Needed by SHAP TreeExplainer, which reads the native tree structure
+        and rejects wrapper objects. Mirrors _LGBMRegressorPrepared.
+
+        Returns:
+            The raw LightGBM Booster.
+        """
+        return self._booster
+
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict class probabilities.
 

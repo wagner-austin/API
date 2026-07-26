@@ -17,10 +17,12 @@ from numpy.typing import NDArray
 
 
 class TreeModelProtocol(Protocol):
-    """Protocol for tree-based models compatible with SHAP TreeExplainer.
+    """Protocol for tree models exposing predict_proba.
 
-    XGBoost, LightGBM, and sklearn tree models implement predict_proba.
-    SHAP TreeExplainer uses internal tree structure, not this method directly.
+    XGBoost's XGBClassifier and sklearn's tree ensembles take this shape.
+    SHAP TreeExplainer reads the internal tree structure and never calls this
+    method; it is here to describe the objects that are passed, not to state
+    a requirement of SHAP.
     """
 
     def predict_proba(
@@ -28,6 +30,28 @@ class TreeModelProtocol(Protocol):
         x: NDArray[np.float64],
     ) -> NDArray[np.float64]:
         """Predict class probabilities."""
+        ...
+
+
+class BoosterModelProtocol(Protocol):
+    """Protocol for native boosters exposing predict.
+
+    A LightGBM Booster loaded from a model file has no predict_proba: for
+    binary objectives predict returns P(class=1) alone. SHAP accepts it
+    regardless, because it reads the tree structure.
+
+    This exists because requiring predict_proba excluded exactly the native
+    handles SHAP wants. Callers wrapped the Booster to satisfy that
+    requirement, and SHAP then rejected the wrapper with "Model type not yet
+    supported by TreeExplainer" -- so lightgbm was advertised as shap_tree
+    compatible while every such request failed.
+    """
+
+    def predict(
+        self,
+        x: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Predict raw scores."""
         ...
 
 
@@ -57,12 +81,16 @@ class TreeExplainerConstructor(Protocol):
 
     def __call__(
         self,
-        model: TreeModelProtocol,
+        model: TreeModelProtocol | BoosterModelProtocol,
         data: NDArray[np.float64] | None = None,
         model_output: str = "raw",
         feature_perturbation: str = "interventional",
     ) -> ShapExplainerProtocol:
-        """Create a new TreeExplainer."""
+        """Create a new TreeExplainer.
+
+        Accepts either shape: SHAP reads the tree structure and calls neither
+        predict_proba nor predict.
+        """
         ...
 
 
@@ -139,11 +167,16 @@ class ShapTreeWrapper:
     Encapsulates the untyped 'shap' library interaction.
     """
 
-    def __init__(self, model: TreeModelProtocol) -> None:
+    def __init__(self, model: TreeModelProtocol | BoosterModelProtocol) -> None:
         """Initialize wrapper with a trained model.
 
+        Both accepted shapes are passed straight to shap.TreeExplainer, which
+        reads the tree structure rather than calling either method. The union
+        is what lets a native LightGBM Booster through; narrowing it to
+        predict_proba alone is what made lightgbm x shap_tree impossible.
+
         Args:
-            model: Trained model (XGBoost, LightGBM, Sklearn tree, etc.)
+            model: Trained model (XGBoost, LightGBM Booster, sklearn tree).
                    Must be compatible with shap.TreeExplainer.
         """
         # Dynamic import to avoid top-level untyped import.
@@ -187,12 +220,19 @@ class ShapTreeWrapper:
         # shap_values returns (n_samples, n_features) for binary XGBoost
         raw_values = self._explainer.shap_values(x)
 
-        # Handle list output (e.g. from sklearn models: [negative_vals, positive_vals])
-        # Take positive class if list, otherwise use directly
-        # SHAP TreeExplainer always returns (n_samples, n_features) shape arrays
+        # SHAP returns one of three shapes, and the positive class is taken
+        # from each, matching _extract_expected_value:
+        #   list of per-class arrays  -- older sklearn output
+        #   (n_samples, n_features, n_classes) -- current sklearn ensembles
+        #   (n_samples, n_features)   -- XGBoost and LightGBM binary
+        # Only the last was handled. A 3-D array left the class axis in place,
+        # so each row flattened to n_features * n_classes values against
+        # n_features names, and the caller indexed off the end of the row.
         values_array: NDArray[np.float64] = (
             raw_values[-1] if isinstance(raw_values, list) else raw_values
         )
+        if values_array.ndim == 3:
+            values_array = values_array[:, :, -1]
 
         results: list[LocalExplanation] = []
         n_samples = values_array.shape[0]

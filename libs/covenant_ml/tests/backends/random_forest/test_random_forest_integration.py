@@ -18,6 +18,7 @@ from covenant_ml.backends.random_forest import (
     RandomForestBackend,
     create_random_forest_backend,
 )
+from covenant_ml.explainers.registry import try_extract_native_tree_model
 from covenant_ml.types import (
     ClassifierTrainConfig,
     MLPConfig,
@@ -573,3 +574,25 @@ def test_rf_backend_different_depths(tmp_path: Path) -> None:
         config = _make_rf_config(n_estimators=10, max_depth=max_depth)
         outcome = _invoke_rf_train(backend, x, y, names, config, tmp_path)
         assert outcome["best_val_auc"] > 0.5, f"Failed for max_depth={max_depth}"
+
+
+def test_rf_prepared_exposes_the_native_sklearn_model(tmp_path: Path) -> None:
+    """The prepared model surrenders the sklearn ensemble SHAP needs.
+
+    shap.TreeExplainer accepts sklearn ensembles directly and rejects
+    wrappers with "Model type not yet supported by TreeExplainer", so the
+    native handle has to be reachable or shap_tree cannot work here.
+    """
+    backend = create_random_forest_backend()
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
+    config = _make_rf_config(n_estimators=5)
+    outcome = _invoke_rf_train(backend, x, y, names, config, tmp_path)
+    loaded = backend.load(path=outcome["model_path"])
+
+    native = try_extract_native_tree_model(loaded)
+
+    # Names the concrete type: a None here would read as "NoneType" and
+    # still fail, so a separate not-None assertion adds nothing.
+    assert type(native).__name__ == "RandomForestClassifier"

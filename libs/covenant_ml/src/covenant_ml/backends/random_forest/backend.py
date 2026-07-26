@@ -148,6 +148,19 @@ class _RandomForestPrepared:
         """
         self._model = model
 
+    @property
+    def raw_model(self) -> _RFModelProtocol:
+        """Return the underlying sklearn RandomForestClassifier.
+
+        SHAP TreeExplainer accepts sklearn ensembles directly and rejects
+        wrappers with "Model type not yet supported by TreeExplainer", so the
+        native handle has to be reachable for shap_tree to work here.
+
+        Returns:
+            The raw sklearn model.
+        """
+        return self._model
+
     def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
         """Predict class probabilities.
 

@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 from covenant_ml.backends.lightgbm import LIGHTGBM_CAPABILITIES, create_lightgbm_backend
 from covenant_ml.backends.lightgbm.backend import _resolve_device
 from covenant_ml.backends.protocol import ClassifierBackend
+from covenant_ml.explainers.registry import try_extract_native_tree_model
 from covenant_ml.types import (
     ClassifierTrainConfig,
     LightGBMConfig,
@@ -492,3 +493,26 @@ def test_resolve_device_unknown_returns_cpu() -> None:
     """_resolve_device returns 'cpu' for unknown device string."""
     result = _resolve_device("unknown")
     assert result == "cpu"
+
+
+def test_lightgbm_prepared_exposes_the_native_booster(tmp_path: Path) -> None:
+    """The prepared model surrenders the Booster SHAP needs.
+
+    Booster.predict returns only P(class=1), so the wrapper exists to satisfy
+    PredictorProtocol. SHAP introspects the native object and rejected that
+    wrapper, which made lightgbm x shap_tree fail while being advertised as
+    compatible.
+    """
+    backend = create_lightgbm_backend()
+    dataset = load_us_bankruptcy_data()
+    x, y, names = dataset["x"], dataset["y"], dataset["feature_names"]
+
+    config = _make_lightgbm_config(n_estimators=5)
+    outcome = _invoke_lightgbm_train(backend, x, y, names, config, tmp_path)
+    loaded = backend.load(path=outcome["model_path"])
+
+    native = try_extract_native_tree_model(loaded)
+
+    # Names the concrete type: a None here would read as "NoneType" and
+    # still fail, so a separate not-None assertion adds nothing.
+    assert type(native).__name__ == "Booster"

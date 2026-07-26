@@ -25,6 +25,7 @@ from covenant_ml.explainers.registry import (
     _rank_features,
     _ShapTreeAdapter,
     default_explainer_registry,
+    try_extract_native_tree_model,
 )
 from covenant_ml.explainers.types import SupportedExplainer
 from covenant_ml.types import BackendName, XGBModelProtocol
@@ -1201,3 +1202,66 @@ class TestDefaultRegistryCoversEveryBackend:
             compatible = registry.list_compatible_explainers(backend)
             assert "gradient" not in compatible
             assert "integrated_gradients" not in compatible
+
+
+class TestNativeModelExtraction:
+    """Prepared models that wrap a native handle must surrender it to SHAP.
+
+    shap.TreeExplainer reads a model's tree structure and rejects anything it
+    does not recognise with "Model type not yet supported by TreeExplainer".
+    LightGBM and RandomForest both return wrappers from load(), so shap_tree
+    failed for LightGBM and RandomForest was left out of its compatible set
+    entirely -- even though SHAP accepts both native handles directly.
+    """
+
+    def test_shap_tree_covers_every_tree_backend(self) -> None:
+        """Only logreg is excluded, because it is not a tree model."""
+        registry = default_explainer_registry()
+
+        without = [
+            backend
+            for backend in default_registry().list_backends()
+            if "shap_tree" not in registry.list_compatible_explainers(backend)
+        ]
+
+        assert without == ["logreg"]
+
+    def test_native_extraction_returns_none_for_already_native_models(self) -> None:
+        """XGBoost's prepared model is the classifier itself, so nothing to unwrap."""
+
+        class _Native:
+            """Stands in for a prepared model that is already native."""
+
+            def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+                """Return a fixed two-column result."""
+                n = int(x.shape[0])
+                return np.full((n, 2), 0.5, dtype=np.float64)
+
+        assert try_extract_native_tree_model(_Native()) is None
+
+    def test_native_extraction_returns_the_wrapped_model(self) -> None:
+        """A prepared model exposing raw_model hands the native handle over."""
+
+        class _Inner:
+            """Stands in for a native booster."""
+
+            def predict(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+                """Return one score per row."""
+                return np.zeros(int(x.shape[0]), dtype=np.float64)
+
+        inner = _Inner()
+
+        class _Wrapping:
+            """Stands in for a prepared model that wraps a native handle."""
+
+            @property
+            def raw_model(self) -> _Inner:
+                """The wrapped native model."""
+                return inner
+
+            def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]:
+                """Return a fixed two-column result."""
+                n = int(x.shape[0])
+                return np.full((n, 2), 0.5, dtype=np.float64)
+
+        assert try_extract_native_tree_model(_Wrapping()) is inner

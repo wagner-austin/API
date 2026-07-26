@@ -392,3 +392,74 @@ def test_extract_float_from_array_single() -> None:
     arr = make_float64_1d([0.99])
     result = _extract_float_from_array(arr)
     assert result == 0.99
+
+
+class _SklearnRFConstructor(Protocol):
+    """Protocol for sklearn's RandomForestClassifier constructor."""
+
+    def __call__(self, *, n_estimators: int, random_state: int) -> _SklearnRFProtocol: ...
+
+
+class _SklearnRFProtocol(Protocol):
+    """Protocol for a fitted sklearn RandomForestClassifier."""
+
+    def fit(self, x: NDArray[np.float64], y: NDArray[np.int64]) -> _SklearnRFProtocol: ...
+    def predict_proba(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
+
+def _create_random_forest() -> _SklearnRFProtocol:
+    """Train a small sklearn RandomForest on separable data.
+
+    Returns:
+        Fitted RandomForestClassifier.
+    """
+    ensemble_mod = __import__("sklearn.ensemble", fromlist=["RandomForestClassifier"])
+    ctor: _SklearnRFConstructor = ensemble_mod.RandomForestClassifier
+    model = ctor(n_estimators=5, random_state=0)
+
+    x_train = make_float64_2d(
+        [
+            [0.1, 0.2, 0.3],
+            [0.2, 0.1, 0.2],
+            [0.15, 0.25, 0.1],
+            [0.9, 0.8, 0.95],
+            [0.85, 0.9, 0.8],
+            [0.95, 0.85, 0.9],
+        ]
+    )
+    y_train = _make_int64_1d([0, 0, 0, 1, 1, 1])
+    return model.fit(x_train, y_train)
+
+
+def test_shap_tree_wrapper_handles_sklearn_three_dimensional_values() -> None:
+    """sklearn ensembles return (n_samples, n_features, n_classes) from SHAP.
+
+    XGBoost returns (n_samples, n_features). Only that shape was handled, so
+    a 3-D result kept its class axis and each row flattened to
+    n_features * n_classes values against n_features names -- which the
+    caller then indexed off the end of.
+    """
+    model = _create_random_forest()
+    wrapper = ShapTreeWrapper(model)
+    feature_names = ["f0", "f1", "f2"]
+
+    explanations = wrapper.explain_local(make_float64_2d([[0.9, 0.8, 0.95]]), feature_names)
+
+    assert len(explanations) == 1
+    assert len(explanations[0]["values"]) == len(feature_names)
+
+
+def test_shap_tree_wrapper_sklearn_multi_sample_row_widths() -> None:
+    """Every row carries exactly one value per feature, across samples."""
+    model = _create_random_forest()
+    wrapper = ShapTreeWrapper(model)
+    feature_names = ["f0", "f1", "f2"]
+
+    explanations = wrapper.explain_local(
+        make_float64_2d([[0.1, 0.2, 0.3], [0.9, 0.8, 0.95]]), feature_names
+    )
+
+    assert len(explanations) == 2
+    for explanation in explanations:
+        assert len(explanation["values"]) == 3
+        assert all(isinstance(v, float) for v in explanation["values"])
