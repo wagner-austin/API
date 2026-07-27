@@ -268,6 +268,8 @@ analyze:
 	@Write-Host "==> analyze (latest run)" -ForegroundColor Cyan
 	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
 	@Write-Host ""
+	poetry run tankpit-forage-economy runs/bot/latest.events.jsonl
+	@Write-Host ""
 	poetry run tankpit-run-audit runs/bot/latest.events.jsonl
 	@Write-Host ""
 	poetry run tankpit-stats

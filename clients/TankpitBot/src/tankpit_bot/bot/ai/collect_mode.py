@@ -582,6 +582,15 @@ def _hop_toward_equipment(
         ctx.inventory["homing_shots"]["count"],
         ctx.inventory["extra_radars"]["count"],
     )
+    emit_diagnostic(
+        diagnostic_kind="hop_selected",
+        hop_kind="equipment",
+        target_x=best_container["x"],
+        target_y=best_container["y"],
+        landing_x=best_landing_x,
+        landing_y=best_landing_y,
+        cost=best_cost,
+    )
     return make_decision(
         make_teleport_command(best_landing_x, best_landing_y),
         "COLLECT",
