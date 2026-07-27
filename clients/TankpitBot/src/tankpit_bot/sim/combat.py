@@ -14,8 +14,10 @@ tank, not the clicked tile. A visible target reroutes the click to
 its current position (the queue-race conversion — a same-tick mover
 draws homing instead of a miss); a DEPARTED target (0x58 emitted)
 keeps drawing guaranteed homing hits until the measured reroute TTL
-(``physics.combat.REROUTE_TTL_MS``, boundary [11.0, 13.0] s), after
-which the id no longer resolves and the shot is a free single miss.
+(``physics.combat.REROUTE_TTL_MS`` = 12,920 ms; corpus boundary
+[12.91, 12.93] s fire-time, 2026-07-22 sweep, confirmed live by run
+bot-20260726-194658: hits to +12.0 s, miss at +14.0 s), after which
+the id no longer resolves and the shot is a free single miss.
 """
 
 from __future__ import annotations

@@ -312,60 +312,6 @@ def block_combat_target_and_replan(
     )
 
 
-def release_combat_target_and_replan(
-    ctx: DecideCtx,
-    target: EnemyThreatDict,
-) -> TickDecisionDict:
-    """Release a departed target WITHOUT blocking and re-acquire fresh.
-
-    The follow-up path for orange-2-style escapes (user ruling
-    2026-07-20): a stationary consumption-miss with ammo available
-    means the target is no longer at the frozen registry position --
-    it escaped (0x58 + reroute TTL expired) or died off-viewport to a
-    third party or hidden mine (the only off-viewport death causes;
-    self-deactivation is impossible -- walking stops debiting at zero
-    fuel and teleports refuse on insufficient fuel). Either way the
-    next map snapshot carries the truth: a live escapee reappears at
-    its real position and competes for acquisition on plain distance
-    (no damage weighting, user ruling 2026-07-20); a corpse either
-    vanishes from the snapshot or is dropped on arrival when the
-    landing scan reveals the corpse direction. The former 30 s block
-    forfeited a near-dead guaranteed kill in the only case that
-    actually occurs (run 2026-07-19 22:30: orange-2 critical, on the
-    next snapshot, nearest and affordable -- excluded purely by the
-    block).
-
-    Args:
-        ctx: Decision context.
-        target: The departed combat target.
-
-    Returns:
-        Tick decision opening the map for fresh acquisition (the
-        escapee's new position arrives with the snapshot).
-    """
-    emit_diagnostic(
-        diagnostic_kind="target_departed",
-        target_id=target["tank_id"],
-        target_name=target["name"],
-        last_x=target["x"],
-        last_y=target["y"],
-    )
-    emit_ai(
-        "%s departed (stationary miss) - releasing without block, following up via map",
-        target["name"],
-    )
-    return make_decision(
-        make_map_open_command(),
-        "HUNT",
-        0,
-        0,
-        0,
-        "find_enemies",
-        AIStateDict(**{**clear_combat_target(ctx.base), "last_map_open_ms": ctx.timestamp_ms}),
-        ctx.equip,
-    )
-
-
 # =============================================================================
 # Internal helpers
 # =============================================================================
@@ -740,18 +686,31 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
             if _has_damaging_weapon_available(ctx):
                 # Departed, not "unkillable": corpses and shields
                 # return positive tile echoes but a consumption-miss
-                # means nothing was there to spend on. Release WITHOUT
-                # the 30 s block so the next map snapshot's fresh
-                # position feeds a follow-up acquisition (user ruling
-                # 2026-07-20; the block cost orange-2's guaranteed
-                # finish on 2026-07-19).
+                # means the reroute window closed on an escaped
+                # target ([[shoot-event-format]]#reroute-ttl-ms; run
+                # 194658 confirmed the wall live: hits to +12.0 s,
+                # miss at +14.0 s). User ruling 2026-07-26: live
+                # targets are NEVER dropped -- hold the lock and open
+                # the map; the resume machinery in HUNT/ACQUIRE
+                # (_locked_target_pursuit) chases the refreshed
+                # position, and it alone releases when the target is
+                # genuinely dead or gone from the registry (the
+                # original orange-2 case, user ruling 2026-07-20).
+                emit_diagnostic(
+                    diagnostic_kind="target_chase",
+                    target_id=target["tank_id"],
+                    target_name=target["name"],
+                    last_x=target["x"],
+                    last_y=target["y"],
+                )
                 emit_ai(
-                    "miss on stationary %s at (%d,%d) - target departed",
+                    "miss on stationary %s at (%d,%d) - reroute window closed; "
+                    "holding lock and chasing via map",
                     target["name"],
                     target["x"],
                     target["y"],
                 )
-                return release_combat_target_and_replan(ctx, target)
+                return open_map_for_target(ctx, target)
             emit_ai(
                 "miss on stationary %s at (%d,%d) but no damaging weapon available - "
                 "disengaging to refill (ammo exhaustion, not afterimage)",

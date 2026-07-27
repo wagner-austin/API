@@ -36,7 +36,7 @@ from tankpit_bot.bot.types import (
 )
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
-from tankpit_bot.runtime_logging import emit_ai
+from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -116,16 +116,17 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
 
     Resume-or-acquire cascade:
 
-    1. **Resume held lock -- viewport-confirmed only.** If
-       ``combat_target_id != -1`` and the locked target is in the
-       current threat list, engage or close on it. If the lock is set
-       but the target is off-viewport, the engagement is stale (a mode
-       interrupt may have relocated the bot arbitrarily far); the lock
-       is RELEASED and acquisition runs fresh. If the same enemy is
-       still the best affordable candidate, acquisition teleports back
-       to it -- resuming a fight means going to the target, never
-       firing from stand-off range (user contract 2026-07-02; live
-       run 2026-07-01 20:48 fired at a target 92 tiles away and
+    1. **Resume held lock.** If ``combat_target_id != -1`` and the
+       locked target is in the current threat list, engage or close on
+       it. If the lock is set but the target is off-viewport (a mode
+       interrupt relocated the bot, or the target fled past the
+       reroute window), the pursuit helper chases it: teleport back on
+       a trustworthy position, refresh the map on a stale one, and
+       release the lock ONLY when the target is genuinely gone -- dead
+       or vanished from the registry (user ruling 2026-07-26: live
+       targets are never dropped). Resuming means going to the target,
+       never firing from stand-off range (user contract 2026-07-02;
+       live run 2026-07-01 20:48 fired at a target 92 tiles away and
        looped on server rejections).
     2. **Strict (viewport-confirmed) threats.** ``analyze_threats``
        returns only enemies with recent ``last_viewport_observation_ms``;
@@ -166,6 +167,15 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         # vanished from the registry).
         pursuit = _locked_target_pursuit(ctx)
         if pursuit is None:
+            # The ONLY place a live-looking lock is released (user
+            # ruling 2026-07-26: live targets are never dropped) --
+            # reached exclusively when the registry says the target
+            # is dead or vanished entirely.
+            emit_diagnostic(
+                diagnostic_kind="target_departed",
+                target_id=ctx.ai_state["combat_target_id"],
+                reason="gone_from_registry",
+            )
             emit_ai(
                 "locked target id=%d is gone - re-acquiring fresh",
                 ctx.ai_state["combat_target_id"],
