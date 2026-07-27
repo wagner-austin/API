@@ -7,7 +7,7 @@ related:
 source_paths:
   - "Makefile"
 source_git_blobs:
-  "Makefile": "350ca9ec3f0f1d8fc00002377fc3a4290705dc3b"
+  "Makefile": "700340821708d152af90d026c6504b1608d6b87e"
 fact_checked: "2026-07-25"
 confidence: high
 hubs: [codebase]
@@ -59,7 +59,7 @@ hubs: [codebase]
 
 | Target | What it does |
 |--------|-------------|
-| `make analyze` | Issue report + run audit (deterministic verdicts + capture replay diff) + cross-session stats on latest run |
+| `make analyze` | Issue report + forage economy + run audit (deterministic verdicts + capture replay diff) + cross-session stats on latest run. The forage-economy section (`tankpit-forage-economy`, 2026-07-26) answers "where did the time go": hunt/collect split, forage viewports per kill, pickups per viewport, weapons per equipment pickup, hop selected/declined breakdown. Pass two events paths to diff runs — built for the 803 s vs 1,187 s 10-kill pair whose deciding number (weapons/pickup 3.34 vs 2.14) was invisible to the issue report. |
 | `make audit` | Re-derive every validated wiki physics claim from the full runs archive (`tankpit-audit --stamp` rewrites `fact_checked:` on green pages). See [[physics-module-roadmap]] Phase 2. |
 | `make shadow` | Price the SIM's laws against the archive — every validator imports its predictor from sim source (sync cadence, grant invariants, kill mercy bundle, corpse window). A failure = sim and real server disagree. See [[physics-module-roadmap]]. |
 | `make roundtrip` | Decode→encode→decode every archive message; byte-identity proof for the sim's encoders |
