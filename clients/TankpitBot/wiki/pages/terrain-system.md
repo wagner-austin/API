@@ -42,6 +42,10 @@ function e(z) {
 
 The three reference colors (`k.m`, `k.l`, `k.o`) are calibrated per-map from the most common blue-channel values in the image.[^1]
 
+**Coast tiles are art, not a terrain class.** The shoreline "water edge" look is generated per-tile by the adjacency renderer (`ug`, line 155) from the 3-class neighborhood — there is no fourth walkable-coast type anywhere in the client. Server-verified live 2026-07-26 (movement probe, capture `runs/probe/coast_test.movement_probe.json`): from shore tile (130,124), single-step moves onto the adjacent blue tiles (129,124) and (130,125) both rejected with `0x52 err=1` (`cant_go`), zero fuel spent, tank unmoved — while the walk TO the shore tile was accepted normally. Blue is water; water is impassable on foot.[^2]
+
+**Containers spawn ON water tiles near shores and are pickable from adjacent land.** 19 server-confirmed pickups across runs bot-20260726-094309/-145124 consumed containers sitting on water-classified tiles, in every case with the tank on a land tile exactly 1 cardinal step away (pickup reach = 1). Water containers ≥2 tiles from the nearest land are unreachable — the equipment-hop atlas accumulates them and `find_teleport_landing_tile` correctly declines them (`no_landing`), which is the dominant, correct source of `hop_declined` spam. A `0x5A` patch enumerating such a tile carries `terrain_type=0`, which means "no dynamic block/ferry feature", NOT "ground" — static walkability is never overridden by a type-0 patch entry.[^2]
+
 ## Terrain Byte Encoding
 
 Each tile has a terrain byte (`cg.i` field) that encodes both the base type AND adjacency information.[^1]
@@ -195,3 +199,4 @@ Each tile: `sprite_x = (index % 8) * 24, sprite_y = floor(index / 8) * 16`[^1]
 The ViewportUpdate (V.Z) sends terrain as the low 4 bits of each entity's packed 24-bit value.[^1]
 
 [^1]: JS truth: `tpclient.js` on disk (frontmatter-pinned `tpclient.js:145`) — `dg`/`gg`/`hg` tables (line 145), classifier `sg` (line 152), adjacency `ug` (line 155), variant `ng` (line 148), all quoted verbatim in the fences above; terrain byte encoding fully traced 2026-06-19 (frontmatter `verified:` field), re-checkable by grep. The rock-family walkability semantics are wire-confirmed in [[movable-blocks]] and composed into the bot's terrain in [[terrain-composition]].
+[^2]: Live measurement 2026-07-26: movement probe `runs/probe/coast_test.movement_probe.json` + its capture (walk-onto-blue rejections, `0x52 err=1`, settled position unchanged, fuel unchanged); containers-on-water from runs bot-20260726-094309/-145124 event logs (19 consumed/clamped pickups at water-classified `target_x/y`, tank `landed_x/y` on land 1 cardinal tile away in every case, cross-checked against the tracked-equipment atlas rebuilt from bot-20260726-145124's capture: 39/53 tracked equipment on water, dist-to-land 1-7 tiles). The type-0-patch-is-not-ground reading: 13-capture terrain mine, 2,729 tiles, zero cross-capture disagreements — type-0 entries appear over deep-lake container tiles the probe proved unwalkable.
