@@ -11,9 +11,9 @@ source_paths:
   - "src/tankpit_bot/sniffer"
   - "runs/bot/latest.events.jsonl"
 source_git_blobs:
-  "src/tankpit_bot/bot": "668435779bed6f88c76f2fd46f61a4bc6e9952a6"
+  "src/tankpit_bot/bot": "8317a83fa06e8c49f8a8ea68b9eae1374fceb61f"
   "src/tankpit_bot/sniffer": "7075bc983a306e326444c4111bdab64a5bc5d4e0"
-fact_checked: "2026-07-25"
+fact_checked: "2026-07-28"
 confidence: high
 verified: 2026-06-20 (anchored to specific code paths + integration tests)
 hubs: [architecture]
@@ -211,6 +211,15 @@ These behaviors exist in the code but lack a verified contract entry (one except
 - Bridge-build vs obstacle-drop decision (carrying state) — correction 2026-07-23: NOT in code at all; the bot has no block state tracking or planner awareness ([[movable-blocks]] open work)
 - Teleport-target selection (heuristic)
 - Self-rank promotion handling (0x2B reception)
+- PvP doctrine (planned 2026-07-27/28, not built): damage-aware break
+  threshold fed by the damage ledger; under-fire teleport-refuel using
+  the larder fuel query ([[larder-plan]]) as a second client; and the
+  **ring-2 stand-off vs a known miner** — a fresh 3x3 placement mines
+  all 8 tiles around the placer ([[mine-mechanics]]), so an approach
+  teleport aimed at the enemy's own tile hands the server 8 mined
+  displacement landings; aim at Chebyshev-2 instead and shoot from
+  there. Gated on the teleport-onto-mine open question
+  ([[mine-mechanics]] §not-covered).
 
 When you add tests for these, also add a contract row here. The contract grows with the test suite, under the coverage and no-mocks discipline in [[coding-standards]].
 

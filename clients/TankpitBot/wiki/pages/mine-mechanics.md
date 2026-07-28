@@ -124,5 +124,6 @@ These follow from the mechanics above; see [[bot-behavior-contract]] §3 for the
 ## What this section does NOT cover yet
 
 - Mine team-decode in `0x4B`: the `mine_type` byte (`data[1]`) and the relationship between `mine_type` and team are observed but not yet cracked from JS. See [[v-table-complete]].
+- **Teleport landing on a mined tile**: walk-over is measured (single mine, movement stops), but whether a teleport LANDING on a mine detonates it — or coexists until the tank next moves — has never been observed. Probe-able in the practice room (place mines, teleport onto one, read the wire). This gates the ring-2 stand-off aim rule ([[bot-behavior-contract]] §6 PvP doctrine), since displacement off a ringed enemy lands on mined tiles.
 - Damage delivered by mine vs shot. The shoot-event format covers shots; mines drop straight to `0x41` Deactivation as `is_mine_kill=true`.
 - Detection range and effectiveness of mines vs different vehicle classes. Out of scope -- bot doesn't expose vehicle class.
