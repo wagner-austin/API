@@ -795,7 +795,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=on_intended,
             hit_signal="tile_occupied",
         )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name)
+        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
         _inc_hit()
         return "hit"
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
@@ -807,7 +807,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="kill_confirmed",
         )
-        resolve_dealt(get_world_service().damage_book, target_id, target_name)
+        resolve_dealt(get_world_service().damage_book, target_id, target_name, target_id)
         _inc_hit()
         # Clear the shot-target fields directly: the trigger is
         # ``killed_tank_ids`` membership, which is not a consumable
@@ -837,7 +837,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="ammo_delta",
         )
-        resolve_dealt(get_world_service().damage_book, victim_id, target_name)
+        resolve_dealt(get_world_service().damage_book, victim_id, target_name, target_id)
         _inc_hit()
         return "hit"
     if got_response:

@@ -44,7 +44,7 @@ def test_resolve_dealt_charges_each_weapon_at_its_victim_cost() -> None:
     total = 0
     for weapon, (kind, cost) in expected.items():
         record_own_shot_echo(book, weapon)
-        resolve_dealt(book, 535, "orange-9")
+        resolve_dealt(book, 535, "orange-9", 535)
         total += cost
         row = book["dealt"]["535"]
         counts = {
@@ -62,7 +62,7 @@ def test_resolve_dealt_charges_each_weapon_at_its_victim_cost() -> None:
 def test_resolve_dealt_without_pairing_counts_unknown_with_zero_fuel() -> None:
     """An unpaired hit is counted but never charges invented fuel."""
     book = make_damage_book()
-    resolve_dealt(book, -1, "")
+    resolve_dealt(book, -1, "", -1)
     row = book["dealt"]["-1"]
     assert row["unknown"] == 1
     assert row["fuel"] == 0
@@ -129,8 +129,8 @@ def test_summarize_side_renders_rows_and_empty() -> None:
     book = make_damage_book()
     assert summarize_side(book["dealt"]) == "none"
     record_own_shot_echo(book, 1)
-    resolve_dealt(book, 535, "orange-9")
-    resolve_dealt(book, 500, "red-1")
+    resolve_dealt(book, 535, "orange-9", 535)
+    resolve_dealt(book, 500, "red-1", 500)
     text = summarize_side(book["dealt"])
     assert "red-1(500): unknown=1 fuel=0" in text
     assert f"orange-9(535): dual=1 fuel={DUAL_HIT_VICTIM_COST}" in text
@@ -168,3 +168,14 @@ def test_contract_names_identify_their_rules() -> None:
     """Each contract exposes its ledger-rule name."""
     assert OwnShotEchoContract().name == "damage_book_own_shot_echo"
     assert IncomingShotContract().name == "damage_book_incoming_shot"
+
+
+def test_resolve_dealt_reroute_hit_charges_the_commanded_target() -> None:
+    """An unresolvable victim (-1) ledgers under the intended id."""
+    book = make_damage_book()
+    record_own_shot_echo(book, 3)
+    resolve_dealt(book, -1, "orange-9", 535)
+    row = book["dealt"]["535"]
+    assert row["homing"] == 1
+    assert row["fuel"] == HOMING_HIT_VICTIM_COST
+    assert "-1" not in book["dealt"]

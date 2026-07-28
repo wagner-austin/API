@@ -220,18 +220,34 @@ def record_own_shot_echo(book: DamageBookDict, weapon: int) -> None:
     book["pending_dealt_weapon"] = weapon
 
 
-def resolve_dealt(book: DamageBookDict, victim_id: int, victim_name: str) -> None:
+def resolve_dealt(
+    book: DamageBookDict,
+    victim_id: int,
+    victim_name: str,
+    intended_id: int,
+) -> None:
     """Charge a confirmed hit to its victim using the paired weapon.
+
+    A hit whose victim tile is unresolvable (``victim_id == -1`` --
+    the off-viewport reroute case, [[shoot-event-format]]) is charged
+    to the COMMANDED target instead: the reroute law guarantees an
+    id-targeted shot lands on the specified id wherever it stands
+    (user callout 2026-07-27: "dont we know the intended target?").
+    In-viewport seeker retargets resolve a real victim id and are
+    unaffected.
 
     Args:
         book: The damage book.
-        victim_id: Tank id the hit resolved against (may be ``-1``
-            for off-viewport reroute hits; they ledger under id -1).
+        victim_id: Tank id the hit resolved against (``-1`` when the
+            impact tile is off-viewport).
         victim_name: Victim display name (may be empty).
+        intended_id: The commanded target id, used when the wire
+            could not resolve the victim.
     """
     weapon = book["pending_dealt_weapon"]
     book["pending_dealt_weapon"] = _NO_PENDING_WEAPON
-    row = _side(book["dealt"], victim_id, victim_name or f"tank-{victim_id}")
+    charged_id = victim_id if victim_id != -1 else intended_id
+    row = _side(book["dealt"], charged_id, victim_name or f"tank-{charged_id}")
     weapon_name = _WEAPON_NAMES.get(weapon)
     if weapon_name is None:
         row["unknown"] += 1
