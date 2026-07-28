@@ -12,6 +12,7 @@ from platform_core.logging import get_logger
 from tankpit_bot import browser, protocol
 from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.ledger.ammo_book import record_ammo_enemy_shot, record_ammo_shot
+from tankpit_bot.ledger.damage_book import record_incoming_shot, record_own_shot_echo
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
@@ -167,9 +168,18 @@ def _record_shot_fuel_entry(ws: WorldService, shooter_id: int, weapon: int) -> N
         hi = -(cost // 2) if weapon == 3 else -cost
         record_fuel_entry(book=ws.fuel_book, kind=_SHOT_ENTRY_KINDS[weapon], lo=-cost, hi=hi)
         record_ammo_shot(book=ws.ammo_book, weapon=weapon)
+        record_own_shot_echo(ws.damage_book, weapon)
     else:
         record_fuel_entry(book=ws.fuel_book, kind="enemy_hit", lo=-DUAL_HIT_VICTIM_COST, hi=0)
         record_ammo_enemy_shot(book=ws.ammo_book)
+        shooter = ws.world_state["tanks"].get(str(shooter_id))
+        record_incoming_shot(
+            ws.damage_book,
+            shooter_id,
+            shooter["name"] if shooter is not None else f"tank-{shooter_id}",
+            weapon,
+            browser.get_current_time_ms(),
+        )
 
 
 def _dispatch_shoot_event(

@@ -58,6 +58,20 @@ class FuelEntryDict(TypedDict):
     hi: int
 
 
+class FuelKindTotalDict(TypedDict):
+    """Cumulative session totals for one entry kind.
+
+    The trace half of the book (user ruling 2026-07-27: fuel traced
+    the whole way through): while windows judge physics, the totals
+    answer "where did the session's fuel go" -- teleport drain, walk
+    drain, shot spend, pickup income -- as summed feasibility bounds.
+    """
+
+    count: int
+    lo_sum: int
+    hi_sum: int
+
+
 class FuelWindowVerdictDict(TypedDict):
     """Reconciliation result for one reading-to-reading window."""
 
@@ -87,6 +101,7 @@ class FuelBookDict(TypedDict):
     entries: list[FuelEntryDict]
     windows: int
     divergences: int
+    totals: dict[str, FuelKindTotalDict]
 
 
 def make_fuel_book() -> FuelBookDict:
@@ -103,6 +118,7 @@ def make_fuel_book() -> FuelBookDict:
         entries=[],
         windows=0,
         divergences=0,
+        totals={},
     )
 
 
@@ -165,6 +181,13 @@ def record_fuel_entry(*, book: FuelBookDict, kind: FuelEntryKind, lo: int, hi: i
             positive ceilings are open credits such as pickups).
     """
     book["entries"].append(FuelEntryDict(kind=kind, lo=lo, hi=hi))
+    total = book["totals"].get(kind)
+    if total is None:
+        book["totals"][kind] = FuelKindTotalDict(count=1, lo_sum=lo, hi_sum=hi)
+    else:
+        total["count"] += 1
+        total["lo_sum"] += lo
+        total["hi_sum"] += hi
 
 
 BLOCK_READING_CAP = 50
@@ -240,6 +263,7 @@ __all__ = [
     "FuelBookDict",
     "FuelEntryDict",
     "FuelEntryKind",
+    "FuelKindTotalDict",
     "FuelWindowVerdictDict",
     "make_fuel_book",
     "record_fuel_entry",

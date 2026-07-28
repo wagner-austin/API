@@ -36,6 +36,7 @@ from tankpit_bot.diagnostics.runs_index import (
     make_index_row,
 )
 from tankpit_bot.diagnostics.self_alignment import maybe_emit_self_alignment_sample
+from tankpit_bot.ledger.damage_book import resolve_dealt, summarize_side
 from tankpit_bot.ledger.decision import latest_decision_event_id, verify_outcome_invariant
 from tankpit_bot.ledger.events import ACTION_KINDS
 from tankpit_bot.ledger.mode_transition import emit_mode_transition
@@ -256,6 +257,16 @@ def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
         ai_mode=mode,
         ai_mode_state=mode_state,
         exit_reason=exit_reason,
+    )
+    damage_book = get_world_service().damage_book
+    fuel_totals = get_world_service().fuel_book["totals"]
+    emit_diagnostic(
+        diagnostic_kind="damage_ledger",
+        dealt=summarize_side(damage_book["dealt"]),
+        taken=summarize_side(damage_book["taken"]),
+        **{f"{kind}_count": total["count"] for kind, total in sorted(fuel_totals.items())},
+        **{f"{kind}_fuel_lo": total["lo_sum"] for kind, total in sorted(fuel_totals.items())},
+        **{f"{kind}_fuel_hi": total["hi_sum"] for kind, total in sorted(fuel_totals.items())},
     )
     shots = hits + misses + rejected
     hit_rate = f"{hits * 100 // shots}%" if shots > 0 else "n/a"
@@ -784,6 +795,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=on_intended,
             hit_signal="tile_occupied",
         )
+        resolve_dealt(get_world_service().damage_book, victim_id, target_name)
         _inc_hit()
         return "hit"
     if str(target_id) in bot._ai_state["killed_tank_ids"]:
@@ -795,6 +807,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="kill_confirmed",
         )
+        resolve_dealt(get_world_service().damage_book, target_id, target_name)
         _inc_hit()
         # Clear the shot-target fields directly: the trigger is
         # ``killed_tank_ids`` membership, which is not a consumable
@@ -824,6 +837,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
             on_intended_target=True,
             hit_signal="ammo_delta",
         )
+        resolve_dealt(get_world_service().damage_book, victim_id, target_name)
         _inc_hit()
         return "hit"
     if got_response:

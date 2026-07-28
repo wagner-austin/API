@@ -10,6 +10,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.facts.source import FactSource
+from tankpit_bot.ledger.damage_book import confirm_incoming_damage
 from tankpit_bot.ledger.fuel_book import record_fuel_entry, record_fuel_reading
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
@@ -49,6 +50,7 @@ def update_world_state_from_fuel_total(
         # every positive-residual divergence was an unentered gain).
         announced = fuel_total - ws.fuel_book["last_fuel"]
         record_fuel_entry(book=ws.fuel_book, kind="pickup", lo=announced, hi=announced)
+    confirm_incoming_damage(ws.damage_book, delta, ts)
     verdict = record_fuel_reading(book=ws.fuel_book, fuel_total=fuel_total)
     if verdict is not None and not verdict["balanced"]:
         emit_diagnostic(
