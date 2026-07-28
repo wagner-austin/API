@@ -115,7 +115,12 @@ collapsed 2026-06-24[^5]). The owner runs a single cascade per tick
    rule" — the original 2026-07-03 "100% clean viewport" contract was
    mis-implemented as a 100%-walkable hard filter that rejected 428
    of 622 dots and starved the cascade). The landing auto-pickup
-   makes each hop partially self-funding.
+   makes each hop partially self-funding — the server auto-picks a
+   fuel container when a teleport lands ON it or CARDINALLY ADJACENT
+   to it, no pickup command needed (user law 2026-07-27; corpus
+   check the same day: 62 of 82 teleport landings across runs
+   214102 + 211712 show the fuel gain arriving before any
+   pickup_fuel was sent).
    With an empty atlas (no map open yet this session) the hop
    dispatches ``map_open`` first, guarded by ``map_open_cooldown_ms``
    so a dotless map cannot loop. When no dot qualifies the owner ends

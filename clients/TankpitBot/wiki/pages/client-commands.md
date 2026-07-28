@@ -146,6 +146,21 @@ From the toolbar click handler and Cb function:[^2]
 | 9 | Equipment search (auto-target nearest equipment) | Uses Db() Manhattan search |
 | 14 | Ferry search (auto-target nearest ferry) | Uses Db() Manhattan search |
 
+## Long-press pickup gesture (decoded 2026-07-27)
+
+The human pickup gesture is a **press-and-hold >300 ms released on the
+same tile** (`bb` release handler, tpclient.js): the client checks the
+held tile and dispatches the matching action — obstacle → "PICK UP
+OBST." (action 7), tile ``cache > 0`` → "GET FUEL" (action 5), ``cache
+< 0`` → "GET EQUIPMENT" (action 6), deposit context → "DEPOSIT FUEL"
+(action 10). The long-press is UI disambiguation from movement only:
+the wire command is the same action code the bot already sends
+programmatically — there is no separate long-press command. Open
+question for a probe: whether the server honors an equipment pickup
+targeting the tank's OWN tile (the single 2026-06-21 sample failed
+silently; fuel needs no command at all on/adjacent to a landing —
+see [[fuel-system]]).
+
 ## Shoot Command Details
 
 The shoot command (Lb, code 's') is only sent when:[^2]
