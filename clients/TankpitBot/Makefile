@@ -36,6 +36,7 @@ help:
 	@Write-Host "  make radar-watch                 free-radar spawn watch (extras stay stocked)"
 	@Write-Host "  make density-probe               budgeted extra-radar density sweep (grid sites)"
 	@Write-Host "  make larder-probe                own-tile equipment pickup vs adjacent control"
+	@Write-Host "  make mine-landing-probe          teleport onto enemy mines, read the bill"
 	@Write-Host "  make viewport-probe              edge walks + boundary moves, autoscroll off/on"
 	@Write-Host "  make fuel-probe                  3 fuel pickups via 9 attempts"
 	@Write-Host "  make fuel-drill                  fill tank to 1100 (long-running)"
@@ -190,6 +191,11 @@ larder-probe: install
 	@Write-Host ""
 	@Write-Host "==> larder-probe (account; own-tile equipment pickup vs adjacent control)" -ForegroundColor Cyan
 	poetry run tankpit-larder-probe
+
+mine-landing-probe: install
+	@Write-Host ""
+	@Write-Host "==> mine-landing-probe (account; teleport onto enemy mines, read the bill)" -ForegroundColor Cyan
+	poetry run tankpit-mine-landing-probe
 
 viewport-probe: install
 	@Write-Host ""
