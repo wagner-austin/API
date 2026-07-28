@@ -13,7 +13,7 @@ source_paths:
   - "src/tankpit_bot/bot/ai"
 source_git_blobs:
   "src/tankpit_bot/state": "474b28f74ce32e4b0409d6694cfe8a1757c1b525"
-  "src/tankpit_bot/bot/ai": "0c634f50801e90ed253a379a7ffb014e9f41e606"
+  "src/tankpit_bot/bot/ai": "34de2bf3e33bf4fd01ac964742c34a4e0de373de"
 fact_checked: "2026-07-27"
 confidence: high
 hubs: [architecture]
@@ -21,11 +21,11 @@ hubs: [architecture]
 
 # Larder Plan — Harvesting Verified Containers the Bot Already Remembers
 
-**Status: GATE CLEARED — ready to implement** (design session +
-probe runs 2026-07-27). The own-tile equipment pickup is live-proven
-(§Probe gate, answered YES). The user attempted a version of this
-feature once before and removed it; the post-mortem of that attempt
-is a standing design input still wanted.[^1]
+**Status: IMPLEMENTED, live-proven** (gate cleared, built, and
+first live run all 2026-07-27; §Implementation). The user attempted
+a version of this feature once before and removed it; the
+post-mortem of that attempt is a standing design input still
+wanted.[^1]
 
 ## The observation
 
@@ -121,6 +121,25 @@ let an identical adjacent pickup credit, isolating the cap as the
 cause), so each attempt now burns one extra radar first for
 guaranteed headroom.[^5]
 
+## Implementation (2026-07-27)
+
+`bot/ai/larder.py` holds the fuel scorer (``select_fuel_larder_hop``:
+physics-only gates -- legal landing, reserve, net-positive gain --
+then argmax, re-run every tick). COLLECT's cascade gained step 5
+``_larder_harvest`` (equipment hop first, then fuel), moved AHEAD of
+forage/discovery; both hops hold a resource lock on their container
+(the landing tick dispatches the pickup directly, own-tile for
+equipment) and set ``suppress_landing_scan`` so the landing latches
+without a radar. Non-larder landings keep the unconditional
+2026-07-03 scan.[^6]
+
+First live proof (3-minute run `bot-20260727-234645`): 2 kills,
+25/25 hits, 0 rejections, exit ``session_complete`` at full stock;
+forage viewports 2.00/kill (vs 3.10 best / 7.70 worst pre-larder);
+6 radars total against 26 pickups and 8 teleports; equipment hops
+landed ON their containers and the own-tile pickups credited;
+"larder landing: latching without radar" on every harvest hop.[^6]
+
 ## Expected payoff
 
 Fuel restocks stop paying the discovery tax: known-stock stops at
@@ -133,4 +152,5 @@ gets harvested instead of rediscovered.[^2]
 [^2]: Forage economics: `tankpit-forage-economy` on runs bot-20260726-094309 vs bot-20260726-145124 (7.70 vs 3.10 viewports/kill, 2.14 vs 3.34 weapons/pickup); auto-pick corpus check 62/82 landings across runs bot-20260727-214102 + -211712.
 [^3]: Registry mechanics: `state/container_mutations.py` (radar upsert, 0x43 remaining-volume update/removal, code-4 purge path), `failed_pickups` blacklist consumed by `bot/ai/equipment_search.py`; coverage clock `state/scan_coverage.py` `FORAGE_COVERAGE_TTL_MS = 180000`.
 [^4]: Cascade order: `bot/ai/collect_mode.py` (in-viewport pickup steps precede hop steps); hunt-gate/lock independence per [[bot-behavior-contract]] §resume and never-drop rows; under-fire refuel doctrine from the 2026-07-27 guest post-mortem (wiki/log.md).
+[^6]: Code: `src/tankpit_bot/bot/ai/larder.py` (scorer + FuelLarderSelectionDict), `collect_mode.py` (`_larder_harvest`, `_hop_toward_fuel_larder`, suppress-aware `_scan_on_landing_decision`), `types.py` `suppress_landing_scan` field; run artifacts `runs/bot/bot-20260727-234645.*`; forage-economy output recorded in wiki/log.md (2026-07-27 larder implementation entry) against baselines bot-20260726-145124 (3.10) and bot-20260726-094309 (7.70).
 [^5]: Probe artifacts on disk: `runs/probe/larder-20260727-224933.json` (water-sitting candidates, 0 trials), `-225643.json` (own-tile 0/2 + adjacent control 1, all-capped inventory, code-7 receipts in the paired `.log`), `-230858.json` (own-tile 3/3, no errors) with matching `.capture_session.json` wire evidence; historical own-tile sample capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6) superseded by the deliberate trials; long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture); code-7 string table [[decode-coverage]] §Supervisor error codes.
