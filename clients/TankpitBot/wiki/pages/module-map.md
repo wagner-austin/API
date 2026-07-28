@@ -7,7 +7,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "1f7318f7195b6a447ba355c1e26a8e1c410c493d"
+  "src/tankpit_bot": "38e2f90dc5e5f7ad01477e0ee542ed6b1c4343f6"
 fact_checked: "2026-07-25"
 confidence: high
 hubs: [codebase]
@@ -33,7 +33,7 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `physics/` | The game's measured laws, one symbol per machine-checked wiki claim | `costs.py`, `capacity.py`, `damage.py`, `combat.py`, `map.py` (see [[physics-module-roadmap]] Phase 1) |
 | `sim/` | The server twin — laws, world, transport, practice room | `server.py` (routing/orchestration), `viewport_window.py` (stored 0x5A window + patch memory + visibility), `combat_emissions.py` (shots, mercy bundle, deferred debits, corpse windows), `emissions.py` (per-command wire emission), `wire_statements.py` (pure builders), `world.py` + `world_seed.py` (static population + mined layouts), `bot_policy.py` + `practice_room.py` (certified bot minds), `opponent.py` (scripted harness) |
 | `validate/` | Archive-priced law validators — `make audit` / `make shadow` / roundtrip | `audit.py`, `shadow*.py`, `roundtrip.py`, `wire_timeline.py` |
-| `ledger/` | Live physics bookkeeping — fuel and ammo books, divergence verdicts | `fuel_book.py`, `ammo_book.py` |
+| `ledger/` | Live physics bookkeeping — fuel, ammo, and per-enemy damage books, divergence verdicts | `fuel_book.py` (windows + per-kind session totals), `ammo_book.py`, `damage_book.py` (dealt/taken per enemy by weapon) |
 | `service/` | The phone-driven bot service — aiohttp + SSE around the tick loop | `http_server.py`, `session_runner.py`, `mode_bridge.py`, `status_bus.py` |
 
 ## Support modules (top-level, not packages)
