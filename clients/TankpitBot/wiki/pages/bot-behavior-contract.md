@@ -213,14 +213,13 @@ These behaviors exist in the code but lack a verified contract entry (one except
 - Bridge-build vs obstacle-drop decision (carrying state) — correction 2026-07-23: NOT in code at all; the bot has no block state tracking or planner awareness ([[movable-blocks]] open work)
 - Teleport-target selection (heuristic)
 - Self-rank promotion handling (0x2B reception)
-- PvP doctrine remainder (planned, not built — the damage-aware break
-  and under-fire larder refuel SHIPPED 2026-07-28, see §3.3): the
-  **ring-2 stand-off vs a known miner** — a fresh 3x3 placement mines
-  all 8 tiles around the placer ([[mine-mechanics]]), so an approach
-  teleport aimed at the enemy's own tile hands the server 8 mined
-  displacement landings; aim at Chebyshev-2 instead and shoot from
-  there. Gated on the teleport-onto-mine open question
-  ([[mine-mechanics]] §not-covered).
+- ~~PvP doctrine ring-2 stand-off~~ **RESOLVED 2026-07-28, no code
+  needed**: the mine-landing probe proved teleport landings DISPLACE
+  off mine tiles (3/3, zero bill, [[mine-mechanics]] §Teleport
+  landings displace off mines), so aiming at a mine-ringed enemy is
+  already self-protecting — the landing can never touch the ring.
+  The damage-aware break and under-fire larder refuel shipped the
+  same day (§3.3), closing the whole 2026-07-27 PvP doctrine list.
 
 When you add tests for these, also add a contract row here. The contract grows with the test suite, under the coverage and no-mocks discipline in [[coding-standards]].
 

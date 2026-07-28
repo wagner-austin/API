@@ -9,8 +9,8 @@ related:
 source_paths:
   - "src/tankpit_bot/action_lab"
 source_git_blobs:
-  "src/tankpit_bot/action_lab": "695491f54d7b51820e4873fdd1eaac4cdc3a2cf6"
-fact_checked: "2026-07-27"
+  "src/tankpit_bot/action_lab": "a842c6aae184a2ffa5fd6f2f013f1735a53581d8"
+fact_checked: "2026-07-28"
 confidence: high
 hubs: [codebase]
 ---
@@ -81,7 +81,7 @@ make check          # lint + test + coverage
 make my-probe       # live run
 ```
 
-## Existing probes (10 types)
+## Existing probes (11 types)
 
 | Probe | File | What it tests |
 |-------|------|--------------|
@@ -93,6 +93,7 @@ make my-probe       # live run
 | Fuel | `fuel_probe.py` | Fuel container pickup |
 | Equipment | `equipment_probe.py` | Equipment container pickup |
 | Larder | `larder_probe.py` | Own-tile equipment pickup vs adjacent control (subclasses DensityProbe for funded hops + extras etiquette; settled the larder-plan gate) |
+| Mine landing | `mine_landing_probe.py` | Teleport aimed AT enemy mines: displacement vs detonation vs coexist (settled the ring-2 doctrine gate: displaces, 3/3) |
 | Movement | `movement_probe.py` | Walking to targets |
 | Queue | `queue_probe.py` | Multi-command server batching |
 

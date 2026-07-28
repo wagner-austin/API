@@ -69,6 +69,25 @@ never eat more than one mine hit** (45 fuel, [[game-economy]]
 walking-into-a-mine row) — a tank crossing a dense field pays one
 mine per movement command, not a chain.[^6]
 
+## Teleport landings displace off mines (live-proven 2026-07-28)
+
+A teleport aimed AT a mined tile never lands on it: the server
+displaces the tank to an adjacent tile, charges only the pure
+teleport cost, and the mine survives. User law (verbatim: "it
+displaces you"), wire-confirmed the same day by the mine-landing
+probe (`make mine-landing-probe`, run `mine-landing-20260728-161432`):
+3/3 teleports aimed dead-on at enemy mines landed exactly one tile
+beside them, `extra_loss = 0` on every attempt, all three mines
+intact in the registry afterward. Mine tiles join occupied tiles in
+the displacement-excluded set.[^7]
+
+Doctrine consequence ([[bot-behavior-contract]] §6, ring-2 item
+RESOLVED): aiming an approach teleport at a mine-ringed enemy is
+self-protecting -- the landing can never touch the ring -- so no
+aim change is needed against miners. The ring's only remaining
+threat is walking through it (one 45-fuel hit per movement,
+walk-over law above).
+
 ## Cascade detonation
 
 When a mine is hit by a NON-movement source (a shot, an adjacent placement, another mine's blast — walk-over is excluded, see above), the server detonates that mine **and every directly-adjacent mine in the same wire tick**. The cascade is broadcast as up to two `0x45` MineDetonation packets:[^5]
@@ -108,6 +127,7 @@ The detonation removes the enemy mines; the placement does not re-add friendly m
 [^2]: user (Austin) 2026-06-20 mechanic spec (the "user-supplied mechanic spec" this page is grounded in); the non-refill is wire-visible in the same-tick `0x4B`+`0x45` pair — detonated tiles are absent from the placement payload — locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_on_mine_destruction_real_capture` (line 264, verified 2026-07-23).
 [^3]: decoder truth on disk: `src/tankpit_bot/container/decoders/mines.py` (`decode_mine_placement`); byte-length fixtures `MINE_PLACEMENT_15`/`MINE_PLACEMENT_19` exercised in `tests/container/test_mines.py:37/:56`; JS sender `Dg` in `tpclient.js` (blob-pinned in frontmatter).
 [^4]: commit `59a097e1` (2026-06-20, "Multi-record ContainerPickup + dispatch-layer pickup dedup") introduced the variable-length `MINE_PLACEMENT_19` fixture and the count-driven decode — the `len == 15` hardcode and its removal are both visible in that commit's diff in git history. "Task #79" was the session-internal tracker id, kept as a historical label only.
+[^7]: probe artifacts on disk: `runs/probe/mine-landing-20260728-161432.json` (three attempts: aim (131,124)→land (132,124), aim (146,93)→land (147,93), aim (145,93)→land (145,92); each `extra_loss: 0`, `mine_survived: true`) with paired `.log` + `.capture_session.json`; probe source `src/tankpit_bot/action_lab/mine_landing_probe.py`; user law (Austin, 2026-07-28, verbatim): "it displaces you".
 [^6]: user (Austin), 2026-07-28, verbatim: "mines explode on walk over and its only the mine occupying the tike you walk on that explodes and your kovement is stopped. so you cant get hit hy more than one mine at a single time" — domain law, correcting the assistant's cascade-on-walk misreading of the shot-triggered chain samples; consistent with the wire-verified 45-fuel walk-into-mine sample ([[game-economy]] t+373.35s row) and the 50-kill run's mine deaths booking single hits.
 [^5]: cascade wire samples on disk: `runs/bot/practice-vs-real-20260620-150138.capture_session.json` t+62.15s (1+6 two-packet chain) and `runs/sniff/sniff-20260721-212348.capture_session.json` t+173.91 (1+3 chain, user-counted on screen — the frontmatter `verified:` field records this re-confirmation); dispatch semantics locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` (line 350, verified 2026-07-23).
 
@@ -124,6 +144,6 @@ These follow from the mechanics above; see [[bot-behavior-contract]] §3 for the
 ## What this section does NOT cover yet
 
 - Mine team-decode in `0x4B`: the `mine_type` byte (`data[1]`) and the relationship between `mine_type` and team are observed but not yet cracked from JS. See [[v-table-complete]].
-- **Teleport landing on a mined tile**: walk-over is measured (single mine, movement stops), but whether a teleport LANDING on a mine detonates it — or coexists until the tank next moves — has never been observed. Probe-able in the practice room (place mines, teleport onto one, read the wire). This gates the ring-2 stand-off aim rule ([[bot-behavior-contract]] §6 PvP doctrine), since displacement off a ringed enemy lands on mined tiles.
+- ~~Teleport landing on a mined tile~~ **ANSWERED 2026-07-28**: see §Teleport landings displace off mines above.
 - Damage delivered by mine vs shot. The shoot-event format covers shots; mines drop straight to `0x41` Deactivation as `is_mine_kill=true`.
 - Detection range and effectiveness of mines vs different vehicle classes. Out of scope -- bot doesn't expose vehicle class.
