@@ -11,7 +11,7 @@ source_paths:
   - "tpclient.js"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
-fact_checked: "2026-06-20"
+fact_checked: "2026-07-28"
 confidence: high
 verified: 2026-07-21 (cascade re-confirmed in manual capture sniff-20260721-212348; original 2026-06-20 real-combat capture matched the documented mechanic byte-for-byte)
 hubs: [combat]
@@ -59,9 +59,19 @@ Total length is `5 + count * 2` bytes; `count` varies from 1 (only one of the 9 
 
 The prior decoder hardcoded `len == 15`; every other length silently dropped to `unknown_container`. Fixed 2026-06-20 via task #79.[^4]
 
+## Walk-over detonation: single mine, movement stops
+
+Stepping onto a mined tile detonates **only the mine occupying that
+tile**, and the movement is stopped there — the walk does not
+continue through the field, and the walk-over does NOT trigger the
+adjacent-mine cascade below. Consequence: **a single movement can
+never eat more than one mine hit** (45 fuel, [[game-economy]]
+walking-into-a-mine row) — a tank crossing a dense field pays one
+mine per movement command, not a chain.[^6]
+
 ## Cascade detonation
 
-When a mine is hit by any source (a shot, an adjacent placement, another mine's blast), the server detonates that mine **and every directly-adjacent mine in the same wire tick**. The cascade is broadcast as up to two `0x45` MineDetonation packets:[^5]
+When a mine is hit by a NON-movement source (a shot, an adjacent placement, another mine's blast — walk-over is excluded, see above), the server detonates that mine **and every directly-adjacent mine in the same wire tick**. The cascade is broadcast as up to two `0x45` MineDetonation packets:[^5]
 
 1. First packet: the directly-triggered mine.
 2. Second packet (if any neighbours existed): every adjacent mine destroyed by the chain.
@@ -98,6 +108,7 @@ The detonation removes the enemy mines; the placement does not re-add friendly m
 [^2]: user (Austin) 2026-06-20 mechanic spec (the "user-supplied mechanic spec" this page is grounded in); the non-refill is wire-visible in the same-tick `0x4B`+`0x45` pair — detonated tiles are absent from the placement payload — locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_on_mine_destruction_real_capture` (line 264, verified 2026-07-23).
 [^3]: decoder truth on disk: `src/tankpit_bot/container/decoders/mines.py` (`decode_mine_placement`); byte-length fixtures `MINE_PLACEMENT_15`/`MINE_PLACEMENT_19` exercised in `tests/container/test_mines.py:37/:56`; JS sender `Dg` in `tpclient.js` (blob-pinned in frontmatter).
 [^4]: commit `59a097e1` (2026-06-20, "Multi-record ContainerPickup + dispatch-layer pickup dedup") introduced the variable-length `MINE_PLACEMENT_19` fixture and the count-driven decode — the `len == 15` hardcode and its removal are both visible in that commit's diff in git history. "Task #79" was the session-internal tracker id, kept as a historical label only.
+[^6]: user (Austin), 2026-07-28, verbatim: "mines explode on walk over and its only the mine occupying the tike you walk on that explodes and your kovement is stopped. so you cant get hit hy more than one mine at a single time" — domain law, correcting the assistant's cascade-on-walk misreading of the shot-triggered chain samples; consistent with the wire-verified 45-fuel walk-into-mine sample ([[game-economy]] t+373.35s row) and the 50-kill run's mine deaths booking single hits.
 [^5]: cascade wire samples on disk: `runs/bot/practice-vs-real-20260620-150138.capture_session.json` t+62.15s (1+6 two-packet chain) and `runs/sniff/sniff-20260721-212348.capture_session.json` t+173.91 (1+3 chain, user-counted on screen — the frontmatter `verified:` field records this re-confirmation); dispatch semantics locked by `tests/sniffer/test_world_state_dispatch_tank.py::test_mine_cascade_two_packet_chain_real_capture` (line 350, verified 2026-07-23).
 
 ## Strategic implications for the bot
