@@ -9,6 +9,7 @@ from tankpit_bot.ledger.damage_book import (
     IncomingShotContract,
     OwnShotEchoContract,
     confirm_incoming_damage,
+    incoming_damage_window,
     make_damage_book,
     record_incoming_shot,
     record_own_shot_echo,
@@ -30,6 +31,7 @@ def test_make_damage_book_is_empty() -> None:
     assert book["taken"] == {}
     assert book["pending_dealt_weapon"] == -1
     assert book["pending_incoming"] == []
+    assert book["confirmed_incoming"] == []
 
 
 def test_resolve_dealt_charges_each_weapon_at_its_victim_cost() -> None:
@@ -122,6 +124,40 @@ def test_confirm_incoming_damage_ignores_positive_deltas() -> None:
     confirm_incoming_damage(book, 900, 2000)
     assert book["taken"]["2627"]["fuel"] == 0
     assert len(book["pending_incoming"]) == 1
+
+
+def test_confirmed_hits_are_timestamped_for_the_rate_window() -> None:
+    """Each fuel-confirmed hit lands in the window log at its confirm time."""
+    book = make_damage_book()
+    record_incoming_shot(book, 2627, "guest", 1, 1000)
+    record_incoming_shot(book, 2627, "guest", 3, 1000)
+    confirm_incoming_damage(book, -(DUAL_HIT_VICTIM_COST + HOMING_HIT_VICTIM_COST), 2000)
+    assert book["confirmed_incoming"] == [
+        {"timestamp_ms": 2000, "cost": DUAL_HIT_VICTIM_COST},
+        {"timestamp_ms": 2000, "cost": HOMING_HIT_VICTIM_COST},
+    ]
+
+
+def test_incoming_damage_window_counts_and_prunes() -> None:
+    """The window sums only in-window hits and prunes the stale tail."""
+    book = make_damage_book()
+    for confirm_ms in (1000, 5000, 12000):
+        record_incoming_shot(book, 2627, "guest", 3, confirm_ms - 500)
+        confirm_incoming_damage(book, -HOMING_HIT_VICTIM_COST, confirm_ms)
+    hits, fuel = incoming_damage_window(book, 13000, 10000)
+    assert (hits, fuel) == (2, 2 * HOMING_HIT_VICTIM_COST)
+    assert len(book["confirmed_incoming"]) == 2
+    hits, fuel = incoming_damage_window(book, 30000, 10000)
+    assert (hits, fuel) == (0, 0)
+    assert book["confirmed_incoming"] == []
+
+
+def test_unconfirmed_shots_never_enter_the_rate_window() -> None:
+    """A counted-but-unconfirmed shot cannot inflate the break rate."""
+    book = make_damage_book()
+    record_incoming_shot(book, 2627, "guest", 1, 1000)
+    confirm_incoming_damage(book, 900, 2000)
+    assert incoming_damage_window(book, 2000, 10000) == (0, 0)
 
 
 def test_summarize_side_renders_rows_and_empty() -> None:

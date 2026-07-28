@@ -119,6 +119,24 @@ def is_move_target_failed(x: int, y: int, now_ms: int) -> bool:
     return _service.is_move_target_failed(x, y, now_ms)
 
 
+def get_incoming_damage_window(now_ms: int, window_ms: int) -> tuple[int, int]:
+    """Return fuel-confirmed incoming (hits, fuel) in the trailing window.
+
+    The damage-aware engagement break's rate instrument -- reads the
+    session damage book ([[bot-behavior-contract]] §3.3).
+
+    Args:
+        now_ms: Current wall-clock ms.
+        window_ms: Trailing window length in ms.
+
+    Returns:
+        ``(hits, fuel)`` confirmed within the window.
+    """
+    from tankpit_bot.ledger.damage_book import incoming_damage_window
+
+    return incoming_damage_window(_service.damage_book, now_ms, window_ms)
+
+
 def mark_scan_viewport_failed(viewport_left: int, viewport_top: int, timestamp_ms: int) -> None:
     """Record a viewport whose radar scan stalled and timed out.
 
@@ -146,6 +164,7 @@ def is_scan_viewport_failed(viewport_left: int, viewport_top: int, now_ms: int) 
 
 __all__ = [
     "check_and_clear_radar_scan_complete",
+    "get_incoming_damage_window",
     "get_terrain_map",
     "get_world_service",
     "get_world_state",

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_break import (
+    INCOMING_RATE_WINDOW_MS,
+    assess_engagement_break,
+)
 from tankpit_bot.bot.ai.combat_strategy import (
     clear_combat_target,
     close_target,
@@ -38,6 +42,7 @@ from tankpit_bot.bot.types import (
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.sniffer.world_state import get_incoming_damage_window
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -651,13 +656,71 @@ def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
     if target is not None:
+        broken = _break_losing_engagement(ctx, target)
+        if broken is not None:
+            return broken
         if has_cardinal_combat_shot(ctx.self_state, target):
             return engage_target(ctx, target)
         return close_target(ctx, target)
     pursuit = _locked_target_pursuit(ctx)
     if pursuit is not None:
+        broken = _break_losing_engagement(ctx, pursuit)
+        if broken is not None:
+            return broken
         return _resume_locked_target_off_viewport(ctx, pursuit)
     return _enter_confirm_kill(ctx)
+
+
+def _break_losing_engagement(
+    ctx: DecideCtx,
+    target: EnemyThreatDict,
+) -> TickDecisionDict | None:
+    """Break the fight when finishing it is projected to strand the tank.
+
+    The damage-aware break ([[bot-behavior-contract]] §3.3, built after
+    run bot-20260728-075336 lost 1050→108 fuel in 30 s of two-attacker
+    fire): the measured incoming rate and the target's remaining health
+    project the fuel at kill completion; when that projection falls
+    below the escape floor the tick delegates to ``refuel_for_hunt``
+    -- the lock survives (never-drop) and COLLECT's larder step aims
+    the escape at known fuel. A near-death target projects cheap and
+    is finished first; a quiet fight (rate 0) never breaks here.
+
+    Args:
+        ctx: Decision context.
+        target: The engaged (or pursued) enemy.
+
+    Returns:
+        The lock-held refuel delegation, or ``None`` to keep fighting.
+    """
+    hits, fuel_lost = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+    assessment = assess_engagement_break(ctx, target, hits, fuel_lost)
+    if not assessment["break_engagement"]:
+        return None
+    emit_ai(
+        "breaking engagement with %s: projected fuel %d at kill < floor %d "
+        "(incoming %d/tick over %d hits, %d hits to kill, fuel=%d)",
+        target["name"],
+        assessment["projected_fuel_at_kill"],
+        assessment["escape_floor"],
+        assessment["incoming_rate_per_tick"],
+        assessment["hits_in_window"],
+        assessment["hits_to_kill"],
+        ctx.fuel,
+    )
+    emit_diagnostic(
+        diagnostic_kind="engagement_break",
+        target_id=target["tank_id"],
+        target_name=target["name"],
+        fuel=ctx.fuel,
+        hits_in_window=assessment["hits_in_window"],
+        incoming_fuel_in_window=assessment["incoming_fuel_in_window"],
+        incoming_rate_per_tick=assessment["incoming_rate_per_tick"],
+        hits_to_kill=assessment["hits_to_kill"],
+        projected_fuel_at_kill=assessment["projected_fuel_at_kill"],
+        escape_floor=assessment["escape_floor"],
+    )
+    return refuel_for_hunt(ctx, target)
 
 
 def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:

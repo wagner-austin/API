@@ -85,6 +85,13 @@ class PendingIncomingDict(TypedDict):
     deadline_ms: int
 
 
+class ConfirmedIncomingDict(TypedDict):
+    """One fuel-confirmed incoming hit, timestamped for rate windows."""
+
+    timestamp_ms: int
+    cost: int
+
+
 class DamageBookDict(TypedDict):
     """The two-sided per-enemy damage ledger.
 
@@ -95,12 +102,16 @@ class DamageBookDict(TypedDict):
         pending_dealt_weapon: Weapon byte of the last own shot echo,
             or ``-1`` when no shot awaits resolution.
         pending_incoming: Incoming shots not yet fuel-confirmed.
+        confirmed_incoming: Recent fuel-confirmed hits, oldest first.
+            Feeds the damage-aware engagement break's incoming-rate
+            window; pruned to the window on every read.
     """
 
     dealt: dict[str, EnemyDamageSideDict]
     taken: dict[str, EnemyDamageSideDict]
     pending_dealt_weapon: int
     pending_incoming: list[PendingIncomingDict]
+    confirmed_incoming: list[ConfirmedIncomingDict]
 
 
 def make_damage_book() -> DamageBookDict:
@@ -114,6 +125,7 @@ def make_damage_book() -> DamageBookDict:
         taken={},
         pending_dealt_weapon=_NO_PENDING_WEAPON,
         pending_incoming=[],
+        confirmed_incoming=[],
     )
 
 
@@ -323,9 +335,41 @@ def confirm_incoming_damage(book: DamageBookDict, fuel_delta: int, now_ms: int) 
             budget -= pending["cost"]
             key = str(pending["shooter_id"])
             book["taken"][key]["fuel"] += pending["cost"]
+            book["confirmed_incoming"].append(
+                ConfirmedIncomingDict(timestamp_ms=now_ms, cost=pending["cost"])
+            )
         else:
             remaining.append(pending)
     book["pending_incoming"] = remaining
+
+
+def incoming_damage_window(
+    book: DamageBookDict,
+    now_ms: int,
+    window_ms: int,
+) -> tuple[int, int]:
+    """Return confirmed incoming (hits, fuel) inside the trailing window.
+
+    The instrument behind the damage-aware engagement break: only
+    fuel-CONFIRMED hits count (a counted-but-unconfirmed shot never
+    inflates the rate), and the log is pruned to the window on every
+    read so it cannot grow unbounded.
+
+    Args:
+        book: The damage book.
+        now_ms: Current wall-clock ms.
+        window_ms: Trailing window length in ms.
+
+    Returns:
+        ``(hits, fuel)`` confirmed within ``[now_ms - window_ms, now_ms]``.
+    """
+    floor = now_ms - window_ms
+    book["confirmed_incoming"] = [
+        hit for hit in book["confirmed_incoming"] if hit["timestamp_ms"] >= floor
+    ]
+    hits = len(book["confirmed_incoming"])
+    fuel = sum(hit["cost"] for hit in book["confirmed_incoming"])
+    return hits, fuel
 
 
 def summarize_side(ledger: dict[str, EnemyDamageSideDict]) -> str:
@@ -355,12 +399,14 @@ def summarize_side(ledger: dict[str, EnemyDamageSideDict]) -> str:
 
 
 __all__ = [
+    "ConfirmedIncomingDict",
     "DamageBookDict",
     "EnemyDamageSideDict",
     "IncomingShotContract",
     "OwnShotEchoContract",
     "PendingIncomingDict",
     "confirm_incoming_damage",
+    "incoming_damage_window",
     "make_damage_book",
     "record_incoming_shot",
     "record_own_shot_echo",
