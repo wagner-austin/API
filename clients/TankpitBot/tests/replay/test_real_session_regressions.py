@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.replay.engine import replay_session
 from tankpit_bot.sniffer.viewport import reset_viewport_tracking
 from tankpit_bot.sniffer.world_state import reset_world_state
@@ -95,36 +94,42 @@ def test_missing_replay_fixture_path_raises() -> None:
     assert Path(str(exc_info.value)).name == "missing.capture_session.json"
 
 
-def test_fuel_radar_loop_replays_known_bad_behavior() -> None:
-    """Replay hits the marooned-no-decision path under the new fuel cascade.
+def test_fuel_radar_loop_replays_as_a_walk_rescue() -> None:
+    """The marooned tank now walks toward known fuel instead of raising.
 
-    Pre-2026-06-22 the fuel-dot atlas shortcut the cascade and the
-    forage walk picker walked one tile at a time. With dots removed
-    AND the walk picker retargeted to maximise free-radar coverage
-    (~5 tiles per walk), the bot burns through this fixture's fuel
-    faster than the recorded policy did and lands marooned at fuel=0
-    by tick ~34. With no Strict / Sense / Hop available the durable
-    COLLECT owner raises rather than idle silently.
+    Pre-2026-06-22 the fuel-dot atlas shortcut the cascade; the walk
+    picker then burned this fixture's fuel and the marooned tank
+    raised ``out_of_fuel``. Under the 2026-07-28 walk-for-fuel last
+    resort the same wire input keeps producing decisions: once broke,
+    every remaining tick is a ``walk_for_fuel`` leg toward the atlas
+    (known fuel sat well inside the 48-tile cap when the old exit
+    fired).
     """
     session = load_capture_fixture("fuel_radar_loop.capture_session.json")
 
-    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
-        replay_session(session)
+    result = replay_session(session)
+
+    walk_ticks = [t for t in result["traces"] if t["behavior_reason"].startswith("walk_for_fuel")]
+    assert walk_ticks
+    assert all(t["command_type"] == "move" for t in walk_ticks)
 
 
-def test_equipment_then_fuel_loop_replays_known_bad_behavior() -> None:
-    """Replay reproduces the boxed-in stranding under the walk-only contract.
+def test_equipment_then_fuel_loop_replays_as_a_walk_rescue() -> None:
+    """The boxed-in stranding now resolves to walk-for-fuel legs.
 
-    User contract (2026-06-26) removed teleport-to-container entirely.
-    This fixture's bot reaches fuel=78 surrounded by water-locked
-    containers; no walk-reachable target exists and the search-hop
-    is unaffordable. The COLLECT owner raises rather than dispatch
-    a pickup the server cannot fulfill.
+    User contract (2026-06-26) removed teleport-to-container entirely;
+    this fixture's bot reaches fuel=78 surrounded by water-locked
+    containers and previously raised. The 2026-07-28 last resort walks
+    toward the nearest passable known fuel instead (the live shape:
+    runs bot-20260728-090813/-091209/-092357).
     """
     session = load_capture_fixture("equipment_then_fuel_loop.capture_session.json")
 
-    with pytest.raises(SessionExitError, match="COLLECT owner produced no decision"):
-        replay_session(session)
+    result = replay_session(session)
+
+    walk_ticks = [t for t in result["traces"] if t["behavior_reason"].startswith("walk_for_fuel")]
+    assert walk_ticks
+    assert all(t["command_type"] == "move" for t in walk_ticks)
 
 
 def test_viewport_enemy_shoot_rejection_loop_replays_as_a_restock() -> None:

@@ -345,44 +345,52 @@ def _walk_for_fuel_last_resort(
         candidates.append(
             (abs(container["x"] - sx) + abs(container["y"] - sy), container["x"], container["y"])
         )
-    reachable = [c for c in candidates if 0 < c[0] <= _WALK_FOR_FUEL_MAX_TILES]
-    if not reachable:
-        return None
-    _, target_x, target_y = min(reachable)
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    leg_x = min(max(target_x, left), right)
-    leg_y = min(max(target_y, top), bottom)
-    if (leg_x, leg_y) == (sx, sy):
-        return None
-    command = walk_or_teleport(ctx, leg_x, leg_y, pickup_kind=None)
-    if command is None or command["cmd_type"] != "move":
-        return None
-    emit_ai(
-        "marooned at fuel %d: walking leg (%d,%d) toward known fuel at (%d,%d)",
-        ctx.fuel,
-        leg_x,
-        leg_y,
-        target_x,
-        target_y,
-    )
-    emit_diagnostic(
-        diagnostic_kind="walk_for_fuel",
-        target_x=target_x,
-        target_y=target_y,
-        leg_x=leg_x,
-        leg_y=leg_y,
-        fuel=ctx.fuel,
-    )
-    return make_decision(
-        command,
-        "COLLECT",
-        _COLLECT_SCORE,
-        leg_x,
-        leg_y,
-        "walk_for_fuel",
-        clear_resource_target(base_state),
-        ctx.equip,
-    )
+    # Nearest-first over EVERY candidate inside the cap: in a shore
+    # corner the closest entries are water-locked containers whose leg
+    # resolves to a teleport fallback, not a walk (run
+    # bot-20260728-092357 gave up after trying only the nearest and
+    # exited with dots in walking range further down the list).
+    for _, target_x, target_y in sorted(
+        c for c in candidates if 0 < c[0] <= _WALK_FOR_FUEL_MAX_TILES
+    ):
+        terrain = ctx.terrain
+        if terrain is not None and not terrain.is_passable(target_x, target_y):
+            continue
+        leg_x = min(max(target_x, left), right)
+        leg_y = min(max(target_y, top), bottom)
+        if (leg_x, leg_y) == (sx, sy):
+            continue
+        command = walk_or_teleport(ctx, leg_x, leg_y, pickup_kind=None)
+        if command is None or command["cmd_type"] != "move":
+            continue
+        emit_ai(
+            "marooned at fuel %d: walking leg (%d,%d) toward known fuel at (%d,%d)",
+            ctx.fuel,
+            leg_x,
+            leg_y,
+            target_x,
+            target_y,
+        )
+        emit_diagnostic(
+            diagnostic_kind="walk_for_fuel",
+            target_x=target_x,
+            target_y=target_y,
+            leg_x=leg_x,
+            leg_y=leg_y,
+            fuel=ctx.fuel,
+        )
+        return make_decision(
+            command,
+            "COLLECT",
+            _COLLECT_SCORE,
+            leg_x,
+            leg_y,
+            "walk_for_fuel",
+            clear_resource_target(base_state),
+            ctx.equip,
+        )
+    return None
 
 
 def _scan_on_landing_decision(

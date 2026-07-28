@@ -209,6 +209,53 @@ def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
         decide_collect_mode(ctx)
 
 
+def test_walk_skips_a_water_locked_nearer_candidate() -> None:
+    """The run bot-20260728-092357 shape: nearest fuel is on water.
+
+    The water-sitting container at (110,100) is closer but cannot be
+    stood on; the walk falls through to the farther land dot instead
+    of giving up.
+    """
+    containers = {
+        "110,100": make_container_state(
+            x=110,
+            y=100,
+            is_fuel=True,
+            volume=200,
+            timestamp_ms=100000,
+        )
+    }
+    world, self_state = make_world(fuel=88, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99000,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap({(110, 100): "W"}),
+        "",
+        ((120, 115),),
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected walk-for-fuel decision")
+    assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
+    assert decision["command"]["cmd_type"] == "move"
+    assert decision["command"]["target_x"] == 107
+    assert decision["command"]["target_y"] == 107
+
+
 def test_healthy_tank_never_reaches_the_walk_rung() -> None:
     """Above the fuel-low break the affordable dot hop wins, never the walk."""
     decision = decide_collect_mode(_marooned_ctx(fuel=1100, map_fuel_dots=((130, 100),)))
