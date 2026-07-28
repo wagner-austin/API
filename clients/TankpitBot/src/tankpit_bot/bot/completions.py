@@ -234,7 +234,13 @@ class CompletionsMixin(SessionBase):
             action = self._state_data["in_flight_action"]
             tx, ty = action["target_x"], action["target_y"]
             if self_state["x"] != tx or self_state["y"] != ty:
-                dist = abs(self_state["x"] - tx) + abs(self_state["y"] - ty)
+                # Chebyshev, not Manhattan: the server's occupied-tile
+                # displacement can land on any of the 8 neighbors, and a
+                # diagonal bump is Chebyshev 1 but Manhattan 2. The old
+                # Manhattan test misfiled clean diagonal landings beside
+                # an aimed enemy as failures, blacklisting a live
+                # target's tile (orange-6, 20-kill run 2026-07-27).
+                dist = max(abs(self_state["x"] - tx), abs(self_state["y"] - ty))
                 world = get_world_service().world_state
                 enemy_on_tile = any(t["x"] == tx and t["y"] == ty for t in world["tanks"].values())
                 if dist > 1 or not enemy_on_tile:
