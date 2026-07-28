@@ -811,7 +811,14 @@ def _select_and_pickup_fuel(
     container, command = selection
     target_x = container["x"]
     target_y = container["y"]
-    if _pickup_not_worth_walk(ctx, container):
+    # The worth-the-walk rate predicate is an EFFICIENCY rule for a
+    # healthy tank; below the fuel-low break the alternative to a
+    # "wasteful" walk is the out_of_fuel exit, so any reachable fuel
+    # is taken (run bot-20260728-090813: exited at fuel 98 with a
+    # pickable 39-fuel container two tiles away, refused as
+    # "not worth 2-tile walk").
+    fuel_critical = ctx.fuel <= ctx.config["fuel_low_threshold"]
+    if not fuel_critical and _pickup_not_worth_walk(ctx, container):
         cap = fuel_capacity(ctx.self_state["rank"])
         walk_tiles = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
         emit_ai(

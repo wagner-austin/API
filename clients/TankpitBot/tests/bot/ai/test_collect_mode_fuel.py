@@ -815,6 +815,53 @@ def test_unclamped_pickup_is_worth_it_at_the_exact_rate_boundary() -> None:
     assert _pickup_not_worth_walk(ctx, container) is False
 
 
+def test_critical_fuel_takes_any_reachable_sliver() -> None:
+    """Below the fuel-low break the worth-the-walk rule is suspended.
+
+    Run bot-20260728-090813 exited ``out_of_fuel`` at fuel 98 with a
+    pickable 39-fuel container two tiles away, refused by the rate
+    predicate as "not worth 2-tile walk". The predicate is efficiency
+    logic for a healthy tank; at critical fuel the alternative to the
+    walk is ending the session, so any reachable fuel dispatches.
+    """
+
+    base_world, base_self = make_world(
+        fuel=98,
+        scanned=True,
+        containers={
+            "102,100": make_container_state(
+                x=102,
+                y=100,
+                is_fuel=True,
+                volume=39,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    self_state = SelfStateDict(**{**base_self, "rank": 1})
+    world = base_world
+    world["self_state"] = self_state
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = _select_and_pickup_fuel(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected critical-fuel pickup decision")
+    assert decision["command"]["cmd_type"] == "pickup_fuel"
+    assert decision["behavior"]["target_x"] == 102
+    assert decision["behavior"]["reason_context"]["volume"] == 39
+
+
 def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> None:
     """``_select_and_pickup_fuel`` returns None on a not-worth-it sliver.
 
