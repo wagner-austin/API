@@ -8,7 +8,7 @@ related:
 source_paths:
   - "tpclient.js:25"
   - "tpclient.js:6"
-fact_checked: "2026-06-19"
+fact_checked: "2026-07-27"
 confidence: high
 verified: 2026-06-19 (every command class traced through JS source)
 hubs: [js-client]
@@ -155,11 +155,14 @@ OBST." (action 7), tile ``cache > 0`` → "GET FUEL" (action 5), ``cache
 < 0`` → "GET EQUIPMENT" (action 6), deposit context → "DEPOSIT FUEL"
 (action 10). The long-press is UI disambiguation from movement only:
 the wire command is the same action code the bot already sends
-programmatically — there is no separate long-press command. Open
-question for a probe: whether the server honors an equipment pickup
-targeting the tank's OWN tile (the single 2026-06-21 sample failed
-silently; fuel needs no command at all on/adjacent to a landing —
-see [[fuel-system]]).
+programmatically — there is no separate long-press command. Probe
+answer (2026-07-27, `make larder-probe`): the server DOES honor an
+equipment pickup targeting the tank's OWN tile — 3/3 credits while
+standing on the container (run `larder-20260727-230858`), so the
+2026-06-21 silent sample is superseded; a pickup with every slot at
+cap is instead rejected with the 0x52 code-7 "Inventory full" receipt
+([[equipment-system]]). Fuel still needs no command at all on/adjacent
+to a landing — see [[fuel-system]].
 
 ## Shoot Command Details
 

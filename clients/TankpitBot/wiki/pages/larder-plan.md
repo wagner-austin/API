@@ -21,10 +21,11 @@ hubs: [architecture]
 
 # Larder Plan — Harvesting Verified Containers the Bot Already Remembers
 
-**Status: PLANNED, not implemented** (user-directed design session
-2026-07-27). One live probe gates the build (§Probe gate). The user
-attempted a version of this feature once before and removed it; the
-post-mortem of that attempt is a standing design input still wanted.[^1]
+**Status: GATE CLEARED — ready to implement** (design session +
+probe runs 2026-07-27). The own-tile equipment pickup is live-proven
+(§Probe gate, answered YES). The user attempted a version of this
+feature once before and removed it; the post-mortem of that attempt
+is a standing design input still wanted.[^1]
 
 ## The observation
 
@@ -88,11 +89,16 @@ covering the deficit is a zero-command emergency refuel.[^4]
   map_open + teleport is silently dropped), so a fuel stop is ~2
   ticks (map_open, teleport) — pickup and verification cost zero.
   Current forage stop: ~4 ticks (map, teleport, scan, pickup).
-* **Equipment: +1 tick.** Land adjacent (on-tile pending the probe)
-  and send `pickup_equipment` — which is the SAME wire action the
-  human long-press dispatches (client `bb` handler: >300 ms hold →
-  action 5 fuel / 6 equipment, [[client-commands]]). The
-  equipment_gain event confirms contents.
+* **Equipment: +1 tick, land ON it.** Teleports aimed at a container
+  tile land exactly on it (5/6 aimed landings, runs -225643 and
+  -230858) and `pickup_equipment` from the tank's OWN tile credits
+  (3/3, §Probe gate) — the SAME wire action the human long-press
+  dispatches (client `bb` handler: >300 ms hold → action 5 fuel /
+  6 equipment, [[client-commands]]). Equipment tiles are walkable
+  and never auto-pick (user law 2026-07-27). Caveat: a pickup with
+  every slot at cap is rejected with the 0x52 code-7 "Inventory
+  full" receipt ([[equipment-system]]) — harmless here, since the
+  larder harvests equipment only against a deficit.
 * **No scan on larder hops** (user-confirmed reading of the
   zero-overlap ruling): the entry is already verified; the landing's
   free 0x5A exposure intel is taken, hidden tiles stay hidden, and a
@@ -100,13 +106,20 @@ covering the deficit is a zero-command emergency refuel.[^4]
   ignored — nearly-covered ground fails the untouched test anyway
   and recycles via the 180 s TTL.
 
-## Probe gate (before any bot-loop code)
+## Probe gate — ANSWERED YES (2026-07-27)
 
-Does the server honor `pickup_equipment` targeting the tank's OWN
-tile? The single 2026-06-21 sample failed silently; the user believes
-on-tile works. Probe: teleport onto a verified equipment container,
-try the pickup at own-tile and at-adjacent, read the wire. The answer
-sets the equipment landing rule above.[^5]
+The server honors `pickup_equipment` targeting the tank's OWN tile,
+as the user predicted. `LarderProbe` (`action_lab/larder_probe.py`,
+`make larder-probe`) teleported onto verified equipment containers
+and credited the own-tile pickup **3/3 with zero 0x52 errors** (run
+`larder-20260727-230858`). Two earlier iterations taught the probe
+its controls: water-sitting shore containers can never host the
+trial (run -224933 — every walk-on rejected, candidates now filtered
+to passable tiles), and a fully-capped tank rejects EVERY pickup
+with code 7 "Inventory full" (run -225643 — the one radar-spent slot
+let an identical adjacent pickup credit, isolating the cap as the
+cause), so each attempt now burns one extra radar first for
+guaranteed headroom.[^5]
 
 ## Expected payoff
 
@@ -120,4 +133,4 @@ gets harvested instead of rediscovered.[^2]
 [^2]: Forage economics: `tankpit-forage-economy` on runs bot-20260726-094309 vs bot-20260726-145124 (7.70 vs 3.10 viewports/kill, 2.14 vs 3.34 weapons/pickup); auto-pick corpus check 62/82 landings across runs bot-20260727-214102 + -211712.
 [^3]: Registry mechanics: `state/container_mutations.py` (radar upsert, 0x43 remaining-volume update/removal, code-4 purge path), `failed_pickups` blacklist consumed by `bot/ai/equipment_search.py`; coverage clock `state/scan_coverage.py` `FORAGE_COVERAGE_TTL_MS = 180000`.
 [^4]: Cascade order: `bot/ai/collect_mode.py` (in-viewport pickup steps precede hop steps); hunt-gate/lock independence per [[bot-behavior-contract]] §resume and never-drop rows; under-fire refuel doctrine from the 2026-07-27 guest post-mortem (wiki/log.md).
-[^5]: Own-tile equipment sample: capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6 -- server placed the tank ON the container, pickup_equipment returned no container_consumed); long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture).
+[^5]: Probe artifacts on disk: `runs/probe/larder-20260727-224933.json` (water-sitting candidates, 0 trials), `-225643.json` (own-tile 0/2 + adjacent control 1, all-capped inventory, code-7 receipts in the paired `.log`), `-230858.json` (own-tile 3/3, no errors) with matching `.capture_session.json` wire evidence; historical own-tile sample capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6) superseded by the deliberate trials; long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture); code-7 string table [[decode-coverage]] §Supervisor error codes.

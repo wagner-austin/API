@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/sim/equipment.py"
 source_git_blobs:
   "src/tankpit_bot/sim/equipment.py": "17815a7fde8141fe2b21bfdf88552ec578c97f41"
-fact_checked: "2026-06-21"
+fact_checked: "2026-07-27"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -78,6 +78,18 @@ it: the server answers 0x52 error 4 ("empty container") and the bot
 deletes the belief (``tick_loop_actions``, code=4 path). The sim
 implements exactly this pair ([[physics-module-roadmap]]).
 
+**Own-tile pickup law (live-proven 2026-07-27)**: the server honors
+``pickup_equipment`` targeting the tank's OWN tile — the larder
+probe (`make larder-probe`) landed teleports exactly on verified
+equipment containers (5/6 aimed landings) and credited the own-tile
+pickup 3/3 with zero 0x52 errors (run `larder-20260727-230858`).
+Equipment container tiles are walkable and never auto-pick — unlike
+fuel, the pickup command is always required (user law 2026-07-27,
+[[fuel-system]] for the fuel auto-pick contrast). Adjacent pickup
+re-confirmed the same day (run -225643 attempt 1). This unlocks the
+[[larder-plan]] harvest atom: teleport ON the container, one pickup
+command, done.[^10]
+
 ## "Inventory full" wire signal
 
 Server returns 0x52 CommandResult error code **7 (`SUPERVISOR_ERROR_INVENTORY_FULL`)** when the bot dispatches ``pickup_equipment`` while every inventory slot is at 25. The error code is defined in `protocol/constants.py:147` and is in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`) as of 2026-06-21, so today the bot:[^7]
@@ -109,3 +121,4 @@ The pre-2026-06-26 blacklist was driven by `find_teleport_landing_tile()` return
 [^7]: protocol/constants.py:147 defines `SUPERVISOR_ERROR_INVENTORY_FULL = 7`. bot/tick_loop_actions.py:44 `_ACTION_BLOCKING_COMMAND_ERRORS` now includes codes 0, 1, 4, 5, 7, 8 (code 7 added 2026-06-21). Two `error_code=7` events recorded in `runs/sniff/latest.events.jsonl` at 19:07:28 / 19:08:30 plus parallel `[GAME:EQUIPMENT] Inventory full` in `runs/sniff/latest.log`.
 [^8]: corpus sweep 2026-07-22 (wiki log): 1,154 0x67→next-frame-0x49 pairs across 246 archive sessions; standing re-derivation on every `make shadow` (grant-invariants 1,149/1,149 + kill-mercy-bundle 283/283 laws, `src/tankpit_bot/validate/shadow_laws.py`)
 [^9]: user contract 2026-06-26 (walk-only pickups) — selection sites `bot/ai/equipment_search.py`; the removed teleport-to-container path predates the current `_is_actionable_with_terrain` gate
+[^10]: larder probe artifacts on disk: `runs/probe/larder-20260727-230858.json` (own-tile 3/3, no 0x52 errors) and `-225643.json` (adjacent credit at attempt 1, code-7 receipts once capped) with paired `.log` + `.capture_session.json`; walkable/no-auto-pick is the user's law (Austin, 2026-07-27 — "you csn walk onto an ewuipment contsiner. theyre notnobstcles. it justxdoesnt pifkcup automstically"); probe source `src/tankpit_bot/action_lab/larder_probe.py`

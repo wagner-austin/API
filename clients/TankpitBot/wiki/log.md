@@ -2023,3 +2023,17 @@ User-supplied mechanics for the larder plan, both verified from artifacts before
 ## [2026-07-27] PLAN FINALIZED | [[larder-plan]] page lands -- the full harvest-circuit spec, grounded in the day's decoded laws, gated on one probe
 
 The larder design session concluded and the complete spec now lives on its own page: memory is pure reuse of world.containers (session-only by ruling), selection is highest-and-nearest scoring re-run per tick, placement is a new priority step inside the COLLECT cascade between in-viewport walking and discovery (no new mode, no hunt changes), and the harvest circuit is map_open -> teleport -> auto-pick chained at ~2 ticks per fuel stop (half a forage stop) with equipment paying one extra tick for the pickup command. Confirmation and list maintenance need zero new code -- the fuel book's announced credits and the 0x43/code-4 registry paths already do both. The scan-coverage TTL (180 s) and container belief are documented as deliberately independent clocks. Build gate: the own-tile equipment pickup probe. Standing input wanted: the post-mortem of the user's removed first implementation.
+
+## [2026-07-27] probe + laws | Larder gate ANSWERED YES -- own-tile equipment pickup works
+
+Built `LarderProbe` (`action_lab/larder_probe.py`, `make larder-probe`, `tankpit-larder-probe`) to settle the [[larder-plan]] build gate: does the server honor `pickup_equipment` targeting the tank's OWN tile? Subclasses DensityProbe for funded site hops + extras etiquette; per attempt: teleport ONTO a verified equipment container, own-tile trial, step off one cardinal, adjacent control. 24 new tests, `make check` green (5,109 tests, 100% coverage).
+
+**Three live runs, each one a lesson:**
+
+1. `larder-20260727-224933` -- 0 trials. All three nearest candidates were water-sitting shore containers: teleports displaced to land, every walk-on rejected (0x52 err=1). Fix: candidates filtered to passable terrain (the plan already excludes inaccessible containers).
+2. `larder-20260727-225643` -- own-tile 0/2, adjacent 1. The two failures were NOT an own-tile verdict: the tank was fully capped (25/25/25/25/25 after the user restock) and BOTH trials returned code 7 -- which the wiki string table already names "Inventory full" ([[decode-coverage]]). The one credit landed in the sole slot with headroom (extra radars at 24 after the search scan). Fix: each attempt burns one extra radar before the baseline read for guaranteed headroom.
+3. `larder-20260727-230858` -- **own-tile 3/3, zero 0x52 errors.** Teleports aimed at container tiles landed exactly on them (3/3 here, 5/6 across runs); each `pickup_equipment` from the container's own tile credited the freed radar slot within one poll.
+
+**Laws recorded:** own-tile equipment pickup works ([[equipment-system]], [[client-commands]] open question resolved, [[larder-plan]] gate section rewritten); equipment tiles are walkable and never auto-pick (user correction, verbatim in [[equipment-system]] footnote 10 -- my "containers are walk obstacles" reading of run 1 was WRONG); full-cap pickups reject with code 7 (re-confirmed live, contrast pair). The 2026-06-21 silent own-tile sample is superseded.
+
+**Larder status:** gate cleared, plan page says ready to implement. Next: build the harvest cascade step per [[larder-plan]].
