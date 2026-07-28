@@ -284,6 +284,10 @@ def _exhausted_collect_outcome(
             f"inventory below combat-ready and no reachable equipment.",
         )
 
+    desperation = _desperation_fuel_hop(ctx, base_state)
+    if desperation is not None:
+        return desperation
+
     walk = _walk_for_fuel_last_resort(ctx, base_state)
     if walk is not None:
         return walk
@@ -294,6 +298,106 @@ def _exhausted_collect_outcome(
         f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
         f"forager exhausted, no affordable search hop, no walkable fuel "
         f"within {_WALK_FOR_FUEL_MAX_TILES} tiles.",
+    )
+
+
+def _desperation_fuel_hop(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Hop to the cheapest believed fuel container when marooned.
+
+    Reached only at critical fuel with every normal cascade step
+    declined. The normal hop selectors serve DISCOVERY and refuse
+    freshly-scanned ground and reserve-breaking costs; a marooned
+    tank is not discovering, it is surviving. Run bot-20260728-093011
+    sat at fuel 68 on a shore patch with 13 radar-verified fuel
+    containers nearby -- 12 water-locked against walking, but the
+    auto-pick law ([[fuel-system]]) credits a teleport landing ON or
+    CARDINALLY ADJACENT to a fuel container, so a 2-tile hop to a
+    shore landing tile refuels where no walk can. Gates here are
+    physics only: a legal landing (`find_teleport_landing_tile`, the
+    shore-aware helper) and cost within the remaining tank. The hop
+    holds a fuel lock and suppresses the landing radar (larder
+    semantics, [[larder-plan]]).
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        Teleport decision to the cheapest believed container's
+        landing, or ``None`` when terrain is unknown or no believed
+        container has an affordable legal landing.
+    """
+    terrain = ctx.terrain
+    if terrain is None:
+        return None
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    best_cost = 0
+    best_landing_x = 0
+    best_landing_y = 0
+    best_container: ContainerStateDict | None = None
+    for container in ctx.world["containers"].values():
+        if not container["is_fuel"] or container["volume"] <= 0:
+            continue
+        if container["failed_pickups"] > 0:
+            continue
+        if is_container_blacklisted(container["x"], container["y"]):
+            continue
+        landing = find_teleport_landing_tile(terrain, container["x"], container["y"])
+        if landing is None:
+            continue
+        landing_x, landing_y = landing
+        cost = teleport_cost(sx, sy, landing_x, landing_y)
+        if cost <= 0 or cost > ctx.fuel:
+            continue
+        if best_container is None or cost < best_cost:
+            best_cost = cost
+            best_landing_x = landing_x
+            best_landing_y = landing_y
+            best_container = container
+    if best_container is None:
+        return None
+    emit_ai(
+        "marooned at fuel %d: desperation hop to fuel at (%d,%d) vol=%d landing (%d,%d) cost=%d",
+        ctx.fuel,
+        best_container["x"],
+        best_container["y"],
+        best_container["volume"],
+        best_landing_x,
+        best_landing_y,
+        best_cost,
+    )
+    emit_diagnostic(
+        diagnostic_kind="hop_selected",
+        hop_kind="fuel_desperation",
+        target_x=best_container["x"],
+        target_y=best_container["y"],
+        landing_x=best_landing_x,
+        landing_y=best_landing_y,
+        cost=best_cost,
+    )
+    return make_decision(
+        make_teleport_command(best_landing_x, best_landing_y),
+        "COLLECT",
+        _COLLECT_SCORE,
+        best_landing_x,
+        best_landing_y,
+        "fuel_hop",
+        AIStateDict(
+            **{
+                **set_resource_target(
+                    base_state,
+                    "fuel",
+                    best_container["x"],
+                    best_container["y"],
+                ),
+                "suppress_landing_scan": True,
+            }
+        ),
+        ctx.equip,
+        reason_context={"volume": best_container["volume"]},
     )
 
 

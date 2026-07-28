@@ -209,12 +209,12 @@ def test_marooned_walk_declines_when_the_leg_is_the_current_tile() -> None:
         decide_collect_mode(ctx)
 
 
-def test_walk_skips_a_water_locked_nearer_candidate() -> None:
-    """The run bot-20260728-092357 shape: nearest fuel is on water.
+def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
+    """A shore container within teleport reach outranks a 35-tile walk.
 
-    The water-sitting container at (110,100) is closer but cannot be
-    stood on; the walk falls through to the farther land dot instead
-    of giving up.
+    The water-sitting container at (110,100) cannot be walked to, but
+    its shore landing (109,100) costs 54 of the tank's 88 -- one hop
+    and an adjacent auto-pick beat twenty walking ticks to the dot.
     """
     containers = {
         "110,100": make_container_state(
@@ -235,13 +235,21 @@ def test_walk_skips_a_water_locked_nearer_candidate() -> None:
             "last_map_open_ms": 99000,
         }
     )
+    terrain = InMemoryTerrainMap(
+        {
+            (110, 100): "W",
+            (111, 100): "W",
+            (110, 99): "W",
+            (110, 101): "W",
+        }
+    )
     ctx = DecideCtx(
         world,
         self_state,
         ai_state,
         make_inventory(),
         100000,
-        InMemoryTerrainMap({(110, 100): "W"}),
+        terrain,
         "",
         ((120, 115),),
     )
@@ -249,11 +257,107 @@ def test_walk_skips_a_water_locked_nearer_candidate() -> None:
     decision = decide_collect_mode(ctx)
 
     if decision is None:
-        raise AssertionError("expected walk-for-fuel decision")
+        raise AssertionError("expected desperation hop decision")
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 109
+    assert decision["command"]["target_y"] == 100
+
+
+def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
+    """The bot-20260728-093011 shape: islet tank, fuel across the water.
+
+    A water channel (column x=105) blocks every walk east, so the
+    walk-pickup and walk rungs decline; the believed container at
+    (108,100) sits ON water with a land landing at (109,100) costing
+    54 of the tank's 68 -- the desperation hop crosses the channel
+    and the adjacent auto-pick refuels, instead of exiting.
+    """
+    containers = {
+        "108,100": make_container_state(
+            x=108,
+            y=100,
+            is_fuel=True,
+            volume=300,
+            timestamp_ms=100000,
+        )
+    }
+    world, self_state = make_world(fuel=68, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99000,
+        }
+    )
+    terrain_data: dict[tuple[int, int], str] = {(105, y): "W" for y in range(92, 108)}
+    terrain_data[(108, 100)] = "W"
+    terrain_data[(107, 100)] = "W"
+    terrain_data[(108, 99)] = "W"
+    terrain_data[(108, 101)] = "W"
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(terrain_data),
+        "",
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected desperation hop decision")
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 109
+    assert decision["command"]["target_y"] == 100
+    updated = decision["updated_ai_state"]
+    assert updated["resource_target_kind"] == "fuel"
+    assert updated["suppress_landing_scan"] is True
+
+
+def test_desperation_hop_declines_when_unaffordable_and_walk_takes_over() -> None:
+    """A landing costing more than the tank holds falls through to walk."""
+    containers = {
+        "150,100": make_container_state(
+            x=150,
+            y=100,
+            is_fuel=True,
+            volume=300,
+            timestamp_ms=100000,
+        )
+    }
+    world, self_state = make_world(fuel=68, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99000,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+        ((130, 100),),
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected walk-for-fuel fallback decision")
     assert decision["behavior"]["reason_kind"] == "walk_for_fuel"
     assert decision["command"]["cmd_type"] == "move"
-    assert decision["command"]["target_x"] == 107
-    assert decision["command"]["target_y"] == 107
 
 
 def test_healthy_tank_never_reaches_the_walk_rung() -> None:
