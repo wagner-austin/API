@@ -242,6 +242,29 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if search is not None:
         return search
 
+    return _exhausted_collect_outcome(ctx, base_state)
+
+
+def _exhausted_collect_outcome(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Resolve a tick where every collect cascade step declined.
+
+    Healthy fuel yields to hunt (or exits ``no_productive_collect``
+    when under-stocked); critical fuel gets the walk-for-fuel last
+    resort before the ``out_of_fuel`` exit.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for a walk decision.
+
+    Returns:
+        ``None`` to hand the tick to hunt, or a walk decision.
+
+    Raises:
+        SessionExitError: When the session has no productive action.
+    """
     if ctx.fuel > ctx.config["fuel_low_threshold"]:
         if hunt_entry_permitted(ctx):
             emit_ai(
@@ -261,11 +284,104 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
             f"inventory below combat-ready and no reachable equipment.",
         )
 
+    walk = _walk_for_fuel_last_resort(ctx, base_state)
+    if walk is not None:
+        return walk
+
     raise SessionExitError(
         "out_of_fuel",
         f"COLLECT owner produced no decision at "
         f"({ctx.self_state['x']},{ctx.self_state['y']}) fuel={ctx.fuel}: "
-        f"forager exhausted, no affordable search hop.",
+        f"forager exhausted, no affordable search hop, no walkable fuel "
+        f"within {_WALK_FOR_FUEL_MAX_TILES} tiles.",
+    )
+
+
+_WALK_FOR_FUEL_MAX_TILES = 48
+"""Farthest known fuel a marooned tank will walk toward (~96 s of
+2 s-per-tile walking). Beyond this the out_of_fuel exit stands -- the
+2026-07-25 exposure rule caps how long a broke tank crawls in the
+open, even in the practice room where bots never initiate."""
+
+
+def _walk_for_fuel_last_resort(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Walk toward the nearest known fuel instead of exiting broke.
+
+    The final rung before the ``out_of_fuel`` exit, reached only when
+    every pickup, larder hop, forage step, and dot hop has declined at
+    critical fuel. Walking is free at any fuel level (the density
+    probe's marooned-recovery law, [[walk-mechanics]]), so a tank with
+    known fuel in walking range is NOT actually stuck: runs
+    bot-20260728-090813/-091209 exited at fuel 98/88 in a shore corner
+    with the whole dot atlas 15+ unaffordable-teleport tiles away.
+    Each tick walks one in-viewport leg toward the nearest candidate
+    (map dot or believed container); arrival is handled by the normal
+    cascade -- fresh ground re-enables forage, scans, and pickups.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        A one-leg walk decision, or ``None`` when no known fuel is
+        inside the walk cap or no leg is walkable (the exit stands).
+        The caller guarantees critical fuel -- the healthy-fuel tick
+        resolved via the hunt handoff before this rung.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    candidates: list[tuple[int, int, int]] = []
+    for dot_x, dot_y in ctx.map_fuel_dots:
+        candidates.append((abs(dot_x - sx) + abs(dot_y - sy), dot_x, dot_y))
+    for container in ctx.world["containers"].values():
+        if not container["is_fuel"] or container["volume"] <= 0:
+            continue
+        if container["failed_pickups"] > 0:
+            continue
+        if is_container_blacklisted(container["x"], container["y"]):
+            continue
+        candidates.append(
+            (abs(container["x"] - sx) + abs(container["y"] - sy), container["x"], container["y"])
+        )
+    reachable = [c for c in candidates if 0 < c[0] <= _WALK_FOR_FUEL_MAX_TILES]
+    if not reachable:
+        return None
+    _, target_x, target_y = min(reachable)
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    leg_x = min(max(target_x, left), right)
+    leg_y = min(max(target_y, top), bottom)
+    if (leg_x, leg_y) == (sx, sy):
+        return None
+    command = walk_or_teleport(ctx, leg_x, leg_y, pickup_kind=None)
+    if command is None or command["cmd_type"] != "move":
+        return None
+    emit_ai(
+        "marooned at fuel %d: walking leg (%d,%d) toward known fuel at (%d,%d)",
+        ctx.fuel,
+        leg_x,
+        leg_y,
+        target_x,
+        target_y,
+    )
+    emit_diagnostic(
+        diagnostic_kind="walk_for_fuel",
+        target_x=target_x,
+        target_y=target_y,
+        leg_x=leg_x,
+        leg_y=leg_y,
+        fuel=ctx.fuel,
+    )
+    return make_decision(
+        command,
+        "COLLECT",
+        _COLLECT_SCORE,
+        leg_x,
+        leg_y,
+        "walk_for_fuel",
+        clear_resource_target(base_state),
+        ctx.equip,
     )
 
 

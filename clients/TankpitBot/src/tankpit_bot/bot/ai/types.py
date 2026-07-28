@@ -48,6 +48,7 @@ ReasonKind = Literal[
     "forage_radar",
     "forage_sweep",
     "search_collect_local",
+    "walk_for_fuel",
     "map_for_dots",
     # HUNT
     "find_target",
@@ -80,6 +81,7 @@ REASON_KINDS: tuple[ReasonKind, ...] = (
     "forage_radar",
     "forage_sweep",
     "search_collect_local",
+    "walk_for_fuel",
     "map_for_dots",
     "find_target",
     "find_enemies",
