@@ -26,6 +26,7 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_teleport_landing_tile,
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
+from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
 from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.resource_search import (
@@ -148,9 +149,15 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
        containers radar would have shown up front.
     3. Pick up the best equipment in the current viewport.
     4. Pick up the best fuel in the current viewport (skipped at cap).
-    5. Forage: radar when the viewport has unscanned tiles, or walk
+    5. Larder ([[larder-plan]], 2026-07-27): harvest KNOWN stock
+       before any discovery -- teleport to tracked equipment when
+       below combat-ready, else to the best-scoring tracked fuel
+       container (``min(volume, deficit) / cost``, profitable hops
+       only). Larder hops hold a resource lock on the target and
+       never spend the landing radar.
+    6. Forage: radar when the viewport has unscanned tiles, or walk
        toward an unscanned tile so the next free radar covers it.
-    6. Hop: teleport to the best-value fuel dot when nothing
+    7. Hop: teleport to the best-value fuel dot when nothing
        actionable remains here -- candidates are RANKED by
        ``dots_in_landing_viewport * walkable_fraction / cost``, hard
        gates are physics only (landing passable, affordable, not
@@ -182,7 +189,7 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     if locked_decision is not None:
         return locked_decision
 
-    landing_scan = _scan_on_landing_decision(ctx, base_state)
+    landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
     if landing_scan is not None:
         return landing_scan
 
@@ -211,6 +218,10 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
         ),
     )
 
+    larder_decision = _larder_harvest(ctx, base_state)
+    if larder_decision is not None:
+        return larder_decision
+
     forage_decision = plan_forage_search(
         ctx,
         base_state,
@@ -220,10 +231,6 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     )
     if forage_decision is not None:
         return forage_decision
-
-    equipment_hop = _hop_toward_equipment(ctx, base_state)
-    if equipment_hop is not None:
-        return equipment_hop
 
     search = make_resource_search_hop(
         ctx,
@@ -265,7 +272,7 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
 def _scan_on_landing_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
-) -> TickDecisionDict | None:
+) -> tuple[TickDecisionDict | None, AIStateDict]:
     """Return a radar decision when this viewport has no landing scan yet.
 
     The COLLECT-mode equivalent of HUNT's ``scan_on_landing``: fired
@@ -280,18 +287,41 @@ def _scan_on_landing_decision(
     gate skipped the scan whenever the 18-wide visible viewport
     overlapped 2 tiles of old coverage after a 16-tile hop.)
 
+    Larder exception (user ruling 2026-07-27, [[larder-plan]]): a
+    landing flagged ``suppress_landing_scan`` is a harvest hop to
+    already-verified stock -- the latch records the viewport WITHOUT
+    dispatching the radar and the flag is consumed, so the cascade
+    proceeds straight to the pickup this tick.
+
     Args:
         ctx: Decision context.
         base_state: Base AI state to rewrite for the produced command.
 
     Returns:
-        ``scan_on_landing`` decision, or ``None`` when this viewport
-        already had its landing radar.
+        ``(decision, base_state)`` -- the ``scan_on_landing`` decision
+        (or ``None`` when this viewport already had its landing radar,
+        or the larder flag consumed it) and the state the remaining
+        cascade must thread.
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     origin_key = f"{left},{top}"
     if base_state["last_landing_scan_viewport"] == origin_key:
-        return None
+        return None, base_state
+    if base_state["suppress_landing_scan"]:
+        emit_ai(
+            "larder landing at viewport (%d,%d)-(%d,%d): latching without radar",
+            left,
+            top,
+            right,
+            bottom,
+        )
+        return None, AIStateDict(
+            **{
+                **base_state,
+                "last_landing_scan_viewport": origin_key,
+                "suppress_landing_scan": False,
+            }
+        )
     emit_ai(
         "scan-on-landing (mode=COLLECT, extras=%d, viewport=(%d,%d)-(%d,%d))",
         ctx.inventory["extra_radars"]["count"],
@@ -300,7 +330,7 @@ def _scan_on_landing_decision(
         right,
         bottom,
     )
-    return make_decision(
+    decision = make_decision(
         make_radar_command(),
         "COLLECT",
         _COLLECT_SCORE,
@@ -315,6 +345,7 @@ def _scan_on_landing_decision(
         ),
         ctx.equip,
     )
+    return decision, base_state
 
 
 def _continue_or_release_lock(
@@ -598,8 +629,126 @@ def _hop_toward_equipment(
         best_landing_x,
         best_landing_y,
         "equipment_hop",
-        clear_resource_target(base_state),
+        # Larder semantics (2026-07-27): the hop holds an equipment
+        # lock so the landing tick dispatches the pickup directly --
+        # the landing tile IS the container when passable and the
+        # own-tile pickup is live-proven ([[equipment-system]]) --
+        # and the landing radar is suppressed (harvest hops never
+        # spend a scan, [[larder-plan]]).
+        AIStateDict(
+            **{
+                **set_resource_target(
+                    base_state,
+                    "equipment",
+                    best_container["x"],
+                    best_container["y"],
+                ),
+                "suppress_landing_scan": True,
+            }
+        ),
         ctx.equip,
+    )
+
+
+def _larder_harvest(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Cascade step 5: harvest known stock before any discovery.
+
+    Equipment first (matching the walk-pickup order), then the scored
+    fuel larder ([[larder-plan]]).
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        Larder hop decision, or ``None`` when the larder is empty or
+        unprofitable and the tick belongs to discovery.
+    """
+    equipment_hop = _hop_toward_equipment(ctx, base_state)
+    if equipment_hop is not None:
+        return equipment_hop
+    return _hop_toward_fuel_larder(ctx, base_state)
+
+
+def _hop_toward_fuel_larder(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Teleport to the best-scoring remembered fuel container.
+
+    The larder plan's fuel harvest ([[larder-plan]], user rulings
+    2026-07-27): before spending radar or blind dot hops, drain the
+    stock the session already verified. Candidates are re-scored every
+    tick by ``min(volume, deficit) / cost`` (no fixed errands); the
+    landing tile is inside the server's fuel auto-pick reach so the
+    stop is ~2 ticks with no pickup command. The hop holds a fuel
+    lock on the target and suppresses the landing radar.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state to rewrite for the produced command.
+
+    Returns:
+        Teleport decision to the winning container's landing tile, or
+        ``None`` when the tank is at capacity, terrain is unknown, or
+        every believed fuel container fails the physics gates (legal
+        landing, reserve, net-positive gain).
+    """
+    if ctx.fuel >= fuel_capacity(ctx.self_state["rank"]):
+        return None
+    if ctx.terrain is None:
+        return None
+    selection = select_fuel_larder_hop(ctx, is_blacklisted=is_container_blacklisted)
+    container = selection["container"]
+    if container is None:
+        if selection["candidates"] > 0:
+            _emit_hop_declined(
+                "fuel_larder",
+                candidates=selection["candidates"],
+                too_close=selection["too_close"],
+                no_landing=selection["no_landing"],
+                reserve_blocked=selection["reserve_blocked"],
+                unprofitable=selection["unprofitable"],
+                fuel=ctx.fuel,
+            )
+        return None
+    emit_ai(
+        "fuel larder hop to (%d,%d) vol=%d landing (%d,%d) cost=%d (fuel=%d)",
+        container["x"],
+        container["y"],
+        container["volume"],
+        selection["landing_x"],
+        selection["landing_y"],
+        selection["cost"],
+        ctx.fuel,
+    )
+    emit_diagnostic(
+        diagnostic_kind="hop_selected",
+        hop_kind="fuel_larder",
+        target_x=container["x"],
+        target_y=container["y"],
+        landing_x=selection["landing_x"],
+        landing_y=selection["landing_y"],
+        cost=selection["cost"],
+    )
+    return make_decision(
+        make_teleport_command(selection["landing_x"], selection["landing_y"]),
+        "COLLECT",
+        _COLLECT_SCORE,
+        selection["landing_x"],
+        selection["landing_y"],
+        "fuel_hop",
+        AIStateDict(
+            **{
+                **set_resource_target(base_state, "fuel", container["x"], container["y"]),
+                "suppress_landing_scan": True,
+            }
+        ),
+        ctx.equip,
+        reason_context={"volume": container["volume"]},
     )
 
 

@@ -43,6 +43,7 @@ ReasonKind = Literal[
     "fuel_locked",
     "equipment_restock",
     "equipment_hop",
+    "fuel_hop",
     "fuel_collect",
     "forage_radar",
     "forage_sweep",
@@ -74,6 +75,7 @@ REASON_KINDS: tuple[ReasonKind, ...] = (
     "fuel_locked",
     "equipment_restock",
     "equipment_hop",
+    "fuel_hop",
     "fuel_collect",
     "forage_radar",
     "forage_sweep",
@@ -456,6 +458,13 @@ class AIStateDict(TypedDict):
             landing radar only when the current origin differs
             (user policy 2026-07-03: always radar right on landing,
             before any pickup).
+        suppress_landing_scan: True while a larder hop is in flight.
+            The larder ruling (user, 2026-07-27, [[larder-plan]]) is
+            that knowledge-based harvest hops never spend a radar on
+            the landing viewport -- the target is already verified
+            and hidden tiles stay hidden. COLLECT's scan-on-landing
+            consumes the flag by latching the new viewport origin
+            without dispatching the radar.
         manual_mode: When not ``None``, the durable mode the SPA has
             pinned the arbitrator to. ``"UNSET"`` means the bot is
             connected but idle (no ticks dispatched, hold position).
@@ -501,6 +510,7 @@ class AIStateDict(TypedDict):
     resource_target_y: int
     attempted_equipment_targets: dict[str, int]
     last_landing_scan_viewport: str
+    suppress_landing_scan: bool
     manual_mode: AIMode | None
     live_radars_used: int
     live_teleports: int
@@ -542,6 +552,7 @@ def make_initial_ai_state(
         resource_target_y=0,
         attempted_equipment_targets={},
         last_landing_scan_viewport="",
+        suppress_landing_scan=False,
         manual_mode=None,
         live_radars_used=0,
         live_teleports=0,
