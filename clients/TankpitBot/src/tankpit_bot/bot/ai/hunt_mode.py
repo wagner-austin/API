@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.combat_strategy import (
     has_cardinal_combat_shot,
     is_already_engaged,
     open_map_for_target,
+    refuel_for_hunt,
     select_new_combat_target,
     teleport_to_target,
 )
@@ -191,12 +192,16 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         if ctx.fuel < return_cost + engagement_floor:
             emit_ai(
                 "cannot fund return to locked target %s (fuel=%d, needs ~%d) - "
-                "releasing and re-acquiring fresh",
+                "refueling with the lock held (resume follows)",
                 pursuit["name"],
                 ctx.fuel,
                 return_cost + engagement_floor,
             )
-            return _decide_hunt_acquire_fresh(ctx, threats, clear_combat_target(ctx.base))
+            # Refuel-then-RESUME (user ruling 2026-07-27): the fuel
+            # detour keeps the lock; the resume machinery returns here
+            # once the trip is fundable. Run 183703's red-1 was lost
+            # to the old release-and-reacquire at this exact branch.
+            return refuel_for_hunt(ctx, pursuit)
         if not target_position_is_fresh(ctx, pursuit):
             emit_ai(
                 "returning to locked target %s - refreshing stale position via map",

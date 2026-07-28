@@ -350,7 +350,7 @@ def _has_damaging_weapon_available(ctx: DecideCtx) -> bool:
     )
 
 
-def _refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
+def refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Delegate the tick to the fuel planner when hunting is fuel-starved.
 
     Threats sort nearest-first and teleport cost is monotone in
@@ -360,14 +360,24 @@ def _refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     spawned at fuel 620 -- above the fuel-low entry rule (500) but
     below every engagement's cost-plus-reserve -- and spent its entire
     240s on 115 map reopens without a single shot. Collecting fuel is
-    the only decision that changes the blocked condition; the combat
-    target is cleared so reacquisition re-derives from fresh intel
-    once an engagement is affordable.
+    the only decision that changes the blocked condition.
+
+    Refuel-then-RESUME (user ruling 2026-07-27, closing the last
+    voluntary live-target drop): the lock is KEPT through the fuel
+    detour, so the 2026-07-25 resume machinery returns to this exact
+    target once the tank can fund the trip -- run 183703's red-1 was
+    deferred at fuel 239 under the old clear-and-reacquire and never
+    hunted again (the guest won the fresh distance race). The old
+    anti-spin property survives because each deferred tick delegates
+    to a real collect decision (fuel strictly grows), not a map
+    reopen.
 
     When the collect cascade itself declines (fuel healthy but nothing
     collectible in reach), the fuel situation is not going to improve
     this tick, so the unaffordable target is blocked and replanned
-    instead of exiting the session.
+    instead of exiting the session -- the terminator that also bounds
+    the pathological corner where cost + reserve exceeds the tank's
+    own fuel capacity.
 
     Args:
         ctx: Decision context.
@@ -381,17 +391,17 @@ def _refuel_for_hunt(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     # this module at import time.
     from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 
-    cleared_ctx = DecideCtx(
+    locked_ctx = DecideCtx(
         ctx.world,
         ctx.self_state,
-        clear_combat_target(ctx.base),
+        _set_combat_target(ctx.base, target),
         ctx.inventory,
         ctx.timestamp_ms,
         ctx.terrain,
         ctx.combat_feedback,
         ctx.map_fuel_dots,
     )
-    decision = decide_collect_mode(cleared_ctx)
+    decision = decide_collect_mode(locked_ctx)
     if decision is None:
         emit_ai(
             "refuel-for-hunt found nothing collectible at fuel %d, blocking %s",
@@ -468,7 +478,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             teleport_fuel_cost_to(ctx, landing_x, landing_y),
             ctx.config["fuel_low_threshold"],
         )
-        return _refuel_for_hunt(ctx, target)
+        return refuel_for_hunt(ctx, target)
     emit_ai(
         "teleport near %s to (%d,%d) (target at %d,%d)",
         target["name"],
@@ -718,7 +728,7 @@ def _combat_shoot(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
                 target["x"],
                 target["y"],
             )
-            return _refuel_for_hunt(ctx, target)
+            return refuel_for_hunt(ctx, target)
         emit_ai(
             "miss on %s at (%d,%d) dist=%d moved=True - re-aiming",
             target["name"],

@@ -344,7 +344,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
 
     assert decision["command"]["cmd_type"] == "teleport"
     assert decision["behavior"]["mode"] == "COLLECT"
-    assert decision["updated_ai_state"]["combat_target_id"] == -1
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
 def test_hunt_refresh_reacquires_when_locked_target_is_missing() -> None:
@@ -472,18 +472,18 @@ def test_hunt_acquire_teleports_back_to_an_affordable_off_viewport_lock() -> Non
     assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
-def test_hunt_acquire_releases_stale_lock_when_target_unaffordable() -> None:
-    """ACQUIRE drops an off-viewport lock whose return is unaffordable.
+def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
+    """ACQUIRE keeps an off-viewport lock whose return is unaffordable.
 
-    The 2026-07-25 resume contract returns to a locked target after a
-    mode interrupt -- but only when the return teleport plus the kill
-    budget plus the fuel-low reserve fits the tank (never pick a
-    fight you cannot pay for, user contract 2026-07-02). Here the
-    return needs ~424 + 650 fuel against 800, so the lock is released
-    and the bot falls through to a map refresh with no lock --
-    instead of firing at a target it cannot legally hit (live run
-    2026-07-01 20:48: eleven server-rejected shots at a target 92
-    tiles away).
+    Refuel-then-RESUME (user ruling 2026-07-27): when the return
+    teleport plus the kill budget plus the fuel-low reserve exceeds
+    the tank (here ~424 + 650 against 800), the tick delegates to
+    fuel recovery WITH the lock held, so the 2026-07-25 resume
+    machinery returns to this exact target once the trip is fundable.
+    The old release-and-reacquire at this branch lost run 183703's
+    red-1 to a fresh distance race. Firing from stand-off range stays
+    forbidden (live run 2026-07-01 20:48: eleven rejected shots at a
+    target 92 tiles away) -- the bot collects, it does not shoot.
     """
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
     world, self_state = make_world(fuel=800, tanks=tanks)
@@ -504,7 +504,9 @@ def test_hunt_acquire_releases_stale_lock_when_target_unaffordable() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "map_open"
-    assert decision["updated_ai_state"]["combat_target_id"] == -1
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["blocked_combat_targets"] == {}
 
 
 def test_hunt_acquire_returns_to_the_locked_target_after_a_mode_interrupt() -> None:

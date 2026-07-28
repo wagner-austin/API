@@ -455,7 +455,7 @@ class TestCombatTeleportGuards:
         if result is None:
             raise AssertionError("expected fuel recovery decision")
         assert result["behavior"]["mode"] == "COLLECT"
-        assert result["updated_ai_state"]["combat_target_id"] == -1
+        assert result["updated_ai_state"]["combat_target_id"] == 50
         assert result["updated_ai_state"]["blocked_combat_targets"] == {}
 
     def test_teleport_to_target_blocks_when_collect_declines(self) -> None:
