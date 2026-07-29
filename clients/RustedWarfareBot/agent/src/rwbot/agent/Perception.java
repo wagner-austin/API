@@ -132,13 +132,31 @@ final class Perception {
         if (team == null || owner == null) {
             return false;
         }
+        return isHostileBetween(team, owner);
+    }
+
+    /**
+     * Reports whether one team counts the other as an enemy.
+     *
+     * <p>The engine's own alliance comparison, and deliberately not the negation
+     * of "same team": an ally and the neutral team are both other teams and
+     * neither is hostile. Shared by the per-entity test and the per-player
+     * scoreboard so the two cannot come to different answers about the same
+     * pair.
+     *
+     * @param team The team asking.
+     * @param other The team asked about.
+     * @return The engine's answer.
+     * @throws IllegalStateException When the comparison does not answer.
+     */
+    static boolean isHostileBetween(Object team, Object other) {
         Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
         Object hostile =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
                                 teamClass, EngineNames.TEAM_HOSTILE_TO, teamClass),
                         team,
-                        owner);
+                        other);
         if (!(hostile instanceof Boolean)) {
             throw new IllegalStateException(
                     "rw-agent: " + EngineNames.TEAM_HOSTILE_TO + "() did not return a boolean"
@@ -394,16 +412,65 @@ final class Perception {
      * @return True once construction is complete.
      */
     static boolean isComplete(Object entity) {
-        Object done =
+        return predicate(entity, EngineNames.ENTITY_COMPLETE);
+    }
+
+    /**
+     * Reports whether an entity is airborne at this moment.
+     *
+     * <p>One of the three the engine's own attackability test branches on, and
+     * read per sample because it is state rather than type: a gunship that has
+     * landed is a ground target (wiki: policy-combat).
+     *
+     * @param entity The entity to read.
+     * @return True while it is flying.
+     */
+    static boolean isFlying(Object entity) {
+        return predicate(entity, EngineNames.ENTITY_FLYING);
+    }
+
+    /**
+     * Reports whether an entity is below the surface at this moment.
+     *
+     * @param entity The entity to read.
+     * @return True while it is submerged.
+     */
+    static boolean isSubmerged(Object entity) {
+        return predicate(entity, EngineNames.ENTITY_SUBMERGED);
+    }
+
+    /**
+     * Reports whether an entity is standing in water at this moment.
+     *
+     * @param entity The entity to read.
+     * @return True while it is touching water.
+     */
+    static boolean isTouchingWater(Object entity) {
+        return predicate(entity, EngineNames.ENTITY_TOUCHING_WATER);
+    }
+
+    /**
+     * Asks an entity one of its no-argument boolean predicates.
+     *
+     * <p>Shared by every predicate above rather than written out per accessor.
+     * The failure they all need is identical — a pinned name that has moved
+     * reports as "did not return a boolean" naming itself — and four copies of
+     * it is four places for that message to drift.
+     *
+     * @param entity The entity to read.
+     * @param name Pinned accessor name.
+     * @return The entity's own answer.
+     * @throws IllegalStateException When the accessor does not return a boolean.
+     */
+    private static boolean predicate(Object entity, String name) {
+        Object answer =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(entity.getClass(), EngineNames.ENTITY_COMPLETE),
-                        entity);
-        if (!(done instanceof Boolean)) {
+                        EngineAccess.pinnedMethod(entity.getClass(), name), entity);
+        if (!(answer instanceof Boolean)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.ENTITY_COMPLETE + "() did not return a boolean"
-                            + EngineNames.PIN);
+                    "rw-agent: " + name + "() did not return a boolean" + EngineNames.PIN);
         }
-        return ((Boolean) done).booleanValue();
+        return ((Boolean) answer).booleanValue();
     }
 
     /**
@@ -586,6 +653,193 @@ final class Perception {
                     "rw-agent: player field " + field + " is not a boolean" + EngineNames.PIN);
         }
         return ((Boolean) value).booleanValue();
+    }
+
+    /**
+     * One player's scoreboard, as the engine keeps it.
+     *
+     * <p>Carried per player rather than for the local one alone, because the
+     * question worth asking is comparative. "Our army is worth 3,400" says
+     * nothing; "ours is 3,400 against a leader on 22,000" is the whole of the
+     * match report.
+     */
+    static final class PlayerStat {
+
+        private final int team;
+        private final boolean local;
+        private final boolean hostile;
+        private final boolean defeated;
+        private final boolean wiped;
+        private final int income;
+        private final int armyValue;
+        private final int buildingValue;
+
+        PlayerStat(
+                int team,
+                boolean local,
+                boolean hostile,
+                boolean defeated,
+                boolean wiped,
+                int income,
+                int armyValue,
+                int buildingValue) {
+            this.team = team;
+            this.local = local;
+            this.hostile = hostile;
+            this.defeated = defeated;
+            this.wiped = wiped;
+            this.income = income;
+            this.armyValue = armyValue;
+            this.buildingValue = buildingValue;
+        }
+
+        int team() {
+            return this.team;
+        }
+
+        boolean local() {
+            return this.local;
+        }
+
+        boolean hostile() {
+            return this.hostile;
+        }
+
+        boolean defeated() {
+            return this.defeated;
+        }
+
+        boolean wiped() {
+            return this.wiped;
+        }
+
+        int income() {
+            return this.income;
+        }
+
+        int armyValue() {
+            return this.armyValue;
+        }
+
+        int buildingValue() {
+            return this.buildingValue;
+        }
+    }
+
+    /**
+     * Returns the scoreboard for every player still holding a slot.
+     *
+     * <p>Read from the engine's own statistics rather than counted here. It
+     * keeps income, army value and building value per player, charts all three,
+     * and writes them into its own save file — so these are the figures the game
+     * itself would show, and a reimplementation could disagree with them
+     * (wiki: perception-visibility).
+     *
+     * <p>Absent slots are skipped and defeated ones are not: a player who has
+     * just been eliminated is exactly who a run report wants to name, and their
+     * final army value is the measurement that says whether we killed them or
+     * somebody else did.
+     *
+     * @param engine The live engine instance.
+     * @return One entry per occupied slot, in slot order.
+     * @throws IllegalStateException When the roster or a statistic cannot be
+     *     read, which is a pinned name that has moved.
+     */
+    static java.util.List<PlayerStat> playerStats(Object engine) {
+        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+        Object localTeam = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        Object roster;
+        int size;
+        try {
+            roster = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER).get(null);
+            size = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER_SIZE).getInt(null);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot read the player roster" + EngineNames.PIN, e);
+        }
+        if (!(roster instanceof Object[])) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.TEAM_ROSTER + " is not an array" + EngineNames.PIN);
+        }
+        Object[] slots = (Object[]) roster;
+        java.util.List<PlayerStat> stats = new java.util.ArrayList<PlayerStat>();
+        for (int index = 0; index < size && index < slots.length; index++) {
+            Object player = slots[index];
+            if (player == null || isAbsent(player)) {
+                continue;
+            }
+            stats.add(
+                    new PlayerStat(
+                            EngineAccess.readIntField(player, EngineNames.TEAM_ID),
+                            player == localTeam,
+                            localTeam != null && isHostileBetween(localTeam, player),
+                            EngineAccess.readBooleanField(player, EngineNames.PLAYER_DEFEATED),
+                            EngineAccess.readBooleanField(player, EngineNames.PLAYER_WIPED),
+                            statOf(player, EngineNames.STAT_INCOME),
+                            statOf(player, EngineNames.STAT_ARMY_VALUE),
+                            statOf(player, EngineNames.STAT_BUILDING_VALUE)));
+        }
+        return stats;
+    }
+
+    /** Reports whether a player slot is empty rather than occupied. */
+    private static boolean isAbsent(Object player) {
+        Object answer =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(player.getClass(), EngineNames.TEAM_ABSENT),
+                        player);
+        if (!(answer instanceof Boolean)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.TEAM_ABSENT + "() did not return a boolean"
+                            + EngineNames.PIN);
+        }
+        return ((Boolean) answer).booleanValue();
+    }
+
+    /**
+     * Reads one named statistic for one player.
+     *
+     * <p>The constant is found by its own {@code name()} rather than by ordinal,
+     * so a reordered enum fails to find the name instead of silently returning
+     * the neighbouring statistic. {@code name()} is final on {@link Enum} and
+     * returns a stored string, so nothing engine-side runs to answer it.
+     *
+     * @param player The player to measure.
+     * @param constant The statistic's own constant name.
+     * @return The figure.
+     * @throws IllegalStateException When the enum carries no such constant, or
+     *     the read does not return an int.
+     */
+    private static int statOf(Object player, String constant) {
+        Class<?> statClass = EngineAccess.pinnedClass(EngineNames.PLAYER_STAT_CLASS);
+        Object[] constants = statClass.getEnumConstants();
+        if (constants == null) {
+            throw new IllegalStateException(
+                    "rw-agent: " + EngineNames.PLAYER_STAT_CLASS + " is no longer an enum"
+                            + EngineNames.PIN);
+        }
+        for (Object candidate : constants) {
+            if (!constant.equals(((Enum<?>) candidate).name())) {
+                continue;
+            }
+            Object value =
+                    EngineAccess.invoke(
+                            EngineAccess.pinnedMethod(
+                                    statClass,
+                                    EngineNames.PLAYER_STAT_READ,
+                                    EngineAccess.pinnedClass(EngineNames.TEAM_CLASS)),
+                            candidate,
+                            player);
+            if (!(value instanceof Integer)) {
+                throw new IllegalStateException(
+                        "rw-agent: statistic " + constant + " did not return an int"
+                                + EngineNames.PIN);
+            }
+            return ((Integer) value).intValue();
+        }
+        throw new IllegalStateException(
+                "rw-agent: " + EngineNames.PLAYER_STAT_CLASS + " carries no constant named "
+                        + constant + EngineNames.PIN);
     }
 
     /**

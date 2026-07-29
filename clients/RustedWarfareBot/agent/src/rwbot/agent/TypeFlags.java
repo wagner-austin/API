@@ -59,9 +59,9 @@ final class TypeFlags {
             flags.put(Perception.nameOfType(type), Boolean.valueOf(needsPool(type)));
         }
 
-        java.util.LinkedHashMap<String, Float> reach = new java.util.LinkedHashMap<String, Float>();
+        java.util.LinkedHashMap<String, Combat> reach = new java.util.LinkedHashMap<String, Combat>();
         for (Object type : allTypes()) {
-            reach.put(Perception.nameOfType(type), Float.valueOf(attackRange(type)));
+            reach.put(Perception.nameOfType(type), combatOf(type));
         }
 
         StringBuilder out = new StringBuilder();
@@ -71,29 +71,86 @@ final class TypeFlags {
                     .append('\n');
         }
         index = 0;
-        for (java.util.Map.Entry<String, Float> entry : reach.entrySet()) {
-            out.append(combatRecord(index++, entry.getKey(), entry.getValue().floatValue()))
-                    .append('\n');
+        for (java.util.Map.Entry<String, Combat> entry : reach.entrySet()) {
+            out.append(combatRecord(index++, entry.getKey(), entry.getValue())).append('\n');
         }
         return out.toString();
     }
 
     /**
-     * Returns a type's attack range in world units, or zero when it is unarmed.
+     * One type's combat facts, as its prototype answers them.
+     *
+     * <p>Range and reachable layers travel together because they are read in one
+     * pass over one prototype and are meaningless apart: a range with no layers
+     * describes a unit that can shoot 130 units at nothing.
+     */
+    static final class Combat {
+
+        /** The unarmed answer: no range, and no layer it can reach. */
+        static final Combat UNARMED = new Combat(0.0f, false, false, false, false);
+
+        private final float attackRange;
+        private final boolean hitsLand;
+        private final boolean hitsAir;
+        private final boolean hitsUnderwater;
+        private final boolean hitsLandOutOfWater;
+
+        Combat(
+                float attackRange,
+                boolean hitsLand,
+                boolean hitsAir,
+                boolean hitsUnderwater,
+                boolean hitsLandOutOfWater) {
+            this.attackRange = attackRange;
+            this.hitsLand = hitsLand;
+            this.hitsAir = hitsAir;
+            this.hitsUnderwater = hitsUnderwater;
+            this.hitsLandOutOfWater = hitsLandOutOfWater;
+        }
+
+        float attackRange() {
+            return this.attackRange;
+        }
+
+        boolean hitsLand() {
+            return this.hitsLand;
+        }
+
+        boolean hitsAir() {
+            return this.hitsAir;
+        }
+
+        boolean hitsUnderwater() {
+            return this.hitsUnderwater;
+        }
+
+        boolean hitsLandOutOfWater() {
+            return this.hitsLandOutOfWater;
+        }
+    }
+
+    /**
+     * Returns a type's range and the layers it can shoot onto.
      *
      * <p>Read off the engine's prototype for the type rather than off a live
      * unit, so asking costs a map lookup and spawns nothing.
      *
-     * <p>Unarmed types are reported as zero rather than omitted. "This type
-     * cannot shoot" is an answer the threat model needs, and a missing record
-     * would be indistinguishable from a type the dump never reached — which is
-     * exactly the ambiguity that made the stat catalogue unsafe to read reach
-     * from (wiki: policy-threat).
+     * <p>Unarmed types are reported as zero range and no reachable layer rather
+     * than omitted. "This type cannot shoot" is an answer the threat model
+     * needs, and a missing record would be indistinguishable from a type the
+     * dump never reached — which is exactly the ambiguity that made the stat
+     * catalogue unsafe to read reach from (wiki: policy-threat).
+     *
+     * <p><b>The layer predicates are forced to false for the unarmed rather
+     * than reported as the engine answers them.</b> Their base implementations
+     * return true for air and land regardless of armament, because the engine
+     * only ever consults them after establishing that a weapon exists. Reporting
+     * that unfiltered would put "a Builder can shoot aircraft" on the wire.
      *
      * @param type The unit type.
-     * @return Its attack range, or zero.
+     * @return Its combat facts, or {@link Combat#UNARMED}.
      */
-    private static float attackRange(Object type) {
+    private static Combat combatOf(Object type) {
         Object prototype =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
@@ -107,14 +164,14 @@ final class TypeFlags {
         // holding a weapon, which is the only question being asked.
         if (prototype == null
                 || !EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS).isInstance(prototype)) {
-            return 0.0f;
+            return Combat.UNARMED;
         }
         Object armed =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(prototype.getClass(), EngineNames.UNIT_ARMED),
                         prototype);
         if (!Boolean.TRUE.equals(armed)) {
-            return 0.0f;
+            return Combat.UNARMED;
         }
         Object range =
                 EngineAccess.invoke(
@@ -126,7 +183,34 @@ final class TypeFlags {
                     "rw-agent: " + EngineNames.UNIT_ATTACK_RANGE + "() did not return a float"
                             + EngineNames.PIN);
         }
-        return ((Float) range).floatValue();
+        return new Combat(
+                ((Float) range).floatValue(),
+                layerPredicate(prototype, EngineNames.UNIT_HITS_LAND),
+                layerPredicate(prototype, EngineNames.UNIT_HITS_AIR),
+                layerPredicate(prototype, EngineNames.UNIT_HITS_UNDERWATER),
+                layerPredicate(prototype, EngineNames.UNIT_HITS_LAND_OUT_OF_WATER));
+    }
+
+    /**
+     * Asks a prototype one of its layer-attack predicates.
+     *
+     * @param prototype The type's prototype entity.
+     * @param name Pinned accessor name.
+     * @return The prototype's own answer.
+     * @throws IllegalStateException When the accessor does not return a boolean,
+     *     which is a pinned name that has moved rather than a unit that cannot
+     *     answer.
+     */
+    private static boolean layerPredicate(Object prototype, String name) {
+        Object answer =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(prototype.getClass(), name), prototype);
+        if (!(answer instanceof Boolean)) {
+            throw new IllegalStateException(
+                    "rw-agent: " + name + "() on " + prototype.getClass().getName()
+                            + " did not return a boolean" + EngineNames.PIN);
+        }
+        return ((Boolean) answer).booleanValue();
     }
 
     /**
@@ -137,11 +221,16 @@ final class TypeFlags {
      * carrying an attack range would be a lie the decoder then has to keep
      * telling. The file already carries more than one kind.
      */
-    static String combatRecord(int index, String name, float attackRange) {
+    static String combatRecord(int index, String name, Combat combat) {
         StringBuilder out = new StringBuilder();
         out.append("{\"kind\":\"unitcombat\",\"index\":").append(index).append(",\"name\":");
         Json.quote(out, name);
-        out.append(",\"attack_range\":").append(attackRange).append('}');
+        out.append(",\"attack_range\":").append(combat.attackRange());
+        out.append(",\"hits_land\":").append(combat.hitsLand());
+        out.append(",\"hits_air\":").append(combat.hitsAir());
+        out.append(",\"hits_underwater\":").append(combat.hitsUnderwater());
+        out.append(",\"hits_land_out_of_water\":").append(combat.hitsLandOutOfWater());
+        out.append('}');
         return out.toString();
     }
 

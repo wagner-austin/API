@@ -23,7 +23,7 @@ final class WireChecks {
     static int checkStateStream() {
         int failures = 0;
 
-        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 4000, false, false, 6);
+        String frame = StateStream.frameRecord(1918, 6461, 3, 2, 5, 6, 4000, false, false, 6);
         // Pinned byte-for-byte on purpose. This is a wire contract, and the
         // consumer parses it strictly, so a field appearing, vanishing or being
         // renamed must fail here rather than at the far end of a socket. That
@@ -32,9 +32,32 @@ final class WireChecks {
         failures += Check.expect(
                 frame.equals(
                         "{\"kind\":\"frame\",\"frame\":1918,\"clock_ms\":6461,"
-                                + "\"visible\":3,\"pools\":2,\"options\":5,\"credits\":4000,"
+                                + "\"visible\":3,\"pools\":2,\"options\":5,\"players\":6,"
+                                + "\"credits\":4000,"
                                 + "\"defeated\":false,\"wiped\":false,\"players_left\":6}"),
                 "frame record is exact");
+
+        // The scoreboard the engine keeps and the bot used to regress for.
+        // Pinned byte-for-byte like every other record the consumer counts.
+        failures += Check.expect(
+                StateStream.playerRecord(
+                                1918,
+                                2,
+                                new Perception.PlayerStat(
+                                        3, false, true, false, false, 12, 4200, 9100))
+                        .equals(
+                                "{\"kind\":\"player\",\"frame\":1918,\"index\":2,\"team\":3,"
+                                        + "\"local\":false,\"hostile\":true,\"defeated\":false,"
+                                        + "\"wiped\":false,\"income\":12,\"army_value\":4200,"
+                                        + "\"building_value\":9100}"),
+                "player record is exact");
+        // A player who has just been eliminated is exactly who a report wants to
+        // name, so their slot is carried rather than dropped.
+        failures += Check.expect(
+                StateStream.playerRecord(
+                                1, 0, new Perception.PlayerStat(1, true, false, true, true, 0, 0, 0))
+                        .contains("\"defeated\":true,\"wiped\":true"),
+                "an eliminated player is still on the wire");
 
         // Pinned for the same reason, and separately: the consumer counts these
         // off the frame record, so the two must agree about what a sample
@@ -50,27 +73,44 @@ final class WireChecks {
                 "a pool record never contains a newline");
 
         String option =
-                StateStream.optionRecord(1918, 0, new BuildOptions.Option(228L, "tank", 3, false, true));
+                StateStream.optionRecord(
+                        1918, 0, new BuildOptions.Option(228L, "tank", 3, false, true, true));
         failures += Check.expect(
                 option.equals(
                         "{\"kind\":\"option\",\"frame\":1918,\"index\":0,\"unit_id\":228,"
                                 + "\"produces\":\"tank\",\"action\":3,\"placed\":false,"
-                                + "\"available\":true}"),
+                                + "\"available\":true,\"makes_something\":true}"),
                 "option record is exact");
         // Reported rather than filtered out. An action a unit has but cannot use
         // yet is a wait; one it does not have at all is a dead plan entry, and
         // the planner can only tell them apart if both are on the wire.
         failures += Check.expect(
-                StateStream.optionRecord(1, 0, new BuildOptions.Option(1L, "x", 0, true, false))
-                        .endsWith("\"available\":false}"),
+                StateStream.optionRecord(
+                                1, 0, new BuildOptions.Option(1L, "x", 0, true, false, true))
+                        .contains("\"available\":false"),
                 "an option a unit cannot use yet says so rather than being omitted");
         // Which verb orders it. A structure is placed at a chosen point; a unit
         // is queued in the building that makes it, and the two are dispatched
         // differently, so the flag has to survive the wire.
         failures += Check.expect(
-                StateStream.optionRecord(1, 0, new BuildOptions.Option(1L, "x", 0, true, true))
+                StateStream.optionRecord(
+                                1, 0, new BuildOptions.Option(1L, "x", 0, true, true, true))
                         .contains("\"placed\":true"),
                 "a placed option is marked as one");
+        // An action that concerns no type at all reaches the wire rather than
+        // being dropped. Filtering these in the agent is what hid upgrades: the
+        // engine models them as conversions, and a planner cannot weigh an
+        // action it was never told about (wiki: policy-holding-ground).
+        failures += Check.expect(
+                StateStream.optionRecord(
+                                1, 0, new BuildOptions.Option(1L, "", 0, false, true, false))
+                        .contains("\"produces\":\"\",\"action\":0,\"placed\":false"),
+                "an action concerning no type is published rather than dropped");
+        failures += Check.expect(
+                StateStream.optionRecord(
+                                1, 0, new BuildOptions.Option(1L, "x", 0, false, true, false))
+                        .endsWith("\"makes_something\":false}"),
+                "whether an action makes something is the planner's to judge, not the agent's");
 
         // The placement flags are a separate stream with the same constraint.
         failures += Check.expect(
@@ -86,6 +126,27 @@ final class WireChecks {
                 TypeFlags.record(0, "a\"b", false).contains("\"name\":\"a\\\"b\""),
                 "a quote in a mod's type name is escaped");
 
+        // Reach and the layers it reaches onto. The planner reads both off one
+        // record because a range with no reachable layer describes a unit that
+        // shoots nothing, and the two were read in one pass over one prototype.
+        failures += Check.expect(
+                TypeFlags.combatRecord(
+                                7, "c_tank", new TypeFlags.Combat(130.0f, true, false, false, true))
+                        .equals(
+                                "{\"kind\":\"unitcombat\",\"index\":7,\"name\":\"c_tank\","
+                                        + "\"attack_range\":130.0,\"hits_land\":true,"
+                                        + "\"hits_air\":false,\"hits_underwater\":false,"
+                                        + "\"hits_land_out_of_water\":true}"),
+                "unit-combat record is exact");
+        failures += Check.expect(
+                TypeFlags.combatRecord(0, "builder", TypeFlags.Combat.UNARMED)
+                        .equals(
+                                "{\"kind\":\"unitcombat\",\"index\":0,\"name\":\"builder\","
+                                        + "\"attack_range\":0.0,\"hits_land\":false,"
+                                        + "\"hits_air\":false,\"hits_underwater\":false,"
+                                        + "\"hits_land_out_of_water\":false}"),
+                "an unarmed type reaches no layer rather than inheriting the base predicates");
+
         // The consumer splits on newlines before parsing, so a newline inside
         // a record would silently become two malformed ones. Code points
         // rather than character literals: 10 is LF, 13 is CR.
@@ -97,13 +158,13 @@ final class WireChecks {
                 "a record is exactly one object");
 
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"visible\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"visible\":0"),
                 "an empty roster is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"pools\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"pools\":0"),
                 "a map with no pool in sight is still a record");
         failures += Check.expect(
-                StateStream.frameRecord(0, 0, 0, 0, 0, 0, false, false, 0).contains("\"options\":0"),
+                StateStream.frameRecord(0, 0, 0, 0, 0, 0, 0, false, false, 0).contains("\"options\":0"),
                 "a player who can make nothing is still a record");
         return failures;
     }

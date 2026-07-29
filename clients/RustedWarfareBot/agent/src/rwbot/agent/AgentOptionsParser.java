@@ -35,6 +35,14 @@ final class AgentOptionsParser {
     private static final String BUILD_TYPE = "buildType";
     private static final String CHANNEL_PORT = "channelPort";
     private static final String SAMPLE_MS = "sampleIntervalMs";
+    private static final String MATCH_MAP = "matchMap";
+    private static final String MATCH_OPPONENTS = "matchOpponents";
+    private static final String MATCH_DIFFICULTY = "matchDifficulty";
+
+    /** Bounds of the engine's difficulty scale: Very Easy to Impossible. */
+    private static final int MIN_DIFFICULTY = -2;
+
+    private static final int MAX_DIFFICULTY = 3;
 
     /** Default move offset: far enough that arrival is unambiguous, in world units. */
     private static final float[] DEFAULT_MOVE_BY = {240.0f, 0.0f};
@@ -71,9 +79,15 @@ final class AgentOptionsParser {
                     "",
                     false,
                     0,
-                    DEFAULT_SAMPLE_MS);
+                    DEFAULT_SAMPLE_MS,
+                    "",
+                    0,
+                    0);
         }
 
+        String matchMap = "";
+        int matchOpponents = 0;
+        int matchDifficulty = 0;
         int lockstep = 0;
         long randomSeed = 0L;
         int[] discoverAt = new int[0];
@@ -143,13 +157,23 @@ final class AgentOptionsParser {
                 lockstep = parseLockstep(value);
             } else if (SAMPLE_MS.equals(key)) {
                 sampleIntervalMs = parseInterval(value);
+            } else if (MATCH_MAP.equals(key)) {
+                if (value.isEmpty()) {
+                    throw new IllegalArgumentException(MATCH_MAP + " expects a map path");
+                }
+                matchMap = value;
+            } else if (MATCH_OPPONENTS.equals(key)) {
+                matchOpponents = parseOpponents(value);
+            } else if (MATCH_DIFFICULTY.equals(key)) {
+                matchDifficulty = parseDifficulty(value);
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
                                 + EXIT_AFTER + ", " + INSPECT_FIELDS + ", " + FIND_UNDER + ", " + STATE_OUT + ", "
                                 + TYPE_FLAGS_OUT + ", " + AI_ZONES + ", "
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
-                                + SAMPLE_MS + ", " + RANDOM_SEED + ", " + LOCKSTEP);
+                                + SAMPLE_MS + ", " + RANDOM_SEED + ", " + LOCKSTEP + ", "
+                                + MATCH_MAP + ", " + MATCH_OPPONENTS + ", " + MATCH_DIFFICULTY);
             }
         }
         return new AgentOptions(
@@ -167,7 +191,54 @@ final class AgentOptionsParser {
                 typeFlagsOut,
                 aiZones,
                 channelPort,
-                sampleIntervalMs);
+                sampleIntervalMs,
+                matchMap,
+                matchOpponents,
+                matchDifficulty);
+    }
+
+    /**
+     * Parses the opponent count, which must be positive.
+     *
+     * <p>Zero is rejected rather than read as "no opponents", because zero is
+     * what "no match was asked for" means: the engine's own default of four
+     * stands unless a count is given.
+     */
+    private static int parseOpponents(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    MATCH_OPPONENTS + " expects a whole count, got " + value, e);
+        }
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(
+                    MATCH_OPPONENTS + " expects a positive count, got " + parsed);
+        }
+        return parsed;
+    }
+
+    /** Parses the AI difficulty, which the engine defines over -2 to 3. */
+    private static int parseDifficulty(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    MATCH_DIFFICULTY + " expects a whole number, got " + value, e);
+        }
+        if (parsed < MIN_DIFFICULTY || parsed > MAX_DIFFICULTY) {
+            throw new IllegalArgumentException(
+                    MATCH_DIFFICULTY
+                            + " expects "
+                            + MIN_DIFFICULTY
+                            + " to "
+                            + MAX_DIFFICULTY
+                            + " (Very Easy to Impossible), got "
+                            + parsed);
+        }
+        return parsed;
     }
 
     /** Parses the lockstep frame interval, which must be a positive count. */

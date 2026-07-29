@@ -40,18 +40,21 @@ final class BuildOptions {
         private final int actionIndex;
         private final boolean placed;
         private final boolean available;
+        private final boolean makesSomething;
 
         Option(
                 long unitId,
                 String produces,
                 int actionIndex,
                 boolean placed,
-                boolean available) {
+                boolean available,
+                boolean makesSomething) {
             this.unitId = unitId;
             this.produces = produces;
             this.actionIndex = actionIndex;
             this.placed = placed;
             this.available = available;
+            this.makesSomething = makesSomething;
         }
 
         long unitId() {
@@ -79,6 +82,27 @@ final class BuildOptions {
 
         boolean available() {
             return available;
+        }
+
+        /**
+         * Whether the engine calls this an action that makes something.
+         *
+         * <p>Published rather than filtered on, and that distinction cost a
+         * whole category of the game. This class used to drop any action that
+         * neither placed something nor answered true here, on the reading that
+         * the rest were stops and rallies. An upgrade is neither: the asset
+         * declares it as {@code convertTo}, and the engine files conversions in
+         * a separate list from build actions before wrapping them back into the
+         * one the agent reads. Opponents are observed holding upgraded
+         * extractors and upgraded turrets while ours publish no options at all
+         * (wiki: policy-holding-ground).
+         *
+         * <p>Whether an action is worth taking is a decision, and decisions
+         * belong to the planner. The agent's job is to say what the engine
+         * offers.
+         */
+        boolean makesSomething() {
+            return makesSomething;
         }
     }
 
@@ -131,23 +155,25 @@ final class BuildOptions {
                 if (action == null) {
                     continue;
                 }
+                // Every action is published, including the ones that concern no
+                // type at all. Two filters used to live here -- drop an action
+                // whose type is null, and drop one that neither places nor
+                // "makes something" -- and together they hid upgrades, which
+                // the engine models as conversions rather than as builds. The
+                // planner can ignore an action; it cannot ignore one it was
+                // never told about (wiki: policy-holding-ground).
                 Object type = EngineAccess.invoke(makes, action);
-                if (type == null) {
-                    continue;
-                }
-                boolean placed = EngineAccess.invoke(placedType, action) != null;
-                if (!placed && !Boolean.TRUE.equals(EngineAccess.invoke(makesSomething, action))) {
-                    continue;
-                }
                 options.add(
                         new Option(
                                 id,
-                                Perception.nameOfType(type),
+                                type == null ? "" : Perception.nameOfType(type),
                                 intOf(
                                         EngineAccess.invoke(index, action),
                                         EngineNames.ACTION_INDEX),
-                                placed,
-                                isUsable(action, unit, available, locked)));
+                                EngineAccess.invoke(placedType, action) != null,
+                                isUsable(action, unit, available, locked),
+                                Boolean.TRUE.equals(
+                                        EngineAccess.invoke(makesSomething, action))));
             }
         }
         return options;
@@ -169,11 +195,16 @@ final class BuildOptions {
         Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
         Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
         Method makes = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES);
-        Method makesSomething =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES_SOMETHING);
+        // Matched on the type alone. This used to skip any action the engine
+        // did not call "makes something", which is the same filter the listing
+        // path applied -- so removing it there and leaving it here produced the
+        // worst of both: the planner was offered an upgrade it could see and
+        // then the dispatch could not find it, and the agent threw inside the
+        // engine's script thread and crashed the game. An action naming the
+        // wanted type IS the action, whatever the engine calls its category
+        // (wiki: policy-holding-ground).
         for (Object action : actionsOf(actions, unit)) {
-            if (action == null
-                    || !Boolean.TRUE.equals(EngineAccess.invoke(makesSomething, action))) {
+            if (action == null) {
                 continue;
             }
             Object type = EngineAccess.invoke(makes, action);
@@ -199,12 +230,12 @@ final class BuildOptions {
         Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
         Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
         Method makes = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES);
-        Method makesSomething =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES_SOMETHING);
         StringBuilder out = new StringBuilder();
+        // Listed on the same rule the lookup uses, so the failure message and
+        // the lookup can never disagree. When they did, an extractor that was
+        // offering an upgrade was reported as able to "make nothing".
         for (Object action : actionsOf(actions, unit)) {
-            if (action == null
-                    || !Boolean.TRUE.equals(EngineAccess.invoke(makesSomething, action))) {
+            if (action == null) {
                 continue;
             }
             Object type = EngineAccess.invoke(makes, action);

@@ -61,11 +61,25 @@ public final class Premain {
                     options.buildType());
         }
         if (options.channelRequested()) {
-            new CommandChannel(
-                            options.channelPort(),
-                            options.sampleIntervalMs(),
-                            options.lockstepFrames())
-                    .start();
+            Runnable openChannel =
+                    () ->
+                            new CommandChannel(
+                                            options.channelPort(),
+                                            options.sampleIntervalMs(),
+                                            options.lockstepFrames())
+                                    .start();
+            // A requested match replaces the engine's game object, so the
+            // channel is opened only once that match exists -- see MatchSetup
+            // for what sampling the discarded one cost.
+            if (options.matchRequested()) {
+                MatchSetup.schedule(
+                        options.matchMap(),
+                        options.matchOpponents(),
+                        options.matchDifficulty(),
+                        openChannel);
+            } else {
+                openChannel.run();
+            }
         }
         Log.info("ready; patched " + targets.size() + " class(es)");
     }

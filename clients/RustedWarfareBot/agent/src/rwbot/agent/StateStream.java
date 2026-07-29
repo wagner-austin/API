@@ -52,6 +52,7 @@ final class StateStream {
         java.util.List<Object> visible = Perception.visibleEntities(engine);
         java.util.List<MapTiles.Pool> pools = MapTiles.visiblePools(engine);
         java.util.List<BuildOptions.Option> options = BuildOptions.ownedOptions(engine);
+        java.util.List<Perception.PlayerStat> players = Perception.playerStats(engine);
         int frame = EngineAccess.readIntField(engine, FRAME_FIELD);
         int clock = EngineAccess.readIntField(engine, CLOCK_FIELD);
 
@@ -62,6 +63,7 @@ final class StateStream {
                                 visible.size(),
                                 pools.size(),
                                 options.size(),
+                                players.size(),
                                 Perception.creditsOf(engine),
                                 Perception.isDefeated(engine),
                                 Perception.isWipedOut(engine),
@@ -83,6 +85,47 @@ final class StateStream {
         for (int index = 0; index < options.size(); index++) {
             out.append(optionRecord(frame, index, options.get(index))).append('\n');
         }
+        for (int index = 0; index < players.size(); index++) {
+            out.append(playerRecord(frame, index, players.get(index))).append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
+     * Renders one player's scoreboard.
+     *
+     * <p>Every player, not only ours. Income, army value and building value are
+     * the engine's own statistics, and the reason they are worth carrying is
+     * that they are comparative: they are what separates "we are behind" from
+     * "we are behind the leader and ahead of three others", which the visible
+     * enemy count cannot say because it measures our own vision as much as
+     * their army.
+     */
+    static String playerRecord(int frame, int index, Perception.PlayerStat player) {
+        StringBuilder out = new StringBuilder();
+        out.append('{');
+        appendString(out, "kind", "player");
+        out.append(',');
+        appendInt(out, "frame", frame);
+        out.append(',');
+        appendInt(out, "index", index);
+        out.append(',');
+        appendInt(out, "team", player.team());
+        out.append(',');
+        appendBool(out, "local", player.local());
+        out.append(',');
+        appendBool(out, "hostile", player.hostile());
+        out.append(',');
+        appendBool(out, "defeated", player.defeated());
+        out.append(',');
+        appendBool(out, "wiped", player.wiped());
+        out.append(',');
+        appendInt(out, "income", player.income());
+        out.append(',');
+        appendInt(out, "army_value", player.armyValue());
+        out.append(',');
+        appendInt(out, "building_value", player.buildingValue());
+        out.append('}');
         return out.toString();
     }
 
@@ -93,6 +136,7 @@ final class StateStream {
             int visibleCount,
             int poolCount,
             int optionCount,
+            int playerCount,
             int credits,
             boolean defeated,
             boolean wiped,
@@ -110,6 +154,8 @@ final class StateStream {
         appendInt(out, "pools", poolCount);
         out.append(',');
         appendInt(out, "options", optionCount);
+        out.append(',');
+        appendInt(out, "players", playerCount);
         out.append(',');
         appendInt(out, "credits", credits);
         out.append(',');
@@ -147,6 +193,8 @@ final class StateStream {
         appendBool(out, "placed", option.placed());
         out.append(',');
         appendBool(out, "available", option.available());
+        out.append(',');
+        appendBool(out, "makes_something", option.makesSomething());
         out.append('}');
         return out.toString();
     }
@@ -226,6 +274,12 @@ final class StateStream {
         appendString(out, "movement", Perception.movementOf(entity));
         out.append(',');
         appendInt(out, "group", Perception.pathGroupOf(entity));
+        out.append(',');
+        appendBool(out, "flying", Perception.isFlying(entity));
+        out.append(',');
+        appendBool(out, "submerged", Perception.isSubmerged(entity));
+        out.append(',');
+        appendBool(out, "touching_water", Perception.isTouchingWater(entity));
         out.append(',');
         appendFloat(out, "hp", health[0]);
         out.append(',');

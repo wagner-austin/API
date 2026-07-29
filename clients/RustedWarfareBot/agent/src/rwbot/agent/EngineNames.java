@@ -40,6 +40,35 @@ final class EngineNames {
 
     static final String SCRIPTS_CLASS = "com.corrodinggames.librocket.scripts.ScriptEngine";
 
+    /**
+     * Starts a match with a chosen map, opponent count and team split.
+     *
+     * <p>What {@code Root.loadConfigCommon} ends at, after reading every figure
+     * out of a GUI document. Calling it directly is what lets the map and the
+     * opponent count be experiment variables rather than Java fallbacks
+     * (wiki: policy-determinism).
+     */
+    static final String MATCH_STARTER_CLASS = "com.corrodinggames.rts.appFramework.i";
+
+    /** {@code (String map, boolean skirmish, int ais, int allies, boolean, boolean)}. */
+    static final String MATCH_START_METHOD = "a";
+
+    /** The settings object on the engine, holding {@link #AI_DIFFICULTY_FIELD}. */
+    static final String SETTINGS_FIELD = "bQ";
+
+    /** Queues one script line for the engine to run on its own thread. */
+    static final String SCRIPT_QUEUE_METHOD = "addScriptToQueue";
+
+    /**
+     * AI difficulty, -2 to 3.
+     *
+     * <p>Not obfuscated, because {@code SettingsEngine} is not. It is an income
+     * multiplier applied to AI players only -- 0.4x, 0.7x, 1.0x, 1.4x, 1.8x and
+     * 3.7x across the scale -- so at the default of 0 an opponent earns exactly
+     * what the bot does.
+     */
+    static final String AI_DIFFICULTY_FIELD = "aiDifficulty";
+
     /** The unit-type interface a placement command carries. */
     static final String TYPE_CLASS = "com.corrodinggames.rts.game.units.as";
 
@@ -355,6 +384,78 @@ final class EngineNames {
     static final String UNIT_ATTACK_RANGE = "m";
 
     /**
+     * Orderable predicate: whether it can shoot a target on the water layer.
+     *
+     * <p>These three are the accessors the engine's own attackability test
+     * consults, rather than a model of it. That test reads, in the decompile,
+     * {@code if (target.isFlying()) return canAttackAir(); if
+     * (target.isUnderwater()) return canAttackUnderwater(); ... return
+     * canAttackLand();} — so asking the same three accessors per type answers
+     * the same question the engine will answer at fire time, one dispatch
+     * earlier.
+     *
+     * <p>The mapping is confirmed through the asset loader rather than guessed
+     * from the accessor order: the custom-unit override returns the
+     * {@code canAttackUnderwaterUnits}, {@code canAttackFlyingUnits} and
+     * {@code canAttackLandUnits} predicates respectively, which are the three
+     * keys an {@code .ini} declares in its {@code [attack]} section.
+     *
+     * <p><b>Read on the prototype, so a dynamic condition is not honoured.</b>
+     * A unit may declare {@code canAttackCondition} as a logic expression
+     * evaluated against the live unit; asking the prototype evaluates it against
+     * the prototype instead. Nothing in the base game's buildable set does that,
+     * and the alternative — asking per attacker-target pair every sample — is a
+     * reflective call per pair per tick for an answer that does not change.
+     */
+    static final String UNIT_HITS_UNDERWATER = "ae";
+
+    /** Orderable predicate: whether it can shoot a target on the air layer. */
+    static final String UNIT_HITS_AIR = "af";
+
+    /** Orderable predicate: whether it can shoot a target on the ground. */
+    static final String UNIT_HITS_LAND = "ag";
+
+    /**
+     * Orderable predicate: whether its ground fire reaches targets clear of water.
+     *
+     * <p>The {@code canAttackNotTouchingWaterUnits} key, and the one branch of
+     * the engine's test that is neither air nor underwater: a weapon declaring
+     * this false — a torpedo, in practice — hits a ground target only while that
+     * target is in the water. True for everything the base game lets a player
+     * build, which is exactly why it is carried rather than assumed: an
+     * assumption that holds for every unit tested so far is the kind that fails
+     * first on a water map.
+     */
+    static final String UNIT_HITS_LAND_OUT_OF_WATER = "ah";
+
+    /**
+     * Entity predicate: whether it is airborne right now.
+     *
+     * <p>State, not type. A gunship that has landed answers false and becomes
+     * shootable by units that cannot hit aircraft, so this is read per entity
+     * per sample rather than derived from the type once.
+     */
+    static final String ENTITY_FLYING = "i";
+
+    /**
+     * Entity predicate: whether it is below the surface right now.
+     *
+     * <p>State, like {@link #ENTITY_FLYING}: the engine implements it as a
+     * height comparison, so a submarine answers true only while submerged and a
+     * surfaced one is an ordinary target.
+     */
+    static final String ENTITY_SUBMERGED = "Q";
+
+    /**
+     * Entity predicate: whether it is standing in water.
+     *
+     * <p>The other half of {@link #UNIT_HITS_LAND_OUT_OF_WATER}. Also a height
+     * comparison, so an amphibious unit answers differently on either side of
+     * the shoreline.
+     */
+    static final String ENTITY_TOUCHING_WATER = "cH";
+
+    /**
      * The engine's terrain-connectivity utility.
      *
      * <p>Holds the answer to "can this thing get there", which the bot
@@ -500,6 +601,50 @@ final class EngineNames {
      * engine's verdict rather than our arithmetic (wiki: policy-grading).
      */
     static final String PLAYERS_REMAINING = "g";
+
+    /**
+     * The playable-slot array the engine's own survivor count walks.
+     *
+     * <p>There are two player arrays and only this one is the roster. The other
+     * is a display list that also carries the neutral and observer pseudo-teams,
+     * so counting it would report players the match does not have. This is the
+     * array {@link #PLAYERS_REMAINING} itself iterates, which is what pins it.
+     */
+    static final String TEAM_ROSTER = "as";
+
+    /** How many slots of {@link #TEAM_ROSTER} are in play. */
+    static final String TEAM_ROSTER_SIZE = "c";
+
+    /** Team predicate: whether the slot is empty rather than a player. */
+    static final String TEAM_ABSENT = "b";
+
+    /**
+     * The engine's own per-player statistic, as an enum of readable names.
+     *
+     * <p>The bot measured income by regressing a credit balance against the
+     * clock across windows in which it deliberately bought nothing. The engine
+     * has the figure. This enum is how it asks for it, and its constants name
+     * themselves — {@code income}, {@code armyValue}, {@code buildingValue},
+     * {@code credits} — because ProGuard renamed the fields and left the
+     * constant name strings alone (wiki: engine-name-oracle).
+     *
+     * <p>Matching on those names rather than on ordinal is the point: a
+     * reordered enum would silently swap army value for income, and a renamed
+     * one fails loudly instead.
+     */
+    static final String PLAYER_STAT_CLASS = "com.corrodinggames.rts.gameFramework.g.f";
+
+    /** Reads one statistic for one player. Takes a {@link #TEAM_CLASS}. */
+    static final String PLAYER_STAT_READ = "a";
+
+    /** {@link #PLAYER_STAT_CLASS} constant: credits earned per second. */
+    static final String STAT_INCOME = "income";
+
+    /** {@link #PLAYER_STAT_CLASS} constant: the value of everything mobile. */
+    static final String STAT_ARMY_VALUE = "armyValue";
+
+    /** {@link #PLAYER_STAT_CLASS} constant: the value of everything standing. */
+    static final String STAT_BUILDING_VALUE = "buildingValue";
 
     static final String PIN = " -- pinned build is 1.15 (code 176, build #28)";
 }

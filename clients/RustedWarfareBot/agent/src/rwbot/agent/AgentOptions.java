@@ -30,6 +30,9 @@ final class AgentOptions {
     private final String buildType;
     private final int channelPort;
     private final int sampleIntervalMs;
+    private final String matchMap;
+    private final int matchOpponents;
+    private final int matchDifficulty;
 
     AgentOptions(
             int lockstepFrames,
@@ -46,7 +49,13 @@ final class AgentOptions {
             String typeFlagsPath,
             boolean aiZones,
             int channelPort,
-            int sampleIntervalMs) {
+            int sampleIntervalMs,
+            String matchMap,
+            int matchOpponents,
+            int matchDifficulty) {
+        this.matchMap = matchMap;
+        this.matchOpponents = matchOpponents;
+        this.matchDifficulty = matchDifficulty;
         this.lockstepFrames = lockstepFrames;
         this.randomSeed = randomSeed;
         this.discoverAtSeconds = discoverAtSeconds;
@@ -197,6 +206,33 @@ final class AgentOptions {
     /** Whether a seed was asked for at all. */
     boolean seedRequested() {
         return randomSeed != 0L;
+    }
+
+    /** Map to start, as the engine names it. Empty when none was asked for. */
+    String matchMap() {
+        return matchMap;
+    }
+
+    /** How many AI players to face. */
+    int matchOpponents() {
+        return matchOpponents;
+    }
+
+    /** AI difficulty, -2 Very Easy to 3 Impossible. */
+    int matchDifficulty() {
+        return matchDifficulty;
+    }
+
+    /**
+     * Whether a match was asked for at all.
+     *
+     * <p>Keyed on the map rather than on the opponent count, because a map is
+     * the one figure with no sensible engine default to fall back to: the
+     * hardcoded one is a ten-player free-for-all nobody chose
+     * (wiki: policy-determinism).
+     */
+    boolean matchRequested() {
+        return !matchMap.isEmpty();
     }
 
     String typeFlagsPath() {
