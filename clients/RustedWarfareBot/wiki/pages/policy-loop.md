@@ -8,6 +8,8 @@ related:
   - "[[runtime-split-java-agent-python-brain]]"
   - "[[mechanics-resource-pools]]"
   - "[[wire-contract-ndjson]]"
+  - "[[policy-budget]]"
+  - "[[policy-verdict]]"
 source_paths:
   - "wiki/sources/m9-policy/plan-completed.txt:5"
   - "wiki/sources/m9-policy/plan-stalled-on-laboratory.txt:5"
@@ -20,14 +22,46 @@ source_paths:
   - "wiki/sources/m12-produce/produce-run.log:437"
   - "src/rw_bot/policy/build_order.py"
   - "src/rw_bot/policy/runner.py"
+  - "src/rw_bot/policy/campaign.py"
+  - "src/rw_bot/policy/budget.py"
   - "scripts/play.py"
 game_version: "1.15 (code 176, build #28)"
-fact_checked: "2026-07-25"
+fact_checked: "2026-07-26"
 confidence: high
 hubs: [bot-architecture, game-mechanics]
 ---
 
 # The Policy Loop
+
+> **[2026-07-26] There is one loop now.** What follows describes the rules the
+> loop applies; the two-phase shape it used to have is gone. The build loop ran
+> the opening plan to completion and handed over to a fight loop, and that seam
+> was the bot's largest structural defect rather than a separation of concerns:
+> while building there was no army and no economy, once fighting there was no
+> build policy at all — so `extractorT1` was the only structure that could ever
+> be placed again and the factory count was frozen for the rest of the match —
+> and a plan that stalled meant a match that never fought, because the handover
+> was conditional on the plan finishing.
+>
+> `rw_bot.policy.campaign.play` is now the whole loop: perceive, arbitrate,
+> dispatch, acknowledge, every observation, for the whole match. Spending across
+> the layers is arbitrated by [[policy-budget]] rather than raced. What survived
+> of `runner.py` is `OrderTracker` — the judgement about whether an order
+> already given is still being carried out, which was never about looping.
+>
+> **One builder, one owner.** The plan holds the builder for as long as it wants
+> something placed, including while waiting to afford it. A live 400-sample run
+> with both the plan and the economy ordering it had four expansions issued and
+> the plan still stuck at 3 of 8; the engine runs whichever waypoint arrived
+> last, so neither order was carried out. With the rule in place, same seed and
+> same budget: plan 4 of 8, one expansion, factory up and producing.
+>
+> **The match ends when the engine says so.** "No army left" and "nothing
+> hostile in sight" were both dropped as exit conditions. The second is the
+> opening position of every match — the map is fogged — so it would have ended
+> the run on its first observation. The first is no longer terminal now that
+> production runs every tick. Both were proxies for a verdict the engine states
+> outright ([[policy-verdict]]).
 
 The bot plays a build order unattended: it reads the world, decides what to make next, orders it, watches for the result, and reports a scorecard. Six entries, six orders, no waste -- five structures placed and one unit produced ([[command-channel]]).
 

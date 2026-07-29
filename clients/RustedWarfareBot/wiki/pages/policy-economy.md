@@ -16,6 +16,8 @@ source_paths:
   - ".game/assets/units/extractor/extractor.ini"
   - ".game/assets/units/fabricator/fabricatorT1.ini"
   - "src/rw_bot/policy/economy.py"
+  - "src/rw_bot/policy/ledger.py"
+  - "wiki/sources/m28-holding/diag-post-worker-fix.ndjson"
   - "src/rw_bot/mechanics/income.py"
   - "scripts/income.py"
 game_version: "1.15 (code 176, build #28)"
@@ -118,6 +120,54 @@ The build phase ended holding 6,975 credits and the run banked more. Nine extrac
 
 Income is no longer the binding constraint — production throughput is. Fixing the economy moved the bottleneck rather than removing it.
 
+## The economy was switched off for most of every match, and nothing could say so
+
+Three findings in sequence, and the order matters because the first is what made the other two visible at all.
+
+### First, the bot's own reasoning was being thrown away
+
+`Budget.claim` has always recorded what each request wanted and why it was refused — *"expand:extractorT1 wanted 700 of 305 available past a 0 reserve"* — and `format_ledger` has always rendered it. Neither was ever called outside its own tests. The loop reduced a whole tick of that to `sum(1 for claim in ledger if not claim["granted"])`: at roughly one refusal per sample across four thousand samples, about four thousand sentences nobody kept.[^11]
+
+Two records now survive to the report. **What was asked for**, totalled by purpose, and **which spender was even reached**. The second is the one that matters, because "declined three thousand times" and "never asked once" were previously the same number: zero.
+
+### Second: one busy worker switched off every spender
+
+`Expander.step` opened with a gate that returned nothing at all when the opening plan held a worker. The plan holds **one**. The bot runs four to eight. Instrumented over 800 samples with six workers alive:
+
+    reach  plan-holds-worker   reached  572  acted  0
+    reach  no-free-worker      reached   69  acted  0
+    reach  income              reached  159  acted  7
+
+**572 of 800 samples — 71.5% of the match — the economy was not declining to spend. It was never asked.** The gate was written when there genuinely was one builder and silently outlived that. It also fires while the plan is merely *waiting to afford* something, so a plan parked at "extractorT1 costs 700, holding 130" switches the economy off for the rest of the match.
+
+The gate existed for a real defect — two spenders each ordering the same builder, the engine running whichever waypoint arrived last, so neither order arrived ([[policy-loop]]). The fix keeps that guarantee and drops only the plan's own worker, which meant a `"wait"` decision had to start naming the unit it was holding.
+
+Same seed, same 800 samples, before and after:
+
+| | before | after |
+|---|---|---|
+| expander skipped, plan held a worker | **572** | 269 |
+| every worker genuinely busy | 69 | **434** |
+| income reached / **acted** | 159 / **7** | 97 / **32** |
+| expansion orders | 4 | **21** |
+| workers | 6 | **8** |
+
+`no-free-worker` rising is the healthy state: the workforce is working rather than barred.
+
+### Third: with the workers freed, they all walked to the same pool
+
+The unblocked economy immediately showed a second defect it had been hiding. A pool is judged occupied by **what stands on it**, so a pool a builder is walking toward still reads as free. With one worker in flight at a time that was nearly harmless. With six:
+
+    spend  expand:extractorT1   asked  32  got  20  spent  14000
+    extractors: peak 4  end 4  gains 4  drops 0
+    losses by type: none
+
+**Twenty-three granted extractor orders, nothing lost all match, four extractors standing.** Nineteen orders never became anything. The credits were not burnt — a granted claim is intent, and the engine simply built one structure — but every duplicate cost a worker its travel time.
+
+This is the shape [[policy-holding-ground]] recorded as *"275 expansion orders against a single surviving extractor"* and could not explain, because expansion had never run freely enough for the ratio to be observable. The workforce had recorded every assigned site all along; `survey_pools` was never asking. A pool under orders now counts as occupied.
+
+**Outcome not yet established.** All three are mechanism findings, verified by instrumentation rather than by a scoreboard. Whether they win matches is a separate measurement, and the figures to judge on are wins and extractor drops — not expansion orders, since *fewer* orders is the point of the third fix and a naive reading would call that a regression.
+
 [^1]: `src/rw_bot/policy/production.py` — `sustain` skips any option the engine reports as `placed`; `scripts/play.py` `reinforcements` skips any type whose placement rule sets `needs_pool`.
 [^2]: `wiki/sources/m19-income/measured-rates.txt`, with all 1,000 readings archived as `income-windows.ndjson`. Produced by `make income`, which builds one extractor per stage and idles 200 samples between them.
 [^3]: `.game/assets/units/extractor/extractor.ini`, `extractorT2.ini`, `extractorT3.ini`, `extractorT3_overclocked.ini`, `extractorT3_reinforced.ini`, `.game/assets/units/fabricator/fabricatorT1.ini`, and `extractor_common.ini` for the `[ai]` block. Shipped as plain text with the game.
@@ -127,4 +177,5 @@ Income is no longer the binding constraint — production throughput is. Fixing 
 [^7]: `wiki/sources/m19-income/economy-run.txt`, from `runs/econ1.planner`.
 [^8]: Steam Community guide "A scientific approach to the economy system (kind of)" by Ionics, posted 2020-05-14, https://steamcommunity.com/sharedfiles/filedetails/?id=2095871975 — game version unstated, and its unit table does not match this build (see above). Carried only because its extractor conclusion agrees with the INI arithmetic, and explicitly NOT relied on for any number. Full notes in `wiki/sources/m19-income/community-research.txt`.
 [^9]: `.game/assets/translations/Strings.properties` lines 55-61 for the enum; `.game/preferences.ini` line 2 for the setting in force.
+[^11]: `runs/sweeps/diag/duel-s12345.txt` and `wiki/sources/m28-holding/diag-post-worker-fix.ndjson` — one 800-sample match before and after, chosen over a full batch because these are mechanism figures a single run settles.
 [^10]: `.decompiled/com/corrodinggames/rts/gameFramework/j/ah.java` — the room settings object, whose `b()` dumps `startingCredits`, `fogMode`, `aiDifficulty`, `startingUnits`, `incomeMultiplier` and `randomSeed`; `incomeMultiplier` is field `h`, initialised to `1.0f`.

@@ -71,6 +71,60 @@ The outcome did not follow the churn, and the two committed runs are why: identi
 
 Outcome variance between runs is therefore larger than anything measured here. The opponents' unit mix is weighted-random by construction ([[ai-opponent-strategy]]), so no two runs are the same experiment, and two of them cannot separate a regression from noise. The churn reduction is safe to claim because it is a direct consequence of the code change and holds in both runs; nothing here says commitment helped or hurt the fight.
 
+## The attrition, once there was a figure for it
+
+Every scorecard until now reported the strongest rival's worth at the first and last observation only, and that pair cannot answer the question the whole fight exists to settle. An opponent that lost half its army and rebuilt reads identically at the last observation to one that was never touched.
+
+Recording the largest fall from a running peak answered it in one run. Uncapped workers, tank goals, 1,500 samples, seed 12345:
+
+    reinforced     63 produce orders
+    army           0 -> 20
+    best rival     4,700 -> 27,850  (peak 27,850, worst dip 700)
+
+Sixty-three tanks ordered plus the four the opening plan builds, twenty alive at the end: about forty-five tanks lost, roughly 16,000 credits, against a 700-credit dent in the leader.
+
+**That reading was an artefact of the measurement, and the correction is the finding.** The dip was taken against `_best_rival`, which is a `max` over hostile players — so it only ever answered "was the *leader* set back". Grinding one opponent down while another builds leaves the maximum tracking the second, and damage to anybody else is invisible to it. Every run measured that way reported roughly the same 700, which should have been suspicious on its own: an identical figure across arms that differ is usually a constant, not a measurement.
+
+Measured **per opponent, against that opponent's own running peak**, the same strategy shows dips of **1,600 to 8,150** across nine matches — one of them 8,150 credits off a single player.[^11] The army was destroying things the whole time. What it never does is damage whoever is winning.
+
+So the constraint is not that the bot cannot fight. It is that it cannot *finish*: nobody has been eliminated in any match yet, and the bot is ahead in all of them — our worth grows 11.6× from the opening position against the strongest rival's 6.9×.
+
+Army size is not the lever either. A run that capped workers at four fielded **thirty-four** tanks rather than twenty and made no more impression than one fielding twenty.
+
+## How much to mass before committing
+
+`WAVE_SIZES` tops out at seven, and that number is the shipped AI's — copied from an opponent playing a different economy. Seven `c_tank` is 2,450 credits walking into turrets that out-range them by 1.27× to 3.54×.[^2]
+
+The final rung is now an argument, so the question could be asked of a run. Three seeds against each of three ladders, everything else fixed:[^11]
+
+| ladder | army | worth | rival | ratio | worst dip | attack orders |
+|---|---|---|---|---|---|---|
+| mass 7 (shipped) | 21.0 | 38,683 | 33,150 | 1.17 | 3,300 | 459 |
+| mass 15 | 22.3 | 38,517 | 31,067 | 1.24 | 1,700 | 207 |
+| mass 25 | 27.0 | 40,717 | 32,300 | 1.26 | 4,217 | 224 |
+
+Massing more helps, mildly and consistently. The army survives larger and order churn halves, which is one fact stated twice: fewer, bigger commitments rather than a trickle. The worth ratio moves 1.17 → 1.26, which is inside the run-to-run spread and is not on its own a result.
+
+Only the final rung moved. The early rungs govern the opening, when holding three units back is the difference between a first attack and none at all, and an experiment that moved both could not say which end mattered. Income, extractor count and worker count are flat across all nine matches, so the arms are isolated and what differs is how units were committed rather than how many were built.
+
+## What a group id cannot be used for
+
+Combat never checks whether a target can be walked to, and the obvious fix does not work. Entities carry a `group` — the connected component of their own movement layer — and the pool policy already reduces reachability to comparing two of them.[^10]
+
+Applying the same comparison to targets fails on the data. A live capture:
+
+| roster | flying | group | count |
+|---|---|---|---|
+| hostile | no | 1 | 21 |
+| hostile | no | **-3** | 24 |
+| ours | no | 1 | 3 |
+| ours | no | -2 / -3 | 6 |
+
+Negative ids mean "not on a movement grid", which is what every **structure** reports. More than half the visible hostiles are buildings, and a naive `attacker.group == target.group` test would refuse all of them — including the Command Centers that have to die for anyone to be eliminated. Pools work only because a pool carries `group_land`, a component id computed for the *tile* rather than for a unit. Doing this for targets needs the agent to emit the same thing at the target's position; it is not a policy-layer change.
+
+[^10]: `src/rw_bot/policy/build_order.py` — `_can_walk_to`. See [[mechanics-movement-layers]].
+[^11]: `wiki/sources/m24-wave-mass/wave-mass-ab.txt` — nine matches played four at a time on cloned game directories with the exchange locked to the tick, so CPU contention cannot shift when a sample is taken ([[harness-nodisplay]]).
+
 [^1]: `agent/src/rwbot/agent/Orders.java` — `attack` adds the subject through the orderable setter and then calls the entity-taking setter, which is the `av.b` waypoint mode. The six candidate setters are listed in the decompiled command class; `av.c` is the build mode already pinned by [[issuing-orders]].
 [^2]: `wiki/sources/m15-production/before-after.txt` [synthesis] — the probe is described in the session log for 2026-07-26; the target's fall from 1200 to 1183 was observed live against a Scout whose catalogue `direct_damage` is 17.
 [^3]: `src/rw_bot/policy/campaign.py` — the `Battle` report names the field `killed` and documents it as targets engaged and no longer visible, explicitly not a kill count.
