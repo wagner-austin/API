@@ -8,10 +8,11 @@ reasons about things that do not exist yet, and nothing the player owns can make
 a tank until a factory is standing.
 
 So this decodes the static half — every producer-to-product edge in the
-registry, dumped by ``make type-flags`` alongside the placement rules. Both
-kinds ride in one file because they are two questions about the same types,
-taken in one pass; two files could be regenerated against different game builds
-and silently disagree.
+registry, dumped by ``make type-flags`` alongside the placement rules and the
+combat profiles. All three kinds ride in one file because they are three
+questions about the same types, taken in one pass; separate files could be
+regenerated against different game builds and silently disagree
+([[mechanics-build-tree]]).
 
 The two sources cross-check, which is what makes either trustworthy. The
 registry says a Builder makes thirteen structures; the live option stream,
@@ -22,40 +23,19 @@ Builder the player owns.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Final
 
-from rw_bot import RwBotError
+from rw_bot.mechanics.registry_dump import KIND_BUILD_EDGE, records_of_kind
 from rw_bot.validation import require_int, require_non_empty_str
-from rw_bot.wire.ndjson import parse_object
-
-KIND_BUILD_EDGE: Final = "buildedge"
-"""``kind`` value of a build-tree record."""
-
-KIND_UNIT_TYPE: Final = "unittype"
-"""``kind`` value of a placement record, which this decoder skips."""
-
-KIND_UNIT_COMBAT: Final = "unitcombat"
-"""``kind`` value of a combat-stat record, which this decoder skips."""
-
-_UNKNOWN_KIND = "RW-BUILDTREE-001"
-
-
-class BuildTreeError(RwBotError):
-    """The dump did not match the shape the agent writes.
-
-    Args:
-        code: Stable machine-readable identifier.
-        message: Human-readable description.
-    """
 
 
 def decode_build_tree(lines: Sequence[str]) -> dict[str, frozenset[str]]:
     """Decode the producer-to-product edges in a type dump.
 
-    Placement records in the same file are skipped rather than rejected: one
-    dump carries both kinds, and each decoder projects the one it needs. A kind
-    that is neither is still an error, so a genuinely unknown record cannot pass
-    silently through both readers.
+    The dump's other kinds are stepped over by
+    :func:`~rw_bot.mechanics.registry_dump.records_of_kind`, which is also what
+    rejects a kind no decoder claims. This module used to carry that list
+    itself and failed on a live run when a third kind was added for a different
+    reader ([[mechanics-build-tree]]).
 
     Args:
         lines: NDJSON lines, without newline terminators.
@@ -67,25 +47,11 @@ def decode_build_tree(lines: Sequence[str]) -> dict[str, frozenset[str]]:
     Raises:
         NdjsonError: When a line does not parse.
         DecodeError: When a record is missing a field or carries a wrong type.
-        BuildTreeError: ``RW-BUILDTREE-001`` on an unknown ``kind``.
+        RegistryDumpError: ``RW-REGISTRY-001`` on a record kind the dump does
+            not define.
     """
     edges: dict[str, set[str]] = {}
-    for line in lines:
-        if line.strip() == "":
-            continue
-        record = parse_object(line)
-        kind = require_non_empty_str(record, "kind")
-        if kind in (KIND_UNIT_TYPE, KIND_UNIT_COMBAT):
-            # One dump, several kinds: each decoder projects its own and steps
-            # over its neighbours'. A kind no decoder claims is still an error
-            # in all of them, so nothing genuinely unknown passes silently --
-            # but a kind added for one reader must be listed here, and this
-            # decoder learned that by failing on a live run when a third kind
-            # appeared ([[mechanics-build-tree]]).
-            continue
-        if kind != KIND_BUILD_EDGE:
-            raise BuildTreeError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
-
+    for record in records_of_kind(lines, KIND_BUILD_EDGE):
         require_int(record, "index")
         producer = require_non_empty_str(record, "producer")
         produces = require_non_empty_str(record, "produces")
@@ -110,11 +76,30 @@ def producers_of(tree: Mapping[str, frozenset[str]], product: str) -> frozenset[
     return frozenset(producer for producer, products in tree.items() if product in products)
 
 
+def encode_build_edge(index: int, producer: str, produces: str) -> str:
+    """Render one producer-to-product edge back to its NDJSON record.
+
+    Round-trips with :func:`decode_build_tree`. The edge is passed as its three
+    fields rather than as a TypedDict because the decoder folds edges into a
+    mapping and never materialises one: inventing a record type so the encoder
+    could take it would add a shape nothing else uses.
+
+    Args:
+        index: Position in the dump.
+        producer: Type name that can make it.
+        produces: Type name made.
+
+    Returns:
+        One NDJSON line, without a newline terminator.
+    """
+    return (
+        f'{{"kind":"{KIND_BUILD_EDGE}","index":{index},'
+        f'"producer":"{producer}","produces":"{produces}"}}'
+    )
+
+
 __all__ = [
-    "KIND_BUILD_EDGE",
-    "KIND_UNIT_COMBAT",
-    "KIND_UNIT_TYPE",
-    "BuildTreeError",
     "decode_build_tree",
+    "encode_build_edge",
     "producers_of",
 ]

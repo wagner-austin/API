@@ -18,28 +18,13 @@ applies here unchanged.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import Final, TypedDict
+from collections.abc import Sequence
+from typing import TypedDict
 
 from rw_bot import RwBotError
-from rw_bot.validation import (
-    require_bool,
-    require_finite_float,
-    require_int,
-    require_non_empty_str,
-)
-from rw_bot.wire.ndjson import parse_object
+from rw_bot.mechanics.registry_dump import KIND_UNIT_TYPE, records_of_kind
+from rw_bot.validation import require_bool, require_int, require_non_empty_str
 
-KIND_UNIT_TYPE: Final = "unittype"
-"""``kind`` value of a placement record."""
-
-KIND_BUILD_EDGE: Final = "buildedge"
-"""``kind`` value of a build-tree record, which this decoder skips."""
-
-KIND_UNIT_COMBAT: Final = "unitcombat"
-"""``kind`` value of a combat record, decoded by :func:`decode_reaches`."""
-
-_UNKNOWN_KIND = "RW-PLACEMENT-001"
 _DUPLICATE_TYPE = "RW-PLACEMENT-002"
 
 
@@ -80,27 +65,14 @@ def decode_placements(lines: Sequence[str]) -> tuple[TypePlacement, ...]:
     Raises:
         NdjsonError: When a line does not parse.
         DecodeError: When a record is missing a field or carries a wrong type.
-        PlacementError: ``RW-PLACEMENT-001`` on an unknown ``kind``,
-            ``RW-PLACEMENT-002`` on a repeated type name.
+        RegistryDumpError: ``RW-REGISTRY-001`` on a record kind the dump does
+            not define.
+        PlacementError: ``RW-PLACEMENT-002`` on a repeated type name.
     """
     placements: list[TypePlacement] = []
     seen: set[str] = set()
 
-    for line in lines:
-        if line.strip() == "":
-            continue
-        record = parse_object(line)
-        kind = require_non_empty_str(record, "kind")
-        if kind in (KIND_BUILD_EDGE, KIND_UNIT_COMBAT):
-            # One dump carries both kinds -- where a type may stand, and what it
-            # can make -- because they are one pass over one registry and two
-            # files could be regenerated against different builds and disagree.
-            # Each decoder projects its own kind; a kind neither claims is still
-            # an error in both, so nothing unknown passes silently.
-            continue
-        if kind != KIND_UNIT_TYPE:
-            raise PlacementError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
-
+    for record in records_of_kind(lines, KIND_UNIT_TYPE):
         type_name = require_non_empty_str(record, "name")
         if type_name in seen:
             raise PlacementError(
@@ -120,60 +92,28 @@ def decode_placements(lines: Sequence[str]) -> tuple[TypePlacement, ...]:
     return tuple(placements)
 
 
-def decode_reaches(lines: Sequence[str]) -> Mapping[str, float]:
-    """Decode how far every registered type can shoot.
+def encode_placement(placement: TypePlacement) -> str:
+    """Render a placement rule back to its NDJSON record.
 
-    Separate from the catalogue on purpose, and it is the coverage that makes
-    the difference. ``-printunits`` emits 90 of the engine's 173 registered
-    types — it skips the bug faction by name prefix, shadowed built-ins, types
-    without a listing flag, and sixteen names it blocklists outright — so a
-    threat model reading it treats 48 armed types as harmless, among them every
-    turret and the artillery ([[policy-threat]]).
-
-    This asks the registry instead, so every type answers. Where the two
-    overlap they agree exactly, on all 90, which is what makes this a wider
-    reading of the same fact rather than a second opinion
-    ([[mechanics-unit-catalogue]]).
+    Round-trips with :func:`decode_placements`, which is what lets a decoded
+    dump be re-emitted as a fixture rather than hand-written.
 
     Args:
-        lines: NDJSON lines, without newline terminators.
+        placement: The rule to encode.
 
     Returns:
-        Attack range in world units by type name, zero for the unarmed.
-
-    Raises:
-        NdjsonError: When a line does not parse.
-        DecodeError: When a record is missing a field or carries a wrong type.
-        PlacementError: ``RW-PLACEMENT-001`` on an unknown ``kind``,
-            ``RW-PLACEMENT-002`` on a repeated type name.
+        One NDJSON line, without a newline terminator.
     """
-    reaches: dict[str, float] = {}
-    for line in lines:
-        if line.strip() == "":
-            continue
-        record = parse_object(line)
-        kind = require_non_empty_str(record, "kind")
-        if kind in (KIND_BUILD_EDGE, KIND_UNIT_TYPE):
-            continue
-        if kind != KIND_UNIT_COMBAT:
-            raise PlacementError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
-        type_name = require_non_empty_str(record, "name")
-        if type_name in reaches:
-            raise PlacementError(
-                _DUPLICATE_TYPE,
-                f"type name {type_name!r} appears twice; it is the join key to live "
-                "entities and must identify exactly one type",
-            )
-        reaches[type_name] = require_finite_float(record, "attack_range")
-    return reaches
+    return (
+        f'{{"kind":"{KIND_UNIT_TYPE}","index":{placement["index"]},'
+        f'"name":"{placement["type_name"]}",'
+        f'"needs_pool":{str(placement["needs_pool"]).lower()}}}'
+    )
 
 
 __all__ = [
-    "KIND_BUILD_EDGE",
-    "KIND_UNIT_COMBAT",
-    "KIND_UNIT_TYPE",
     "PlacementError",
     "TypePlacement",
     "decode_placements",
-    "decode_reaches",
+    "encode_placement",
 ]
