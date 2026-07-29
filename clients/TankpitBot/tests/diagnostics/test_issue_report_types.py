@@ -245,6 +245,15 @@ def test_issue_report_round_trip_with_session_room_present() -> None:
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
             action_outcome_counts={},
+            fuel_low_water_threshold=100,
+            fuel_low_water_episodes=[],
+            teleport_spend=[],
+            teleport_spend_total=0,
+            ledger_teleport_spend_min=-1,
+            ledger_teleport_spend_max=-1,
+            ledger_shot_singles=-1,
+            ledger_shot_duals=-1,
+            ledger_shot_homings=-1,
             career_destroyed_last=-1,
             career_deactivated_last=-1,
             career_score_last=-1,
@@ -307,6 +316,15 @@ def test_issue_report_round_trip_with_no_session_room() -> None:
             equipment_approach_distinct_targets=0,
             equipment_approach_max_repeats=0,
             action_outcome_counts={},
+            fuel_low_water_threshold=100,
+            fuel_low_water_episodes=[],
+            teleport_spend=[],
+            teleport_spend_total=0,
+            ledger_teleport_spend_min=-1,
+            ledger_teleport_spend_max=-1,
+            ledger_shot_singles=-1,
+            ledger_shot_duals=-1,
+            ledger_shot_homings=-1,
             career_destroyed_last=-1,
             career_deactivated_last=-1,
             career_score_last=-1,
@@ -393,6 +411,15 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
                 equipment_approach_distinct_targets=0,
                 equipment_approach_max_repeats=0,
                 action_outcome_counts={},
+                fuel_low_water_threshold=100,
+                fuel_low_water_episodes=[],
+                teleport_spend=[],
+                teleport_spend_total=0,
+                ledger_teleport_spend_min=-1,
+                ledger_teleport_spend_max=-1,
+                ledger_shot_singles=-1,
+                ledger_shot_duals=-1,
+                ledger_shot_homings=-1,
                 career_destroyed_last=-1,
                 career_deactivated_last=-1,
                 career_score_last=-1,
@@ -411,11 +438,139 @@ def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
 
 def test_state_budget_record_round_trip() -> None:
     """``StateBudgetRecordDict`` round-trips through JSON encoding."""
-    record = StateBudgetRecordDict(state="COMBAT", seconds=42)
+    record = StateBudgetRecordDict(state="COMBAT", seconds=42, stretches=7, max_seconds=12)
 
     decoded = decode_state_budget_record(_round_trip(encode_state_budget_record(record)))
 
     assert decoded == record
+
+
+def test_state_budget_record_decodes_pre_stretch_artifacts() -> None:
+    """State budget rows persisted before stretch stats decode as zeros."""
+    decoded = decode_state_budget_record({"state": "COMBAT", "seconds": 42})
+
+    assert decoded == StateBudgetRecordDict(state="COMBAT", seconds=42, stretches=0, max_seconds=0)
+
+
+def test_fuel_low_water_episode_round_trip() -> None:
+    """``FuelLowWaterEpisodeDict`` round-trips through JSON encoding."""
+    from tankpit_bot.diagnostics.issue_report_codecs import (
+        decode_fuel_low_water_episode,
+        encode_fuel_low_water_episode,
+    )
+    from tankpit_bot.diagnostics.issue_report_types import FuelLowWaterEpisodeDict
+
+    episode = FuelLowWaterEpisodeDict(
+        start_timestamp="2026-07-29T11:06:35",
+        end_timestamp="2026-07-29T11:06:43",
+        duration_seconds=8,
+        entry_fuel=372,
+        min_fuel=140,
+        cause_kind="teleport",
+        cause_drop=158,
+        cause_state="HUNT/CLOSE",
+        recovery_fuel=1047,
+        recovery_kind="collect",
+    )
+
+    decoded = decode_fuel_low_water_episode(_round_trip(encode_fuel_low_water_episode(episode)))
+
+    assert decoded == episode
+
+
+def test_teleport_spend_record_round_trip() -> None:
+    """``TeleportSpendRecordDict`` round-trips through JSON encoding."""
+    from tankpit_bot.diagnostics.issue_report_codecs import (
+        decode_teleport_spend_record,
+        encode_teleport_spend_record,
+    )
+    from tankpit_bot.diagnostics.issue_report_types import TeleportSpendRecordDict
+
+    record = TeleportSpendRecordDict(bot_state="HUNT/CLOSE", drops=53, fuel_spent=7389)
+
+    decoded = decode_teleport_spend_record(_round_trip(encode_teleport_spend_record(record)))
+
+    assert decoded == record
+
+
+def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
+    """Scorecards persisted before the 2026-07-29 analyzer upgrades decode
+    with the sentinel/empty defaults for every new field."""
+    from tankpit_bot.diagnostics.issue_report_codecs import (
+        decode_session_scorecard,
+        encode_session_scorecard,
+    )
+    from tankpit_bot.diagnostics.issue_report_types import (
+        SessionScorecardDict,
+        make_unsampled_inventory_counts,
+        make_zero_inventory_counts,
+    )
+
+    scorecard = SessionScorecardDict(
+        duration_seconds=0,
+        state_budget=[],
+        kills=0,
+        shots=0,
+        combat_misses=0,
+        combat_ghosts_blocked=0,
+        combat_stale_positions_blocked=0,
+        tank_damage_changes=0,
+        fuel_min=-1,
+        fuel_last=-1,
+        fuel_sample_count=0,
+        inventory_first=make_unsampled_inventory_counts(),
+        inventory_last=make_unsampled_inventory_counts(),
+        inventory_sample_count=0,
+        equipment_gain_events=0,
+        equipment_gained=make_zero_inventory_counts(),
+        scans_extra=0,
+        scans_builtin=0,
+        physics_divergences=0,
+        equipment_approaches=[],
+        equipment_approach_distinct_targets=0,
+        equipment_approach_max_repeats=0,
+        action_outcome_counts={},
+        fuel_low_water_threshold=100,
+        fuel_low_water_episodes=[],
+        teleport_spend=[],
+        teleport_spend_total=0,
+        ledger_teleport_spend_min=-1,
+        ledger_teleport_spend_max=-1,
+        ledger_shot_singles=-1,
+        ledger_shot_duals=-1,
+        ledger_shot_homings=-1,
+        career_destroyed_last=-1,
+        career_deactivated_last=-1,
+        career_score_last=-1,
+        career_playtime_seconds_last=-1,
+        container_pickups_full=0,
+        container_pickups_partial=0,
+    )
+    encoded = encode_session_scorecard(scorecard)
+    for key in (
+        "fuel_low_water_threshold",
+        "fuel_low_water_episodes",
+        "teleport_spend",
+        "teleport_spend_total",
+        "ledger_teleport_spend_min",
+        "ledger_teleport_spend_max",
+        "ledger_shot_singles",
+        "ledger_shot_duals",
+        "ledger_shot_homings",
+    ):
+        del encoded[key]
+
+    decoded = decode_session_scorecard(encoded)
+
+    assert decoded["fuel_low_water_threshold"] == 0
+    assert decoded["fuel_low_water_episodes"] == []
+    assert decoded["teleport_spend"] == []
+    assert decoded["teleport_spend_total"] == 0
+    assert decoded["ledger_teleport_spend_min"] == -1
+    assert decoded["ledger_teleport_spend_max"] == -1
+    assert decoded["ledger_shot_singles"] == -1
+    assert decoded["ledger_shot_duals"] == -1
+    assert decoded["ledger_shot_homings"] == -1
 
 
 def test_targeted_teleport_record_round_trip() -> None:

@@ -10,6 +10,12 @@ from tankpit_bot.diagnostics.issue_report_types import (
     IssueReportDict,
     SessionScorecardDict,
 )
+from tankpit_bot.diagnostics.session_scorecard import (
+    render_fuel_low_water_lines,
+    render_shot_billing_lines,
+    render_state_budget_lines,
+    render_teleport_spend_lines,
+)
 
 log = get_logger(__name__)
 
@@ -127,11 +133,10 @@ def _render_scorecard_section(report: IssueReportDict) -> list[str]:
         ),
         f"  fuel: {fuel_text}",
     ]
-    if not scorecard["state_budget"]:
-        lines.append("  state budget: (no transitions)")
-    else:
-        for record in scorecard["state_budget"]:
-            lines.append(f"  {record['state']:>22}: {record['seconds']}s")
+    lines.extend(render_shot_billing_lines(scorecard))
+    lines.extend(render_fuel_low_water_lines(scorecard))
+    lines.extend(render_teleport_spend_lines(scorecard))
+    lines.extend(render_state_budget_lines(scorecard))
     lines.append("")
     return lines
 

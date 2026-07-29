@@ -14,6 +14,7 @@ from platform_core.json_utils import (
 
 from tankpit_bot.diagnostics.issue_report_types import (
     ActionOutcomeRowDict,
+    FuelLowWaterEpisodeDict,
     FuelTargetSelectionRecordDict,
     InventoryCountsDict,
     IssueReportDict,
@@ -23,6 +24,7 @@ from tankpit_bot.diagnostics.issue_report_types import (
     StateBudgetRecordDict,
     TargetedTeleportRecordDict,
     TeleportAttemptRecordDict,
+    TeleportSpendRecordDict,
 )
 
 
@@ -269,7 +271,12 @@ def encode_state_budget_record(record: StateBudgetRecordDict) -> JSONObject:
     Returns:
         JSON-compatible representation.
     """
-    return {"state": record["state"], "seconds": record["seconds"]}
+    return {
+        "state": record["state"],
+        "seconds": record["seconds"],
+        "stretches": record["stretches"],
+        "max_seconds": record["max_seconds"],
+    }
 
 
 def decode_state_budget_record(data: JSONObject) -> StateBudgetRecordDict:
@@ -279,11 +286,92 @@ def decode_state_budget_record(data: JSONObject) -> StateBudgetRecordDict:
         data: JSON object to decode.
 
     Returns:
-        Validated record.
+        Validated record. Stretch statistics absent on artifacts
+        persisted before they existed decode as 0.
     """
     return StateBudgetRecordDict(
         state=require_str(data, "state"),
         seconds=require_int(data, "seconds"),
+        stretches=require_int(data, "stretches") if "stretches" in data else 0,
+        max_seconds=require_int(data, "max_seconds") if "max_seconds" in data else 0,
+    )
+
+
+def encode_fuel_low_water_episode(record: FuelLowWaterEpisodeDict) -> JSONObject:
+    """Encode a fuel low-water episode to JSON.
+
+    Args:
+        record: Episode to encode.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "start_timestamp": record["start_timestamp"],
+        "end_timestamp": record["end_timestamp"],
+        "duration_seconds": record["duration_seconds"],
+        "entry_fuel": record["entry_fuel"],
+        "min_fuel": record["min_fuel"],
+        "cause_kind": record["cause_kind"],
+        "cause_drop": record["cause_drop"],
+        "cause_state": record["cause_state"],
+        "recovery_fuel": record["recovery_fuel"],
+        "recovery_kind": record["recovery_kind"],
+    }
+
+
+def decode_fuel_low_water_episode(data: JSONObject) -> FuelLowWaterEpisodeDict:
+    """Decode a fuel low-water episode from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated episode.
+    """
+    return FuelLowWaterEpisodeDict(
+        start_timestamp=require_str(data, "start_timestamp"),
+        end_timestamp=require_str(data, "end_timestamp"),
+        duration_seconds=require_int(data, "duration_seconds"),
+        entry_fuel=require_int(data, "entry_fuel"),
+        min_fuel=require_int(data, "min_fuel"),
+        cause_kind=require_str(data, "cause_kind"),
+        cause_drop=require_int(data, "cause_drop"),
+        cause_state=require_str(data, "cause_state"),
+        recovery_fuel=require_int(data, "recovery_fuel"),
+        recovery_kind=require_str(data, "recovery_kind"),
+    )
+
+
+def encode_teleport_spend_record(record: TeleportSpendRecordDict) -> JSONObject:
+    """Encode a teleport spend record to JSON.
+
+    Args:
+        record: Record to encode.
+
+    Returns:
+        JSON-compatible representation.
+    """
+    return {
+        "bot_state": record["bot_state"],
+        "drops": record["drops"],
+        "fuel_spent": record["fuel_spent"],
+    }
+
+
+def decode_teleport_spend_record(data: JSONObject) -> TeleportSpendRecordDict:
+    """Decode a teleport spend record from JSON.
+
+    Args:
+        data: JSON object to decode.
+
+    Returns:
+        Validated record.
+    """
+    return TeleportSpendRecordDict(
+        bot_state=require_str(data, "bot_state"),
+        drops=require_int(data, "drops"),
+        fuel_spent=require_int(data, "fuel_spent"),
     )
 
 
@@ -392,6 +480,17 @@ def encode_session_scorecard(scorecard: SessionScorecardDict) -> JSONObject:
         "equipment_approach_distinct_targets": scorecard["equipment_approach_distinct_targets"],
         "equipment_approach_max_repeats": scorecard["equipment_approach_max_repeats"],
         "action_outcome_counts": dict(scorecard["action_outcome_counts"]),
+        "fuel_low_water_threshold": scorecard["fuel_low_water_threshold"],
+        "fuel_low_water_episodes": [
+            encode_fuel_low_water_episode(r) for r in scorecard["fuel_low_water_episodes"]
+        ],
+        "teleport_spend": [encode_teleport_spend_record(r) for r in scorecard["teleport_spend"]],
+        "teleport_spend_total": scorecard["teleport_spend_total"],
+        "ledger_teleport_spend_min": scorecard["ledger_teleport_spend_min"],
+        "ledger_teleport_spend_max": scorecard["ledger_teleport_spend_max"],
+        "ledger_shot_singles": scorecard["ledger_shot_singles"],
+        "ledger_shot_duals": scorecard["ledger_shot_duals"],
+        "ledger_shot_homings": scorecard["ledger_shot_homings"],
         "career_destroyed_last": scorecard["career_destroyed_last"],
         "career_deactivated_last": scorecard["career_deactivated_last"],
         "career_score_last": scorecard["career_score_last"],
@@ -461,6 +560,49 @@ def decode_session_scorecard(data: JSONObject) -> SessionScorecardDict:
         ),
         equipment_approach_max_repeats=require_int(data, "equipment_approach_max_repeats"),
         action_outcome_counts=_require_str_int_map(data, "action_outcome_counts"),
+        fuel_low_water_threshold=(
+            require_int(data, "fuel_low_water_threshold")
+            if "fuel_low_water_threshold" in data
+            else 0
+        ),
+        fuel_low_water_episodes=(
+            [
+                decode_fuel_low_water_episode(item)
+                for item in _require_object_list(data, "fuel_low_water_episodes")
+            ]
+            if "fuel_low_water_episodes" in data
+            else []
+        ),
+        teleport_spend=(
+            [
+                decode_teleport_spend_record(item)
+                for item in _require_object_list(data, "teleport_spend")
+            ]
+            if "teleport_spend" in data
+            else []
+        ),
+        teleport_spend_total=(
+            require_int(data, "teleport_spend_total") if "teleport_spend_total" in data else 0
+        ),
+        ledger_teleport_spend_min=(
+            require_int(data, "ledger_teleport_spend_min")
+            if "ledger_teleport_spend_min" in data
+            else -1
+        ),
+        ledger_teleport_spend_max=(
+            require_int(data, "ledger_teleport_spend_max")
+            if "ledger_teleport_spend_max" in data
+            else -1
+        ),
+        ledger_shot_singles=(
+            require_int(data, "ledger_shot_singles") if "ledger_shot_singles" in data else -1
+        ),
+        ledger_shot_duals=(
+            require_int(data, "ledger_shot_duals") if "ledger_shot_duals" in data else -1
+        ),
+        ledger_shot_homings=(
+            require_int(data, "ledger_shot_homings") if "ledger_shot_homings" in data else -1
+        ),
         career_destroyed_last=(
             require_int(data, "career_destroyed_last") if "career_destroyed_last" in data else -1
         ),
@@ -594,6 +736,7 @@ def decode_issue_report(data: JSONObject) -> IssueReportDict:
 
 __all__ = [
     "decode_action_outcome_row",
+    "decode_fuel_low_water_episode",
     "decode_fuel_target_selection_record",
     "decode_inventory_counts",
     "decode_issue_report",
@@ -603,7 +746,9 @@ __all__ = [
     "decode_state_budget_record",
     "decode_targeted_teleport_record",
     "decode_teleport_attempt_record",
+    "decode_teleport_spend_record",
     "encode_action_outcome_row",
+    "encode_fuel_low_water_episode",
     "encode_fuel_target_selection_record",
     "encode_inventory_counts",
     "encode_issue_report",
@@ -613,4 +758,5 @@ __all__ = [
     "encode_state_budget_record",
     "encode_targeted_teleport_record",
     "encode_teleport_attempt_record",
+    "encode_teleport_spend_record",
 ]

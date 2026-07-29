@@ -9,16 +9,19 @@ these functions; it does not reimplement them.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime
 
 from typing_extensions import TypedDict
 
 from tankpit_bot.diagnostics.issue_report_types import (
+    FuelLowWaterEpisodeDict,
     InventoryCountsDict,
     SessionScorecardDict,
     StateBudgetRecordDict,
     TargetedTeleportRecordDict,
+    TeleportSpendRecordDict,
     make_unsampled_inventory_counts,
     make_zero_inventory_counts,
 )
@@ -42,6 +45,78 @@ _COMBAT_FUTILITY_SHOT_THRESHOLD = 20
 # cost 6 per tile, so dipping below this means the session nearly
 # stranded itself.
 _FUEL_FLOOR_THRESHOLD = 100
+
+# Low-water episodes listed in full in the rendered report; beyond this
+# many, the tail is summarized as a count to keep the section readable.
+_LOW_WATER_RENDER_CAP = 10
+
+# WORLD-channel fuel transition receipts, e.g. "Fuel: 1090 -> 823 (-267)".
+_WORLD_FUEL_PATTERN = re.compile(r"^Fuel: (-?\d+) -> (-?\d+) ")
+
+
+class FuelSampleRecordDict(TypedDict):
+    """One ``self_alignment_sample`` fuel reading with its tick context.
+
+    The bare fuel integer cannot explain a low-water dip; the ambient
+    ``bot_state`` / ``in_flight_action_kind`` context stamped on every
+    runtime event is what attributes each sample-to-sample drop to the
+    action that paid it.
+
+    Attributes:
+        timestamp: ISO timestamp of the sample record.
+        fuel: ``belief_fuel`` value.
+        bot_state: Ambient ``MODE/STATE`` context, ``""`` on artifacts
+            predating the context fields.
+        in_flight: Ambient ``in_flight_action_kind`` context,
+            ``"none"`` when absent.
+    """
+
+    timestamp: str
+    fuel: int
+    bot_state: str
+    in_flight: str
+
+
+def _optional_int_field(
+    fields: dict[str, str | int | float | bool],
+    key: str,
+    default: int,
+) -> int:
+    """Extract an int field, tolerating absence on older artifacts.
+
+    Args:
+        fields: Decoded structured payload from a runtime event record.
+        key: Field name to extract.
+        default: Value returned when the field is absent or not an int.
+
+    Returns:
+        The int value, or ``default``.
+    """
+    value = fields.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return default
+    return value
+
+
+def _optional_str_field(
+    fields: dict[str, str | int | float | bool],
+    key: str,
+    default: str,
+) -> str:
+    """Extract a str field, tolerating absence on older artifacts.
+
+    Args:
+        fields: Decoded structured payload from a runtime event record.
+        key: Field name to extract.
+        default: Value returned when the field is absent or not a str.
+
+    Returns:
+        The str value, or ``default``.
+    """
+    value = fields.get(key)
+    if not isinstance(value, str):
+        return default
+    return value
 
 
 class ScorecardAccumulatorDict(TypedDict):
@@ -71,8 +146,28 @@ class ScorecardAccumulatorDict(TypedDict):
             DIAGNOSTIC events (any tank's ``damage_state`` transitioned
             via wire), useful for sanity-checking shots against damage
             observations.
-        fuel_samples: ``belief_fuel`` values from every
-            ``self_alignment_sample`` event, in stream order.
+        fuel_samples: Context-stamped ``belief_fuel`` readings from
+            every ``self_alignment_sample`` event, in stream order.
+        max_escape_floor: Highest ``escape_floor`` any
+            ``engagement_break`` event computed, ``0`` when combat
+            never projected one. This is the session's own danger
+            line, used as the low-water episode threshold.
+        teleport_spend_fuel: Per-``bot_state`` fuel totals from
+            WORLD-channel fuel debits billed while a teleport was in
+            flight.
+        teleport_spend_drops: Per-``bot_state`` receipt counts for
+            those debits.
+        ledger_teleport_spend_min: Least possible teleport spend from
+            the fuel book's feasibility bounds, ``-1`` without a
+            ``damage_ledger`` event.
+        ledger_teleport_spend_max: Greatest possible teleport spend,
+            ``-1`` without one.
+        ledger_shot_singles: ``shot_single_count`` from the ledger,
+            ``-1`` without one.
+        ledger_shot_duals: ``shot_dual_count`` from the ledger,
+            ``-1`` without one.
+        ledger_shot_homings: ``shot_homing_count`` from the ledger,
+            ``-1`` without one.
         inventory_samples: Counts from every ``inventory_sample``
             event, in stream order.
         equipment_gain_events: Count of ``equipment_gain`` events.
@@ -97,7 +192,15 @@ class ScorecardAccumulatorDict(TypedDict):
     combat_ghosts_blocked: int
     combat_stale_positions_blocked: int
     tank_damage_changes: int
-    fuel_samples: list[int]
+    fuel_samples: list[FuelSampleRecordDict]
+    max_escape_floor: int
+    teleport_spend_fuel: dict[str, int]
+    teleport_spend_drops: dict[str, int]
+    ledger_teleport_spend_min: int
+    ledger_teleport_spend_max: int
+    ledger_shot_singles: int
+    ledger_shot_duals: int
+    ledger_shot_homings: int
     inventory_samples: list[InventoryCountsDict]
     equipment_gain_events: int
     equipment_gained: InventoryCountsDict
@@ -140,6 +243,14 @@ def new_scorecard_accumulator() -> ScorecardAccumulatorDict:
         combat_stale_positions_blocked=0,
         tank_damage_changes=0,
         fuel_samples=[],
+        max_escape_floor=0,
+        teleport_spend_fuel={},
+        teleport_spend_drops={},
+        ledger_teleport_spend_min=-1,
+        ledger_teleport_spend_max=-1,
+        ledger_shot_singles=-1,
+        ledger_shot_duals=-1,
+        ledger_shot_homings=-1,
         inventory_samples=[],
         equipment_gain_events=0,
         equipment_gained=make_zero_inventory_counts(),
@@ -244,9 +355,47 @@ def route_scorecard_record(
     if channel == "WIRE" and record["message"].startswith("shoot("):
         accumulator["shots"] += 1
         return
+    if channel == "WORLD":
+        _route_world_fuel_receipt(record, accumulator)
+        return
     if channel != "DIAGNOSTIC":
         return
     _route_scorecard_diagnostic(record, accumulator)
+
+
+def _route_world_fuel_receipt(
+    record: RuntimeEventRecordDict,
+    accumulator: ScorecardAccumulatorDict,
+) -> None:
+    """Attribute an in-flight teleport fuel debit to its bot state.
+
+    WORLD-channel fuel transitions are the per-receipt view of the
+    fuel book; a debit billed while ``in_flight_action_kind`` is
+    ``teleport`` is teleport spend, attributed to the ambient
+    ``bot_state``. Measured on run 20260729-105325: 15592 across 104
+    receipts, inside the ledger's 11993..19290 feasibility bound
+    (sample-to-sample fuel deltas undercounted at 10972 because
+    pickup credits mask debits inside one tick window).
+
+    Args:
+        record: Decoded WORLD-channel event record.
+        accumulator: Scorecard accumulator to update in place.
+    """
+    if _optional_str_field(record["fields"], "in_flight_action_kind", "none") != "teleport":
+        return
+    match = _WORLD_FUEL_PATTERN.match(record["message"])
+    if match is None:
+        return
+    delta = int(match.group(2)) - int(match.group(1))
+    if delta >= 0:
+        return
+    state = _optional_str_field(record["fields"], "bot_state", "")
+    accumulator["teleport_spend_fuel"][state] = (
+        accumulator["teleport_spend_fuel"].get(state, 0) - delta
+    )
+    accumulator["teleport_spend_drops"][state] = (
+        accumulator["teleport_spend_drops"].get(state, 0) + 1
+    )
 
 
 def _route_scorecard_diagnostic(
@@ -262,9 +411,9 @@ def _route_scorecard_diagnostic(
     kind = record["fields"].get("diagnostic_kind")
     if _route_combat_diagnostic(kind, accumulator):
         return
-    if kind == "self_alignment_sample":
-        accumulator["fuel_samples"].append(require_int_field(record["fields"], "belief_fuel"))
-    elif kind == "equipment_approach":
+    if _route_fuel_diagnostic(kind, record, accumulator):
+        return
+    if kind == "equipment_approach":
         accumulator["equipment_approaches"].append(_classify_targeted_teleport(record))
     elif kind == "inventory_sample":
         accumulator["inventory_samples"].append(_classify_inventory_counts(record))
@@ -290,6 +439,59 @@ def _route_scorecard_diagnostic(
         counts[counter_key] = counts.get(counter_key, 0) + 1
     else:
         _route_metrics_diagnostic(kind, record, accumulator)
+
+
+def _route_fuel_diagnostic(
+    kind: str | int | float | bool | None,
+    record: RuntimeEventRecordDict,
+    accumulator: ScorecardAccumulatorDict,
+) -> bool:
+    """Route the fuel-trajectory diagnostics into the accumulator.
+
+    Covers the three kinds the low-water / teleport-spend analysis
+    reads: context-stamped fuel samples, the engagement-break escape
+    floors (the session's own danger line), and the end-of-run damage
+    ledger's authoritative billing totals.
+
+    Args:
+        kind: ``diagnostic_kind`` field value.
+        record: Decoded event record carrying the structured payload.
+        accumulator: Scorecard accumulator to update in place.
+
+    Returns:
+        True when ``kind`` matched and was applied, False otherwise.
+    """
+    fields = record["fields"]
+    if kind == "self_alignment_sample":
+        accumulator["fuel_samples"].append(
+            FuelSampleRecordDict(
+                timestamp=record["timestamp"],
+                fuel=require_int_field(fields, "belief_fuel"),
+                bot_state=_optional_str_field(fields, "bot_state", ""),
+                in_flight=_optional_str_field(fields, "in_flight_action_kind", "none"),
+            )
+        )
+        return True
+    if kind == "engagement_break":
+        accumulator["max_escape_floor"] = max(
+            accumulator["max_escape_floor"],
+            _optional_int_field(fields, "escape_floor", 0),
+        )
+        return True
+    if kind == "damage_ledger":
+        # The fuel book's ``[lo, hi]`` sums are feasibility bounds on
+        # spend, both negative; negate into a positive min..max spend
+        # interval. Absent fields (pre-ledger artifacts) keep the -1
+        # sentinels from the accumulator factory.
+        lo = _optional_int_field(fields, "teleport_fuel_lo", 1)
+        hi = _optional_int_field(fields, "teleport_fuel_hi", 1)
+        accumulator["ledger_teleport_spend_max"] = -lo if lo <= 0 else -1
+        accumulator["ledger_teleport_spend_min"] = -hi if hi <= 0 else -1
+        accumulator["ledger_shot_singles"] = _optional_int_field(fields, "shot_single_count", -1)
+        accumulator["ledger_shot_duals"] = _optional_int_field(fields, "shot_dual_count", -1)
+        accumulator["ledger_shot_homings"] = _optional_int_field(fields, "shot_homing_count", -1)
+        return True
+    return False
 
 
 def _route_metrics_diagnostic(
@@ -379,6 +581,10 @@ def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetR
     to the EARLIER transition's destination -- the state the bot was
     actually in during that interval. Non-transition STATE lines (the
     initial bare state announcement) carry no interval and are skipped.
+    Each interval is also one VISIT to its state, so the per-state
+    stretch count and longest single visit fall out of the same walk --
+    that pair distinguishes tick-boundary residue (many short visits)
+    from a stall (one long visit) at no extra cost.
 
     Args:
         transitions: ``(timestamp, message)`` pairs in stream order.
@@ -387,6 +593,8 @@ def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetR
         Per-state totals sorted by descending seconds then state name.
     """
     totals: Counter[str] = Counter()
+    visits: Counter[str] = Counter()
+    longest: dict[str, int] = {}
     previous_state = ""
     previous_moment: datetime | None = None
     for timestamp, message in transitions:
@@ -395,14 +603,122 @@ def _build_state_budget(transitions: list[tuple[str, str]]) -> list[StateBudgetR
         _, _, destination = message.partition(" -> ")
         moment = datetime.fromisoformat(timestamp)
         if previous_moment is not None:
-            totals[previous_state] += int((moment - previous_moment).total_seconds())
+            interval = int((moment - previous_moment).total_seconds())
+            totals[previous_state] += interval
+            visits[previous_state] += 1
+            longest[previous_state] = max(longest.get(previous_state, 0), interval)
         previous_state = destination
         previous_moment = moment
     records = [
-        StateBudgetRecordDict(state=state, seconds=seconds) for state, seconds in totals.items()
+        StateBudgetRecordDict(
+            state=state,
+            seconds=seconds,
+            stretches=visits[state],
+            max_seconds=longest[state],
+        )
+        for state, seconds in totals.items()
     ]
     records.sort(key=_budget_sort_key)
     return records
+
+
+def _build_teleport_spend(
+    spent: dict[str, int],
+    drops: dict[str, int],
+) -> tuple[list[TeleportSpendRecordDict], int]:
+    """Shape the accumulated per-state teleport spend into sorted rows.
+
+    Args:
+        spent: Per-``bot_state`` fuel totals from the WORLD receipts.
+        drops: Per-``bot_state`` receipt counts.
+
+    Returns:
+        Tuple of per-state spend rows (descending fuel, then state)
+        and the total spend.
+    """
+    records = [
+        TeleportSpendRecordDict(bot_state=state, drops=drops[state], fuel_spent=fuel)
+        for state, fuel in spent.items()
+    ]
+    records.sort(key=lambda record: (-record["fuel_spent"], record["bot_state"]))
+    return records, sum(spent.values())
+
+
+def _episode_cause(
+    samples: list[FuelSampleRecordDict],
+    entry_index: int,
+    min_index: int,
+) -> tuple[str, int, str]:
+    """Find the largest fuel drop on the way down into one episode.
+
+    Args:
+        samples: Context-stamped fuel samples in stream order.
+        entry_index: Index of the first below-threshold sample.
+        min_index: Index of the episode's minimum-fuel sample.
+
+    Returns:
+        Tuple of ``(cause_kind, cause_drop, cause_state)``. When no
+        positive drop exists in the window (a session that STARTED
+        below threshold at its minimum), the entry sample's own
+        context is returned with a drop of 0.
+    """
+    best_drop = 0
+    best_index = entry_index
+    for index in range(max(entry_index, 1), min_index + 1):
+        drop = samples[index - 1]["fuel"] - samples[index]["fuel"]
+        if drop > best_drop:
+            best_drop = drop
+            best_index = index
+    chosen = samples[best_index]
+    return chosen["in_flight"], best_drop, chosen["bot_state"]
+
+
+def _build_low_water_episodes(
+    samples: list[FuelSampleRecordDict],
+    threshold: int,
+) -> list[FuelLowWaterEpisodeDict]:
+    """Split the fuel trajectory into below-threshold episodes.
+
+    Args:
+        samples: Context-stamped fuel samples in stream order.
+        threshold: Danger line; samples strictly below it are "low".
+
+    Returns:
+        One record per maximal contiguous below-threshold run, in
+        stream order.
+    """
+    episodes: list[FuelLowWaterEpisodeDict] = []
+    index = 0
+    while index < len(samples):
+        if samples[index]["fuel"] >= threshold:
+            index += 1
+            continue
+        end = index
+        min_index = index
+        while end + 1 < len(samples) and samples[end + 1]["fuel"] < threshold:
+            end += 1
+            if samples[end]["fuel"] < samples[min_index]["fuel"]:
+                min_index = end
+        cause_kind, cause_drop, cause_state = _episode_cause(samples, index, min_index)
+        first = datetime.fromisoformat(samples[index]["timestamp"])
+        last = datetime.fromisoformat(samples[end]["timestamp"])
+        recovery = samples[end + 1] if end + 1 < len(samples) else None
+        episodes.append(
+            FuelLowWaterEpisodeDict(
+                start_timestamp=samples[index]["timestamp"],
+                end_timestamp=samples[end]["timestamp"],
+                duration_seconds=int((last - first).total_seconds()),
+                entry_fuel=samples[index - 1]["fuel"] if index > 0 else -1,
+                min_fuel=samples[min_index]["fuel"],
+                cause_kind=cause_kind,
+                cause_drop=cause_drop,
+                cause_state=cause_state,
+                recovery_fuel=recovery["fuel"] if recovery is not None else -1,
+                recovery_kind=recovery["in_flight"] if recovery is not None else "",
+            )
+        )
+        index = end + 1
+    return episodes
 
 
 def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionScorecardDict:
@@ -420,6 +736,16 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         last = datetime.fromisoformat(accumulator["last_timestamp"])
         duration_seconds = int((last - first).total_seconds())
     fuel_samples = accumulator["fuel_samples"]
+    fuel_values = [sample["fuel"] for sample in fuel_samples]
+    low_water_threshold = (
+        accumulator["max_escape_floor"]
+        if accumulator["max_escape_floor"] > 0
+        else _FUEL_FLOOR_THRESHOLD
+    )
+    teleport_spend, teleport_spend_total = _build_teleport_spend(
+        accumulator["teleport_spend_fuel"],
+        accumulator["teleport_spend_drops"],
+    )
     inventory_samples = accumulator["inventory_samples"]
     approaches = accumulator["equipment_approaches"]
     approach_counts = Counter((row["target_x"], row["target_y"]) for row in approaches)
@@ -432,9 +758,9 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         combat_ghosts_blocked=accumulator["combat_ghosts_blocked"],
         combat_stale_positions_blocked=accumulator["combat_stale_positions_blocked"],
         tank_damage_changes=accumulator["tank_damage_changes"],
-        fuel_min=min(fuel_samples) if fuel_samples else -1,
-        fuel_last=fuel_samples[-1] if fuel_samples else -1,
-        fuel_sample_count=len(fuel_samples),
+        fuel_min=min(fuel_values) if fuel_values else -1,
+        fuel_last=fuel_values[-1] if fuel_values else -1,
+        fuel_sample_count=len(fuel_values),
         inventory_first=(
             inventory_samples[0] if inventory_samples else make_unsampled_inventory_counts()
         ),
@@ -451,6 +777,15 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         equipment_approach_distinct_targets=len(approach_counts),
         equipment_approach_max_repeats=(max(approach_counts.values()) if approach_counts else 0),
         action_outcome_counts=dict(sorted(accumulator["action_outcome_counts"].items())),
+        fuel_low_water_threshold=low_water_threshold,
+        fuel_low_water_episodes=_build_low_water_episodes(fuel_samples, low_water_threshold),
+        teleport_spend=teleport_spend,
+        teleport_spend_total=teleport_spend_total,
+        ledger_teleport_spend_min=accumulator["ledger_teleport_spend_min"],
+        ledger_teleport_spend_max=accumulator["ledger_teleport_spend_max"],
+        ledger_shot_singles=accumulator["ledger_shot_singles"],
+        ledger_shot_duals=accumulator["ledger_shot_duals"],
+        ledger_shot_homings=accumulator["ledger_shot_homings"],
         career_destroyed_last=accumulator["career_destroyed_last"],
         career_deactivated_last=accumulator["career_deactivated_last"],
         career_score_last=accumulator["career_score_last"],
@@ -458,6 +793,103 @@ def build_session_scorecard(accumulator: ScorecardAccumulatorDict) -> SessionSco
         container_pickups_full=accumulator["container_pickups_full"],
         container_pickups_partial=accumulator["container_pickups_partial"],
     )
+
+
+def render_state_budget_lines(scorecard: SessionScorecardDict) -> list[str]:
+    """Render the per-state time budget with stretch statistics.
+
+    Args:
+        scorecard: Session scorecard to render.
+
+    Returns:
+        One line per state (or the no-transitions placeholder).
+    """
+    if not scorecard["state_budget"]:
+        return ["  state budget: (no transitions)"]
+    return [
+        f"  {record['state']:>22}: {record['seconds']}s "
+        f"({record['stretches']}x, max {record['max_seconds']}s)"
+        for record in scorecard["state_budget"]
+    ]
+
+
+def render_shot_billing_lines(scorecard: SessionScorecardDict) -> list[str]:
+    """Render the ledger's shot billing with the singles reconciliation.
+
+    Args:
+        scorecard: Session scorecard to render.
+
+    Returns:
+        A single billing line, or no lines when the run ended without
+        a ``damage_ledger`` event.
+    """
+    if scorecard["ledger_shot_singles"] < 0:
+        return []
+    return [
+        f"  shot billing (ledger): dual={scorecard['ledger_shot_duals']} "
+        f"homing={scorecard['ledger_shot_homings']} "
+        f"single={scorecard['ledger_shot_singles']} "
+        "-- singles are server-billed non-connects (weapon=0 misses/clips), "
+        "not loadout drift"
+    ]
+
+
+def render_fuel_low_water_lines(scorecard: SessionScorecardDict) -> list[str]:
+    """Render the fuel low-water episode narrative.
+
+    Args:
+        scorecard: Session scorecard to render.
+
+    Returns:
+        Header plus one line per episode (capped), or the all-clear
+        line when fuel never dipped below the threshold.
+    """
+    threshold = scorecard["fuel_low_water_threshold"]
+    episodes = scorecard["fuel_low_water_episodes"]
+    if not episodes:
+        return [f"  fuel low-water: none (never below {threshold})"]
+    lines = [f"  fuel low-water (below {threshold}): {len(episodes)} episode(s)"]
+    for episode in episodes[:_LOW_WATER_RENDER_CAP]:
+        entry = "start" if episode["entry_fuel"] < 0 else str(episode["entry_fuel"])
+        recovery = (
+            "session end"
+            if episode["recovery_fuel"] < 0
+            else f"{episode['recovery_fuel']} via {episode['recovery_kind']}"
+        )
+        lines.append(
+            f"    {episode['start_timestamp']} ({episode['duration_seconds']}s) "
+            f"entry={entry} min={episode['min_fuel']} "
+            f"cause={episode['cause_kind']} -{episode['cause_drop']} "
+            f"in {episode['cause_state']} recovery={recovery}"
+        )
+    hidden = len(episodes) - _LOW_WATER_RENDER_CAP
+    if hidden > 0:
+        lines.append(f"    ... and {hidden} more episode(s)")
+    return lines
+
+
+def render_teleport_spend_lines(scorecard: SessionScorecardDict) -> list[str]:
+    """Render the teleport fuel spend grouped by paying bot state.
+
+    Args:
+        scorecard: Session scorecard to render.
+
+    Returns:
+        Header plus one line per bot-state group, or the no-spend
+        line when no in-flight teleport drops were observed.
+    """
+    spend_min = scorecard["ledger_teleport_spend_min"]
+    spend_max = scorecard["ledger_teleport_spend_max"]
+    ledger_text = f" (ledger bound {spend_min}..{spend_max})" if spend_max >= 0 else ""
+    if not scorecard["teleport_spend"]:
+        return [f"  teleport spend: none observed{ledger_text}"]
+    lines = [f"  teleport spend: {scorecard['teleport_spend_total']} fuel{ledger_text}"]
+    lines.extend(
+        f"    {record['bot_state'] or '(no context)'}: {record['fuel_spent']} "
+        f"over {record['drops']} drop(s)"
+        for record in scorecard["teleport_spend"]
+    )
+    return lines
 
 
 def render_scorecard_section(scorecard: SessionScorecardDict) -> list[str]:
@@ -501,11 +933,10 @@ def render_scorecard_section(scorecard: SessionScorecardDict) -> list[str]:
         f"distinct={scorecard['equipment_approach_distinct_targets']} "
         f"max_repeats={scorecard['equipment_approach_max_repeats']}",
     ]
-    if not scorecard["state_budget"]:
-        lines.append("  state budget: (no transitions)")
-    else:
-        for record in scorecard["state_budget"]:
-            lines.append(f"  {record['state']:>22}: {record['seconds']}s")
+    lines.extend(render_shot_billing_lines(scorecard))
+    lines.extend(render_fuel_low_water_lines(scorecard))
+    lines.extend(render_teleport_spend_lines(scorecard))
+    lines.extend(render_state_budget_lines(scorecard))
     lines.append("")
     return lines
 
@@ -548,10 +979,15 @@ def collect_scorecard_issues(scorecard: SessionScorecardDict) -> list[str]:
 
 
 __all__ = [
+    "FuelSampleRecordDict",
     "ScorecardAccumulatorDict",
     "build_session_scorecard",
     "collect_scorecard_issues",
     "new_scorecard_accumulator",
+    "render_fuel_low_water_lines",
     "render_scorecard_section",
+    "render_shot_billing_lines",
+    "render_state_budget_lines",
+    "render_teleport_spend_lines",
     "route_scorecard_record",
 ]

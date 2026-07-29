@@ -123,10 +123,85 @@ class StateBudgetRecordDict(TypedDict):
         state: Bot state name (``COMBAT``, ``MOVING``, ``IDLE``, ...).
         seconds: Whole seconds attributed to the state, summed across
             every visit (event timestamps have second granularity).
+        stretches: Number of distinct visits to the state. A large
+            total made of many short visits (tick-boundary residue) is
+            healthy; the same total in one visit is a stall.
+        max_seconds: Longest single visit in whole seconds. The
+            stall detector: run 20260729-105325 spent 285s IDLE across
+            283 visits with ``max_seconds=6`` -- pure residue, no stall.
     """
 
     state: str
     seconds: int
+    stretches: int
+    max_seconds: int
+
+
+class FuelLowWaterEpisodeDict(TypedDict):
+    """One contiguous dip of belief fuel below the session's danger line.
+
+    The scorecard's bare ``fuel_min`` says how low the session got but
+    not why; each episode narrates one dip -- what spent the fuel, how
+    low it went, and what refilled it (run 20260729-105325: a 158-fuel
+    chase teleport explained the session min of 140, invisible in the
+    old report).
+
+    Attributes:
+        start_timestamp: ISO timestamp of the first below-threshold
+            fuel sample.
+        end_timestamp: ISO timestamp of the last below-threshold fuel
+            sample in the episode.
+        duration_seconds: Whole seconds between the first and last
+            below-threshold samples (0 for a single-sample dip).
+        entry_fuel: Last at-or-above-threshold sample before the
+            episode, or ``-1`` when the session started below.
+        min_fuel: Lowest sample inside the episode.
+        cause_kind: ``in_flight_action_kind`` of the largest
+            sample-to-sample fuel drop between entry and the episode
+            minimum (``none`` when nothing was in flight).
+        cause_drop: Size of that largest drop in fuel units (positive).
+        cause_state: ``bot_state`` at the sample where the largest
+            drop landed.
+        recovery_fuel: First at-or-above-threshold sample after the
+            episode, or ``-1`` when the session ended below.
+        recovery_kind: ``in_flight_action_kind`` at the recovery
+            sample, or ``""`` when the session ended below.
+    """
+
+    start_timestamp: str
+    end_timestamp: str
+    duration_seconds: int
+    entry_fuel: int
+    min_fuel: int
+    cause_kind: str
+    cause_drop: int
+    cause_state: str
+    recovery_fuel: int
+    recovery_kind: str
+
+
+class TeleportSpendRecordDict(TypedDict):
+    """Fuel spent on teleports, grouped by the bot state paying it.
+
+    Teleports were the dominant fuel expense of run 20260729-105325
+    (measured 15592, ledger feasibility bound 11993..19290) but the
+    fuel book's totals cannot say whether chases or forage hops paid
+    it; this row attributes each WORLD-channel fuel debit billed while
+    a teleport was in flight to the ``bot_state`` that dispatched the
+    jump.
+
+    Attributes:
+        bot_state: ``bot_state`` context (``MODE/STATE``) stamped on
+            the WORLD fuel-transition record.
+        drops: Number of in-flight debit receipts observed
+            (approximately the jump count -- a jump billed across two
+            receipts counts twice, with the fuel split between them).
+        fuel_spent: Total fuel across those receipts (positive).
+    """
+
+    bot_state: str
+    drops: int
+    fuel_spent: int
 
 
 class TargetedTeleportRecordDict(TypedDict):
@@ -243,6 +318,33 @@ class SessionScorecardDict(TypedDict):
             single equipment coordinate, ``0`` with no approaches.
         action_outcome_counts: Per ``"kind:outcome"`` tallies from the
             unified ``action_outcome`` fabric, sorted by key.
+        fuel_low_water_threshold: The danger line used for episode
+            detection -- the highest ``escape_floor`` any
+            ``engagement_break`` event computed this session, falling
+            back to the static critical floor when combat never
+            projected one.
+        fuel_low_water_episodes: Every contiguous dip below the
+            threshold, in stream order.
+        teleport_spend: In-flight teleport fuel debits grouped by
+            paying ``bot_state``, sorted by descending spend.
+        teleport_spend_total: Sum of ``fuel_spent`` across the groups.
+        ledger_teleport_spend_min: Least possible total teleport
+            spend from the fuel book's summed feasibility intervals
+            (the negated ``teleport_fuel_hi``), or ``-1`` when the run
+            ended without a ``damage_ledger`` event. The measured
+            ``teleport_spend_total`` must fall inside
+            ``[min, max]`` -- outside means the attribution drifted.
+        ledger_teleport_spend_max: Greatest possible total teleport
+            spend (the negated ``teleport_fuel_lo``), or ``-1``.
+        ledger_shot_singles: ``shot_single_count`` from the
+            ``damage_ledger`` event, or ``-1`` without a ledger.
+            Nonzero singles under a dual+homing loadout are
+            server-billed non-connects (weapon=0 misses/clips), not
+            loadout drift -- see wiki weapon-selection.
+        ledger_shot_duals: ``shot_dual_count`` from the ledger, or
+            ``-1``.
+        ledger_shot_homings: ``shot_homing_count`` from the ledger,
+            or ``-1``.
     """
 
     duration_seconds: int
@@ -268,6 +370,15 @@ class SessionScorecardDict(TypedDict):
     equipment_approach_distinct_targets: int
     equipment_approach_max_repeats: int
     action_outcome_counts: dict[str, int]
+    fuel_low_water_threshold: int
+    fuel_low_water_episodes: list[FuelLowWaterEpisodeDict]
+    teleport_spend: list[TeleportSpendRecordDict]
+    teleport_spend_total: int
+    ledger_teleport_spend_min: int
+    ledger_teleport_spend_max: int
+    ledger_shot_singles: int
+    ledger_shot_duals: int
+    ledger_shot_homings: int
     # Career-totals snapshot taken at the LAST 0x56 Statistics broadcast
     # the run saw. -1 means the wire never sent one (very short Practice
     # runs sometimes finish before the cadence fires).
@@ -340,6 +451,7 @@ class IssueReportDict(TypedDict):
 
 __all__ = [
     "ActionOutcomeRowDict",
+    "FuelLowWaterEpisodeDict",
     "FuelTargetSelectionRecordDict",
     "InventoryCountsDict",
     "IssueReportDict",
@@ -349,6 +461,7 @@ __all__ = [
     "StateBudgetRecordDict",
     "TargetedTeleportRecordDict",
     "TeleportAttemptRecordDict",
+    "TeleportSpendRecordDict",
     "make_unsampled_inventory_counts",
     "make_zero_inventory_counts",
 ]
