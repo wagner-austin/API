@@ -7,7 +7,7 @@ related:
 source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
-  - "src/tankpit_bot/browser/screencast.py"
+  - "src/tankpit_bot/browser/live_view.py"
 fact_checked: "2026-07-29"
 confidence: medium
 hubs: [architecture]
@@ -40,7 +40,7 @@ Nine routes, all under nginx's `/api/tankbot/*` prefix in production:[^1]
 | `GET  /status` | Subscribes to `StatusBus`, streams `SessionStatusDict` frames as SSE `data: <json>` lines | `200 text/event-stream` |
 | `POST /shutdown` | Requests session stop, fires the service shutdown signal | `202 shutting down` |
 | `GET  /watch`  | Self-contained phone watch page (`service/watch_page.py`) | `200 text/html` |
-| `GET  /video`  | Subscribes to `FrameBus`, streams screencast JPEGs as MJPEG multipart parts | `200 multipart/x-mixed-replace` |
+| `GET  /video`  | Subscribes to `FrameBus`, streams live-view JPEGs as MJPEG multipart parts | `200 multipart/x-mixed-replace` |
 | `GET  /frame`  | One-shot JPEG snapshot (fresh-frame wait, cached fallback) | `200 image/jpeg` / `404` before any frame |
 
 The SSE handler runs `subscriber.next_frame(timeout=15.0)` inside `loop.run_in_executor` so the event loop stays responsive; on timeout it writes a `: heartbeat` SSE comment to keep intermediaries (nginx, cloudflared) from idling the TCP connection out. The MJPEG drain mirrors that shape; its keepalive re-sends the last JPEG (MJPEG has no comment channel).[^1]
@@ -55,19 +55,44 @@ non-adjacency strands it (the user's "steals my mouse" complaint; see
 the fiesta wiki's 2026-07-01 desktop-takeover incident page). The
 replacement is wire-only, inside this repo:[^3]
 
-- **`browser/screencast.py`** — `ScreencastService` relays Chrome's
-  own `Page.startScreencast` JPEG stream (quality 70, max edge 1024,
-  every frame) off the CDP session the bot already holds; each frame
-  is acked (`Page.screencastFrameAck`) then published. Ack-in-handler
-  follows the `CDPService._record_frame` precedent.
+- **`browser/live_view.py`** — the page-push caster (2026-07-29,
+  REPLACING the one-day CDP `Page.startScreencast` relay: Chrome
+  sends the next screencast frame only after the previous ACK, and
+  acks rode the same Playwright thread the tick loop owns, so every
+  heavy tick operation stalled the stream for seconds — the user's
+  "laggy... seems to freeze" report; measured 0.6 fps idle / 2.8 fps
+  bursty in play). An injected interval INSIDE the game page
+  composites the client's six stacked canvases
+  ([[rendering-pipeline]]: Background/Tanks/Action/Map/Overlay at
+  384x256 + the 384x48 Menu strip, DPI-scaled) to one JPEG per frame
+  and hands the data URL to the bot over a CDP BINDING
+  (`Runtime.addBinding` → `window.__botCastDeliver`; the handler
+  decodes and publishes to the frame bus, loud on drift). **Law
+  (2026-07-29): a game-page fetch to loopback CANNOT deliver the
+  frames** — Chrome's Local Network Access gate parks page →
+  `127.0.0.1` fetches behind an ungrantable permission and they hang
+  forever, resolving nothing and rejecting nothing (in-page
+  telemetry: `ticks=36 posts=0` in 3 s; Playwright 1.57 has no
+  `local-network-access` permission). The binding channel has no
+  gate and no backpressure: the page captures at its configured
+  fps — env `TANKPIT_BOT_VIDEO_FPS` (default 12) /
+  `TANKPIT_BOT_VIDEO_QUALITY` (default 0.8) — regardless of what
+  the bot thread is doing; frames queued during a tick stall
+  burst-deliver and collapse into the latest-wins bus. Measured:
+  117 MJPEG parts / 10 s (11.7 fps) with the tank IDLE, ~800 KB/s,
+  and the picture is PURE GAME pixels — no page chrome, which also
+  delivers the user's "game fullscreen" wish without touching the
+  client's fullscreen button.
 - **`service/frame_bus.py`** — `FrameBus`, byte-for-byte the
   `StatusBus` pattern (latest-wins, cache-on-publish, explicit
   unsubscribe) plus a `latest()` accessor for `/frame`. Its
   `subscriber_count()` doubles as the DEMAND signal.
-- **`bot/tick_loop.py::_sync_screencast_demand`** — runs each tick
+- **`bot/tick_loop.py::_sync_live_view_demand`** — runs each tick
   inside the `_tick_once` `TargetClosedError` guard: subscribers > 0
-  starts the screencast, zero stops it. Unwatched sessions (and every
-  `make run` — inert default bus) pay nothing.
+  re-`ensure`s the idempotent caster EVERY tick (the repetition
+  self-heals across page navigations, which wipe injected JS); zero
+  subscribers stops it. Unwatched sessions (and every `make run` —
+  inert default bus) never run the caster.
 - **`service/watch_page.py`** — one HTML string served at `/watch`:
   MJPEG `<img>`, SSE stats strip, START/STOP + mode buttons over the
   existing HTTP routes. All URLs are RELATIVE so the page works both

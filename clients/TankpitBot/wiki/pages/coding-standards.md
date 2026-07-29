@@ -7,8 +7,8 @@ source_paths:
   - "src/tankpit_bot"
   - "tests"
 source_git_blobs:
-  "src/tankpit_bot": "8fcd9d1101846fbc4451f64d404e0651eda45bb0"
-  "tests": "10bf8a97794be40b4f61cbe33ac962cde7fc463a"
+  "src/tankpit_bot": "37991bd467ca1af869006d58c73c447f7ba6a9a2"
+  "tests": "a39b04d16ad4f3fb3cb0c54abfa29737257ad92d"
 fact_checked: "2026-06-16"
 confidence: high
 hubs: [architecture]
