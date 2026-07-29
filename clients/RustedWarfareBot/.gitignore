@@ -3,6 +3,15 @@
 # and the build stays pinned against Steam auto-update.
 .game/
 
+# Per-worker clones of that copy, one per concurrent match. A running game
+# writes three fixed-name paths into its own directory — preferences.ini,
+# saves/autosave.rwsave.tmp2 and the mod cache — so two matches sharing one
+# directory race on all three. Everything else the harness needs was already
+# per-invocation: the agent jar is GUID-stamped, the channel port is drawn per
+# invocation, and the logs are named by the caller. Cloning the directory is
+# the whole of what parallel matches require ([[harness-nodisplay]]).
+.game-w*/
+
 # Bulk run output (event streams, replays, per-session logs) — many
 # and large. The monorepo root .gitignore already excludes **/runs/;
 # this line is here for intent, not effect.

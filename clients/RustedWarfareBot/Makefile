@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play income
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play income sweep
 
 help:
 	@Write-Host ""
@@ -32,6 +32,8 @@ help:
 	@Write-Host "                                   PLAY_SEED pins the opponents' RNG; PLAY_LOCKSTEP locks the tick"
 	@Write-Host "  make income                      measure extractor credits/s and payback time"
 	@Write-Host "                                   INCOME_STAGES=4 INCOME_IDLE=200 INCOME_LOG=runs/income.log"
+	@Write-Host "  make sweep                       play a batch of matches in parallel, resumably"
+	@Write-Host "                                   SWEEP_JOBS=sweeps/x.txt SWEEP_NAME=x SWEEP_WORKERS=4"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
 	@Write-Host "  make agent                       compile + jar the javaagent"
@@ -303,6 +305,18 @@ TYPE_DUMP := wiki/sources/m11-pools/type-flags.ndjson
 # its own directory there instead -- so "python scripts/income.py" cannot see
 # "scripts.play" at all. "python -m" is what `make lint` already uses for the
 # guard, so this is the form the tree is known to support.
+# Which match to play. Empty leaves the engine's own hardcoded sandbox, which is
+# a five-player free-for-all on a ten-player map that nobody chose: the setup is
+# read from a GUI document with no values headless, so every figure falls
+# through to a Java default of four opponents at Medium ([[policy-determinism]]).
+#
+# Difficulty is an income multiplier on the AI alone -- 0.4x Very Easy, 0.7x
+# Easy, 1.0x Medium, 1.4x Hard, 1.8x Very Hard, 3.7x Impossible -- so at the
+# default an opponent earns exactly what the bot does.
+PLAY_MAP ?=
+PLAY_OPPONENTS ?= 1
+PLAY_DIFFICULTY ?= 0
+
 PLAY_MODULE ?= scripts.play
 PLAY_ARGS ?= $(PLAY_SAMPLES)
 
@@ -318,7 +332,37 @@ play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; if ($(PLAY_LOCKSTEP) -ne 0) { $$agentArgs = $$agentArgs + ";lockstepFrames=$(PLAY_LOCKSTEP)"; Write-Host "[play] lockstep every $(PLAY_LOCKSTEP) frames" -ForegroundColor DarkGray }; $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList @("-Xmx1000M", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound", "-sandbox", "-width", "800", "-height", "600", "-log", "$$log") -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python -m $(PLAY_MODULE) $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_ARGS) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }
+	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; if ($(PLAY_LOCKSTEP) -ne 0) { $$agentArgs = $$agentArgs + ";lockstepFrames=$(PLAY_LOCKSTEP)"; Write-Host "[play] lockstep every $(PLAY_LOCKSTEP) frames" -ForegroundColor DarkGray }; if ("$(PLAY_MAP)" -ne "") { $$agentArgs = $$agentArgs + ";matchMap=$(PLAY_MAP);matchOpponents=$(PLAY_OPPONENTS);matchDifficulty=$(PLAY_DIFFICULTY)"; Write-Host "[play] $(PLAY_OPPONENTS) opponent(s) at difficulty $(PLAY_DIFFICULTY) on $(PLAY_MAP)" -ForegroundColor DarkGray }; $$gameArgs = @("-Xmx1000M", "--add-opens", "java.base/java.lang=ALL-UNNAMED", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound"); if ("$(PLAY_MAP)" -eq "") { $$gameArgs += "-sandbox" } else { Write-Host "[play] -sandbox withheld; the agent starts the match" -ForegroundColor DarkGray }; $$gameArgs += @("-width", "800", "-height", "600", "-log", "$$log"); $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList $$gameArgs -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python -m $(PLAY_MODULE) $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_ARGS) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }
+
+# A batch of matches, played several at a time. Each worker gets its own copy of
+# the game directory because a running match writes three fixed-name paths
+# inside its own -- everything else the launcher needs was already
+# per-invocation ([[harness-nodisplay]]).
+#
+# Resumable by construction: a match's result is a file named after its job, so
+# re-issuing the same command replays only what is missing. There is no progress
+# file that could disagree with the results.
+SWEEP_JOBS ?= sweeps/jobs.txt
+SWEEP_NAME ?= run
+SWEEP_WORKERS ?= 4
+# Engine frames between samples. Never zero for a sweep: free running, the
+# exchange is paced by a wall clock, so parallel matches under CPU contention
+# sample at different game-times and running them in parallel would change their
+# results ([[policy-determinism]]).
+SWEEP_LOCKSTEP ?= 75
+
+# Which match every job in the batch plays: a map path and a difficulty, or
+# empty for the engine's own hardcoded ten-player free-for-all. The map decides
+# the opponent count, because the engine caps teams by the map's own -- so a
+# two-player map is a duel ([[policy-determinism]]).
+#
+#   make sweep SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx -2"
+SWEEP_MATCH ?=
+
+sweep:
+	@Write-Host ""
+	@Write-Host "==> sweep $(SWEEP_NAME) ($(SWEEP_WORKERS) workers, jobs: $(SWEEP_JOBS))" -ForegroundColor Cyan
+	poetry run python -m scripts.sweep "$(SWEEP_JOBS)" "$(SWEEP_NAME)" $(SWEEP_WORKERS) $(SWEEP_LOCKSTEP) $(SWEEP_MATCH)
 
 income: PLAY_MODULE = scripts.income
 income: PLAY_ARGS = $(INCOME_STAGES) $(INCOME_IDLE)
