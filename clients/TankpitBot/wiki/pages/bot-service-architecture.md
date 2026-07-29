@@ -8,7 +8,7 @@ source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/screencast.py"
-fact_checked: "2026-07-28"
+fact_checked: "2026-07-29"
 confidence: medium
 hubs: [architecture]
 ---
@@ -74,19 +74,41 @@ replacement is wire-only, inside this repo:[^3]
   direct (`:27100/watch`) and behind nginx's `/api/tankbot/` prefix
   strip (`https://tankpit.austinwagner.org/api/tankbot/watch`) — the
   existing proxy block already forwards every subpath unbuffered.
-  Since MCPs commit `62b8a214` (same day), the BARE hostname
-  `tankpit.austinwagner.org/` 302s straight to the watch page
-  (host-conditional exact-root redirect in `fiesta/nginx.conf`);
-  every other gated host keeps the SPA root, and the SPA — with its
-  Vibeshine stream and the SERVER launch button — remains reachable
-  on the tankpit host at `/index.html`.
+  The 2026-07-28 exact-root redirect to this page lived one day:
+  since 2026-07-29 the RETRO SPA is the tankpit front door again
+  (next paragraph), and `/api/tankbot/watch` remains as the
+  dependency-free fallback view.
 - Idle-exit gate (`exit_when_idle`) counts `/video` viewers alongside
   SSE subscribers, so watching keeps the service alive.[^3]
 
+**The SPA is the tankpit UI (2026-07-29, MCPs `95f27215`).** The
+fiesta SPA's tankpit profile went stream-less: `"stream": null` +
+`"botVideoUrl": "/api/tankbot/video"`. The SPA's bot-overlay binding
+drives a `#bot-video` image (same screen box as the WebRTC video)
+from live `BotUIState` — MJPEG src attached while a session runs,
+detached otherwise. No Vibeshine session is ever created, so no
+input data channel exists; every input surface was removed from the
+profile (joystick, L/R click bubbles, Q, ALT+F4, `server:start`) and
+what remains is watch-and-control over this service's HTTP routes:
+START/STOP BOT, the four mode buttons, STOP SERVER, and the stats
+strip. `botServerLaunchCommand` stays in the profile for the
+games-hub hash-swap cold chain (a Vibeshine session from the games
+host CAN still fire `make service` via run_command).[^3]
+
+**Always-on service (2026-07-29).** With the SPA's video served by
+this process, the phone expects the URL to answer at any hour:
+`TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS` (resolver
+`bot/config.py::resolve_idle_exit_seconds`) overrides the 1800 s
+idle window, and `0` disables the self-exit — `exit_when_idle`
+returns immediately. The shell:startup launcher
+(`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\tankpit-bot-service.cmd`)
+runs `make service` minimized at logon with the exit disabled;
+`make service`'s respawn loop covers crashes. Delete the .cmd to
+return to manual starts. Default behavior (no env) is unchanged.[^3]
+
 No input path exists anywhere in this surface — the buttons are HTTP
-POSTs to the bot service; nothing can touch the host mouse. The
-vibeshine tankpit profile still exists but is now redundant for
-monitoring.[^3]
+POSTs to the bot service; nothing can touch the host mouse, in the
+SPA and plain watch page alike.[^3]
 
 **Service sessions now get run artifacts.** The first live watch test
 exposed a gap as old as the service itself: only `bot/entry.py`
@@ -216,4 +238,4 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 
 [^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`mode_bridge.py`, `status_bus.py`, `session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
 [^2]: cross-repo truth in `~/PROJECTS/MCPs`: `fiesta/src/tankbot/` and `fiesta/nginx.conf`; Phase B/C landing commit `6c78deff` ("fiesta: bot-controls SPA panel + /api/tankbot proxy"), later reworked by `88fc8ae5` ("bot-controls view replaced by overlay viewmodel") — see the staleness note; file inventory re-verified against that repo 2026-07-23.
-[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/screencast.py`, `src/tankpit_bot/service/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes`, `_drain_frame_bus_to_response`, `_latest_frame_snapshot`), `bot/tick_loop.py` (`_sync_screencast_demand`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`).
+[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/screencast.py`, `src/tankpit_bot/service/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes`, `_drain_frame_bus_to_response`, `_latest_frame_snapshot`), `bot/tick_loop.py` (`_sync_screencast_demand`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`). SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) and this repo commit `59201238` (`bot/config.py::resolve_idle_exit_seconds`, `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
