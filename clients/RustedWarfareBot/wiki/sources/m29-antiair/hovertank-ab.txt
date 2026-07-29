@@ -1,0 +1,95 @@
+Anti-air in the army: does closing the air gap change the outcome?
+
+Twelve seeds per arm at each of two rungs on [p2]duel_lake, 4,000 samples. The
+arms differ only in the goals string -- c_tank x4 against c_tank x3 + hoverTank
+-- which is where the army mix comes from, so no code changed ([[policy-production]]).
+
+WHY THE HOVERTANK AND NOT THE TURRET. c_antiAirTurret is the better unit (7.50
+dps per 100 credits against 3.41, 133 hp per 100 against 33, 250 range) but a
+BUILDER places it, and the builder channel built three turrets across twelve
+full matches. The hovertank comes off a Land Factory through the production
+channel, which reinforced 120-143 units in the same runs.
+
+READING THE ENGAGEABLE COLUMN. Compare only matches that did NOT finish. A win
+ends with a handful of enemies left and often reads 0% -- that is the bot having
+won while unable to shoot the aircraft that survived it, not a failure.
+
+                    won   lost      drops   engageable, in matches that ran on
+  duel-hard         4/12      0        21   76-83%
+  duel-hard-aa      6/12      1        16   89-98%
+  duel-medium       9/12      0         -   84-91%
+  duel-medium-aa   10/12      1         -   96-100%
+
+The drops column is blank for any batch whose traces were later overwritten;
+see compare.py, which refuses to borrow another run's trace.
+
+VERDICT: the mechanism is confirmed -- the army can now shoot what it sees --
+and the win gain is real but small, 13/24 -> 16/24 across both rungs, which is
+not decisive at that count. Both new losses carry the stalled-plan signature
+(army zero beside a large banked balance) rather than a combat one, and the same
+signature appeared in the defence arm too, so it predates this change.
+
+=== duel-hard
+     seed     verdict  samples  drops  visible  engageable     %
+    12345    survived     4000             165         130   78%
+     1337    survived     4000              60          48   80%
+    24601    survived     4000             110          89   80%
+    31337         won     3326               7           0    0%
+     4242         won     2188               3           0    0%
+      555         won     2475              10           0    0%
+    60613    survived     4000             145         121   83%
+      777         won     1755               4           0    0%
+     8128    survived     4000             158         125   79%
+  8675309    survived     4000              50          38   76%
+    90210    survived     4000              62          42   67%
+    99991    survived     4000             122          94   77%
+  4 won, 0 lost, {'survived': 8, 'won': 4}
+
+=== duel-hard-aa
+     seed     verdict  samples  drops  visible  engageable     %
+    12345         won     2272               1           1  100%
+     1337         won     3769               9           9  100%
+    24601         won     2577               2           2  100%
+    31337    survived     4000              48          43   89%
+     4242    survived     4000              94          92   97%
+      555    survived     4000              73          72   98%
+    60613         won     3615               3           1   33%
+      777    survived     4000              89          87   97%
+     8128    survived     4000             119         116   97%
+  8675309         won     2584               3           3  100%
+    90210         won     2794               1           0    0%
+    99991       wiped     3711             139           0    0%
+  6 won, 1 lost, {'won': 6, 'survived': 5, 'wiped': 1}
+
+=== duel-medium
+     seed     verdict  samples  drops  visible  engageable     %
+    12345         won     1739               7           0    0%
+     1337         won     1981               2           1   50%
+    24601         won     2079               7           0    0%
+    31337         won     2437               5           2   40%
+     4242    survived     4000              51          43   84%
+      555         won     2277               9           0    0%
+    60613         won     2792              12           0    0%
+      777    survived     4000             144         132   91%
+     8128    survived     4000             120         110   91%
+  8675309         won     1598               4           0    0%
+    90210         won     2056              10           1   10%
+    99991         won     2360               9           0    0%
+  9 won, 0 lost, {'won': 9, 'survived': 3}
+
+=== duel-medium-aa
+     seed     verdict  samples  drops  visible  engageable     %
+    12345         won     1791      0        0           0    --
+     1337         won     2315      0        0           0    --
+    24601         won     2120      0        1           1  100%
+    31337         won     2416      0        6           6  100%
+     4242         won     1981      1        2           2  100%
+      555         won     2142      1        3           3  100%
+    60613    survived     4000      3       79          76   96%
+      777       wiped     3387      2      113           0    0%
+     8128         won     3110      1        1           1  100%
+  8675309         won     1989      0        1           1  100%
+    90210         won     3167      1        0           0    --
+    99991         won     1523      0        0           0    --
+  10 won, 1 lost, {'won': 10, 'survived': 1, 'wiped': 1}
+

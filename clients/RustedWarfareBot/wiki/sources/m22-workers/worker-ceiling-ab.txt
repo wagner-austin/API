@@ -1,0 +1,114 @@
+How many builders is the right number?
+
+The multi-builder change removed the throttle that had held the bot to one
+worker, and the bot then spent its way to 33 of them. A ceiling was added on
+the argument that a builder is 500 credits of thing that does not fight. This
+sweep asks the argument to justify itself: three seeds against each of three
+ceilings, tank goals, 1500 samples, identical code -- only --max-workers differs.
+
+### workers=4 seed=12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     34
+expansions     31 (0 factories) (every worker is already building something)
+extractors     0 -> 10
+attack orders  661
+rallied        28
+army           0 -> 34
+army value     500 -> 13900
+total worth    3500 -> 24600
+best rival     4700 -> 25350
+workers        4
+income         98/s
+enemies seen   16 -> 88 (78 engageable)
+engaged gone   36
+players        5 -> 5 (0 eliminated)
+claims refused 0
+samples seen   1500
+credits left   17938
+### workers=8 seed=12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     38
+expansions     61 (0 factories) (every worker is already building something)
+extractors     0 -> 10
+attack orders  406
+rallied        28
+army           0 -> 23
+army value     500 -> 12050
+total worth    3500 -> 23450
+best rival     4700 -> 26850
+workers        8
+income         98/s
+enemies seen   16 -> 88 (76 engageable)
+engaged gone   22
+players        5 -> 5 (0 eliminated)
+claims refused 0
+samples seen   1500
+credits left   15229
+### workers=8 seed=777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     38
+expansions     61 (0 factories) (every worker is already building something)
+extractors     0 -> 10
+attack orders  180
+rallied        28
+army           0 -> 34
+army value     500 -> 15900
+total worth    3500 -> 27300
+best rival     4700 -> 29600
+workers        8
+income         98/s
+enemies seen   16 -> 115 (105 engageable)
+engaged gone   12
+players        5 -> 5 (0 eliminated)
+claims refused 0
+samples seen   1500
+credits left   15304
+### workers=8 seed=4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     38
+expansions     65 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  222
+rallied        28
+army           0 -> 18
+army value     500 -> 10300
+total worth    3500 -> 23100
+best rival     4700 -> 27050
+workers        8
+income         122/s
+enemies seen   16 -> 100 (82 engageable)
+engaged gone   18
+players        5 -> 5 (0 eliminated)
+claims refused 0
+samples seen   1500
+credits left   17837
+### workers=99 seed=12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     128 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  208
+rallied        27
+army           0 -> 20
+army value     500 -> 23500
+total worth    3500 -> 37000
+best rival     4700 -> 27850 (peak 27850, worst dip 700)
+workers        33
+income         122/s
+enemies seen   16 -> 99 (86 engageable)
+engaged gone   16
+players        5 -> 5 (0 eliminated)
+claims refused 144
+samples seen   1500
+credits left   3880
+### workers=99 seed=777

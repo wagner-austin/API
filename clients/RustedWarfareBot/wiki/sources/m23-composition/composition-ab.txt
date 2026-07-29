@@ -1,0 +1,133 @@
+﻿### tank seed=12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     129 (3 factories) (every worker is already building something)
+extractors     0 -> 10
+attack orders  141
+rallied        27
+army           0 -> 32
+army value     500 -> 27200
+total worth    3500 -> 39300
+best rival     4700 -> 29050 (peak 29050, worst dip 1200)
+workers        32
+composition    c_tank x32
+income         98/s
+enemies seen   15 -> 108 (93 engageable)
+engaged gone   12
+players        5 -> 5 (0 eliminated)
+claims refused 150
+samples seen   1500
+credits left   3424
+### tank seed=777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     64
+expansions     129 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  312
+rallied        28
+army           0 -> 13
+army value     500 -> 21050
+total worth    3500 -> 34550
+best rival     5400 -> 26200 (peak 26300, worst dip 1000)
+workers        33
+composition    c_tank x13
+income         122/s
+enemies seen   19 -> 97 (79 engageable)
+engaged gone   25
+players        5 -> 5 (0 eliminated)
+claims refused 145
+samples seen   1500
+credits left   4377
+### tank seed=4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     122 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  349
+rallied        27
+army           0 -> 10
+army value     500 -> 20000
+total worth    3500 -> 32800
+best rival     5400 -> 26800 (peak 27500, worst dip 700)
+workers        33
+composition    c_tank x10
+income         122/s
+enemies seen   18 -> 93 (78 engageable)
+engaged gone   23
+players        5 -> 5 (0 eliminated)
+claims refused 148
+samples seen   1500
+credits left   4579
+### tank-arty seed=12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     53
+expansions     93 (0 factories) (every worker is already building something)
+extractors     0 -> 10
+attack orders  275
+rallied        25
+army           0 -> 9
+army value     500 -> 17250
+total worth    3500 -> 29350
+best rival     4700 -> 28350 (peak 28550, worst dip 700)
+workers        26
+composition    c_tank x7, c_artillery x2
+income         98/s
+enemies seen   16 -> 105 (93 engageable)
+engaged gone   24
+players        5 -> 5 (0 eliminated)
+claims refused 385
+samples seen   1500
+credits left   1907
+### tank-arty seed=777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     54
+expansions     96 (0 factories) (every worker is already building something)
+extractors     0 -> 12
+attack orders  124
+rallied        24
+army           0 -> 30
+army value     500 -> 28400
+total worth    3500 -> 40500
+best rival     5400 -> 32450 (peak 32450, worst dip 500)
+workers        27
+composition    c_tank x22, c_artillery x8
+income         114/s
+enemies seen   19 -> 122 (109 engageable)
+engaged gone   11
+players        5 -> 5 (0 eliminated)
+claims refused 374
+samples seen   1500
+credits left   2209
+### tank-arty seed=4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     55
+expansions     94 (0 factories) (every worker is already building something)
+extractors     0 -> 12
+attack orders  330
+rallied        25
+army           0 -> 26
+army value     500 -> 26450
+total worth    3500 -> 39250
+best rival     4700 -> 28300 (peak 28300, worst dip 1200)
+workers        27
+composition    c_tank x19, c_artillery x7
+income         114/s
+enemies seen   16 -> 104 (93 engageable)
+engaged gone   20
+players        5 -> 5 (0 eliminated)
+claims refused 363
+samples seen   1500
+credits left   1826
+### sweep complete

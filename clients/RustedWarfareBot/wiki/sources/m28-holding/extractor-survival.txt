@@ -1,0 +1,64 @@
+     seed  won  peak  end  first@   peak@  credits>=700 max_credits
+    12345    .     3    0      1%      9%           93%        7997
+     1337    .     3    0      1%      9%           17%        4720
+    24601    .     3    1      1%      9%           23%        4733
+    31337    Y     3    2      2%     12%           22%        4733
+     4242    Y     3    3      3%     18%           32%        4747
+      555    Y     3    3      3%     16%           27%        4747
+    60613    .     3    1      1%      9%           28%        4742
+      777    Y     3    3      4%     22%           38%        4742
+     8128    .     3    0      1%      9%           50%        6459
+  8675309    .     3    1      1%     10%           16%        4747
+    90210    .     3    1      1%      9%           16%        4738
+    99991    .     3    1      1%     10%           25%        4747
+
+     seed  won  drops  regained  army@drop  army_avg
+    12345    .      3         3         10        11
+     1337    .      3         3         51        31
+    24601    .      3         4         22        18
+    31337    Y      1         3         30        20
+     4242    Y      0         3          0        17
+      555    Y      0         3          0        17
+    60613    .      2         3         22        15
+      777    Y      0         3          0        16
+     8128    .      3         3         20        15
+  8675309    .      2         3         32        21
+    90210    .      2         3         25        17
+    99991    .      2         3         87        44
+=== what a duel loses ===
+     seed  won  losses   what it loses, commonest first
+    12345    .      97   c_tank x83, builder x9, landFactory x2, extractorT1 x1, extractorT2 x1
+     1337    .     131   c_tank x124, builder x2, landFactory x2, extractorT1 x1, extractorT2 x1
+    24601    .     188   c_tank x176, builder x7, extractorT2 x2, landFactory x2, extractorT1 x1
+    31337    Y     127   c_tank x121, builder x4, extractorT1 x1, landFactory x1
+     4242    Y      48   c_tank x47, builder x1
+      555    Y      84   c_tank x83, builder x1
+    60613    .     158   c_tank x152, builder x3, extractorT1 x1, extractorT2 x1, landFactory x1
+      777    Y      24   c_tank x24
+     8128    .     138   c_tank x129, builder x3, landFactory x3, extractorT1 x1, extractorT2 x1
+  8675309    .     146   c_tank x142, builder x2, extractorT1 x1, extractorT2 x1
+    90210    .     150   c_tank x145, builder x2, extractorT1 x1, extractorT2 x1, landFactory x1
+    99991    .     178   c_tank x168, builder x6, landFactory x2, extractorT1 x1, extractorT2 x1
+
+across all twelve:
+  c_tank                1394
+  builder                 40
+  landFactory             14
+  extractorT1              9
+  extractorT2              9
+  extractorT3              3
+
+=== where the extractors die ===
+     seed  won  extractor deaths  at % of run   distance from the army's front
+    12345    .                 319%, 22%, 69%   768, 1316, 1215  (army spread 697)
+     1337    .                 355%, 60%, 63%   1430, 1119, 1671  (army spread 289)
+    24601    .                 360%, 69%, 94%   1312, 1732, 1362  (army spread 511)
+    31337    Y                 1          58%   1161  (army spread 294)
+     4242    Y                 0           --   --
+      555    Y                 0           --   --
+    60613    .                 2     26%, 65%   688, 1284  (army spread 308)
+      777    Y                 0           --   --
+     8128    .                 332%, 52%, 98%   1078, 1715, 1634  (army spread 343)
+  8675309    .                 2     41%, 44%   1655, 1069  (army spread 229)
+    90210    .                 2     45%, 48%   1173, 1766  (army spread 473)
+    99991    .                 2     59%, 68%   1387, 1617  (army spread 829)

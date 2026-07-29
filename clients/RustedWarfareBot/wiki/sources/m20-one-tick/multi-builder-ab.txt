@@ -1,0 +1,161 @@
+﻿
+### tank seed=12345
+  c_tank costs 350, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     125 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  518
+rallied        27
+army           0 -> 33
+army value     500 -> 28050
+total worth    3500 -> 40850 (best rival 26650)
+income         122/s
+enemies seen   16 -> 99 (84 engageable)
+engaged gone   23
+players        5 -> 5 (0 eliminated)
+claims refused 149
+samples seen   1500
+frames elapsed 111563
+credits left   4620
+[play] game stopped
+### arty seed=12345
+  c_artillery costs 900, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     28
+expansions     13 (0 factories) (production is not the constraint)
+extractors     0 -> 5
+attack orders  124
+rallied        19
+army           0 -> 8
+army value     500 -> 11200
+total worth    3500 -> 18400 (best rival 33650)
+income         58/s
+enemies seen   16 -> 124 (110 engageable)
+engaged gone   11
+players        5 -> 5 (0 eliminated)
+claims refused 783
+samples seen   1500
+frames elapsed 112223
+credits left   647
+[play] game stopped
+### tank seed=777
+  c_tank costs 350, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     124 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  299
+rallied        27
+army           0 -> 32
+army value     500 -> 27700
+total worth    3500 -> 41200 (best rival 27600)
+income         122/s
+enemies seen   16 -> 105 (95 engageable)
+engaged gone   17
+players        5 -> 5 (0 eliminated)
+claims refused 145
+samples seen   1500
+frames elapsed 111746
+credits left   3875
+[play] game stopped
+### arty seed=777
+  c_artillery costs 900, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     27
+expansions     6 (0 factories) (expand:extractorT1 wanted 700 of 0 available past a 900 reserve; 0 already committed this tick)
+extractors     0 -> 5
+attack orders  166
+rallied        19
+army           0 -> 10
+army value     500 -> 12500
+total worth    3500 -> 19700 (best rival 29450)
+income         58/s
+enemies seen   16 -> 115 (101 engageable)
+engaged gone   15
+players        5 -> 5 (0 eliminated)
+claims refused 840
+samples seen   1500
+frames elapsed 112114
+credits left   715
+[play] game stopped
+### tank seed=4242
+  c_tank costs 350, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     63
+expansions     132 (0 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  265
+rallied        27
+army           0 -> 33
+army value     500 -> 28050
+total worth    3500 -> 40850 (best rival 29550)
+income         122/s
+enemies seen   16 -> 108 (93 engageable)
+engaged gone   15
+players        5 -> 5 (0 eliminated)
+claims refused 152
+samples seen   1500
+frames elapsed 111773
+credits left   4799
+[play] game stopped
+### arty seed=4242
+  c_artillery costs 900, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     27
+expansions     6 (0 factories) (production is not the constraint)
+extractors     0 -> 5
+attack orders  121
+rallied        19
+army           0 -> 18
+army value     500 -> 19700
+total worth    3500 -> 26900 (best rival 35600)
+income         58/s
+enemies seen   16 -> 137 (123 engageable)
+engaged gone   10
+players        5 -> 5 (0 eliminated)
+claims refused 867
+samples seen   1500
+frames elapsed 112091
+credits left   427
+[play] game stopped
+
+SUMMARY (three seeds per arm, identical code, only the goals differ)
+
+  arm    army  extractors  income  worth   best rival  ratio  credits left
+  ---------------------------------------------------------------------------
+  tank   32.7          13   122/s  40,967      27,933   1.47         4,431
+  arty   12.0           5    58/s  21,667      32,900   0.66           596
+
+Baseline this replaces, from the original audit: army 4 -> 2, three extractors
+frozen for the whole match, 21,164 credits banked, and no way to compare against
+an opponent at all.
+
+Artillery loses decisively, and the engine's own catalogue said so before the
+runs did: 2.22 damage per second per 100 credits against the tank's 5.71. Its
+290 range does out-reach the c_turret_t1 that our tanks cannot trade with, and
+that did not compensate.
+
+Variance collapsed: 40,850 / 41,200 / 40,850 across three seeds, against a
+documented 3 / 6 / 14 army spread from identical code before this work. That is
+the multi-builder change removing a bottleneck the bot used to hit at a
+different point in every run.
+
+NOT ESTABLISHED: whether we are killing anything. players 5 -> 5 in all six
+runs, so no opponent was ever eliminated. Army value is also flattered by
+builders, which are mobile and count toward it while doing no fighting -- 28,050
+across 33 fighting units is roughly 850 each against a tank's 350. Rival worth
+is recorded only at the last observation, so nothing here can say whether an
+opponent's value ever dipped.

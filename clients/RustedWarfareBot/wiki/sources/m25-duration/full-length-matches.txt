@@ -1,0 +1,203 @@
+﻿Does the bot win, if the match is allowed to finish?
+
+Every experiment before this was scored at 1500 samples. Four matches at 4000
+samples, played in parallel on cloned game directories with the exchange locked
+to the tick, say that 1500 samples measures a transient.
+
+BEFORE = the code as it stood when the question was asked.
+AFTER  = the same four seeds after the builder-from-a-factory fix.
+
+########## BEFORE ##########
+### long-s12345
+verdict        defeated (defeated)
+plan           2/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     241
+expansions     172 (22 factories) (every worker is already building something)
+extractors     0 -> 2
+attack orders  1248
+rallied        181
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 1400
+best rival     4700 -> 131450 (peak 131450, worst dip 4900)
+workers        0
+composition    none
+income         16/s
+enemies seen   16 -> 513 (0 engageable)
+engaged gone   61
+players        5 -> 4 (1 eliminated)
+claims refused 988
+samples seen   3692
+frames elapsed 276825
+credits left   709
+
+### long-s31337
+verdict        survived (sample_limit)
+plan           4/8 -- building: extractorT1 needs a resource pool: of the 46 in sight, 43 are built on, 0 cannot be walked to and 3 can only be reached through enemy fire
+build orders   8
+reinforced     362
+expansions     304 (39 factories) (the opening plan is using a worker)
+extractors     0 -> 1
+attack orders  1483
+rallied        287
+army           0 -> 2
+army value     500 -> 1200
+total worth    3500 -> 6300
+best rival     4700 -> 129200 (peak 129650, worst dip 6100)
+workers        1
+composition    c_tank x2
+income         26/s
+enemies seen   16 -> 548 (459 engageable)
+engaged gone   40
+players        5 -> 5 (0 eliminated)
+claims refused 1627
+samples seen   4000
+frames elapsed 299925
+credits left   357
+
+### long-s4242
+verdict        defeated (defeated)
+plan           2/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     222
+expansions     204 (13 factories) (every worker is already building something)
+extractors     0 -> 1
+attack orders  310
+rallied        157
+army           0 -> 1
+army value     500 -> 350
+total worth    3500 -> 1050
+best rival     4700 -> 151100 (peak 151100, worst dip 3750)
+workers        0
+composition    c_tank x1
+income         8/s
+enemies seen   16 -> 493 (429 engageable)
+engaged gone   20
+players        5 -> 4 (1 eliminated)
+claims refused 799
+samples seen   3483
+frames elapsed 261150
+credits left   186
+
+### long-s777
+verdict        wiped (wiped)
+plan           0/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     270
+expansions     213 (21 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  274
+rallied        211
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 0
+best rival     4700 -> 142300 (peak 142300, worst dip 2100)
+workers        0
+composition    none
+income         0/s
+enemies seen   16 -> 533 (0 engageable)
+engaged gone   8
+players        5 -> 4 (1 eliminated)
+claims refused 1729
+samples seen   3559
+frames elapsed 266850
+credits left   381
+
+########## AFTER ##########
+### long-s12345
+verdict        wiped (wiped)
+plan           0/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     330
+expansions     337 (37 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  1781
+rallied        259
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 0
+best rival     4700 -> 148550 (peak 148550, worst dip 8800)
+workers        0
+composition    none
+income         0/s
+enemies seen   15 -> 517 (0 engageable)
+engaged gone   58
+players        5 -> 4 (1 eliminated)
+claims refused 1511
+samples seen   3892
+frames elapsed 291825
+credits left   404
+
+### long-s31337
+verdict        survived (sample_limit)
+plan           6/8 -- building: extractorT1 needs a resource pool: of the 46 in sight, 44 are built on, 0 cannot be walked to and 2 can only be reached through enemy fire
+build orders   8
+reinforced     316
+expansions     326 (53 factories) (the opening plan is using a worker)
+extractors     0 -> 1
+attack orders  928
+rallied        247
+army           0 -> 5
+army value     500 -> 2250
+total worth    3500 -> 8050
+best rival     4700 -> 158000 (peak 158300, worst dip 4100)
+workers        1
+composition    c_tank x5
+income         26/s
+enemies seen   16 -> 592 (504 engageable)
+engaged gone   52
+players        5 -> 5 (0 eliminated)
+claims refused 1685
+samples seen   4000
+frames elapsed 299925
+credits left   64
+
+### long-s4242
+verdict        wiped (wiped)
+plan           0/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     202
+expansions     214 (18 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  261
+rallied        144
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 0
+best rival     4700 -> 144550 (peak 144550, worst dip 2500)
+workers        0
+composition    none
+income         0/s
+enemies seen   16 -> 481 (0 engageable)
+engaged gone   10
+players        5 -> 4 (1 eliminated)
+claims refused 1185
+samples seen   3189
+frames elapsed 239100
+credits left   390
+
+### long-s777
+verdict        survived (sample_limit)
+plan           6/8 -- building: extractorT1 needs a resource pool: of the 46 in sight, 44 are built on, 0 cannot be walked to and 2 can only be reached through enemy fire
+build orders   8
+reinforced     321
+expansions     275 (28 factories) (the opening plan is using a worker)
+extractors     0 -> 1
+attack orders  662
+rallied        242
+army           0 -> 5
+army value     500 -> 2250
+total worth    3500 -> 8750
+best rival     4700 -> 147150 (peak 147150, worst dip 5950)
+workers        1
+composition    c_tank x5
+income         26/s
+enemies seen   16 -> 528 (456 engageable)
+engaged gone   27
+players        5 -> 5 (0 eliminated)
+claims refused 1436
+samples seen   4000
+frames elapsed 299925
+credits left   199
+

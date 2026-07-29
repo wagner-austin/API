@@ -1,0 +1,50 @@
+Where does the bot's army actually die?
+
+Instrument: the per-loss table rw_bot.policy.trace already writes. A loss is
+"was ours last sample, absent now", and the position is taken from the previous
+sample because the current one no longer has the unit to ask.
+
+Base (the Command Center, which is the anchor placement measures from) sits at
+approximately (4250, 2550) on this map.
+
+  distance from base       run A        run B
+  ---------------------------------------------
+  < 300  (at the base)      0   0%      0    0%
+  300 - 900                 0   0%      3   17%
+  900 - 2000                2   4%      2   11%
+  > 2000 (deep)            46  96%     13   72%
+  ---------------------------------------------
+  total losses             48          18
+
+  run A by type: c_tank x48
+  run B by type: c_tank x15, extractorT1 x2, builder x1
+
+READING: the base is not under attack. Not one unit was lost within 900 world
+units of it across either run. Essentially everything the bot loses, it loses
+walking into the opponents' half of the map.
+
+That kills the first hypothesis it was collected to test. Static defence -- a
+turret ring at the base -- answers an attack that is not happening. c_turret_t1
+is the most cost-effective thing the bot can buy by a wide margin (16.4 damage
+per second per 100 credits against c_tank's 5.71, and 140 hit points per 100
+credits against 60), and none of that matters if nothing comes to it.
+
+WHAT IT POINTS AT INSTEAD: the army is being thrown away on offence, and one
+mechanism was visible in the code as soon as the question was asked the right
+way round. Survivors of a released wave kept their attack clearance
+permanently. A wave of three that lost two left one tank still cleared, still
+committed to a target, still walking into the same defended ground the other two
+died in -- which is exactly the trickle the wave gate exists to prevent,
+happening on the way out instead of the way in.
+
+A wave reduced below the ladder's own first rung now returns to the reserve,
+rallies home, and goes out with the next wave. The threshold is FIRST_WAVE,
+reused rather than invented: it is the size the shipped AI uses for its first
+attack group, and the size below which this module already called an attack a
+trickle.
+
+ALSO WORTH RECORDING: run B lost an extractor and a builder. Those are economy
+losses at 300-900 units out -- the builder walking to a pool and being caught.
+The threat model that screens pool routes exists for exactly this and is
+evidently not screening it perfectly; the straight-line route test is documented
+as an approximation of a path the engine steers around terrain.

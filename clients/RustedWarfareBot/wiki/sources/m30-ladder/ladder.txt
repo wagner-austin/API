@@ -1,0 +1,168 @@
+The difficulty ladder after the economy fixes, baseline beside result.
+
+Twelve seeds per rung on [p2]duel_lake, 4,000 samples, one opponent. Difficulty
+is an income multiplier on the AI alone: 1.0x Medium, 1.4x Hard, 1.8x Very Hard,
+3.7x Impossible.
+
+  rung        AI income        arm     won  lost  routs  median win  worst margin
+  Medium           1.0x   baseline    9/12     0      0        2079          0.2x
+  Medium           1.0x      fixed   12/12     0      6        2013         13.6x
+  Hard             1.4x   baseline    4/12     0      0        2475             -
+  Hard             1.4x      fixed    6/12     0      2        2080          0.2x
+  Very Hard        1.8x   baseline    5/11     1      1        2907          0.0x
+  Very Hard        1.8x      fixed    7/12     2      3        2207          0.0x
+
+"routs" counts matches leaving the opponent with NOTHING; the margin column
+reads "total" for those. No baseline at any rung produced a single one.
+
+MEDIUM IS NOW PERFECT: twelve of twelve, no losses, six routs, and **the worst
+match beats the baseline's median** (13.6x against 9.8x). The largest extractor
+loss in any of the twelve was three.
+
+WHAT THE FIXES WERE, in the order they were found -- the first is instrumentation
+and it is what made the rest visible at all:
+  * the budget ledger and the spender census (nothing reported what the bot was
+    trying to buy, or which spender was even asked)
+  * the expander gate -- 572 of 800 samples had been skipped entirely
+  * pools claimed in flight -- 23 orders had been buying 4 extractors
+  * the priced-out gate -- 29 turrets had been bought against 4 extractors
+  * the economy floor -- 2,800 credits of 65,000 had been reaching the economy
+
+READ THE DROPS COLUMN. At Very Hard the separation is exact and has no overlap:
+every win lost four extractors or fewer, every non-win lost six or more. At Hard
+it is strong but not clean (one seed survived on two drops), so "extractor losses
+decide the match" is the dominant effect rather than the whole of it.
+
+A CAUTION ON READING THE RUNGS AGAINST EACH OTHER: Very Hard (7/12) scoring above
+Hard (6/12) on identical code is the noise floor talking. Twelve seeds cannot
+separate 50% from 58% in a harness whose engine randomness is unseeded
+([[policy-determinism]]). Treat the two as indistinguishable.
+
+=== duel-medium
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345         won     1739               7           0    0%   10.1x
+     1337         won     1981               2           1   50%   57.5x
+    24601         won     2079               7           0    0%   13.8x
+    31337         won     2437               5           2   40%   15.9x
+     4242    survived     4000              51          43   84%    0.3x
+      555         won     2277               9           0    0%    7.5x
+    60613         won     2792              12           0    0%    4.2x
+      777    survived     4000             144         132   91%    0.2x
+     8128    survived     4000             120         110   91%    0.2x
+  8675309         won     1598               4           0    0%   11.1x
+    90210         won     2056              10           1   10%    6.1x
+    99991         won     2360               9           0    0%    9.8x
+  9 won, 0 lost, {'won': 9, 'survived': 3}
+  samples to win: fastest 1598, median 2079, slowest 2792
+  margin where anything survived (our worth / theirs): worst 0.2x, median 9.8x, best 57.5x
+
+=== duel-medium-floor
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345         won     1584               6           6  100%   17.3x
+     1337         won     1656      2        0           0    --   total
+    24601         won     1668      0        0           0    --   total
+    31337         won     1654               0           0    --   total
+     4242         won     2013      0        1           1  100%   63.7x
+      555         won     1543      1        1           1  100%   67.9x
+    60613         won     2557      2        0           0    --   total
+      777         won     2602      3        1           1  100%   13.6x
+     8128         won     2250      1        0           0    --   total
+  8675309         won     1522               3           3  100%   42.8x
+    90210         won     2598      2        4           4  100%   14.9x
+    99991         won     2761      1        0           0    --   total
+  12 won, 0 lost, {'won': 12}
+  samples to win: fastest 1522, median 2013, slowest 2761
+  opponent left with nothing at all: 6 (1337, 24601, 31337, 60613, 8128, 99991)
+  margin where anything survived (our worth / theirs): worst 13.6x, median 42.8x, best 67.9x
+
+=== duel-hard
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345    survived     4000             165         130   78%    0.1x
+     1337    survived     4000              60          48   80%    0.2x
+    24601    survived     4000             110          89   80%    0.1x
+    31337         won     3326               7           0    0%    5.9x
+     4242         won     2188               3           0    0%   45.8x
+      555         won     2475              10           0    0%    8.5x
+    60613    survived     4000             145         121   83%    0.1x
+      777         won     1755               4           0    0%   24.5x
+     8128    survived     4000             158         125   79%    0.1x
+  8675309    survived     4000              50          38   76%    0.5x
+    90210    survived     4000              62          42   67%    0.4x
+    99991    survived     4000             122          94   77%    0.2x
+  4 won, 0 lost, {'survived': 8, 'won': 4}
+  samples to win: fastest 1755, median 2475, slowest 3326
+  margin where anything survived (our worth / theirs): worst 0.1x, median 0.4x, best 45.8x
+
+=== duel-hard-floor
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345         won     3805               0           0    --   total
+     1337    survived     4000              83          81   97%    0.4x
+    24601    survived     4000              80          76   95%    0.3x
+    31337         won     1931               4           4  100%   25.6x
+     4242         won     2046               2           1   50%   27.8x
+      555    survived     4000              95          90   94%    0.2x
+    60613         won     2080               0           0    --   total
+      777         won     1848               2           2  100%   33.5x
+     8128    survived     4000              70          69   98%    0.4x
+  8675309    survived     4000              74          68   91%    0.2x
+    90210    survived     4000              40          40  100%    0.4x
+    99991         won     2204               1           1  100%   17.9x
+  6 won, 0 lost, {'won': 6, 'survived': 6}
+  samples to win: fastest 1848, median 2080, slowest 3805
+  opponent left with nothing at all: 2 (12345, 60613)
+  margin where anything survived (our worth / theirs): worst 0.2x, median 0.4x, best 33.5x
+
+=== duel-veryhard
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345         won     1864               0           0    --   total
+     1337    survived     4000             132           0    0%    0.0x
+    24601         won     2907               1           1  100%   46.0x
+     4242         won     3501               7           7  100%    2.9x
+      555         won     2192               5           1   20%   15.5x
+    60613         won     3606              13          13  100%    1.6x
+      777    survived     4000             132         124   93%    0.1x
+     8128    survived     4000              91          87   95%    0.1x
+  8675309       wiped     3435             132           0    0%    0.0x
+    90210    survived     4000              70          65   92%    0.3x
+    99991    survived     4000             166         130   78%    0.0x
+  5 won, 1 lost, {'won': 5, 'survived': 5, 'wiped': 1}
+  samples to win: fastest 1864, median 2907, slowest 3606
+  opponent left with nothing at all: 1 (12345)
+  margin where anything survived (our worth / theirs): worst 0.0x, median 0.3x, best 46.0x
+
+=== duel-veryhard-floor
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345         won     2063               5           0    0%   12.9x
+     1337    survived     4000             153         150   98%    0.1x
+    24601    survived     4000             145         120   82%    0.0x
+    31337         won     2207               2           2  100%   34.1x
+     4242         won     2336               0           0    --   total
+      555         won     1834               0           0    --   total
+    60613    survived     4000              16          16  100%    0.9x
+      777         won     2248               0           0    --   total
+     8128       wiped     3610             156           0    0%    0.0x
+  8675309         won     2857               7           5   71%    8.3x
+    90210    defeated     3606             164         156   95%    0.0x
+    99991         won     1624               1           1  100%   51.3x
+  7 won, 2 lost, {'won': 7, 'survived': 3, 'wiped': 1, 'defeated': 1}
+  samples to win: fastest 1624, median 2207, slowest 2857
+  opponent left with nothing at all: 3 (4242, 555, 777)
+  margin where anything survived (our worth / theirs): worst 0.0x, median 0.9x, best 51.3x
+
+=== duel-impossible
+     seed     verdict  samples  drops  visible  engageable     %  margin
+    12345    defeated     2060      7      163         152   93%    0.0x
+     1337       wiped     2245      6      166           0    0%    0.0x
+    24601       wiped     2624      6      177           0    0%    0.0x
+    31337       wiped     2084      6      180           0    0%    0.0x
+     4242       wiped     2344      8      173           0    0%    0.0x
+      555    defeated     2703      9      200         160   80%    0.0x
+    60613       wiped     2101      6      151           0    0%    0.0x
+      777       wiped     2288      7      113           0    0%    0.0x
+     8128    defeated     2612      7      187           0    0%    0.0x
+  8675309       wiped     1937      6      172           0    0%    0.0x
+    90210    defeated     2323      7      171         160   93%    0.0x
+    99991       wiped     2424      7      185           0    0%    0.0x
+  0 won, 12 lost, {'defeated': 4, 'wiped': 8}
+  margin where anything survived (our worth / theirs): worst 0.0x, median 0.0x, best 0.0x
+

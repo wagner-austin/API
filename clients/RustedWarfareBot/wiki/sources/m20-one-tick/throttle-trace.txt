@@ -1,0 +1,68 @@
+Why does the bot end every match holding five figures of unspent credits?
+
+Instrument: rw_bot.policy.trace, widened to record per observation the
+production pipeline itself -- how many owned units the engine says can make a
+wanted type, how many of those held an empty queue, how many produce orders were
+issued, and how many budget claims were refused.
+
+Run: seed 12345, 1500 samples.
+
+  state                                   ticks
+  -------------------------------------------------
+  producers = 0                             437     (before the plan's factory)
+  producers = 1, idle = 0  (busy)          1035
+  producers = 1, idle = 1  (free)            28
+  producers >= 2                              0
+
+  produce orders issued                      28     -- on exactly the 28 free ticks
+
+ANSWER: one factory, busy on 97% of the observations it existed for. Not the
+unit cap -- capability never dropped while a factory stood. Not credits -- the
+budget refused nothing. Not policy -- every free tick was filled. Production was
+throttled by build time on a single producer.
+
+The same trace answered a second question nobody had asked. Production capacity
+never reached two, although the run reported seven factories "expanded". The
+agent log showed why:
+
+  build landFactory by 214 at (4450.0, 2670.0)   anchor + (+200, +120)
+  build landFactory by 214 at (4050.0, 2670.0)   anchor + (-200, +120)
+  build landFactory by 214 at (4450.0, 2430.0)   anchor + (+200, -120)
+  build landFactory by 214 at (4050.0, 2430.0)   anchor + (-200, -120)
+  build landFactory by 214 at (4530.0, 2550.0)   anchor + (+280,    0)
+  build landFactory by 214 at (3970.0, 2550.0)   anchor + (-280,    0)
+  build landFactory by 214 at (4250.0, 2790.0)   anchor + (   0, +240)
+  build landFactory by 214 at (4250.0, 2310.0)   anchor + (   0, -240)
+
+All eight ring positions, ordered once each, none completed. A factory joins the
+roster the moment construction starts, so the position it stands on reads as
+taken and the next order goes to the next position -- but it is not a *producer*
+until finished, so the throughput rule kept firing. Each order re-tasked the one
+builder off the last. Two defects, both fixed:
+
+  * expand_production had neither the "already going up" nor the "builder is
+    walking" guard that expand_economy always had;
+  * and the guard alone was not enough, because a refusal from the throughput
+    rule fell straight through to the pool rule, which ordered an extractor and
+    re-tasked the builder anyway. Builder availability is now settled once, by
+    the dispatcher that owns the builder, before either rule is asked.
+
+WHAT REMOVING THE THROTTLE DID: it made the bot worse.
+
+  config                          factories  extractors  income  army  value  credits
+  -------------------------------------------------------------------------------------
+  factories could not complete            1           9    90/s    22   8200    16417
+  builder fixed, throughput first         3           4    50/s    17   6450      315
+
+Sixty-two units produced against twenty-eight, and a smaller army. The bank was
+never the waste; it was the symptom of an economy ahead of what the army could
+usefully spend. Extractors compound and factories do not, so trading the builder
+away from pools trades the asset that grows for the one that does not.
+
+NOT ESTABLISHED. Whether income-before-throughput is the right ordering is *not*
+settled by these runs. Single-seed comparisons on this map are noisy -- three
+runs of identical code have given armies of 3, 6 and 14 -- and a later run under
+the shipped ordering produced 4 extractors rather than 9. The ordering shipped
+is the theoretically sounder default and is consistent with the one clean
+comparison above, and that is all that can honestly be claimed for it. Settling
+it needs repeated seeds per arm, which is a measurement nobody has run.

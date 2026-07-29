@@ -1,0 +1,17 @@
+﻿
+==> play (headless match on port 27886, log: runs/upgrade-probe2.log)
+New-Item -ItemType Directory -Force "runs" | Out-Null
+$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $dir = "agent/build/play-$stamp"; $jar = "agent/build/rw-agent-play-$stamp.jar"; $root = (Resolve-Path -LiteralPath ".").Path; $log = $root + "\runs/upgrade-probe2.log"; try { New-Item -ItemType Directory -Force $dir | Out-Null; & ".game-w1/jvm64/bin/javac.exe" --release 11 -Xlint:all -Werror -d $dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $_.FullName }); if ($LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & ".game-w1/jvm64/bin/jar.exe" cfm $jar agent/manifest.mf -C $dir .; if ($LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $agentArgs = "channelPort=27886"; if (12345 -ne 0) { $agentArgs = $agentArgs + ";randomSeed=12345"; Write-Host "[play] engine random pinned to seed 12345" -ForegroundColor DarkGray }; if (75 -ne 0) { $agentArgs = $agentArgs + ";lockstepFrames=75"; Write-Host "[play] lockstep every 75 frames" -ForegroundColor DarkGray }; $game = Start-Process -FilePath "$root\.game-w1\jvm64\bin\java.exe" -ArgumentList @("-Xmx1000M", "-Djava.library.path=.", "-javaagent:$root\$jar=$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound", "-sandbox", "-width", "800", "-height", "600", "-log", "$log") -WorkingDirectory "$root\.game-w1" -PassThru -RedirectStandardOutput "$root\runs/upgrade-probe2.log.agent" -RedirectStandardError "$root\runs/upgrade-probe2.log.err"; try { $sw = [Diagnostics.Stopwatch]::StartNew(); $open = $false; while ($sw.Elapsed.TotalSeconds -lt 90) { try { $c = New-Object Net.Sockets.TcpClient("127.0.0.1", 27886); $c.Close(); $open = $true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $open) { Write-Host "[play] the agent never opened port 27886" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle 22s" -ForegroundColor DarkGray; Start-Sleep -Seconds 22; poetry run python -m scripts.upgrade_probe 27886 "wiki/sources/m0-probe/printunits.log" "wiki/sources/m11-pools/type-flags.ndjson" 400 } finally { Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }; Start-Sleep -Milliseconds 500; if (Test-Path $jar) { Remove-Item -Force $jar -ErrorAction SilentlyContinue } }
+[play] engine random pinned to seed 12345
+[play] lockstep every 75 frames
+[play] channel open; letting the map settle 22s
+extractors standing: 4
+holder                      unit  produces                      placed  available
+commandCenter                213                                 False       True
+commandCenter                213  builder                        False       True
+commandCenter                213  scout                          False       True
+extractorT1                  227  extractorT2                    False       True
+extractorT1                  241  extractorT2                    False       True
+extractorT1                  270  extractorT2                    False       True
+extractorT1                  277  extractorT2                    False       True
+[play] game stopped

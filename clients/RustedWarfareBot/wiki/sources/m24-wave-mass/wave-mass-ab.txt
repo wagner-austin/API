@@ -1,0 +1,251 @@
+﻿How much should the bot mass before committing a wave?
+
+Nine matches, three seeds against each of three ladders, played in parallel on
+four cloned game directories with the sample exchange locked to the tick at 75
+frames. Everything except the final rung of the wave ladder is held fixed; the
+early rungs govern the opening and are left at the shipped AI's.
+
+The dip column is measured PER OPPONENT against that opponent's own running
+peak. Measured against the leader instead -- which is what the first version of
+this figure did -- every one of these runs reported a dip of about 700, because
+the bot never damages whoever is currently ahead. That reading said the army
+cost nobody anything, and it was an artefact of a max().
+
+### mass07-s12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     130 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  312
+rallied        30
+army           0 -> 11
+army value     500 -> 21850
+total worth    3500 -> 35350
+best rival     4700 -> 32800 (peak 32800, worst dip 1800)
+workers        36
+composition    c_tank x11
+income         130/s
+enemies seen   16 -> 124 (99 engageable)
+engaged gone   22
+players        5 -> 5 (0 eliminated)
+claims refused 159
+samples seen   1500
+frames elapsed 112425
+credits left   6421
+
+### mass07-s4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     69
+expansions     129 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  371
+rallied        30
+army           0 -> 21
+army value     500 -> 24850
+total worth    3500 -> 38350
+best rival     4700 -> 31700 (peak 31700, worst dip 4900)
+workers        35
+composition    c_tank x21
+income         130/s
+enemies seen   16 -> 111 (95 engageable)
+engaged gone   23
+players        5 -> 5 (0 eliminated)
+claims refused 157
+samples seen   1500
+frames elapsed 112425
+credits left   6675
+
+### mass07-s777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     133 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  694
+rallied        30
+army           0 -> 31
+army value     500 -> 28850
+total worth    3500 -> 42350
+best rival     4700 -> 34950 (peak 38150, worst dip 3200)
+workers        36
+composition    c_tank x31
+income         130/s
+enemies seen   16 -> 106 (94 engageable)
+engaged gone   32
+players        5 -> 5 (0 eliminated)
+claims refused 145
+samples seen   1500
+frames elapsed 112425
+credits left   5936
+
+### mass15-s12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     69
+expansions     131 (1 factories) (every worker is already building something)
+extractors     0 -> 12
+attack orders  174
+rallied        33
+army           0 -> 16
+army value     500 -> 22600
+total worth    3500 -> 34700
+best rival     4700 -> 29350 (peak 29350, worst dip 1600)
+workers        34
+composition    c_tank x16
+income         114/s
+enemies seen   15 -> 116 (100 engageable)
+engaged gone   15
+players        5 -> 5 (0 eliminated)
+claims refused 159
+samples seen   1500
+frames elapsed 112425
+credits left   6208
+
+### mass15-s4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     72
+expansions     129 (1 factories) (every worker is already building something)
+extractors     0 -> 13
+attack orders  248
+rallied        32
+army           0 -> 32
+army value     500 -> 29200
+total worth    3500 -> 42700
+best rival     4700 -> 32500 (peak 32500, worst dip 1700)
+workers        36
+composition    c_tank x32
+income         122/s
+enemies seen   16 -> 119 (105 engageable)
+engaged gone   14
+players        5 -> 5 (0 eliminated)
+claims refused 179
+samples seen   1500
+frames elapsed 112425
+credits left   6316
+
+### mass15-s777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     128 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  198
+rallied        31
+army           0 -> 19
+army value     500 -> 24650
+total worth    3500 -> 38150
+best rival     4700 -> 31350 (peak 31350, worst dip 1800)
+workers        36
+composition    c_tank x19
+income         130/s
+enemies seen   16 -> 119 (102 engageable)
+engaged gone   14
+players        5 -> 5 (0 eliminated)
+claims refused 144
+samples seen   1500
+frames elapsed 112425
+credits left   6182
+
+### mass25-s12345
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     136 (0 factories) (every worker is already building something)
+extractors     0 -> 12
+attack orders  108
+rallied        32
+army           0 -> 28
+army value     500 -> 27800
+total worth    3500 -> 40600
+best rival     4700 -> 33500 (peak 33500, worst dip 2100)
+workers        36
+composition    c_tank x28
+income         114/s
+enemies seen   16 -> 129 (114 engageable)
+engaged gone   10
+players        5 -> 5 (0 eliminated)
+claims refused 134
+samples seen   1500
+frames elapsed 112425
+credits left   4602
+
+### mass25-s4242
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     130 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  126
+rallied        32
+army           0 -> 37
+army value     500 -> 30950
+total worth    3500 -> 44450
+best rival     4700 -> 35550 (peak 35550, worst dip 2400)
+workers        36
+composition    c_tank x37
+income         130/s
+enemies seen   16 -> 134 (123 engageable)
+engaged gone   10
+players        5 -> 5 (0 eliminated)
+claims refused 152
+samples seen   1500
+frames elapsed 112425
+credits left   7667
+
+### mass25-s777
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     70
+expansions     134 (0 factories) (every worker is already building something)
+extractors     0 -> 14
+attack orders  438
+rallied        34
+army           0 -> 16
+army value     500 -> 23600
+total worth    3500 -> 37100
+best rival     4700 -> 27850 (peak 27850, worst dip 8150)
+workers        36
+composition    c_tank x16
+income         130/s
+enemies seen   16 -> 97 (81 engageable)
+engaged gone   30
+players        5 -> 5 (0 eliminated)
+claims refused 168
+samples seen   1500
+frames elapsed 112425
+credits left   7038
+
+SUMMARY (three seeds per arm, identical code and economy, only the final rung
+of the wave ladder differs)
+
+  arm       army   worth    rival    ratio   worst dip   attack orders
+  ------------------------------------------------------------------------
+  mass 7    21.0   38,683   33,150   1.17        3,300             459
+  mass 15   22.3   38,517   31,067   1.24        1,700             207
+  mass 25   27.0   40,717   32,300   1.26        4,217             224
+
+Economy is flat across the arms -- income 114-130/s, 12-14 extractors, 34-36
+workers -- so the arms are cleanly isolated and what differs is how the units
+were committed rather than how many were made. `reinforced` is 69-72 in every
+one of the nine.
+
+READING: massing more helps, mildly and consistently. A larger army survives
+(21 -> 27) and order churn halves (459 -> 224), which is the same fact twice:
+fewer, bigger commitments instead of a trickle. The worth ratio moves 1.17 ->
+1.26, which is inside the run-to-run spread and is not on its own a result.
+
+NOT SOLVED: nobody was eliminated in any of the nine, and the bot is ahead in
+all of them. Our worth grew 11.6x from the opening position against the
+strongest rival's 6.9x. The economy is won and never converted.

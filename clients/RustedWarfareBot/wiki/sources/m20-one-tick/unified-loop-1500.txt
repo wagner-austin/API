@@ -1,0 +1,23 @@
+  landFactory costs 700, goes on the ring
+  c_tank costs 350, goes on the ring
+  c_tank costs 350, goes on the ring
+  c_tank costs 350, goes on the ring
+  c_tank costs 350, goes on the ring
+verdict        survived (sample_limit)
+plan           8/8 -- done: all 8 plan entries satisfied
+build orders   8
+reinforced     29
+expansions     8 (builder still walking to its site)
+extractors     0 -> 10
+attack orders  311
+rallied        26
+army           0 -> 17
+army value     500 -> 6450 (best rival 10250)
+income         98/s
+enemies seen   16 -> 112 (104 engageable)
+engaged gone   25
+players        5 -> 5 (0 eliminated)
+claims refused 0
+samples seen   1500
+frames elapsed 111686
+credits left   18576

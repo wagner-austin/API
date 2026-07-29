@@ -1,0 +1,41 @@
+Throughput rule, four shapes, one seed (12345), 1500 samples each.
+
+Question: the bot ends every match holding five figures of unspent credits.
+Is it throughput-bound -- too few factories to convert income into units?
+
+  rule                              factories  extractors  income  army value  credits left
+  ------------------------------------------------------------------------------------------
+  A  "every producer busy"                  0          10    98/s        6450        18576
+  B  A, restricted to wanted types          1           9    90/s        4000        16412
+  C  surplus after all claims               7           7    74/s        3300        10270
+  D  B and C together (shipped)             1           9    90/s        5400        16442
+
+A never fired at all: a producer was any unit offering a non-placed action,
+which the Command Center always does because it can make a Builder, and it is
+idle almost permanently. The answer was "no" on every observation of every
+match.
+
+B fired once. A factory is busy for the whole of a build and idle for the single
+tick in which it finishes -- which is the tick the rule is evaluated on, because
+that is when production had capacity to fill.
+
+C fired freely and was the worst of the four. The bank drained, and the army
+shrank with it.
+
+The mechanism is not run-to-run variance. Income is the low-variance figure --
+it is a deterministic function of extractor count -- and it falls monotonically
+as factories rise: 98, 90, 74. There is one builder, and every factory it places
+is an extractor it does not. Income gates production, so buying capacity with
+the credits that would have bought income trades the thing that was working for
+the thing that was idle.
+
+D is the conjunction, and it is deliberately conservative: queues genuinely full
+AND money genuinely spare.
+
+What this does NOT establish: why the credits accumulate in the first place.
+Twenty-eight reinforcements over 1500 samples is far below what even two
+factories can produce, so something other than factory count is throttling the
+spend. The unit cap is the first candidate -- the agent already reads the
+engine's own availability predicate, which accounts for it -- and the per-sample
+trace (rw_bot.policy.trace) is the instrument that would settle it. Adding
+factories is not the experiment; it was the guess, and it was wrong.

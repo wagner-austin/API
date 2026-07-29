@@ -1,0 +1,170 @@
+﻿Is attacking what kills the bot?
+
+Every loss is spent on offence -- 96% of losses fall more than 2,000 world units
+from home, none within 900 of it -- and 200 to 300 units a match are fed in for a
+few thousand credits of damage. So the question is whether the bot does better
+by never attacking at all.
+
+It needed no code. The wave ladder's final rung is already an argument, and a
+mass larger than any army the bot can field releases no wave ever. The army
+still gathers, still rallies at the base, and still defends; it simply never
+walks into the opponents' half.
+
+Two arms, three seeds, six matches, one batch, played to a verdict.
+
+### attack-s12345
+verdict        defeated (defeated)
+plan           0/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     219
+expansions     323 (0 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  512
+rallied        113
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 500
+best rival     4700 -> 118050 (peak 118750, worst dip 6400)
+workers        0
+composition    none
+income         0/s
+enemies seen   16 -> 513 (0 engageable)
+engaged gone   32
+players        5 -> 4 (1 eliminated)
+claims refused 121
+samples seen   3705
+frames elapsed 277800
+credits left   12242
+
+### attack-s4242
+verdict        defeated (defeated)
+plan           1/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     217
+expansions     340 (0 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  455
+rallied        121
+army           0 -> 1
+army value     500 -> 350
+total worth    3500 -> 350
+best rival     4700 -> 153250 (peak 153250, worst dip 9950)
+workers        0
+composition    c_tank x1
+income         0/s
+enemies seen   16 -> 565 (487 engageable)
+engaged gone   28
+players        5 -> 4 (1 eliminated)
+claims refused 129
+samples seen   3894
+frames elapsed 291975
+credits left   29112
+
+### attack-s777
+verdict        defeated (defeated)
+plan           0/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     208
+expansions     335 (0 factories) (every worker is already building something)
+extractors     0 -> 0
+attack orders  496
+rallied        107
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 500
+best rival     5400 -> 138500 (peak 138500, worst dip 6700)
+workers        0
+composition    none
+income         0/s
+enemies seen   18 -> 472 (0 engageable)
+engaged gone   27
+players        5 -> 4 (1 eliminated)
+claims refused 163
+samples seen   3543
+frames elapsed 265650
+credits left   21827
+
+### turtle-s12345
+verdict        defeated (defeated)
+plan           3/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     222
+expansions     357 (0 factories) (every worker is already building something)
+extractors     0 -> 2
+attack orders  252
+rallied        110
+army           0 -> 1
+army value     500 -> 350
+total worth    3500 -> 3750
+best rival     4700 -> 156200 (peak 156200, worst dip 3250)
+workers        0
+composition    c_tank x1
+income         16/s
+enemies seen   16 -> 581 (492 engageable)
+engaged gone   17
+players        5 -> 4 (1 eliminated)
+claims refused 131
+samples seen   3752
+frames elapsed 281325
+credits left   17383
+
+### turtle-s4242
+verdict        defeated (defeated)
+plan           1/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     204
+expansions     453 (0 factories) (every worker is already building something)
+extractors     0 -> 1
+attack orders  253
+rallied        103
+army           0 -> 0
+army value     500 -> 0
+total worth    3500 -> 1700
+best rival     4700 -> 133600 (peak 133600, worst dip 2100)
+workers        0
+composition    none
+income         8/s
+enemies seen   16 -> 600 (0 engageable)
+engaged gone   20
+players        5 -> 4 (1 eliminated)
+claims refused 128
+samples seen   3504
+frames elapsed 262725
+credits left   27404
+
+### turtle-s777
+verdict        defeated (defeated)
+plan           2/8 -- blocked: nothing the player owns can make extractorT1; the plan is not playable from here
+build orders   8
+reinforced     176
+expansions     260 (0 factories) (every worker is already building something)
+extractors     0 -> 1
+attack orders  266
+rallied        95
+army           0 -> 1
+army value     500 -> 350
+total worth    3500 -> 1050
+best rival     4700 -> 115050 (peak 115050, worst dip 3300)
+workers        0
+composition    c_tank x1
+income         8/s
+enemies seen   16 -> 445 (384 engageable)
+engaged gone   25
+players        5 -> 4 (1 eliminated)
+claims refused 132
+samples seen   3257
+frames elapsed 244200
+credits left   23400
+
+SUMMARY
+
+  arm      survived  defeated  wiped   final worth
+  --------------------------------------------------
+  attack          0         3      0   500 / 500 / 350
+  turtle          0         3      0   3,750 / 1,050 / 1,700
+
+READING: refuted. Turtling ends the same way. Final worth is consistently higher
+without attacking -- the units are not thrown away -- and it changes no verdict,
+so the attacking is not what kills the bot. Three hypotheses are now closed by
+measurement rather than argument: more builders, defensive structures in either
+spending position, and not attacking at all.
