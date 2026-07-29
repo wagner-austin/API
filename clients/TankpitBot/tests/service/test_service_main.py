@@ -577,6 +577,31 @@ class TestExitWhenIdle:
         assert stop_event.is_set()
 
     @pytest.mark.asyncio
+    async def test_non_positive_threshold_disables_the_monitor(self) -> None:
+        """A 0 threshold returns immediately without ever firing the stop.
+
+        The always-on deployment (2026-07-29): the SPA's tankpit
+        video is served by this process, so the startup launcher
+        disables the idle self-exit via
+        ``TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS=0``.
+        """
+        stop_event = asyncio.Event()
+
+        await asyncio.wait_for(
+            exit_when_idle(
+                _IdleProbeRunner(),
+                StatusBus(),
+                FrameBus(),
+                stop_event,
+                idle_exit_seconds=0.0,
+                poll_seconds=0.01,
+            ),
+            timeout=1.0,
+        )
+
+        assert not stop_event.is_set()
+
+    @pytest.mark.asyncio
     async def test_returns_promptly_when_stop_event_already_set(self) -> None:
         """An externally-fired shutdown ends the monitor without a full wait."""
         stop_event = asyncio.Event()

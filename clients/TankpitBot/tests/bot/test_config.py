@@ -8,9 +8,12 @@ Covers the two env-driven bot-launch resolvers used by both
 
 from __future__ import annotations
 
+import pytest
+
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot.config import (
     DEFAULT_TARGET_URL,
+    resolve_idle_exit_seconds,
     resolve_prefer_account,
     resolve_target_url,
 )
@@ -42,6 +45,33 @@ class TestResolveTargetURL:
         """An empty-string override is treated as unset."""
         _test_hooks.get_env = FakeEnv({"TANKPIT_URL": ""})
         assert resolve_target_url() == "https://tankpit.com/"
+
+
+class TestResolveIdleExitSeconds:
+    """``resolve_idle_exit_seconds`` env override contract (2026-07-29)."""
+
+    def test_missing_env_returns_the_default_window(self) -> None:
+        """No env var yields the 1800 s default idle window."""
+        from tankpit_bot.service.constants import SERVICE_IDLE_EXIT_SECONDS
+
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_idle_exit_seconds() == SERVICE_IDLE_EXIT_SECONDS
+
+    def test_zero_disables_the_idle_exit(self) -> None:
+        """``"0"`` resolves to 0.0 — the always-on deployment mode."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS": "0"})
+        assert resolve_idle_exit_seconds() == 0.0
+
+    def test_custom_window_wins(self) -> None:
+        """A numeric override replaces the default."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS": "600"})
+        assert resolve_idle_exit_seconds() == 600.0
+
+    def test_non_numeric_value_raises(self) -> None:
+        """A malformed value fails loudly instead of picking a default."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS": "forever"})
+        with pytest.raises(ValueError):
+            resolve_idle_exit_seconds()
 
 
 class TestResolvePreferAccount:

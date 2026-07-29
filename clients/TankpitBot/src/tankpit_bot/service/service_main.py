@@ -19,7 +19,11 @@ from pathlib import Path
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.bot.config import resolve_prefer_account, resolve_target_url
+from tankpit_bot.bot.config import (
+    resolve_idle_exit_seconds,
+    resolve_prefer_account,
+    resolve_target_url,
+)
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol
@@ -93,9 +97,20 @@ async def exit_when_idle(
         frame_bus: Video-frame bus whose ``subscriber_count`` also
             gates the clock (2026-07-28 watch page).
         stop_event: The service main's shutdown signal.
-        idle_exit_seconds: Sustained idle seconds before exit.
+        idle_exit_seconds: Sustained idle seconds before exit. A
+            non-positive value DISABLES the idle self-exit — the
+            always-on deployment (2026-07-29): the SPA's tankpit
+            video is served by this process, so the startup launcher
+            runs it with the exit off and the monitor returns
+            immediately.
         poll_seconds: Cadence of the idleness checks.
     """
+    if idle_exit_seconds <= 0:
+        log.info(
+            "Idle self-exit disabled (threshold %.0f); service runs until stopped.",
+            idle_exit_seconds,
+        )
+        return
     idle_elapsed = 0.0
     while not stop_event.is_set():
         await asyncio.sleep(poll_seconds)
@@ -144,7 +159,15 @@ async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> Non
     stop_event = asyncio.Event()
     app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
     site = await service_hooks.build_site(app, host, port)
-    idle_monitor = asyncio.create_task(exit_when_idle(runner, status_bus, frame_bus, stop_event))
+    idle_monitor = asyncio.create_task(
+        exit_when_idle(
+            runner,
+            status_bus,
+            frame_bus,
+            stop_event,
+            idle_exit_seconds=resolve_idle_exit_seconds(),
+        )
+    )
     try:
         await run_service_forever(site, stop_event)
     finally:
