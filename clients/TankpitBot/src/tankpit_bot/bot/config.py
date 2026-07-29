@@ -50,8 +50,23 @@ def resolve_prefer_account() -> bool:
     return raw.lower() in _PREFER_ACCOUNT_TRUE_VALUES
 
 
+def resolve_priority_target() -> str:
+    """Return the priority hunt account from ``TANKPIT_BOT_PRIORITY_TARGET``.
+
+    The named account outranks every other target at acquisition
+    (case-insensitive; humans already outrank practice bots without
+    any configuration -- [[bot-behavior-contract]] §3.2).
+
+    Returns:
+        The configured account name, or ``""`` when unset/empty.
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_PRIORITY_TARGET")
+    return raw if raw is not None else ""
+
+
 __all__ = [
     "DEFAULT_TARGET_URL",
     "resolve_prefer_account",
+    "resolve_priority_target",
     "resolve_target_url",
 ]

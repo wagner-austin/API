@@ -275,6 +275,7 @@ def _decide_hunt_acquire_fresh(
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
+        priority_target_name=ctx.config["priority_target_name"],
     )
     if map_target is not None:
         emit_ai(
@@ -401,6 +402,7 @@ def _relay_toward_unaffordable_enemy(
         engagement_reserve_fuel=(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
+        priority_target_name=ctx.config["priority_target_name"],
     )
     if travel is None:
         return None

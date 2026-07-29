@@ -6,7 +6,10 @@ analyzed EnemyThreatDict lists for use by behavior evaluators.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from tankpit_bot._test_hooks import TerrainMapProtocol
+from tankpit_bot.bot.ai.humans import threat_priority_tier
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
 
@@ -196,24 +199,46 @@ def _finish_priority(damage_state: int) -> int:
     return damage_state
 
 
-def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int]:
-    """Sort key: distance, then finish-off priority, then freshness.
+def _threat_sort_key(threat: EnemyThreatDict) -> tuple[int, int, int, int]:
+    """Sort key: human tier, then distance, finish-off priority, freshness.
 
-    Closer threats come first. Among threats at equal distance, more
-    damaged enemies come first (easier to finish off). Among equal
-    distance and damage, prefer recently confirmed tanks.
+    Human-classified enemies outrank every practice bot regardless of
+    distance (user doctrine 2026-07-28: farm bots normally, but any
+    human who logs in becomes the priority). Within a tier, closer
+    threats come first; among equal distance, more damaged enemies
+    come first (easier to finish off); then recently confirmed tanks.
 
     Args:
         threat: Enemy threat to compute sort key for.
 
     Returns:
-        Tuple of (distance, finish_priority, -timestamp_ms) for sorting.
+        Tuple of (human_tier, distance, finish_priority, -timestamp_ms).
     """
-    return (
-        threat["distance"],
-        _finish_priority(threat["damage_state"]),
-        -threat["timestamp_ms"],
-    )
+    return _threat_sort_key_for("")(threat)
+
+
+def _threat_sort_key_for(
+    priority_target_name: str,
+) -> Callable[[EnemyThreatDict], tuple[int, int, int, int]]:
+    """Build the threat sort key with a configured priority account.
+
+    Args:
+        priority_target_name: Account name that outranks even other
+            humans (case-insensitive), or ``""`` for none.
+
+    Returns:
+        Sort-key callable ordering by (tier, distance, finish, age).
+    """
+
+    def _key(threat: EnemyThreatDict) -> tuple[int, int, int, int]:
+        return (
+            threat_priority_tier(threat["name"], priority_target_name),
+            threat["distance"],
+            _finish_priority(threat["damage_state"]),
+            -threat["timestamp_ms"],
+        )
+
+    return _key
 
 
 # A second enemy this close to a target can reach our fight tile during
@@ -393,8 +418,14 @@ def find_acquisition_target(
     map_open_cooldown_ms: int,
     *,
     engagement_reserve_fuel: int,
+    priority_target_name: str = "",
 ) -> EnemyThreatDict | None:
-    """Pick the nearest map-fresh enemy the bot can afford to fight.
+    """Pick the highest-priority map-fresh enemy the bot can afford.
+
+    Human-classified enemies outrank every practice bot regardless of
+    distance, and the configured priority account outranks even other
+    humans (user doctrine 2026-07-28); within a tier the pick is
+    nearest-first.
 
     This is the **acquisition** gate, deliberately looser than the
     **firing** gate in :func:`analyze_threats`. Firing requires
@@ -490,7 +521,7 @@ def find_acquisition_target(
             )
         )
 
-    candidates.sort(key=_threat_sort_key)
+    candidates.sort(key=_threat_sort_key_for(priority_target_name))
     winner = candidates[0] if candidates else None
     emit_diagnostic(
         diagnostic_kind="acquisition_candidates",
@@ -518,8 +549,13 @@ def find_relay_travel_target(
     map_open_cooldown_ms: int,
     *,
     engagement_reserve_fuel: int,
+    priority_target_name: str = "",
 ) -> EnemyThreatDict | None:
     """Pick the nearest map-fresh enemy that fails ONLY the affordability gate.
+
+    The same human-first tiering as acquisition applies, so the relay
+    chain hops toward a distant human even when a cheaper practice bot
+    is also unaffordable.
 
     The dot-relay travel planner needs a destination worth travelling
     toward: an enemy that would be a perfectly viable acquisition if
@@ -584,7 +620,7 @@ def find_relay_travel_target(
             )
         )
 
-    candidates.sort(key=_threat_sort_key)
+    candidates.sort(key=_threat_sort_key_for(priority_target_name))
     return candidates[0] if candidates else None
 
 

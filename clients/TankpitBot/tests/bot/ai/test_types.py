@@ -353,6 +353,7 @@ class TestAIState:
             radar_break_threshold=config["radar_break_threshold"],
             engagement_fuel_budget=config["engagement_fuel_budget"],
             patrol_waypoints=config["patrol_waypoints"],
+            priority_target_name=config["priority_target_name"],
         )
         state = make_initial_ai_state(custom)
         assert state["config"]["fuel_low_threshold"] == 400

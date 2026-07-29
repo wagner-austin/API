@@ -376,6 +376,12 @@ class AIConfigDict(TypedDict):
             (user contract 2026-07-02). Mid-engagement
             (``combat_target_id != -1``) bypasses the mode-level gate
             -- a kill in progress is finished even on a tight budget.
+        priority_target_name: Account name that outranks every other
+            target at acquisition (case-insensitive; ``""`` for none).
+            Human-classified enemies already outrank practice bots
+            unconditionally ([[bot-behavior-contract]] §3.2, user
+            doctrine 2026-07-28); this names the tier above that.
+            Wired from ``TANKPIT_BOT_PRIORITY_TARGET``.
             Recalibrated 2026-07-02 from wire data: shots cost ~45
             fuel plus ~10/tick position drain (live runs 2026-07-01)
             and practice-room kills take ~8-10 hits (recorded human
@@ -397,6 +403,7 @@ class AIConfigDict(TypedDict):
     dual_break_threshold: int
     radar_break_threshold: int
     engagement_fuel_budget: int
+    priority_target_name: str
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -418,6 +425,7 @@ def make_default_ai_config() -> AIConfigDict:
         dual_break_threshold=4,
         radar_break_threshold=5,
         engagement_fuel_budget=450,
+        priority_target_name="",
     )
 
 

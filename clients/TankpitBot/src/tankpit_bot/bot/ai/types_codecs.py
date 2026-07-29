@@ -274,6 +274,7 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "dual_break_threshold": config["dual_break_threshold"],
         "radar_break_threshold": config["radar_break_threshold"],
         "engagement_fuel_budget": config["engagement_fuel_budget"],
+        "priority_target_name": config["priority_target_name"],
     }
 
 
@@ -330,6 +331,7 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         dual_break_threshold=require_int(data, "dual_break_threshold"),
         radar_break_threshold=require_int(data, "radar_break_threshold"),
         engagement_fuel_budget=require_int(data, "engagement_fuel_budget"),
+        priority_target_name=require_str(data, "priority_target_name"),
     )
 
 

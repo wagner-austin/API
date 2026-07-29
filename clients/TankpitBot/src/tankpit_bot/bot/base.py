@@ -14,7 +14,12 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol, PageProtocol
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
+from tankpit_bot.bot.ai.types import (
+    AIConfigDict,
+    AIStateDict,
+    make_default_ai_config,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.bot_dispatch import DispatchMixin
 from tankpit_bot.bot.command_service import CommandService
 from tankpit_bot.bot.states import (
@@ -69,6 +74,25 @@ _ACCOUNT_STATS_PANEL_RENDER_MS = _ACCOUNT_STATS_POLL_INTERVAL_MS * _ACCOUNT_STAT
 # 20260611-013801: panel never opened across a full poll budget), so
 # the startup capture retries on later ticks.
 _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS = 3
+
+
+def _env_ai_config() -> AIConfigDict:
+    """Build the session AI config with environment overrides applied.
+
+    Currently the only override is ``TANKPIT_BOT_PRIORITY_TARGET`` (the
+    priority hunt account, [[bot-behavior-contract]] §3.2).
+
+    Returns:
+        Default AI config with env-resolved fields filled in.
+    """
+    from tankpit_bot.bot.config import resolve_priority_target
+
+    return AIConfigDict(
+        **{
+            **make_default_ai_config(),
+            "priority_target_name": resolve_priority_target(),
+        }
+    )
 
 
 class BotError(Exception):
@@ -141,7 +165,7 @@ class Bot(DispatchMixin):
         self._game_log_scraper: GameLogScraper | None = None
         self._game_log_witness: list[GameLogEntryWithTimestamp] = []
         self._shot_screenshot_seq: int = 0
-        self._ai_state: AIStateDict = make_initial_ai_state()
+        self._ai_state: AIStateDict = make_initial_ai_state(_env_ai_config())
         default_mode_bridge: ModeBridgeProtocol = ModeBridge()
         default_status_bus: StatusBusProtocol = StatusBus()
         self._mode_bridge: ModeBridgeProtocol = (
@@ -395,7 +419,7 @@ class Bot(DispatchMixin):
         self._ws_urls = {}
         self._magic = None
         self._state_data = make_initial_state_data()
-        self._ai_state = make_initial_ai_state()
+        self._ai_state = make_initial_ai_state(_env_ai_config())
         self._cdp_message_buffer = []
 
         launch_args = _chrome_stream_display_args()
