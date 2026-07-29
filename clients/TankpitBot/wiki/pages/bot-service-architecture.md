@@ -72,9 +72,14 @@ replacement is wire-only, inside this repo:[^3]
   MJPEG `<img>`, SSE stats strip, START/STOP + mode buttons over the
   existing HTTP routes. All URLs are RELATIVE so the page works both
   direct (`:27100/watch`) and behind nginx's `/api/tankbot/` prefix
-  strip (`https://tankpit.austinwagner.org/api/tankbot/watch`) with
-  ZERO MCPs-repo changes — the existing proxy block already forwards
-  every subpath unbuffered.
+  strip (`https://tankpit.austinwagner.org/api/tankbot/watch`) — the
+  existing proxy block already forwards every subpath unbuffered.
+  Since MCPs commit `62b8a214` (same day), the BARE hostname
+  `tankpit.austinwagner.org/` 302s straight to the watch page
+  (host-conditional exact-root redirect in `fiesta/nginx.conf`);
+  every other gated host keeps the SPA root, and the SPA — with its
+  Vibeshine stream and the SERVER launch button — remains reachable
+  on the tankpit host at `/index.html`.
 - Idle-exit gate (`exit_when_idle`) counts `/video` viewers alongside
   SSE subscribers, so watching keeps the service alive.[^3]
 
