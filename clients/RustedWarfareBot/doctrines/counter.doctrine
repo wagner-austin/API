@@ -1,0 +1,11 @@
+# One line away from default: production tilts toward the layers the
+# opponent is seen fielding, instead of holding the stated mix regardless.
+# The A/B arm for the counter-composition question.
+
+name counter
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
+max_workers 4
+mass 7
+reserve -1
+expand 1
+counter 1

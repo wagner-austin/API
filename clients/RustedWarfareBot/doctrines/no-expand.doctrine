@@ -1,0 +1,10 @@
+# The control arm of the expansion A/B: the old fixed economy, one line away
+# from default ([[policy-economy]]). Replaces the CLI's positional `expand 0`.
+
+name no-expand
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
+max_workers 4
+mass 7
+reserve -1
+expand 0
+counter 0

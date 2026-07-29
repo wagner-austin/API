@@ -1,0 +1,17 @@
+# The style everything so far was measured under, exactly.
+# Matches DEFAULT_DOCTRINE in rw_bot.policy.doctrine -- kept as a file so an
+# experiment can start from it by copying one file and editing one line.
+
+name default
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
+max_workers 4
+
+# The shipped AI's sustained wave size ([[engine-ai-triggers]]).
+mass 7
+
+# -1 derives the reserve from the composition; a fixed figure holds it still
+# across a composition A/B ([[policy-economy]]).
+reserve -1
+
+expand 1
+counter 0
