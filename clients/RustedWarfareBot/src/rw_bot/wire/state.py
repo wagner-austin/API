@@ -19,17 +19,7 @@ replay corpus without a branch between them.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from typing import Final, TypedDict
-
-from rw_bot import RwBotError
-from rw_bot.validation import (
-    require_bool,
-    require_finite_float,
-    require_int,
-    require_non_empty_str,
-)
-from rw_bot.wire.ndjson import parse_object
 
 KIND_FRAME: Final = "frame"
 """``kind`` value opening a sample."""
@@ -43,21 +33,19 @@ KIND_POOL: Final = "pool"
 KIND_OPTION: Final = "option"
 """``kind`` value of a build-option record inside a sample."""
 
-_UNKNOWN_KIND = "RW-WIRE-001"
-_RECORD_BEFORE_FRAME = "RW-WIRE-002"
-_COUNT_MISMATCH = "RW-WIRE-003"
-_FRAME_MISMATCH = "RW-WIRE-004"
-_POOL_COUNT_MISMATCH = "RW-WIRE-005"
-_OPTION_COUNT_MISMATCH = "RW-WIRE-006"
+KIND_PLAYER: Final = "player"
+"""``kind`` value of a per-player scoreboard record inside a sample."""
 
+CHILD_COUNT_FIELDS: Final = ("visible", "pools", "options", "players")
+"""Frame-record fields declaring how many child records follow.
 
-class WireError(RwBotError):
-    """The record sequence did not form whole samples.
-
-    Args:
-        code: Stable machine-readable identifier.
-        message: Human-readable description of the offending record.
-    """
+Declared once because two readers need the total and they must not disagree:
+this module folds records into samples, and
+:mod:`rw_bot.control.channel` decides when a sample has finished arriving. When
+the channel carried its own copy of this list, adding a record kind left it
+reading a sample one short — the decoder then rejected it as truncated, which
+is a true statement about the wrong thing.
+"""
 
 
 class Entity(TypedDict):
@@ -96,6 +84,16 @@ class Entity(TypedDict):
             and both are non-negative — a negative is the engine's way of
             saying the point has no component at all
             ([[mechanics-movement-layers]]).
+        flying: Whether it is airborne at this moment. State rather than type:
+            a gunship that has landed reports false and can then be shot by
+            units that cannot hit aircraft, which is why this is read per
+            sample rather than derived once from ``movement``.
+        submerged: Whether it is below the surface at this moment. A surfaced
+            submarine is an ordinary target and reports false.
+        touching_water: Whether it is standing in water at this moment. Only
+            matters to weapons that cannot strike a target clear of it — a
+            torpedo — and is carried so that rule needs no special case
+            ([[mechanics-combat-profile]]).
         hp: Current health.
         max_hp: Health at full.
         complete: Whether construction has finished. A building joins the roster
@@ -118,6 +116,9 @@ class Entity(TypedDict):
     hostile: bool
     movement: str
     group: int
+    flying: bool
+    submerged: bool
+    touching_water: bool
     hp: float
     max_hp: float
     complete: bool
@@ -181,6 +182,17 @@ class BuildOption(TypedDict):
         available: Whether the unit may use it right now. An action that exists
             but is unavailable is a wait; one that does not exist at all is a
             dead plan entry, and the two need different answers.
+        makes_something: Whether the engine calls this an action that produces
+            a thing, as opposed to a stop or a rally.
+
+            **Judged here rather than in the agent, and that distinction cost a
+            whole category of the game.** The agent used to drop any action
+            that neither placed something nor answered true here. An upgrade is
+            neither: the asset declares it as ``convertTo``, and the engine
+            models conversions separately from builds. So an owned extractor
+            published no options at all while opponents were observed holding
+            twelve upgraded ones ([[policy-holding-ground]]). Whether an action
+            is worth taking is a decision, and decisions belong to this layer.
     """
 
     index: int
@@ -189,6 +201,48 @@ class BuildOption(TypedDict):
     action: int
     placed: bool
     available: bool
+    makes_something: bool
+
+
+class PlayerStat(TypedDict):
+    """One player's scoreboard, as the engine keeps it.
+
+    The bot measured its own income by regressing a credit balance against the
+    clock across windows in which it deliberately bought nothing
+    ([[policy-economy]]). The engine keeps the figure, keeps it for every player
+    rather than only ours, charts all three of these and writes them to its own
+    save file. So this is not a better estimate; it is the number the estimate
+    was approximating.
+
+    Carried per player because the useful form is comparative. "Our army is
+    worth 500" says nothing on its own; "500 against four opponents on 1,000"
+    is the whole of the match report — and unlike the visible-enemy count it
+    cannot be inflated by our own scouting.
+
+    Attributes:
+        index: Position in the sample's player list. Enumeration order only.
+        team: The engine's team number, which is what joins a player to the
+            ``team`` field of a visible entity.
+        local: Whether this is the player the bot is playing.
+        hostile: Whether the engine considers this player an enemy of the local
+            one. Read from the engine's own alliance comparison, so an ally and
+            the neutral team are both false rather than "not local".
+        defeated: Whether the engine has set this player's defeat flag.
+        wiped: Whether the engine has set the stronger wiped-out flag.
+        income: Credits earned per second.
+        army_value: Total value of everything mobile the player holds.
+        building_value: Total value of everything standing.
+    """
+
+    index: int
+    team: int
+    local: bool
+    hostile: bool
+    defeated: bool
+    wiped: bool
+    income: int
+    army_value: int
+    building_value: int
 
 
 class Sample(TypedDict):
@@ -209,6 +263,10 @@ class Sample(TypedDict):
             explored rather than listing the whole map from the first frame.
         options: Everything the player's own units can currently make, one entry
             per producible type per unit.
+        players: One scoreboard per occupied player slot, in slot order. Not
+            fog-filtered: these are the engine's own bookkeeping rather than
+            anything observed, so an opponent's army value is known even when
+            none of it is in sight.
     """
 
     frame: int
@@ -220,347 +278,4 @@ class Sample(TypedDict):
     entities: tuple[Entity, ...]
     pools: tuple[ResourcePool, ...]
     options: tuple[BuildOption, ...]
-
-
-def decode_samples(lines: Sequence[str]) -> tuple[Sample, ...]:
-    """Fold a run of NDJSON lines into whole samples.
-
-    Blank lines are skipped, which is what a file ending in a newline produces.
-
-    Args:
-        lines: NDJSON lines, without newline terminators.
-
-    Returns:
-        Every complete sample, in stream order.
-
-    Raises:
-        NdjsonError: When a line does not parse.
-        DecodeError: When a record is missing a field or carries a wrong type.
-        WireError: ``RW-WIRE-001`` on an unknown ``kind``, ``RW-WIRE-002`` when
-            an entity or pool precedes any frame, ``RW-WIRE-003`` when a
-            sample's entity count disagrees with its declared count,
-            ``RW-WIRE-004`` when a record's frame disagrees with the sample it
-            falls in, ``RW-WIRE-005`` when the pool count disagrees.
-    """
-    samples: list[Sample] = []
-    frame: int = 0
-    clock_ms: int = 0
-    declared_entities: int = 0
-    declared_pools: int = 0
-    declared_options: int = 0
-    credits: int = 0
-    defeated: bool = False
-    wiped: bool = False
-    players_left: int = 0
-    entities: list[Entity] = []
-    pools: list[ResourcePool] = []
-    options: list[BuildOption] = []
-    started = False
-
-    for line in lines:
-        if line.strip() == "":
-            continue
-        record = parse_object(line)
-        kind = require_non_empty_str(record, "kind")
-
-        if kind == KIND_FRAME:
-            if started:
-                samples.append(
-                    _close(
-                        frame,
-                        clock_ms,
-                        credits,
-                        defeated,
-                        wiped,
-                        players_left,
-                        declared_entities,
-                        declared_pools,
-                        declared_options,
-                        entities,
-                        pools,
-                        options,
-                    )
-                )
-            frame = require_int(record, "frame")
-            clock_ms = require_int(record, "clock_ms")
-            declared_entities = require_int(record, "visible")
-            declared_pools = require_int(record, "pools")
-            declared_options = require_int(record, "options")
-            credits = require_int(record, "credits")
-            defeated = require_bool(record, "defeated")
-            wiped = require_bool(record, "wiped")
-            players_left = require_int(record, "players_left")
-            entities = []
-            pools = []
-            options = []
-            started = True
-            continue
-
-        if kind == KIND_OPTION:
-            _require_inside_sample(started, kind, frame, record)
-            options.append(
-                BuildOption(
-                    index=require_int(record, "index"),
-                    unit_id=require_int(record, "unit_id"),
-                    produces=require_non_empty_str(record, "produces"),
-                    action=require_int(record, "action"),
-                    placed=require_bool(record, "placed"),
-                    available=require_bool(record, "available"),
-                )
-            )
-            continue
-
-        if kind == KIND_POOL:
-            _require_inside_sample(started, kind, frame, record)
-            pools.append(
-                ResourcePool(
-                    index=require_int(record, "index"),
-                    tile_x=require_int(record, "tile_x"),
-                    tile_y=require_int(record, "tile_y"),
-                    x=require_finite_float(record, "x"),
-                    y=require_finite_float(record, "y"),
-                    group_land=require_int(record, "group_land"),
-                )
-            )
-            continue
-
-        if kind == KIND_ENTITY:
-            _require_inside_sample(started, kind, frame, record)
-            entities.append(
-                Entity(
-                    index=require_int(record, "index"),
-                    unit_id=require_int(record, "id"),
-                    type_name=require_non_empty_str(record, "type"),
-                    class_name=require_non_empty_str(record, "class"),
-                    x=require_finite_float(record, "x"),
-                    y=require_finite_float(record, "y"),
-                    team=require_int(record, "team"),
-                    mine=require_bool(record, "mine"),
-                    hostile=require_bool(record, "hostile"),
-                    movement=require_non_empty_str(record, "movement"),
-                    group=require_int(record, "group"),
-                    hp=require_finite_float(record, "hp"),
-                    max_hp=require_finite_float(record, "max_hp"),
-                    complete=require_bool(record, "complete"),
-                    queued=require_int(record, "queued"),
-                )
-            )
-            continue
-
-        raise WireError(_UNKNOWN_KIND, f"unknown record kind {kind!r}")
-
-    if started:
-        samples.append(
-            _close(
-                frame,
-                clock_ms,
-                credits,
-                defeated,
-                wiped,
-                players_left,
-                declared_entities,
-                declared_pools,
-                declared_options,
-                entities,
-                pools,
-                options,
-            )
-        )
-    return tuple(samples)
-
-
-def _require_inside_sample(
-    started: bool,
-    kind: str,
-    frame: int,
-    record: Mapping[str, str | int | float | bool],
-) -> None:
-    """Check that a record falls inside the sample it claims to.
-
-    Args:
-        started: Whether a frame record has opened a sample.
-        kind: The record's ``kind``, for the message.
-        frame: The open sample's frame counter.
-        record: The record being placed.
-
-    Raises:
-        WireError: ``RW-WIRE-002`` when no sample is open, ``RW-WIRE-004`` when
-            the record's own frame disagrees with the open one.
-    """
-    if not started:
-        raise WireError(
-            _RECORD_BEFORE_FRAME,
-            f"a {kind} record appeared before any frame record; the stream does "
-            "not begin at a sample boundary",
-        )
-    reported = require_int(record, "frame")
-    if reported != frame:
-        raise WireError(
-            _FRAME_MISMATCH,
-            f"{kind} reports frame {reported} inside the sample for frame {frame}; "
-            "the records have been interleaved",
-        )
-
-
-def _close(
-    frame: int,
-    clock_ms: int,
-    credits: int,
-    defeated: bool,
-    wiped: bool,
-    players_left: int,
-    declared_entities: int,
-    declared_pools: int,
-    declared_options: int,
-    entities: list[Entity],
-    pools: list[ResourcePool],
-    options: list[BuildOption],
-) -> Sample:
-    """Finish a sample, checking it against its own declared counts.
-
-    Args:
-        frame: The sample's frame counter.
-        clock_ms: The sample's millisecond clock.
-        credits: The sample's credit balance.
-        declared_entities: The entity count the frame record promised.
-        declared_pools: The pool count the frame record promised.
-        declared_options: The option count the frame record promised.
-        entities: The entity records actually seen.
-        pools: The pool records actually seen.
-        options: The option records actually seen.
-
-    Returns:
-        The completed sample.
-
-    Raises:
-        WireError: ``RW-WIRE-003`` when the entity counts disagree,
-            ``RW-WIRE-005`` when the pool counts do, ``RW-WIRE-006`` when the
-            option counts do.
-    """
-    if len(entities) != declared_entities:
-        raise WireError(
-            _COUNT_MISMATCH,
-            f"frame {frame} declared {declared_entities} visible entities but carried "
-            f"{len(entities)}; the capture is truncated or interleaved",
-        )
-    if len(pools) != declared_pools:
-        raise WireError(
-            _POOL_COUNT_MISMATCH,
-            f"frame {frame} declared {declared_pools} visible resource pools but carried "
-            f"{len(pools)}; the capture is truncated or interleaved",
-        )
-    if len(options) != declared_options:
-        raise WireError(
-            _OPTION_COUNT_MISMATCH,
-            f"frame {frame} declared {declared_options} build options but carried "
-            f"{len(options)}; the capture is truncated or interleaved",
-        )
-    return Sample(
-        frame=frame,
-        clock_ms=clock_ms,
-        credits=credits,
-        defeated=defeated,
-        wiped=wiped,
-        players_left=players_left,
-        entities=tuple(entities),
-        pools=tuple(pools),
-        options=tuple(options),
-    )
-
-
-def encode_sample(sample: Sample) -> tuple[str, ...]:
-    """Render a sample back to NDJSON lines.
-
-    Round-trips with :func:`decode_samples`, which is what makes a decoded
-    corpus re-emittable as a fixture.
-
-    Args:
-        sample: The sample to encode.
-
-    Returns:
-        One frame line, then one line per entity, then one line per pool — the
-        order the agent writes them in, which is what makes the round trip
-        byte-for-byte rather than merely equivalent.
-    """
-    frame = sample["frame"]
-    lines = [
-        f'{{"kind":"{KIND_FRAME}","frame":{frame},'
-        f'"clock_ms":{sample["clock_ms"]},"visible":{len(sample["entities"])},'
-        f'"pools":{len(sample["pools"])},"options":{len(sample["options"])},'
-        f'"credits":{sample["credits"]},'
-        f'"defeated":{str(sample["defeated"]).lower()},'
-        f'"wiped":{str(sample["wiped"]).lower()},'
-        f'"players_left":{sample["players_left"]}}}'
-    ]
-    for entity in sample["entities"]:
-        name = _escape(entity["class_name"])
-        type_name = _escape(entity["type_name"])
-        lines.append(
-            f'{{"kind":"{KIND_ENTITY}","frame":{frame},"index":{entity["index"]},'
-            f'"id":{entity["unit_id"]},"type":"{type_name}",'
-            f'"class":"{name}","x":{entity["x"]!r},"y":{entity["y"]!r},'
-            f'"team":{entity["team"]},"mine":{str(entity["mine"]).lower()},'
-            f'"hostile":{str(entity["hostile"]).lower()},'
-            f'"movement":"{entity["movement"]}","group":{entity["group"]},'
-            f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r},'
-            f'"complete":{str(entity["complete"]).lower()},'
-            f'"queued":{entity["queued"]}}}'
-        )
-    for pool in sample["pools"]:
-        lines.append(
-            f'{{"kind":"{KIND_POOL}","frame":{frame},"index":{pool["index"]},'
-            f'"tile_x":{pool["tile_x"]},"tile_y":{pool["tile_y"]},'
-            f'"x":{pool["x"]!r},"y":{pool["y"]!r},'
-            f'"group_land":{pool["group_land"]}}}'
-        )
-    for option in sample["options"]:
-        produces = _escape(option["produces"])
-        lines.append(
-            f'{{"kind":"{KIND_OPTION}","frame":{frame},"index":{option["index"]},'
-            f'"unit_id":{option["unit_id"]},"produces":"{produces}",'
-            f'"action":{option["action"]},'
-            f'"placed":{str(option["placed"]).lower()},'
-            f'"available":{str(option["available"]).lower()}}}'
-        )
-    return tuple(lines)
-
-
-def _escape(text: str) -> str:
-    """Escape a string for inclusion in a JSON string literal.
-
-    Engine class names contain nothing that needs escaping, so this never fires
-    in practice. It is here because :func:`encode_sample` claims to round-trip,
-    and a claim that holds only for the values seen so far is not a round trip.
-
-    Args:
-        text: The raw string.
-
-    Returns:
-        The escaped string, without surrounding quotes.
-    """
-    out: list[str] = []
-    for char in text:
-        if char in ('"', "\\"):
-            out.append("\\" + char)
-        elif char in ("\n", "\r", "\t"):
-            out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t"}[char])
-        elif ord(char) < 0x20:
-            out.append(f"\\u{ord(char):04x}")
-        else:
-            out.append(char)
-    return "".join(out)
-
-
-__all__ = [
-    "KIND_ENTITY",
-    "KIND_FRAME",
-    "KIND_OPTION",
-    "KIND_POOL",
-    "BuildOption",
-    "Entity",
-    "ResourcePool",
-    "Sample",
-    "WireError",
-    "decode_samples",
-    "encode_sample",
-]
+    players: tuple[PlayerStat, ...]
