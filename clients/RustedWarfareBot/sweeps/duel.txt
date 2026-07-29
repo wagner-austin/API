@@ -1,0 +1,33 @@
+# The duel ladder: twelve seeds against one opponent.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The match itself -- map, opponent count, difficulty -- is a property of the
+# BATCH and is passed with SWEEP_MATCH, because the map decides the opponent
+# count: the engine caps teams by the map's own, so a two-player map is a duel
+# whatever else is asked ([[policy-determinism]]).
+#
+# Rungs, and what the difficulty actually does. It is an income multiplier on
+# the AI alone: 0.4x Very Easy, 0.7x Easy, 1.0x Medium, 1.4x Hard, 1.8x Very
+# Hard, 3.7x Impossible. At Medium an opponent earns exactly what the bot does.
+#
+#   make sweep SWEEP_JOBS=sweeps/duel.txt SWEEP_NAME=duel-veryeasy \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx -2"
+#
+# One full-length duel at Very Easy has been won outright -- opponent
+# eliminated at sample 2,387, income 158/s, seven workers, army 23 alive. This
+# batch asks whether that was a rate or a sample: the noise floor in the
+# four-opponent game was a 25% survival rate on identical specifications, and
+# the floor here is not yet known.
+duel|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|555|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|1337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|24601|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|8128|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|60613|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+duel|99991|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1

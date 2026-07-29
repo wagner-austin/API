@@ -1,0 +1,47 @@
+# mechGun against c_tank, paired across twelve seeds.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# A PAIRED design, because the noise floor forces it. Twelve runs of one
+# identical specification gave 3 survivals and 9 defeats with total worth
+# spanning 350 to 15,350 -- and seeding java.lang.Math's generator did not
+# shrink it ([[policy-determinism]]). So arms are compared per seed, and scored
+# on `samples seen` (how long the bot lasted), which is the lowest-variance
+# figure the scorecard carries: standard deviation about 300 against a mean
+# near 3,600, where total worth has a standard deviation larger than its own
+# mean.
+#
+# One candidate rather than a twelve-way screen. At this noise level a
+# one-match-per-arm screen would report roughly three survivals whatever the
+# arms were, so the twelve compositions in sweeps/comps.txt wait until there is
+# something worth screening for.
+#
+# Why mechGun: it dominates c_tank on both axes at identical reach -- 600
+# credits for 500 hit points and 7.67 damage per second per 100 credits,
+# against 350 for 210 and 5.71. That is 83 hit points per 100 credits against
+# 60 ([[mechanics-unit-value]]). Naming it makes expansion insert a
+# mechFactory, so the arm also carries a different producer.
+tank|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|555|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|1337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|24601|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|8128|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|60613|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|99991|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+mechgun|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|777|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|4242|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|31337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|8675309|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|90210|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|555|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|1337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|24601|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|8128|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|60613|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechgun|99991|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1

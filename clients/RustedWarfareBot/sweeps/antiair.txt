@@ -1,0 +1,23 @@
+# Is it worth fielding anything that can shoot upwards?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The census settled that the opponents fly: 5 airFactory plus dropship,
+# gunShip, lightGunship, c_helicopter and c_interceptor, against an army where
+# every unit declares hits_air = false. We have never been able to shoot at any
+# of it ([[policy-holding-ground]]).
+#
+# hoverTank is the only answer needing no code: the Land Factory already builds
+# it and it hits air. It is a worse unit per credit than c_tank -- 3.41 damage
+# per second per 100 credits against 5.71, and 33 hit points per 100 against 60
+# ([[mechanics-unit-value]]) -- so this is a real trade rather than a free win,
+# and that is exactly why it is measured instead of argued.
+#
+# The composition rule reads repeats as a ratio, so the arms differ by one
+# argument ([[policy-production]]).
+tank|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+tank|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+tank|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+hover|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank|99|4000|25|-1
+hover|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank|99|4000|25|-1
+hover|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank|99|4000|25|-1

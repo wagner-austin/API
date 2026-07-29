@@ -1,0 +1,28 @@
+# How big is the noise floor?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# Twelve runs of ONE job spec. Identical seed, identical arguments, identical
+# code -- so every difference between these results is run-to-run variance and
+# nothing else.
+#
+# The reason to ask: two runs of the same spec in earlier batches came back
+# `survived, 4 extractors, 66/s, worth 13,800` and `defeated, 0 extractors,
+# 0/s, worth 500`. The simulation advances by the wall-clock delta Slick
+# measures each frame (u.java:637,710), so CPU contention perturbs the deltas
+# and a floating-point RTS diverges from there. PLAY_LOCKSTEP pins when samples
+# are taken, not what the engine integrates.
+#
+# Until this spread is known, no arm of six seeds can be read as a result.
+r01|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r02|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r03|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r04|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r05|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r06|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r07|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r08|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r09|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r10|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r11|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+r12|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1

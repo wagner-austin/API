@@ -1,0 +1,47 @@
+# Artillery in the composition: three tanks to one artillery to one hovertank.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The bot has never fielded anything that can shoot an aircraft. `c_tank`
+# declares `canAttackFlyingUnits: false` and prints as "Can attack ground
+# only"; `c_turret_t1` is "Attacks ground units." That is the whole army and
+# the whole defence ([[mechanics-unit-value]]).
+#
+# It shows in every report. In all four winning Hard duels the surviving
+# enemies are **0 engageable** -- every one is something the bot cannot shoot.
+# In the losers, 20-25% of the opponent's force is.
+#
+# WHY THE HOVERTANK RATHER THAN THE TURRET. `c_antiAirTurret` is the better
+# unit -- 7.50 dps per 100 credits against 3.41, 133 hp per 100 against 33, and
+# 250 range -- but a *builder* places it, and the builder channel barely
+# functions: three turrets were built across twelve full matches. The hovertank
+# comes off a Land Factory, of which these matches end holding four to eleven,
+# through the production channel that reinforced 120-143 units in the same runs
+# ([[policy-holding-ground]]).
+#
+# No code changes: the army mix is the mobile half of the goals, repeats
+# meaningful as a ratio ([[policy-production]]).
+#
+# Two side effects to keep in mind when reading the result. The mix costs ground
+# strength -- the hovertank is worse per credit against ground than the tank it
+# displaces -- and the expansion reserve rises 350 -> 450, because it tracks the
+# priciest thing being reinforced.
+#
+#   make sweep SWEEP_JOBS=sweeps/duel-aa.txt SWEEP_NAME=duel-hard-aa \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+#
+# Compare against runs/sweeps/duel-hard (4 won, 21 extractor drops, 0 losses).
+# Judge on wins and drops, not on income or worth: the change that took Easy
+# from 3/12 to 12/12 lowered both.
+duel|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|555|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|1337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|24601|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|8128|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|60613|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1
+duel|99991|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_artillery,hoverTank|8|4000|25|-1

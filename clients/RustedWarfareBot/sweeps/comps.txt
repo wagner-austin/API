@@ -1,0 +1,37 @@
+# Twelve army compositions, one seed, one match each.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The bot's army is whatever mobile types the goals string names -- five
+# hardcoded constants and this field are its entire build vocabulary, against a
+# game registering 173 types and opponents fielding 38. Every arm before this
+# one varied *how much* of a single-type army to build; none varied *what*.
+#
+# One match per arm rather than six, which is only defensible if runs repeat.
+# Twelve runs of one identical spec gave 3 survivals, 9 defeats and a 44x spread
+# on total worth, so a one-match screen was worthless until `Math.random` was
+# pinned ([[policy-determinism]]). Read the result only against the seeded noise
+# batch, not against the unseeded one.
+#
+# What the value table says to expect ([[mechanics-unit-value]]):
+#   mechGun       600  500hp  130 reach  7.67 dps/100c        -- beats c_tank on
+#                                                                both axes
+#   mechMissile   900  500hp  190 reach  3.59 dps/100c  air   -- the air answer
+#   c_tank        350  210hp  130 reach  5.71 dps/100c        -- what we build
+#   c_interceptor 600  250hp  170 reach  6.25 dps/100c  air
+#
+# Expansion derives the prerequisite factory, so naming a mech inserts a
+# mechFactory and naming an interceptor inserts an airFactory -- which is also a
+# second production building, where every match so far has finished with one.
+tank|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+mechgun|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechGun|8|4000|25|-1
+mechmix|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechMissile|8|4000|25|-1
+mechtank|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,mechGun,mechGun|8|4000|25|-1
+mechaa|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechMissile,mechMissile|8|4000|25|-1
+air|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+airmix|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_interceptor,c_interceptor|8|4000|25|-1
+arty|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_artillery|8|4000|25|-1
+hover|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank|8|4000|25|-1
+mecharty|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery|8|4000|25|-1
+gunship|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,lightGunship|8|4000|25|-1
+heli|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_helicopter|8|4000|25|-1

@@ -1,0 +1,17 @@
+# Does the strategy ever convert an economic lead into an elimination?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# Nine matches at 1500 samples have now ended 5 -> 5, with the bot ahead on
+# worth in every one: ours grew 11.6x from the opening position while the
+# strongest rival grew 6.9x. Compounding faster and never finishing anybody is
+# either a match that ends too early to see the conversion, or a strategy that
+# has no conversion in it. Those call for opposite work, and only length
+# separates them.
+#
+# 4000 samples is 300,000 engine frames, about 2.7x the matches measured so far.
+# Everything else is held at the best arm the wave-mass sweep found.
+long|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1

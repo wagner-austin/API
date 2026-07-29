@@ -1,0 +1,34 @@
+# ONE VARIABLE: mechGun in place of c_tank. Everything else identical to
+# sweeps/duel-aa-medium.txt, which is the arm the whole ladder was measured on.
+#
+#   type       price    hp  range   dps   hp/100c  dps/100c   built by
+#   c_tank       350   210    130    20        60       5.7   landFactory
+#   mechGun      600   500    130    46        83       7.7   mechFactory (1,000)
+#
+# mechGun beats c_tank on hit points per credit AND damage per credit -- not a
+# trade, strictly better -- and the prerequisite is a 1,000-credit building the
+# Builder can already place. policy.expand inserts it, so no code changes.
+#
+# WHY THIS IS THE SECOND ATTEMPT. The first put mechGun, mechArtillery AND
+# mechMissile in at once. That moved three things, and the third was invisible:
+# scripts.play.expansion_reserve returns the MAX price of any reinforced type,
+# so a 1,400-credit artillery raised the reserve 450 -> 1,400 and expansion was
+# refused 232 times of 237 while 42,800 credits went into the army. The arm was
+# measuring my own composition choice, not the mechs ([[policy-economy]]).
+#
+# Here the reserve moves 450 -> 600, which is the smallest step that testing
+# mechGun at all allows.
+#
+# Compare against duel-veryhard-floor (7/12 won, 2 lost, 3 routs, median 2207).
+duel|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|777|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|4242|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|31337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|8675309|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|90210|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|555|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|1337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|24601|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|8128|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|60613|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1
+duel|99991|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,hoverTank|8|4000|25|-1

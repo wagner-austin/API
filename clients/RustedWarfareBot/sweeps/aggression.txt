@@ -1,0 +1,23 @@
+# Is attacking net-negative?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# Every loss so far is spent on offence: 96% of losses fall more than 2,000
+# world units from home, none within 900 of it, and the strongest rival's worst
+# dip across a whole match is a few thousand credits against 200-300 units fed
+# in. The bot is ahead on worth at sample 1500 and annihilated by 3500
+# ([[policy-holding-ground]]).
+#
+# So the question is whether the attacking is what kills us. It needs no code:
+# the wave ladder's final rung is already an argument, and a mass larger than
+# any army the bot can field means no wave is ever released. The army still
+# gathers, still rallies at the base, and still defends -- it simply never
+# walks into the opponents' half.
+#
+# Two arms, three seeds, six matches, one batch.
+attack|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+attack|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+attack|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+turtle|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|999|-1
+turtle|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|999|-1
+turtle|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|999|-1

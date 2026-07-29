@@ -1,0 +1,6 @@
+# One short match, purely to read the new spend and reach blocks against real
+# data. 800 samples rather than 4,000: this is verifying that instrumentation
+# populates, not measuring an outcome.
+#
+# label | seed | goals | max_workers | samples | mass
+duel|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank|8|800|25|-1

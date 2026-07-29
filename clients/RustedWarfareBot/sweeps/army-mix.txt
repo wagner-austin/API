@@ -1,0 +1,38 @@
+# Does an army of more than one unit type change a verdict?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The bot's whole build vocabulary is five hardcoded type names plus this goals
+# string, and `reinforcements` keeps only the *mobile* entries -- so with the
+# default goals the army composition is literally `c_tank` repeated. The game
+# registers 173 types and the opponents field 38 of them.
+#
+# `c_tank` declares `canAttackFlyingUnits: false`, and a census of one match has
+# the opponents fielding roughly 65 air units: lightGunship x17, c_helicopter
+# x12, c_interceptor x12, dropship x12, gunShip x6, heavyInterceptor x5. That is
+# why a full-length match reports `enemies seen 470 (405 engageable)` -- the
+# remainder is not a targeting failure, it is an army that cannot shoot them
+# ([[mechanics-combat-profile]]).
+#
+# `c_interceptor` is the answer the value table already gives: 6.25 damage per
+# second per 100 credits against `c_tank`'s 5.71, 170 reach against 130, and it
+# hits air ([[mechanics-unit-value]]). Repeats are a ratio, so `air` holds three
+# tanks per interceptor.
+#
+# Both arms run at the worker ceiling that won the previous A/B, so this differs
+# from the control by the goals string alone. Expansion derives the
+# prerequisite: naming an interceptor inserts an `airFactory`, which is also a
+# **second production building** -- the previous batch finished every match with
+# exactly one, against the opponents' thirty-two.
+tank|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+tank|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+air|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+air|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+air|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+air|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+air|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1
+air|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_interceptor|8|4000|25|-1

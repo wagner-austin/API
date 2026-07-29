@@ -1,0 +1,62 @@
+# The mech army: one 1,000-credit building unlocks a strictly better one.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# WHAT WE HAVE BEEN FIELDING. Two unit types, both tier one, both from a Land
+# Factory: c_tank (350, 210hp, 130 range, 20 dps) and hoverTank (450, 150hp,
+# 140 range). Every enemy turret outranges the tank -- c_turret_t1 at 165,
+# c_turret_t2_gun at 185, c_antiAirTurretT2 at 320 -- so the army walks into
+# fire it cannot answer and dies there. That is the "we lose everything we
+# build" the whole ladder has been bounded by ([[policy-holding-ground]]).
+#
+# WHAT A mechFactory COSTS: 1,000 credits, and a Builder can already place it.
+# It was never built because economy.py names two structures and this is not
+# one of them -- not because anything blocked it.
+#
+# WHAT IT MAKES, against the c_tank it replaces:
+#
+#   type           price    hp  range   dps   hp/100c  dps/100c
+#   c_tank           350   210    130    20        60       5.7
+#   mechGun          600   500    130    46        83       7.7
+#   mechMissile      900   500    190     -        56         -   air only, area
+#   mechArtillery   1400   500    290     -        56         -   ground, area
+#
+# **mechGun beats c_tank on hit points per credit AND damage per credit.** Not
+# a trade -- strictly better. mechArtillery outranges every enemy turret in the
+# game bar the tier-2 anti-air. mechMissile is a dedicated anti-air mech with
+# 3.3x the hit points of the hoverTank now doing that job.
+#
+# WHY THE VALUE TABLE MISSED THIS: [[mechanics-unit-value]] ranks "everything
+# reachable from a Command Center", and since mechFactory was never built its
+# units never counted as reachable. The table's scope quietly excluded the
+# answer -- the same shape of error as judging defence by a refusal count.
+#
+# NO CODE CHANGE. policy.expand resolves prerequisites from the registry, so
+# naming mechGun in the goals inserts mechFactory before it:
+#
+#   goals  extractorT1 x3, mechGun x3, mechArtillery, mechMissile
+#   plan   extractorT1 x3, mechFactory, mechGun x3, mechArtillery, mechMissile
+#
+# mechFactory also makes builders, so the workforce is not stranded by dropping
+# the Land Factory.
+#
+# WATCH: the cycle costs 4,100 credits against the current 1,500, so the army
+# grows in fewer, tougher units. Judge on wins, extractor drops and margin --
+# NOT on unit count, which will fall by design.
+#
+#   make sweep SWEEP_JOBS=sweeps/duel-mech.txt SWEEP_NAME=duel-veryhard-mech \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+#
+# Compare against duel-veryhard-floor (7/12 won, 2 lost, 3 routs, median 2207).
+duel|12345|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|777|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|4242|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|31337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|8675309|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|90210|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|555|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|1337|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|24601|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|8128|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|60613|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1
+duel|99991|extractorT1,extractorT1,extractorT1,mechGun,mechGun,mechGun,mechArtillery,mechMissile|8|4000|25|-1

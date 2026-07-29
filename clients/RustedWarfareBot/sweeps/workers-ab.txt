@@ -1,0 +1,34 @@
+# Does running several builders change a verdict?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# One arm per worker ceiling, six seeds each, played to a verdict. The arms
+# differ by an *argument* and nothing else -- `worker_need` now puts a wanted
+# builder into the army composition, and the ceiling is what bounds it, so
+# `max_workers` is the whole of the difference between these twelve matches.
+#
+# `one` is the control and reproduces the old behaviour closely: at a ceiling
+# of 1 the bot keeps the builder it spawns with and never asks for another,
+# which is what every match before this one played.
+#
+# Both arms run in the same batch rather than one after the other. A match
+# takes its real duration because the simulation is delta-driven and advances
+# in real time, so twelve matches cost the same wall clock as six and the arms
+# cannot drift apart between batches ([[harness-parallel-matches]]).
+#
+# Why this arm at all: a traced match shows 98 builders lost with the worker
+# count never accumulating and the producer count never passing two. The
+# engine's own AI runs several bases, each targeting two builders
+# ([[ai-opponent-strategy]]).
+one|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+one|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+one|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+one|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+one|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+one|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|1|4000|25|-1
+eight|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+eight|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+eight|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+eight|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+eight|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+eight|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1

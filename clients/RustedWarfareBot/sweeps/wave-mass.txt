@@ -1,0 +1,23 @@
+# How much should the bot mass before committing a wave?
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# Measured before this sweep: about sixty tanks go into defended ground across a
+# match and the strongest opponent is set back by roughly a thousand credits,
+# with nobody eliminated in any run yet. The shipped ladder tops out at seven,
+# which is a number copied from an opponent playing a different economy -- seven
+# tanks is 2,450 credits walking into turrets that out-range them by 1.27x to
+# 3.54x ([[mechanics-unit-value]]).
+#
+# Everything except the final rung of the wave ladder is held fixed. The early
+# rungs govern the opening, when holding three units back is the difference
+# between a first attack and none at all.
+mass07|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|7|-1
+mass07|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|7|-1
+mass07|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|7|-1
+mass15|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|15|-1
+mass15|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|15|-1
+mass15|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|15|-1
+mass25|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|25|-1
+mass25|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|25|-1
+mass25|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|1500|25|-1

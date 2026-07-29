@@ -1,0 +1,19 @@
+# Full-length matches, six seeds.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# Six rather than four because the batch costs the same wall clock either way:
+# matches run concurrently, one cloned game directory per worker, and the box
+# holds about six. Four seeds is thin for this game -- the wave-mass arms showed
+# within-arm army spreads of 10 to 32 on identical code -- so the extra two are
+# statistics bought for nothing ([[harness-parallel-matches]]).
+#
+# Scored to a verdict rather than to a sample limit. At 1500 samples the bot
+# reads as ahead; by 3500 it has been annihilated, so a sample-limited score
+# measures a transient ([[policy-holding-ground]]).
+long|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|4242|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|31337|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|8675309|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+long|90210|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1

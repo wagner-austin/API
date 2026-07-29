@@ -1,0 +1,19 @@
+# How many builders, asked at full length this time.
+#
+# label | seed | goals | max_workers | samples | mass
+#
+# The ceiling was measured once before and the result -- uncapped clearly best,
+# 1.53 against 0.97 and 0.87 -- was taken at 1500 samples, which is now known to
+# measure a transient ([[policy-holding-ground]]). Every experiment since has
+# passed 99 explicitly, so the shipped default of 4 is an arm no recent
+# measurement has used and the evidence against it is unreliable.
+#
+# The one part of that result which is mechanistic rather than outcome-based is
+# that capping left 15,000-18,000 credits unspendable. That should survive the
+# transient concern, and this is where it gets tested rather than assumed.
+cap04|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|4|4000|25|-1
+cap04|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|4|4000|25|-1
+cap08|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+cap08|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|8|4000|25|-1
+uncap|12345|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
+uncap|777|extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank|99|4000|25|-1
