@@ -9,7 +9,6 @@ from __future__ import annotations
 import runpy
 import sys
 from pathlib import Path
-from types import TracebackType
 
 import pytest
 from scripts.play import (
@@ -17,12 +16,14 @@ from scripts.play import (
     EXIT_BAD_USAGE,
     EXIT_INCOMPLETE,
     EXIT_OK,
+    expansion_reserve,
     load_catalogue,
     load_placements,
     main,
 )
 
-from rw_bot.control import _test_hooks
+from rw_bot.policy.doctrine import Doctrine, format_doctrine
+from tests.wire_fixtures import ScriptedPeer, StubbedConnect
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CATALOGUE_PATH = _PROJECT_ROOT / "wiki" / "sources" / "m0-probe" / "printunits.log"
@@ -33,7 +34,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":100.0,"y":200.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
@@ -53,7 +54,7 @@ _BUILDER_OFFERS = ("extractorT1", "landFactory", "c_tank")
 def _option_line(frame: int, index: int, unit_id: int, produces: str) -> str:
     return (
         f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
-        f'"produces":"{produces}","action":1,"placed":true,"available":true}}'
+        f'"produces":"{produces}","action":1,"placed":true,"available":true,"makes_something":true}}'
     )
 
 
@@ -69,7 +70,7 @@ def _sample_lines(
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{frame * 3},'
         f'"visible":{len(entities)},"pools":{len(pools)},'
-        f'"options":{len(options)},'
+        f'"options":{len(options)},"players":0,'
         f'"credits":{credits},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name) in enumerate(entities):
@@ -96,89 +97,6 @@ _EXPANDED = (
     "c_tank",
     "c_tank",
 )
-
-
-class _ScriptedPeer:
-    """Serves prepared lines and records what was sent back.
-
-    Attributes:
-        sent: Every line written, in order.
-    """
-
-    def __init__(self, lines: list[str]) -> None:
-        self._lines = lines
-        self.sent: list[str] = []
-
-    def send_line(self, line: str) -> None:
-        """Record one written line.
-
-        Args:
-            line: Line content, without a newline.
-        """
-        self.sent.append(line)
-
-    def read_line(self) -> str:
-        """Serve the next prepared line, or end of stream.
-
-        Returns:
-            The next line, or an empty string once exhausted.
-        """
-        if not self._lines:
-            return ""
-        return self._lines.pop(0)
-
-    def close(self) -> None:
-        """Release the connection."""
-
-
-class _StubbedConnect:
-    """Binds the connect hook to a scripted peer for one block.
-
-    Attributes:
-        peer: The peer every connection returns.
-    """
-
-    def __init__(self, peer: _ScriptedPeer) -> None:
-        self.peer = peer
-        self._original: _test_hooks.ConnectProto = _test_hooks.connect
-
-    def __call__(self, host: str, port: int, timeout_s: float) -> _test_hooks.Connection:
-        """Return the scripted peer.
-
-        Args:
-            host: Ignored.
-            port: Ignored.
-            timeout_s: Ignored.
-
-        Returns:
-            The scripted peer.
-        """
-        return self.peer
-
-    def __enter__(self) -> _StubbedConnect:
-        """Install the stub.
-
-        Returns:
-            This stub.
-        """
-        self._original = _test_hooks.connect
-        _test_hooks.connect = self
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        """Restore the original hook.
-
-        Args:
-            exc_type: Exception class raised in the block, if any.
-            exc: Exception raised in the block, if any.
-            traceback: Traceback of the raised exception, if any.
-        """
-        _test_hooks.connect = self._original
 
 
 def test_the_real_catalogue_prices_every_goal() -> None:
@@ -228,15 +146,17 @@ def test_the_goals_name_no_factory_but_the_plan_has_one() -> None:
 
 def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
-    # Three reads: one for expansion, one for the build loop, one for the
-    # fight phase that a completed plan triggers.
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
-    with _StubbedConnect(peer):
-        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "5"]) == EXIT_OK
+    # One read for the opening observation the plan is expanded against, then
+    # one per loop sample. The loop no longer stops when the plan finishes: a
+    # completed opening is where playing starts ([[policy-loop]]).
+    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
+    with StubbedConnect(peer):
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_OK
     # The world already holds a finished Land Factory, so expansion inserts
     # nothing -- the goals are reachable as written. That is the same rule the
     # insertion cases exercise, seen from the other side.
     assert capsys.readouterr().out.splitlines() == [
+        "doctrine: default",
         "goals: extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
         "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank",
         "  extractorT1 costs 700, goes on a resource pool",
@@ -246,40 +166,108 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         "  c_tank costs 350, goes on the ring",
         "  c_tank costs 350, goes on the ring",
         "  c_tank costs 350, goes on the ring",
-        "outcome        done (all 7 plan entries satisfied)",
-        "completed      7/7",
-        "orders sent    0",
-        "samples seen   1",
-        "frames elapsed 0",
-        "credits left   9000",
-        # The plan finished, so the fight phase runs. This world holds no
-        # hostiles, so it clears immediately without an order.
-        "fight outcome  cleared",
-        "attack orders  0",
+        "verdict        survived (sample_limit)",
+        "plan           7/7 -- done: all 7 plan entries satisfied",
+        "build orders   0",
         "reinforced     0",
-        "army           4 -> 4",
-        "enemies seen   0 -> 0",
-        "engaged gone   0",
         # No pool rides on this scripted world, so expansion has nothing to
-        # claim and says so rather than reporting a bare zero.
+        # claim and says so rather than reporting a bare zero. The reason is
+        # the economy's rather than defence's even though defence is attempted
+        # last: "no pool was taken" has five distinct causes and this
+        # enumerates them, where defence would report only that it ran last
+        # ([[policy-economy]]).
+        "expansions     0 (0 factories) (no pool free of 0: 0 occupied, 0 unreachable, 0 exposed)",
         "extractors     3 -> 3",
-        "expansions     0",
-        "expand note    no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
-        "samples seen   1",
+        "attack orders  0",
+        "rallied        0",
+        "army           4 -> 4",
+        # The scripted world carries no player records, so the engine's own
+        # scoreboard reads as absent rather than as a measurement of nothing.
+        "army value     0 -> 0",
+        "total worth    0 -> 0",
+        "best rival     0 -> 0 (peak 0, worst dip 0)",
+        "workers        1",
+        # What is standing, which no other line reports: a turret is neither
+        # army nor income, so without this a run that bought defences and one
+        # that bought none read identically ([[policy-economy]]).
+        "structures     extractorT1 x3, landFactory x1",
+        "composition    c_tank x4",
+        "enemy fields   none",
+        "income         0/s",
+        "enemies seen   0 -> 0 (0 engageable)",
+        "engaged gone   0",
+        "players        6 -> 6 (0 eliminated)",
+        "claims refused 0",
+        "samples seen   2",
+        "frames elapsed 0",
+        "engine clock   0 ms",
+        "credits left   9000",
+        # **Which spender was even asked**, which no other figure reports. A
+        # stage that declined three thousand times and one that was never
+        # reached both leave a refusal count of zero, and defence was measured
+        # and refuted on exactly that ambiguity -- it had fired three times in
+        # twelve full matches ([[policy-holding-ground]]).
+        "reach          income                  reached     2  acted     0"
+        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
+        "reach          defence                 reached     2  acted     0"
+        "  last: no free worker can place c_turret_t1",
+        "reach          throughput              reached     2  acted     0"
+        "  last: production is not the constraint",
+        # The plan is already satisfied in this world, so nothing is ever
+        # claimed -- named rather than left blank, because an empty block reads
+        # as a measurement that failed to happen.
+        "spend          nothing was ever claimed",
     ]
 
 
 def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) -> None:
-    peer = _ScriptedPeer(_sample_lines(1, 10, _BUILDER) * 2)
-    with _StubbedConnect(peer):
+    peer = ScriptedPeer(_sample_lines(1, 10, _BUILDER) * 2)
+    with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[10:] == [
-        "outcome        sample_limit (extractorT1 needs a resource pool and none is visible yet)",
-        "completed      0/8",
-        "orders sent    0",
+    assert capsys.readouterr().out.splitlines()[11:] == [
+        "verdict        survived (sample_limit)",
+        # The extractor has no pool in this scripted world, so the plan reaches
+        # past it to the factory and reports what blocks *that* -- an entry
+        # with nowhere to stand defers rather than stopping the plan, which is
+        # what kept two duels from ever building an army
+        # ([[policy-holding-ground]]).
+        "plan           0/8 -- building: landFactory costs 700, holding 10",
+        "build orders   0",
+        "reinforced     0",
+        # There is one builder and the opening plan is still using it, so the
+        # economy stands down rather than re-tasking it to its own pool. Both
+        # ordering it in one tick means neither order is carried out, which a
+        # live run showed as four expansions and a plan stuck at 3/8.
+        "expansions     0 (0 factories) (the opening plan is using the only free worker)",
+        "extractors     0 -> 0",
+        "attack orders  0",
+        "rallied        0",
+        "army           0 -> 0",
+        "army value     0 -> 0",
+        "total worth    0 -> 0",
+        "best rival     0 -> 0 (peak 0, worst dip 0)",
+        "workers        1",
+        "structures     none",
+        # No army, so no mix -- named rather than left blank, because an empty
+        # field reads as a measurement that failed to happen.
+        "composition    none",
+        "enemy fields   none",
+        "income         0/s",
+        "enemies seen   0 -> 0 (0 engageable)",
+        "engaged gone   0",
+        "players        6 -> 6 (0 eliminated)",
+        "claims refused 0",
         "samples seen   1",
         "frames elapsed 0",
+        "engine clock   0 ms",
         "credits left   10",
+        # The gate that switches the whole economy off, seen from outside for
+        # the first time: the plan holds the one worker, so income, defence and
+        # throughput are not reached at all rather than declining
+        # ([[policy-economy]]).
+        "reach          plan-holds-only-worker  reached     1  acted     0"
+        "  last: the opening plan is using the only free worker",
+        "spend          nothing was ever claimed",
     ]
 
 
@@ -287,38 +275,67 @@ def test_the_sample_budget_defaults_when_not_given(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
-    # Three reads: one for expansion, one for the build loop, one for the
-    # fight phase that a completed plan triggers.
-    peer = _ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 3)
-    with _StubbedConnect(peer):
+    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 200)
+    with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
-    assert capsys.readouterr().out.splitlines()[9:] == [
-        "outcome        done (all 7 plan entries satisfied)",
-        "completed      7/7",
-        "orders sent    0",
-        "samples seen   1",
-        "frames elapsed 0",
-        "credits left   9000",
-        "fight outcome  cleared",
-        "attack orders  0",
+    assert capsys.readouterr().out.splitlines()[10:] == [
+        "verdict        survived (sample_limit)",
+        "plan           7/7 -- done: all 7 plan entries satisfied",
+        "build orders   0",
         "reinforced     0",
-        "army           4 -> 4",
-        "enemies seen   0 -> 0",
-        "engaged gone   0",
+        # No pool rides on this scripted world, so expansion has nothing to
+        # claim and says so rather than reporting a bare zero. The reason is
+        # the economy's rather than defence's even though defence is attempted
+        # last: "no pool was taken" has five distinct causes and this
+        # enumerates them, where defence would report only that it ran last
+        # ([[policy-economy]]).
+        "expansions     0 (0 factories) (no pool free of 0: 0 occupied, 0 unreachable, 0 exposed)",
         "extractors     3 -> 3",
-        "expansions     0",
-        "expand note    no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
-        "samples seen   1",
+        "attack orders  0",
+        "rallied        0",
+        "army           4 -> 4",
+        # The scripted world carries no player records, so the engine's own
+        # scoreboard reads as absent rather than as a measurement of nothing.
+        "army value     0 -> 0",
+        "total worth    0 -> 0",
+        "best rival     0 -> 0 (peak 0, worst dip 0)",
+        "workers        1",
+        "structures     extractorT1 x3, landFactory x1",
+        "composition    c_tank x4",
+        "enemy fields   none",
+        "income         0/s",
+        "enemies seen   0 -> 0 (0 engageable)",
+        "engaged gone   0",
+        "players        6 -> 6 (0 eliminated)",
+        "claims refused 0",
+        "samples seen   120",
+        "frames elapsed 0",
+        "engine clock   0 ms",
+        "credits left   9000",
+        # Reached on every one of the 120 observations and acting on none of
+        # them, which is the shape "declined constantly" makes. The opposite
+        # shape -- never reached at all -- is the one in the test above, and a
+        # refusal count renders both as zero.
+        "reach          income                  reached   120  acted     0"
+        "  last: no pool free of 0: 0 occupied, 0 unreachable, 0 exposed",
+        "reach          defence                 reached   120  acted     0"
+        "  last: no free worker can place c_turret_t1",
+        "reach          throughput              reached   120  acted     0"
+        "  last: production is not the constraint",
+        "spend          nothing was ever claimed",
     ]
 
 
-@pytest.mark.parametrize("args", [[], ["27200"], ["a", "b", "c", "d", "e"]])
+@pytest.mark.parametrize(
+    "args", [[], ["27200"], ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"]]
+)
 def test_a_bad_argument_count_prints_usage(
     args: list[str], capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(args) == EXIT_BAD_USAGE
     assert capsys.readouterr().out == (
-        "usage: play <port> <catalogue-path> <placement-path> [max-samples]\n"
+        "usage: play <port> <catalogue-path> <placement-path> "
+        "[max-samples] [doctrine-path] [trace-path]\n"
     )
 
 
@@ -336,5 +353,86 @@ def test_module_entry_point_exits_with_the_run_result(
         sys.modules["scripts.play"] = already_imported
     assert caught.value.code == EXIT_BAD_USAGE
     assert capsys.readouterr().out == (
-        "usage: play <port> <catalogue-path> <placement-path> [max-samples]\n"
+        "usage: play <port> <catalogue-path> <placement-path> "
+        "[max-samples] [doctrine-path] [trace-path]\n"
     )
+
+
+def test_the_style_can_be_given_as_a_doctrine_file(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """So one arm of an experiment differs from another by a file.
+
+    Editing the source between runs is how an A/B stops being an A/B: the two
+    arms end up differing by whatever else was in the working tree. The file
+    also outlives the run, so the arm that played last week can be re-run
+    rather than reconstructed.
+    """
+    preset = tmp_path / "tanks.doctrine"
+    preset.write_text(
+        "\n".join(
+            format_doctrine(
+                Doctrine(
+                    name="tanks",
+                    goals=("c_tank", "c_tank"),
+                    max_workers=4,
+                    mass=7,
+                    reserve=-1,
+                    expand=True,
+                    counter=False,
+                )
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, (300, "landFactory")) * 3)
+    with StubbedConnect(peer):
+        code = main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1", str(preset)])
+    # The exit code is about whether the plan finished, which is not what this
+    # is testing; what matters is that the style came from the file.
+    assert code in (EXIT_OK, EXIT_INCOMPLETE)
+    printed = capsys.readouterr().out.splitlines()
+    assert printed[0] == "doctrine: tanks"
+    assert printed[1] == "goals: c_tank -> c_tank"
+    assert printed[2] == "plan:  c_tank -> c_tank"
+
+
+def test_a_dash_means_the_default_doctrine_and_no_trace(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Both optional slots have to be fillable without being used."""
+    peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, (300, "landFactory")) * 3)
+    with StubbedConnect(peer):
+        main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1", "-", "-"])
+    assert capsys.readouterr().out.splitlines()[0] == "doctrine: default"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_the_reserve_covers_the_dearest_thing_the_bot_keeps_making() -> None:
+    """Enough to replace a single loss, and the depth measured better than a
+    shallower one.
+
+    The objection to the maximum is real: one expensive type raises the barrier
+    the whole economy must clear, invisibly, since nothing about a unit list
+    looks like a reserve. It was changed to the composition mean on exactly that
+    reasoning, moving the standard mix 450 -> 375, and twelve seeds at Very Hard
+    called it a **regression: 7 wins became 3**, routs 3 -> 1, outside the noise
+    floor ([[policy-holding-ground]]). A shallower reserve starves the
+    replacement it exists to fund.
+
+    The confound the objection identified is answered by the override below
+    rather than by lowering the figure.
+    """
+    catalogue = load_catalogue(_CATALOGUE_PATH)
+    arty = catalogue["c_artillery"]["price"]
+    assert arty > catalogue["c_tank"]["price"]
+    assert expansion_reserve(("c_tank", "c_tank", "c_tank", "c_artillery"), catalogue) == arty
+    assert expansion_reserve(("c_tank",), catalogue) == catalogue["c_tank"]["price"]
+
+
+def test_nothing_to_reinforce_reserves_nothing() -> None:
+    """No army to protect means every spare credit belongs to the economy."""
+    assert expansion_reserve((), load_catalogue(_CATALOGUE_PATH)) == 0

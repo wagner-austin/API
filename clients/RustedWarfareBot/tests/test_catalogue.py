@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from rw_bot.mechanics.catalogue import CatalogueError, Weapon, decode_catalogue
-from rw_bot.wire.state import decode_samples
+from rw_bot.wire.codec import decode_samples
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CATALOGUE = _PROJECT_ROOT / "wiki" / "sources" / "m0-probe" / "printunits.log"

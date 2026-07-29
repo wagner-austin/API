@@ -21,21 +21,23 @@ from scripts.planner_probe import (
 )
 
 from rw_bot.control import _test_hooks
-from rw_bot.wire.state import Entity, Sample, decode_samples
+from rw_bot.wire.codec import decode_samples
+from rw_bot.wire.state import Sample
+from tests.wire_fixtures import entity
 
 
 def _entity(index: int, unit_id: int, type_name: str, x: float, y: float) -> str:
     return (
         f'{{"kind":"entity","frame":1,"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":{y},'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
 def _sample_lines(*entities: str) -> list[str]:
     frame = (
         f'{{"kind":"frame","frame":1,"clock_ms":10,'
-        f'"visible":{len(entities)},"pools":0,"options":0,'
+        f'"visible":{len(entities)},"pools":0,"options":0,"players":0,'
         f'"credits":4000,"defeated":false,"wiped":false,"players_left":6}}'
     )
     return [frame, *entities]
@@ -141,23 +143,7 @@ def test_the_builder_is_found_by_type_not_by_position() -> None:
         _entity(0, 214, "builder", 5.0, 6.0),
         _entity(1, 213, "commandCenter", 0.0, 0.0),
     )
-    expected = Entity(
-        index=1,
-        unit_id=214,
-        type_name="builder",
-        class_name="units.x",
-        x=5.0,
-        y=6.0,
-        team=0,
-        mine=True,
-        hostile=False,
-        movement="LAND",
-        group=1,
-        hp=100.0,
-        max_hp=100.0,
-        complete=True,
-        queued=0,
-    )
+    expected = entity(214, "builder", index=1, class_name="units.x", x=5.0, y=6.0)
     assert find_builder(forward) == expected
     # Same unit, now first in the roster: the index differs, the choice must not.
     assert find_builder(reversed_roster) == {**expected, "index": 0}

@@ -12,10 +12,11 @@ from pathlib import Path
 import pytest
 
 from rw_bot.mechanics.build_tree import (
-    BuildTreeError,
     decode_build_tree,
+    encode_build_edge,
     producers_of,
 )
+from rw_bot.mechanics.registry_dump import RegistryDumpError
 from rw_bot.validation import DecodeError
 from rw_bot.wire.ndjson import NdjsonError
 
@@ -110,10 +111,15 @@ def test_producers_of_finds_every_maker() -> None:
 
 
 def test_an_unknown_kind_is_rejected() -> None:
-    """A record neither decoder claims must not pass silently through both."""
-    with pytest.raises(BuildTreeError) as caught:
+    """A record no decoder claims must not pass silently through all of them.
+
+    Owned by the dump rather than by this decoder: each used to carry its own
+    list of its neighbours' kinds, so adding a third kind broke this one on a
+    live run ([[mechanics-build-tree]]).
+    """
+    with pytest.raises(RegistryDumpError) as caught:
         decode_build_tree(['{"kind":"weather","index":0}'])
-    assert caught.value.code == "RW-BUILDTREE-001"
+    assert caught.value.code == "RW-REGISTRY-001"
 
 
 def test_a_missing_field_propagates_as_a_decode_error() -> None:
@@ -125,3 +131,10 @@ def test_a_missing_field_propagates_as_a_decode_error() -> None:
 def test_a_malformed_line_propagates_as_an_ndjson_error() -> None:
     with pytest.raises(NdjsonError):
         decode_build_tree(["{oops}"])
+
+
+def test_an_edge_round_trips_through_its_record() -> None:
+    """The encoder exists so a decoded dump can be re-emitted as a fixture."""
+    line = encode_build_edge(0, "builder", "landFactory")
+    assert decode_build_tree([line]) == {"builder": frozenset({"landFactory"})}
+    assert line == _EDGE

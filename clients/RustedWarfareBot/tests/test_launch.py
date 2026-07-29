@@ -39,6 +39,8 @@ def test_argv_renders_the_shipped_launcher_shape() -> None:
     assert build_argv(config) == (
         JAVA_EXE_RELATIVE,
         "-Xmx1000M",
+        "--add-opens",
+        "java.base/java.lang=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Djava.library.path=.",
         f"-javaagent:{_AGENT}",
@@ -54,6 +56,22 @@ def test_argv_renders_the_shipped_launcher_shape() -> None:
         "-log",
         _LOG,
     )
+
+
+def test_agent_options_ride_on_the_flag_as_one_element() -> None:
+    """One argv element, so a map path with spaces needs no quoting.
+
+    Assembled as a shell command line, ``[p2]Lake (2p).tmx`` split the flag in
+    two and the JVM aborted with ``processing of -javaagent failed`` before the
+    agent loaded ([[policy-determinism]]).
+    """
+    options = "channelPort=27800;matchMap=maps/skirmish/[p2]Lake (2p).tmx"
+    config = make_launch_config(
+        game_dir=_GAME_DIR, log_path=_LOG, agent_jar=_AGENT, agent_options=options
+    )
+    argv = build_argv(config)
+    assert f"-javaagent:{_AGENT}={options}" in argv
+    assert sum(1 for element in argv if element.startswith("-javaagent:")) == 1
 
 
 def test_agent_is_attached_as_a_jvm_option_not_a_game_argument() -> None:

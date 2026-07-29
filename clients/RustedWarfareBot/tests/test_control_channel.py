@@ -18,15 +18,15 @@ from rw_bot.control.channel import (
     ChannelError,
     open_channel,
 )
+from rw_bot.wire.codec import WireError
 from rw_bot.wire.command import attack_order, build_order, move_order, produce_order
-from rw_bot.wire.state import WireError
 
 _FRAME_3 = (
-    '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,'
+    '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,"players":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 _FRAME_1 = (
-    '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"pools":0,"options":0,'
+    '{"kind":"frame","frame":9,"clock_ms":30,"visible":1,"pools":0,"options":0,"players":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 
@@ -35,7 +35,7 @@ def _entity(index: int, unit_id: int, type_name: str) -> str:
     return (
         f'{{"kind":"entity","frame":854,"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":1.0,"y":2.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
 
@@ -160,7 +160,7 @@ def test_an_immediately_closed_stream_is_reported() -> None:
 
 def test_a_sample_declaring_no_entities_completes_on_its_frame_line() -> None:
     empty = (
-        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,'
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     assert AgentChannel(_ScriptedPeer([empty])).next_sample()["entities"] == ()
@@ -171,9 +171,9 @@ def test_successive_samples_are_read_in_order() -> None:
         [
             _FRAME_1,
             '{"kind":"entity","frame":9,"index":0,"id":1,"type":"builder",'
-            '"class":"u","x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,'
+            '"class":"u","x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
             '"hp":1.0,"max_hp":1.0,"complete":true,"queued":0}',
-            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"options":0,'
+            '{"kind":"frame","frame":10,"clock_ms":33,"visible":0,"pools":0,"options":0,"players":0,'
             '"credits":4000,"defeated":false,"wiped":false,"players_left":6}',
         ]
     )
@@ -188,7 +188,7 @@ def test_an_entity_count_disagreeing_with_the_frame_still_fails_the_decoder() ->
         [
             _FRAME_1,
             '{"kind":"entity","frame":99,"index":0,"id":1,"type":"b","class":"u",'
-            '"x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"hp":1.0,"max_hp":1.0,"complete":true,"queued":0}',
+            '"x":0.0,"y":0.0,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,"hp":1.0,"max_hp":1.0,"complete":true,"queued":0}',
         ]
     )
     with pytest.raises(WireError) as caught:

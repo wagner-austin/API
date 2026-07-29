@@ -1,76 +1,58 @@
 """The threat model, exercised on its own geometry.
 
 The pool-selection tests in ``test_policy_build_order`` cover what threat does
-to a decision. These cover what it computes: the reach table's contract, and the
-segment arithmetic every answer rests on.
+to a decision. These cover what it computes: the segment arithmetic every answer
+rests on, and the layer test that decides whether a given hostile is a threat to
+a given traveller at all.
 """
 
 from __future__ import annotations
 
-import pytest
+from rw_bot.mechanics.combat_profile import CombatProfile
+from rw_bot.policy.threat import route_is_exposed
+from rw_bot.wire.state import Entity
+from tests.wire_fixtures import enemy, entity, sample
 
-from rw_bot.policy.threat import reach_of, route_is_exposed
-from rw_bot.wire.state import Entity, Sample
 
-#: Attack range by type name, as the registry dump gives it.
+def _profile(
+    type_name: str,
+    attack_range: float,
+    *,
+    land: bool = True,
+    air: bool = False,
+    underwater: bool = False,
+    out_of_water: bool = True,
+) -> CombatProfile:
+    return CombatProfile(
+        index=0,
+        type_name=type_name,
+        attack_range=attack_range,
+        hits_land=land,
+        hits_air=air,
+        hits_underwater=underwater,
+        hits_land_out_of_water=out_of_water,
+    )
+
+
+#: Combat profiles as the registry dump gives them.
 #:
 #: Every registered type appears, armed or not — that completeness is the
-#: contract :func:`reach_of` relies on, which is why the unarmed builder is
-#: present at zero rather than absent.
-_REACHES = {"turret": 100.0, "builder": 0.0}
+#: contract the threat model relies on, which is why the unarmed builder is
+#: present at zero rather than absent. The figures are the ones the live dump
+#: reports for these types.
+_PROFILES = {
+    "turret": _profile("turret", 100.0),
+    "builder": _profile("builder", 0.0, land=False),
+    "antiAirTurret": _profile("antiAirTurret", 250.0, land=False, air=True),
+    "heavySub": _profile("heavySub", 210.0, underwater=True, out_of_water=False),
+}
+
+_BUILDER = entity(214, "builder")
 
 
-def _entity(type_name: str, x: float, y: float, *, hostile: bool = True) -> Entity:
-    return Entity(
-        index=0,
-        unit_id=900,
-        type_name=type_name,
-        class_name="units.x",
-        x=x,
-        y=y,
-        team=1,
-        mine=False,
-        hostile=hostile,
-        movement="LAND",
-        group=1,
-        hp=100.0,
-        max_hp=100.0,
-        complete=True,
-        queued=0,
-    )
-
-
-def _sample(*entities: Entity) -> Sample:
-    return Sample(
-        frame=1,
-        clock_ms=10,
-        credits=0,
-        defeated=False,
-        wiped=False,
-        players_left=6,
-        entities=entities,
-        pools=(),
-        options=(),
-    )
-
-
-def test_a_type_the_dump_does_not_carry_fails_loudly() -> None:
-    """The dump covers every registered type, so a miss is a stale dump.
-
-    Absorbing it is what previously reported every turret as harmless: a zero
-    is indistinguishable from "this unit is unarmed", and the units missing from
-    the old source were the turrets and the artillery.
-    """
-    with pytest.raises(KeyError, match="someModTank"):
-        reach_of(_entity("someModTank", 0.0, 0.0), _REACHES)
-
-
-def test_a_unit_the_engine_reports_unarmed_has_no_reach() -> None:
-    assert reach_of(_entity("builder", 0.0, 0.0), _REACHES) == 0.0
-
-
-def test_reach_is_the_catalogue_attack_range() -> None:
-    assert reach_of(_entity("turret", 0.0, 0.0), _REACHES) == 100.0
+def _walker(x: float, y: float) -> Entity:
+    """The unit whose walk is being judged: an ordinary ground builder."""
+    return entity(214, "builder", x=x, y=y)
 
 
 def test_a_walk_of_no_distance_is_still_judged() -> None:
@@ -80,11 +62,11 @@ def test_a_walk_of_no_distance_is_still_judged() -> None:
     survey asks about a route whose two ends are the same point.
     """
     standing = (500.0, 500.0)
-    covering = _sample(_entity("turret", 550.0, 500.0))
-    assert route_is_exposed(covering, _REACHES, standing, standing) is True
+    covering = sample(enemy(900, "turret", x=550.0, y=500.0))
+    assert route_is_exposed(covering, _PROFILES, _BUILDER, standing, standing) is True
 
-    clear = _sample(_entity("turret", 650.5, 500.0))
-    assert route_is_exposed(clear, _REACHES, standing, standing) is False
+    clear = sample(enemy(900, "turret", x=650.5, y=500.0))
+    assert route_is_exposed(clear, _PROFILES, _BUILDER, standing, standing) is False
 
 
 def test_a_hostile_behind_the_start_is_not_on_the_route() -> None:
@@ -93,28 +75,77 @@ def test_a_hostile_behind_the_start_is_not_on_the_route() -> None:
     Projecting onto an unbounded line would put a turret 400 units behind the
     builder squarely 'on' a walk that never goes near it.
     """
-    behind = _sample(_entity("turret", -400.0, 0.0))
-    assert route_is_exposed(behind, _REACHES, (0.0, 0.0), (1000.0, 0.0)) is False
+    behind = sample(enemy(900, "turret", x=-400.0, y=0.0))
+    assert route_is_exposed(behind, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
 
 
 def test_a_hostile_past_the_end_is_not_on_the_route() -> None:
-    beyond = _sample(_entity("turret", 1400.0, 0.0))
-    assert route_is_exposed(beyond, _REACHES, (0.0, 0.0), (1000.0, 0.0)) is False
+    beyond = sample(enemy(900, "turret", x=1400.0, y=0.0))
+    assert route_is_exposed(beyond, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
 
 
 def test_a_hostile_beside_the_middle_is_on_the_route() -> None:
-    beside = _sample(_entity("turret", 500.0, 99.0))
-    assert route_is_exposed(beside, _REACHES, (0.0, 0.0), (1000.0, 0.0)) is True
+    beside = sample(enemy(900, "turret", x=500.0, y=99.0))
+    assert route_is_exposed(beside, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is True
 
 
 def test_the_edge_of_reach_counts_as_covered() -> None:
     """A unit at maximum range is a unit in range."""
-    astride = _sample(_entity("turret", 500.0, 100.0))
-    assert route_is_exposed(astride, _REACHES, (0.0, 0.0), (1000.0, 0.0)) is True
+    astride = sample(enemy(900, "turret", x=500.0, y=100.0))
+    assert route_is_exposed(astride, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is True
 
-    outside = _sample(_entity("turret", 500.0, 100.5))
-    assert route_is_exposed(outside, _REACHES, (0.0, 0.0), (1000.0, 0.0)) is False
+    outside = sample(enemy(900, "turret", x=500.0, y=100.5))
+    assert route_is_exposed(outside, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
 
 
 def test_an_empty_world_exposes_nothing() -> None:
-    assert route_is_exposed(_sample(), _REACHES, (0.0, 0.0), (1000.0, 0.0)) is False
+    assert route_is_exposed(sample(), _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
+
+
+def test_an_unarmed_hostile_is_an_obstacle_rather_than_a_threat() -> None:
+    """An enemy builder standing on the route does not endanger anything."""
+    harmless = sample(enemy(900, "builder", x=500.0, y=0.0))
+    assert route_is_exposed(harmless, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
+
+
+def test_an_ally_on_the_route_is_not_a_threat() -> None:
+    """Hostility is the engine's answer, not the negation of ownership."""
+    friendly = entity(900, "turret", x=500.0, y=0.0, team=2, mine=False, hostile=False)
+    assert (
+        route_is_exposed(sample(friendly), _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
+    )
+
+
+def test_an_anti_air_turret_does_not_threaten_a_ground_builder() -> None:
+    """The layer test, and the reason it is not an optimisation.
+
+    ``antiAirTurret`` is armed, has a 250-unit reach, and reports
+    ``hits_land: false`` in the live dump. Counting reach alone made it rule out
+    every pool within 250 units of one, on a map where it cannot touch the
+    builder walking past it ([[mechanics-combat-profile]]).
+    """
+    covered = sample(enemy(900, "antiAirTurret", x=500.0, y=0.0))
+    assert route_is_exposed(covered, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
+
+
+def test_the_same_turret_does_threaten_something_airborne() -> None:
+    """The complement, so the case above is the layer test and not a dead branch."""
+    flyer = entity(215, "helicopter", flying=True)
+    covered = sample(enemy(900, "antiAirTurret", x=500.0, y=0.0))
+    assert route_is_exposed(covered, _PROFILES, flyer, (0.0, 0.0), (1000.0, 0.0)) is True
+
+
+def test_a_torpedo_boat_does_not_threaten_a_builder_on_dry_land() -> None:
+    """``hits_land_out_of_water`` is false for every submarine in the dump.
+
+    A torpedo has to strike something in the water, so a submarine 100 units off
+    the shoreline is not a reason to refuse a pool inland.
+    """
+    lurking = sample(enemy(900, "heavySub", x=500.0, y=0.0))
+    assert route_is_exposed(lurking, _PROFILES, _BUILDER, (0.0, 0.0), (1000.0, 0.0)) is False
+
+
+def test_the_same_torpedo_boat_threatens_a_builder_that_is_in_the_water() -> None:
+    wading = entity(214, "builder", touching_water=True)
+    lurking = sample(enemy(900, "heavySub", x=500.0, y=0.0))
+    assert route_is_exposed(lurking, _PROFILES, wading, (0.0, 0.0), (1000.0, 0.0)) is True

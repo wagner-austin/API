@@ -12,27 +12,21 @@ from pathlib import Path
 import pytest
 
 from rw_bot.validation import DecodeError
+from rw_bot.wire.codec import WireError, decode_samples, encode_sample
 from rw_bot.wire.ndjson import NdjsonError
-from rw_bot.wire.state import (
-    BuildOption,
-    Entity,
-    ResourcePool,
-    Sample,
-    WireError,
-    decode_samples,
-    encode_sample,
-)
+from rw_bot.wire.state import BuildOption, ResourcePool, Sample
+from tests.wire_fixtures import entity
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _CAPTURE = _PROJECT_ROOT / "wiki" / "sources" / "m6-wire" / "world-sample.ndjson"
 
 _FRAME = (
-    '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,'
+    '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,"pools":0,"options":0,"players":0,'
     '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
 )
 _ENTITY = (
     '{"kind":"entity","frame":7,"index":0,"id":214,"type":"builder",'
-    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,'
+    '"class":"units.e.b","x":1.5,"y":-2.5,"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
     '"hp":170.0,"max_hp":170.0,"complete":true,"queued":0}'
 )
 _POOL = (
@@ -137,7 +131,7 @@ def test_blank_lines_are_skipped() -> None:
 
 def test_a_sample_with_no_entities_is_valid() -> None:
     empty = (
-        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,'
+        '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,"options":0,"players":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     samples = decode_samples([empty])
@@ -182,7 +176,7 @@ def test_a_pool_before_any_frame_is_rejected() -> None:
 
 def test_a_sample_short_of_its_declared_pools_is_rejected() -> None:
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":2,"options":0,"players":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     with pytest.raises(WireError) as caught:
@@ -199,12 +193,13 @@ def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
     and the planner would answer that by declaring the plan dead.
     """
     short = (
-        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,'
+        '{"kind":"frame","frame":7,"clock_ms":25,"visible":0,"pools":0,"options":2,"players":0,'
         '"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
     )
     option = (
         '{"kind":"option","frame":7,"index":0,"unit_id":214,'
-        '"produces":"landFactory","action":1,"placed":true,"available":true}'
+        '"produces":"landFactory","action":1,"placed":true,"available":true,'
+        '"makes_something":true}'
     )
     with pytest.raises(WireError) as caught:
         decode_samples([short, option])
@@ -230,7 +225,7 @@ def test_a_short_sample_is_rejected_rather_than_silently_truncated() -> None:
     with pytest.raises(WireError) as caught:
         short = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":3,'
-            '"pools":0,"options":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+            '"pools":0,"options":0,"players":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([short, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -241,7 +236,7 @@ def test_a_long_sample_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
         long_frame = (
             '{"kind":"frame","frame":7,"clock_ms":25,"visible":1,'
-            '"pools":0,"options":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
+            '"pools":0,"options":0,"players":0,"credits":4000,"defeated":false,"wiped":false,"players_left":6}'
         )
         decode_samples([long_frame, _ENTITY, _ENTITY])
     assert caught.value.code == "RW-WIRE-003"
@@ -255,9 +250,28 @@ def test_an_interleaved_entity_frame_is_rejected() -> None:
 
 
 def test_an_unknown_record_kind_is_rejected() -> None:
+    """Inside a sample, because outside one it is the earlier fault.
+
+    A record before any frame is rejected as a stream that does not begin at a
+    sample boundary, which is a different and more specific complaint. Opening a
+    frame first is what makes this test about the unknown kind.
+    """
+    with pytest.raises(WireError) as caught:
+        decode_samples(
+            [
+                '{"kind":"frame","frame":1,"clock_ms":0,"visible":0,"pools":0,'
+                '"options":0,"players":0,"credits":0,"defeated":false,'
+                '"wiped":false,"players_left":6}',
+                '{"kind":"weather","frame":1}',
+            ]
+        )
+    assert caught.value.code == "RW-WIRE-001"
+
+
+def test_a_record_before_any_frame_is_rejected() -> None:
     with pytest.raises(WireError) as caught:
         decode_samples(['{"kind":"weather","frame":1}'])
-    assert caught.value.code == "RW-WIRE-001"
+    assert caught.value.code == "RW-WIRE-002"
 
 
 def test_a_missing_field_propagates_as_a_decode_error() -> None:
@@ -289,23 +303,17 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
         defeated=False,
         wiped=False,
         players_left=6,
+        players=(),
         entities=(
-            Entity(
-                index=0,
-                unit_id=214,
-                type_name='a"b\\c\nd\te\rf\x01g',
+            entity(
+                214,
+                'a"b\\c\nd\te\rf\x01g',
                 class_name='a"b\\c\nd\te\rf\x01g',
-                x=0.0,
-                y=0.0,
                 team=3,
                 mine=False,
                 hostile=True,
-                movement="LAND",
-                group=1,
                 hp=1.5,
                 max_hp=2.5,
-                complete=True,
-                queued=0,
             ),
         ),
         pools=(ResourcePool(index=0, tile_x=115, tile_y=6, x=2310.0, y=130.0, group_land=1),),
@@ -317,6 +325,7 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 action=1,
                 placed=True,
                 available=False,
+                makes_something=True,
             ),
         ),
     )

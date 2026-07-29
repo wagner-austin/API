@@ -40,7 +40,7 @@ def _entity_line(frame: int, index: int, unit_id: int, type_name: str, x: float)
     return (
         f'{{"kind":"entity","frame":{frame},"index":{index},"id":{unit_id},'
         f'"type":"{type_name}","class":"units.x","x":{x},"y":200.0,'
-        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,'
+        f'"team":0,"mine":true,"hostile":false,"movement":"LAND","group":1,"flying":false,"submerged":false,"touching_water":false,'
         f'"hp":100.0,"max_hp":100.0,"complete":true,"queued":0}}'
     )
 
@@ -58,7 +58,7 @@ def _world(frame: int, clock_ms: int, credits_held: int, *, extractors: int = 0)
     options = [(214, "extractorT1")]
     lines = [
         f'{{"kind":"frame","frame":{frame},"clock_ms":{clock_ms},'
-        f'"visible":{len(roster)},"pools":1,"options":{len(options)},'
+        f'"visible":{len(roster)},"pools":1,"options":{len(options)},"players":0,'
         f'"credits":{credits_held},"defeated":false,"wiped":false,"players_left":6}}'
     ]
     for index, (unit_id, type_name, x) in enumerate(roster):
@@ -70,7 +70,7 @@ def _world(frame: int, clock_ms: int, credits_held: int, *, extractors: int = 0)
     for index, (unit_id, produces) in enumerate(options):
         lines.append(
             f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
-            f'"produces":"{produces}","action":1,"placed":true,"available":true}}'
+            f'"produces":"{produces}","action":1,"placed":true,"available":true,"makes_something":true}}'
         )
     return lines
 
