@@ -354,6 +354,8 @@ class TestAIState:
             engagement_fuel_budget=config["engagement_fuel_budget"],
             patrol_waypoints=config["patrol_waypoints"],
             priority_target_name=config["priority_target_name"],
+            human_target_min_rank=config["human_target_min_rank"],
+            human_target_max_rank=config["human_target_max_rank"],
         )
         state = make_initial_ai_state(custom)
         assert state["config"]["fuel_low_threshold"] == 400

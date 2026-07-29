@@ -382,6 +382,16 @@ class AIConfigDict(TypedDict):
             unconditionally ([[bot-behavior-contract]] §3.2, user
             doctrine 2026-07-28); this names the tier above that.
             Wired from ``TANKPIT_BOT_PRIORITY_TARGET``.
+        human_target_min_rank: Lowest human rank the bot may target
+            (ranks are integers, 0 recruit .. 8 general). Default 1:
+            recruits are never targeted (user ruling 2026-07-28).
+            Wired from ``TANKPIT_BOT_HUMAN_MIN_RANK``.
+        human_target_max_rank: Highest human rank the bot may target.
+            Default 8 (no ceiling); a main-map bot can lower it to
+            leave high ranks alone out of respect (user doctrine
+            2026-07-28). Wired from ``TANKPIT_BOT_HUMAN_MAX_RANK``.
+            Practice bots are farmed at any rank -- the window
+            applies to human-classified enemies only.
             Recalibrated 2026-07-02 from wire data: shots cost ~45
             fuel plus ~10/tick position drain (live runs 2026-07-01)
             and practice-room kills take ~8-10 hits (recorded human
@@ -404,6 +414,8 @@ class AIConfigDict(TypedDict):
     radar_break_threshold: int
     engagement_fuel_budget: int
     priority_target_name: str
+    human_target_min_rank: int
+    human_target_max_rank: int
 
 
 def make_default_ai_config() -> AIConfigDict:
@@ -426,6 +438,8 @@ def make_default_ai_config() -> AIConfigDict:
         radar_break_threshold=5,
         engagement_fuel_budget=450,
         priority_target_name="",
+        human_target_min_rank=1,
+        human_target_max_rank=8,
     )
 
 

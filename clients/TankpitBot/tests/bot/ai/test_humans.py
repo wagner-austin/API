@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.humans import (
     PRIORITY_HUMAN,
     PRIORITY_NAMED,
     is_human_name,
+    is_human_rank_protected,
     is_practice_bot_name,
     threat_priority_tier,
 )
@@ -51,18 +52,39 @@ def test_priority_tiers_order_named_over_human_over_bot() -> None:
     assert threat_priority_tier("Yuppler", "") == PRIORITY_HUMAN
 
 
+def test_rank_window_protects_humans_below_the_floor_and_above_the_ceiling() -> None:
+    """The window applies to humans only; bots are farmed at any rank."""
+    assert is_human_rank_protected("guest", 0, min_rank=1, max_rank=8) is True
+    assert is_human_rank_protected("guest", 1, min_rank=1, max_rank=8) is False
+    assert is_human_rank_protected("guest", 8, min_rank=1, max_rank=8) is False
+    assert is_human_rank_protected("orange-1", 0, min_rank=1, max_rank=8) is False
+    assert is_human_rank_protected("", 0, min_rank=1, max_rank=8) is False
+
+
+def test_rank_window_supports_a_main_map_lieutenant_floor_and_respect_ceiling() -> None:
+    """A [4, 5] window targets lieutenants/captains, spares majors up."""
+    assert is_human_rank_protected("Yuppler", 3, min_rank=4, max_rank=5) is True
+    assert is_human_rank_protected("Yuppler", 4, min_rank=4, max_rank=5) is False
+    assert is_human_rank_protected("Yuppler", 5, min_rank=4, max_rank=5) is False
+    assert is_human_rank_protected("Yuppler", 6, min_rank=4, max_rank=5) is True
+    assert is_human_rank_protected("Yuppler", 8, min_rank=4, max_rank=5) is True
+    assert is_human_rank_protected("orange-1", 2, min_rank=4, max_rank=5) is False
+
+
 def _map_fresh_enemy(
     tank_id: int,
     x: int,
     y: int,
     name: str,
+    *,
+    rank: int = 1,
 ) -> TankStateDict:
     return make_tank_state(
         tank_id=tank_id,
         x=x,
         y=y,
         team=2,
-        rank=1,
+        rank=rank,
         name=name,
         is_self=False,
         is_bot=False,
@@ -113,6 +135,27 @@ def test_acquisition_prefers_the_named_account_over_another_human() -> None:
     }
     _, picked = _acquire(tanks, priority_target_name="yuppler")
     assert picked == "Yuppler"
+
+
+def test_acquisition_never_targets_a_human_recruit() -> None:
+    """User ruling 2026-07-28: rank-0 humans are off-limits; the bot
+    falls back to farming even when the recruit is the only human."""
+    tanks = {
+        "50": _map_fresh_enemy(50, 160, 100, "orange-1"),
+        "2627": _map_fresh_enemy(2627, 105, 100, "guest", rank=0),
+    }
+    _, picked = _acquire(tanks)
+    assert picked == "orange-1"
+
+
+def test_acquisition_targets_a_ranked_human_normally() -> None:
+    """Any human rank above recruit is fair game and keeps priority."""
+    tanks = {
+        "50": _map_fresh_enemy(50, 105, 100, "orange-1"),
+        "2627": _map_fresh_enemy(2627, 160, 100, "guest", rank=2),
+    }
+    _, picked = _acquire(tanks)
+    assert picked == "guest"
 
 
 def test_acquisition_stays_nearest_first_among_bots() -> None:

@@ -275,6 +275,8 @@ def encode_ai_config(config: AIConfigDict) -> JSONObject:
         "radar_break_threshold": config["radar_break_threshold"],
         "engagement_fuel_budget": config["engagement_fuel_budget"],
         "priority_target_name": config["priority_target_name"],
+        "human_target_min_rank": config["human_target_min_rank"],
+        "human_target_max_rank": config["human_target_max_rank"],
     }
 
 
@@ -332,6 +334,8 @@ def decode_ai_config(data: JSONObject) -> AIConfigDict:
         radar_break_threshold=require_int(data, "radar_break_threshold"),
         engagement_fuel_budget=require_int(data, "engagement_fuel_budget"),
         priority_target_name=require_str(data, "priority_target_name"),
+        human_target_min_rank=require_int(data, "human_target_min_rank"),
+        human_target_max_rank=require_int(data, "human_target_max_rank"),
     )
 
 

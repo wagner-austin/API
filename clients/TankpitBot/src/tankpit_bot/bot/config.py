@@ -50,6 +50,30 @@ def resolve_prefer_account() -> bool:
     return raw.lower() in _PREFER_ACCOUNT_TRUE_VALUES
 
 
+def resolve_human_rank_window() -> tuple[int, int]:
+    """Return the targetable human rank window from the environment.
+
+    ``TANKPIT_BOT_HUMAN_MIN_RANK`` / ``TANKPIT_BOT_HUMAN_MAX_RANK``
+    bound which human ranks the bot may engage (integers, 0 recruit ..
+    8 general). Defaults ``(1, 8)``: recruits protected, no ceiling.
+    A main-map bot can raise the floor (lieutenant+ = 4) or lower the
+    ceiling to leave high ranks alone (user doctrine 2026-07-28).
+    Practice bots are farmed at any rank regardless of this window.
+
+    Returns:
+        ``(min_rank, max_rank)``.
+
+    Raises:
+        ValueError: If either value is not an integer.
+    """
+    raw_min = _test_hooks.get_env("TANKPIT_BOT_HUMAN_MIN_RANK")
+    raw_max = _test_hooks.get_env("TANKPIT_BOT_HUMAN_MAX_RANK")
+    return (
+        int(raw_min) if raw_min is not None else 1,
+        int(raw_max) if raw_max is not None else 8,
+    )
+
+
 def resolve_priority_target() -> str:
     """Return the priority hunt account from ``TANKPIT_BOT_PRIORITY_TARGET``.
 
@@ -66,6 +90,7 @@ def resolve_priority_target() -> str:
 
 __all__ = [
     "DEFAULT_TARGET_URL",
+    "resolve_human_rank_window",
     "resolve_prefer_account",
     "resolve_priority_target",
     "resolve_target_url",

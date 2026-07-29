@@ -1106,6 +1106,36 @@ def _map_known_enemy(
     )
 
 
+def test_hunt_acquire_teleports_at_an_affordable_map_known_enemy() -> None:
+    """A map-fresh enemy inside the affordability gate is teleport-acquired.
+
+    No viewport-confirmed threat and no lock exist; the enemy is known
+    only from the map snapshot (fresh ``timestamp_ms``, no viewport
+    observation), close enough that teleport + kill budget + reserve
+    fits inside the tank -- the acquisition path teleports at it.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(x=130, y=100),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["updated_ai_state"]["combat_target_id"] == 60
+
+
 def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
     """An unaffordable enemy triggers a dot-relay hop instead of an exit.
 

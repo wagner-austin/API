@@ -9,7 +9,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
-from tankpit_bot.bot.ai.humans import threat_priority_tier
+from tankpit_bot.bot.ai.humans import (
+    DEFAULT_HUMAN_MAX_RANK,
+    DEFAULT_HUMAN_MIN_RANK,
+    is_human_rank_protected,
+    threat_priority_tier,
+)
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
 
@@ -92,6 +97,9 @@ def analyze_threats(
     world: WorldStateDict,
     self_state: SelfStateDict,
     now_ms: int,
+    *,
+    human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
+    human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
 ) -> list[EnemyThreatDict]:
     """Analyze all enemy tanks and return sorted threat list.
 
@@ -150,6 +158,17 @@ def analyze_threats(
         # ``storage_source == "viewport"`` -- the actual viewport-
         # bound proof.
         if now_ms - tank["last_viewport_observation_ms"] > VIEWPORT_PRESENCE_TTL_MS:
+            continue
+        # Human rank-window protection (user ruling 2026-07-28):
+        # humans outside [human_min_rank, human_max_rank] never enter
+        # the threat list, so they can be neither locked nor fired at.
+        # Practice bots are farmed at any rank.
+        if is_human_rank_protected(
+            tank["name"],
+            tank["rank"],
+            min_rank=human_min_rank,
+            max_rank=human_max_rank,
+        ):
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
         threats.append(
@@ -365,6 +384,8 @@ def _acquisition_rejection_reason(
     now_ms: int,
     map_open_cooldown_ms: int,
     engagement_reserve_fuel: int,
+    human_min_rank: int,
+    human_max_rank: int,
 ) -> str | None:
     """Return why an enemy fails the acquisition gates, or ``None`` if viable.
 
@@ -387,6 +408,19 @@ def _acquisition_rejection_reason(
 
     if tank["liveness"] != "alive":
         return "not_alive"
+    if is_human_rank_protected(
+        tank["name"],
+        tank["rank"],
+        min_rank=human_min_rank,
+        max_rank=human_max_rank,
+    ):
+        # User ruling 2026-07-28: humans outside the configured rank
+        # window are never targeted (recruits below the floor; high
+        # ranks above a respect ceiling when one is set). Checked
+        # before the affordability gate so the relay path (which
+        # accepts only "unaffordable" rejections) can never travel
+        # toward one.
+        return "protected_human_rank"
     if tank["x"] == 0 and tank["y"] == 0:
         return "unsynced_position"
     if str(tank["tank_id"]) in killed:
@@ -419,6 +453,8 @@ def find_acquisition_target(
     *,
     engagement_reserve_fuel: int,
     priority_target_name: str = "",
+    human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
+    human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
 ) -> EnemyThreatDict | None:
     """Pick the highest-priority map-fresh enemy the bot can afford.
 
@@ -487,6 +523,8 @@ def find_acquisition_target(
             now_ms,
             map_open_cooldown_ms,
             engagement_reserve_fuel,
+            human_min_rank,
+            human_max_rank,
         )
         candidate_log.append(
             {
@@ -550,6 +588,8 @@ def find_relay_travel_target(
     *,
     engagement_reserve_fuel: int,
     priority_target_name: str = "",
+    human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
+    human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
 ) -> EnemyThreatDict | None:
     """Pick the nearest map-fresh enemy that fails ONLY the affordability gate.
 
@@ -596,6 +636,8 @@ def find_relay_travel_target(
             now_ms,
             map_open_cooldown_ms,
             engagement_reserve_fuel,
+            human_min_rank,
+            human_max_rank,
         )
         if rejected_reason != "unaffordable":
             continue

@@ -59,6 +59,46 @@ def is_human_name(name: str) -> bool:
     return name != "" and not is_practice_bot_name(name)
 
 
+DEFAULT_HUMAN_MIN_RANK = 1
+"""Default floor: privates and up are targetable, recruits are not
+(user ruling 2026-07-28: "we dont target recruits")."""
+
+DEFAULT_HUMAN_MAX_RANK = 8
+"""Default ceiling: general -- no rank is protected from above unless
+configured (the "captains and generals out of respect" knob)."""
+
+
+def is_human_rank_protected(
+    name: str,
+    rank: int,
+    *,
+    min_rank: int,
+    max_rank: int,
+) -> bool:
+    """Return whether a tank is a human outside the targetable rank window.
+
+    User ruling 2026-07-28: rank-aware HUMAN targeting only -- practice
+    bots are farmed at any rank. The window is a configurable
+    ``[min_rank, max_rank]`` (ranks are plain integers, 0 recruit ..
+    8 general): a practice-room bot runs the default (ignore recruits,
+    engage everyone else), a main-map bot might run min 4 (lieutenant
+    and higher only) or cap the top out of respect for high ranks.
+    Fail-safe note: an unsynced tank's rank defaults to 0, so a human
+    whose rank has not yet ridden the wire is briefly spared rather
+    than briefly attacked (rank arrives with the early 0x21/0x28 wire).
+
+    Args:
+        name: Tank display name from the registry.
+        rank: Registry rank (0 = recruit .. 8 = general).
+        min_rank: Lowest human rank the bot may target.
+        max_rank: Highest human rank the bot may target.
+
+    Returns:
+        True when the tank is human-classified and outside the window.
+    """
+    return is_human_name(name) and (rank < min_rank or rank > max_rank)
+
+
 def threat_priority_tier(name: str, priority_target_name: str) -> int:
     """Return the target-priority tier for a tank name.
 
@@ -79,10 +119,13 @@ def threat_priority_tier(name: str, priority_target_name: str) -> int:
 
 
 __all__ = [
+    "DEFAULT_HUMAN_MAX_RANK",
+    "DEFAULT_HUMAN_MIN_RANK",
     "PRIORITY_BOT",
     "PRIORITY_HUMAN",
     "PRIORITY_NAMED",
     "is_human_name",
+    "is_human_rank_protected",
     "is_practice_bot_name",
     "threat_priority_tier",
 ]

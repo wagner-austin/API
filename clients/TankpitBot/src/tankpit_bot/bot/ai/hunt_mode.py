@@ -276,6 +276,8 @@ def _decide_hunt_acquire_fresh(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
         priority_target_name=ctx.config["priority_target_name"],
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
     )
     if map_target is not None:
         emit_ai(
@@ -403,6 +405,8 @@ def _relay_toward_unaffordable_enemy(
             ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         ),
         priority_target_name=ctx.config["priority_target_name"],
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
     )
     if travel is None:
         return None
@@ -765,7 +769,13 @@ def _visible_threats(ctx: DecideCtx) -> list[EnemyThreatDict]:
     Returns:
         Visible enemy threats ordered by the threat analyzer.
     """
-    return analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
+    return analyze_threats(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.timestamp_ms,
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
+    )
 
 
 __all__ = [

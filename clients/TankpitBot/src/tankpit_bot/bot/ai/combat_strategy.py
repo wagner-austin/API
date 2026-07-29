@@ -271,7 +271,13 @@ def block_combat_target_and_replan(
         }
     )
 
-    threats = analyze_threats(ctx.filtered, ctx.self_state, ctx.timestamp_ms)
+    threats = analyze_threats(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.timestamp_ms,
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
+    )
     skip = {*blocked, *ctx.killed}
     viable = [t for t in threats if str(t["tank_id"]) not in skip]
     if viable:

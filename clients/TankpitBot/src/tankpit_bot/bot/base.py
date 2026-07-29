@@ -79,18 +79,23 @@ _ACCOUNT_STATS_MAX_CAPTURE_ATTEMPTS = 3
 def _env_ai_config() -> AIConfigDict:
     """Build the session AI config with environment overrides applied.
 
-    Currently the only override is ``TANKPIT_BOT_PRIORITY_TARGET`` (the
-    priority hunt account, [[bot-behavior-contract]] §3.2).
+    Overrides: ``TANKPIT_BOT_PRIORITY_TARGET`` (the priority hunt
+    account) and ``TANKPIT_BOT_HUMAN_MIN_RANK`` /
+    ``TANKPIT_BOT_HUMAN_MAX_RANK`` (the targetable human rank window)
+    -- [[bot-behavior-contract]] §3.2.
 
     Returns:
         Default AI config with env-resolved fields filled in.
     """
-    from tankpit_bot.bot.config import resolve_priority_target
+    from tankpit_bot.bot.config import resolve_human_rank_window, resolve_priority_target
 
+    min_rank, max_rank = resolve_human_rank_window()
     return AIConfigDict(
         **{
             **make_default_ai_config(),
             "priority_target_name": resolve_priority_target(),
+            "human_target_min_rank": min_rank,
+            "human_target_max_rank": max_rank,
         }
     )
 

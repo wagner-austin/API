@@ -51,12 +51,16 @@ def _tank(
     Returns:
         TankStateDict with the provided values.
     """
+    # rank=1 (private): the default ``tank-{key}`` names classify as
+    # HUMAN under the 2026-07-28 rank-window rule, and rank-0 humans
+    # are protected from targeting -- these fixtures test the
+    # distance/freshness/liveness gates, so they sit inside the window.
     return make_tank_state(
         tank_id=int(key),
         x=x,
         y=y,
         team=team,
-        rank=0,
+        rank=1,
         damage_state=damage_state,
         direction=direction,
         name=name or f"tank-{key}",
