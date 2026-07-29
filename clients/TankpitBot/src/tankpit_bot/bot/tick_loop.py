@@ -167,7 +167,7 @@ def run_tick_loop(
             )
         try:
             _tick_once(bot)
-            _sync_screencast_demand(bot)
+            _sync_live_view_demand(bot)
         except TargetClosedError:
             log.info("Browser closed during tick, ending run gracefully")
             _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
@@ -469,17 +469,19 @@ def _publish_session_status(bot: Bot) -> None:
     bot._status_bus.publish(status)
 
 
-def _sync_screencast_demand(bot: Bot) -> None:
-    """Start or stop the Chrome screencast to match viewer demand.
+def _sync_live_view_demand(bot: Bot) -> None:
+    """Keep the in-page caster matched to viewer demand.
 
     Runs once per tick, directly after ``_tick_once`` inside the same
     ``TargetClosedError`` guard (a closed browser during the toggle
-    ends the run as ``browser_closed``). Demand is the frame
-    bus's subscriber count: a ``/video`` (or ``/frame``) connection on
-    the service creates it; the last disconnect removes it. Sessions
-    nobody watches never pay the encode cost, and ``make run`` /
-    replay sessions (inert default bus, zero subscribers) never start
-    a screencast at all.
+    ends the run as ``browser_closed``). Demand is the frame bus's
+    subscriber count: a ``/video`` (or ``/frame``) connection on the
+    service creates it; the last disconnect removes it. While demand
+    holds, :meth:`LiveViewService.ensure` re-evaluates the idempotent
+    caster snippet EVERY tick — that repetition is the self-heal for
+    page navigations, which wipe injected JS. Sessions nobody watches
+    never run the caster, and ``make run`` / replay sessions (inert
+    default bus, zero subscribers) never start it at all.
 
     Skipped silently before the CDP session is attached — the tick
     loop's readiness gates run this only in ticks where the browser is
@@ -487,17 +489,16 @@ def _sync_screencast_demand(bot: Bot) -> None:
     here pre-attach.
 
     Args:
-        bot: Bot instance whose ``_screencast`` and ``_frame_bus``
+        bot: Bot instance whose ``_live_view`` and ``_frame_bus``
             drive the decision.
     """
     cdp = bot._cdp
     if cdp is None:
         return
-    want = bot._frame_bus.subscriber_count() > 0
-    if want and not bot._screencast.active:
-        bot._screencast.start(cdp)
-    elif not want and bot._screencast.active:
-        bot._screencast.stop(cdp)
+    if bot._frame_bus.subscriber_count() > 0:
+        bot._live_view.ensure(cdp)
+    elif bot._live_view.active:
+        bot._live_view.stop(cdp)
 
 
 def _tick_once(bot: Bot) -> None:

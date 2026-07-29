@@ -97,6 +97,39 @@ def resolve_idle_exit_seconds() -> float:
     return float(raw) if raw is not None else SERVICE_IDLE_EXIT_SECONDS
 
 
+def resolve_video_fps() -> float:
+    """Return the live-view capture rate from ``TANKPIT_BOT_VIDEO_FPS``.
+
+    Default 12 fps — steady motion for phone monitoring at roughly
+    0.5-1 MB/s of JPEG through the tunnel (2026-07-29 page-push live
+    view, [[bot-service-architecture]]).
+
+    Returns:
+        Frames per second the in-page caster targets.
+
+    Raises:
+        ValueError: If the env value is set but not a number.
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_FPS")
+    return float(raw) if raw is not None else 12.0
+
+
+def resolve_video_quality() -> float:
+    """Return the live-view JPEG quality from ``TANKPIT_BOT_VIDEO_QUALITY``.
+
+    Default 0.8 — visually clean on the composited game canvases
+    without ballooning per-frame size.
+
+    Returns:
+        JPEG quality in (0, 1] for the page's ``toDataURL``.
+
+    Raises:
+        ValueError: If the env value is set but not a number.
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_VIDEO_QUALITY")
+    return float(raw) if raw is not None else 0.8
+
+
 def resolve_priority_target() -> str:
     """Return the priority hunt account from ``TANKPIT_BOT_PRIORITY_TARGET``.
 
@@ -118,4 +151,6 @@ __all__ = [
     "resolve_prefer_account",
     "resolve_priority_target",
     "resolve_target_url",
+    "resolve_video_fps",
+    "resolve_video_quality",
 ]

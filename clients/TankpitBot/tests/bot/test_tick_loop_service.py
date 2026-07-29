@@ -1,12 +1,12 @@
 """Tests for the bot-service wiring inside the tick loop.
 
 Covers ``_apply_pending_mode_override``, ``_publish_session_status``,
-and ``_sync_screencast_demand`` against a real :class:`Bot` with a
+and ``_sync_live_view_demand`` against a real :class:`Bot` with a
 real :class:`ModeBridge` / :class:`StatusBus` / :class:`FrameBus` (no
 mocks — the primitives are the DUT). The wire is: SPA writes to the
 bridge → tick loop drains it → ai_state carries the override → tick
 loop publishes a status frame reflecting it; ``/video`` subscribers
-on the frame bus toggle the Chrome screencast.
+on the frame bus toggle the in-page live-view caster.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.tick_loop import (
     _apply_pending_mode_override,
     _publish_session_status,
-    _sync_screencast_demand,
+    _sync_live_view_demand,
 )
 from tankpit_bot.service.frame_bus import FrameBus
 from tankpit_bot.service.mode_bridge import ModeBridge
@@ -27,7 +27,7 @@ from tankpit_bot.service.status_bus import StatusBus
 
 
 class _RecordingCDP:
-    """CDP-session fake that records screencast sends."""
+    """CDP-session fake that records live-view evaluate sends."""
 
     def __init__(self) -> None:
         self.sent: list[tuple[str, JSONObject | None]] = []
@@ -237,23 +237,9 @@ class TestBotServiceDefaults:
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         assert bot._frame_bus is frames
 
-    def test_screencast_publishes_into_the_bots_frame_bus(self) -> None:
-        """The screencast relay's sink IS the bot's frame bus."""
-        import base64
 
-        frames = FrameBus()
-        bot = Bot("https://test.tankpit.com/", frame_bus=frames)
-        cdp = _RecordingCDP()
-        bot._screencast.start(cdp)
-
-        handler = cdp.handlers["Page.screencastFrame"]
-        handler({"sessionId": 2, "data": base64.b64encode(b"jpeg-xy").decode()})
-
-        assert frames.latest() == b"jpeg-xy"
-
-
-class TestSyncScreencastDemand:
-    """Demand-driven screencast toggling at the tick boundary."""
+class TestSyncLiveViewDemand:
+    """Demand-driven in-page caster toggling at the tick boundary."""
 
     def test_noop_before_cdp_attach(self) -> None:
         """No CDP session yet → nothing happens even with demand."""
@@ -261,63 +247,68 @@ class TestSyncScreencastDemand:
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         frames.subscribe()
 
-        _sync_screencast_demand(bot)
+        _sync_live_view_demand(bot)
 
-        assert bot._screencast.active is False
+        assert bot._live_view.active is False
 
-    def test_viewer_demand_starts_the_screencast(self) -> None:
-        """A frame-bus subscriber makes the next tick start the cast."""
+    def test_viewer_demand_installs_the_caster(self) -> None:
+        """A frame-bus subscriber makes the next tick install the caster."""
         frames = FrameBus()
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         frames.subscribe()
 
-        _sync_screencast_demand(bot)
+        _sync_live_view_demand(bot)
 
-        assert bot._screencast.active is True
+        assert bot._live_view.active is True
         methods = [method for method, _ in cdp.sent]
-        assert methods == ["Page.startScreencast"]
+        assert methods == ["Runtime.addBinding", "Runtime.evaluate"]
 
-    def test_no_demand_with_inactive_cast_stays_inactive(self) -> None:
-        """Zero subscribers and no cast → nothing is sent."""
+    def test_no_demand_with_inactive_caster_stays_inactive(self) -> None:
+        """Zero subscribers and no caster → nothing is sent."""
         frames = FrameBus()
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         cdp = _RecordingCDP()
         bot._cdp = cdp
 
-        _sync_screencast_demand(bot)
+        _sync_live_view_demand(bot)
 
-        assert bot._screencast.active is False
+        assert bot._live_view.active is False
         assert cdp.sent == []
 
-    def test_last_viewer_leaving_stops_the_screencast(self) -> None:
-        """Demand dropping to zero stops the cast at the next tick."""
+    def test_last_viewer_leaving_stops_the_caster(self) -> None:
+        """Demand dropping to zero stops the caster at the next tick."""
         frames = FrameBus()
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         subscriber = frames.subscribe()
-        _sync_screencast_demand(bot)
-        assert bot._screencast.active is True
+        _sync_live_view_demand(bot)
+        assert bot._live_view.active is True
 
         frames.unsubscribe(subscriber)
-        _sync_screencast_demand(bot)
+        _sync_live_view_demand(bot)
 
-        assert bot._screencast.active is False
-        methods = [method for method, _ in cdp.sent]
-        assert methods == ["Page.startScreencast", "Page.stopScreencast"]
+        assert bot._live_view.active is False
+        assert len(cdp.sent) == 3  # addBinding + caster install + stop
 
-    def test_sustained_demand_does_not_restart_the_cast(self) -> None:
-        """An active cast with continuing demand is left alone."""
+    def test_sustained_demand_reensures_every_tick(self) -> None:
+        """Continuing demand re-evaluates the idempotent snippet per tick.
+
+        The repetition is the navigation self-heal: quit-to-lobby or
+        a re-login wipes injected JS, and the next demanded tick
+        reinstalls the caster without any navigation detection.
+        """
         frames = FrameBus()
         bot = Bot("https://test.tankpit.com/", frame_bus=frames)
         cdp = _RecordingCDP()
         bot._cdp = cdp
         frames.subscribe()
-        _sync_screencast_demand(bot)
 
-        _sync_screencast_demand(bot)
+        _sync_live_view_demand(bot)
+        _sync_live_view_demand(bot)
+        _sync_live_view_demand(bot)
 
-        methods = [method for method, _ in cdp.sent]
-        assert methods == ["Page.startScreencast"]
+        assert bot._live_view.active is True
+        assert len(cdp.sent) == 4  # one addBinding + three caster installs

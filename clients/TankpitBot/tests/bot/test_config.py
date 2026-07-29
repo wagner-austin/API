@@ -74,6 +74,54 @@ class TestResolveIdleExitSeconds:
             resolve_idle_exit_seconds()
 
 
+class TestResolveVideoSettings:
+    """``resolve_video_fps`` / ``resolve_video_quality`` contracts (2026-07-29)."""
+
+    def test_fps_defaults_to_twelve(self) -> None:
+        """No env var yields the 12 fps monitoring default."""
+        from tankpit_bot.bot.config import resolve_video_fps
+
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_video_fps() == 12.0
+
+    def test_fps_override_wins(self) -> None:
+        """A numeric override replaces the default."""
+        from tankpit_bot.bot.config import resolve_video_fps
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_FPS": "20"})
+        assert resolve_video_fps() == 20.0
+
+    def test_fps_non_numeric_raises(self) -> None:
+        """A malformed value fails loudly instead of picking a default."""
+        from tankpit_bot.bot.config import resolve_video_fps
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_FPS": "fast"})
+        with pytest.raises(ValueError):
+            resolve_video_fps()
+
+    def test_quality_defaults_to_point_eight(self) -> None:
+        """No env var yields the 0.8 JPEG-quality default."""
+        from tankpit_bot.bot.config import resolve_video_quality
+
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_video_quality() == 0.8
+
+    def test_quality_override_wins(self) -> None:
+        """A numeric override replaces the default."""
+        from tankpit_bot.bot.config import resolve_video_quality
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_QUALITY": "0.6"})
+        assert resolve_video_quality() == 0.6
+
+    def test_quality_non_numeric_raises(self) -> None:
+        """A malformed value fails loudly instead of picking a default."""
+        from tankpit_bot.bot.config import resolve_video_quality
+
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_VIDEO_QUALITY": "crisp"})
+        with pytest.raises(ValueError):
+            resolve_video_quality()
+
+
 class TestResolvePreferAccount:
     """``resolve_prefer_account`` env override contract."""
 

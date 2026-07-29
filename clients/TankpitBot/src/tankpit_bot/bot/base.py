@@ -38,7 +38,7 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
     wait_for_game_ready,
 )
-from tankpit_bot.browser.screencast import ScreencastService
+from tankpit_bot.browser.live_view import LiveViewService
 from tankpit_bot.browser.session_storage import (
     STORAGE_STATE_PATH,
     load_storage_state,
@@ -191,7 +191,11 @@ class Bot(DispatchMixin):
         self._frame_bus: FrameBusProtocol = (
             frame_bus if frame_bus is not None else default_frame_bus
         )
-        self._screencast = ScreencastService(publish=self._frame_bus.publish)
+        # The in-page caster captures at its own cadence and delivers
+        # frames over the CDP binding channel (Chrome's Local Network
+        # Access gate hangs page→loopback fetches forever, 2026-07-29);
+        # the binding handler publishes onto the shared frame bus.
+        self._live_view = LiveViewService(publish=self._frame_bus.publish)
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x

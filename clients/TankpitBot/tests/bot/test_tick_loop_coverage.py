@@ -682,15 +682,15 @@ class TestBrowserClosedExit:
         row = decode_row(data_lines[0])
         assert row["exit_reason"] == "browser_closed"
 
-    def test_browser_closed_during_screencast_sync_records_browser_closed(
+    def test_browser_closed_during_live_view_sync_records_browser_closed(
         self, fake_fs: FakeFileSystem, fake_env: FakeEnv
     ) -> None:
-        """A ``TargetClosedError`` from the screencast toggle exits cleanly.
+        """A ``TargetClosedError`` from the caster toggle exits cleanly.
 
-        The demand sync runs after the status publish; a viewer
+        The demand sync runs inside ``_tick_once``'s guard; a viewer
         subscribing in the same instant the operator closes the
-        browser makes ``Page.startScreencast`` the first call to
-        observe the dead target.
+        browser makes the caster's ``Runtime.evaluate`` the first
+        call to observe the dead target.
         """
         from collections.abc import Callable
 
@@ -706,7 +706,7 @@ class TestBrowserClosedExit:
         class _ClosedTargetCDP:
             def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
                 _ = params
-                if method == "Page.startScreencast":
+                if method == "Runtime.evaluate":
                     raise TargetClosedError(f"{method}: target closed")
                 return {}
 
