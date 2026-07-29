@@ -84,4 +84,8 @@ def test_manual_unset_produces_hold_decision() -> None:
     assert decision["updated_ai_state"]["mode"] == "UNSET"
     assert decision["updated_ai_state"]["mode_state"] == ""
     assert decision["behavior"]["reason_kind"] == "manual_hold"
-    assert decision["desired_equipment"] == []
+    # The hold keeps the stocked loadout armed (2026-07-29): dual (2)
+    # + homing (4) while stocked, radar (5) always — the old empty
+    # set visibly disarmed the pinned tank and persisted across
+    # logout.
+    assert decision["desired_equipment"] == [2, 4, 5]

@@ -33,6 +33,7 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.inventory import InventoryItem, InventoryState
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 
 
@@ -557,6 +558,21 @@ def test_resolve_owner_from_manual_pins_collect() -> None:
 # =============================================================================
 
 
+def _make_hold_inventory(
+    dual_count: int = 25,
+    homing_count: int = 25,
+) -> InventoryState:
+    """Build an inventory for the hold-decision equipment checks."""
+    item = InventoryItem(count=25, enabled=True)
+    return InventoryState(
+        armor_shields=item,
+        dual_shots=InventoryItem(count=dual_count, enabled=True),
+        missile_shots=item,
+        homing_shots=InventoryItem(count=homing_count, enabled=True),
+        extra_radars=item,
+    )
+
+
 def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
     """Hold decision emits ``cmd_type = "hold"`` and clears durable ownership."""
     state = AIStateDict(
@@ -569,7 +585,9 @@ def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
         }
     )
 
-    decision = make_hold_decision(state, timestamp_ms=15000)
+    decision = make_hold_decision(
+        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory()
+    )
 
     assert decision["command"]["cmd_type"] == "hold"
     assert decision["updated_ai_state"]["mode"] == "UNSET"
@@ -578,8 +596,32 @@ def test_make_hold_decision_produces_hold_command_and_unset_state() -> None:
     assert decision["updated_ai_state"]["mode_started_ms"] == 15000
     assert decision["updated_ai_state"]["manual_mode"] == "UNSET"
     assert decision["behavior"]["reason_kind"] == "manual_hold"
-    assert decision["desired_equipment"] == []
+    # The hold keeps the tank ARMED: dual (2) + homing (4) while
+    # stocked, radar (5) always — the empty set the first idle-pin
+    # implementation requested disarmed the tank visibly (user
+    # report 2026-07-29) and, because toggle state persists across
+    # logout, left it disarmed for the next login too.
+    assert decision["desired_equipment"] == [2, 4, 5]
     assert decision["secondary_command"] is None
+
+
+def test_make_hold_decision_drops_empty_weapon_stocks_from_the_loadout() -> None:
+    """Depleted dual/homing stocks stay off the hold loadout (no dead toggles)."""
+    state = AIStateDict(
+        **{
+            **make_initial_ai_state(),
+            "manual_mode": "UNSET",
+        }
+    )
+
+    decision = make_hold_decision(
+        state,
+        timestamp_ms=15000,
+        fuel=900,
+        inventory=_make_hold_inventory(dual_count=0, homing_count=0),
+    )
+
+    assert decision["desired_equipment"] == [5]
 
 
 def test_make_hold_decision_preserves_started_ms_when_already_unset() -> None:
@@ -594,7 +636,9 @@ def test_make_hold_decision_preserves_started_ms_when_already_unset() -> None:
         }
     )
 
-    decision = make_hold_decision(state, timestamp_ms=15000)
+    decision = make_hold_decision(
+        state, timestamp_ms=15000, fuel=900, inventory=_make_hold_inventory()
+    )
 
     assert decision["updated_ai_state"]["mode_started_ms"] == 8000
 

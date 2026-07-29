@@ -64,7 +64,12 @@ def decide(
     manual = resolve_owner_from_manual(normalized_state)
     if manual == "UNSET":
         emit_ai("manual mode UNSET: holding position")
-        return make_hold_decision(normalized_state, timestamp_ms)
+        return make_hold_decision(
+            normalized_state,
+            timestamp_ms,
+            self_state["fuel"],
+            inventory,
+        )
     ctx = DecideCtx(
         world,
         self_state,

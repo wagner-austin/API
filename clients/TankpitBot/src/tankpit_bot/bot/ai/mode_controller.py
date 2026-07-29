@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
+from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand, make_hold_command
+from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 
 
@@ -180,7 +182,12 @@ def apply_dispatch_counters(decision: TickDecisionDict) -> TickDecisionDict:
     )
 
 
-def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecisionDict:
+def make_hold_decision(
+    ai_state: AIStateDict,
+    timestamp_ms: int,
+    fuel: int,
+    inventory: InventoryState,
+) -> TickDecisionDict:
     """Return a no-op decision for a manually-pinned idle tick.
 
     Produced when :func:`resolve_owner_from_manual` resolves to
@@ -195,15 +202,33 @@ def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecision
       the previous owner was something other than ``UNSET`` so the
       bot-service status stream can report accurate idle duration.
 
+    Equipment: the hold keeps the NORMAL stocked loadout (dual +
+    homing while stocked, radar always) instead of the empty set the
+    first idle-pin implementation requested — that set actively
+    DISARMED the tank, printing "Using dual shot disabled" in the
+    game log and, because toggle state persists across logout
+    ([[radar-mechanics]]), leaving the tank visibly disarmed for the
+    next login (user report 2026-07-29: "the hot has homing and dual
+    shots disabled for some reaosn?").
+
     Args:
         ai_state: Current AI state.
         timestamp_ms: Current tick timestamp in milliseconds.
+        fuel: Current fuel level (equipment-policy input).
+        inventory: Current inventory state (stock counts gate the
+            dual/homing toggles).
 
     Returns:
-        Tick decision that dispatches nothing and stamps ``UNSET``
-        ownership onto the returned AI state.
+        Tick decision that dispatches nothing, keeps the tank armed,
+        and stamps ``UNSET`` ownership onto the returned AI state.
     """
     started_ms = timestamp_ms if ai_state["mode"] != "UNSET" else ai_state["mode_started_ms"]
+    desired = compute_desired_equipment(
+        "UNSET",
+        fuel,
+        dual_shots_count=inventory["dual_shots"]["count"],
+        homing_shots_count=inventory["homing_shots"]["count"],
+    )
     return make_tick_decision(
         command=make_hold_command(),
         behavior=make_behavior_score(
@@ -221,7 +246,7 @@ def make_hold_decision(ai_state: AIStateDict, timestamp_ms: int) -> TickDecision
                 "mode_started_ms": started_ms,
             }
         ),
-        desired_equipment=[],
+        desired_equipment=sorted(desired),
     )
 
 
