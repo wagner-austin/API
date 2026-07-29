@@ -10,3 +10,4 @@ Run artifacts are archived under `runs/` and are the primary sources this wiki c
 [Agent: Render-Callback No-Op](../pages/agent-render-callback-noop.md) -- neutralising the GUI callbacks that dereference a missing display; what unblocked a live headless skirmish
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
+[Playing Matches in Parallel](../pages/harness-parallel-matches.md) -- what actually had to be separated to run several headless matches at once, and why lockstep is not optional for a batch
