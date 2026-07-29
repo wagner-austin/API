@@ -16,7 +16,7 @@ from collections.abc import Sequence
 
 from rw_bot import RwBotError
 from rw_bot.control import _test_hooks
-from rw_bot.validation import require_int
+from rw_bot.wire.codec import declared_children, decode_samples
 from rw_bot.wire.command import (
     AttackOrder,
     BuildOrder,
@@ -29,7 +29,7 @@ from rw_bot.wire.command import (
     encode_produce,
 )
 from rw_bot.wire.ndjson import parse_object
-from rw_bot.wire.state import Sample, decode_samples
+from rw_bot.wire.state import Sample
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT_S = 30.0
@@ -173,7 +173,7 @@ def open_channel(
 def _complete_or_none(lines: Sequence[str]) -> Sample | None:
     """Return the sample these lines form, or None while it is still partial.
 
-    The frame record states how many entity and pool records follow, so
+    The frame record states how many child records follow, so
     completeness is known before parsing the whole thing. Decoding is left to
     :func:`~rw_bot.wire.state.decode_samples`, which re-checks both counts and
     rejects a mismatch — this only decides when to stop reading.
@@ -190,11 +190,11 @@ def _complete_or_none(lines: Sequence[str]) -> Sample | None:
         DecodeError: When a record is missing a field or mistyped.
     """
     opening = parse_object(lines[0])
-    declared = (
-        require_int(opening, "visible")
-        + require_int(opening, "pools")
-        + require_int(opening, "options")
-    )
+    # Asked of the wire module rather than counted here. This used to add up the
+    # declared counts itself, so a new record kind left the channel reading a
+    # sample one record short and the decoder rejecting it as truncated -- a
+    # true complaint about the wrong thing ([[wire-contract-ndjson]]).
+    declared = declared_children(opening)
     if len(lines) < declared + 1:
         return None
     return decode_samples(list(lines))[0]
