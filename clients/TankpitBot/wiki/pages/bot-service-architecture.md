@@ -7,7 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
-fact_checked: "2026-07-23"
+  - "src/tankpit_bot/browser/screencast.py"
+fact_checked: "2026-07-28"
 confidence: medium
 hubs: [architecture]
 ---
@@ -28,7 +29,7 @@ The primitives are constructed once at service boot in `_async_main` and shared 
 
 ## HTTP surface (`service/http_server.py`)
 
-Five routes, all under nginx's `/api/tankbot/*` prefix in production:[^1]
+Nine routes, all under nginx's `/api/tankbot/*` prefix in production:[^1]
 
 | Route | Handler | Response |
 |---|---|---|
@@ -37,8 +38,61 @@ Five routes, all under nginx's `/api/tankbot/*` prefix in production:[^1]
 | `POST /stop`   | Calls `runner.request_stop()` | `202 stopping` (idempotent) |
 | `POST /mode`   | Decodes `ModeCommandDict`, calls `mode_bridge.submit(...)` | `204` on success |
 | `GET  /status` | Subscribes to `StatusBus`, streams `SessionStatusDict` frames as SSE `data: <json>` lines | `200 text/event-stream` |
+| `POST /shutdown` | Requests session stop, fires the service shutdown signal | `202 shutting down` |
+| `GET  /watch`  | Self-contained phone watch page (`service/watch_page.py`) | `200 text/html` |
+| `GET  /video`  | Subscribes to `FrameBus`, streams screencast JPEGs as MJPEG multipart parts | `200 multipart/x-mixed-replace` |
+| `GET  /frame`  | One-shot JPEG snapshot (fresh-frame wait, cached fallback) | `200 image/jpeg` / `404` before any frame |
 
-The SSE handler runs `subscriber.next_frame(timeout=15.0)` inside `loop.run_in_executor` so the event loop stays responsive; on timeout it writes a `: heartbeat` SSE comment to keep intermediaries (nginx, cloudflared) from idling the TCP connection out.[^1]
+The SSE handler runs `subscriber.next_frame(timeout=15.0)` inside `loop.run_in_executor` so the event loop stays responsive; on timeout it writes a `: heartbeat` SSE comment to keep intermediaries (nginx, cloudflared) from idling the TCP connection out. The MJPEG drain mirrors that shape; its keepalive re-sends the last JPEG (MJPEG has no comment channel).[^1]
+
+## Watch surface — tankpit cut loose from fiesta (2026-07-28)
+
+The phone no longer needs the Sunshine/Vibeshine stack to SEE the bot.
+The fiesta path streamed a virtual monitor (kernel IDD driver, patched
+Sunshine fork) and injected phone input via `SendInput` — which warps
+the one real Windows cursor onto the invisible isolated display, where
+non-adjacency strands it (the user's "steals my mouse" complaint; see
+the fiesta wiki's 2026-07-01 desktop-takeover incident page). The
+replacement is wire-only, inside this repo:[^3]
+
+- **`browser/screencast.py`** — `ScreencastService` relays Chrome's
+  own `Page.startScreencast` JPEG stream (quality 70, max edge 1024,
+  every frame) off the CDP session the bot already holds; each frame
+  is acked (`Page.screencastFrameAck`) then published. Ack-in-handler
+  follows the `CDPService._record_frame` precedent.
+- **`service/frame_bus.py`** — `FrameBus`, byte-for-byte the
+  `StatusBus` pattern (latest-wins, cache-on-publish, explicit
+  unsubscribe) plus a `latest()` accessor for `/frame`. Its
+  `subscriber_count()` doubles as the DEMAND signal.
+- **`bot/tick_loop.py::_sync_screencast_demand`** — runs each tick
+  inside the `_tick_once` `TargetClosedError` guard: subscribers > 0
+  starts the screencast, zero stops it. Unwatched sessions (and every
+  `make run` — inert default bus) pay nothing.
+- **`service/watch_page.py`** — one HTML string served at `/watch`:
+  MJPEG `<img>`, SSE stats strip, START/STOP + mode buttons over the
+  existing HTTP routes. All URLs are RELATIVE so the page works both
+  direct (`:27100/watch`) and behind nginx's `/api/tankbot/` prefix
+  strip (`https://tankpit.austinwagner.org/api/tankbot/watch`) with
+  ZERO MCPs-repo changes — the existing proxy block already forwards
+  every subpath unbuffered.
+- Idle-exit gate (`exit_when_idle`) counts `/video` viewers alongside
+  SSE subscribers, so watching keeps the service alive.[^3]
+
+No input path exists anywhere in this surface — the buttons are HTTP
+POSTs to the bot service; nothing can touch the host mouse. The
+vibeshine tankpit profile still exists but is now redundant for
+monitoring.[^3]
+
+**Service sessions now get run artifacts.** The first live watch test
+exposed a gap as old as the service itself: only `bot/entry.py`
+(`make run`) called `configure_bot_runtime_logging`, so every
+phone-driven session ran with UNCONFIGURED logging — INFO lines
+dropped, no archive log/events file, no `_index.tsv` scorecard row
+(the 2026-07-28 22:31 service session played a full 10-kill
+`session_complete` run and left nothing on disk but
+`latest.summary.txt`). `SessionRunner.start` now configures the
+per-session artifact bundle before constructing the bot, logging
+`Session artifacts: <archive path>` as its first line.[^3]
 
 ## Shared bot-launch config (`bot/config.py`)
 
@@ -157,3 +211,4 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 
 [^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`mode_bridge.py`, `status_bus.py`, `session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
 [^2]: cross-repo truth in `~/PROJECTS/MCPs`: `fiesta/src/tankbot/` and `fiesta/nginx.conf`; Phase B/C landing commit `6c78deff` ("fiesta: bot-controls SPA panel + /api/tankbot proxy"), later reworked by `88fc8ae5` ("bot-controls view replaced by overlay viewmodel") — see the staleness note; file inventory re-verified against that repo 2026-07-23.
+[^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/screencast.py`, `src/tankpit_bot/service/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes`, `_drain_frame_bus_to_response`, `_latest_frame_snapshot`), `bot/tick_loop.py` (`_sync_screencast_demand`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`).
