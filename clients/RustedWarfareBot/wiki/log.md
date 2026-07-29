@@ -474,3 +474,354 @@ Measured honestly, it changed nothing on the sample to hand. Of 55 visible hosti
 Two smaller corrections fell out. The unit-catalogue page presented 90 as the catalogue, which reads as "the game's units" and is about half of them; it now says which 83 are missing and why. And the fifty `--- ERROR: running printForHelp()` lines in the printunits log are not errors -- they are a banner loop at the top of the printer.
 
 make check green: 436 tests, 100% statements and branches, guard 0 violations, agent-selftest passing. Live 7/8 on a 500-sample run with the wider table, which was the risk worth checking: 48 more armed types could have made every pool read as exposed, and did not.
+
+## [2026-07-26] refactor | one tick, one budget, one owner per fact
+Artifacts: `wiki/sources/m11-pools/type-flags.ndjson` regenerated (660, now carrying four layer predicates per type); `wiki/sources/m6-wire/world-sample.ndjson` recaptured (579, entity records carry `flying`/`submerged`/`touching_water`, and a new `player` record carries the engine's own scoreboard); new pages `mechanics-combat-profile`, `policy-budget`, `policy-verdict`
+
+Notes: an audit went looking for the divergent planners the run reports implied and did not find any. What it found was the opposite, and worse: layers that never ran.
+
+**The seam was the defect.** The build loop ran the opening plan to completion and handed over to a fight loop. While building there was no army and no economy; once fighting there was no build policy at all, so `extractorT1` was the only structure that could ever be placed again and the factory count was frozen for the rest of the match -- which is the arithmetic behind the run that banked 7,013 credits behind a single Land Factory. And a plan that stalled meant a match that never fought, because the handover was conditional on the plan finishing. There is one loop now; `runner.py` kept the only part of itself that was never about looping, the judgement about whether an order already given is still being carried out.
+
+**Two spenders, one balance.** Inside a single observation the production pass budgeted across every idle producer against `sample["credits"]`, and the expansion pass then asked the same field whether it could afford an extractor. Both correct alone; the pair committed one credit twice. With one factory the overlap was small enough to hide. `policy/budget.py` makes spending a single ordered decision, and every refusal now carries its reason into the run report.
+
+**`c_tank` cannot shoot aircraft, and nothing read that.** It is in the unit's own `.ini`, three lines under `[attack]`. Combat selected on *having* a weapon and never on the weapon *reaching the target*, so on a water map the army could commit to a helicopter, hold it for as long as it stayed visible because commitment keeps a visible target, and never fire. The engine's own attackability test is four branches; it is now transcribed rather than modelled, with the attacker's predicates on the type record and the target's three states on the entity record so neither side is inferred.
+
+Two rows of the regenerated dump changed real behaviour beyond that. `antiAirTurret` reports `hits_land: false` -- armed, 250 units of reach, and unable to touch a builder walking past, so it had been ruling out pools it could not defend. And every submarine in the game reports `hits_land_out_of_water: false`: torpedoes, which have to strike something in the water. Four hulls, and they are exactly the four that matter on the water map we play.
+
+**The engine had the scoreboard the whole time.** `gameFramework.g.f` computes income, army value and building value per player and writes them into its own save; the enum constants name themselves through the ProGuard oracle, so the reader matches on `"income"` rather than on an ordinal. The bot had been regressing a credit balance against the clock across deliberately idle windows to estimate the first of those. First live capture: our army value 500 against four opponents on 1,000, and `income 42/s` -- which is base 18 plus three extractors at the `generation_resources: credits=8` each declares. Two unrelated routes to the same figure.
+
+**The live run found what the tests could not.** With the loop unified, the plan and the economy both drove the one builder: the engine runs whichever waypoint arrived last, so 400 samples produced four expansion orders and a plan still stuck at 3 of 8. Whoever holds the builder now holds it alone. Same seed, same budget, after: plan 4 of 8, one expansion, factory up and producing.
+
+Three defects fell out of coverage rather than review: a branch handling a budget refusal that could never happen, a guarded lookup whose miss was impossible by construction, and -- the one worth keeping -- `idle_producers` counting every owned unit, so "is every producer busy?" answered no for as long as the player owned a Command Center, and the throughput rule could never fire at all.
+
+`tests/test_architecture.py` is new and is the part meant to outlast this: it asserts that exactly one module reads from the agent, that every other policy module is pure, that no exported policy *function* is unreachable from the rest of the tree, and that every record decoder has an encoder. The unreachable-function check is the one that would have caught `production_bound`, which was written, tested, documented with the measured evidence for it, and called by nothing -- while the suite stayed green.
+
+**Measured, on the engine, same seed.** A 1500-sample match with everything in place (`wiki/sources/m20-one-tick/unified-loop-1500.txt`): plan 8 of 8, ten extractors, 29 reinforcements, 311 attack orders, army 0 -> 17, army value 500 -> 6,450 against a leader on 10,250. The reference the audit started from, on the same map: army 4 -> 2 while the opponents went 47 -> 142, three extractors for the whole match, 21,164 credits banked. Income read 98/s, which is base 18 plus ten extractors at the 8 each declares -- the third independent confirmation of that constant.
+
+Of 112 visible hostiles, 104 read as engageable and 8 did not. Before this the army would have been free to commit to any of those 8 and hold it.
+
+**The throughput rule, and a guess that measured worse.** Chasing the leftover credits turned up a second copy of the bug just fixed: `production_bound` called any unit offering a non-placed action a producer, and the Command Center always offers a Builder and is idle almost permanently -- so "is every producer busy" answered *no* on every observation of every match, and the rule had never fired once in the life of the bot. Restricting it to producers of a wanted type made it fire exactly once, because a factory is idle only on the single tick it finishes, which is the tick the rule is evaluated on.
+
+So the test was rewritten to ask the budget instead: is there a surplus left after everything else has claimed? That fired freely, drained the bank -- and was the worst of the four shapes tried (`wiki/sources/m20-one-tick/factory-rule-ab.txt`). Income is the low-variance figure, being a deterministic function of extractor count, and it fell monotonically as factories rose: 98, 90, 74 credits/s, with army value going 6,450 -> 4,000 -> 3,300. **There is one builder, and every factory it places is an extractor it does not.** Income gates production, so buying capacity with the credits that would have bought income trades the thing that was working for the thing that was idle. The shipped rule is the conjunction of both tests, which restores 90/s and an army worth 5,400.
+
+**The trace answered it, and the answer was not the one being guessed at** (`wiki/sources/m20-one-tick/throttle-trace.txt`). Widening the per-sample record to carry the production pipeline itself -- capable producers, how many idle, orders issued, claims refused -- settled it in one run: **one factory, busy on 97% of the observations it existed for**, and produce orders issued on exactly the 28 ticks it was free. Not the unit cap, since capability never lapsed. Not credits, since the budget refused nothing. Every free tick was filled.
+
+The same trace surfaced a defect nobody had asked about: capacity never reached two, although the run reported seven factories expanded. The agent log showed all eight ring positions ordered once each and none completed. A factory joins the roster the moment construction starts, so its position reads as taken and the next order goes to the next one -- but it is not a *producer* until finished, so the throughput rule kept firing, and each order re-tasked the one builder off the last. `expand_production` had neither guard its sibling always had; and adding them was still not enough, because a refusal from the throughput rule fell straight through to the pool rule, which re-tasked the builder anyway. Builder availability is settled once now, by the dispatcher that owns the builder, before either rule is asked.
+
+**Removing the throttle made the bot worse**, which is the finding worth keeping. With factories completing properly the bank drained to 315 credits and production doubled to 62 units -- against a *smaller* army, 17 rather than 22, worth 6,450 rather than 8,200. The bank was never the waste; it was the symptom of an economy ahead of what the army could usefully spend. Extractors compound and factories do not, so taking the builder off pools trades the asset that grows for the one that does not.
+
+The expansion order was inverted to buy income before throughput on that reasoning. **It is not demonstrated.** Single-seed runs on this map are noisy -- three runs of identical code have given armies of 3, 6 and 14 -- and a later run under the shipped ordering produced 4 extractors rather than 9. The shipped order is the theoretically sounder default, consistent with the one clean comparison, and that is the whole of the claim. Settling it needs repeated seeds per arm.
+
+make check green: 593 tests, 100% statements and branches, guard 0 violations, agent-selftest passing with the widened records covered.
+
+## [2026-07-26] policy | a priority list cannot express an army, and a squared damage figure nearly sent the fix the wrong way
+
+The question was whether the bot has a strategy. It did not, and the reason was structural rather than a matter of tuning: `sustain` took the first wanted type a producer could make and stopped, and `reinforcements` collapsed duplicate goals on the reading that four tanks meant one preference stated four times. Between them **a mixed army was not expressible**. Every idle producer reached the same head of the same list, so three 1500-sample matches ended with 33 identical `c_tank`.
+
+That matters because of what `c_tank` is. It cannot shoot at aircraft at all, and roughly 15 of ~99 visible enemies per match were unreachable for that reason alone. Its 130 reach is the shortest of anything worth fielding, and every static defence in the game out-ranges it -- `c_turret_t1` by 1.27x, `c_turret_t1_artillery` by 2.69x, `c_turret_t2_artillery` by 3.54x. The loss table says the same thing in corpses: 96% of losses more than 2,000 world units from home, none at all within 900 of it.
+
+Repeats are the ratio now. Each idle producer builds whatever the roster is furthest short of, measured as a **share** so one rule covers an army of three and an army of three hundred. Two details are load-bearing. Orders decided earlier in the same tick count toward the roster -- without that a batch of idle factories all see the identical shortfall and all fill it identically, which is the old bug rediscovered one tick at a time. And the worker fallback is a separate argument rather than the tail of the composition, because a share is owed to everything in the mix and a builder owed a share of a 34-unit roster is a land factory ordering builders.
+
+**The unit value table was wrong, and it was wrong in the direction that mattered.** `Weapon` carries damage twice -- per shot and per volley -- and the engine prints a separate volley total only when it differs, so the decoder copies the per-shot figure across when it does not. For every single-barrel unit in the game the two fields therefore hold the same number. A derived ranking multiplied them, which squares the damage, and squaring reorders any two units whose damage and firing rate differ in opposite directions. Under it `c_artillery` read as the better buy over `c_tank` (2.96 against 2.38); corrected, it is 2.25 against 5.71 and less than half as good. The conclusion drawn from the bad table -- "the tank is the worst thing we can build" -- was exactly backwards. **The tank is the best thing the land factory makes.**
+
+What caught it was printing the raw fields rather than the derived ones and noticing `direct_damage == direct_damage_volley` in all seven units sampled. The corrected figures reproduce numbers recorded from an independent earlier pass (`c_turret_t1` 16.40, `c_tank` 5.71), which is what makes them trustworthy now rather than merely different.
+
+Two things follow from the corrected table. Everything ranked above `c_tank` is built by a **builder**, not a factory -- so the bot's spending ceiling is set by how many builders it holds, not how many factories. And `hoverTank`, briefly the candidate answer to the air problem on the strength of the bad numbers, is worse than a tank at everything except being able to shoot upward.
+
+**The builder ceiling does not survive measurement** (`wiki/sources/m22-workers/worker-ceiling-ab.txt`). It was added on the argument that a builder is 500 credits of thing that does not fight, after a run bought 33 of them. Capping them caps extractors, which caps income, and the surplus then has nowhere to go -- the land factory can only start one 350-credit unit at a time:
+
+    ceiling   extractors  income   worth   best rival  ratio   banked
+    4               10     98/s   24,600      25,350    0.97   17,938
+    8               10     98/s   23,450      26,850    0.87   15,229
+    uncapped        13    122/s   40,850      26,650    1.53    4,620
+
+Both capped arms end the match sitting on 15,000-18,000 credits they could not spend, and both are at or behind the strongest opponent. The ceiling stays a parameter rather than a constant precisely so this could be asked of a run instead of an argument.
+
+`composition` is now a reported figure, because a composition is something the caller *asks* for and asking is not getting: a type the engine never offers leaves the mix silently at whatever else was makeable, and without the breakdown an experiment cannot tell a mix that was built from one that was requested and quietly denied.
+
+**Still not established: whether we are killing anything.** `players 5 -> 5` in every run recorded so far, and the strongest rival's worth is only ever read at the first and last observation. Nobody has been eliminated in any match yet.
+
+make check green: 617 tests, 100% statements and branches, guard 0 violations, agent-selftest passing.
+
+## [2026-07-27] measurement | the bot loses, and every experiment so far was scored on a transient
+
+Played to a verdict instead of to a sample limit, the bot is defeated or wiped in three of four matches. At 1,500 samples the same code reads as 1.26x ahead on total worth; by 3,500 its extractors have gone 14 to 0, its workers 36 to 0, its income 130/s to 0, and the strongest opponent has compounded from 4,700 to between 131,000 and 151,000 while fielding over 500 visible units.
+
+The worker ceiling, the army composition and the wave mass were all measured at 1,500. None of those measurements is wrong; they answer a question that turned out not to be the question. Full-length runs are affordable now only because matches run four at a time.
+
+**The build policy named the cause without new instrumentation:** `44 are built on, 0 cannot be walked to, and 2 can only be reached through enemy fire`. The opponents hold 44 of the map's 46 pools. The same run records 275 expansion orders and one surviving extractor -- the bot is not failing to expand, it expands constantly and loses every claim, at 700 credits a time.
+
+So expansion without defence is a credit shredder, and the obvious ranking inverts. Upgrading an extractor to tier 3 is a real 2.3x on income -- 8 credits a second becomes 20, and the extractor upgrades *itself* with no builder and no new pool -- and it is worth nothing while 246 of 247 extractors die.
+
+**The bot cannot build a defensive structure at all, by construction rather than by policy.** Three gates compose: `economy.py` names exactly two placeable types, `reinforcements` drops every immobile type from the composition, and `sustain` skips placed options. A builder can place thirteen things and the bot places two. `c_turret_t1` is the best damage per credit and the best hit points per credit in the game, costs less than the extractor it would defend, and has never been built. Seventeen upgrade paths are unreachable for the same reason.
+
+**One real bug found and fixed, which changed nothing.** A builder is produced by the Command Center *and by every Land Factory*. The policy asked for one only as a fallback, and a fallback is reached only by a producer that can make nothing in the composition -- which a Land Factory never is, because it can always make a tank. When the Command Center died, twenty-two factories built tanks while the player had no builder and no way back, ending `plan blocked: nothing the player owns can make extractorT1` with `workers 0`. At zero builders the builder now goes into the composition instead. Measured on the same four seeds: one survival became two, and one seed died 294 samples earlier. Noise. The fix stays because a permanent-death trap is indefensible whatever the scoreboard says, but it is not why the bot loses.
+
+No test caught it: every fixture gave the builder option to the Command Center alone, so the fallback always fired and the real case -- a producer that can make *both* -- was never constructed.
+
+**Infrastructure.** Matches now run several at a time, one cloned game directory per worker, because a running match writes three fixed-name paths inside its own directory and everything else was already per-invocation. Jobs are a file, results are one file per match, so a batch is resumable by construction and crash-isolated. Lockstep is mandatory for a batch: free-running, parallel matches under CPU contention would sample at different game-times and the act of running them in parallel would change their results.
+
+`campaign.py` went from 1,207 lines to 453, split into `scoreboard`, `match_report`, `workforce`, `recorder`, `dispatch` and `spending`. The architecture guard caught that the first attempt broke the "exactly one module touches the wire" invariant, so `dispatch` and `spending` are pure -- they return typed orders and the loop sends them -- rather than the guard being weakened to fit the refactor.
+
+make check green: 697 tests, 100% statements and branches, guard 0 violations, agent-selftest passing.
+
+## [2026-07-27] agent | the upgrade the bot could not see, and the filter of ours that hid it
+
+The opponents hold twelve upgraded extractors against four un-upgraded ones. Ours held none, and three separate investigations concluded that upgrading was out of reach. All three were wrong, and each was reached by reasoning correctly from real evidence.
+
+The first said the engine never offers it: a probe played the real opening until four extractors were standing, asked what every owned structure offered, and got nothing at all. The observation was right. The second said it was gated behind a tech level -- `extractorT2` declares `techLevel: 2`, and the engine registers a type's build action only into the action lists at or above its tier. Both facts are true and neither is why the extractor was silent. The third said it needed a tier-two builder: `mechEngineer` is produced by nothing in this build and `combatEngineer` only by experimental units, so the chain read as 44,500 credits of prerequisites. Also true, also not the answer.
+
+**The agent was dropping the action before it reached the wire.** `BuildOptions` discarded any action that neither placed something nor answered true to the engine's "makes something" predicate, on the reading that the remainder were stops and rallies. An upgrade is neither: the asset declares it as `convertTo`, a conversion. So it was filtered out silently, and an extractor that was offering an upgrade published no options at all.
+
+That filter was a policy decision living in the agent, whose stated job is to publish what the engine offers and let the planner decide. Every action is now published, with `makes_something` carried as a wire field. With the filter gone, all four extractors offer `extractorT2` and the engine calls it **available** -- at tier one, with no prerequisite of any kind.
+
+**Two faults surfaced on the way to a working upgrade, and both crashed the match rather than degrading it.**
+
+The same filter existed in two places: the listing path and `actionMaking`, which resolves an order to an action. Removing it from one gave the worst of both -- the planner was offered an upgrade it could see, the agent could not find it to dispatch, and it threw inside the engine's script thread: `extractorT1 has no action making 'extractorT2'; it can make nothing`. A predicate duplicated across a producer and a consumer is the same shape as the sweep filter that silently dropped two report figures earlier the same day.
+
+Then: a conversion does not fill the production queue. `queued` stays at zero for as long as it runs, so the structure keeps offering the upgrade it is already performing, and the order went out again every observation. One duplicate landed after the conversion finished, addressed to a unit that was now an `extractorT2` and could only make an `extractorT3` -- which is how the second crash announced that the upgrade had worked. Ordered once per structure now, the same way every other re-issued order in this codebase is guarded.
+
+Measured live over 800 samples with both fixed: **income 54/s, which is the base 18 plus three tier-two extractors at 12 each.** The first income this bot has produced above the tier-one ceiling.
+
+A reporting fault was caught in the same run. `count_extractors` matched `extractorT1` alone, so a player holding three upgraded extractors was reported as holding none -- a figure quietly meaning something other than what it says, which is exactly how the 1,500-sample reading went wrong. Every tier counts now.
+
+**Also settled, and both negative.** The 300 fps cap is not a throughput ceiling: a full match reports 112,425 frames against an engine clock of 406,149 ms and about 400 seconds of wall time, so the simulation is paced by the wall rather than by frames and uncapping it would buy nothing. No bytecode patch was written, which is the point of measuring first. And the wave-mass, defence and turtle arms are all refuted at full length -- four hypotheses closed by measurement, none of which changed a verdict.
+
+The wire capture was regenerated rather than patched, because `makes_something` cannot honestly be synthesised for records written before it existed. 369 option records became 483.
+
+make check green: 735 tests, 100% statements and branches, guard 0 violations, agent-selftest passing with the widened option record covered byte-for-byte.
+
+## [2026-07-27] agent | the upgrade path priced wrong, the chain shaped wrong, and a statistic that was never measured
+Pages updated: mechanics-unit-value (new section: conversion pricing and the fork), policy-holding-ground (two corrections)
+Artifacts: `runs/sweeps/upgrade-fixed/` — six full-length matches, six seeds
+
+Three faults, found by reading `.game/assets/units/extractor/*.ini` and the `-printunits` dump directly rather than by reasoning from the code.
+
+**The plan fix that had to come first.** `completed_count` was taught that an upgraded structure still satisfies the entry that built it. `next_unsatisfied_index` answers a different question off the same roster and had the identical exact-name-match bug, unfixed — so the count advanced while the index did not, which is a plan reporting progress it will not act on. Both go through `satisfies` now.
+
+**A conversion is not priced at what the result costs to build.** `upgrade_income` claimed `extractorT2`'s `price` — 2,100, the cost to *build* one, a transaction nothing in this game can perform, because the builder places tier ones and nothing above. The engine charges 1,400, printed as `T2 Upgrade Price: $1400` on the tier one and declared as `action_upgradeT2`'s price in the asset. So every upgrade over-reserved 700 credits and was refused outright whenever the balance sat between the two figures, against a budget already refusing 1,185–1,685 claims a match. The price now comes from the **holder** and by **position**: the first entry of a unit's `upgrade_prices` is the cost of its own next conversion (1,400, 4,000, 8,000 down the line). Position rather than label, deliberately — the dump prints a tier three's overclock cost under `T2 Upgrade Price`, and a tier two carries both `T2` and `T3 Upgrade Price` at 4,000 for a single declared action.
+
+The campaign fixture had priced `extractorT2` at 1,400 — the conversion cost — which described a world the game cannot produce and made the buggy reading look correct. That is why no test caught it. The fixture now carries both real figures, and `tests/test_policy_spending.py` asserts against the archived dump rather than against a fixture.
+
+**The extractor line is not a line.** `extractorT3.ini` declares two conversions off the tier three — `action_overclock` to 30 credits a second at 1,100 hit points, `action_reinforce` to 20 at 4,700 with an 800 shield — and neither leads to the other; both carry only an `action_refund` back down. Modelled as one five-long chain, the code asserted that an overclocked extractor was an upgrade of a reinforced one, false in both directions. Two paths sharing a prefix state the truth instead, and `satisfies` needs no special case: it requires both types in the same path, and no path holds both siblings. `next_tier` walks as far as the paths agree and returns nothing at the fork, because which branch is worth more depends on whether the ground is contested and that is a measurement nobody has taken.
+
+**A statistic that was never measured, corrected in four places.** "246 of 247 extractors the bot placed were destroyed" appeared in `policy-holding-ground`, in two docstrings and in a test. It was the only claim on that page carrying no footnote, and no file under `wiki/sources/` contains the figure: it is `275 − 28 = 247` **expansion orders** restated as placed-and-destroyed structures. An order granted by the budget is not a structure that went up — the builder still has to walk there and the engine refuses a placement silently. The endpoint scorecard cannot separate "built and destroyed" from "never built", and those call for opposite fixes, so the page now says so and points at `policy-trace` for the instrument that can.
+
+**Measured: the plan fix alone, six seeds at 4,000 samples.** Three survived, three defeated, none wiped, against a four-seed baseline of one survived, two defeated, one wiped. On the four shared seeds it is a wash — 12345 and 4242 improve from wiped to survived, 777 and 31337 regress the other way. No signal.
+
+A new symptom is unambiguous, though: **every one of the six built zero factories**, against 18–53 in the baseline, and finished with 12,480–35,984 credits banked, an army of at most one tank, and no worker at all in four of the six. Whatever else is true, the bot has stopped converting credits into anything. Not diagnosed here — the next run carries a per-sample trace, because that is exactly the question the endpoints cannot answer.
+
+## [2026-07-27] measure | throughput-before-income refuted, and the frame limiter reopened
+Artifacts: `runs/sweeps/throughput/` — six full-length matches; `runs/trace-12345.ndjson` — the first per-sample trace of a full match
+
+**The trace changed what the problem looked like, and then the fix drawn from it failed.**
+
+A per-sample trace of seed 12345 contradicts the endpoint scorecard on nearly every point. The scorecard reports `extractors 0 -> 0`; the trace shows the bot **holding a peak of 14**, and reaching **56,650 total worth at the midpoint against the strongest rival's 38,650 — ahead**. It then falls to 850 while the bank climbs to 24,866. The producer count never exceeds **two** for the entire match. Losses were 115 tanks, 98 builders and **34 extractors** — not the 246 a previous entry claimed, which was never a measurement.
+
+The reading taken from that: two factories cannot spend that income, so income never becomes army. `expand_production` self-gates on `production_bound` (every producer busy *and* surplus enough for a factory) but ran last, reachable only when no pool was claimable, which with pools churning is almost never. So the gate was reordered to run first, on the argument that it would only fire when income genuinely could not be spent.
+
+**Measured over six seeds it was the worst arm yet: three wiped, three defeated, none survived**, against three survivals on the same seeds without it. Expansion collapsed from 307–509 orders to **2–6**, every one a factory; extractors finished at 0 or 1 and income at 0/s. With one or two producers `production_bound` holds on nearly every observation, so the rule took the builder nearly every time it came free.
+
+`production_bound`'s own docstring had said this and it was dismissed as a 1,500-sample artifact answering a question that had since changed. **It was not.** There is one builder, and every factory it places is an extractor it does not — and that holds at full length exactly as it held at 1,500. Reverted.
+
+The banked credits are real and remain unexplained. What they are evidence for is too few *builders*, not a different use of the one. That is also what the engine's own AI answers with: it runs several bases, each targeting two builders, each claiming what is near it ([[ai-opponent-strategy]]).
+
+**Scoreboard to date: no change has yet improved a verdict.** More builders, turrets before income, turrets from surplus, turtling, anti-air, wave mass, upgrades and the plan fix are all a wash or worse. What has improved is correctness and instrumentation.
+
+**The frame limiter is reopened, having been closed on an inverted inference.** It was closed on the reasoning that a match reports an engine clock tracking wall time, so the simulation is wall-paced and uncapping buys nothing. The clock tracks the wall *because the limiter makes it*: `java/u.java:117` sets `setTargetFrameRate(300)`, `u.java:141-145` re-sets it every frame from `highRefreshRate`, and `java/b.java:122` then calls `Display.sync(targetFPS)` unless the target is -1. `Display.sync` sleeps. `Main.java:479` builds the same container under `-nodisplay`, so killing the renderer never removed it. Achieved rate is ~277 fps against a 300 cap and the JVMs sit at 13–21% CPU — sleeping, not computing. A 4,000-sample match at lockstep 75 is 288,750 frames, about 962 s of game time, roughly half the observed wall clock.
+
+## [2026-07-27] measure | the noise floor, and why seeding did not remove it
+Artifacts: `runs/sweeps/noise/` and `runs/sweeps/noise-seeded/` — twelve runs each of ONE identical job specification
+
+**Every arm measured before this was read against nothing.** Twelve matches from an identical specification -- same seed, same arguments, same code -- came back:
+
+| | unseeded | seeded |
+|---|---|---|
+| verdict | 3 survived / 9 defeated | 3 survived / 9 defeated |
+| total worth | 350 – 15,350 (sd 5,158) | 500 – 15,850 (sd 4,848) |
+| income | 0 – 54/s | 0 – 60/s |
+| extractors | 0 – 3 | 0 – 4 |
+| samples seen | 3,232 – 4,000 (sd 284) | 3,005 – 4,000 (sd 354) |
+
+A 25% survival rate on an identical specification. So `eight` at one survival in six against `one` at none, `tank` and `air` at none in six, and the upgrade arm at three in six are all consistent with the base rate and none of them measured anything. The single run reported as evidence that more builders worked -- *survived, four extractors, 66 credits a second, worth 13,800* -- is the same specification as these twenty-four and sits above all of them. It was a top-tail sample read as a result.
+
+**Two findings do survive, because they fall outside the floor.** More builders raised expansion orders from 16–22 to 107–182 where the floor's own expansion spread is 118–194, non-overlapping against the low arm. And throughput-before-income wiped three matches in six against **zero** wipes in twenty-four here.
+
+**The cause is not what either candidate hypothesis said.** Twelve engine call sites use `java.lang.Math.random()` -- a JVM-global generator `EngineRandom` never touched, driving the AI's choice of which unit to plant a base at (`game/a/a.java:1713,1737,1761`), its site and worker-destination positioning on a random disc (`game/a/o.java:96-97,166-167`), and unit scatter (`game/units/y.java:4811-4837`). That is real, and it is now seeded -- verified in isolation across three JVM launches and live in a match logging both generators pinned.
+
+**It changed nothing measurable.** Seeding fixes the *sequence*, not which draw each consumer receives: if the number of calls before a given decision varies, every consumer downstream shifts. And the map settles for 22 seconds of free-running wall clock before the planner attaches, on a simulation that advances by measured delta -- so runs begin from already-different worlds. The earlier delta-jitter reading was wrong about the mechanism and right that the wall clock is implicated.
+
+**So the harness is statistical, and the data says how to use it.** Coefficient of variation across identical runs: total worth 1.1, income 1.0, expansions 0.15, **samples seen 0.09**. Survival time is the lowest-variance figure the scorecard carries and has the right shape -- longer is better, censored at the sample limit. Twelve runs give a standard error near 87 samples, so a 250-sample difference is detectable; detecting a change in survival rate from 25% to 50% would need about 58 matches an arm.
+
+Experiments are paired across seeds from here, scored on survival time, and a one-match-per-arm screen of twelve compositions is not worth running: at this noise level it would report about three survivals whatever the arms were.
+
+Every sweep match now writes a per-sample trace rather than passing `-`, because the endpoints proved actively misleading -- a match reporting `extractors 0 -> 0` had held a peak of fourteen and led the strongest rival at the midpoint ([[policy-trace]]).
+
+## [2026-07-27] measure | the bot leads for sixty per cent of every match, then cannot spend
+Artifacts: `runs/traces/r01..r12-s12345.ndjson` — twelve traced runs of one identical specification
+
+**Averaged over twelve identical runs, and the shape is the same in all of them.**
+
+| progress | our worth | strongest rival | army | extractors | producers | credits |
+|---|---|---|---|---|---|---|
+| 20% | 17,354 | 16,217 | 12.1 | 5.6 | 1.0 | 2,440 |
+| 40% | 35,125 | 30,575 | 15.3 | 10.0 | 1.0 | 1,621 |
+| 50% | **50,296** | 42,488 | 22.6 | 10.5 | 1.3 | 2,299 |
+| 60% | 58,696 | 56,558 | 21.2 | 10.1 | 1.5 | 6,058 |
+| 70% | 52,012 | 73,362 | 17.8 | 7.8 | 1.2 | 12,660 |
+| 100% | 7,238 | 135,508 | 0.4 | 1.2 | 0.2 | 22,429 |
+
+Peak worth averages 67,650 and arrives 63% of the way through; final worth averages 7,237. **The bot builds a leading position in every match and loses ninety per cent of it.**
+
+**The cause is throughput, and it is not subtle.** The producer count is 1.0 for the whole first half and never passes 1.7, while idle producers sit at zero -- one factory, permanently saturated. Income keeps compounding to about ten extractors, and at the crossover the credits it earns stop becoming army: 2,299 at the halfway mark, then 6,058, 12,660, and 22,429 at the end. The rival's worth grows on a near-straight line through all of it.
+
+So the bot does not lose fights. It loses because it cannot spend what it earns, and the army stops at twenty-two units while an opponent's does not.
+
+That is the same diagnosis the throughput arm was built on and it remains right; what was wrong was the remedy. Re-prioritising the *one* builder's time toward factories only displaced the extractors funding everything ([[policy-production]]). The builder count has since been fixed -- a wanted builder joins the army composition rather than a channel only the Command Center could reach -- and eight builders raise expansion orders from 16–22 to 107–182. Whether that is enough to also buy factories is the next measurement, not an assumption.
+
+**A better score fell out of the same traces.** Coefficient of variation across the twelve identical runs: final worth 0.67, peak worth 0.20, extractor peak 0.12, survival time 0.098, army peak 0.094, and the mean share of worth held against the strongest rival **0.066**. The endpoint figure every scorecard has reported all along is ten times noisier than a score computable from the trace beside it.
+
+## [2026-07-28] measure | the bot won a match
+Artifacts: `runs/traces/duel-veryeasy.ndjson`; `runs/duel-full.log`
+
+```
+verdict        won (won)
+players        2 -> 1 (1 eliminated)
+plan           8/8 -- done: all 8 plan entries satisfied
+total worth    3500 -> 60950
+best rival     5400 -> 2550 (peak 12500, worst dip 9950)
+income         158/s
+army           0 -> 23
+extractors     0 -> 7
+workers        7
+samples seen   2387
+```
+
+The opponent was eliminated at sample 2,387, well inside the limit. Against the four-opponent game every figure here is unrecognisable: worth 60,950 and climbing rather than peaking at 67,000 and collapsing to 7,000; income 158/s against 26–66; seven workers against nought to two; an army of 23 alive at the end rather than decaying to nothing.
+
+**The bot had never played the game it was being judged on.** `-sandbox` hardcodes a ten-player map, and the setup is read from a GUI document with no values headless, so every figure falls through to a Java default: four opponents, at Medium, on *Crossing Large (10p)*. No opponent is ever eliminated there, so the "best rival" reaching 135,508 was one of **four** growing unopposed while the bot fought all of them. Leading the strongest of four to the sixty per cent mark reads differently in that light.
+
+**Getting there took two wrong readings of the engine, both caught by its own log.** Calling the match-setup helper directly with its last argument true set the players up and started nothing -- the argument defers the start, and without it the map's units are skipped for want of a player and both sides are wiped on the first tick. Then `bS.y()`, guessed as the starter, turned out to be a stopper. What worked was to stop reimplementing the startup and queue the engine's own script with the map substituted -- **and the opponent count then needs no override at all**, because the helper caps teams by the map's own count. Choosing a two-player map *is* choosing one opponent.
+
+Difficulty is set after the load rather than before, because `loadConfigCommon` overwrites the field from the GUI's unread default and saves -- which is why `preferences.ini` reads `aiDifficulty:0` however it is edited. It is an **income multiplier on the AI alone**: 0.4x Very Easy, 0.7x Easy, 1.0x Medium, 1.4x Hard, 1.8x Very Hard, 3.7x Impossible. At Medium an opponent earns exactly what the bot does, which is the setting every prior measurement used.
+
+**What this does not establish.** One match, at the bottom rung of six, and the noise floor for duels is unmeasured -- in the four-opponent game it was a 25% survival rate across twelve identical specifications. Twelve seeds at Very Easy are running to turn this into a rate. `expansions 67 (0 factories)` and 11,224 credits left say the throughput fault is still there and merely no longer fatal.
+
+**Also fixed on the way.** A map path carrying a space split the `-javaagent` flag and the JVM aborted with `processing of -javaagent failed` before the agent loaded; the launch now renders the flag and its options as one argv element rather than a shell string, which is what `harness/launch.py` existed for and the Makefile recipe was quietly duplicating.
+
+## [2026-07-28] measure | twelve of twelve at Easy, and the two faults that were costing the other nine
+Artifacts: `runs/sweeps/duel-easy/`, `duel-easy-fixed/`, `duel-easy-throughput/` — three arms, twelve seeds each, paired
+
+| arm at Easy (0.7x AI income) | won | timed out | lost |
+|---|---|---|---|
+| before | 3/12 | 9 | 0 |
+| + plan deferral | 5/12 | 7 | 0 |
+| **+ throughput** | **12/12** | 0 | 0 |
+
+**The bot is never beaten at these rungs.** Every non-win was the sample limit, at both Very Easy and Easy, across every arm. What was failing was the ability to *finish*, and it failed in two distinct ways that the paired seeds separated cleanly.
+
+**Fault one: the opening plan waited forever.** It is a sequence -- three extractors, then the factory, then the army -- and it stopped on whichever entry it had reached. When the third extractor had no free pool the wait was permanent: the factory was never built, no army was ever produced, and a match ran to the limit with five idle builders, 60,676 credits and nothing to fight with. Seed 90210 finished at 18 credits a second with total worth unchanged from its opening 3,500, which is the base rate with **zero** extractors. An entry with nowhere to stand now defers to the next. Only placement defers: being unaffordable or having no producer is a fact about the whole plan, and skipping past those would spend the next entry's credits because this one is short.
+
+**Fault two: the bank was never spent.** The healthy-economy timeouts finished with a completed plan, an army of 26, five extractors -- and **44,660 credits against a single factory**, having knocked the opponent from a peak of 37,750 down to 6,650 without finishing it. One spare builder now buys throughput. The measured effect is exactly the intended mechanism: **4-8 factories** where there had been none, and **44-347 credits left** where there had been 40,000-52,000.
+
+Worth noting what that trade looks like, because it is not what a scorecard reader would guess: income *fell* from 98-158/s to 50-66/s and total worth from 44-66k to 27-32k. Fewer extractors, more factories, a smaller position -- and every match won. Banking an economy was never the goal.
+
+**This is the same change that was the worst arm ever measured**, when it reordered the whole chain: three wiped, three defeated, expansion collapsing from 307-509 orders to 2-6. The defect was arithmetic rather than priority -- there was **one** builder, so every factory it placed was an extractor it did not. Duels run with seven or eight now, so it takes one and leaves the rest, and a floor of two free workers withholds it entirely in the opening. Re-running it before the builder count was fixed would have repeated a known-bad arm.
+
+**A fault of my own, caught only by pairing.** Deferral made seed 4242 go from five extractors and an army of 25 to none of either, reporting `stalled: extractorT1 was ordered but never appeared`. `OrderTracker` keyed an outstanding order by the completed count alone, so the deferred extractor and the factory after it -- both pending at the same count -- collided on one slot. The second target was never issued, and the clock then ran against an order that had never been sent. Keyed by what is being built now, and the clock restarts when the plan turns to another entry. **Verdict counts alone would have read 3 to 5 as unambiguous progress and hidden it.**
+
+## [2026-07-28] measure | the duel ladder: twelve, twelve, and nine of twelve
+Artifacts: `runs/sweeps/duel-veryeasy-fixed/`, `duel-easy-throughput/`, `duel-medium/` — twelve seeds a rung, paired
+
+| rung | AI income | won | timed out | lost |
+|---|---|---|---|---|
+| Very Easy | 0.4x | **12/12** | 0 | 0 |
+| Easy | 0.7x | **12/12** | 0 | 0 |
+| Medium | **1.0x** | **9/12** | 3 | 0 |
+
+**Medium is the bar that matters: the multiplier is one, so the opponent earns exactly what the bot does.** Every measurement this project took before the duel work ran at that setting -- against *four* such opponents at once, on a ten-player map, with none of them ever eliminated. What looked like a bot that could not win was a bot that had never played a winnable game.
+
+**Zero losses at every rung, in every arm.** Every non-win is the four-thousand-sample limit expiring, never a defeat. Medium wins finish in 1,598-2,792 samples and Very Easy wins in 1,306-1,823 -- a five-hundred-sample band, which is what a policy that reliably executes looks like rather than one that sometimes stalls. Very Easy was 9/12 before the fixes and is 12/12 after.
+
+**The remaining failure mode has not changed in kind.** All three Medium non-wins sit at 18-38 credits a second against 50-66 in every win: the same economic signature the plan-deferral and throughput fixes attacked, so there is headroom left in that direction rather than a new problem to find.
+
+**A warning worth carrying forward.** The change that took Easy from 3/12 to 12/12 *lowered* income from 98-158/s to 50-66/s and total worth from 44-66k to 27-32k. Fewer extractors, more factories, a smaller position, every match won. Any search optimising income or worth -- the two figures a scorecard makes most prominent -- would have rejected it. The only figure that improved was whether the match was finished.
+
+## [2026-07-28] measure | the duels were never a pool race — every seed builds three extractors, most lose them, and turrets do not stop it
+Artifacts: `wiki/sources/m28-holding/extractor-survival.txt`, `pools.py`, `holding.py`, `where.py`, `deaths.py`; `runs/sweeps/duel-hard-defence/` against `runs/sweeps/duel-hard/`
+Notes: Read from the per-sample traces the twelve Hard duels had already written, so it cost no runs — the "built and destroyed" versus "never built" distinction [[policy-trace]] exists to make, finally asked of a batch that carried it.
+
+**Every one of the twelve seeds reaches a peak of three extractors**, inside the first quarter of the match (first at 1-4% of the run, peak at 9-22%). There is no race being lost. The verdict follows what happens after the peak, with no overlap at all:
+
+| extractors lost | seeds | verdict |
+|---|---|---|
+| 0 | 4242, 555, 777 | **won** |
+| 1 | 31337 | **won** |
+| 2 | 60613, 8675309, 90210, 99991 | not won |
+| 3 | 12345, 1337, 8128, 24601 | not won |
+
+Every run also regains three or four, so the bot is not failing to re-expand either — it re-buys the same ground at 700 credits a time and cannot keep it. That answers the question [[policy-holding-ground]] has carried since it was written, about what 247 expansion orders bought: **built and destroyed**, not never built.
+
+**The ending-income threshold recorded yesterday was a consequence, not a lever.** Income of 18/38/50/58 per second is the base 18 plus whatever extractors survived — a restatement of the same count, which is why it separated wins so cleanly and why treating it as the target would have been chasing the symptom.
+
+**The obvious follow-up was tried and lost.** `undefended` offered every immobile structure nearest-anchor-first, "so the base is covered before the frontier", and the per-loss table from m21 refutes that ordering outright — **not one unit died within 900 world units of the base across either traced run**, with 96% and 72% of losses deeper than 2,000, and the structures among them extractors out where the pools are. Restricting cover to extractors, same twelve seeds and same rung: **wins 4 -> 0, drops 21 -> 24, and the first two losses in fifty-two duels.** Reverted; the reasoning is recorded because it was good and still lost. Four defence arms have now failed.
+
+**The arm was not a fair test, and finding that out is what the new instrumentation bought.** The `structures` line shows three turrets standing across all twelve matches — two in one seed, one built and destroyed in another. Defence has never been a policy that ran, only one that was reached. Unverified candidates for why: it fires only when income declines, seldom on a nine-pool map; and its site is a bare `+60` offset never checked against terrain, which at a pool would be refused silently at the cost of a walk and a stall window per attempt.
+
+**What the army cannot do at all.** `c_tank` declares `canAttackFlyingUnits: false` and prints as "Can attack ground only"; `c_turret_t1` is "Attacks ground units." That is the whole army and the whole defence. In all four winning duels the surviving enemies are **0 engageable** — every one is something the bot cannot shoot; in the losers, 20-25% of the opponent's force is. Not yet shown to be what kills the extractors, since 75-80% of their units are ground, but no turret we can place stops the other fifth.
+
+**A measurement gap closed in the same change, and it is the more important half.** Nothing reported whether a turret had ever been built: our own buildings appeared in no report line, the trace has no column for them, and the expander keeps the *income* reason when defence declines, so the defence reason never reached a log at all. Asked whether one turret had been built across twelve full matches, the honest answer was that the run output could not say. The report now carries a `structures` line, and the question is answerable rather than arguable.
+
+## [2026-07-28] measure | the economy was switched off most of every match, and the ladder moved two rungs
+Artifacts: `wiki/sources/m30-ladder/ladder.txt`, `wiki/sources/m29-antiair/`, `wiki/sources/m28-holding/diag-post-worker-fix.ndjson`, `runs/sweeps/duel-{medium,hard,veryhard}*`
+Notes: Five changes, in the order they were found. The first is instrumentation and it is what made the rest visible.
+
+**Nothing reported what the bot was trying to buy.** `Budget.claim` had always recorded each request's purpose, amount and refusal reason, and `format_ledger` had always rendered it — neither was ever called outside its own tests. The loop kept a *count* of refusals: about four thousand sentences a match, discarded. Two records now survive to the report, and the load-bearing one is **which spender was even reached**, because "declined three thousand times" and "never asked once" were previously the same number. Four defence experiments had been judged on exactly that ambiguity.
+
+**One busy worker switched off every spender.** `Expander.step` returned nothing at all while the opening plan held a worker. The plan holds one; the bot runs four to eight. Instrumented over 800 samples: **the expander was skipped on 572 of them**, and it fires while the plan is merely *waiting to afford* something, so a plan parked on price switched the economy off for the rest of the match. Fixed by naming the held worker rather than flagging it — expansion orders 4 → 21, income actions 7 → 32.
+
+**Freed, the workers all walked to the same pool.** Occupancy is judged by what *stands* on a pool, so one being walked toward reads as free. A run granted **23 extractor orders, lost nothing at all, and finished with four extractors**. A defect the previous fix exposed rather than created — and the shape this wiki recorded as "275 expansion orders against a single surviving extractor" without being able to explain it.
+
+**A turret costs 500 and an extractor 700, so defence won on price.** At Hard: **29 turrets bought against 4 extractors**, with 43 of 47 extractor claims refused for credits and income stuck at 34/s. Expansion now marks a refusal that was purely about money, and nothing cheaper is offered the balance the economy was short of.
+
+**And the army was eating the economy.** `replace_losses` claims protected and unbounded; expansion claimed unprotected. The reserve protects the army *from* the economy and nothing did the reverse: at Very Hard **2,800 credits of roughly 65,000 reached the economy**, 129 units were produced and two survived. Expansion now claims protected below four extractors — a floor taken from the outcome data, where income ≥50/s won 36 of 36 and 50/s is base 18 plus four extractors.
+
+| rung | AI income | won | lost | routs | median win |
+|---|---|---|---|---|---|
+| Medium | 1.0x | 9/11 | 0 | **4** | 2,000 |
+| Hard | 1.4x | **6/12** | 0 | **2** | 2,434 |
+| Very Hard | 1.8x | 5/11 | 1 | 1 | 2,907 |
+
+**The bot now wins more at Very Hard than its own baseline did at Hard** (5/11 at 1.8x against 4/12 at 1.4x), and Hard went 4/12 → 6/12 with no losses. "Routs" are matches leaving the opponent with nothing; neither baseline produced one.
+
+**Still binding, unchanged at both rungs:** the non-wins lose four to eight extractors and end at 0.0–0.3x the opponent's worth. Holding ground, not claiming it.
+
+**Also this session:** four modules split along real seams — `siting` out of `build_order`, `defence` out of `economy`, `expander` out of `spending`, `codec` out of `state` — and an architecture test added so module size cannot drift back. Nothing is over 600 lines.
+
+## [2026-07-28] measure | three unit-value arguments, three refutations, and the pattern behind them
+Artifacts: `runs/sweeps/duel-veryhard-{floor,order,mechgun}`, `wiki/sources/m30-ladder/ladder.txt`
+Notes: A stretch of negative results, kept because the *shape* of the error repeated and is worth more than any of the three findings.
+
+**The tech question, answered properly.** Tech is per unit type, not a player level: a unit exposes only its own tier's action list, so tier-2 units need a tier-2 *builder*. That chain is real and expensive — builder → `experimentalLandFactory` (11,000) → `experimentalDropship` (30,000) → `combatEngineer` (3,500). **But it is not the relevant path.** Querying the registry directly, `mechFactory` costs **1,000** and our Builder can already place it; it makes `mechGun`, `mechMissile`, `mechArtillery` and builders. `policy.expand` inserts the prerequisite automatically, so reaching it needs no code at all. It was never built for a mundane reason: `economy.py` names two structure types and this is not one of them.
+
+**mechGun refuted.** 0 won of 7 against the tank arm's 7 of 12, two of the losses being seeds that won comfortably before. The argument for it was that it beats `c_tank` on hit points per credit *and* damage per credit — 83 against 60, 7.7 against 5.7. It does. It is also **27% slower** (0.8 against 1.1), and on a ladder decided entirely by extractor survival a slower army defends scattered pools worse.
+
+**Expansion-before-upgrades refuted.** Pools are six times better per credit than conversions — 87 credits per +1/s against 350, which [[policy-economy]] states as a rule and the game's own assets annotate. Reordered on exactly that arithmetic: **7 won → 5**, same two losses, routs 3 → 2, median win 2,207 → 2,362. Inside the noise floor, so not a refutation — but not the improvement the figure promised. What the arithmetic omits is **risk**: a new extractor is income that can be destroyed, a conversion is income on ground already held, and this ladder is decided by extractors *lost*. The original docstring said so — "the one income the map cannot take away" — and was read past.
+
+**The pattern.** Three arguments, three per-credit metrics, three omitted dimensions: **range** (why `c_artillery` ranks last and outranges every enemy ground defence), **speed** (mechGun), **survivability** (upgrades). A table that ranks units by cost efficiency is silent about the thing that decides the match, and it has now been wrong three times in one session in three different ways.
+
+**Two unpinned decisions found while doing it.** Swapping the upgrade and expansion calls broke no test; `expansion_reserve` had no test at all. Both are pinned now. The reserve also turned out to return the **maximum** price in the composition, so one expensive unit raised the barrier for the whole economy — a 1,400-credit artillery took it 450 → 1,400 and expansion was refused 232 times of 237. It is the mean now, which is what stops a composition A/B from silently being a reserve A/B as well.
+
+## [2026-07-28] build | the style becomes a file: doctrines, a decomposed loop, and counter-composition
+Notes: Structural session, no live runs — `make check` green throughout (837 tests, 100% statements and branches, guard 0). Three changes, one motive: testing a gameplay style should be an argument, not an edit.
+
+**A doctrine is one file naming the whole style.** `rw_bot.policy.doctrine` carries goals, worker ceiling, wave mass, reserve (with `-1` = derive, the same sentinel the CLI override used), the expansion switch and the new counter switch, decoded with the same `require_*` discipline as every other flat payload. Presets live in `doctrines/`; `default.doctrine` is pinned to the `DEFAULT_DOCTRINE` constant by a test so the copy-and-edit starting point cannot drift, and the two shipped arms (`counter`, `no-expand`) are pinned to differ from default in exactly one field. `scripts/play.py` shrinks from ten positional slots to `[max-samples] [doctrine-path] [trace-path]` — the tail that grew one slot per question stops growing. Sweep job lines shrink with it: `label|seed|goals|max_workers|samples|mass|reserve` becomes `label|seed|doctrine|samples`, so what an arm *was* survives as a file rather than a job line reconstructed afterwards.
+
+**The campaign loop is three objects instead of forty locals.** `play()` carried every report figure as a hand-threaded local — around forty of them — plus six more for wave state. The figures moved to `policy.scorekeeper.Scorekeeper` (observe per sample, assemble the report at the end); the wave memory — released, rallying, holding, last-sent pairings — moved to `policy.dispatch.WaveController`, the same shape `OrderTracker` and `Workforce` already have. Wave discipline is now exercised directly in `tests/test_policy_dispatch.py` rather than only by playing a whole match; the campaign's 62 tests pass unchanged, which is what says the refactor preserved behaviour. One naming note: the controller's method is `command`, not `step` — the monorepo test-quality guard reads `.step()` in a test as an ML optimizer pattern.
+
+**Production can now read the record the loop already kept.** `enemy_types_end` sat on every report while the mix stayed blind to it — the 33-tanks-under-an-air-force failure ([[mechanics-combat-profile]]) was fixed by allowing a static mix, and the mix stayed static however the opponent played. `policy.counter.counter_composition` tilts the composition until its anti-air share covers the share of the visible threat that flies, repeating only types already asked for (a doctrine with no anti-air is left alone — which unit answers air stays the doctrine's question). All-air threats drop armed ground-only types; unarmed stay, a builder is in the mix for the economy. **Off by default and unmeasured**: `doctrines/counter.doctrine` is the A/B arm, and until seeds are run against `default.doctrine` the tilt is an argument, not a finding.
+
+**Follow-ups this leaves open:** the docstring essays this session did *not* move to wiki pages (deliberately — separate pass, separate diff); `policy-loop` and the bot-architecture hub need repinning to the decomposed loop once this lands; and the counter A/B needs its sweep.
+
+## [2026-07-28] correction | the reserve is the maximum again, and the log said otherwise
+Notes: The previous measure entry ends "It is the mean now." That was true when written and was reverted the same day: twelve seeds at Very Hard called the mean a regression — **7 wins became 3**, routs 3 → 1, outside the noise floor — so `expansion_reserve` returns the **maximum** again and its docstring carries the full story. The confound the mean was meant to fix (a composition A/B silently also being a reserve A/B) is answered instead by a fixed per-arm reserve, which now lives in the doctrine file (`reserve` field, `-1` = derive).
