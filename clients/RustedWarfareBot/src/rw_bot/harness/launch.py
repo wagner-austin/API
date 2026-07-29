@@ -22,6 +22,7 @@ from rw_bot.validation import (
     require_bool,
     require_non_empty_str,
     require_positive_int,
+    require_str,
 )
 
 MAIN_CLASS: Final = "com.corrodinggames.rts.java.Main"
@@ -74,6 +75,13 @@ class LaunchConfig(TypedDict):
             (``wiki/pages/agent-render-callback-noop.md``), so a launch without
             it is not a supported mode, and modelling it as optional would add
             a branch whose only reachable outcome is a crash.
+        agent_options: The agent's own ``;``-separated settings, appended after
+            ``=``. Carried here rather than pasted onto the flag by each caller
+            because it is the part that **contains spaces**: a map path like
+            ``maps/skirmish/[p2]Lake (2p).tmx`` split the ``-javaagent`` flag in
+            two when the launch was assembled as a shell string, and the JVM
+            died with ``processing of -javaagent failed`` before the agent
+            loaded. Rendered into one argv element here, quoting never arises.
     """
 
     game_dir: str
@@ -85,6 +93,7 @@ class LaunchConfig(TypedDict):
     print_units: bool
     log_path: str
     agent_jar: str
+    agent_options: str
 
 
 def make_launch_config(
@@ -92,6 +101,7 @@ def make_launch_config(
     game_dir: str,
     log_path: str,
     agent_jar: str,
+    agent_options: str = "",
     max_heap_mb: int = 1000,
     width: int = VERIFIED_WIDTH,
     height: int = VERIFIED_HEIGHT,
@@ -105,6 +115,7 @@ def make_launch_config(
         game_dir: Directory holding the pinned game copy.
         log_path: Absolute path the engine writes its log to.
         agent_jar: Absolute path to the built javaagent.
+        agent_options: The agent's ``;``-separated settings, empty for none.
         max_heap_mb: JVM maximum heap in megabytes.
         width: Virtual display width.
         height: Virtual display height.
@@ -133,6 +144,7 @@ def make_launch_config(
         "print_units": print_units,
         "log_path": log_path,
         "agent_jar": agent_jar,
+        "agent_options": agent_options,
     }
     return decode_launch_config(payload)
 
@@ -170,6 +182,9 @@ def decode_launch_config(payload: Mapping[str, str | int | bool]) -> LaunchConfi
         print_units=print_units,
         log_path=require_absolute_path(payload, "log_path"),
         agent_jar=require_absolute_path(payload, "agent_jar"),
+        # Deliberately not require_non_empty_str: no options is an ordinary
+        # launch, and the probes that predate the agent taking any pass none.
+        agent_options=require_str(payload, "agent_options"),
     )
 
 
@@ -195,6 +210,7 @@ def encode_launch_config(config: LaunchConfig) -> dict[str, str | int | bool]:
         "print_units": config["print_units"],
         "log_path": config["log_path"],
         "agent_jar": config["agent_jar"],
+        "agent_options": config["agent_options"],
     }
 
 
@@ -210,18 +226,33 @@ def build_argv(config: LaunchConfig) -> tuple[str, ...]:
     main class, because the JVM stops parsing its own options at the main class
     name and would otherwise hand the flag to the engine as a game argument.
 
+    **The flag and its options are one element, and that is the point of
+    building an argv rather than a command line.** A map path carries spaces --
+    ``maps/skirmish/[p2]Lake (2p).tmx`` -- and assembled as a string it split
+    the flag in two, so the JVM aborted with ``processing of -javaagent
+    failed`` before the agent loaded. A list has no quoting to get wrong.
+
     Args:
         config: The validated configuration to render.
 
     Returns:
         The argument vector, ready to spawn.
     """
+    agent = f"-javaagent:{config['agent_jar']}"
+    if config["agent_options"]:
+        agent = f"{agent}={config['agent_options']}"
     argv: list[str] = [
         JAVA_EXE_RELATIVE,
         f"-Xmx{config['max_heap_mb']}M",
+        # Reflective access to java.lang.Math's generator, which the agent pins
+        # so the opponents' placement repeats. Without it the agent throws at
+        # premain rather than leaving a generator silently unseeded
+        # ([[policy-determinism]]).
+        "--add-opens",
+        "java.base/java.lang=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Djava.library.path=.",
-        f"-javaagent:{config['agent_jar']}",
+        agent,
         "-cp",
         CLASSPATH,
         MAIN_CLASS,
