@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
+from rw_bot.mechanics.combat_profile import CombatProfile, can_engage, is_armed
 from rw_bot.wire.state import Entity, Sample
 
 #: Type name of the map editor's placeholder, which is owned and cannot fight.
@@ -26,25 +27,53 @@ from rw_bot.wire.state import Entity, Sample
 PLACEHOLDER_TYPE = "editorOrBuilder"
 
 
+#: The fewest units that count as attacking together.
+#:
+#: The ladder's own first rung, reused rather than reinvented: it is the number
+#: the shipped AI uses for its first attack group, and the number below which
+#: this module already calls an attack a trickle ([[engine-ai-triggers]]).
+FIRST_WAVE = 3
+
 #: Units each successive wave waits for, in order.
 #:
 #: The shipped AI's ladder: three for the first attack, five for the next few,
 #: seven thereafter. Its groups are created empty with a target size and recruit
 #: until full before they move, and the size climbs with the number of groups it
 #: has already sent ([[engine-ai-triggers]]).
-WAVE_SIZES = (3, 3, 5, 5, 5, 7)
+WAVE_SIZES: tuple[int, ...] = (FIRST_WAVE, FIRST_WAVE, 5, 5, 5, 7)
 
 
-def wave_size(waves_sent: int) -> int:
+def ladder_to(mass: int) -> tuple[int, ...]:
+    """Return the shipped ladder with its final rung replaced.
+
+    The early rungs are left alone deliberately. They govern the opening, when
+    the player has three units and holding them back is the difference between
+    a first attack and no attack at all; the final rung governs the other
+    twenty-eight minutes, and it is the one worth asking a question about. An
+    experiment that moved both would not be able to say which end mattered.
+
+    Args:
+        mass: Units the sustained wave waits for. Values at or below the last
+            fixed rung leave the ladder unchanged, so the shipped behaviour is
+            reachable rather than a special case.
+
+    Returns:
+        The ladder to muster against.
+    """
+    return (*WAVE_SIZES[:-1], max(mass, WAVE_SIZES[-2]))
+
+
+def wave_size(waves_sent: int, ladder: Sequence[int] = WAVE_SIZES) -> int:
     """Return how many units the next wave waits for.
 
     Args:
         waves_sent: Waves already released.
+        ladder: Sizes in order, the last rung repeating thereafter.
 
     Returns:
         The size the next one needs, the last rung repeating thereafter.
     """
-    return WAVE_SIZES[min(waves_sent, len(WAVE_SIZES) - 1)]
+    return ladder[min(waves_sent, len(ladder) - 1)]
 
 
 class Muster(TypedDict):
@@ -65,7 +94,12 @@ class Muster(TypedDict):
     reason: str
 
 
-def muster(army: Sequence[Entity], released: frozenset[int], waves: int) -> Muster:
+def muster(
+    army: Sequence[Entity],
+    released: frozenset[int],
+    waves: int,
+    ladder: Sequence[int] = WAVE_SIZES,
+) -> Muster:
     """Decide which units are cleared to attack, and which keep gathering.
 
     Fill, then commit. Attacking with whatever exists feeds units in one at a
@@ -79,30 +113,50 @@ def muster(army: Sequence[Entity], released: frozenset[int], waves: int) -> Must
     45 reinforcements for a net army growth of one. So a unit is either in a
     released wave or in the reserve, and only the reserve gathers.
 
-    Survivors of a released wave keep their clearance. They do not turn round
-    to wait for reinforcements — abandoning an attack while still in range of
-    it is the worst of both behaviours, and it is why the reserve is counted
-    separately rather than the whole army being re-tested against the
-    threshold.
+    **A wave reduced below the size that makes a wave is not one any more.**
+    Survivors used to keep their clearance permanently, on the reasoning that
+    turning round mid-attack is the worst of both behaviours. Measured, that
+    reasoning was wrong in the one way that mattered: of 48 units lost in a
+    1500-sample match, 46 died more than 2,000 world units from home and not one
+    died within 900 ([[policy-combat]]). Nothing was attacking the base. The
+    army was walking into defended ground and dying, and the last survivor of
+    each wave kept its clearance and walked in after them, alone -- which is
+    precisely the trickle this gate exists to prevent, happening on the way out
+    instead of the way in.
+
+    So clearance is held only while the wave is still a wave, and the threshold
+    is the ladder's own first rung rather than a new number: below
+    :data:`FIRST_WAVE` the survivors return to the reserve, rally home, and go
+    out again with the next one.
 
     Args:
         army: Units available to fight, as :func:`find_army` reports them.
         released: Engine ids already cleared by an earlier wave.
         waves: Waves released so far.
+        ladder: How many units each successive wave waits for. Defaults to the
+            shipped AI's, which is a number copied from an opponent playing a
+            different economy: measured, this bot feeds about sixty tanks into
+            defended ground across a match and sets the leader back by roughly
+            a thousand credits, so how much to mass before committing is a
+            question rather than a constant ([[policy-combat]]).
 
     Returns:
         The decision, carrying the state the next call needs.
     """
     alive = {unit["unit_id"] for unit in army}
     survivors = alive & released
-    reserve = alive - released
-    wanted = wave_size(waves)
+    if len(survivors) < FIRST_WAVE:
+        # Decimated, so no longer a wave. Handing them back to the reserve is
+        # what sends them home to re-gather rather than in to die one at a time.
+        survivors = set()
+    reserve = alive - survivors
+    wanted = wave_size(waves, ladder)
 
     if len(reserve) >= wanted:
         return Muster(
             released=frozenset(alive),
             gathering=0,
-            wanted=wave_size(waves + 1),
+            wanted=wave_size(waves + 1, ladder),
             waves=waves + 1,
             reason=f"wave {waves + 1} of {len(reserve)} released",
         )
@@ -192,28 +246,6 @@ class Engagement(TypedDict):
     reason: str
 
 
-def is_armed(entity: Entity, catalogue: Mapping[str, UnitStats]) -> bool:
-    """Report whether an entity has a weapon at all.
-
-    Read from the catalogue rather than guessed from the type name. The engine
-    prints an attack range for units that have one and omits it for units that
-    do not, so a Builder is unarmed by the same source that says a Tank is not
-    ([[mechanics-unit-catalogue]]).
-
-    A type the catalogue does not know counts as unarmed. Sending a unit whose
-    weapon is unknown into a fight is the more expensive of the two mistakes.
-
-    Args:
-        entity: The entity to test.
-        catalogue: Unit stats by type name.
-
-    Returns:
-        True when the catalogue gives it a weapon.
-    """
-    stats = catalogue.get(entity["type_name"])
-    return stats is not None and stats["weapon"] is not None
-
-
 def is_mobile(entity: Entity, catalogue: Mapping[str, UnitStats]) -> bool:
     """Report whether an entity can move to a fight.
 
@@ -231,7 +263,11 @@ def is_mobile(entity: Entity, catalogue: Mapping[str, UnitStats]) -> bool:
     return stats is not None and stats["speed"] != 0.0
 
 
-def find_army(sample: Sample, catalogue: Mapping[str, UnitStats]) -> tuple[Entity, ...]:
+def find_army(
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    profiles: Mapping[str, CombatProfile],
+) -> tuple[Entity, ...]:
     """Return the units that can be sent to fight.
 
     Owned, finished, armed, mobile, and not the editor placeholder. Each
@@ -239,12 +275,21 @@ def find_army(sample: Sample, catalogue: Mapping[str, UnitStats]) -> tuple[Entit
     Builder sent at a tank is a Builder thrown away, a turret cannot travel, and
     the placeholder is not a unit at all.
 
+    Armament comes from the registry rather than the stat catalogue, because the
+    catalogue describes 90 of 173 types and an absent entry there is
+    indistinguishable from an unarmed unit ([[mechanics-combat-profile]]).
+
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name.
+        catalogue: Unit stats by type name, for mobility.
+        profiles: Combat profiles by type name, for armament.
 
     Returns:
         The army, in roster order.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe an
+            owned type.
     """
     return tuple(
         entity
@@ -252,7 +297,7 @@ def find_army(sample: Sample, catalogue: Mapping[str, UnitStats]) -> tuple[Entit
         if entity["mine"]
         and entity["complete"]
         and entity["type_name"] != PLACEHOLDER_TYPE
-        and is_armed(entity, catalogue)
+        and is_armed(profiles, entity)
         and is_mobile(entity, catalogue)
     )
 
@@ -274,6 +319,40 @@ def find_targets(sample: Sample) -> tuple[Entity, ...]:
     return tuple(entity for entity in sample["entities"] if entity["hostile"])
 
 
+def engageable(
+    profiles: Mapping[str, CombatProfile],
+    army: Sequence[Entity],
+    targets: Sequence[Entity],
+) -> tuple[Entity, ...]:
+    """Return the targets at least one of these units can actually shoot.
+
+    **This is the filter whose absence could hang a whole match.** ``c_tank`` --
+    the only unit the opening plan builds -- declares ``canAttackFlyingUnits:
+    false``. Combat used to select on *having* a weapon and never on the weapon
+    reaching the target, so on a water map the army could commit to a
+    helicopter, hold it for as long as it stayed visible because commitment
+    keeps a visible target, and never fire a shot or pick anything else
+    ([[mechanics-combat-profile]]).
+
+    Args:
+        profiles: Combat profiles by type name.
+        army: The units available to fight.
+        targets: The hostile entities to filter.
+
+    Returns:
+        The targets some unit in ``army`` can engage, in roster order.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe a
+            visible type.
+    """
+    return tuple(
+        target
+        for target in targets
+        if any(can_engage(profiles, attacker, target) for attacker in army)
+    )
+
+
 def choose_target(
     army: Sequence[Entity],
     targets: Sequence[Entity],
@@ -286,23 +365,28 @@ def choose_target(
     measured from the army's centre, that centre shifts whenever a unit dies or
     a new one rolls out, and the whole army was re-tasked on a flip that could
     be a few world units wide. One measured run spent 743 attack orders across
-    48 units on 24 targets -- about fifteen re-orders each
-    ([[policy-combat]]).
+    48 units on 24 targets -- about fifteen re-orders each ([[policy-combat]]).
 
-    So a target already being attacked is kept while it remains visible and
-    hostile, and a new one is chosen only when it is not. The engine's own AI
+    So a target already being attacked is kept while it remains in the candidate
+    list, and a new one is chosen only when it is not. The engine's own AI
     reaches the same place from the other direction: it holds a target and
     refreshes on a timer rather than on a change of mind
     ([[ai-opponent-strategy]]).
 
     Purity is not lost by this. The prior choice is an argument rather than
-    hidden state, exactly as the build loop passes its own progress in, so the
+    hidden state, exactly as the plan passes its own progress in, so the
     function is still a value in and a value out.
 
     Nearest is measured to the army's centre rather than per unit, so a split
     force converges instead of each unit wandering to its own closest enemy.
     Concentrating fire is the one tactic that matters at this scale: two tanks
     on one target kill it in half the time and take half the return fire.
+
+    **Health breaks ties and nothing more.** Equidistant targets are ordinary on
+    a symmetric map, and resolving them by roster order is arbitrary where
+    resolving them by what is closest to dying is not. It is deliberately not a
+    scoring model: ranking a distant cripple above a near healthy unit would be
+    a number invented here rather than measured ([[policy-combat]]).
 
     Distance is squared and left squared -- only the ordering is used, and a
     square root would cost precision for nothing.
@@ -311,10 +395,6 @@ def choose_target(
         army: The units available to fight.
         targets: The hostile entities to choose between.
         holding: Engine identity of the target already being attacked, if any.
-        fighting: The units cleared to attack. ``None`` means the whole army,
-            which is what a caller with no wave discipline wants; a caller that
-            musters passes the released wave so reinforcements still gathering
-            are not ordered in alone ([[engine-ai-triggers]]).
 
     Returns:
         The chosen target, or None when either side is empty.
@@ -328,18 +408,20 @@ def choose_target(
     centre_y = sum(unit["y"] for unit in army) / len(army)
 
     best: Entity | None = None
-    best_distance = 0.0
+    best_key: tuple[float, float] = (0.0, 0.0)
     for target in targets:
         distance = (target["x"] - centre_x) ** 2 + (target["y"] - centre_y) ** 2
-        if best is None or distance < best_distance:
+        key = (distance, target["hp"])
+        if best is None or key < best_key:
             best = target
-            best_distance = distance
+            best_key = key
     return best
 
 
 def engagements(
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
+    profiles: Mapping[str, CombatProfile],
     holding: int | None = None,
     fighting: Sequence[Entity] | None = None,
 ) -> tuple[Engagement, ...]:
@@ -349,17 +431,31 @@ def engagements(
     that target persists across samples, both for the reasons given in
     :func:`choose_target`.
 
+    Only units that can reach the chosen target's layer are ordered at it. The
+    rest are left alone rather than sent: an order a unit cannot carry out is
+    accepted by the engine and then does nothing, which is indistinguishable
+    from a unit that is simply losing ([[mechanics-combat-profile]]).
+
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name.
+        catalogue: Unit stats by type name, for mobility.
+        profiles: Combat profiles by type name, for armament and reachability.
         holding: Engine identity of the target already being attacked, if any.
+        fighting: The units cleared to attack. ``None`` means the whole army,
+            which is what a caller with no wave discipline wants; a caller that
+            musters passes the released wave so reinforcements still gathering
+            are not ordered in alone ([[engine-ai-triggers]]).
 
     Returns:
-        One engagement per available unit, empty when there is no army or
-        nothing hostile in sight.
+        One engagement per unit that can reach the target, empty when there is
+        no army or nothing it can touch.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe a
+            visible type.
     """
-    army = find_army(sample, catalogue) if fighting is None else tuple(fighting)
-    target = choose_target(army, find_targets(sample), holding)
+    army = find_army(sample, catalogue, profiles) if fighting is None else tuple(fighting)
+    target = choose_target(army, engageable(profiles, army, find_targets(sample)), holding)
     if target is None:
         return ()
     return tuple(
@@ -369,10 +465,12 @@ def engagements(
             reason=f"{unit['type_name']} -> {target['type_name']} {target['unit_id']}",
         )
         for unit in army
+        if can_engage(profiles, unit, target)
     )
 
 
 __all__ = [
+    "FIRST_WAVE",
     "PLACEHOLDER_TYPE",
     "RALLY_RADIUS",
     "WAVE_SIZES",
@@ -380,10 +478,10 @@ __all__ = [
     "Engagement",
     "Muster",
     "choose_target",
+    "engageable",
     "engagements",
     "find_army",
     "find_targets",
-    "is_armed",
     "is_mobile",
     "muster",
     "rally",

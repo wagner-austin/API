@@ -12,13 +12,16 @@ perfectly safe ground with the only approach to it running down an enemy
 frontage, and screening destinations alone would have sent that builder to its
 death exactly as before.
 
-Two things make the answer legitimate rather than invented. Hostility comes from
-the engine's own alliance comparison, carried per entity on the wire, so an
-ally's tank and a neutral map object are not mistaken for threats
-([[perception-visibility]]). Reach comes from each unit's declared attack range,
-dumped from the engine's registry rather than from ``-printunits`` — that output
-covers 90 of 173 registered types and omits every turret ([[policy-threat]]) —
-so no radius here is a number this module made up, and none is missing.
+Three things make the answer legitimate rather than invented, and none of them
+is a number this module chose. Hostility comes from the engine's own alliance
+comparison, carried per entity on the wire, so an ally's tank and a neutral map
+object are not mistaken for threats ([[perception-visibility]]). Reach comes
+from each type's declared attack range, dumped from the registry rather than
+from ``-printunits`` — that output covers 90 of 173 registered types and omits
+every turret ([[mechanics-unit-catalogue]]). And whether a given hostile can
+shoot *this* traveller at all is the engine's own layer test
+([[mechanics-combat-profile]]), which is what keeps an anti-air turret from
+ruling out ground the builder can safely walk.
 
 **What this deliberately does not model.** The route is a straight line, and the
 engine's pathfinder does not walk straight lines — it steers around terrain, so
@@ -35,42 +38,18 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from rw_bot.mechanics.combat_profile import CombatProfile, can_engage, reach_of
 from rw_bot.wire.state import Entity, Sample
-
-
-def reach_of(entity: Entity, reaches: Mapping[str, float]) -> float:
-    """Return how far an entity can shoot.
-
-    Indexed rather than looked up with a default, and that is the whole point of
-    the change that produced this signature. The reach table is dumped from the
-    engine's registry and covers **every** registered type, so a missing name is
-    a stale dump against a running game, not a gap to absorb — and absorbing it
-    is what previously reported every turret as harmless
-    ([[mechanics-movement-layers]] for the sibling case, and the reasoning is
-    the same).
-
-    A `KeyError` naming the type is therefore the correct failure. It is loud,
-    it says which type, and it cannot be mistaken for "this unit is unarmed" —
-    which is what a zero would have looked like.
-
-    Args:
-        entity: The entity to measure.
-        reaches: Attack range by type name, from the registry dump.
-
-    Returns:
-        Attack range in world units, comparable with entity positions. Zero for
-        a unit the engine reports as unarmed.
-    """
-    return reaches[entity["type_name"]]
 
 
 def route_is_exposed(
     sample: Sample,
-    reaches: Mapping[str, float],
+    profiles: Mapping[str, CombatProfile],
+    traveller: Entity,
     start: tuple[float, float],
     end: tuple[float, float],
 ) -> bool:
-    """Report whether a hostile can shoot anything walking from start to end.
+    """Report whether a hostile can shoot the traveller anywhere along its walk.
 
     The destination is the segment's endpoint, so a target standing in a
     turret's field of fire is caught by the same test that catches a route
@@ -79,26 +58,38 @@ def route_is_exposed(
 
     Only hostiles count, and hostility is the engine's answer rather than
     "everything that is not mine" — see :attr:`~rw_bot.wire.state.Entity.hostile`
-    for why the two differ. Unarmed hostiles are skipped: an enemy builder
-    standing on the route is an obstacle, not a threat, and treating it as one
-    would rule out ground the bot can safely cross.
+    for why the two differ.
+
+    **The traveller is an argument because exposure is not a property of the
+    ground.** A hostile that cannot reach the traveller's layer is not a threat
+    to it however close the route passes: an anti-air turret does not endanger a
+    builder, and counting it ruled out pools the bot could have taken safely.
+    Unarmed hostiles fall out of the same test rather than needing a case of
+    their own — an enemy builder standing on the route is an obstacle, not a
+    threat.
 
     Args:
         sample: One observation of the world.
-        reaches: Attack range by type name, from the registry dump.
+        profiles: Combat profiles by type name, from the registry dump.
+        traveller: The unit making the walk, whose layer decides which hostiles
+            can touch it.
         start: Where the walk begins, as world x and y.
         end: Where it ends.
 
     Returns:
-        True when some visible hostile's attack range covers any point of the
-        straight line between them.
+        True when some visible hostile that can engage the traveller has it
+        within reach at some point of the straight line between them.
+
+    Raises:
+        CombatProfileError: ``RW-COMBAT-002`` when the dump does not describe a
+            visible type, which is a stale dump rather than a safe route.
     """
     for entity in sample["entities"]:
         if not entity["hostile"]:
             continue
-        reach = reach_of(entity, reaches)
-        if reach <= 0.0:
+        if not can_engage(profiles, entity, traveller):
             continue
+        reach = reach_of(profiles, entity)
         if _distance_squared_to_segment(entity["x"], entity["y"], start, end) <= reach**2:
             return True
     return False
@@ -138,4 +129,4 @@ def _distance_squared_to_segment(
     return (x - (start[0] + along * span_x)) ** 2 + (y - (start[1] + along * span_y)) ** 2
 
 
-__all__ = ["reach_of", "route_is_exposed"]
+__all__ = ["route_is_exposed"]

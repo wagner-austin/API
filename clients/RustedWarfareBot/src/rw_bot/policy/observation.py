@@ -17,30 +17,12 @@ Pure, like the rest of the policy layer: a sample goes in and a fact comes out.
 
 from __future__ import annotations
 
-from rw_bot.wire.state import Entity, Sample
+from rw_bot.wire.state import Sample
 
 #: World-unit displacement between samples below which a unit counts as
 #: stationary. A parked unit reports byte-identical coordinates, so this only
 #: has to survive float noise rather than distinguish slow movement.
 MOVEMENT_EPSILON = 0.5
-
-
-def position_of(entity: Entity | None) -> tuple[float, float] | None:
-    """Return an entity's position, or None when it is not there.
-
-    The None case is the point. A builder that has died is absent from the
-    roster, and the callers track positions across samples -- so "gone" has to
-    be representable rather than defaulted to an origin no unit ever stands on.
-
-    Args:
-        entity: The entity, or None when the roster does not hold one.
-
-    Returns:
-        The position, or None when there is no entity.
-    """
-    if entity is None:
-        return None
-    return (entity["x"], entity["y"])
 
 
 def has_moved(before: tuple[float, float] | None, after: tuple[float, float] | None) -> bool:
@@ -82,4 +64,4 @@ def is_rising(sample: Sample, type_name: str) -> bool:
     return False
 
 
-__all__ = ["MOVEMENT_EPSILON", "has_moved", "is_rising", "position_of"]
+__all__ = ["MOVEMENT_EPSILON", "has_moved", "is_rising"]

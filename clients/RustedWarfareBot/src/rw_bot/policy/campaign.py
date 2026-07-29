@@ -1,512 +1,430 @@
-"""Play a whole match: build the plan, then fight with what it built.
+"""Play a whole match in one tick: perceive, arbitrate, dispatch, acknowledge.
 
-Two phases, kept apart because they stop for different reasons. The build phase
-ends when the plan is satisfied or cannot proceed; the fight phase ends when
-there is nothing left to attack, nothing left to attack with, or the sample
-budget runs out.
+There used to be two loops. The build loop ran the opening plan to completion
+and handed over to a fight loop, and the seam between them was the bot's largest
+structural defect rather than a tidy separation of concerns:
+
+* while building there was no army and no economy, so the opening was played
+  defenceless and every credit above the plan's cost sat in the bank;
+* once fighting there was no build policy at all, so ``extractorT1`` was the
+  only structure that could ever be placed again and the factory count was
+  frozen for the rest of the match — which is the arithmetic behind a run that
+  banked 7,013 credits behind a single Land Factory ([[policy-production]]);
+* and a plan that stalled meant a match that never fought, because the handover
+  was conditional on the plan finishing.
+
+So there is one loop, and everything runs on every observation. The plan keeps
+building, the factories keep producing, the economy keeps expanding and the army
+keeps fighting, for as long as the match lasts.
+
+**Spending is arbitrated, not raced.** Every decision that costs credits claims
+against one :class:`~rw_bot.policy.budget.Budget` per observation, in priority
+order: the plan first because its prerequisites gate everything, then replacing
+losses, then more income, then more throughput. Before this, the production pass
+and the expansion pass each budgeted against ``sample["credits"]`` independently
+and committed the same credit twice ([[policy-budget]]).
 
 This module is orchestration only. What to build is
 :mod:`rw_bot.policy.build_order`, what to attack is
-:mod:`rw_bot.policy.combat`, and both are pure -- the channel is touched here
-and in :mod:`rw_bot.policy.runner` and nowhere else.
+:mod:`rw_bot.policy.combat`, what to claim is :mod:`rw_bot.policy.economy`, and
+all of them are pure -- the channel is touched here and nowhere else.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TypedDict
+from pathlib import Path
 
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.build_order import BUILDER_TYPE, find_anchor, find_builder
-from rw_bot.policy.combat import (
-    Engagement,
-    engagements,
-    find_army,
-    find_targets,
-    muster,
-    rally,
+from rw_bot.mechanics.combat_profile import CombatProfile
+from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.policy.budget import Budget
+from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
+from rw_bot.policy.counter import counter_composition
+from rw_bot.policy.dispatch import WaveController
+from rw_bot.policy.expander import Expander
+from rw_bot.policy.ledger import Outlays
+from rw_bot.policy.match_report import MatchReport
+from rw_bot.policy.production import wanted_producers
+from rw_bot.policy.recorder import Recorder
+from rw_bot.policy.runner import DEFAULT_STALL_SAMPLES, OrderTracker
+from rw_bot.policy.scorekeeper import Scorekeeper
+from rw_bot.policy.spending import (
+    PlanStep,
+    build_plan,
+    replace_losses,
+    upgrade_income,
+    worker_need,
 )
-from rw_bot.policy.economy import count_extractors, expand_economy, expand_production
-from rw_bot.policy.observation import has_moved, position_of
-from rw_bot.policy.production import sustain
-from rw_bot.wire.command import attack_order, build_order, move_order, produce_order
-from rw_bot.wire.state import Entity, Sample
+from rw_bot.policy.verdict import GRADE_SURVIVED
+from rw_bot.policy.workforce import Workforce
+from rw_bot.wire.command import AttackOrder, BuildOrder, MoveOrder, ProduceOrder
 
 #: Samples a stationary builder may sit on an unstarted expansion before the
 #: order is presumed lost and sent again.
 #:
-#: The same reasoning as the build loop's stall window, used for the opposite
-#: purpose: there it ends the run, here it retries. A builder that has neither
-#: moved nor started building for this many samples is not on its way anywhere,
-#: and the cost of being wrong is one duplicate order the engine collapses onto
-#: the same waypoint ([[policy-loop]]).
+#: The same reasoning as the plan's stall window, used for the opposite purpose:
+#: there it ends the plan, here it retries. A builder that has neither moved nor
+#: started building for this many samples is not on its way anywhere, and the
+#: cost of being wrong is one duplicate order the engine collapses onto the same
+#: waypoint ([[policy-loop]]).
 EXPAND_RETRY_SAMPLES = 45
 
-
-class Battle(TypedDict):
-    """What the fight phase achieved.
-
-    Attributes:
-        orders_sent: Attack orders issued.
-        army_start: Units available to fight when the phase opened.
-        army_end: Units still available when it closed.
-        targets_seen: Hostile entities visible when the phase opened.
-        targets_end: Hostile entities visible when it closed.
-        killed: Targets the bot ordered an attack on that are no longer
-            visible. Not a kill count -- a target that retreated into fog reads
-            the same way, which is why the field is named for what was observed
-            rather than for what was concluded.
-        produced: Reinforcements ordered while the fight ran.
-        expanded: Extractors ordered onto resource pools while the fight ran.
-        extractors_start: Finished extractors held when the phase opened.
-        extractors_end: Finished extractors held when it closed.
-        expand_reason: The economy's own words for its last decision, which is
-            what tells a match that could not expand from one that chose not
-            to.
-        samples_seen: World samples read during the phase.
-        outcome: Why it stopped: ``"cleared"``, ``"no_army"``, or
-            ``"sample_limit"``.
-    """
-
-    produced: int
-    expanded: int
-    extractors_start: int
-    extractors_end: int
-    expand_reason: str
-    orders_sent: int
-    rallied: int
-    army_start: int
-    army_end: int
-    targets_seen: int
-    targets_end: int
-    killed: int
-    samples_seen: int
-    outcome: str
+#: The most builders worth holding.
+#:
+#: Set by measurement, not by argument. Uncapped, the bot bought 33 in a
+#: 1500-sample match -- 16,500 credits of labour placing 13 extractors, while the
+#: army it was supposed to be funding stayed at a dozen units
+#: ([[policy-production]]).
+DEFAULT_MAX_WORKERS = 4
 
 
-class _Expander:
-    """Turns economy decisions into orders, and remembers what it already asked.
-
-    The decision is :func:`rw_bot.policy.economy.expand_economy` and stays pure.
-    What lives here is the part that cannot: whether an order already sent is
-    worth sending again. Those are different questions, and keeping them apart
-    is what lets the choice of pool be tested without a clock.
-
-    Re-sending matters because the economy is asked on every sample. A builder
-    that has been told to claim a pool, and has not yet started walking, is
-    still offered that same pool -- so without a memory the order would go out
-    at sample rate. That is the churn that produced 743 attack orders against 24
-    targets before the combat side learned to commit ([[policy-combat]]).
-
-    The memory is not a ban. An order can be refused or lost, and a pool that is
-    never retried is an economy that stops for the rest of the match, so a
-    repeat is allowed once the builder has sat still through
-    :data:`EXPAND_RETRY_SAMPLES` observations doing nothing at all.
-
-    A caller that passes no reach table gets one of these anyway, switched off.
-    Returning None instead would push a "then are we expanding?" test into every
-    place that touches it, and the loop it lives in is already at the limit of
-    the branching it can carry.
-
-    Attributes:
-        enabled: Whether expansion is being played at all.
-        count: Expansion orders sent.
-        reason: The economy's own words for its most recent decision.
-    """
-
-    def __init__(
-        self,
-        catalogue: Mapping[str, UnitStats],
-        reaches: Mapping[str, float] | None,
-        reserve: int,
-    ) -> None:
-        self.enabled = reaches is not None
-        self.count = 0
-        self.reason = "no sample seen yet" if self.enabled else "expansion disabled"
-        self._catalogue = catalogue
-        self._reaches = reaches
-        self._reserve = reserve
-        self._last_site: tuple[float, float] | None = None
-        self._quiet = 0
-
-    def step(self, channel: AgentChannel, sample: Sample, builder_moved: bool) -> None:
-        """Ask the economy what to do about this sample, and do it.
-
-        Does nothing when expansion is switched off, so the caller does not have
-        to ask.
-
-        Args:
-            channel: An open connection to the agent.
-            sample: One observation of the world.
-            builder_moved: Whether the builder moved since the previous sample.
-
-        Raises:
-            OSError: When the connection fails.
-        """
-        if self._reaches is None:
-            return
-        # Throughput before income. Another extractor earns credits the player
-        # already cannot spend, and the run that measured this banked 7,013 of
-        # them behind a single factory ([[policy-production]]). A producer is
-        # therefore proposed first, and only when the queue is genuinely the
-        # constraint -- otherwise this falls straight through to the pool.
-        growth = expand_production(sample, self._catalogue, reserve=self._reserve)
-        if not growth["build"]:
-            growth = expand_economy(
-                sample,
-                self._catalogue,
-                self._reaches,
-                reserve=self._reserve,
-                builder_moved=builder_moved,
-            )
-        self.reason = growth["reason"]
-        if not growth["build"]:
-            # Walking, building, or saving up. The retry clock measures a
-            # builder doing none of those, so anything else resets it.
-            self._quiet = 0
-            return
-        site = (growth["x"], growth["y"])
-        if site == self._last_site and self._quiet < EXPAND_RETRY_SAMPLES:
-            self._quiet += 1
-            return
-        channel.send_build(
-            build_order(
-                unit_id=growth["unit_id"],
-                type_name=growth["type_name"],
-                x=growth["x"],
-                y=growth["y"],
-            )
-        )
-        self.count += 1
-        self._last_site = site
-        self._quiet = 0
-
-
-def _gather_reserve(
-    channel: AgentChannel,
-    sample: Sample,
-    catalogue: Mapping[str, UnitStats],
-    reserve: Sequence[Entity],
-    rallying: set[int],
-) -> int:
-    """Send the units still gathering to the base, once each.
-
-    Once each, not once per sample: the engine runs a waypoint until it is
-    replaced, so re-issuing at the sampling rate resets the walk and nothing
-    arrives. A unit knocked off course is therefore not re-ordered, which is a
-    real gap and a cheaper one than never arriving at all.
+def _send_plan_step(channel: AgentChannel, step: PlanStep) -> None:
+    """Send whatever the opening plan decided on, if anything.
 
     Args:
         channel: An open connection to the agent.
-        sample: One observation of the world.
-        catalogue: Unit stats by type name, for finding the anchor.
-        reserve: Units not cleared to attack.
-        rallying: Ids already sent. Extended in place.
-
-    Returns:
-        How many move orders were sent.
-    """
-    anchor = find_anchor(sample, catalogue)
-    if anchor is None:
-        # Nothing immobile left to gather at. A player who has lost every
-        # structure has worse problems than formation.
-        return 0
-    sent = 0
-    for move in rally(reserve, (anchor["x"], anchor["y"])):
-        if move["unit_id"] in rallying:
-            continue
-        rallying.add(move["unit_id"])
-        channel.send_move(move_order(unit_id=move["unit_id"], x=move["x"], y=move["y"]))
-        sent += 1
-    return sent
-
-
-def _wanted(
-    reinforce: Sequence[str],
-    builder: Entity | None,
-    expanding: bool,
-) -> tuple[str, ...]:
-    """Return what idle producers should make, in preference order.
-
-    A lost builder ends the economy permanently, so a replacement is asked for
-    when none is alive. It goes **last**, which is what keeps the factories on
-    tanks: a producer takes the first type it can make, and only the command
-    centre -- which cannot make a tank -- falls through to the builder.
-
-    Nothing is added when expansion is switched off. A builder with no pools to
-    claim is a unit that walks nowhere and costs 200 credits.
-
-    Args:
-        reinforce: Type names the plan keeps wanting.
-        builder: The owned builder, or None when there is none.
-        expanding: Whether the economy is being played at all.
-
-    Returns:
-        Type names to keep making, in preference order.
-    """
-    if expanding and builder is None:
-        return (*reinforce, BUILDER_TYPE)
-    return tuple(reinforce)
-
-
-def _replace_losses(
-    channel: AgentChannel,
-    sample: Sample,
-    catalogue: Mapping[str, UnitStats],
-    wanted: Sequence[str],
-) -> int:
-    """Order every idle producer to make what the plan keeps wanting.
-
-    Args:
-        channel: An open connection to the agent.
-        sample: One observation of the world.
-        catalogue: Unit stats by type name, for prices.
-        wanted: Type names to keep making, in preference order.
-
-    Returns:
-        How many produce orders were sent.
+        step: What the plan decided this observation.
 
     Raises:
         OSError: When the connection fails.
     """
-    sent = 0
-    for order in sustain(sample, catalogue, wanted):
-        channel.send_produce(produce_order(unit_id=order["unit_id"], type_name=order["type_name"]))
-        sent += 1
-    return sent
+    if step["produce"] is not None:
+        channel.send_produce(step["produce"])
+    if step["build"] is not None:
+        channel.send_build(step["build"])
 
 
-def _dispatch_attacks(
-    channel: AgentChannel,
-    current: Sequence[Engagement],
-    ordered: dict[int, int],
-    attacked: set[int],
-) -> int:
-    """Send each engagement whose attacker is not already on that target.
-
-    The engine keeps executing a waypoint until it is replaced, so re-issuing
-    an identical attack every sample would replace an in-progress order with a
-    copy of itself and the unit would never close the distance.
+def _send_moves(channel: AgentChannel, moves: Sequence[MoveOrder]) -> int:
+    """Send every move order and report how many.
 
     Args:
         channel: An open connection to the agent.
-        current: The engagements the combat policy chose.
-        ordered: Target each attacker was last sent at, updated in place.
-        attacked: Every target ordered against, updated in place.
+        moves: The orders to send.
 
     Returns:
-        How many attack orders were sent.
+        How many were sent.
 
     Raises:
         OSError: When the connection fails.
     """
-    sent = 0
-    for engagement in current:
-        attacker = engagement["attacker_id"]
-        target = engagement["target_id"]
-        if ordered.get(attacker) == target:
-            continue
-        ordered[attacker] = target
-        attacked.add(target)
-        channel.send_attack(attack_order(unit_id=attacker, target_id=target))
-        sent += 1
-    return sent
+    for move in moves:
+        channel.send_move(move)
+    return len(moves)
 
 
-def fight(
+def _send_attacks(channel: AgentChannel, attacks: Sequence[AttackOrder]) -> int:
+    """Send every attack order and report how many.
+
+    Args:
+        channel: An open connection to the agent.
+        attacks: The orders to send.
+
+    Returns:
+        How many were sent.
+
+    Raises:
+        OSError: When the connection fails.
+    """
+    for attack in attacks:
+        channel.send_attack(attack)
+    return len(attacks)
+
+
+def _send_produces(channel: AgentChannel, orders: Sequence[ProduceOrder]) -> int:
+    """Send every produce order and report how many.
+
+    Args:
+        channel: An open connection to the agent.
+        orders: The orders to send.
+
+    Returns:
+        How many were sent.
+
+    Raises:
+        OSError: When the connection fails.
+    """
+    for order in orders:
+        channel.send_produce(order)
+    return len(orders)
+
+
+def _send_builds(channel: AgentChannel, orders: Sequence[BuildOrder]) -> None:
+    """Send every build order.
+
+    Args:
+        channel: An open connection to the agent.
+        orders: The orders to send.
+
+    Raises:
+        OSError: When the connection fails.
+    """
+    for order in orders:
+        channel.send_build(order)
+
+
+def play(
     channel: AgentChannel,
+    plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
+    placements: Mapping[str, TypePlacement],
+    profiles: Mapping[str, CombatProfile],
     max_samples: int,
-    reinforce: Sequence[str] = (),
     *,
-    reaches: Mapping[str, float] | None = None,
+    reinforce: Sequence[str] = (),
     reserve: int = 0,
-) -> Battle:
-    """Send the army at the enemy, replacing losses and claiming ground as it goes.
+    expand: bool = True,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+    counter: bool = False,
+    stop_when_plan_done: bool = False,
+    stall_samples: int = DEFAULT_STALL_SAMPLES,
+    ladder: Sequence[int] = WAVE_SIZES,
+    trace: Path | None = None,
+) -> MatchReport:
+    """Play the match: one observation, one arbitration, one dispatch, repeat.
 
-    An order is re-sent only when a unit's target changes. The engine keeps
-    executing a waypoint until it is replaced, so re-issuing the same attack
-    every sample would replace an in-progress order with an identical one at
-    ~300 Hz and the unit would never close the distance.
+    Every layer runs on every observation. That is the whole of the change this
+    function represents, and it is what removes three defects at once: the bot
+    is no longer defenceless while building, no longer unable to build once
+    fighting, and no longer unable to fight at all when the opening plan stalls.
 
-    Reinforcement is what makes this a fight rather than a sortie. Without it
-    the bot commits a fixed force and is finished when that force is, which is
-    exactly how it lost 4 tanks to nothing: the opponents replace losses
-    continuously and we did not ([[ai-opponent-strategy]]).
+    Order within a tick is the spending priority, and it is expressed by call
+    order rather than by weights, because the order *is* the policy:
 
-    Expansion is what makes reinforcement affordable. Replacing losses out of a
-    fixed income is a race the bot loses on arithmetic: three extractors funded
-    45 replacements over a run that ended with two units alive, while the
-    opponents grew from 47 visible units to 142 by taking more of the map's 46
-    resource pools ([[policy-economy]]). So the same loop that spends credits
-    also earns them, and a builder that would otherwise stand idle for the whole
-    match claims another pool whenever one is safe and affordable.
+    1. **The plan**, protected. Its prerequisites gate everything else.
+    2. **Replacing losses**, protected. An army dying now cannot wait for
+       income.
+    3. **Expansion**, unprotected. Income first, then throughput: income
+       compounds and throughput does not, and buying the second ahead of the
+       first takes the one builder away from the only asset that grows
+       ([[policy-production]]). Neither may take the credits held for the army
+       ([[policy-budget]]).
 
-    A lost builder ends the economy permanently, so when nothing owned can place
-    an extractor the command centre is asked for another. It is put last in the
-    preference order, which is what keeps the factories on tanks: a producer
-    takes the first type it can make, and only the command centre -- which
-    cannot make a tank -- falls through to the builder.
+    Attacking costs nothing and is therefore not arbitrated at all.
 
     Args:
         channel: An open connection to the agent.
-        catalogue: Unit stats by type name, for reading who is armed.
-        max_samples: Stop after this many samples regardless.
+        plan: What to make, in order. Entries may be structures or units.
+        catalogue: Unit stats by type name, for prices and mobility.
+        placements: Placement rules by type name, for where each may stand.
+        profiles: Combat profiles by type name, for reach, for the threat
+            filter, and for which targets the army can engage at all.
+        max_samples: Stop after this many observations regardless.
         reinforce: Type names idle producers should keep making. Empty means
             fight with what exists and make nothing.
-        reaches: Attack range by type name, for judging which resource pools can
-            be reached without walking through fire. None disables expansion
-            entirely, which is what a caller that only wants to fight passes.
-        reserve: Credits to leave unspent for the army before claiming a pool.
+        reserve: Credits held back from expansion for the army.
+        max_workers: The most builders worth holding. Every one past the point
+            where they can be usefully employed is credits standing still
+            instead of fighting ([[policy-production]]).
+        counter: Whether production tilts toward the layers the opponent is
+            seen fielding, repeating anti-air already in the mix until its
+            share covers the visible air threat. False holds the stated mix
+            regardless, which is the behaviour every measurement so far was
+            taken under ([[mechanics-combat-profile]]).
+        expand: Whether to play the economy at all. False is the control arm of
+            the A/B that measures whether expanding helps, and what a probe
+            passes when it wants the economy held still ([[policy-economy]]).
+        stop_when_plan_done: Whether finishing the plan ends the run. False for
+            a match, because a finished opening is when playing starts. True is
+            what a probe passes when the plan *is* the task -- the income probe
+            builds an extractor and then wants control back to measure, and
+            playing on would spend the credits it is trying to observe.
+        stall_samples: Observations of no visible progress before the plan is
+            called stalled.
+        ladder: How many units each successive wave waits for. Defaults to the
+            shipped AI's ([[engine-ai-triggers]]).
+        trace: Where to write the per-sample record, or None to keep none.
 
     Returns:
-        The battle report.
+        The match report.
 
     Raises:
-        ChannelError: When the agent closes the connection mid-phase.
+        ChannelError: When the agent closes the connection mid-match.
         OSError: When the connection fails.
     """
-    holding: int | None = None
-    released: frozenset[int] = frozenset()
-    waves = 0
-    rallying: set[int] = set()
-    rallied = 0
-    ordered: dict[int, int] = {}
-    attacked: set[int] = set()
-    visible_now: set[int] = set()
-    orders_sent = 0
-    produced = 0
-    samples_seen = 0
-    army_start = 0
-    targets_seen = 0
-    army_end = 0
-    targets_end = 0
-    outcome = "sample_limit"
-    extractors_start = 0
-    extractors_end = 0
-    builder_was: tuple[float, float] | None = None
-    expander = _Expander(catalogue, reaches, reserve)
+    tracker = OrderTracker(plan, stall_samples)
+    expander = Expander(catalogue, profiles, expand)
+    workforce = Workforce(EXPAND_RETRY_SAMPLES)
+    recorder = Recorder(trace)
+    scores = Scorekeeper(catalogue, profiles)
+    waves = WaveController(ladder)
 
-    while samples_seen < max_samples:
+    produced = 0
+    refused = 0
+    outlays = Outlays()
+    # Conversions already ordered, as (structure, tier). A conversion never
+    # fills the queue, so without this the same order is re-sent every
+    # observation -- and it is keyed by the pair rather than by the structure
+    # because a conversion keeps the engine identity, so remembering the unit
+    # alone would bar it from ever taking a second step up the chain.
+    upgraded: set[tuple[int, str]] = set()
+    completed = 0
+    build_outcome = "building"
+    build_reason = "no sample seen yet"
+    outcome = "sample_limit"
+
+    while scores.samples_seen < max_samples:
         sample = channel.next_sample()
-        samples_seen += 1
 
         # Acknowledged on every exit, including the ones that break out. In
         # lockstep the agent holds the simulation until this arrives
         # ([[policy-determinism]]).
         try:
-            army = find_army(sample, catalogue)
+            army = find_army(sample, catalogue, profiles)
             targets = find_targets(sample)
-            army_end = len(army)
-            targets_end = len(targets)
-            visible_now = {entity["unit_id"] for entity in targets}
-            if samples_seen == 1:
-                army_start = army_end
-                targets_seen = targets_end
+            scores.observe(sample, army, targets, workforce.size(sample))
+            completed = tracker.completed(sample)
 
-            # Read unconditionally, on every sample. The builder's travel is
-            # what tells expansion its order is still being carried out, so it
-            # has to be sampled even on observations that never reach a
-            # decision -- the same rule the build loop's stall clock follows.
-            builder = find_builder(sample)
-            builder_now = position_of(builder)
-            builder_moved = has_moved(builder_was, builder_now)
-            builder_was = builder_now
+            # Read unconditionally, on every sample. Movement is what tells
+            # both the plan and the economy that an order is still being carried
+            # out, so every worker has to be sampled even on observations that
+            # never reach a decision.
+            free = workforce.free(sample)
 
-            extractors_end = count_extractors(sample)
-            if samples_seen == 1:
-                extractors_start = extractors_end
+            budget = Budget(sample["credits"], reserve)
 
-            # Production runs before the army check, so a wave that has just been
-            # wiped still queues its replacements on the sample that notices.
-            produced += _replace_losses(
-                channel, sample, catalogue, _wanted(reinforce, builder, expander.enabled)
-            )
-            expander.step(channel, sample, builder_moved)
-
-            if not army:
-                # Nothing left to fight with. Distinct from having cleared the
-                # field, and the run log has to be able to tell those apart.
-                outcome = "no_army"
-                break
-            if not targets:
-                outcome = "cleared"
-                break
-
-            # Fill, then commit. Reinforcements pool in the reserve until they
-            # are a wave rather than walking into the fight one at a time, which
-            # is what the shipped AI does and what a plain "have we started"
-            # flag got wrong ([[engine-ai-triggers]]).
-            wave = muster(army, released, waves)
-            released = wave["released"]
-            waves = wave["waves"]
-
-            # The reserve gathers at the base rather than sitting wherever it
-            # rolled out of the factory. Without it a released wave arrives
-            # piecemeal even after the gate opens, which is the trickle again
-            # one step earlier -- and units waiting at the base are the only
-            # thing standing between an attacker and it ([[policy-combat]]).
-            rallied += _gather_reserve(
-                channel,
+            plan_step = build_plan(
                 sample,
+                tracker,
+                budget,
                 catalogue,
-                tuple(u for u in army if u["unit_id"] not in released),
-                rallying,
+                placements,
+                profiles,
+                free,
+                workforce,
+            )
+            build_outcome = plan_step["outcome"]
+            build_reason = plan_step["reason"]
+            plan_holds_worker = plan_step["holds_worker"]
+            _send_plan_step(channel, plan_step)
+            # Production runs before the army check, so a wave that has just
+            # been wiped still queues its replacements on the sample that
+            # notices.
+            need = worker_need(
+                free,
+                workforce.size(sample),
+                budget.spendable(),
+                catalogue,
+                max_workers,
+            )
+            # A wanted builder joins the composition rather than sitting in a
+            # channel of its own. The separate channel was reachable only by a
+            # producer that could make nothing in the army mix -- the Command
+            # Center and nothing else -- so a Land Factory, which can always
+            # make a tank, never fell through to it and the bot ran the whole
+            # match on one builder ([[policy-production]]).
+            composition_now: tuple[str, ...] = (*need, *reinforce)
+            if counter:
+                composition_now = counter_composition(composition_now, targets, profiles)
+            capable = wanted_producers(sample, composition_now)
+            queues_open = sum(
+                1
+                for entity in sample["entities"]
+                if entity["unit_id"] in set(capable) and entity["queued"] == 0
+            )
+            produce_orders = replace_losses(sample, catalogue, budget, composition_now)
+            ordered_now = _send_produces(channel, produce_orders)
+            produced += ordered_now
+            # **Upgrading claims before expanding, and the arithmetic says the
+            # opposite.** A new extractor is 700 for +8 credits a second;
+            # converting one is 1,400 for +4 and then 4,000 for +8, so pools are
+            # six times better per credit and [[policy-economy]] states the rule
+            # outright -- "take every free pool before upgrading anything".
+            #
+            # **It was reordered on that arithmetic and measured worse.** Twelve
+            # seeds at Very Hard: 7 won with upgrades first, 5 with expansion
+            # first, same two losses, routs 3 -> 2, median win 2,207 -> 2,362.
+            # Inside the noise floor, so not a refutation -- but it is certainly
+            # not the improvement the per-credit figure promised.
+            #
+            # The mechanism the arithmetic omits is **risk**, and it is the one
+            # thing every rung of this ladder turns on. Matches are decided by
+            # how many extractors are LOST -- winners drop nought to four, the
+            # rest six or more ([[policy-holding-ground]]). A new extractor is
+            # income that can be destroyed; a conversion is income on ground
+            # already held, needing no builder and crossing no contested map.
+            # Six times the price for income that cannot be taken away is a
+            # different trade from six times the price for nothing.
+            #
+            # So the order stands, and the reasoning is recorded because the
+            # arithmetic against it is correct and still lost.
+            _send_produces(channel, upgrade_income(sample, catalogue, budget, upgraded))
+            _send_builds(
+                channel,
+                expander.step(sample, budget, free, plan_holds_worker, composition_now, workforce),
+            )
+            refused_now = sum(1 for claim in budget.ledger() if not claim["granted"])
+            refused += refused_now
+            # **The reasons are kept now, not just the count.** Every claim
+            # carries a sentence saying what it wanted and why it did not get
+            # it, and this loop used to reduce a whole tick of that to the one
+            # number above -- about four thousand sentences a match, discarded
+            # ([[policy-economy]]).
+            outlays.add(budget.ledger())
+            recorder.step(
+                sample,
+                scores.army_end,
+                scores.targets_end,
+                scores.extractors_end,
+                len(capable),
+                queues_open,
+                ordered_now,
+                refused_now,
+                scores.worth_end,
+                scores.rival_worth_end,
             )
 
-            if not released:
-                continue
-            fighting = tuple(u for u in army if u["unit_id"] in released)
+            # The engine's verdict is the only thing that ends a match early.
+            #
+            # The two-loop version also stopped on "no army left" and on
+            # "nothing hostile in sight", and neither survives the move to one
+            # loop. Nothing hostile in sight is the *opening* position of every
+            # match -- the map is fogged and the opponents are across it -- so it
+            # would have ended the run on the first observation. And an army of
+            # zero is no longer terminal now that production runs every tick:
+            # losing a wave is a setback to rebuild from, not a reason to stop
+            # playing. Both were proxies for a verdict the engine states
+            # outright ([[policy-verdict]]).
+            if scores.verdict != GRADE_SURVIVED:
+                outcome = scores.verdict
+                break
+            if stop_when_plan_done and build_outcome != "building":
+                # The plan is the caller's whole task and it has settled, one
+                # way or another. Only a probe asks for this; a match treats a
+                # finished opening as the point where playing begins.
+                outcome = build_outcome
+                break
 
-            # The target the army is already on is carried in, so the choice
-            # persists across samples instead of being remade every observation.
-            # Without it the whole army is re-tasked whenever its centre shifts.
-            current = engagements(sample, catalogue, holding, fighting)
-            holding = current[0]["target_id"] if current else None
-            orders_sent += _dispatch_attacks(channel, current, ordered, attacked)
+            # Fill, then commit; gather, then hold one target. The rules and
+            # their memory live on the controller; what the loop owns is only
+            # that attacking runs last and costs nothing, which is why it is
+            # not arbitrated at all ([[policy-combat]]).
+            moves, attacks = waves.command(sample, catalogue, profiles, army)
+            _send_moves(channel, moves)
+            _send_attacks(channel, attacks)
         finally:
             channel.send_ack()
 
-    return Battle(
+    recorder.write()
+    return scores.report(
+        completed=completed,
+        planned=len(tracker.plan),
+        build_orders=tracker.orders_sent,
+        build_outcome=build_outcome,
+        build_reason=build_reason,
         produced=produced,
         expanded=expander.count,
-        extractors_start=extractors_start,
-        extractors_end=extractors_end,
+        expanded_factories=expander.factories,
         expand_reason=expander.reason,
-        orders_sent=orders_sent,
-        rallied=rallied,
-        army_start=army_start,
-        army_end=army_end,
-        targets_seen=targets_seen,
-        targets_end=targets_end,
-        killed=len(attacked - visible_now),
-        samples_seen=samples_seen,
+        attack_orders=waves.attack_orders,
+        rallied=waves.rallied,
+        killed=waves.killed(scores.visible_now),
+        refused_claims=refused,
+        outlays=outlays.rows(),
+        reaches=expander.reaches.rows(),
         outcome=outcome,
     )
 
 
-def format_battle(battle: Battle) -> tuple[str, ...]:
-    """Render a battle report as lines.
-
-    Args:
-        battle: The report.
-
-    Returns:
-        One line per figure.
-    """
-    return (
-        f"fight outcome  {battle['outcome']}",
-        f"attack orders  {battle['orders_sent']}",
-        f"reinforced     {battle['produced']}",
-        f"army           {battle['army_start']} -> {battle['army_end']}",
-        f"enemies seen   {battle['targets_seen']} -> {battle['targets_end']}",
-        f"engaged gone   {battle['killed']}",
-        f"extractors     {battle['extractors_start']} -> {battle['extractors_end']}",
-        f"expansions     {battle['expanded']}",
-        f"expand note    {battle['expand_reason']}",
-        f"samples seen   {battle['samples_seen']}",
-    )
-
-
-__all__ = ["Battle", "fight", "format_battle"]
+__all__ = ["EXPAND_RETRY_SAMPLES", "play"]

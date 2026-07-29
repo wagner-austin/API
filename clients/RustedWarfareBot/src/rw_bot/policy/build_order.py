@@ -11,12 +11,11 @@ waiting when it cannot afford the next one and stopping when it cannot make
 progress at all. It does not fight, expand, or react to an opponent. What it
 demonstrates is a loop that observes, chooses, acts, and can be scored.
 
-Placement is the one part that is not simple, because the engine's rules are
-not. Most structures go on a ring around the base. Extractors go on resource
-pools and nowhere else, and which types those are is read from the engine
-rather than assumed ([[mechanics-resource-pools]]). Which pool is worth having
-is a separate question from which pool is legal, and it is answered by who can
-shoot the way there ([[policy-threat]]).
+**Where** a structure would stand is a different job and lives in
+:mod:`rw_bot.policy.siting`. This module decides *what* to make next and
+whether anything owned can make it; that one answers which pool or which ring
+slot is free, and answers it identically for the economy, so the two spenders
+cannot collide over one site ([[policy-loop]]).
 """
 
 from __future__ import annotations
@@ -25,9 +24,16 @@ from collections.abc import Mapping, Sequence
 from typing import Literal, TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
+from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.placement import TypePlacement
-from rw_bot.policy.threat import route_is_exposed
-from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
+from rw_bot.mechanics.upgrades import satisfies
+from rw_bot.policy.siting import (
+    find_anchor,
+    next_ring_site,
+    no_pool_reason,
+    survey_pools,
+)
+from rw_bot.wire.state import BuildOption, Entity, Sample
 
 BUILDER_TYPE = "builder"
 
@@ -39,35 +45,6 @@ BUILDER_TYPE = "builder"
 #: producer by capability has to exclude it by name -- see
 #: :func:`find_producer` for what including it costs.
 PLACEHOLDER_TYPE = "editorOrBuilder"
-
-#: World-unit radius within which an entity is treated as occupying a pool.
-#:
-#: A pool is one tile, tiles are 20 world units across, and an extractor's own
-#: collision radius is 18 — so anything standing within a tile of the centre is
-#: on it. Measured from the map rather than guessed: the tile grid is 20x20 and
-#: the extractor's ``radius`` is declared in its unit definition.
-#:
-#: This is deliberately not the engine's own occupancy test, because the engine
-#: has none to ask. Its placement check answers "is this tile a pool", not "is
-#: this pool taken"; a second extractor on an occupied pool fails later, on the
-#: ordinary overlap rule. So occupancy is the planner's judgement, and it is
-#: made here where it can be read and changed.
-POOL_OCCUPIED_RADIUS = 20.0
-
-#: World-space offsets from the builder at which successive structures are
-#: placed. A ring rather than a line: buildings occupy space, and walking the
-#: builder steadily away from its base would put later structures out of reach
-#: of anything that has to defend them.
-PLACEMENT_RING: tuple[tuple[float, float], ...] = (
-    (200.0, 120.0),
-    (-200.0, 120.0),
-    (200.0, -120.0),
-    (-200.0, -120.0),
-    (280.0, 0.0),
-    (-280.0, 0.0),
-    (0.0, 240.0),
-    (0.0, -240.0),
-)
 
 
 class Decision(TypedDict):
@@ -83,8 +60,18 @@ class Decision(TypedDict):
             session can be read back without re-deriving why it stalled.
         type_name: What to make. Empty unless ``action`` is ``"build"`` or
             ``"produce"``.
-        unit_id: Unit to order. Zero unless ``action`` is ``"build"`` or
-            ``"produce"``.
+        unit_id: The unit the plan intends to order, zero when there is none.
+            Set for ``"build"`` and ``"produce"``, and **also for a ``"wait"``
+            that already knows which unit it is holding** -- one waiting on
+            price or on an action the engine has not offered yet.
+
+            That last case reads like a detail and was worth most of the
+            economy. The plan reserves its worker while it waits, and the only
+            way it could say so was a boolean, which switched off *every*
+            spender rather than removing *one* worker. Instrumented, the
+            expander was skipped on 572 of 800 samples while six workers stood
+            free ([[policy-economy]]). Zero still means "no unit", so a caller
+            filtering on it is safe on the waits that genuinely hold nothing.
         x: Placement world x. Zero unless ``action`` is ``"build"`` -- a
             produced unit appears where the engine puts it, not where the
             planner asks.
@@ -132,8 +119,15 @@ def completed_count(sample: Sample, plan: Sequence[str]) -> int:
     for entity in sample["entities"]:
         if not entity["mine"] or not entity["complete"]:
             continue
-        if entity["type_name"] in remaining:
-            remaining.remove(entity["type_name"])
+        # An upgraded structure still answers the entry that asked for it. This
+        # matched the type name exactly, which was right until a structure
+        # could convert itself: an extractor that upgraded stopped satisfying
+        # the plan that built it, so the plan ordered another and did that
+        # forever, and the builder was never free again
+        # ([[policy-holding-ground]]).
+        match = next((name for name in remaining if satisfies(entity["type_name"], name)), None)
+        if match is not None:
+            remaining.remove(match)
             built += 1
     return built
 
@@ -159,6 +153,11 @@ def next_unsatisfied_index(sample: Sample, plan: Sequence[str]) -> int:
     caller's once-per-position rule is what stops it being ordered twice while
     it goes up.
 
+    An upgraded structure satisfies the entry that asked for it, by the same
+    :func:`~rw_bot.mechanics.upgrades.satisfies` rule the count uses. The two
+    answers have to agree about what counts as satisfied or the plan reports
+    progress it will not act on ([[policy-holding-ground]]).
+
     Args:
         sample: One observation of the world.
         plan: What to make, in order. Entries may be structures or units.
@@ -166,230 +165,39 @@ def next_unsatisfied_index(sample: Sample, plan: Sequence[str]) -> int:
     Returns:
         The index to build next, or ``len(plan)`` when the plan is satisfied.
     """
+    pending = unsatisfied_indices(sample, plan)
+    return pending[0] if pending else len(plan)
+
+
+def unsatisfied_indices(sample: Sample, plan: Sequence[str]) -> tuple[int, ...]:
+    """Return every plan entry the world does not already show, in order.
+
+    All of them rather than only the first, because an entry with nowhere to
+    stand defers to the next one: a plan that waited on whichever entry it had
+    reached stopped dead when the third extractor had no free pool, and never
+    built the factory that funds everything after it
+    ([[policy-holding-ground]]).
+
+    Args:
+        sample: One observation of the world.
+        plan: What to make, in order. Entries may be structures or units.
+
+    Returns:
+        The indices still wanted, in plan order. Empty when the plan is
+        satisfied.
+    """
     owned: list[str] = [e["type_name"] for e in sample["entities"] if e["mine"] and e["complete"]]
+    pending: list[int] = []
     for index, wanted in enumerate(plan):
-        if wanted in owned:
-            owned.remove(wanted)
+        held = next((name for name in owned if satisfies(name, wanted)), None)
+        if held is None:
+            pending.append(index)
             continue
-        return index
-    return len(plan)
+        owned.remove(held)
+    return tuple(pending)
 
 
-def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | None:
-    """Return the fixed structure that placement offsets are measured from.
-
-    The offsets in :data:`PLACEMENT_RING` describe a ring around a base, and a
-    ring only spreads if its centre holds still. Measuring from the builder does
-    not work, because the builder walks to each site it is sent to: by the third
-    structure it is standing next to the first one, and the third offset lands
-    on top of it. Observed directly — factory one at ``(4450, 2730)`` and the
-    third order at ``(4451, 2646)``, 84 world units apart on a grid where a land
-    factory is wider than that, which the engine silently refused.
-
-    The anchor is the oldest owned immobile entity: lowest engine id among
-    entities the catalogue gives a speed of zero. Lowest id is the oldest
-    because ids are assigned once at construction, so the anchor is the Command
-    Center at the start of a match and stays the same structure as more are
-    built. Immobility is read from the catalogue rather than assumed by type
-    name ([[mechanics-unit-catalogue]]).
-
-    Args:
-        sample: One observation of the world.
-        catalogue: Unit stats by type name, for the speed field.
-
-    Returns:
-        The anchor entity, or None when the player owns no immobile structure,
-        in which case the caller measures from the builder instead.
-    """
-    oldest: Entity | None = None
-    for entity in sample["entities"]:
-        if not entity["mine"]:
-            continue
-        stats = catalogue.get(entity["type_name"])
-        if stats is None or stats["speed"] != 0.0:
-            continue
-        if oldest is None or entity["unit_id"] < oldest["unit_id"]:
-            oldest = entity
-    return oldest
-
-
-class PoolSurvey(TypedDict):
-    """Which pool to build on, and what happened to the ones passed over.
-
-    The counts exist so a refusal can say something true. "Every pool in sight
-    is occupied" was the only explanation the policy could give, and once pools
-    can also be ruled out for sitting under enemy guns that sentence becomes a
-    lie on exactly the runs where the reason matters most.
-
-    Attributes:
-        pool: The pool to build on, or None when none qualifies.
-        visible: How many pools the sample carries.
-        occupied: How many already have a structure standing on them.
-        unreachable: How many the builder cannot walk to at all.
-        exposed: How many were reachable only through hostile fire.
-    """
-
-    pool: ResourcePool | None
-    visible: int
-    occupied: int
-    unreachable: int
-    exposed: int
-
-
-def survey_pools(
-    sample: Sample,
-    anchor: Entity,
-    builder: Entity,
-    catalogue: Mapping[str, UnitStats],
-    reaches: Mapping[str, float],
-) -> PoolSurvey:
-    """Choose a resource pool to build on, and account for the rejects.
-
-    Two filters and then a ranking. A pool with something standing on it is out.
-    A pool the builder can only reach by walking through hostile fire is out —
-    the route is what matters, not the destination, because the builder this
-    rule was written for died in transit rather than on arrival
-    ([[policy-threat]]). What survives is ranked by distance.
-
-    **The two measurements start from different places, deliberately.** Exposure
-    is measured along the builder's walk, because the builder is what gets shot
-    and it starts from wherever it happens to be standing. Distance is measured
-    from the anchor, because the economy should grow outward from the base
-    rather than trail whichever pool the builder last walked past. Using one
-    origin for both would get one of the two questions wrong.
-
-    Distance stays squared. The ordering is all that is wanted from it, and a
-    square root would only cost precision.
-
-    Args:
-        sample: One observation of the world.
-        anchor: The structure to measure distance from.
-        builder: The unit that will walk to the pool.
-        catalogue: Unit stats by type name, for the speed that judges pool
-            occupancy.
-        reaches: Attack range by type name, for the threat filter.
-
-    Returns:
-        The chosen pool with the counts behind the choice. ``pool`` is None when
-        every visible pool is occupied or exposed, and when none is visible at
-        all.
-    """
-    best: ResourcePool | None = None
-    best_distance = 0.0
-    occupied = 0
-    unreachable = 0
-    exposed = 0
-    origin = (builder["x"], builder["y"])
-    for pool in sample["pools"]:
-        if _is_occupied(sample, pool, catalogue):
-            occupied += 1
-            continue
-        if not _can_walk_to(builder, pool):
-            unreachable += 1
-            continue
-        if route_is_exposed(sample, reaches, origin, (pool["x"], pool["y"])):
-            exposed += 1
-            continue
-        distance = (pool["x"] - anchor["x"]) ** 2 + (pool["y"] - anchor["y"]) ** 2
-        if best is None or distance < best_distance:
-            best = pool
-            best_distance = distance
-    return PoolSurvey(
-        pool=best,
-        visible=len(sample["pools"]),
-        occupied=occupied,
-        unreachable=unreachable,
-        exposed=exposed,
-    )
-
-
-def _can_walk_to(builder: Entity, pool: ResourcePool) -> bool:
-    """Report whether the builder can reach a pool over land at all.
-
-    The engine precomputes connected components per movement layer and reduces
-    reachability to comparing two component ids, which is the whole of this
-    function ([[mechanics-movement-layers]]). Both ids ride on the wire, so no
-    search happens here.
-
-    Negative ids are rejected rather than compared. The engine uses them for
-    "impassable", "off the map" and "the grids were never built", and its own
-    predicate has a hole -- it compares two of the last kind for equality and
-    answers true. Refusing every negative is strictly more conservative than the
-    engine, and costs at most a pool it might have allowed.
-
-    There is deliberately no case for a builder that travels on some other
-    layer. Its component id would index a different grid and simply not match
-    any land component, so the pool is refused — the bot declines to build
-    rather than building somewhere it cannot reach, which is the safe direction
-    and needs no branch to arrange.
-
-    Args:
-        builder: The unit that would walk there.
-        pool: The pool it would walk to.
-
-    Returns:
-        True when the builder and the pool share a land component.
-    """
-    if builder["group"] < 0 or pool["group_land"] < 0:
-        return False
-    return builder["group"] == pool["group_land"]
-
-
-def _is_occupied(sample: Sample, pool: ResourcePool, catalogue: Mapping[str, UnitStats]) -> bool:
-    """Report whether a structure is standing on a pool.
-
-    Only immobile entities count. A builder walking across a pool — or parked
-    on one, which is exactly where it stands after building there — does not
-    stop anything being built on it, and counting it would make the pool the
-    bot just used look permanently taken.
-
-    Ownership does not matter. An opponent's extractor holds a pool exactly as
-    firmly as ours does, and ordering onto it would spend the credits and
-    produce nothing.
-
-    A type the catalogue does not know is treated as not occupying. The two
-    errors are not symmetric: guessing "free" wrongly costs one order the
-    engine refuses, which the stall detector already catches, while guessing
-    "occupied" wrongly hides the pool for the rest of the run.
-
-    Args:
-        sample: One observation of the world.
-        pool: The pool to test.
-        catalogue: Unit stats by type name, for the speed field.
-
-    Returns:
-        True when an immobile visible entity is within
-        :data:`POOL_OCCUPIED_RADIUS` of the pool's centre.
-    """
-    limit = POOL_OCCUPIED_RADIUS**2
-    for entity in sample["entities"]:
-        stats = catalogue.get(entity["type_name"])
-        if stats is None or stats["speed"] != 0.0:
-            continue
-        if (entity["x"] - pool["x"]) ** 2 + (entity["y"] - pool["y"]) ** 2 <= limit:
-            return True
-    return False
-
-
-def find_builder(sample: Sample) -> Entity | None:
-    """Return a builder from the roster, or None when the player owns none.
-
-    Enemy builders are visible in the stream and are not orderable, so the
-    ownership check is what keeps this from returning one.
-
-    Args:
-        sample: One observation of the world.
-
-    Returns:
-        The first owned builder, or None.
-    """
-    for entity in sample["entities"]:
-        if entity["mine"] and entity["type_name"] == BUILDER_TYPE:
-            return entity
-    return None
-
-
-def find_producer(sample: Sample, target: str) -> BuildOption | None:
+def find_producer(sample: Sample, target: str, free: Sequence[Entity] = ()) -> BuildOption | None:
     """Return the option by which something the player owns makes ``target``.
 
     This replaces asking "which of my units is a builder", which was a guess
@@ -411,9 +219,16 @@ def find_producer(sample: Sample, target: str) -> BuildOption | None:
     but is not usable yet is a wait; one that does not exist is a dead plan
     entry, and the caller needs to tell those apart.
 
+    **A placed structure is only ever ordered from a free worker.** A produced
+    unit is not: a factory's queue is the engine's own, and asking a busy one is
+    how the queue gets filled. The distinction is the option's own ``placed``
+    flag, so nothing here has to know which types are structures.
+
     Args:
         sample: One observation of the world.
         target: Type name the plan asks for.
+        free: Workers not already carrying out an order. Empty means no worker
+            is free, so no placed option qualifies.
 
     Returns:
         The option, preferring an available one, or None when nothing the
@@ -424,9 +239,12 @@ def find_producer(sample: Sample, target: str) -> BuildOption | None:
         for entity in sample["entities"]
         if entity["type_name"] == PLACEHOLDER_TYPE
     }
+    idle = {worker["unit_id"] for worker in free}
     fallback: BuildOption | None = None
     for option in sample["options"]:
         if option["produces"] != target or option["unit_id"] in placeholders:
+            continue
+        if option["placed"] and option["unit_id"] not in idle:
             continue
         if option["available"]:
             return option
@@ -473,7 +291,9 @@ def decide(
     plan: Sequence[str],
     catalogue: Mapping[str, UnitStats],
     placements: Mapping[str, TypePlacement],
-    reaches: Mapping[str, float],
+    profiles: Mapping[str, CombatProfile],
+    free: Sequence[Entity] = (),
+    claimed: Sequence[tuple[float, float]] = (),
 ) -> Decision:
     """Choose the next action from one observation.
 
@@ -483,20 +303,82 @@ def decide(
         catalogue: Unit stats by type name, for prices.
         placements: Placement rules by type name, for where a structure may
             stand.
-        reaches: Attack range by type name, for the threat filter.
+        profiles: Combat profiles by type name, for the threat filter.
+        free: Workers not already carrying out an order. A placed structure is
+            ordered from one of these; which of them is free is decided by the
+            loop, because it is the only thing that can see what each was last
+            sent to do ([[policy-loop]]).
 
     Returns:
         The decision.
     """
     built = completed_count(sample, plan)
-    index = next_unsatisfied_index(sample, plan)
-    if index >= len(plan):
+    pending = unsatisfied_indices(sample, plan)
+    if not pending:
         return _decision("done", f"all {len(plan)} plan entries satisfied")
 
+    # **An entry with nowhere to stand defers to the next one; it does not stop
+    # the plan.** The opening is a sequence -- extractors, then the factory,
+    # then the army -- and it used to wait on whichever entry it had reached.
+    # When the third extractor had no free pool, the wait was permanent: the
+    # factory was never built, no army was ever produced, and matches ended
+    # with five idle builders, 60,676 credits and an army of nothing, against
+    # an opponent left to do as it liked. Two of twelve duels were lost that
+    # way, and both had been level until the pools ran out
+    # ([[policy-holding-ground]]).
+    #
+    # Only *placement* defers. Being unaffordable or having no producer is a
+    # condition on the whole plan rather than on one entry, so those still stop
+    # it -- skipping past them would spend the next entry's credits on the
+    # strength of the current one's being short.
+    deferred: Decision | None = None
+    for index in pending:
+        attempt, deferrable = _attempt(
+            sample, plan, index, built, catalogue, placements, profiles, free, claimed
+        )
+        if not deferrable:
+            return attempt
+        if deferred is None:
+            deferred = attempt
+    # Every entry left is unplaceable. Reported with the *first* entry's own
+    # reason -- a full ring and an occupied pool are different problems and the
+    # run log has to say which ([[policy-loop]]).
+    return deferred if deferred is not None else _decision("wait", "nothing left to place")
+
+
+def _attempt(
+    sample: Sample,
+    plan: Sequence[str],
+    index: int,
+    built: int,
+    catalogue: Mapping[str, UnitStats],
+    placements: Mapping[str, TypePlacement],
+    profiles: Mapping[str, CombatProfile],
+    free: Sequence[Entity],
+    claimed: Sequence[tuple[float, float]],
+) -> tuple[Decision, bool]:
+    """Decide one plan entry, and say whether the next entry may be tried.
+
+    Args:
+        sample: One observation of the world.
+        plan: What to make, in order.
+        index: Which entry to try.
+        built: How much of the plan the world already shows, for the reason.
+        catalogue: Unit stats by type name, for prices.
+        placements: Placement rules by type name.
+        profiles: Combat profiles by type name, for the threat filter.
+        free: Workers not already carrying out an order.
+
+    Returns:
+        The decision, and whether it is *deferrable* -- true only when the
+        entry has nowhere legal to stand, which is a fact about this entry.
+        Being unaffordable or having no producer is a fact about the plan, so
+        those are not deferrable and stop it.
+    """
     target = plan[index]
     undescribed = _undescribed(target, catalogue, placements)
     if undescribed is not None:
-        return undescribed
+        return undescribed, False
     stats = catalogue[target]
     placement = placements[target]
 
@@ -505,19 +387,25 @@ def decide(
     # A builder cannot construct a laboratory, and the refusal produces no
     # roster change and no error -- a plan naming one used to run for three
     # hundred samples reporting progress ([[policy-loop]]).
-    producer = find_producer(sample, target)
+    producer = find_producer(sample, target, free)
     if producer is None:
-        return _decision(
-            "blocked",
-            f"nothing the player owns can make {target}; the plan is not playable from here",
+        return (
+            _decision(
+                "blocked",
+                f"nothing the player owns can make {target}; the plan is not playable from here",
+            ),
+            False,
         )
     if not producer["available"]:
         # Available is a property of the world, not of the plan. A prerequisite
         # can still be built and tech can still be researched, so this is a
         # wait and the stall detector bounds it.
-        return _decision(
-            "wait",
-            f"unit {producer['unit_id']} can make {target} but the action is not available yet",
+        return (
+            _waiting_on(
+                f"unit {producer['unit_id']} can make {target} but the action is not available yet",
+                producer["unit_id"],
+            ),
+            False,
         )
 
     # Where it goes is settled before whether it is affordable, so a structure
@@ -526,47 +414,67 @@ def decide(
     # bank.
     site: tuple[float, float] | None = None
     if producer["placed"]:
-        placed = _placed_site(sample, index, target, placement, catalogue, reaches)
+        # Indexed rather than searched with a guard: a placed option is only
+        # returned for a worker the caller listed as free, so a miss here would
+        # mean those two reads disagreed about the same list.
+        worker = {entity["unit_id"]: entity for entity in free}[producer["unit_id"]]
+        placed = _placed_site(sample, worker, target, placement, catalogue, profiles, claimed)
         if isinstance(placed, dict):
-            return placed
+            # Nowhere legal to stand. Handed back as deferrable, carrying its
+            # own reason -- a full ring and an occupied pool are different
+            # problems and the run log has to say which.
+            return placed, True
         site = placed
 
     if sample["credits"] < stats["price"]:
-        return _decision(
-            "wait",
-            f"{target} costs {stats['price']}, holding {sample['credits']}",
+        # The dominant wait, and the one that used to stop the whole economy.
+        # It names its worker so the expander can skip that one and run on the
+        # rest, rather than being switched off entirely ([[policy-economy]]).
+        return (
+            _waiting_on(
+                f"{target} costs {stats['price']}, holding {sample['credits']}",
+                producer["unit_id"],
+            ),
+            False,
         )
 
     if site is None:
         # A produced unit rolls out of the building that made it. The engine
         # chooses where, so this decision carries no position -- offering one
         # would be a number the planner invented.
-        return Decision(
-            action="produce",
-            reason=f"producing {target} ({built + 1} of {len(plan)})",
-            type_name=target,
-            unit_id=producer["unit_id"],
-            x=0.0,
-            y=0.0,
+        return (
+            Decision(
+                action="produce",
+                reason=f"producing {target} ({built + 1} of {len(plan)})",
+                type_name=target,
+                unit_id=producer["unit_id"],
+                x=0.0,
+                y=0.0,
+            ),
+            False,
         )
 
-    return Decision(
-        action="build",
-        reason=f"building {target} ({built + 1} of {len(plan)})",
-        type_name=target,
-        unit_id=producer["unit_id"],
-        x=site[0],
-        y=site[1],
+    return (
+        Decision(
+            action="build",
+            reason=f"building {target} ({built + 1} of {len(plan)})",
+            type_name=target,
+            unit_id=producer["unit_id"],
+            x=site[0],
+            y=site[1],
+        ),
+        False,
     )
 
 
 def _placed_site(
     sample: Sample,
-    index: int,
+    builder: Entity,
     target: str,
     placement: TypePlacement,
     catalogue: Mapping[str, UnitStats],
-    reaches: Mapping[str, float],
+    profiles: Mapping[str, CombatProfile],
+    claimed: Sequence[tuple[float, float]],
 ) -> tuple[float, float] | Decision:
     """Choose where a placed structure goes, or explain why nowhere will do.
 
@@ -578,19 +486,17 @@ def _placed_site(
 
     Args:
         sample: One observation of the world.
-        index: The target's position in the plan, which selects the ring offset.
+        builder: The worker that will place it, chosen by the caller. Which
+            worker is free is the loop's business, not this module's
+            ([[policy-loop]]).
         target: The type being placed, for the failure message.
         placement: The engine's placement rule for it.
         catalogue: Unit stats by type name, for the anchor and pool judgement.
-        reaches: Attack range by type name, for the threat filter.
+        profiles: Combat profiles by type name, for the threat filter.
 
     Returns:
         The world point to build at, or the decision that stops this tick.
     """
-    builder = find_builder(sample)
-    if builder is None:
-        return _decision("blocked", "the player owns no builder")
-
     # Measure from the most stable reference available. A structure never moves;
     # the builder does, and measuring from it collapses the ring. With no
     # structure owned the builder is the only reference there is, so the
@@ -599,43 +505,25 @@ def _placed_site(
     anchor = find_anchor(sample, catalogue) or builder
 
     if not placement["needs_pool"]:
-        offset = PLACEMENT_RING[index % len(PLACEMENT_RING)]
-        return (anchor["x"] + offset[0], anchor["y"] + offset[1])
+        site = next_ring_site(sample, anchor, catalogue)
+        if site is None:
+            # Every ring position is taken. A wait rather than a block: a
+            # structure destroyed frees its slot, so the world can leave this
+            # state on its own and the stall detector bounds the wait.
+            return _waiting_on(
+                f"{target} needs a ring position and all are taken", builder["unit_id"]
+            )
+        return site
 
-    survey = survey_pools(sample, anchor, builder, catalogue, reaches)
+    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed)
     chosen = survey["pool"]
     if chosen is None:
         # Not "blocked". No pool being usable is a state the world can leave on
         # its own -- fog lifts as units move, a destroyed extractor frees its
         # pool, and a killed enemy stops covering the route to one -- so this is
         # a wait, and the stall detector is what stops it waiting forever.
-        return _decision("wait", _no_pool_reason(target, survey))
+        return _waiting_on(no_pool_reason(target, survey), builder["unit_id"])
     return (chosen["x"], chosen["y"])
-
-
-def _no_pool_reason(target: str, survey: PoolSurvey) -> str:
-    """Explain why no pool was chosen, in terms of what was rejected.
-
-    Worth the separate function because the two cases read completely
-    differently to whoever is reading the run log. Nothing visible yet is a map
-    the bot has not explored; everything visible and rejected is a map where the
-    bot is losing ground, and one of those is a reason to keep playing while the
-    other is a reason to look at the screen.
-
-    Args:
-        target: Type name the plan asks for.
-        survey: The rejected counts.
-
-    Returns:
-        The wait reason.
-    """
-    if survey["visible"] == 0:
-        return f"{target} needs a resource pool and none is visible yet"
-    return (
-        f"{target} needs a resource pool: of the {survey['visible']} in sight, "
-        f"{survey['occupied']} are built on, {survey['unreachable']} cannot be "
-        f"walked to and {survey['exposed']} can only be reached through enemy fire"
-    )
 
 
 def _decision(
@@ -653,18 +541,32 @@ def _decision(
     return Decision(action=action, reason=reason, type_name="", unit_id=0, x=0.0, y=0.0)
 
 
+def _waiting_on(reason: str, unit_id: int) -> Decision:
+    """Build a wait that still names the unit the plan is holding.
+
+    **A wait used to name nothing, and that cost the economy most of the match.**
+    The plan reserves its worker while merely waiting to afford something, and
+    the only way to express that to the expander was a boolean -- which switched
+    off *every* spender rather than removing *one* worker. Measured on an
+    instrumented match: the expander was skipped on 572 of 800 samples while six
+    workers stood free ([[policy-economy]]).
+
+    Args:
+        reason: Why the plan is waiting.
+        unit_id: The unit it intends to order once it can.
+
+    Returns:
+        The decision, carrying the unit and no position.
+    """
+    return Decision(action="wait", reason=reason, type_name="", unit_id=unit_id, x=0.0, y=0.0)
+
+
 __all__ = [
     "BUILDER_TYPE",
     "PLACEHOLDER_TYPE",
-    "PLACEMENT_RING",
-    "POOL_OCCUPIED_RADIUS",
     "Decision",
-    "PoolSurvey",
     "completed_count",
     "decide",
-    "find_anchor",
-    "find_builder",
     "find_producer",
     "next_unsatisfied_index",
-    "survey_pools",
 ]

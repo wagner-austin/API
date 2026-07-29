@@ -1,0 +1,100 @@
+"""Collecting the per-sample record a run is read back from.
+
+The loop sees everything and the scorecard keeps about two dozen numbers. What
+is dropped between those two is every question of the form "when did it turn",
+and that is the question a pair of runs always ends up posing
+([[policy-trace]]).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from pathlib import Path
+
+from rw_bot.policy.trace import Loss, Tick, format_trace, losses_between, owned_by_id
+from rw_bot.wire.state import Entity, Sample
+
+
+class Recorder:
+    """Keeps one row per sample so a run can be read back afterwards.
+
+    Off unless a path is given, because most runs are tests and a trace file
+    per test would be noise. Accumulates in memory and writes once at the end:
+    the loop is holding the simulation between samples in lockstep, and a
+    flush per observation would pace the match by disk.
+
+    Attributes:
+        ticks: One entry per sample, in order.
+        losses: Every inferred loss, in order.
+    """
+
+    def __init__(self, path: Path | None) -> None:
+        """Open a recorder.
+
+        Args:
+            path: Where to write the trace, or None to keep none.
+        """
+        self._path = path
+        self.ticks: list[Tick] = []
+        self.losses: list[Loss] = []
+        self._previous: Mapping[int, Entity] = {}
+
+    def step(
+        self,
+        sample: Sample,
+        army: int,
+        enemies: int,
+        extractors: int,
+        producers: int,
+        idle: int,
+        orders: int,
+        refused: int,
+        worth: int,
+        rival: int,
+    ) -> None:
+        """Record one observation.
+
+        Args:
+            sample: One observation of the world.
+            army: Units able to fight.
+            enemies: Hostile entities visible.
+            extractors: Finished extractors owned.
+            producers: Owned units able to make something wanted.
+            idle: How many of those held nothing in their queue.
+            orders: Produce orders issued this observation.
+            refused: Credit claims the budget turned down this observation.
+            worth: Everything the player holds.
+            rival: The strongest hostile player's total.
+        """
+        if self._path is None:
+            return
+        current = owned_by_id(sample)
+        gone = losses_between(self._previous, current, sample["frame"])
+        self._previous = current
+        self.losses.extend(gone)
+        self.ticks.append(
+            Tick(
+                frame=sample["frame"],
+                army=army,
+                credits=sample["credits"],
+                enemies=enemies,
+                extractors=extractors,
+                lost=len(gone),
+                producers=producers,
+                idle=idle,
+                orders=orders,
+                refused=refused,
+                worth=worth,
+                rival=rival,
+            )
+        )
+
+    def write(self) -> None:
+        """Write both tables, if a path was given."""
+        if self._path is None:
+            return
+        lines = format_trace(self.ticks, self.losses)
+        self._path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+__all__ = ["Recorder"]

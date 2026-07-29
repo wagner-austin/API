@@ -1,0 +1,272 @@
+"""A gameplay style as data, so trying one is an argument rather than an edit.
+
+Every knob here already existed; what was missing was a single carrier. The
+goals, the worker ceiling, the wave mass and the expansion switch were spread
+across nine positional CLI slots, and the ninth slot only exists because the
+eighth did -- each new question threaded one more position through the entry
+point, the Makefile and the sweep harness ([[policy-loop]]).
+
+A doctrine is one file naming all of them. Two arms of an experiment are two
+files that differ in one line, which is the same discipline the sweep already
+enforces for jobs: the arm that ran last week can be re-run, because the file
+that defined it was never edited into the next one.
+
+Every field is required. A doctrine file with a missing field is an error
+naming the field, not a default quietly changing what the arm means -- the same
+rule the sweep's job lines follow, for the same reason.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from typing import Final, TypedDict
+
+from rw_bot import RwBotError
+from rw_bot.policy.campaign import DEFAULT_MAX_WORKERS
+from rw_bot.policy.combat import WAVE_SIZES
+from rw_bot.validation import (
+    require_bool,
+    require_int,
+    require_non_empty_str,
+    require_positive_int,
+)
+
+_FIELD_SHAPE = "RW-DOCTRINE-001"
+_UNKNOWN_FIELD = "RW-DOCTRINE-002"
+_NOT_A_NUMBER = "RW-DOCTRINE-003"
+_NOT_A_FLAG = "RW-DOCTRINE-004"
+_REPEATED_FIELD = "RW-DOCTRINE-005"
+_BLANK_GOAL = "RW-DOCTRINE-006"
+_BAD_RESERVE = "RW-DOCTRINE-007"
+
+#: The ``reserve`` value that means "derive it from the composition".
+#:
+#: Negative rather than zero, because zero is a real reserve a doctrine may
+#: want, and conflating "reserve nothing" with "decide for me" is how an arm
+#: stops testing what it claims ([[policy-economy]]).
+DERIVE_RESERVE: Final = -1
+
+#: Fields carried as whole numbers in a doctrine file.
+_INT_FIELDS: Final = ("max_workers", "mass", "reserve")
+
+#: Fields carried as ``0`` or ``1`` in a doctrine file.
+_FLAG_FIELDS: Final = ("expand", "counter")
+
+#: Fields carried as text in a doctrine file.
+_STR_FIELDS: Final = ("name", "goals")
+
+#: Every field a doctrine file must carry, in the order presets write them.
+DOCTRINE_FIELDS: Final = (*_STR_FIELDS, *_INT_FIELDS, *_FLAG_FIELDS)
+
+
+class DoctrineError(RwBotError):
+    """A doctrine file could not be read as a gameplay style.
+
+    Args:
+        code: Stable machine-readable identifier.
+        message: Human-readable description of the offending line.
+    """
+
+
+class Doctrine(TypedDict):
+    """One gameplay style, complete.
+
+    Attributes:
+        name: What this style is called, for the run log and the result file.
+        goals: What to ask the planner for, in order. Repeats are a ratio, not
+            a preference stated twice ([[policy-production]]).
+        max_workers: The most builders worth holding ([[policy-production]]).
+        mass: Units the sustained wave waits for. Values at or below the
+            shipped ladder's last fixed rung leave the ladder unchanged, so the
+            shipped behaviour is a value rather than a special case
+            ([[engine-ai-triggers]]).
+        reserve: Credits held back from expansion for the army, or
+            :data:`DERIVE_RESERVE` to derive it from the composition. A fixed
+            figure is what keeps a composition A/B from silently also being a
+            reserve A/B ([[policy-economy]]).
+        expand: Whether to play the economy at all. False is the control arm
+            of the expansion A/B ([[policy-economy]]).
+        counter: Whether production tilts toward what the opponent is seen to
+            field, or holds the stated mix regardless
+            ([[mechanics-combat-profile]]).
+    """
+
+    name: str
+    goals: tuple[str, ...]
+    max_workers: int
+    mass: int
+    reserve: int
+    expand: bool
+    counter: bool
+
+
+#: The style everything so far was measured under, exactly.
+#:
+#: Extractors first because they pay for everything after them; no factory
+#: named because the build tree inserts prerequisites; the shipped AI's wave
+#: mass; expansion on; the mix held as stated. A doctrine file is only ever
+#: compared against this, so it is a constant rather than a file that could
+#: drift.
+DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
+    name="default",
+    goals=(
+        "extractorT1",
+        "extractorT1",
+        "extractorT1",
+        "c_tank",
+        "c_tank",
+        "c_tank",
+        "c_tank",
+    ),
+    max_workers=DEFAULT_MAX_WORKERS,
+    mass=WAVE_SIZES[-1],
+    reserve=DERIVE_RESERVE,
+    expand=True,
+    counter=False,
+)
+
+
+def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
+    """Decode a flat payload into a :class:`Doctrine`.
+
+    Args:
+        payload: Field values by name. ``goals`` is comma-separated text, as a
+            job line carries it.
+
+    Returns:
+        The validated doctrine.
+
+    Raises:
+        DecodeError: When a field is absent, mistyped, blank or non-positive.
+        DoctrineError: ``RW-DOCTRINE-006`` when the goals carry a blank entry,
+            which is a stray comma rather than a unit.
+    """
+    goals = tuple(part.strip() for part in require_non_empty_str(payload, "goals").split(","))
+    if any(goal == "" for goal in goals):
+        raise DoctrineError(
+            _BLANK_GOAL,
+            f"the goals carry a blank entry: {payload['goals']!r}",
+        )
+    reserve = require_int(payload, "reserve")
+    if reserve < DERIVE_RESERVE:
+        raise DoctrineError(
+            _BAD_RESERVE,
+            f"field 'reserve' must be >= 0, or {DERIVE_RESERVE} to derive it, got {reserve}",
+        )
+    return Doctrine(
+        name=require_non_empty_str(payload, "name"),
+        goals=goals,
+        max_workers=require_positive_int(payload, "max_workers"),
+        mass=require_positive_int(payload, "mass"),
+        reserve=reserve,
+        expand=require_bool(payload, "expand"),
+        counter=require_bool(payload, "counter"),
+    )
+
+
+def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
+    """Encode a :class:`Doctrine` back to a flat payload.
+
+    Round-trips with :func:`decode_doctrine`.
+
+    Args:
+        doctrine: The doctrine to encode.
+
+    Returns:
+        Field values by name, as :func:`decode_doctrine` reads them.
+    """
+    return {
+        "name": doctrine["name"],
+        "goals": ",".join(doctrine["goals"]),
+        "max_workers": doctrine["max_workers"],
+        "mass": doctrine["mass"],
+        "reserve": doctrine["reserve"],
+        "expand": doctrine["expand"],
+        "counter": doctrine["counter"],
+    }
+
+
+def parse_doctrine_lines(lines: Sequence[str]) -> Doctrine:
+    """Read a doctrine file: one ``field value`` pair per line.
+
+    Blank lines and ``#`` comments are skipped, so a preset can record why its
+    values are what they are beside the values themselves. Fields may appear in
+    any order; each exactly once.
+
+    Args:
+        lines: The file's lines, without newlines.
+
+    Returns:
+        The doctrine it describes.
+
+    Raises:
+        DoctrineError: When a line is malformed, names an unknown field,
+            repeats one, or carries a value of the wrong shape.
+        DecodeError: When a field is absent or out of range.
+    """
+    payload: dict[str, str | int | float | bool] = {}
+    for line in lines:
+        bare = line.strip()
+        if not bare or bare.startswith("#"):
+            continue
+        field, _, raw = bare.partition(" ")
+        raw = raw.strip()
+        if not raw:
+            raise DoctrineError(_FIELD_SHAPE, f"a doctrine line is 'field value', got {line!r}")
+        if field in payload:
+            raise DoctrineError(_REPEATED_FIELD, f"field {field!r} appears twice")
+        if field in _STR_FIELDS:
+            payload[field] = raw
+        elif field in _INT_FIELDS:
+            try:
+                payload[field] = int(raw)
+            except ValueError as error:
+                raise DoctrineError(
+                    _NOT_A_NUMBER, f"field {field!r} must be a whole number, got {raw!r}"
+                ) from error
+        elif field in _FLAG_FIELDS:
+            if raw not in ("0", "1"):
+                raise DoctrineError(_NOT_A_FLAG, f"field {field!r} must be 0 or 1, got {raw!r}")
+            payload[field] = raw == "1"
+        else:
+            raise DoctrineError(
+                _UNKNOWN_FIELD,
+                f"field {field!r} is not one of {', '.join(DOCTRINE_FIELDS)}",
+            )
+    return decode_doctrine(payload)
+
+
+def format_doctrine(doctrine: Doctrine) -> tuple[str, ...]:
+    """Render a doctrine as the lines :func:`parse_doctrine_lines` reads.
+
+    What a probe or a test writes when it needs a preset on disk, so the two
+    formats cannot drift.
+
+    Args:
+        doctrine: The doctrine to render.
+
+    Returns:
+        One line per field, in :data:`DOCTRINE_FIELDS` order.
+    """
+    flat = encode_doctrine(doctrine)
+    rendered: list[str] = []
+    for field in DOCTRINE_FIELDS:
+        value = flat[field]
+        if isinstance(value, bool):
+            rendered.append(f"{field} {int(value)}")
+        else:
+            rendered.append(f"{field} {value}")
+    return tuple(rendered)
+
+
+__all__ = [
+    "DEFAULT_DOCTRINE",
+    "DERIVE_RESERVE",
+    "DOCTRINE_FIELDS",
+    "Doctrine",
+    "DoctrineError",
+    "decode_doctrine",
+    "encode_doctrine",
+    "format_doctrine",
+    "parse_doctrine_lines",
+]

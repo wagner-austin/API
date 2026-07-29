@@ -29,32 +29,44 @@ sends the order.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.policy.build_order import (
-    PLACEMENT_RING,
+from rw_bot.mechanics.combat_profile import CombatProfile
+from rw_bot.mechanics.upgrades import TIER_CHAINS, next_tier, satisfies
+from rw_bot.policy.build_order import find_producer
+from rw_bot.policy.production import production_bound
+from rw_bot.policy.siting import (
     find_anchor,
-    find_producer,
+    next_ring_site,
     survey_pools,
 )
-from rw_bot.policy.observation import is_rising
-from rw_bot.policy.production import production_bound
 from rw_bot.wire.state import Entity, Sample
 
 #: The producer the opening plan builds and production expansion keeps adding.
 FACTORY_TYPE = "landFactory"
 
+
+#: What an owned extractor converts itself into.
+#:
+#: Tier two pays 12 credits a second against tier one's 8, for 1,400 -- a
+#: payback of about 350 seconds against matches lasting roughly 4,400
+#: ([[policy-holding-ground]]).
+UPGRADE_TYPE = "extractorT2"
+
 #: The extractor the opening plan builds and expansion keeps building.
 #:
-#: T1 rather than a higher tier because it is what a Builder can place from the
-#: start: the archived capture has the Builder offering ``extractorT1`` and
-#: nothing above it, while T2 and T3 appear only on the map editor's placeholder
-#: ([[mechanics-build-tree]]). The upgrade path exists -- an ``extractorT1``
-#: lists ``extractorT2`` as a build edge, priced at 1400 against T1's 700 -- but
-#: no capture has yet shown an owned extractor offering it, so upgrading is
-#: deliberately not attempted here rather than guessed at.
+#: T1 rather than a higher tier because it is what a Builder can *place*: the
+#: capture has the Builder offering ``extractorT1`` and nothing above it
+#: ([[mechanics-build-tree]]).
+#:
+#: A higher tier is reached by upgrading rather than by placing, and that path
+#: is now taken -- see :data:`UPGRADE_TYPE` and :func:`upgradeable`. This note
+#: used to say no capture had shown an owned extractor offering the upgrade, so
+#: it was "deliberately not attempted rather than guessed at". The caution was
+#: right and the conclusion was wrong: the agent was dropping the action before
+#: it reached the wire ([[policy-holding-ground]]).
 EXTRACTOR_TYPE = "extractorT1"
 
 
@@ -74,6 +86,18 @@ class Expansion(TypedDict):
         unit_id: The producer to order. Zero unless ``build``.
         x: Placement world x. Zero unless ``build``.
         y: Placement world y. Zero unless ``build``.
+        priced_out: Whether the *only* thing stopping this was credits. It
+            separates "the map has nothing left to claim" from "we cannot afford
+            it yet" -- two states that look identical in a ``build`` of False
+            and call for opposite responses.
+
+            **Without it a cheaper spender jumps the queue every time the
+            economy is short.** A turret is 500 and an extractor 700 plus the
+            reserve, so on any observation where income is refused for want of
+            1,150, defence is offered the same balance, asks for 500, and
+            succeeds. Measured at Hard: **29 turrets bought against 4
+            extractors, with 43 of 47 extractor claims refused for credits**,
+            while income sat at 34/s and never grew ([[policy-holding-ground]]).
         owned: Finished extractors the player holds.
         occupied: Pools with something already standing on them.
         exposed: Pools reachable only through hostile fire.
@@ -81,6 +105,7 @@ class Expansion(TypedDict):
 
     build: bool
     reason: str
+    priced_out: bool
     type_name: str
     unit_id: int
     x: float
@@ -91,34 +116,50 @@ class Expansion(TypedDict):
 
 
 def count_extractors(sample: Sample, type_name: str = EXTRACTOR_TYPE) -> int:
-    """Count the finished extractors the player owns.
+    """Count the finished extractors the player owns, at any tier.
 
     Unfinished ones are excluded deliberately. A structure joins the roster the
     moment construction starts, so counting presence would report income the
     player does not have yet -- the same distinction ``completed_count`` draws
     for the build plan ([[policy-loop]]).
 
+    **Every tier counts, and that correction matters more than it looks.** This
+    counted the named type alone, which was right for as long as the bot could
+    not upgrade. The moment it could, an upgraded extractor stopped being an
+    extractor as far as this was concerned, and a run holding three tier-two
+    extractors and earning 54 credits a second reported ``extractors 0 -> 0``.
+    A figure that quietly means something other than what it says is how the
+    1,500-sample reading went wrong ([[policy-holding-ground]]).
+
     Args:
         sample: One observation of the world.
-        type_name: The extractor type to count.
+        type_name: The base extractor type. Higher tiers of the same family are
+            counted with it.
 
     Returns:
-        How many finished extractors of that type the player owns.
+        How many finished extractors of that family the player owns.
     """
+    # A set because the upgrade paths share a prefix: every tier below the
+    # branch appears on both, and counting membership rather than occurrences
+    # is what makes that harmless.
+    counted = {name for chain in TIER_CHAINS for name in chain if satisfies(name, type_name)}
     return sum(
         1
         for entity in sample["entities"]
-        if entity["mine"] and entity["complete"] and entity["type_name"] == type_name
+        if entity["mine"] and entity["complete"] and entity["type_name"] in counted
     )
 
 
-def _waiting(reason: str, sample: Sample, type_name: str) -> Expansion:
+def waiting(reason: str, sample: Sample, type_name: str, *, priced_out: bool = False) -> Expansion:
     """Build a no-expansion answer that still carries its reasoning.
 
     Args:
         reason: Why nothing is being claimed.
         sample: One observation of the world.
         type_name: The extractor type under consideration.
+        priced_out: Whether credits were the only obstacle. Defaults to False,
+            because every other refusal here is a fact about the world rather
+            than about the balance.
 
     Returns:
         An expansion with ``build`` false.
@@ -126,6 +167,7 @@ def _waiting(reason: str, sample: Sample, type_name: str) -> Expansion:
     return Expansion(
         build=False,
         reason=reason,
+        priced_out=priced_out,
         type_name="",
         unit_id=0,
         x=0.0,
@@ -136,7 +178,7 @@ def _waiting(reason: str, sample: Sample, type_name: str) -> Expansion:
     )
 
 
-def _placer(sample: Sample, type_name: str) -> Entity | None:
+def placer(sample: Sample, type_name: str, free: Sequence[Entity]) -> Entity | None:
     """Return the entity the engine says can place an extractor.
 
     Selected by capability rather than by type name, which is the same rule the
@@ -148,27 +190,28 @@ def _placer(sample: Sample, type_name: str) -> Entity | None:
     Args:
         sample: One observation of the world.
         type_name: The extractor type to place.
+        free: Workers not already carrying out an order.
 
     Returns:
-        The producing entity, or None when nothing owned can place one right
+        The producing entity, or None when no free worker can place one right
         now.
     """
-    option = find_producer(sample, type_name)
+    option = find_producer(sample, type_name, free)
     if option is None or not option["available"]:
         return None
-    for entity in sample["entities"]:
-        if entity["unit_id"] == option["unit_id"]:
-            return entity
-    return None
+    # Indexed rather than searched: a placed option is only returned for a
+    # worker in this very list, so a miss would mean the two reads disagreed.
+    return {worker["unit_id"]: worker for worker in free}[option["unit_id"]]
 
 
 def expand_economy(
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
-    reaches: Mapping[str, float],
+    profiles: Mapping[str, CombatProfile],
     *,
     reserve: int,
-    builder_moved: bool,
+    free: Sequence[Entity],
+    claimed: Sequence[tuple[float, float]] = (),
     type_name: str = EXTRACTOR_TYPE,
 ) -> Expansion:
     """Decide whether to claim another resource pool, and which one.
@@ -205,44 +248,52 @@ def expand_economy(
         sample: One observation of the world.
         catalogue: Unit stats by type name, for the extractor's price and for
             the speed that judges pool occupancy.
-        reaches: Attack range by type name, for the threat filter.
+        profiles: Combat profiles by type name, for the threat filter.
         reserve: Credits to leave unspent for the army.
-        builder_moved: Whether the placing unit moved since the previous
-            sample, which is what "still walking to its site" looks like.
+        free: Workers not already carrying out an order. Whether a worker is
+            free is the loop's judgement, because only the loop can see what
+            each was last sent to do -- and keeping it there is what stopped two
+            expansion rules re-tasking the same worker off each other
+            ([[policy-loop]]).
+        claimed: Sites workers are already under orders to build on, so several
+            free workers are not all sent to the same pool. A pool is judged
+            occupied by what *stands* on it, so one being walked toward reads as
+            free -- which cost nineteen orders in twenty the moment more than one
+            worker was available at a time ([[policy-holding-ground]]).
         type_name: The extractor type to place.
 
     Returns:
         What to do, with the reasoning behind it either way.
     """
-    if builder_moved:
-        return _waiting("builder still walking to its site", sample, type_name)
-    if is_rising(sample, type_name):
-        return _waiting(f"{type_name} already going up", sample, type_name)
-
-    builder = _placer(sample, type_name)
+    builder = placer(sample, type_name, free)
     if builder is None:
-        return _waiting(f"nothing owned can place {type_name}", sample, type_name)
+        return waiting(f"no free worker can place {type_name}", sample, type_name)
 
     stats = catalogue.get(type_name)
     if stats is None:
-        return _waiting(f"{type_name} is not in the catalogue", sample, type_name)
+        return waiting(f"{type_name} is not in the catalogue", sample, type_name)
     needed = stats["price"] + reserve
     if sample["credits"] < needed:
-        return _waiting(
+        # Marked, because a cheaper claimant must not take this balance instead.
+        # A turret at 500 was winning 29 purchases to the economy's 4 on exactly
+        # these observations ([[policy-holding-ground]]).
+        return waiting(
             f"{sample['credits']} credits, need {needed} to expand past a {reserve} reserve",
             sample,
             type_name,
+            priced_out=True,
         )
 
     # The anchor is what distance is measured from, so the economy grows out of
     # the base. A player holding no immobile structure measures from the builder
     # instead, which is the build plan's own fallback.
     anchor = find_anchor(sample, catalogue) or builder
-    survey = survey_pools(sample, anchor, builder, catalogue, reaches)
+    survey = survey_pools(sample, anchor, builder, catalogue, profiles, claimed)
     owned = count_extractors(sample, type_name)
     if survey["pool"] is None:
         return Expansion(
             build=False,
+            priced_out=False,
             reason=(
                 f"no pool free of {survey['visible']}: "
                 f"{survey['occupied']} occupied, {survey['unreachable']} unreachable, "
@@ -260,6 +311,7 @@ def expand_economy(
     pool = survey["pool"]
     return Expansion(
         build=True,
+        priced_out=False,
         reason=f"{type_name} #{owned + 1} at ({pool['x']:.0f}, {pool['y']:.0f})",
         type_name=type_name,
         unit_id=builder["unit_id"],
@@ -271,36 +323,13 @@ def expand_economy(
     )
 
 
-def _immobile_count(sample: Sample, catalogue: Mapping[str, UnitStats]) -> int:
-    """Count the finished immobile structures the player holds.
-
-    Immobility comes from the catalogue's speed field rather than a type-name
-    guess, the same test the build plan's anchor uses. A type the catalogue does
-    not describe is not counted: it cannot be sited from either, so including it
-    would shift the ring index for a structure the planner cannot reason about.
-
-    Args:
-        sample: One observation of the world.
-        catalogue: Unit stats by type name, for the speed field.
-
-    Returns:
-        How many finished immobile structures are owned.
-    """
-    standing = 0
-    for entity in sample["entities"]:
-        if not entity["mine"] or not entity["complete"]:
-            continue
-        stats = catalogue.get(entity["type_name"])
-        if stats is not None and stats["speed"] == 0.0:
-            standing += 1
-    return standing
-
-
 def expand_production(
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
     *,
-    reserve: int,
+    available: int,
+    wanted: Sequence[str],
+    free: Sequence[Entity],
     factory_type: str = FACTORY_TYPE,
 ) -> Expansion:
     """Decide whether to add another producer.
@@ -326,42 +355,120 @@ def expand_production(
     Args:
         sample: One observation of the world.
         catalogue: Unit stats by type name, for prices and immobility.
-        reserve: Credits to leave unspent for the army.
+        available: Credits still unclaimed after the plan and every producer
+            have taken what they can this tick. Surplus nobody could spend is
+            the definition of throughput being the constraint
+            ([[policy-budget]]).
+        wanted: Type names the player is trying to make. Nothing able to make
+            any of them makes this the build plan's problem rather than the
+            economy's.
+        free: Workers not already carrying out an order.
         factory_type: The producer to add.
 
     Returns:
         What to do, with the reasoning behind it either way.
     """
-    if not production_bound(sample, catalogue, factory_type):
-        return _waiting("production is not the constraint", sample, factory_type)
+    if not production_bound(sample, catalogue, factory_type, wanted, available):
+        return waiting("production is not the constraint", sample, factory_type)
 
-    stats = catalogue[factory_type]
-    needed = stats["price"] + reserve
-    if sample["credits"] < needed:
-        return _waiting(
-            f"{sample['credits']} credits, need {needed} past a {reserve} reserve",
-            sample,
-            factory_type,
-        )
-
-    builder = _placer(sample, factory_type)
+    builder = placer(sample, factory_type, free)
     if builder is None:
-        return _waiting(f"nothing owned can place {factory_type}", sample, factory_type)
+        return waiting(f"no free worker can place {factory_type}", sample, factory_type)
     anchor = find_anchor(sample, catalogue) or builder
 
-    standing = _immobile_count(sample, catalogue)
-    offset = PLACEMENT_RING[standing % len(PLACEMENT_RING)]
+    site = next_ring_site(sample, anchor, catalogue)
+    if site is None:
+        return waiting("every ring position is taken", sample, factory_type)
     return Expansion(
         build=True,
-        reason=f"every producer busy on {sample['credits']} credits; adding a {factory_type}",
+        priced_out=False,
+        reason=f"{available} credits nobody could spend; adding a {factory_type}",
         type_name=factory_type,
         unit_id=builder["unit_id"],
-        x=anchor["x"] + offset[0],
-        y=anchor["y"] + offset[1],
+        x=site[0],
+        y=site[1],
         owned=count_extractors(sample),
         occupied=0,
         exposed=0,
     )
+
+
+class UpgradeStep(TypedDict):
+    """One owned structure and the tier it would convert itself into.
+
+    The target is carried rather than assumed because it differs per structure:
+    a tier one names a tier two and a tier two names a tier three, so a single
+    wanted type cannot describe a roster holding both.
+
+    Attributes:
+        unit_id: Engine identity of the structure offering the conversion.
+        produces: The tier it converts into, taken from the engine's own option
+            rather than from the chain, so a type the engine declines to offer
+            is never ordered.
+    """
+
+    unit_id: int
+    produces: str
+
+
+def upgradeable(sample: Sample) -> tuple[UpgradeStep, ...]:
+    """Return the owned structures offering to upgrade themselves, and to what.
+
+    **The walk used to stop at tier two, which capped income at 12 a second.**
+    This took a single wanted type and matched options against it, so an
+    ``extractorT2`` standing next to 62,146 unspent credits was never asked to
+    become an ``extractorT3`` -- 20 a second for 4,000, a 500-second payback in
+    a match lasting about 1,130. Each structure is now asked for its *own* next
+    tier ([[mechanics-unit-value]]).
+
+    **This was invisible for the whole life of the bot, and the cause was ours.**
+    An upgrade is not a build: the asset declares it as ``convertTo``, and the
+    engine reports the action with no "makes something" flag and no placement
+    type. The agent used to drop exactly that shape, so an owned extractor
+    published no options at all and the upgrade path looked unreachable --
+    while opponents were observed holding twelve upgraded extractors against
+    four un-upgraded ones ([[policy-holding-ground]]).
+
+    With every action published, all four standing extractors offer
+    ``extractorT2`` and the engine reports it **available**. No tier-2 builder
+    is needed and no prerequisite chain: the reading that it was gated behind
+    44,500 credits of experimental units was wrong, and only the probe caught
+    it.
+
+    It is the best income in the game per unit of risk. An extractor upgrading
+    itself needs no builder, crosses no contested ground, and claims no new
+    pool -- on a map where the opponents end up holding 44 of the 46
+    ([[policy-holding-ground]]). It pays 12 credits a second against tier one's
+    8, for 1,400.
+
+    The engine's own offer is still what authorises the order. The chain says
+    which tier is *next*; the option stream says whether it may be built now,
+    and that is where tech gating and the unit cap already live
+    ([[mechanics-build-actions]]). A structure at a fork -- the tier three,
+    which offers both an overclock and a reinforce -- has no single next tier
+    and is left alone rather than assigned a preference nobody measured.
+
+    Args:
+        sample: One observation of the world.
+
+    Returns:
+        One entry per owned structure that can convert itself right now, in
+        roster order.
+    """
+    offered = {
+        (option["unit_id"], option["produces"])
+        for option in sample["options"]
+        if option["available"] and not option["placed"]
+    }
+    steps: list[UpgradeStep] = []
+    for entity in sample["entities"]:
+        if not entity["mine"] or not entity["complete"] or entity["queued"] != 0:
+            continue
+        target = next_tier(entity["type_name"])
+        if target is None or (entity["unit_id"], target) not in offered:
+            continue
+        steps.append(UpgradeStep(unit_id=entity["unit_id"], produces=target))
+    return tuple(steps)
 
 
 __all__ = [
@@ -371,4 +478,7 @@ __all__ = [
     "count_extractors",
     "expand_economy",
     "expand_production",
+    "placer",
+    "upgradeable",
+    "waiting",
 ]
