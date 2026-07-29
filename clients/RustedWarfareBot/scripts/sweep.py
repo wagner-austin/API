@@ -1,0 +1,123 @@
+"""Play a batch of matches in parallel and file one result per match.
+
+The command-line adapter for experiments: it parses arguments, builds the batch
+configuration, and reports. Deciding what a match is belongs to
+:mod:`rw_bot.harness.sweep`, and playing one belongs to
+:mod:`rw_bot.harness.runner`.
+
+Run as ``python -m scripts.sweep <job-file> <name> [workers] [lockstep]``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from pathlib import Path
+
+from rw_bot.harness import _test_hooks
+from rw_bot.harness.match import decode_match_config, describe
+from rw_bot.harness.runner import SweepConfig, decode_sweep_config, outstanding, run_worker
+from rw_bot.harness.sweep import parse_jobs
+
+#: Opponents asked for when a match is given. One, because the goal is to beat
+#: one -- and because the engine caps the count by the map anyway, so a
+#: two-player map would give one whatever was asked.
+DUEL_OPPONENTS = 1
+
+#: Where a batch's results are filed, under the run artifacts directory.
+SWEEP_ROOT = "runs/sweeps"
+
+#: The pinned game directory worker copies are taken from.
+SOURCE_GAME_DIR = ".game"
+
+#: Leading part of every worker copy's directory name.
+CLONE_PREFIX = ".game-w"
+
+#: Engine frames between samples, defaulting to the observed free-running rate
+#: so a locked match covers the same ground as the unlocked ones already
+#: recorded ([[policy-determinism]]).
+DEFAULT_LOCKSTEP = 75
+
+DEFAULT_WORKERS = 4
+
+EXIT_OK = 0
+EXIT_INCOMPLETE = 1
+EXIT_BAD_USAGE = 2
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Read a job file, play what is outstanding, and report.
+
+    Args:
+        argv: ``<job-file> <name> [workers] [lockstep]``. ``None`` reads the
+            process arguments.
+
+    Returns:
+        ``EXIT_OK`` when every match in the file has a result, ``EXIT_INCOMPLETE``
+        when any is still outstanding, ``EXIT_BAD_USAGE`` on a bad argument
+        count.
+
+    Raises:
+        SweepError: When the job file is malformed.
+        DecodeError: When an argument is out of range.
+        CloneError: When a worker's copy of the game is unusable.
+        OSError: When the job file cannot be read or a result cannot be written.
+    """
+    args = list(argv) if argv is not None else _test_hooks.read_argv()
+    if len(args) not in (2, 3, 4, 6):
+        _test_hooks.write_line(
+            "usage: sweep <job-file> <name> [workers] [lockstep] [map difficulty]"
+        )
+        return EXIT_BAD_USAGE
+
+    # The map decides the opponent count, because the engine caps teams by the
+    # map's own -- so a two-player map is a duel and the count needs no saying
+    # ([[policy-determinism]]).
+    match = (
+        decode_match_config(
+            {"map_path": args[4], "opponents": DUEL_OPPONENTS, "difficulty": int(args[5])}
+        )
+        if len(args) == 6
+        else None
+    )
+
+    jobs = parse_jobs(_test_hooks.read_text_lines(Path(args[0])))
+    out_dir = Path(SWEEP_ROOT) / args[1]
+    _test_hooks.make_dirs(out_dir)
+    todo = outstanding(jobs, out_dir)
+
+    # Never more workers than there are matches, so a batch of two does not copy
+    # the game four times to leave two of the copies idle.
+    asked = int(args[2]) if len(args) >= 3 else DEFAULT_WORKERS
+    config: SweepConfig = decode_sweep_config(
+        {
+            "out_dir": str(out_dir),
+            "workers": min(asked, len(todo)) if todo else asked,
+            "lockstep": int(args[3]) if len(args) >= 4 else DEFAULT_LOCKSTEP,
+            "clone_prefix": CLONE_PREFIX,
+            "source_game_dir": SOURCE_GAME_DIR,
+        },
+        match,
+    )
+    if match is not None:
+        _test_hooks.write_line(f"[sweep] {describe(match)}")
+
+    already = len(jobs) - len(todo)
+    _test_hooks.write_line(
+        f"[sweep] {len(jobs)} matches, {already} already played, "
+        f"{len(todo)} to go over {config['workers']} workers"
+    )
+
+    played = 0
+    if todo:
+        with ThreadPoolExecutor(max_workers=config["workers"]) as pool:
+            counts = pool.map(partial(run_worker, todo, config=config), range(config["workers"]))
+            played = sum(counts)
+
+    _test_hooks.write_line(f"[sweep] {already + played}/{len(jobs)} matches have results")
+    return EXIT_OK if already + played == len(jobs) else EXIT_INCOMPLETE
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(None))

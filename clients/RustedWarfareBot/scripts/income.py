@@ -30,6 +30,7 @@ from pathlib import Path
 
 from rw_bot.control.channel import AgentChannel, open_channel
 from rw_bot.mechanics.catalogue import UnitStats
+from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.income import (
     Reading,
     format_rates,
@@ -38,9 +39,9 @@ from rw_bot.mechanics.income import (
     payback_seconds,
 )
 from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.policy.campaign import play
 from rw_bot.policy.economy import EXTRACTOR_TYPE, count_extractors
-from rw_bot.policy.runner import run
-from scripts.play import load_catalogue, load_placements, load_reaches
+from scripts.play import load_catalogue, load_combat_profiles, load_placements
 
 #: Extractors to build, and therefore windows to measure -- one before the
 #: first is built, then one after each.
@@ -149,7 +150,7 @@ def _stages(
     idle: int,
     catalogue: Mapping[str, UnitStats],
     placements: Mapping[str, TypePlacement],
-    reaches: Mapping[str, float],
+    profiles: Mapping[str, CombatProfile],
 ) -> tuple[list[Reading], bool]:
     """Alternate idle windows with building one more extractor.
 
@@ -159,7 +160,7 @@ def _stages(
         idle: Samples to spend in each window.
         catalogue: Unit stats by type name.
         placements: Placement rules by type name.
-        reaches: Attack range by type name.
+        profiles: Combat profiles by type name.
 
     Returns:
         Every reading taken, and whether all stages completed.
@@ -177,9 +178,22 @@ def _stages(
         # no point paying for an extractor no window will observe.
         if window < stages:
             plan = (EXTRACTOR_TYPE,) * (window + 1)
-            card = run(channel, plan, catalogue, placements, reaches, BUILD_BUDGET)
-            if card["outcome"] != "done":
-                sys.stdout.write(f"# stage {window + 1} stopped: {card['last_reason']}\n")
+            # The probe must not perturb what it measures, so expansion is off
+            # and nothing is reinforced: only the plan runs, and the credit
+            # slope across each window is then income and nothing else
+            # ([[policy-economy]]).
+            report = play(
+                channel,
+                plan,
+                catalogue,
+                placements,
+                profiles,
+                BUILD_BUDGET,
+                expand=False,
+                stop_when_plan_done=True,
+            )
+            if report["build_outcome"] != "done":
+                sys.stdout.write(f"# stage {window + 1} stopped: {report['build_reason']}\n")
                 return readings, False
     return readings, True
 
@@ -206,12 +220,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     catalogue = load_catalogue(Path(args[1]))
     placements = load_placements(Path(args[2]))
-    reaches = load_reaches(Path(args[2]))
+    profiles = load_combat_profiles(Path(args[2]))
 
     channel = open_channel(int(args[0]))
     channel.next_sample()
     channel.send_ack()
-    readings, complete = _stages(channel, stages, idle, catalogue, placements, reaches)
+    readings, complete = _stages(channel, stages, idle, catalogue, placements, profiles)
     channel.close()
 
     for reading in readings:

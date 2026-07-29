@@ -16,12 +16,20 @@ from pathlib import Path
 from rw_bot.control.channel import open_channel
 from rw_bot.mechanics.build_tree import decode_build_tree
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
-from rw_bot.mechanics.placement import TypePlacement, decode_placements, decode_reaches
-from rw_bot.policy.campaign import fight, format_battle
+from rw_bot.mechanics.combat_profile import CombatProfile, decode_combat_profiles
+from rw_bot.mechanics.placement import TypePlacement, decode_placements
+from rw_bot.policy.campaign import play
+from rw_bot.policy.combat import ladder_to
+from rw_bot.policy.doctrine import (
+    DEFAULT_DOCTRINE,
+    DERIVE_RESERVE,
+    Doctrine,
+    parse_doctrine_lines,
+)
 from rw_bot.policy.expand import expand
-from rw_bot.policy.runner import format_scorecard, run
+from rw_bot.policy.match_report import format_report
 
-#: What the bot is asked for -- goals, not a build order.
+#: What the default doctrine asks for -- goals, not a build order.
 #:
 #: The distinction is the point. No factory appears here, and two of these
 #: entries need one: a Land Factory is what makes a tank, and the plan the bot
@@ -34,15 +42,7 @@ from rw_bot.policy.runner import format_scorecard, run
 #: starting balance and nothing after it. Where they go is not a choice the plan
 #: makes -- the engine allows them on resource pools and nowhere else
 #: ([[mechanics-resource-pools]]).
-DEFAULT_GOALS: tuple[str, ...] = (
-    "extractorT1",
-    "extractorT1",
-    "extractorT1",
-    "c_tank",
-    "c_tank",
-    "c_tank",
-    "c_tank",
-)
+DEFAULT_GOALS: tuple[str, ...] = DEFAULT_DOCTRINE["goals"]
 
 DEFAULT_MAX_SAMPLES = 120
 
@@ -88,20 +88,24 @@ def load_build_tree(path: Path) -> dict[str, frozenset[str]]:
     return decode_build_tree(lines)
 
 
-def load_reaches(path: Path) -> Mapping[str, float]:
-    """Read every registered type's attack range from the registry dump.
+def load_combat_profiles(path: Path) -> Mapping[str, CombatProfile]:
+    """Read every registered type's reach and reachable layers.
 
     The same file the placement flags come from, because both are one pass over
-    one registry and two files could be regenerated against different builds
-    and disagree.
+    one registry and two files could be regenerated against different builds and
+    disagree.
 
     Args:
         path: Path to the registry dump.
 
     Returns:
-        Attack range by type name, zero for the unarmed.
+        Combat profiles by type name.
+
+    Raises:
+        OSError: When the file cannot be read.
+        CombatProfileError: When the dump carries a type twice.
     """
-    return decode_reaches(path.read_text(encoding="utf-8", errors="strict").splitlines())
+    return decode_combat_profiles(path.read_text(encoding="utf-8", errors="strict").splitlines())
 
 
 def load_placements(path: Path) -> dict[str, TypePlacement]:
@@ -123,35 +127,41 @@ def load_placements(path: Path) -> dict[str, TypePlacement]:
 
 def reinforcements(
     goals: Sequence[str],
-    placements: Mapping[str, TypePlacement],
+    catalogue: Mapping[str, UnitStats],
 ) -> tuple[str, ...]:
-    """Return the goal types worth making again once the plan is finished.
+    """Return the army composition worth holding once the plan is finished.
 
     The plan ends; wanting the units it asked for does not. So reinforcement
     repeats the goals rather than ranking units by some invented notion of
     combat worth -- a number attached to a guess is still a guess.
 
-    Structures are dropped. Rebuilding an extractor means choosing a resource
-    pool to put it on, which is the build policy's decision and not something
-    a producer queue can express ([[mechanics-resource-pools]]).
+    **Structures are dropped, and immobility is what identifies one.** This used
+    to drop only the types needing a resource pool, which was the same test by
+    accident: every structure the goals had ever named was an extractor. A
+    turret needs no pool and is still placed, so it passed the filter into a
+    list of things producers should keep making -- where no producer can make it,
+    because a queue cannot express a position ([[mechanics-resource-pools]]).
+    Speed is the catalogue's own answer and it identifies every structure, not
+    just the ones that stand on pools.
 
-    Duplicates are collapsed, keeping first appearance. Asking for four tanks
-    does not mean four preferences; it means one, wanted repeatedly.
+    **Duplicates are kept, and they are the ratio.** They used to be collapsed,
+    on the reading that four tanks meant one preference stated four times. That
+    reading cost the bot its army: the composition was a strict priority list,
+    every producer took the head of it, and three matches ended with 33
+    identical ``c_tank`` against opponents fielding aircraft no ``c_tank`` can
+    shoot at ([[mechanics-combat-profile]]). Repeats now say what they look
+    like they say -- three tanks per anti-air unit is a mix, not a queue
+    ([[policy-production]]).
 
     Args:
         goals: What the plan was asked for, in order.
-        placements: Placement rules by type name, for telling a structure from
-            a unit.
+        catalogue: Unit stats by type name, for the speed that tells a structure
+            from a unit.
 
     Returns:
-        Unit type names to keep making, in preference order.
+        Unit type names to keep making, repeats meaningful as a ratio.
     """
-    wanted: list[str] = []
-    for name in goals:
-        if placements[name]["needs_pool"] or name in wanted:
-            continue
-        wanted.append(name)
-    return tuple(wanted)
+    return tuple(name for name in goals if catalogue[name]["speed"] > 0.0)
 
 
 def expansion_reserve(
@@ -161,29 +171,72 @@ def expansion_reserve(
     """Return the credits to hold back for the army before claiming a pool.
 
     The most expensive thing the bot keeps making, so expansion never leaves it
-    unable to replace a single loss. That is a deliberately shallow reserve: an
-    extractor pays back over the rest of the match and a bank does not, and the
-    run that banked 21,164 credits while its army was ground down is what the
-    shallow end of this trade-off is guarding against ([[policy-economy]]).
+    unable to replace a single loss. Deliberately shallow: an extractor pays
+    back over the rest of the match and a bank does not, and the run that banked
+    21,164 credits while its army was ground down is what the shallow end of
+    this trade-off guards against ([[policy-economy]]).
 
-    Nothing to reinforce means nothing to protect, so the reserve is zero and
-    every spare credit goes into the economy.
+    **The maximum, and it was replaced by the mean and put back.** The objection
+    to the maximum is real: one expensive type raises the barrier the whole
+    economy must clear, invisibly, because nothing about a unit list looks like
+    a reserve. Adding a 1,400-credit ``mechArtillery`` took it from 450 to 1,400
+    and expansion was then refused 232 times of 237. So it was changed to the
+    mean over the composition, which moved the standard mix 450 -> 375.
+
+    Twelve seeds at Very Hard say that was a **regression: 7 wins became 3**,
+    with the same two losses and routs falling 3 to 1 -- and unlike most arms
+    this session that gap sits outside the noise floor
+    ([[policy-holding-ground]]). A shallower reserve starves the replacement it
+    exists to fund, and at 1.8x AI income the army cannot absorb that. The
+    barrier the objection complained about was doing real work.
+
+    **The confound the objection identified is real and is fixed elsewhere.**
+    Deriving the reserve from the composition means a composition A/B is also a
+    reserve A/B, so ``reserve`` is now overridable per run -- see :func:`main`.
+    That separates the two questions without lowering the figure that measured
+    better.
 
     Args:
         reinforce: Type names the bot keeps making.
         catalogue: Unit stats by type name, for prices.
 
     Returns:
-        Credits to leave unspent.
+        Credits to leave unspent. Zero when there is nothing to reinforce,
+        because then there is nothing to protect and every spare credit belongs
+        to the economy.
     """
     return max((catalogue[name]["price"] for name in reinforce), default=0)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Connect, play the plan, and report.
+def load_doctrine(path: Path) -> Doctrine:
+    """Read a gameplay style from a doctrine file.
 
     Args:
-        argv: ``<port> <catalogue-path> <placement-path> [max-samples]``.
+        path: The preset, e.g. ``doctrines/default.doctrine``.
+
+    Returns:
+        The doctrine it describes.
+
+    Raises:
+        OSError: When the file cannot be read.
+        DoctrineError: When a line is malformed.
+        DecodeError: When a field is absent or out of range.
+    """
+    return parse_doctrine_lines(path.read_text(encoding="utf-8", errors="strict").splitlines())
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Connect, play the doctrine, and report.
+
+    Args:
+        argv: ``<port> <catalogue-path> <placement-path> [max-samples]
+            [doctrine-path] [trace-path]``. The doctrine is the whole of the
+            gameplay style -- goals, worker ceiling, wave mass, reserve, the
+            expansion switch and the counter switch -- so one arm of an
+            experiment differs from another by a file rather than by an edit,
+            and the positional tail this entry point used to grow one slot per
+            question stops growing ([[policy-loop]]). ``-`` or absent plays the
+            default doctrine; ``-`` or absent for the trace keeps none.
             ``None`` reads ``sys.argv[1:]``.
 
     Returns:
@@ -191,14 +244,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         not, ``EXIT_BAD_USAGE`` on a bad argument count.
     """
     args = list(argv) if argv is not None else sys.argv[1:]
-    if len(args) not in (3, 4):
-        sys.stdout.write("usage: play <port> <catalogue-path> <placement-path> [max-samples]\n")
+    if len(args) not in (3, 4, 5, 6):
+        sys.stdout.write(
+            "usage: play <port> <catalogue-path> <placement-path> "
+            "[max-samples] [doctrine-path] [trace-path]\n"
+        )
         return EXIT_BAD_USAGE
-    max_samples = int(args[3]) if len(args) == 4 else DEFAULT_MAX_SAMPLES
+    max_samples = int(args[3]) if len(args) >= 4 else DEFAULT_MAX_SAMPLES
+    doctrine = (
+        load_doctrine(Path(args[4])) if len(args) >= 5 and args[4] != "-" else DEFAULT_DOCTRINE
+    )
+    # Where to write the per-sample record. Absent means keep none, because a
+    # run that is not being compared against another has nothing to read it
+    # for ([[policy-trace]]).
+    trace = Path(args[5]) if len(args) >= 6 and args[5] != "-" else None
 
     catalogue = load_catalogue(Path(args[1]))
     placements = load_placements(Path(args[2]))
-    reaches = load_reaches(Path(args[2]))
+    profiles = load_combat_profiles(Path(args[2]))
     tree = load_build_tree(Path(args[2]))
 
     # Expansion needs to know what the player already has, so it runs against a
@@ -212,36 +275,45 @@ def main(argv: Sequence[str] | None = None) -> int:
     # ([[policy-determinism]]).
     channel.send_ack()
     owned = [e["type_name"] for e in opening["entities"] if e["mine"] and e["complete"]]
-    plan = expand(DEFAULT_GOALS, tree, owned, catalogue)
+    goals = doctrine["goals"]
+    plan = expand(goals, tree, owned, catalogue)
 
-    sys.stdout.write(f"goals: {' -> '.join(DEFAULT_GOALS)}\n")
+    sys.stdout.write(f"doctrine: {doctrine['name']}\n")
+    sys.stdout.write(f"goals: {' -> '.join(goals)}\n")
     sys.stdout.write(f"plan:  {' -> '.join(plan)}\n")
     for name in plan:
         site = "on a resource pool" if placements[name]["needs_pool"] else "on the ring"
         sys.stdout.write(f"  {name} costs {catalogue[name]['price']}, goes {site}\n")
 
-    card = run(channel, plan, catalogue, placements, reaches, max_samples)
-    for line in format_scorecard(card):
+    reinforce = reinforcements(goals, catalogue)
+    # The derive-or-fix choice the reserve override existed for, now carried by
+    # the doctrine: a fixed figure keeps a composition A/B from silently also
+    # being a reserve A/B ([[policy-economy]]).
+    reserve = (
+        expansion_reserve(reinforce, catalogue)
+        if doctrine["reserve"] == DERIVE_RESERVE
+        else doctrine["reserve"]
+    )
+    report = play(
+        channel,
+        plan,
+        catalogue,
+        placements,
+        profiles,
+        max_samples,
+        reinforce=reinforce,
+        reserve=reserve,
+        expand=doctrine["expand"],
+        max_workers=doctrine["max_workers"],
+        counter=doctrine["counter"],
+        ladder=ladder_to(doctrine["mass"]),
+        trace=trace,
+    )
+    for line in format_report(report):
         sys.stdout.write(f"{line}\n")
-
-    # Building is not playing. The fight phase only runs on a plan that
-    # finished, because sending a half-built army at five opponents loses the
-    # army and proves nothing.
-    if card["outcome"] == "done":
-        reinforce = reinforcements(DEFAULT_GOALS, placements)
-        battle = fight(
-            channel,
-            catalogue,
-            max_samples,
-            reinforce=reinforce,
-            reaches=reaches,
-            reserve=expansion_reserve(reinforce, catalogue),
-        )
-        for line in format_battle(battle):
-            sys.stdout.write(f"{line}\n")
     channel.close()
 
-    return EXIT_OK if card["outcome"] == "done" else EXIT_INCOMPLETE
+    return EXIT_OK if report["build_outcome"] == "done" else EXIT_INCOMPLETE
 
 
 if __name__ == "__main__":
