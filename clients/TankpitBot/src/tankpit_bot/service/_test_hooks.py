@@ -253,6 +253,7 @@ def _real_build_bot_factory(
         :class:`SessionRunner` invokes once per session.
     """
     from tankpit_bot.bot.base import Bot
+    from tankpit_bot.service.frame_bus import FrameBusProtocol
     from tankpit_bot.service.mode_bridge import ModeBridgeProtocol
     from tankpit_bot.service.session_runner import RunnableBotProtocol
     from tankpit_bot.service.status_bus import StatusBusProtocol
@@ -261,6 +262,7 @@ def _real_build_bot_factory(
         *,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
+        frame_bus: FrameBusProtocol,
     ) -> RunnableBotProtocol:
         return Bot(
             target_url,
@@ -268,6 +270,7 @@ def _real_build_bot_factory(
             prefer_account=prefer_account,
             mode_bridge=mode_bridge,
             status_bus=status_bus,
+            frame_bus=frame_bus,
         )
 
     return factory

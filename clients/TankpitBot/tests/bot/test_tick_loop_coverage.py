@@ -682,6 +682,60 @@ class TestBrowserClosedExit:
         row = decode_row(data_lines[0])
         assert row["exit_reason"] == "browser_closed"
 
+    def test_browser_closed_during_screencast_sync_records_browser_closed(
+        self, fake_fs: FakeFileSystem, fake_env: FakeEnv
+    ) -> None:
+        """A ``TargetClosedError`` from the screencast toggle exits cleanly.
+
+        The demand sync runs after the status publish; a viewer
+        subscribing in the same instant the operator closes the
+        browser makes ``Page.startScreencast`` the first call to
+        observe the dead target.
+        """
+        from collections.abc import Callable
+
+        from platform_core.json_utils import JSONObject
+        from playwright._impl._errors import TargetClosedError
+
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import run_tick_loop
+        from tankpit_bot.diagnostics.runs_index import DEFAULT_INDEX_PATH, decode_row
+        from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+        from tankpit_bot.service.frame_bus import FrameBus
+
+        class _ClosedTargetCDP:
+            def send(self, method: str, params: JSONObject | None = None) -> JSONObject:
+                _ = params
+                if method == "Page.startScreencast":
+                    raise TargetClosedError(f"{method}: target closed")
+                return {}
+
+            def on(self, event: str, handler: Callable[[JSONObject], None]) -> None:
+                _ = (event, handler)
+
+            def detach(self) -> None:
+                raise AssertionError("never detached in this test")
+
+        configure_bot_runtime_logging("20260728-120000")
+        frames = FrameBus()
+        bot = Bot("https://test.tankpit.com/", headless=True, frame_bus=frames)
+        bot._cdp = _ClosedTargetCDP()
+        frames.subscribe()  # viewer demand → the sync attempts a start
+
+        run_tick_loop(
+            bot,
+            _FakePage(),
+            session_seconds=0,
+            stop_file_path=Path("C:/tmp/never_exists.sentinel"),
+        )
+
+        text = fake_fs.get_written_files()[str(DEFAULT_INDEX_PATH)]
+        data_lines = [line for line in text.splitlines() if line and not line.startswith("stamp\t")]
+        if len(data_lines) != 1:
+            raise AssertionError(f"expected 1 index row, got {len(data_lines)}")
+        row = decode_row(data_lines[0])
+        assert row["exit_reason"] == "browser_closed"
+
     def test_session_exit_request_records_its_reason(
         self, fake_fs: FakeFileSystem, fake_env: FakeEnv
     ) -> None:

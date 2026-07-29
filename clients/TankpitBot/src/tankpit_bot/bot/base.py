@@ -38,6 +38,7 @@ from tankpit_bot.browser.lifecycle import (
     navigate_and_login,
     wait_for_game_ready,
 )
+from tankpit_bot.browser.screencast import ScreencastService
 from tankpit_bot.browser.session_storage import (
     STORAGE_STATE_PATH,
     load_storage_state,
@@ -48,6 +49,7 @@ from tankpit_bot.diagnostics.account_stats import (
     parse_account_stats,
 )
 from tankpit_bot.runtime_logging import emit_state
+from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.sniffer.core import (
@@ -136,6 +138,7 @@ class Bot(DispatchMixin):
         command_service: CommandService | None = None,
         mode_bridge: ModeBridgeProtocol | None = None,
         status_bus: StatusBusProtocol | None = None,
+        frame_bus: FrameBusProtocol | None = None,
     ) -> None:
         """Initialize the bot.
 
@@ -158,6 +161,11 @@ class Bot(DispatchMixin):
                 a fresh :class:`StatusBus` is created — a standalone
                 session gets a bus with zero subscribers, so publish
                 is a no-op.
+            frame_bus: Fan-out the screencast relay publishes JPEG
+                frames into (2026-07-28 watch page). When ``None``, a
+                fresh :class:`FrameBus` is created — a standalone
+                session has zero subscribers, so the tick loop's
+                demand check never starts the screencast.
         """
         super().__init__(
             target_url,
@@ -179,6 +187,11 @@ class Bot(DispatchMixin):
         self._status_bus: StatusBusProtocol = (
             status_bus if status_bus is not None else default_status_bus
         )
+        default_frame_bus: FrameBusProtocol = FrameBus()
+        self._frame_bus: FrameBusProtocol = (
+            frame_bus if frame_bus is not None else default_frame_bus
+        )
+        self._screencast = ScreencastService(publish=self._frame_bus.publish)
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x

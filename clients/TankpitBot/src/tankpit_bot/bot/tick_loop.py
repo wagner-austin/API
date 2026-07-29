@@ -167,6 +167,7 @@ def run_tick_loop(
             )
         try:
             _tick_once(bot)
+            _sync_screencast_demand(bot)
         except TargetClosedError:
             log.info("Browser closed during tick, ending run gracefully")
             _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
@@ -466,6 +467,37 @@ def _publish_session_status(bot: Bot) -> None:
         stats=stats,
     )
     bot._status_bus.publish(status)
+
+
+def _sync_screencast_demand(bot: Bot) -> None:
+    """Start or stop the Chrome screencast to match viewer demand.
+
+    Runs once per tick, directly after ``_tick_once`` inside the same
+    ``TargetClosedError`` guard (a closed browser during the toggle
+    ends the run as ``browser_closed``). Demand is the frame
+    bus's subscriber count: a ``/video`` (or ``/frame``) connection on
+    the service creates it; the last disconnect removes it. Sessions
+    nobody watches never pay the encode cost, and ``make run`` /
+    replay sessions (inert default bus, zero subscribers) never start
+    a screencast at all.
+
+    Skipped silently before the CDP session is attached — the tick
+    loop's readiness gates run this only in ticks where the browser is
+    already up, but the very first iterations of a session can land
+    here pre-attach.
+
+    Args:
+        bot: Bot instance whose ``_screencast`` and ``_frame_bus``
+            drive the decision.
+    """
+    cdp = bot._cdp
+    if cdp is None:
+        return
+    want = bot._frame_bus.subscriber_count() > 0
+    if want and not bot._screencast.active:
+        bot._screencast.start(cdp)
+    elif not want and bot._screencast.active:
+        bot._screencast.stop(cdp)
 
 
 def _tick_once(bot: Bot) -> None:

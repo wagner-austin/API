@@ -29,6 +29,7 @@ from tankpit_bot.service.constants import (
     SERVICE_IDLE_POLL_SECONDS,
     SERVICE_PORT,
 )
+from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import SessionRunner
@@ -69,6 +70,7 @@ async def run_service_forever(
 async def exit_when_idle(
     runner: SessionRunnerHTTPProtocol,
     status_bus: StatusBusProtocol,
+    frame_bus: FrameBusProtocol,
     stop_event: asyncio.Event,
     *,
     idle_exit_seconds: float = SERVICE_IDLE_EXIT_SECONDS,
@@ -76,17 +78,20 @@ async def exit_when_idle(
 ) -> None:
     """Set ``stop_event`` after a sustained stretch of total idleness.
 
-    "Idle" means no session running AND no SSE subscriber — nobody is
-    using the service and nobody is even watching it. The idle clock
-    resets whenever either condition breaks, so an operator staring at
-    the stats strip (SSE open) keeps the service alive indefinitely.
-    Part of the 2026-07-18 lifecycle pass: the phone's START SERVER
-    button relaunches in ~2 s, so an abandoned server has no reason to
+    "Idle" means no session running AND no SSE subscriber AND no video
+    viewer — nobody is using the service and nobody is even watching
+    it. The idle clock resets whenever any condition breaks, so an
+    operator staring at the stats strip (SSE open) or the live video
+    (``/video`` open) keeps the service alive indefinitely. Part of
+    the 2026-07-18 lifecycle pass: the phone's START SERVER button
+    relaunches in ~2 s, so an abandoned server has no reason to
     outlive its last viewer by more than this window.
 
     Args:
         runner: Session runner whose ``is_running`` gates the clock.
         status_bus: Bus whose ``subscriber_count`` gates the clock.
+        frame_bus: Video-frame bus whose ``subscriber_count`` also
+            gates the clock (2026-07-28 watch page).
         stop_event: The service main's shutdown signal.
         idle_exit_seconds: Sustained idle seconds before exit.
         poll_seconds: Cadence of the idleness checks.
@@ -94,7 +99,11 @@ async def exit_when_idle(
     idle_elapsed = 0.0
     while not stop_event.is_set():
         await asyncio.sleep(poll_seconds)
-        if runner.is_running() or status_bus.subscriber_count() > 0:
+        if (
+            runner.is_running()
+            or status_bus.subscriber_count() > 0
+            or frame_bus.subscriber_count() > 0
+        ):
             idle_elapsed = 0.0
             continue
         idle_elapsed += poll_seconds
@@ -119,6 +128,7 @@ async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> Non
     """
     mode_bridge: ModeBridgeProtocol = ModeBridge()
     status_bus: StatusBusProtocol = StatusBus()
+    frame_bus: FrameBusProtocol = FrameBus()
     runner = SessionRunner(
         bot_factory=service_hooks.build_bot_factory(
             resolve_target_url(),
@@ -127,13 +137,14 @@ async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> Non
         ),
         mode_bridge=mode_bridge,
         status_bus=status_bus,
+        frame_bus=frame_bus,
         stop_file_path=_DEFAULT_STOP_FILE,
     )
     status_bus.publish(idle_session_status(get_current_time_ms()))
     stop_event = asyncio.Event()
-    app = make_app(runner, mode_bridge, status_bus, stop_event.set)
+    app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
     site = await service_hooks.build_site(app, host, port)
-    idle_monitor = asyncio.create_task(exit_when_idle(runner, status_bus, stop_event))
+    idle_monitor = asyncio.create_task(exit_when_idle(runner, status_bus, frame_bus, stop_event))
     try:
         await run_service_forever(site, stop_event)
     finally:

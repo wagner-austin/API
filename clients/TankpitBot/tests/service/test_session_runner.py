@@ -20,6 +20,7 @@ from tankpit_bot._test_hooks.browser import (
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
 )
+from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.session_runner import (
     RunnableBotProtocol,
@@ -104,14 +105,16 @@ def _make_runner(
         *,
         mode_bridge: ModeBridgeProtocol,
         status_bus: StatusBusProtocol,
+        frame_bus: FrameBusProtocol,
     ) -> RunnableBotProtocol:
-        _ = (mode_bridge, status_bus)
+        _ = (mode_bridge, status_bus, frame_bus)
         return bot
 
     return SessionRunner(
         bot_factory=factory,
         mode_bridge=used_bridge,
         status_bus=used_bus,
+        frame_bus=FrameBus(),
         stop_file_path=_STOP_FILE,
     )
 
@@ -345,6 +348,40 @@ class TestSessionAlreadyRunningError:
         assert issubclass(SessionAlreadyRunningError, RuntimeError)
 
 
+class TestSessionRunnerConfiguresRunArtifacts:
+    """Service sessions get the same run artifacts as ``make run``.
+
+    Until 2026-07-28 the service path never called
+    ``configure_bot_runtime_logging``, so phone-driven sessions ran
+    with unconfigured logging — INFO lines vanished, no archive log or
+    events file existed, and the session scorecard never reached
+    ``_index.tsv``. Discovered when a live service session's
+    screencast lifecycle lines were nowhere on disk.
+    """
+
+    def test_start_configures_bot_runtime_logging(self, fake_fs: FakeFileSystem) -> None:
+        """``start`` installs the per-session bot artifact bundle."""
+        from tankpit_bot.runtime_logging import get_bot_runtime_artifacts
+
+        runner = _make_runner(_RecordingBot())
+
+        runner.start()
+
+        artifacts = get_bot_runtime_artifacts()
+        if artifacts is None:
+            raise AssertionError("start() must configure the bot runtime artifacts")
+        assert Path(artifacts["latest_log_path"]) == Path("runs/bot/latest.log")
+        assert Path(artifacts["latest_events_path"]) == Path("runs/bot/latest.events.jsonl")
+        # The artifact text handler mirrors session log lines into the
+        # latest log through the filesystem hooks — proof the configure
+        # ran inside ``start`` BEFORE the session logging began.
+        written = fake_fs.get_written_files()
+        latest_log = written[str(Path(artifacts["latest_log_path"]))]
+        assert "Session artifacts:" in latest_log
+        assert "Session start: running bot" in latest_log
+        assert "Session end: bot.run returned" in latest_log
+
+
 class TestBotFactoryReceivesSharedChannels:
     """The factory sees the exact bridge / bus the runner owns."""
 
@@ -353,20 +390,23 @@ class TestBotFactoryReceivesSharedChannels:
         _ = fake_fs
         bridge = ModeBridge()
         bus = StatusBus()
-        received: list[tuple[ModeBridgeProtocol, StatusBusProtocol]] = []
+        frames = FrameBus()
+        received: list[tuple[ModeBridgeProtocol, StatusBusProtocol, FrameBusProtocol]] = []
 
         def factory(
             *,
             mode_bridge: ModeBridgeProtocol,
             status_bus: StatusBusProtocol,
+            frame_bus: FrameBusProtocol,
         ) -> RunnableBotProtocol:
-            received.append((mode_bridge, status_bus))
+            received.append((mode_bridge, status_bus, frame_bus))
             return _RecordingBot()
 
         runner = SessionRunner(
             bot_factory=factory,
             mode_bridge=bridge,
             status_bus=bus,
+            frame_bus=frames,
             stop_file_path=_STOP_FILE,
         )
 
@@ -375,3 +415,4 @@ class TestBotFactoryReceivesSharedChannels:
         assert len(received) == 1
         assert received[0][0] is bridge
         assert received[0][1] is bus
+        assert received[0][2] is frames

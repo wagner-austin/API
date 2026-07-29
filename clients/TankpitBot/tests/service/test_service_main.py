@@ -28,6 +28,7 @@ from tankpit_bot.service._test_hooks import (
     _real_serve,
 )
 from tankpit_bot.service.constants import SERVICE_HOST, SERVICE_PORT
+from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.mode_bridge import ModeBridge, ModeBridgeProtocol
 from tankpit_bot.service.service_main import (
     _async_main,
@@ -136,8 +137,9 @@ def _make_recording_bot_factory(
             *,
             mode_bridge: ModeBridgeProtocol,
             status_bus: StatusBusProtocol,
+            frame_bus: FrameBusProtocol,
         ) -> RunnableBotProtocol:
-            _ = (mode_bridge, status_bus)
+            _ = (mode_bridge, status_bus, frame_bus)
             return recording_bot
 
         return factory
@@ -186,13 +188,15 @@ class TestRealBuildBotFactory:
         )
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
+        frames: FrameBusProtocol = FrameBus()
 
-        raw = factory(mode_bridge=bridge, status_bus=bus)
+        raw = factory(mode_bridge=bridge, status_bus=bus, frame_bus=frames)
         if not isinstance(raw, Bot):
             raise AssertionError("real bot factory must return a Bot instance")
 
         assert raw._mode_bridge is bridge
         assert raw._status_bus is bus
+        assert raw._frame_bus is frames
 
     def test_factory_carries_headless_and_prefer_account(self) -> None:
         """Construction args flow through to the produced bot."""
@@ -204,7 +208,7 @@ class TestRealBuildBotFactory:
         bridge: ModeBridgeProtocol = ModeBridge()
         bus: StatusBusProtocol = StatusBus()
 
-        raw = factory(mode_bridge=bridge, status_bus=bus)
+        raw = factory(mode_bridge=bridge, status_bus=bus, frame_bus=FrameBus())
         if not isinstance(raw, Bot):
             raise AssertionError("real bot factory must return a Bot instance")
 
@@ -303,6 +307,9 @@ class TestAsyncMain:
             "/mode",
             "/status",
             "/shutdown",
+            "/watch",
+            "/video",
+            "/frame",
         }
         assert fake_site.start_calls == 1
         assert fake_site.cleanup_calls == 1
@@ -487,6 +494,7 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 StatusBus(),
+                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -506,6 +514,7 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 bus,
+                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -521,6 +530,30 @@ class TestExitWhenIdle:
         assert stop_event.is_set()
 
     @pytest.mark.asyncio
+    async def test_a_video_viewer_keeps_the_service_alive(self) -> None:
+        """An open ``/video`` connection resets the idle clock every poll."""
+        stop_event = asyncio.Event()
+        frames = FrameBus()
+        subscriber = frames.subscribe()
+        task = asyncio.create_task(
+            exit_when_idle(
+                _IdleProbeRunner(),
+                StatusBus(),
+                frames,
+                stop_event,
+                idle_exit_seconds=0.03,
+                poll_seconds=0.01,
+            )
+        )
+
+        await asyncio.sleep(0.15)
+        assert not stop_event.is_set()
+
+        frames.unsubscribe(subscriber)
+        await asyncio.wait_for(task, timeout=2.0)
+        assert stop_event.is_set()
+
+    @pytest.mark.asyncio
     async def test_a_running_session_keeps_the_service_alive(self) -> None:
         """An active session resets the idle clock every poll."""
         stop_event = asyncio.Event()
@@ -529,6 +562,7 @@ class TestExitWhenIdle:
             exit_when_idle(
                 runner,
                 StatusBus(),
+                FrameBus(),
                 stop_event,
                 idle_exit_seconds=0.03,
                 poll_seconds=0.01,
@@ -552,6 +586,7 @@ class TestExitWhenIdle:
             exit_when_idle(
                 _IdleProbeRunner(),
                 StatusBus(),
+                FrameBus(),
                 stop_event,
                 idle_exit_seconds=10.0,
                 poll_seconds=0.01,
