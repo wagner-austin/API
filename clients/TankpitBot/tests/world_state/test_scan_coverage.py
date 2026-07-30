@@ -92,14 +92,27 @@ class TestRecordScannedTiles:
         assert result["timestamp_ms"] == 100000
 
     def test_prunes_expired_tiles_in_the_same_pass(self) -> None:
-        """Stale marks are dropped while fresh ones survive."""
-        stale = {"1,1": 100000 - FORAGE_COVERAGE_TTL_MS - 1}
+        """Marks older than harvest memory drop; younger ones survive.
+
+        Retention is :data:`HARVEST_MEMORY_TTL_MS`, NOT the forage TTL:
+        the barren-memory veto must still know "we swept this ground 4
+        minutes ago" after the 180 s forage coverage aged out
+        ([[flag-triage-20260729]] F2).
+        """
+        from tankpit_bot.state.scan_coverage import HARVEST_MEMORY_TTL_MS
+
+        stale = {"1,1": 100000 - HARVEST_MEMORY_TTL_MS - 1}
+        aged_but_remembered = {"3,3": 100000 - FORAGE_COVERAGE_TTL_MS - 1}
         fresh = {"2,2": 100000 - 1000}
-        world = _make_world({**stale, **fresh})
+        world = _make_world({**stale, **aged_but_remembered, **fresh})
 
         result = record_scanned_tiles(world, [(10, 10)], 100000)
 
-        assert result["scanned_tiles"] == {"2,2": 100000 - 1000, "10,10": 100000}
+        assert result["scanned_tiles"] == {
+            "3,3": 100000 - FORAGE_COVERAGE_TTL_MS - 1,
+            "2,2": 100000 - 1000,
+            "10,10": 100000,
+        }
 
     def test_does_not_mutate_input(self) -> None:
         """The original world state is unchanged after recording."""
@@ -111,7 +124,9 @@ class TestRecordScannedTiles:
 
     def test_recording_zero_tiles_still_prunes_expired(self) -> None:
         """An empty reveal set is a valid pure-prune operation."""
-        world = _make_world({"1,1": 100000 - FORAGE_COVERAGE_TTL_MS - 1})
+        from tankpit_bot.state.scan_coverage import HARVEST_MEMORY_TTL_MS
+
+        world = _make_world({"1,1": 100000 - HARVEST_MEMORY_TTL_MS - 1})
 
         result = record_scanned_tiles(world, [], 100000)
 
@@ -290,3 +305,95 @@ class TestSelectBestFreeRadarPosition:
         # candidates wins; (103, 100) is the closest position with (105, 100)
         # inside its 5x5 footprint.
         assert result == (103, 100)
+
+
+class TestIsViewportScannedWithin:
+    """The barren-memory predicate ([[flag-triage-20260729]] F2)."""
+
+    def _full_coverage(self, ts: int) -> dict[str, int]:
+        """Every tile of the (100,100)-(103,103) test viewport marked at ts."""
+        return {f"{x},{y}": ts for y in range(100, 104) for x in range(100, 104)}
+
+    def test_full_recent_coverage_is_scanned(self) -> None:
+        """Every tile marked inside the window -> True."""
+        from tankpit_bot.state.scan_coverage import (
+            HARVEST_MEMORY_TTL_MS,
+            is_viewport_scanned_within,
+        )
+
+        coverage = self._full_coverage(100000)
+        assert (
+            is_viewport_scanned_within(
+                coverage,
+                100,
+                100,
+                103,
+                103,
+                100000 + HARVEST_MEMORY_TTL_MS,
+                ttl_ms=HARVEST_MEMORY_TTL_MS,
+            )
+            is True
+        )
+
+    def test_one_missing_tile_is_not_scanned(self) -> None:
+        """A single unmarked tile means the sweep was incomplete."""
+        from tankpit_bot.state.scan_coverage import (
+            HARVEST_MEMORY_TTL_MS,
+            is_viewport_scanned_within,
+        )
+
+        coverage = self._full_coverage(100000)
+        del coverage["102,101"]
+        assert (
+            is_viewport_scanned_within(
+                coverage, 100, 100, 103, 103, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS
+            )
+            is False
+        )
+
+    def test_expired_coverage_is_not_scanned(self) -> None:
+        """Marks older than the window no longer count as knowledge."""
+        from tankpit_bot.state.scan_coverage import (
+            HARVEST_MEMORY_TTL_MS,
+            is_viewport_scanned_within,
+        )
+
+        coverage = self._full_coverage(100000)
+        assert (
+            is_viewport_scanned_within(
+                coverage,
+                100,
+                100,
+                103,
+                103,
+                100000 + HARVEST_MEMORY_TTL_MS + 1,
+                ttl_ms=HARVEST_MEMORY_TTL_MS,
+            )
+            is False
+        )
+
+    def test_edge_viewport_clamps_off_map_tiles(self) -> None:
+        """Off-map tiles beyond the 0..255 border cannot dirty the answer."""
+        from tankpit_bot.state.scan_coverage import (
+            HARVEST_MEMORY_TTL_MS,
+            is_viewport_scanned_within,
+        )
+
+        coverage = {f"{x},{y}": 100000 for y in range(0, 3) for x in range(0, 3)}
+        # Viewport (-2,-2)-(2,2): the on-map part is (0,0)-(2,2), fully marked.
+        assert (
+            is_viewport_scanned_within(coverage, -2, -2, 2, 2, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS)
+            is True
+        )
+
+    def test_fully_off_map_viewport_is_not_scanned(self) -> None:
+        """Bounds with no on-map tiles carry no knowledge at all."""
+        from tankpit_bot.state.scan_coverage import (
+            HARVEST_MEMORY_TTL_MS,
+            is_viewport_scanned_within,
+        )
+
+        assert (
+            is_viewport_scanned_within({}, 260, 260, 270, 270, 100000, ttl_ms=HARVEST_MEMORY_TTL_MS)
+            is False
+        )
