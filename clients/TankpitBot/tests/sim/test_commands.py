@@ -61,6 +61,23 @@ def test_toggle_equipment_decodes_the_slot_digit() -> None:
         decode_client_command(bytes([0x23, CMD_TOGGLE_EQUIPMENT]))
 
 
+def test_chat_decodes_message_id_and_sender_tile() -> None:
+    """The 6-byte Hb chat frame decodes to kind=chat with its preset id.
+
+    Fixture mirrors the live HELLO send of sniff-20260729-214411:
+    ``[6, 'm', 41, 141, 236, 0]``.
+    """
+    from tankpit_bot.protocol.chat import CMD_CHAT
+
+    decoded = decode_client_command(bytes([6, CMD_CHAT, 41, 141, 236, 0]))
+    assert decoded["kind"] == "chat"
+    assert decoded["message_id"] == 41
+    assert decoded["x"] == 141
+    assert decoded["y"] == 236
+    with pytest.raises(DecodeError):
+        decode_client_command(bytes([6, CMD_CHAT, 41, 141]))
+
+
 def test_unknown_command_preserves_raw_byte() -> None:
     """Unmapped commands decode as ``other`` with the byte kept."""
     decoded = decode_client_command(bytes([2, 90]))

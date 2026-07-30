@@ -71,23 +71,31 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     from tankpit_bot.sim.commands import ClientCommandDict
 
     server.queue_command(
-        11, ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0)
+        11,
+        ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0),
     )
     blocked = server.advance_tick()
     assert [m for m in blocked if m["msg_type"] == 0x52] == []
     world["tanks"][11]["fuel"] = 2
     server.queue_command(
-        11, ClientCommandDict(kind="teleport", command=116, x=40, y=40, target_id=0, slot=0)
+        11,
+        ClientCommandDict(
+            kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0
+        ),
     )
     poor = server.advance_tick()
     assert [m for m in poor if m["msg_type"] == 0x52] == []
     server.queue_command(
-        11, ClientCommandDict(kind="move", command=112, x=20, y=14, target_id=0, slot=0)
+        11,
+        ClientCommandDict(kind="move", command=112, x=20, y=14, target_id=0, slot=0, message_id=0),
     )
     broke = server.advance_tick()
     assert [m for m in broke if m["msg_type"] == 0x52] == []
     server.queue_command(
-        11, ClientCommandDict(kind="pickup_fuel", command=100, x=20, y=10, target_id=0, slot=0)
+        11,
+        ClientCommandDict(
+            kind="pickup_fuel", command=100, x=20, y=10, target_id=0, slot=0, message_id=0
+        ),
     )
     ghost = server.advance_tick()
     assert [m for m in ghost if m["msg_type"] == 0x52] == []
@@ -144,7 +152,8 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
     world["equipment"].append(SimEquipmentDict(x=16, y=10))
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     server.queue_command(
-        11, ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0)
+        11,
+        ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0),
     )
     messages = server.advance_tick()
     assert [m for m in messages if m["msg_type"] in (0x67, 0x49)] == []

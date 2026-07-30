@@ -42,12 +42,16 @@ def _server(world: SimWorldDict) -> SimServer:
 
 def _teleport(x: int, y: int) -> ClientCommandDict:
     """A decoded teleport command to (x, y)."""
-    return ClientCommandDict(kind="teleport", command=116, x=x, y=y, target_id=0, slot=0)
+    return ClientCommandDict(
+        kind="teleport", command=116, x=x, y=y, target_id=0, slot=0, message_id=0
+    )
 
 
 def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
     """A decoded id-targeted shoot command clicked at (x, y)."""
-    return ClientCommandDict(kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0)
+    return ClientCommandDict(
+        kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0, message_id=0
+    )
 
 
 def test_viewport_exit_emits_tank_remove_and_reentry_restates_position() -> None:
@@ -107,7 +111,9 @@ def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
     world["tanks"][9] = make_sim_tank(9, 0, 1, 10, 10, 1000)
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
-    enemy_move = ClientCommandDict(kind="move", command=112, x=15, y=12, target_id=0, slot=0)
+    enemy_move = ClientCommandDict(
+        kind="move", command=112, x=15, y=12, target_id=0, slot=0, message_id=0
+    )
     server.queue_command(7, enemy_move)
     server.queue_command(9, _id_shot(15, 10, 7))
     messages = server.advance_tick()

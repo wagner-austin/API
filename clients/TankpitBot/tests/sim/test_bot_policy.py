@@ -147,7 +147,9 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
     server = SimServer(world, InMemoryTerrainMap(), client_id=9, roster_ids=frozenset({BOT_ID}))
     server.queue_command(
         9,
-        ClientCommandDict(kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=BOT_ID, slot=0),
+        ClientCommandDict(
+            kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=BOT_ID, slot=0, message_id=0
+        ),
     )
     first = server.advance_tick()
     assert [m["msg_type"] for m in first if m["msg_type"] == 0x41] == [0x41]
@@ -270,11 +272,15 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     server.queue_command(
         9,
-        ClientCommandDict(kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=510, slot=0),
+        ClientCommandDict(
+            kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=510, slot=0, message_id=0
+        ),
     )
     server.queue_command(
         510,
-        ClientCommandDict(kind="shoot", command=CMD_SHOOT, x=100, y=100, target_id=9, slot=0),
+        ClientCommandDict(
+            kind="shoot", command=CMD_SHOOT, x=100, y=100, target_id=9, slot=0, message_id=0
+        ),
     )
     batch = server.advance_tick()
     shooters = [m["shooter_id"] for m in batch if m["msg_type"] == 0x53]

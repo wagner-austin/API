@@ -123,7 +123,8 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     assert [(e["terrain_type"], e["col"] + left - 1) for e in entities] == [(5, 13)]
     world["ferries"][0] = SimFerryDict(x=13, y=12)
     server.queue_command(
-        9, ClientCommandDict(kind="move", command=112, x=11, y=10, target_id=0, slot=0)
+        9,
+        ClientCommandDict(kind="move", command=112, x=11, y=10, target_id=0, slot=0, message_id=0),
     )
     batch = server.advance_tick()
     patch = next(m for m in batch if m["msg_type"] == 0x5A)
@@ -163,7 +164,10 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     assert (13, 10) in server._viewport._patched_dynamic_tiles
     world["ferries"][0] = SimFerryDict(x=13, y=12)
     server.queue_command(
-        9, ClientCommandDict(kind="teleport", command=116, x=40, y=10, target_id=0, slot=0)
+        9,
+        ClientCommandDict(
+            kind="teleport", command=116, x=40, y=10, target_id=0, slot=0, message_id=0
+        ),
     )
     batch = server.advance_tick()
     patch = next(m for m in batch if m["msg_type"] == 0x5A)

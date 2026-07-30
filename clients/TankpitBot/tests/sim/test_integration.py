@@ -137,7 +137,10 @@ def test_victim_fuel_sync_does_not_leak_into_self_belief() -> None:
     """
     server, table = _boot()
     server.queue_command(
-        _CLIENT, ClientCommandDict(kind="shoot", command=115, x=107, y=100, target_id=0, slot=0)
+        _CLIENT,
+        ClientCommandDict(
+            kind="shoot", command=115, x=107, y=100, target_id=0, slot=0, message_id=0
+        ),
     )
     _deliver(server.advance_tick(), table)
     assert server.world["tanks"][_ENEMY]["fuel"] == 500 - 90
