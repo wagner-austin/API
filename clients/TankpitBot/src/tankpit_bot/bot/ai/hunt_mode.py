@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.threats import (
     find_acquisition_target,
     find_locked_target_pursuit,
     find_relay_travel_target,
+    pursuit_trace_is_live,
     stale_human_exists,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, ReasonKind
@@ -813,6 +814,16 @@ def _resume_locked_target_off_viewport(
         position.
     """
     if is_already_engaged(ctx):
+        if not pursuit_trace_is_live(ctx.filtered, pursuit["tank_id"], ctx.timestamp_ms):
+            # The homing trace died with the reroute wall (~12 s after
+            # the target left view): one more shot is a booked miss
+            # and a wasted tick, so skip straight to the map chase
+            # the miss would have triggered anyway.
+            emit_ai(
+                "homing trace on %s expired - chasing via map instead of a dead shot",
+                pursuit["name"],
+            )
+            return open_map_for_target(ctx, pursuit)
         emit_ai(
             "locked target %s left viewport - firing toward last wire position",
             pursuit["name"],
@@ -865,6 +876,12 @@ def _decide_hunt_scan_on_landing(ctx: DecideCtx) -> TickDecisionDict:
         return close_target(ctx, target)
     pursuit = _locked_target_pursuit(ctx)
     if pursuit is not None:
+        if not pursuit_trace_is_live(ctx.filtered, pursuit["tank_id"], ctx.timestamp_ms):
+            emit_ai(
+                "homing trace on %s expired - chasing via map instead of a dead shot",
+                pursuit["name"],
+            )
+            return open_map_for_target(ctx, pursuit)
         emit_ai(
             "locked target %s left viewport - firing toward last wire position",
             pursuit["name"],

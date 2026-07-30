@@ -301,6 +301,38 @@ def threats_in_range(
     return [t for t in threats if t["distance"] <= combat_range]
 
 
+# The server's homing trace on a departed target, measured live (run
+# 194658, [[shoot-event-format]]#reroute-ttl-ms): pursuit homings hit
+# to +12.0 s after the target left the viewport and missed at +14.0 s.
+# Firing on the safe side of the wall saves the guaranteed-miss shot
+# and its tick (flag s-latest-4: seven homings hit, the eighth always
+# missed -- "couldnt we avoid the missed shot entirely?").
+PURSUIT_TRACE_TTL_MS = 12_000
+
+
+def pursuit_trace_is_live(
+    world: WorldStateDict,
+    locked_target_id: int,
+    now_ms: int,
+) -> bool:
+    """Return True while pursuit homings at the departed target can hit.
+
+    Args:
+        world: Filtered world state.
+        locked_target_id: The locked target's tank id.
+        now_ms: Current tick timestamp.
+
+    Returns:
+        True when the target's last in-viewport observation is inside
+        the homing-trace window; False once a fired homing would
+        resolve after the wall (a booked miss and a wasted tick).
+    """
+    tank = world["tanks"].get(str(locked_target_id))
+    if tank is None:
+        return False
+    return now_ms - tank["last_viewport_observation_ms"] <= PURSUIT_TRACE_TTL_MS
+
+
 def find_locked_target_pursuit(
     world: WorldStateDict,
     self_state: SelfStateDict,

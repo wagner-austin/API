@@ -8,7 +8,10 @@ plus every cardinally/diagonally adjacent mine at private and above
 (a recruit's shot clears only the directly-hit mine), and the
 follow-up teleport then lands on the exposed container and collects
 ("1 single shot can clear liek 9 mines. which may unlock multiple
-equipment containers"). Mines never occlude the shot line — only
+equipment containers"). Mine shots consume NO inventory (user law
+2026-07-30: "shooting a mine doesnt cost any inventory. you click
+and it shoots a single shot, and destroys the mines") — the clearance
+is free apart from the tick. Mines never occlude the shot line — only
 mountains and movable land blocks do — so dense fields are shot
 straight through ([[physics/line_of_sight|line_of_sight]] is the one
 shared clearance test).
