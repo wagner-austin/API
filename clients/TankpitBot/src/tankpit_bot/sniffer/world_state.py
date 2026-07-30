@@ -119,6 +119,29 @@ def is_move_target_failed(x: int, y: int, now_ms: int) -> bool:
     return _service.is_move_target_failed(x, y, now_ms)
 
 
+def recent_own_mine_hit(now_ms: int) -> bool:
+    """Check whether a walk-over mine hit landed within the flip window.
+
+    User doctrine 2026-07-30: "walk to targets or containers in
+    viewport but if we hit a mine teleport to target or container.
+    then resume walking within viewport." One window is enough for
+    the flipped approach to dispatch; afterwards walking resumes.
+
+    Args:
+        now_ms: Current timestamp.
+
+    Returns:
+        True while the last own-tile detonation is fresh.
+    """
+    return now_ms - _service.last_own_mine_hit_ms < _OWN_MINE_HIT_FLIP_MS
+
+
+# The reactive walk->teleport flip stays live long enough for the next
+# decision to dispatch the teleport approach (a few server windows),
+# then expires so walking resumes per the doctrine.
+_OWN_MINE_HIT_FLIP_MS = 6_000
+
+
 def get_incoming_damage_window(now_ms: int, window_ms: int) -> tuple[int, int]:
     """Return fuel-confirmed incoming (hits, fuel) in the trailing window.
 

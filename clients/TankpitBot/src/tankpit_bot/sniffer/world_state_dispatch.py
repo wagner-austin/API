@@ -1061,6 +1061,26 @@ def _apply_container_pickups(
         )
 
 
+def _note_own_mine_hit(ws: WorldService, positions: list[tuple[int, int]]) -> None:
+    """Stamp the walk-over signature when a detonation hits our tile.
+
+    Args:
+        ws: World service instance.
+        positions: Detonated mine tiles from the 0x45 payload.
+    """
+    self_state = ws.world_state["self_state"]
+    if self_state is None:
+        return
+    if (self_state["x"], self_state["y"]) not in positions:
+        return
+    ws.last_own_mine_hit_ms = browser.get_current_time_ms()
+    emit_world(
+        "MINE_WALKOVER: detonation on own tile (%d,%d) - next approach teleports",
+        self_state["x"],
+        self_state["y"],
+    )
+
+
 def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessage) -> bool:
     """Dispatch container-level messages (mines, pickup, teleport landed).
 
@@ -1081,6 +1101,7 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
             return _dispatch_mine_placement(ws, mine_type, tank_id, positions)
         case {"msg_type": 0x45, "positions": list(positions)}:
             record_fuel_entry(book=ws.fuel_book, kind="detonation", lo=-MINE_DETONATION_COST, hi=0)
+            _note_own_mine_hit(ws, positions)
             return _dispatch_mine_detonation(ws, positions)
         case {"msg_type": "container_pickup", "pickups": tuple(pickups)}:
             _apply_container_pickups(ws, pickups)

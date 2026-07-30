@@ -140,6 +140,14 @@ class WorldService:
         # death; the tick loop converts it into the ``deactivated``
         # session exit (a corpse has no decisions left).
         self.self_deactivated: bool = False
+        # Wall-clock stamp of the last 0x45 detonation on OUR OWN
+        # tile -- the wire signature of a walk-over mine hit (45
+        # fuel, movement arrested). Drives the user's 2026-07-30
+        # movement doctrine: walk in-viewport, but after a mine
+        # hit approach the SAME destination by teleport (landings
+        # are mine-immune by the displacement law), then resume
+        # walking.
+        self.last_own_mine_hit_ms: int = 0
         # ContainerPickup de-duplication. The server broadcasts each
         # 0x43 pickup TWICE within ~200 ms (one to the picker, one to
         # the world view) -- empirical 43.9% duplicate rate across 13

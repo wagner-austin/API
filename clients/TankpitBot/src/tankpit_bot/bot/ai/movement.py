@@ -32,7 +32,11 @@ from tankpit_bot.bot.types import (
     make_teleport_command,
 )
 from tankpit_bot.runtime_logging import emit_ai
-from tankpit_bot.sniffer.world_state import is_move_target_failed, is_scan_viewport_failed
+from tankpit_bot.sniffer.world_state import (
+    is_move_target_failed,
+    is_scan_viewport_failed,
+    recent_own_mine_hit,
+)
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.types import viewport_scan_key
 
@@ -69,9 +73,51 @@ def walk_or_teleport(
         emit_ai("skipping failed move target (%d,%d)", tx, ty)
         return None
 
+    if recent_own_mine_hit(ctx.timestamp_ms):
+        # User movement doctrine (2026-07-30): "walk to targets or
+        # containers in viewport but if we hit a mine teleport to
+        # target or container. then resume walking within viewport."
+        # A walk-over just cost 45 and arrested the move, which means
+        # unrevealed mines sit on the walking route; the teleport
+        # landing is mine-immune by the displacement law, and the
+        # flip window expires so walking resumes afterwards.
+        flip = _mine_flip_teleport(ctx, tx, ty)
+        if flip is not None:
+            emit_ai(
+                "mine walk-over flip: teleporting to (%d,%d) instead of re-walking",
+                tx,
+                ty,
+            )
+            return flip
+
     if ctx.terrain is not None:
         return _walk_or_teleport_with_terrain(ctx, tx, ty, sx, sy, pickup_kind=pickup_kind)
     return _walk_or_teleport_without_terrain(ctx, tx, ty, pickup_kind=pickup_kind)
+
+
+def _mine_flip_teleport(ctx: DecideCtx, tx: int, ty: int) -> BotCommand | None:
+    """Build the post-mine-hit teleport approach to a destination.
+
+    Args:
+        ctx: Decision context.
+        tx: Destination X.
+        ty: Destination Y.
+
+    Returns:
+        Teleport command to the destination's landing tile, or
+        ``None`` when no landing exists or the hop is unaffordable --
+        the caller then falls back to walking (one more 45-fuel risk
+        beats stranding the tank).
+    """
+    if ctx.terrain is None:
+        return None
+    landing = find_teleport_landing_tile(ctx.terrain, tx, ty)
+    if landing is None:
+        return None
+    landing_x, landing_y = landing
+    if not can_afford_teleport(ctx, landing_x, landing_y, reserve_fuel=0):
+        return None
+    return make_teleport_command(landing_x, landing_y)
 
 
 def is_pickup_target_actionable(ctx: DecideCtx, tx: int, ty: int) -> bool:

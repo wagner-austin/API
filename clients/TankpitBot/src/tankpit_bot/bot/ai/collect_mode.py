@@ -12,7 +12,6 @@ from tankpit_bot.bot.ai.combat_break import INCOMING_RATE_WINDOW_MS
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_use_radar,
-    clear_resource_target,
     locked_resource_target,
     make_decision,
     set_resource_target,
@@ -30,6 +29,11 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_teleport_landing_tile,
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
+from tankpit_bot.bot.ai.intent import (
+    current_collect_plan,
+    plan_completes_here,
+    release_collect_plan,
+)
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
 from tankpit_bot.bot.ai.mine_clearance import find_mine_clearance_shot
 from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
@@ -299,6 +303,18 @@ def _escape_under_fire_decision(
         "collecting under fire (%d hits in window) - walk in-viewport fuel or hop OUT",
         fire_hits,
     )
+    # Committed-plan continuity ([[committed-intent]], s8-2 receipt of
+    # run bot-20260730-025337: an escape hop landed ON its target and
+    # the next derivation re-selected a teleport to the tile the tank
+    # was standing on, burning a map-open tick): a held plan whose
+    # purpose is served from HERE is finished first — the continuation
+    # is one action (a pickup, or the single blessed-under-fire step),
+    # so re-deriving can only add exposure, never remove it.
+    plan = current_collect_plan(base_state)
+    if plan is not None and plan_completes_here(plan, ctx.self_state["x"], ctx.self_state["y"]):
+        locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
+        if locked_decision is not None:
+            return locked_decision
     fuel_walk = _select_and_pickup_fuel(ctx, base_state)
     if fuel_walk is not None:
         return fuel_walk
@@ -316,10 +332,9 @@ def _escape_under_fire_decision(
         return escape_hop
     # Nothing clears the attacker's envelope: any movement still beats
     # standing in the firing line drinking dregs.
-    if larder_under_fire is not None:
-        return larder_under_fire
-    if escape_hop is not None:
-        return escape_hop
+    trapped_fallback = larder_under_fire if larder_under_fire is not None else escape_hop
+    if trapped_fallback is not None:
+        return trapped_fallback
     return _exhausted_collect_outcome(ctx, base_state)
 
 
@@ -694,7 +709,7 @@ def _walk_for_fuel_last_resort(
             leg_x,
             leg_y,
             "walk_for_fuel",
-            clear_resource_target(base_state),
+            release_collect_plan(base_state, reason="walk_for_fuel_override"),
             ctx.equip,
         )
     return None
@@ -811,7 +826,7 @@ def _scan_on_landing_decision(
         "scan_on_landing",
         AIStateDict(
             **{
-                **clear_resource_target(base_state),
+                **release_collect_plan(base_state, reason="landing_scan_reset"),
                 "last_landing_scan_viewport": origin_key,
             }
         ),
@@ -851,13 +866,13 @@ def _continue_or_release_equipment_lock(
             locked_target["x"],
             locked_target["y"],
         )
-        return None, clear_resource_target(base_state)
+        return None, release_collect_plan(base_state, reason="superior_candidate")
     target_x = locked_target["x"]
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
     if locked_command is None:
         emit_ai("locked equipment target at (%d,%d) no longer executable", target_x, target_y)
-        return None, clear_resource_target(base_state)
+        return None, release_collect_plan(base_state, reason="not_executable")
     emit_ai("continue locked equipment target at (%d,%d)", target_x, target_y)
     decision = make_decision(
         locked_command,
@@ -892,20 +907,20 @@ def _continue_or_release_fuel_lock(
             locked_target["y"],
             ctx.fuel,
         )
-        return None, clear_resource_target(base_state)
+        return None, release_collect_plan(base_state, reason="tank_at_capacity")
     if _superior_fuel_candidate(ctx, locked_target) is not None:
         emit_ai(
             "releasing fuel lock at (%d,%d): markedly closer fuel is visible",
             locked_target["x"],
             locked_target["y"],
         )
-        return None, clear_resource_target(base_state)
+        return None, release_collect_plan(base_state, reason="superior_candidate")
     target_x = locked_target["x"]
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
     if locked_command is None:
         emit_ai("locked fuel target at (%d,%d) no longer executable", target_x, target_y)
-        return None, clear_resource_target(base_state)
+        return None, release_collect_plan(base_state, reason="not_executable")
     emit_ai(
         "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",
         target_x,
@@ -1035,8 +1050,10 @@ def _hop_toward_equipment(
     # identified containers and paid a return trip for them later
     # ([[flag-triage-20260729]]).
     landing_reserve = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     no_landing = 0
     reserve_blocked = 0
+    own_ground = 0
     best_cost = -1
     best_landing_x = 0
     best_landing_y = 0
@@ -1051,12 +1068,15 @@ def _hop_toward_equipment(
             no_landing += 1
             continue
         landing_x, landing_y = landing
-        cost = teleport_cost(
-            ctx.self_state["x"],
-            ctx.self_state["y"],
-            landing_x,
-            landing_y,
-        )
+        if (landing_x, landing_y) == (sx, sy):
+            # A teleport that does not move the tank is never travel
+            # (s8-2, [[flag-triage-20260729]]: the escape landing
+            # re-derived a hop TO THE TILE THE TANK STOOD ON and
+            # burned a map-open tick). Ground the tank already owns
+            # belongs to the pickup steps.
+            own_ground += 1
+            continue
+        cost = teleport_cost(sx, sy, landing_x, landing_y)
         if ctx.fuel - cost < landing_reserve:
             reserve_blocked += 1
             continue
@@ -1071,6 +1091,7 @@ def _hop_toward_equipment(
             candidates=len(candidates),
             no_landing=no_landing,
             reserve_blocked=reserve_blocked,
+            own_ground=own_ground,
             fuel=ctx.fuel,
             landing_reserve=landing_reserve,
         )

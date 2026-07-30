@@ -105,3 +105,69 @@ def test_non_teleport_decisions_pass_through() -> None:
     )
 
     assert _hop_escapes_attacker(state, decision) is True
+
+
+def test_trapped_escape_takes_the_near_hop_over_standing_still() -> None:
+    """When no hop clears the attacker, the near larder hop still goes.
+
+    The envelope rule prefers real exits, but a trapped tank (every
+    known landing inside the attacker's reach) must still move -- any
+    hop beats standing in the firing line drinking dregs.
+    """
+    from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
+    from tankpit_bot.bot.ai.context import DecideCtx
+    from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
+    from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+    from tankpit_bot.state.types import make_container_state
+    from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    reset_world_state()
+    try:
+        book = get_world_service().damage_book
+        for i in range(4):
+            ts = 95000 + i * 1000
+            record_incoming_shot(book, 60, "Yuppler", 1, ts)
+            confirm_incoming_damage(book, -90, ts + 100)
+        world, self_state = make_world(
+            fuel=800,
+            containers={
+                "110,100": make_container_state(
+                    x=110,
+                    y=100,
+                    is_fuel=True,
+                    volume=400,
+                    timestamp_ms=100000,
+                    failed_pickups=0,
+                )
+            },
+        )
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "SEARCH",
+                "mode_started_ms": 90000,
+                "last_map_open_ms": 99000,
+                "combat_target_id": 50,
+                "combat_target_x": 112,
+                "combat_target_y": 100,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            InMemoryTerrainMap(),
+            "",
+        )
+        decision = decide_collect_mode(ctx)
+    finally:
+        reset_world_state()
+
+    if decision is None:
+        raise AssertionError("expected trapped-escape hop decision")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
