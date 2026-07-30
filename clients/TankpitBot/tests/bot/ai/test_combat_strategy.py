@@ -858,6 +858,87 @@ class TestCombatTeleportGuards:
             raise AssertionError("expected re-close teleport decision")
         assert result["command"]["cmd_type"] == "teleport"
 
+    def test_blocked_line_short_close_walks_instead_of_teleporting(self) -> None:
+        """A 2-tile re-close with a blocked line is a walk, not a teleport.
+
+        Flag 1 of run bot-20260730-011x ("i think it should ahve waked
+        back instead of teleporting"): a walk tile costs ~2 s and no
+        fuel; a mid-fight teleport costs ~4 s plus fuel plus the
+        map-open tick the last shot closed. Within WALK_CLOSE_TILES
+        the walk wins outright.
+        """
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=102,
+                y=100,
+                team=2,
+                rank=1,
+                name="NearEnemy",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        terrain = InMemoryTerrainMap({(101, 100): InMemoryTerrainMap.ROCK})
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=102, y=100, name="NearEnemy"))
+
+        if result is None:
+            raise AssertionError("expected walk decision")
+        assert result["command"]["cmd_type"] == "move"
+        assert result["behavior"]["reason_kind"] == "walk_to_target"
+        assert result["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_blocked_line_long_close_still_teleports(self) -> None:
+        """Beyond the walk break-even the blocked-line close pays the teleport."""
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=106,
+                y=100,
+                team=2,
+                rank=1,
+                name="FarEnemy",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        terrain = InMemoryTerrainMap({(103, 100): InMemoryTerrainMap.ROCK})
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=106, y=100, name="FarEnemy"))
+
+        if result is None:
+            raise AssertionError("expected teleport decision")
+        assert result["command"]["cmd_type"] == "teleport"
+
     def test_teleport_to_target_shoots_when_in_view_beyond_shot_range_bound(self) -> None:
         """In view beyond ``SHOT_RANGE_TILES`` is still a shot, not a teleport.
 
