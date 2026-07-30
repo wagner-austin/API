@@ -8,6 +8,7 @@ remains here.
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.combat_break import INCOMING_RATE_WINDOW_MS
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_use_radar,
@@ -16,7 +17,10 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     set_resource_target,
 )
-from tankpit_bot.bot.ai.equipment import is_lock_release_warranted
+from tankpit_bot.bot.ai.equipment import (
+    is_fuel_lock_release_warranted,
+    is_lock_release_warranted,
+)
 from tankpit_bot.bot.ai.equipment_search import (
     describe_container_search,
     find_all_tracked_equipment,
@@ -27,6 +31,7 @@ from tankpit_bot.bot.ai.equipment_search import (
 )
 from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
+from tankpit_bot.bot.ai.mine_clearance import find_mine_clearance_shot
 from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.resource_search import (
@@ -35,11 +40,17 @@ from tankpit_bot.bot.ai.resource_search import (
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import BotCommand, make_radar_command, make_teleport_command
+from tankpit_bot.bot.types import (
+    BotCommand,
+    make_radar_command,
+    make_shoot_command,
+    make_teleport_command,
+)
 from tankpit_bot.inventory import inventory_all_full
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.sniffer.world_state import get_incoming_damage_window
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -134,6 +145,130 @@ def select_fuel_target(
     return (container, command)
 
 
+# How long a clearance aim stays suppressed after its shot: the 0x45
+# detonation follows the shot echo within a wire tick, so two server
+# windows comfortably covers apply-lag without stalling a genuine
+# re-clear (a recruit's 1-mine blast leaving covered neighbors).
+_MINE_CLEARANCE_EFFECT_MS = 5_000
+
+# Sustained-fire floor for the escape verb law: matches the break
+# assessment's own 3-hit window floor so "under fire" means the same
+# thing in both places.
+_SUSTAINED_FIRE_HIT_FLOOR = 3
+
+
+def _mine_clearance_decision(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Shoot the best mine-covered container in view, if any.
+
+    User doctrine ([[flag-triage-20260729]] F3: "there is equipment
+    that we can see under the orange mines"): a container under an
+    enemy mine needs no path clearing -- one clear-line shot at the
+    container's tile detonates the covering mine plus the full
+    adjacent 3x3 at private+, and the exposed containers become
+    ordinary pickups on the very next tick (the 0x45 detonation
+    removes them from the world's mine layer). Mine shots consume NO
+    inventory (user law 2026-07-30: "shooting a mine doesnt cost any
+    inventory. you click and it shoots a single shot") -- the server
+    routes a free single -- so the only spend is the shot's tick. The
+    aim comes from the pure planner in
+    :mod:`tankpit_bot.bot.ai.mine_clearance`; mines never occlude the
+    shot line, only rock and movable land blocks do.
+
+    Args:
+        ctx: Decision context.
+        base_state: AI state for the produced command.
+
+    Returns:
+        Shoot decision at the covered container, or ``None`` when no
+        covered container in view has a clear line.
+    """
+    aim = find_mine_clearance_shot(ctx.filtered, ctx.self_state, ctx.terrain)
+    if aim is None:
+        return None
+    aim_x, aim_y = aim
+    aim_key = f"{aim_x},{aim_y}"
+    if (
+        aim_key == base_state["mine_clearance_aim_key"]
+        and ctx.timestamp_ms - base_state["mine_clearance_shot_ms"] < _MINE_CLEARANCE_EFFECT_MS
+    ):
+        # The previous clearance shot at this exact tile has not had
+        # its detonation applied yet (the 0x45 follows the shot echo
+        # by up to a wire tick); re-aiming inside the window is the
+        # live double-shot at (162,94), 01:59:57/:59 -- one shot
+        # wasted on mines that were already dead on the server.
+        return None
+    emit_ai(
+        "mine clearance: shooting covered container at (%d,%d) to expose the pickups",
+        aim_x,
+        aim_y,
+    )
+    return make_decision(
+        make_shoot_command(aim_x, aim_y),
+        "COLLECT",
+        _COLLECT_SCORE,
+        aim_x,
+        aim_y,
+        "mine_clearance_shot",
+        AIStateDict(
+            **{
+                **base_state,
+                "mine_clearance_aim_key": aim_key,
+                "mine_clearance_shot_ms": ctx.timestamp_ms,
+            }
+        ),
+        ctx.equip,
+    )
+
+
+def _escape_under_fire_decision(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Escape by hop when collecting under measured sustained fire.
+
+    Escape verb law (Yuppler receipt, run bot-20260730-023x
+    02:39:15-21: the break's first escape action was a WALKING fuel
+    pickup, fuel bled 640->492 while the attacker landed 4-5 free
+    duals -- "he was deciding or teleporting or something"): under
+    sustained fire the walk rungs are skipped entirely. Walking keeps
+    the tank in the firing line for the whole trip; a hop breaks the
+    firing geometry in one action and its landing auto-pickup still
+    refuels.
+
+    Args:
+        ctx: Decision context.
+        base_state: AI state for the produced command.
+
+    Returns:
+        Hop (or exhausted-outcome) decision while under fire, or
+        ``None`` when no sustained fire is measured and the normal
+        cascade should run.
+    """
+    fire_hits, _fire_fuel = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+    if fire_hits < _SUSTAINED_FIRE_HIT_FLOOR:
+        return None
+    emit_ai(
+        "collecting under fire (%d hits in window) - escaping by hop, no walking",
+        fire_hits,
+    )
+    larder_under_fire = _larder_harvest(ctx, base_state)
+    if larder_under_fire is not None:
+        return larder_under_fire
+    escape_hop = make_resource_search_hop(
+        ctx,
+        mode="COLLECT",
+        score=_COLLECT_SCORE,
+        reason="search_collect_local",
+        ai_state=base_state,
+    )
+    if escape_hop is not None:
+        return escape_hop
+    return _exhausted_collect_outcome(ctx, base_state)
+
+
 def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
     """Run the durable ``COLLECT`` owner for this tick.
 
@@ -185,13 +320,23 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
             2026-07-02).
     """
     base_state = ctx.base
-    locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
-    if locked_decision is not None:
-        return locked_decision
-
+    # Landing scan gates BEFORE lock continuation (reordered 2026-07-30,
+    # flag s4-3): the user policy is "always radar right on landing,
+    # before any pickup" (2026-07-03), and a DISPLACED harvest landing
+    # keeps its lock — running the lock first walked blind into the
+    # unobserved minefield three ticks straight. Clean suppressed
+    # landings still latch silently here and fall through to the lock.
     landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
     if landing_scan is not None:
         return landing_scan
+
+    under_fire = _escape_under_fire_decision(ctx, base_state)
+    if under_fire is not None:
+        return under_fire
+
+    locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
+    if locked_decision is not None:
+        return locked_decision
 
     equip_decision = _select_and_pickup_equipment(ctx, base_state)
     if equip_decision is not None:
@@ -217,6 +362,10 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
             minimum_volume=1,
         ),
     )
+
+    clearance_decision = _mine_clearance_decision(ctx, base_state)
+    if clearance_decision is not None:
+        return clearance_decision
 
     larder_decision = _larder_harvest(ctx, base_state)
     if larder_decision is not None:
@@ -521,6 +670,17 @@ def _scan_on_landing_decision(
     dispatching the radar and the flag is consumed, so the cascade
     proceeds straight to the pickup this tick.
 
+    Displacement exception to the exception (flag s4-3,
+    [[flag-triage-20260729]]): a harvest hop expects to stand within
+    auto-pick reach of its locked target. Standing farther means the
+    server displaced the landing — unobserved mines shoved it — or the
+    landing was a ferry boarding; either way the ground is NOT the
+    verified stock the no-radar ruling assumed, and walking blind ate
+    three straight ``cant_go`` rejections at 01:28. The radar fires,
+    the LOCK IS KEPT (the target is still valid; the mine-composed
+    passability decides the re-approach), and the suppression is
+    consumed.
+
     Args:
         ctx: Decision context.
         base_state: Base AI state to rewrite for the produced command.
@@ -536,20 +696,50 @@ def _scan_on_landing_decision(
     if base_state["last_landing_scan_viewport"] == origin_key:
         return None, base_state
     if base_state["suppress_landing_scan"]:
+        lock_dist = abs(ctx.self_state["x"] - base_state["resource_target_x"]) + abs(
+            ctx.self_state["y"] - base_state["resource_target_y"]
+        )
+        if base_state["resource_target_kind"] == "" or lock_dist <= 1:
+            emit_ai(
+                "larder landing at viewport (%d,%d)-(%d,%d): latching without radar",
+                left,
+                top,
+                right,
+                bottom,
+            )
+            return None, AIStateDict(
+                **{
+                    **base_state,
+                    "last_landing_scan_viewport": origin_key,
+                    "suppress_landing_scan": False,
+                }
+            )
         emit_ai(
-            "larder landing at viewport (%d,%d)-(%d,%d): latching without radar",
-            left,
-            top,
-            right,
-            bottom,
+            "harvest landing displaced: self (%d,%d) is %d tiles from lock (%d,%d)"
+            " - un-suppressing landing radar",
+            ctx.self_state["x"],
+            ctx.self_state["y"],
+            lock_dist,
+            base_state["resource_target_x"],
+            base_state["resource_target_y"],
         )
-        return None, AIStateDict(
-            **{
-                **base_state,
-                "last_landing_scan_viewport": origin_key,
-                "suppress_landing_scan": False,
-            }
+        displaced_scan = make_decision(
+            make_radar_command(),
+            "COLLECT",
+            _COLLECT_SCORE,
+            0,
+            0,
+            "scan_on_landing",
+            AIStateDict(
+                **{
+                    **base_state,
+                    "last_landing_scan_viewport": origin_key,
+                    "suppress_landing_scan": False,
+                }
+            ),
+            ctx.equip,
         )
+        return displaced_scan, base_state
     emit_ai(
         "scan-on-landing (mode=COLLECT, extras=%d, viewport=(%d,%d)-(%d,%d))",
         ctx.inventory["extra_radars"]["count"],
@@ -736,14 +926,17 @@ def _hop_toward_equipment(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
-    """Teleport toward tracked equipment outside the current viewport.
+    """Teleport toward tracked equipment the walk-pickup step cannot reach.
 
     ``find_nearest_equipment`` filters to walkable-from-here candidates
     inside the current viewport; step 3 of the cascade
-    (``_select_and_pickup_equipment``) handles those. Everything else
-    ``world.containers`` has ever accumulated -- equipment revealed by
-    prior radar or 0x5A patches in other viewports -- is invisible to
-    the viewport-scoped picks and was silently ignored until Bug 0.7.
+    (``_select_and_pickup_equipment``) handles those and runs FIRST.
+    Every tracked container this step sees is therefore not
+    walk-actionable this tick — equipment revealed in other viewports
+    by prior radar or 0x5A patches, AND in-viewport equipment whose
+    walk path is terrain-blocked (the 2026-07-30 flag-4 fix: the old
+    external-only filter hid walk-blocked in-viewport containers from
+    both steps).
 
     User contract (2026-07-06): while inventory is below combat-ready
     the bot must be actively topping up. This cascade step reaches
@@ -765,12 +958,11 @@ def _hop_toward_equipment(
         base_state: Base AI state to rewrite for the produced command.
 
     Returns:
-        Teleport decision to the closest reachable + affordable
-        out-of-viewport equipment container, or ``None`` when
-        inventory is combat-ready, terrain is unknown, no tracked
-        equipment sits outside the viewport, no candidate has a
-        legal landing tile, or every affordable teleport would
-        leave the engagement reserve.
+        Teleport decision to the cheapest tracked equipment container
+        with a legal landing, or ``None`` when inventory is
+        combat-ready, terrain is unknown, nothing is tracked, no
+        candidate has a legal landing tile, or every affordable
+        teleport would leave the engagement reserve.
     """
     if hunt_entry_permitted(ctx):
         return None
@@ -780,15 +972,14 @@ def _hop_toward_equipment(
     if not candidates:
         _emit_hop_declined("equipment", no_candidates=1)
         return None
-    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    external = [
-        container
-        for container in candidates
-        if not (left <= container["x"] <= right and top <= container["y"] <= bottom)
-    ]
-    if not external:
-        _emit_hop_declined("equipment", none_external=len(candidates))
-        return None
+    # No external-only filter (2026-07-30, flag-4 fix): this step runs
+    # AFTER the walk-pickup step declined, so every tracked container
+    # left — including IN-viewport ones whose walk path is blocked by
+    # terrain — is teleport fair game. The pre-fix filter hid
+    # in-viewport walk-blocked equipment from both steps: run
+    # bot-20260730-000038 ticks 121-126 dot-hopped away from three
+    # identified containers and paid a return trip for them later
+    # ([[flag-triage-20260729]]).
     landing_reserve = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
     no_landing = 0
     reserve_blocked = 0
@@ -796,7 +987,7 @@ def _hop_toward_equipment(
     best_landing_x = 0
     best_landing_y = 0
     best_container: ContainerStateDict | None = None
-    for container in external:
+    for container in candidates:
         landing = find_teleport_landing_tile(
             ctx.terrain,
             container["x"],
@@ -823,7 +1014,7 @@ def _hop_toward_equipment(
     if best_container is None:
         _emit_hop_declined(
             "equipment",
-            external=len(external),
+            candidates=len(candidates),
             no_landing=no_landing,
             reserve_blocked=reserve_blocked,
             fuel=ctx.fuel,
@@ -940,6 +1131,8 @@ def _hop_toward_fuel_larder(
                 no_landing=selection["no_landing"],
                 reserve_blocked=selection["reserve_blocked"],
                 unprofitable=selection["unprofitable"],
+                dreg=selection["dreg"],
+                ferry_served=selection["ferry_served"],
                 fuel=ctx.fuel,
             )
         return None
@@ -1118,13 +1311,8 @@ def _superior_fuel_candidate(
         return None
     if (candidate["x"], candidate["y"]) == (locked_target["x"], locked_target["y"]):
         return None
-    if not is_lock_release_warranted(
-        ctx.self_state,
-        locked_target["x"],
-        locked_target["y"],
-        candidate["x"],
-        candidate["y"],
-    ):
+    deficit = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
+    if not is_fuel_lock_release_warranted(ctx.self_state, locked_target, candidate, deficit):
         return None
     return candidate
 
