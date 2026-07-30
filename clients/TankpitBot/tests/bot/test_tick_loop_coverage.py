@@ -1233,3 +1233,78 @@ class TestClearCommandError:
         assert _COMMAND_ERROR_APPLICABILITY["map_open"] == frozenset()
         assert _COMMAND_ERROR_APPLICABILITY["none"] == frozenset()
         assert _COMMAND_ERROR_APPLICABILITY["shoot"] == frozenset()
+
+
+class TestEarlyWakeSleep:
+    """Tests for the early-wake between-tick sleep."""
+
+    def test_idle_wait_sleeps_the_full_window(self) -> None:
+        """With no in-flight action the sleep is one uninterrupted window."""
+        from tankpit_bot.bot.tick_loop import _wait_between_ticks
+        from tankpit_bot.protocol.commands import TICK_RATE_MS
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._cdp_message_buffer = []
+        waits: list[float] = []
+
+        class _RecordingPage(_FakePage):
+            def wait_for_timeout(self, timeout: float) -> None:
+                waits.append(timeout)
+
+        waited = _wait_between_ticks(bot, _RecordingPage())
+
+        assert waited == TICK_RATE_MS
+        assert waits == [float(TICK_RATE_MS)]
+
+    def test_in_flight_wait_wakes_on_fresh_wire_traffic(self) -> None:
+        """Fresh CDP traffic during an in-flight action ends the sleep early.
+
+        The Artax-era fixed sleep waited out the whole 2 s window after
+        a completion message arrived, drifting one server tick behind a
+        human who acts the moment the tank arrives (user observation
+        2026-07-30: "you can click as soon as it reaches it's
+        destination and it'll go instantly to the next action").
+        """
+        from tankpit_bot.bot.states import make_in_flight_action
+        from tankpit_bot.bot.tick_loop import _WAKE_SLICE_MS, _wait_between_ticks
+        from tankpit_bot.browser import get_current_time_ms
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._cdp_message_buffer = []
+        bot._state_data["in_flight_action"] = make_in_flight_action(
+            "scan", 0, 0, get_current_time_ms()
+        )
+        waits: list[float] = []
+
+        class _TrafficPage(_FakePage):
+            def wait_for_timeout(self, timeout: float) -> None:
+                waits.append(timeout)
+                bot._cdp_message_buffer.append("traffic")
+
+        waited = _wait_between_ticks(bot, _TrafficPage())
+
+        assert waited == _WAKE_SLICE_MS
+        assert waits == [float(_WAKE_SLICE_MS)]
+
+    def test_in_flight_wait_without_traffic_runs_the_window(self) -> None:
+        """A quiet wire keeps the in-flight sleep at the full window."""
+        from tankpit_bot.bot.states import make_in_flight_action
+        from tankpit_bot.bot.tick_loop import _WAKE_SLICE_MS, _wait_between_ticks
+        from tankpit_bot.browser import get_current_time_ms
+        from tankpit_bot.protocol.commands import TICK_RATE_MS
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._cdp_message_buffer = []
+        bot._state_data["in_flight_action"] = make_in_flight_action(
+            "scan", 0, 0, get_current_time_ms()
+        )
+        waits: list[float] = []
+
+        class _QuietPage(_FakePage):
+            def wait_for_timeout(self, timeout: float) -> None:
+                waits.append(timeout)
+
+        waited = _wait_between_ticks(bot, _QuietPage())
+
+        assert waited == TICK_RATE_MS
+        assert waits == [float(_WAKE_SLICE_MS)] * (TICK_RATE_MS // _WAKE_SLICE_MS)
