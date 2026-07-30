@@ -183,3 +183,79 @@ def test_blast_clips_at_the_map_edge() -> None:
     _add_covered_container(world, 0, 0)
 
     assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (0, 0)
+
+
+class TestCorridorClearance:
+    """Tests for the walk-corridor mine guard."""
+
+    def test_first_corridor_mine_is_the_aim(self) -> None:
+        """A mined walk corridor names its nearest mine for the free shot.
+
+        Flags s6-8/9: six 45-fuel walk-ins against KNOWN mines because
+        no walk consulted the mine layer before stepping.
+        """
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["mines"]["102,100"] = make_mine_state(x=102, y=100, mine_type=0, tank_id=-1, team=1)
+        world["mines"]["104,100"] = make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1)
+
+        aim = find_corridor_clearance_shot(world, self_state, InMemoryTerrainMap(), 105, 100)
+
+        assert aim == (102, 100)
+
+    def test_clean_corridor_needs_no_shot(self) -> None:
+        """No hostile mine on the line means the walk proceeds."""
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["mines"]["102,104"] = make_mine_state(x=102, y=104, mine_type=0, tank_id=-1, team=1)
+
+        aim = find_corridor_clearance_shot(world, self_state, InMemoryTerrainMap(), 105, 100)
+
+        assert aim is None
+
+    def test_destination_mine_counts_as_corridor(self) -> None:
+        """A mine sitting on the walk destination itself draws the shot."""
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["mines"]["105,100"] = make_mine_state(x=105, y=100, mine_type=0, tank_id=-1, team=1)
+
+        assert find_corridor_clearance_shot(world, self_state, InMemoryTerrainMap(), 105, 100) == (
+            105,
+            100,
+        )
+
+    def test_friendly_mines_do_not_block_the_walk(self) -> None:
+        """Own-team mines are passable; the corridor guard ignores them."""
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["mines"]["102,100"] = make_mine_state(x=102, y=100, mine_type=0, tank_id=-1, team=2)
+
+        aim = find_corridor_clearance_shot(world, self_state, InMemoryTerrainMap(), 105, 100)
+
+        assert aim is None
+
+    def test_terrain_blocked_corridor_mine_is_not_shootable(self) -> None:
+        """Rock between self and the corridor mine defers the clearance."""
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["mines"]["103,100"] = make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)
+        terrain = InMemoryTerrainMap({(101, 100): InMemoryTerrainMap.ROCK})
+
+        assert find_corridor_clearance_shot(world, self_state, terrain, 105, 100) is None
+
+    def test_out_of_view_corridor_mine_waits(self) -> None:
+        """A corridor mine outside the visible viewport cannot be aimed at."""
+        from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+
+        world, self_state = _world_with_self()
+        world["viewport"] = make_viewport_state(left=92, top=92, width=10, height=10)
+        world["mines"]["103,100"] = make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)
+
+        aim = find_corridor_clearance_shot(world, self_state, InMemoryTerrainMap(), 105, 100)
+
+        assert aim is None

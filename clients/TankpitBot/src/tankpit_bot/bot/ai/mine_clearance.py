@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
-from tankpit_bot.physics.line_of_sight import is_shot_line_clear
+from tankpit_bot.physics.line_of_sight import is_shot_line_clear, shot_line_tiles
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -126,6 +126,63 @@ def find_mine_clearance_shot(
     return best
 
 
+def find_corridor_clearance_shot(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None,
+    dest_x: int,
+    dest_y: int,
+) -> tuple[int, int] | None:
+    """Pick the first known hostile mine on the walk corridor to shoot.
+
+    Flags s6-8/9 (run bot-20260730-021x): Yuppler laid mines in view
+    and Artax walked into six of them at 45 fuel each — every hit
+    arrested the move and the next tick re-dispatched the same walk
+    into the next mine. The mines were KNOWN (0x4B placements land in
+    the mine layer without a re-scan); the walk dispatch simply never
+    consulted them. Before walking, the straight corridor to the
+    destination (endpoints included) is checked for hostile mines; the
+    first one with a clear shot line becomes a free clearance single
+    (rank-dependent blast, [[mine-mechanics]]), and the walk proceeds
+    next tick through drained ground.
+
+    Args:
+        world: Current world state.
+        self_state: The bot's own state.
+        terrain: Static field-image map; ``None`` trusts wire patches
+            alone.
+        dest_x: Walk destination X.
+        dest_y: Walk destination Y.
+
+    Returns:
+        The first corridor mine's ``(x, y)`` with a clear shot line,
+        or ``None`` when the corridor is mine-free or nothing on it
+        can be shot from here.
+    """
+    mines = hostile_mines(world)
+    if not mines:
+        return None
+    left, top, right, bottom = viewport_visible_bounds(world["viewport"])
+    corridor = shot_line_tiles(self_state["x"], self_state["y"], dest_x, dest_y)
+    corridor.append((dest_x, dest_y))
+    for tile_x, tile_y in corridor:
+        if f"{tile_x},{tile_y}" not in mines:
+            continue
+        if not (left <= tile_x <= right and top <= tile_y <= bottom):
+            continue
+        if is_shot_line_clear(
+            self_state["x"],
+            self_state["y"],
+            tile_x,
+            tile_y,
+            terrain,
+            world["terrain"],
+        ):
+            return (tile_x, tile_y)
+    return None
+
+
 __all__ = [
+    "find_corridor_clearance_shot",
     "find_mine_clearance_shot",
 ]

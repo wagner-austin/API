@@ -21,6 +21,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
@@ -542,9 +543,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             target["x"],
             target["y"],
         )
-    close_distance = abs(ctx.self_state["x"] - target["x"]) + abs(
-        ctx.self_state["y"] - target["y"]
-    )
+    close_distance = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
     if close_distance <= WALK_CLOSE_TILES:
         # Short closes WALK (user timing law + flag 1 of run
         # bot-20260730-011x: "i think it should ahve waked back
@@ -555,6 +554,37 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         walk_candidates = _combat_landing_candidates(ctx, target)
         if walk_candidates:
             walk_x, walk_y = walk_candidates[0]
+            corridor_mine = find_corridor_clearance_shot(
+                ctx.filtered,
+                ctx.self_state,
+                ctx.terrain,
+                walk_x,
+                walk_y,
+            )
+            if corridor_mine is not None:
+                # Flags s6-8/9: six 45-fuel walk-ins against KNOWN
+                # mines because no walk ever consulted the mine layer.
+                # Mine shots are free singles ([[mine-mechanics]]), so
+                # the corridor is drained before the first step.
+                mine_x, mine_y = corridor_mine
+                emit_ai(
+                    "walk corridor to (%d,%d) is mined - clearing (%d,%d) first",
+                    walk_x,
+                    walk_y,
+                    mine_x,
+                    mine_y,
+                )
+                return make_decision(
+                    make_shoot_command(mine_x, mine_y),
+                    "HUNT",
+                    800,
+                    mine_x,
+                    mine_y,
+                    "mine_clearance_shot",
+                    _set_combat_target(ctx.base, target),
+                    ctx.equip,
+                    reason_context={"target_name": target["name"]},
+                )
             emit_ai(
                 "walking %d tiles to close on %s at (%d,%d)",
                 close_distance,
