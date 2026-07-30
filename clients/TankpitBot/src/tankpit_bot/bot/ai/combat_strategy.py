@@ -470,6 +470,26 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
 
 def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 1: Teleport to enemy."""
+    # In-view and already in shot range: no teleport is needed at all
+    # (flag 1, run bot-20260730-000030: purple-4 stood 2 tiles away in
+    # the freshly scanned viewport and the map-acquire path still paid
+    # a teleport onto him). _combat_close only asks this question for
+    # an EXISTING lock; asking it here covers every acquire path --
+    # fresh viewport, map-known, and locked resume -- and
+    # _combat_shoot latches the lock itself.
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    if (
+        left <= target["x"] <= right
+        and top <= target["y"] <= bottom
+        and has_combat_shot(ctx, target)
+    ):
+        emit_ai(
+            "%s already in view at (%d,%d) within shot range - engaging without teleport",
+            target["name"],
+            target["x"],
+            target["y"],
+        )
+        return _combat_shoot(ctx, target)
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         # Mine-ring counterplay (user ruling 2026-07-29: "fix the bot
