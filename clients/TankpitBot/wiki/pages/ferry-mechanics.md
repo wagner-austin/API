@@ -74,6 +74,28 @@ with explicit reverts) and is proven against the production ingestion
 over real wire bytes — see the ferries as-built in
 [[physics-module-roadmap]].
 
+## Forage platform doctrine (2026-07-29)
+
+User (verbatim, flag-11 narration, 2026-07-29): "ferries are actaully
+the best way to get fuel and equipment, since you can use them to
+access many equipment and fuel cannisters yu other wise couldnt. you
+generally will need to teleport to the ferry since many times it will
+be on its own area in the water. not touching land. but they are very
+good to use."[^6] Consequences the planner does not yet implement:
+water-locked containers (counted `no_landing` by the larder scorer)
+are harvestable by teleporting TO a ferry and riding it; ferries are
+often unreachable by walking (their water body touches no shore path),
+so the approach is a teleport, not a board-from-land. Tracked as F5 in
+[[flag-triage-20260729]].
+
+Combat corollary, proven live the same night: a ferry RIDER sits on a
+water tile with zero passable neighbors, which cloaked a human from
+acquisition until the stand-off gate replaced strict adjacency (F4 in
+[[flag-triage-20260729]]).
+
+[^6]: user (Austin), 2026-07-29, mid-run flag 11 debrief of
+    bot-20260729-232252.
+
 ## Discovery (2026-06-12)
 
 The "marooned one-tile island" from run 131003 was actually the tank standing ON A FERRY in a lake. It could have driven across the water the whole time. The walkability model treated all water as impassable. Fixed by making passability ferry-aware.[^3]
