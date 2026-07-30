@@ -439,26 +439,55 @@ class TestFindAcquisitionTarget:
 
         assert result is None
 
-    def test_filters_water_locked_enemy(self) -> None:
-        """A tank without a passable adjacent tile is not a teleport target.
+    def test_acquires_ferry_rider_with_shore_in_shot_range(self) -> None:
+        """An enemy on open water is viable when shore lies within shot range.
 
-        Covers the terrain-blocked gate at
-        ``threats.py::find_acquisition_target``. Even if the bot teleports
-        to (enemy_x, enemy_y), the server lands the bot on an adjacent
-        tile -- if every adjacent tile is water, the teleport silently
-        fails. The acquisition path declines and falls through to the
-        next strategy.
+        Live 2026-07-29 (run bot-20260729-232252): Yuppler rode a ferry
+        at (128,102) -- his tile and every neighbor water -- and the old
+        strictly-adjacent gate rejected him with no_passable_adjacent on
+        every acquisition pass while ground sat three tiles west. The
+        gate is stand-off now: the close aims at a passable shore tile
+        and duals fire over water ([[weapon-selection]]).
         """
         tank = _tank("10", x=105, y=100, team=1)
         tank["timestamp_ms"] = 100000
         world = _world({"10": tank})
         terrain_data: dict[tuple[int, int], str] = {
+            (105, 100): "W",
             (104, 100): "W",
             (106, 100): "W",
             (105, 99): "W",
             (105, 101): "W",
         }
         terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+
+        result = find_acquisition_target(
+            world,
+            _self_at(),
+            blocked={},
+            killed={},
+            terrain=terrain,
+            now_ms=100000,
+            map_open_cooldown_ms=5000,
+            engagement_reserve_fuel=650,
+        )
+
+        if result is None:
+            raise AssertionError("expected the ferry rider to be acquirable")
+        assert result["tank_id"] == 10
+
+    def test_filters_enemy_with_no_standoff_landing(self) -> None:
+        """An enemy with no passable tile inside the shot-range diamond is skipped.
+
+        Mid-ocean ferry rider: nothing to land on within
+        ``SHOT_RANGE_TILES``, so there is no firing position and the
+        acquisition path declines and falls through to the next
+        strategy.
+        """
+        tank = _tank("10", x=105, y=100, team=1)
+        tank["timestamp_ms"] = 100000
+        world = _world({"10": tank})
+        terrain = InMemoryTerrainMap.from_passable_set(set())
 
         result = find_acquisition_target(
             world,

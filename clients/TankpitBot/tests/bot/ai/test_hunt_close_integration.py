@@ -275,7 +275,6 @@ class TestDecideTeleportToFarTarget:
         inventory = make_inventory()
         terrain = InMemoryTerrainMap(
             terrain_data={
-                (197, 86): "W",
                 (198, 86): "W",
                 (197, 87): "W",
             }

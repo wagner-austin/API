@@ -136,6 +136,78 @@ def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() ->
     assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
 
 
+def test_choose_combat_landing_tile_standoff_when_target_tile_impassable() -> None:
+    """A ferry rider on open water gets the nearest shore stand-off landing.
+
+    Live 2026-07-29: Yuppler rode a ferry at (128,102) -- water on his
+    tile and every neighbor -- and the direct-to-target aim would have
+    been refused by the server. The chooser must aim at the passable
+    tile nearest the target instead (water never blocks the shot).
+    """
+    world, self_state, target = _world()
+    water = {(x, y): InMemoryTerrainMap.WATER for x in range(102, 108) for y in range(97, 104)}
+    terrain = InMemoryTerrainMap(water)
+
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (101, 100)
+
+
+def test_choose_combat_landing_tile_standoff_skips_occupied_and_prefers_self() -> None:
+    """Occupied stand-off tiles are skipped; distance ties break toward self."""
+    world, self_state, target = _world()
+    water = {(x, y): InMemoryTerrainMap.WATER for x in range(102, 108) for y in range(97, 104)}
+    terrain = InMemoryTerrainMap(water)
+    world["tanks"]["60"] = make_tank_state(
+        tank_id=60,
+        x=101,
+        y=100,
+        team=1,
+        rank=1,
+        damage_state=0,
+        name="occupier",
+        is_bot=False,
+        is_self=False,
+    )
+
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (100, 100)
+
+
+def test_choose_combat_landing_tile_returns_target_when_no_standoff_exists() -> None:
+    """With no passable tile inside the shot-range diamond, fall back to target coords."""
+    world, self_state, target = _world()
+    terrain = InMemoryTerrainMap.from_passable_set(set())
+
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
+
+
+def test_choose_combat_landing_tile_standoff_clips_map_bounds() -> None:
+    """A water-locked target at the map corner only considers in-bounds tiles."""
+    world = make_empty_world_state()
+    self_state = make_self_state(
+        tank_id=1,
+        x=1,
+        y=1,
+        team=2,
+        rank=1,
+        fuel=900,
+        leaderboard_position=1,
+    )
+    target = make_enemy_threat(
+        tank_id=50,
+        x=0,
+        y=0,
+        distance=2,
+        damage_state=0,
+        rank=1,
+        team=1,
+        name="enemy",
+        is_bot=False,
+        timestamp_ms=1000,
+    )
+    terrain = InMemoryTerrainMap.from_passable_set({(2, 0)})
+
+    assert choose_combat_landing_tile(world, self_state, target, terrain) == (2, 0)
+
+
 def test_has_cardinal_enemy_adjacency_matches_exact_distance_one() -> None:
     self_state = make_self_state(
         tank_id=1,

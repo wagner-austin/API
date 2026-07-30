@@ -234,8 +234,37 @@ class TestCombatTargetSelection:
             raise AssertionError("expected nearest isolated combat target")
         assert result["tank_id"] == 50
 
-    def test_select_new_combat_target_skips_impassable_adjacent(self) -> None:
-        """Targets with no passable adjacent tile are skipped."""
+    def test_select_new_combat_target_skips_when_no_standoff_landing(self) -> None:
+        """Targets with no passable tile inside the shot-range diamond are skipped."""
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        terrain = InMemoryTerrainMap.from_passable_set(set())
+
+        world, self_state = make_world(fuel=800)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = select_new_combat_target(
+            ctx,
+            [_enemy_threat(tank_id=50, x=110, y=100, name="WaterLocked")],
+        )
+        assert result is None
+
+    def test_select_new_combat_target_keeps_ringed_target_with_standoff(self) -> None:
+        """A target whose ring is impassable stays viable via stand-off range.
+
+        Mine rings and ferry riders share this shape: the tiles touching
+        the target are impassable but ground exists within
+        ``SHOT_RANGE_TILES``, so the stand-off engagement (teleport near,
+        dual from range) still works and the target must not be skipped.
+        """
         from tests.action_lab.conftest import Terrain
 
         rocks = {
@@ -259,9 +288,11 @@ class TestCombatTargetSelection:
 
         result = select_new_combat_target(
             ctx,
-            [_enemy_threat(tank_id=50, x=110, y=100, name="Surrounded")],
+            [_enemy_threat(tank_id=50, x=110, y=100, name="Ringed")],
         )
-        assert result is None
+        if result is None:
+            raise AssertionError("expected the ringed target to stay viable")
+        assert result["tank_id"] == 50
 
 
 class TestGetLockedTargetWorldStateFallback:
