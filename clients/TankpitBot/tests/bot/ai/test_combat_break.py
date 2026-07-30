@@ -114,17 +114,23 @@ def _pursuit_target(*, damage_state: int) -> TankStateDict:
     )
 
 
-def _seed_confirmed_incoming(count: int) -> None:
-    """Confirm ``count`` dual hits into the live world-service book."""
+def _seed_confirmed_incoming(count: int, weapon: int = 1, damage: int = -90) -> None:
+    """Confirm ``count`` hits into the live world book.
+
+    Defaults model dual fire (weapon 1, -90); pass ``weapon=0`` with
+    ``damage=-45`` for the practice-room single-shot rate -- the
+    confirm budget must cover the recorded weapon's cost or the book
+    confirms nothing.
+    """
     book = get_world_service().damage_book
     for i in range(count):
         ts = 95000 + i * 1000
-        record_incoming_shot(book, 60, "ganker", 1, ts)
-        confirm_incoming_damage(book, -90, ts + 100)
+        record_incoming_shot(book, 60, "ganker", weapon, ts)
+        confirm_incoming_damage(book, damage, ts + 100)
 
 
-def _engage_ctx(*, fuel: int) -> DecideCtx:
-    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(damage_state=3)}
+def _engage_ctx(*, fuel: int, damage_state: int = 3) -> DecideCtx:
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(damage_state=damage_state)}
     world, self_state = make_world(
         fuel=fuel,
         tanks=tanks,
@@ -162,18 +168,39 @@ def _engage_ctx(*, fuel: int) -> DecideCtx:
     )
 
 
-def test_engage_breaks_under_sustained_fire_and_keeps_the_lock() -> None:
-    """A losing pursuit hands the tick to refuel with the lock held.
+def test_engage_blocks_the_unwinnable_two_attacker_fight() -> None:
+    """A fight no fuel level can fund is BLOCKED, not endlessly sortied.
 
     The bot-20260728-075336 shape: healthy fleeing target, ~90/tick
-    measured incoming. The break fires, COLLECT's larder step aims the
-    escape at the remembered 700-fuel container, and the combat lock
-    survives the detour (never-drop).
+    measured incoming. Making the break projection whole would need
+    more fuel than the tank can hold (fuel_at_break + shortfall >=
+    capacity), so escaping-and-returning would loop forever -- the
+    break blocks the target with the standard TTL and replans.
     """
     reset_world_state()
     _seed_confirmed_incoming(5)
     try:
         decision = decide_hunt_mode(_engage_ctx(fuel=800))
+    finally:
+        reset_world_state()
+
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
+    assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+
+
+def test_engage_breaks_under_moderate_fire_and_keeps_the_lock() -> None:
+    """A fundable losing fight hands the tick to refuel with the lock held.
+
+    Moderate incoming (27/tick, the practice-room single-attacker
+    rate): the projection fails at the current fuel but recovering the
+    shortfall fits inside the tank, so the break escapes to the
+    remembered 700-fuel larder container with the lock held
+    (never-drop) and latches the release level.
+    """
+    reset_world_state()
+    _seed_confirmed_incoming(5, weapon=0, damage=-45)
+    try:
+        decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
     finally:
         reset_world_state()
 
@@ -205,13 +232,18 @@ def test_break_sets_the_escape_latch_on_the_delegated_decision() -> None:
     next tick's shot, reopened by the next break, 27-36 fuel/tick).
     """
     reset_world_state()
-    _seed_confirmed_incoming(5)
+    _seed_confirmed_incoming(5, weapon=0, damage=-45)
     try:
-        decision = decide_hunt_mode(_engage_ctx(fuel=800))
+        decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
     finally:
         reset_world_state()
 
-    assert decision["updated_ai_state"]["break_escape_until_fuel"] > 0
+    # Release = fuel_at_break + (floor - projected): the level at which
+    # the SAME projection clears. A bare-floor release was a zero-width
+    # band (current fuel at break is usually above the floor already,
+    # live receipts 23:23:45-55: three instant releases in ten
+    # seconds), so the latch must exceed the fuel at break time.
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] > 500
 
 
 def test_latched_break_escapes_even_when_the_projection_recovers() -> None:

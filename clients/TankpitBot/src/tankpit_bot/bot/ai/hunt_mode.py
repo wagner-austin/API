@@ -7,6 +7,7 @@ from tankpit_bot.bot.ai.combat_break import (
     assess_engagement_break,
 )
 from tankpit_bot.bot.ai.combat_strategy import (
+    block_combat_target_and_replan,
     clear_combat_target,
     close_target,
     engage_target,
@@ -935,13 +936,36 @@ def _break_losing_engagement(
         projected_fuel_at_kill=assessment["projected_fuel_at_kill"],
         escape_floor=assessment["escape_floor"],
     )
+    # Release level = the fuel at which the SAME projection clears the
+    # floor: fuel_at_break + shortfall. Latching at the bare floor was
+    # a zero-width band in disguise -- current fuel at break time is
+    # usually far ABOVE the floor (the break trips on the PROJECTION),
+    # so a floor-release cleared next tick and the latch was a no-op
+    # (live receipts 23:23:45-55: three releases in ten seconds at
+    # falling fuel 755/697/626, every one instantly re-broken).
+    shortfall = assessment["escape_floor"] - assessment["projected_fuel_at_kill"]
+    release_at = ctx.fuel + shortfall
+    capacity = fuel_capacity(ctx.self_state["rank"])
+    if release_at >= capacity:
+        # Even a full tank cannot fund this fight -- the projection
+        # fails at every reachable fuel level, so latching would pin
+        # the bot in COLLECT forever. Block with the standard TTL and
+        # replan; the cooldown retries once the fight geometry may
+        # have changed.
+        emit_ai(
+            "engagement with %s unwinnable at any fuel (needs %d, capacity %d) - blocking",
+            target["name"],
+            release_at,
+            capacity,
+        )
+        return block_combat_target_and_replan(ctx, target)
     latched_ctx = DecideCtx(
         ctx.world,
         ctx.self_state,
         AIStateDict(
             **{
                 **ctx.ai_state,
-                "break_escape_until_fuel": assessment["escape_floor"],
+                "break_escape_until_fuel": release_at,
             }
         ),
         ctx.inventory,
