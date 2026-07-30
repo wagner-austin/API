@@ -52,6 +52,86 @@ def is_lock_release_warranted(
     return locked_dist - candidate_dist >= _LOCK_RELEASE_MIN_GAP
 
 
+_FUEL_LOCK_VALUE_HYSTERESIS = 2
+"""A fuel candidate must be worth at least this multiple of the locked
+target's deliverable score to break the lock on value alone.
+
+Prevents lock ping-pong between comparable containers while still
+releasing dreg locks: in the flag-13 incident
+([[flag-triage-20260729]], run bot-20260729-232252 tick 1055) an
+84-fuel remnant held its lock at deficit 207 against a 462-volume
+container five tiles away because the release rule was distance-only —
+deliverable scores 75 vs 202, ratio 2.7, released under this rule.
+"""
+
+
+def fuel_deliverable_score(
+    self_state: SelfStateDict,
+    container: ContainerStateDict,
+    deficit: int,
+) -> int:
+    """Return a fuel container's deliverable value net of travel.
+
+    The server clamps a fuel pickup to ``min(volume, headroom)``, so
+    volume beyond the current deficit is worthless this trip; distance
+    then discounts the trip itself (the same ``volume - distance``
+    shape as :func:`~tankpit_bot.bot.ai.equipment_search.find_best_fuel`
+    scoring, with the deliverable clamp applied).
+
+    Args:
+        self_state: Player state for the distance origin.
+        container: Fuel container to score.
+        deficit: Current fuel deficit (``capacity - fuel``).
+
+    Returns:
+        ``min(volume, deficit) - manhattan_distance(self, container)``.
+    """
+    deliverable = min(container["volume"], max(deficit, 0))
+    return deliverable - manhattan_distance(
+        self_state["x"], self_state["y"], container["x"], container["y"]
+    )
+
+
+def is_fuel_lock_release_warranted(
+    self_state: SelfStateDict,
+    locked_target: ContainerStateDict,
+    candidate: ContainerStateDict,
+    deficit: int,
+) -> bool:
+    """Return True when a fuel candidate justifies dropping the locked target.
+
+    Two independent release paths:
+
+    1. The distance rule shared with equipment locks
+       (:func:`is_lock_release_warranted` — markedly closer).
+    2. The value rule (flag-13 fix): the candidate's deliverable score
+       must be at least :data:`_FUEL_LOCK_VALUE_HYSTERESIS` times the
+       locked target's (floored at 1, so a non-positive locked score —
+       a dreg not worth its own walk — releases for any candidate with
+       positive deliverable value).
+
+    Args:
+        self_state: Player state for the distance origin.
+        locked_target: Currently locked fuel container.
+        candidate: Best fresh fuel candidate.
+        deficit: Current fuel deficit (``capacity - fuel``).
+
+    Returns:
+        True when either release path fires.
+    """
+    if is_lock_release_warranted(
+        self_state,
+        locked_target["x"],
+        locked_target["y"],
+        candidate["x"],
+        candidate["y"],
+    ):
+        return True
+    locked_score = fuel_deliverable_score(self_state, locked_target, deficit)
+    candidate_score = fuel_deliverable_score(self_state, candidate, deficit)
+    return candidate_score >= _FUEL_LOCK_VALUE_HYSTERESIS * max(locked_score, 1)
+
+
 def is_container_pursuable(
     container: ContainerStateDict,
     *,
@@ -117,7 +197,9 @@ def hostile_mines(world: WorldStateDict) -> dict[str, MineStateDict]:
 
 __all__ = [
     "_viewport_bounds",
+    "fuel_deliverable_score",
     "hostile_mines",
     "is_container_pursuable",
+    "is_fuel_lock_release_warranted",
     "is_lock_release_warranted",
 ]
