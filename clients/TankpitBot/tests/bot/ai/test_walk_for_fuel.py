@@ -215,13 +215,17 @@ def test_desperation_hop_beats_a_long_walk_to_a_far_dot() -> None:
     The water-sitting container at (110,100) cannot be walked to, but
     its shore landing (109,100) costs 54 of the tank's 88 -- one hop
     and an adjacent auto-pick beat twenty walking ticks to the dot.
+    Volume 90 keeps this the DESPERATION rung's case: since the F16
+    net-of-gain reserve, the ordinary larder takes rich (>= 100)
+    containers even at desperation fuel; sub-floor dregs are the
+    desperation hop's remaining niche.
     """
     containers = {
         "110,100": make_container_state(
             x=110,
             y=100,
             is_fuel=True,
-            volume=200,
+            volume=90,
             timestamp_ms=100000,
         )
     }
@@ -271,14 +275,16 @@ def test_desperation_hop_crosses_a_water_channel_to_shore_fuel() -> None:
     walk-pickup and walk rungs decline; the believed container at
     (108,100) sits ON water with a land landing at (109,100) costing
     54 of the tank's 68 -- the desperation hop crosses the channel
-    and the adjacent auto-pick refuels, instead of exiting.
+    and the adjacent auto-pick refuels, instead of exiting. Volume 90
+    keeps this the desperation rung's case (rich containers now route
+    through the larder at any fuel, F16).
     """
     containers = {
         "108,100": make_container_state(
             x=108,
             y=100,
             is_fuel=True,
-            volume=300,
+            volume=90,
             timestamp_ms=100000,
         )
     }
@@ -367,3 +373,62 @@ def test_healthy_tank_never_reaches_the_walk_rung() -> None:
         raise AssertionError("expected a dot-hop decision at healthy fuel")
     assert decision["behavior"]["reason_kind"] == "search_collect_local"
     assert decision["command"]["cmd_type"] == "teleport"
+
+
+def test_desperation_hop_picks_the_cheaper_of_two_dregs() -> None:
+    """Two sub-floor candidates: the cheaper landing wins.
+
+    Both containers are below the larder's 100 floor (desperation's
+    niche since F16), so the desperation rung scores them and the
+    nearer shore landing outranks the farther one.
+    """
+    containers = {
+        "110,100": make_container_state(
+            x=110,
+            y=100,
+            is_fuel=True,
+            volume=90,
+            timestamp_ms=100000,
+        ),
+        "100,112": make_container_state(
+            x=100,
+            y=112,
+            is_fuel=True,
+            volume=90,
+            timestamp_ms=100000,
+        ),
+    }
+    world, self_state = make_world(fuel=88, scanned=True, containers=containers)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "SEARCH",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99000,
+        }
+    )
+    terrain = InMemoryTerrainMap(
+        {
+            (110, 100): "W",
+            (100, 112): "W",
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        terrain,
+        "",
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected desperation hop decision")
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 111
+    assert decision["command"]["target_y"] == 100
