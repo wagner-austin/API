@@ -1363,3 +1363,108 @@ class TestFindCombatPickup:
         )
         ctx.world = world_no_self
         assert _find_combat_pickup(ctx) is None
+
+
+class TestCombatCorridorMineGuard:
+    """Tests for the walk-close corridor mine clearance."""
+
+    def setup_method(self) -> None:
+        """Reset shared world-state globals before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
+
+    def test_mined_walk_corridor_draws_the_free_clearance_first(self) -> None:
+        """A short close through a known mine shoots it before stepping.
+
+        Flags s6-8/9: six 45-fuel walk-ins against mines that were in
+        the mine layer the whole time. The clearance single is free
+        ([[mine-mechanics]]), so the corridor is drained before the
+        first step and the walk proceeds next tick.
+        """
+        from tankpit_bot.state.types import make_mine_state
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=103,
+                y=100,
+                team=2,
+                rank=1,
+                name="NearEnemy",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        # make_world's self is team 1, so a team-2 mine is hostile.
+        world["mines"]["101,100"] = make_mine_state(x=101, y=100, mine_type=0, tank_id=-1, team=2)
+        terrain = InMemoryTerrainMap({(102, 100): InMemoryTerrainMap.ROCK})
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="NearEnemy"))
+
+        if result is None:
+            raise AssertionError("expected corridor clearance decision")
+        assert result["command"]["cmd_type"] == "shoot"
+        assert result["behavior"]["reason_kind"] == "mine_clearance_shot"
+        assert result["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_short_close_with_no_usable_landing_falls_through_to_teleport(self) -> None:
+        """All-occupied adjacency at short range leaves the teleport close.
+
+        The server displaces a teleport off mines and tanks, so when
+        every adjacent tile is dynamically occupied the walk has no
+        destination and the direct close remains the answer.
+        """
+        from tankpit_bot.state.types import make_mine_state
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=103,
+                y=100,
+                team=2,
+                rank=1,
+                name="RingedNear",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        for mx, my in ((102, 100), (104, 100), (103, 99), (103, 101)):
+            world["mines"][f"{mx},{my}"] = make_mine_state(
+                x=mx, y=my, mine_type=0, tank_id=-1, team=2
+            )
+        terrain = InMemoryTerrainMap({(101, 100): InMemoryTerrainMap.ROCK})
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=103, y=100, name="RingedNear"))
+
+        if result is None:
+            raise AssertionError("expected teleport decision")
+        assert result["command"]["cmd_type"] == "teleport"
