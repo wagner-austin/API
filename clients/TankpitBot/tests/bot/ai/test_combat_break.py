@@ -110,7 +110,10 @@ def _pursuit_target(*, damage_state: int) -> TankStateDict:
         timestamp_ms=100000,
         last_wire_seen_ms=100000,
         last_position_update_ms=100000,
-        last_viewport_observation_ms=80000,
+        # Left the viewport 8 s ago -- inside the ~12 s homing trace
+        # ([[shoot-event-format]]#reroute-ttl-ms), so pursuit fire is
+        # still live; the trace-expired behavior has its own pin.
+        last_viewport_observation_ms=92000,
     )
 
 

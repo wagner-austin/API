@@ -86,7 +86,10 @@ def _pursuit_target(
         timestamp_ms=100000,
         last_wire_seen_ms=100000,
         last_position_update_ms=100000,
-        last_viewport_observation_ms=80000,
+        # Left the viewport 8 s ago -- inside the ~12 s homing trace
+        # ([[shoot-event-format]]#reroute-ttl-ms), so pursuit fire is
+        # still live; the trace-expired behavior has its own pin.
+        last_viewport_observation_ms=92000,
     )
 
 
@@ -1052,6 +1055,52 @@ def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
+
+
+def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
+    """A departed target past the ~12 s trace gets the map chase, not a shot.
+
+    Flags 4 and 5 of run bot-20260730-01xx: seven pursuit homings hit,
+    then one shot always resolved after the reroute wall as a booked
+    miss and a wasted tick ("couldnt we avoid the missed shot
+    entirely? and save a tick"). Past ``PURSUIT_TRACE_TTL_MS`` the
+    pursuit goes straight to the map refresh the miss would have
+    bought anyway, with the lock held.
+    """
+    stale_target = make_tank_state(
+        tank_id=50,
+        x=150,
+        y=150,
+        team=2,
+        rank=1,
+        name="Runner",
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        last_viewport_observation_ms=80000,
+    )
+    world, self_state = make_world(fuel=800, tanks={"50": stale_target})
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ENGAGE",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+            "last_shot_target_id": 50,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
 
 
 def test_scan_on_landing_fires_homing_when_locked_target_left_viewport() -> None:

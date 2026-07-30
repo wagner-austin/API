@@ -83,7 +83,7 @@ def test_no_covered_containers_returns_none() -> None:
 
 
 def test_friendly_mine_on_container_is_not_a_target() -> None:
-    """Own-team mines are passable and never worth a dual."""
+    """Own-team mines are passable and need no clearance shot."""
     world, self_state = _world_with_self()
     _add_covered_container(world, 104, 100, team=2)
 
