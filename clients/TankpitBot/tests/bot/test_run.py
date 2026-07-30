@@ -131,8 +131,11 @@ class TestBotRunMethod:
             # After cleanup, _cdp and _page should be None
             assert bot._cdp is None
             assert bot._page is None
-            # The session-start enforcement fired exactly once.
-            assert autoscroll_calls == [1]
+            # The enforcement now rides the tick loop's first spawned
+            # tick; the fake game loop interrupts before any tick, so
+            # the stub records nothing here (tick-loop tests own the
+            # one-shot contract).
+            assert autoscroll_calls == []
         finally:
             _test_hooks.sync_playwright = original
             _test_hooks.ensure_autoscroll_off = original_autoscroll

@@ -176,6 +176,9 @@ class Bot(DispatchMixin):
             command_service=command_service,
         )
         self._page: PageProtocol | None = None
+        # One-shot latch for the in-game autoscroll enforcement; the
+        # tick loop flips it on the first spawned tick.
+        self._autoscroll_enforced: bool = False
         self._game_log_scraper: GameLogScraper | None = None
         self._game_log_witness: list[GameLogEntryWithTimestamp] = []
         self._shot_screenshot_seq: int = 0
@@ -485,15 +488,6 @@ class Bot(DispatchMixin):
             )
 
             wait_for_game_ready(page, self._messages)
-
-            # Autoscroll must be OFF for the whole scan/landing model
-            # to hold (user ruling 2026-07-29: "make sure autoscroll
-            # is always off... sometimes it resets to on"). The
-            # setting is server-persisted per account, so a stray
-            # toggle would otherwise skew every later session. Hook
-            # seam: run-path tests stub this (their fake pages have
-            # no wire to ack from).
-            _test_hooks.ensure_autoscroll_off(page, self._messages)
 
             # Persist the freshly-issued auth cookies + localStorage
             # before the game loop can crash. Next launch of the bot

@@ -503,6 +503,26 @@ def _sync_live_view_demand(bot: Bot) -> None:
         bot._live_view.stop(cdp)
 
 
+def _enforce_autoscroll_once(bot: Bot) -> None:
+    """Run the autoscroll-off dance on the FIRST spawned tick only.
+
+    The toggle only acks in-game (user ruling 2026-07-29: "you cant
+    enable or disable autoscroll til the bot is in the game"), and the
+    caller invokes this after confirming ``self_state`` -- fed by THIS
+    tick's drain -- which is the proof of being in-game. Wiring it
+    before the tick loop was the 23:08/23:16 double failure: the world
+    service is pull-fed, so a pre-loop wait starved forever on a state
+    nothing was draining yet.
+
+    Args:
+        bot: Bot instance carrying the one-shot latch and live page.
+    """
+    if bot._autoscroll_enforced or bot._page is None:
+        return
+    _test_hooks.ensure_autoscroll_off(bot._page, bot._messages)
+    bot._autoscroll_enforced = True
+
+
 def _tick_once(bot: Bot) -> None:
     """Execute one sync-decide-execute cycle.
 
@@ -527,6 +547,8 @@ def _tick_once(bot: Bot) -> None:
     self_state = world["self_state"]
     if self_state is None:
         return
+
+    _enforce_autoscroll_once(bot)
 
     # 2a. The wire announced OUR OWN death (0x41, victim == self). A
     # corpse has no decisions left — end the session through the

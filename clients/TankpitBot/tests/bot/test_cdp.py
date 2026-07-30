@@ -477,6 +477,92 @@ class TestBotAIIntegration:
 
         assert bot._world_reads == 2
 
+    def test_tick_once_enforces_autoscroll_once_on_first_spawned_tick(
+        self, fake_env: FakeEnv
+    ) -> None:
+        """The first tick with a spawned tank runs the toggle dance once.
+
+        The enforcement rides the tick loop because the world service
+        is pull-fed -- the 23:08/23:16 launches proved a pre-loop wait
+        starves forever on a state nothing was draining yet. The
+        two-read flaky world fires the enforcement on read 1 (spawned)
+        and aborts on read 2, keeping the tick shallow; the second
+        tick must not re-enforce.
+        """
+        from tankpit_bot import _test_hooks
+        from tankpit_bot._test_hooks import AutoscrollPageProtocol
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import _tick_once
+        from tankpit_bot.state.types import WorldStateDict
+        from tankpit_bot.types.message import CapturedMessage
+        from tests.fakes.base import FakeCDPSession, FakePage
+
+        class SpawnedOnceBot(Bot):
+            """Bot whose world is spawned on read 1, gone on read 2."""
+
+            def __init__(self, target_url: str, *, headless: bool) -> None:
+                super().__init__(target_url, headless=headless)
+                self._world_reads = 0
+                self._state_data["state"] = "IDLE"
+
+            def get_world_state(self) -> WorldStateDict:
+                self._world_reads += 1
+                if self._world_reads <= 1:
+                    return WorldStateDict(
+                        self_state=make_self_state(
+                            tank_id=1,
+                            x=100,
+                            y=100,
+                            team=1,
+                            rank=1,
+                            fuel=800,
+                            leaderboard_position=1,
+                        ),
+                        tanks={},
+                        containers={},
+                        mines={},
+                        terrain={},
+                        viewport=make_viewport_state(left=91, top=91, width=18, height=18),
+                        scanned_tiles={},
+                        timestamp_ms=0,
+                    )
+                return WorldStateDict(
+                    self_state=None,
+                    tanks={},
+                    containers={},
+                    mines={},
+                    terrain={},
+                    viewport=make_viewport_state(left=91, top=91, width=18, height=18),
+                    scanned_tiles={},
+                    timestamp_ms=0,
+                )
+
+            def _update_state_from_world(self) -> None:
+                """Keep the bot in IDLE for this targeted tick-loop test."""
+
+        calls: list[int] = []
+
+        def _recorder(page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> None:
+            del page, messages
+            calls.append(1)
+
+        original = _test_hooks.ensure_autoscroll_off
+        _test_hooks.ensure_autoscroll_off = _recorder
+        try:
+            bot = SpawnedOnceBot("https://test.tankpit.com/", headless=True)
+            session = FakeCDPSession()
+            bot._page = FakePage(session)
+
+            _tick_once(bot)
+            assert calls == [1]
+            assert bot._autoscroll_enforced is True
+
+            bot._world_reads = 0
+            _tick_once(bot)
+            assert calls == [1]
+        finally:
+            _test_hooks.ensure_autoscroll_off = original
+
     def test_tick_once_waits_for_position_before_planning(self, fake_env: FakeEnv) -> None:
         """_tick_once does not execute AI commands while state is WAITING_FOR_POSITION."""
         from tankpit_bot.bot.base import Bot
