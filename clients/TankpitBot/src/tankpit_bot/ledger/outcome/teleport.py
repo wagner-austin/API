@@ -58,6 +58,19 @@ def reset_teleport_dispatch_tracking() -> None:
     _pending = None
 
 
+def pending_teleport_target() -> tuple[int, int] | None:
+    """Return the requested landing tile of the in-flight teleport.
+
+    Returns:
+        ``(target_x, target_y)`` from the dispatch context the executor
+        recorded when it sent the wire teleport, or ``None`` when no
+        teleport is in flight.
+    """
+    if _pending is None:
+        return None
+    return (_pending["target_x"], _pending["target_y"])
+
+
 class TeleportDispatchContract:
     """Structural invariants on a recorded teleport dispatch."""
 
@@ -276,6 +289,7 @@ __all__ = [
     "emit_teleport_command_rejected",
     "emit_teleport_landed",
     "emit_teleport_stall_timeout",
+    "pending_teleport_target",
     "record_teleport_dispatch",
     "reset_teleport_dispatch_tracking",
 ]
