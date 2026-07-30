@@ -456,6 +456,28 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     """Phase 1: Teleport to enemy."""
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
+        # Mine-ring counterplay (user ruling 2026-07-29: "fix the bot
+        # so it can hunt even if i put mines around me. if it lands 4
+        # tiles away or more, it can still fire a dual shot right?"):
+        # a ringed target displaces our landing off the mines and the
+        # re-close then fails on the same tile forever -- live proof
+        # 21:35:06, Yuppler blocked from dist 2. When the target is
+        # viewport-visible the shot needs no landing at all: the
+        # server fires duals at stationary targets from any in-view
+        # range ([[weapon-selection]]), hits confirm via the ammo
+        # ledger, and terrain-clipped shots resolve as misses through
+        # the existing stationary-miss block. Only an OFF-view target
+        # with a dead landing still blocks.
+        left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+        if left <= target["x"] <= right and top <= target["y"] <= bottom:
+            emit_ai(
+                "landing near %s failed but they are in view at (%d,%d) - "
+                "firing from stand-off (mine-ring counter)",
+                target["name"],
+                target["x"],
+                target["y"],
+            )
+            return _combat_shoot(ctx, target)
         emit_ai(
             "combat landing (%d,%d) for %s already failed, blocking target",
             landing_x,

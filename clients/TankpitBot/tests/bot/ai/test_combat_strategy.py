@@ -517,6 +517,97 @@ class TestCombatTeleportGuards:
         assert "50" in result["updated_ai_state"]["blocked_combat_targets"]
         assert result["updated_ai_state"]["blocked_combat_targets"]["50"] == 100000
 
+    def test_failed_landing_with_target_in_view_fires_from_stand_off(self) -> None:
+        """A dead landing next to an in-view target becomes a shot, not a block.
+
+        Mine-ring counterplay (user ruling 2026-07-29: "fix the bot so
+        it can hunt even if i put mines around me... it can still fire
+        a dual shot right?"). Live proof of the old hole at 21:35:06:
+        the ring displaced the landing, the re-close failed on the
+        same tile, and Yuppler was BLOCKED from dist 2. With the
+        target inside the visible viewport the shot needs no landing:
+        the server fires duals at stationary targets from any in-view
+        range and the ammo ledger confirms the hit.
+        """
+        from tankpit_bot.sniffer.world_state import mark_move_target_failed
+
+        tanks: dict[str, TankStateDict] = {
+            "90": make_tank_state(
+                tank_id=90,
+                x=102,
+                y=100,
+                team=2,
+                rank=1,
+                name="Yuppler",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1100, tanks=tanks)
+        mark_move_target_failed(102, 100, 99000)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(tank_id=90, x=102, y=100, name="Yuppler"))
+
+        assert result["command"]["cmd_type"] == "shoot"
+        assert "90" not in result["updated_ai_state"]["blocked_combat_targets"]
+
+    def test_failed_landing_with_target_off_view_still_blocks(self) -> None:
+        """A dead landing at an OFF-view target keeps the block behavior.
+
+        Firing needs the target inside the visible viewport (the
+        server rejects out-of-view aims); with no legal landing and no
+        legal shot, blocking and replanning is still correct.
+        """
+        from tankpit_bot.sniffer.world_state import mark_move_target_failed
+
+        tanks: dict[str, TankStateDict] = {
+            "90": make_tank_state(
+                tank_id=90,
+                x=120,
+                y=100,
+                team=2,
+                rank=1,
+                name="Yuppler",
+                is_self=False,
+                is_bot=False,
+                damage_state=0,
+                timestamp_ms=100000,
+                last_wire_seen_ms=100000,
+                last_position_update_ms=100000,
+                last_viewport_observation_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1100, tanks=tanks)
+        mark_move_target_failed(120, 100, 99000)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(tank_id=90, x=120, y=100, name="Yuppler"))
+
+        assert result["command"]["cmd_type"] != "shoot"
+        assert "90" in result["updated_ai_state"]["blocked_combat_targets"]
+
     def test_teleport_reserve_includes_the_engagement_budget(self) -> None:
         """A chase the old reserve passed by 14 fuel now refuels first.
 
