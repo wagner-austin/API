@@ -194,3 +194,51 @@ def test_unprofitable_larder_hands_the_tick_to_discovery() -> None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason_kind"] == "forage_radar"
     assert decision["command"]["cmd_type"] == "radar"
+
+
+def test_displaced_harvest_landing_unsuppresses_the_radar() -> None:
+    """A shoved landing fires the scan and KEEPS the lock (flag s4-3).
+
+    The harvest hop expected to stand within auto-pick reach of its
+    locked container; landing 7 tiles away means the server displaced
+    it off unobserved mines ([[flag-triage-20260729]] s4-3: three
+    straight cant_go walks at 01:28). The radar reveals the field so
+    the mine-composed passability can veto the doomed walks; the lock
+    survives for the informed re-approach.
+    """
+    state = AIStateDict(
+        **{
+            **make_scanned_ai_state(landing_scan_viewport="0,0"),
+            "mode": "COLLECT",
+            "mode_state": "APPROACH",
+            "mode_started_ms": 90000,
+            "suppress_landing_scan": True,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 95,
+            "resource_target_y": 105,
+        }
+    )
+    containers = {
+        "95,105": make_container_state(
+            x=95, y=105, is_fuel=True, volume=600, timestamp_ms=100000, failed_pickups=0
+        ),
+    }
+    ctx = _collect_ctx(
+        fuel=700,
+        scanned=False,
+        containers=containers,
+        inventory=make_inventory(),
+        ai_state=state,
+    )
+
+    decision = decide_collect_mode(ctx)
+
+    if decision is None:
+        raise AssertionError("expected collect decision")
+    assert decision["behavior"]["reason_kind"] == "scan_on_landing"
+    assert decision["command"]["cmd_type"] == "radar"
+    updated = decision["updated_ai_state"]
+    assert updated["suppress_landing_scan"] is False
+    assert updated["resource_target_kind"] == "fuel"
+    assert updated["resource_target_x"] == 95
+    assert updated["resource_target_y"] == 105
