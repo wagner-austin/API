@@ -22,10 +22,11 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     capture_page_client_snapshot,
 )
 from tankpit_bot.bot import ai_strategy, executor, world_sync
-from tankpit_bot.bot.ai.types import AIStateDict, render_reason
+from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_reason
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.browser.overlay import OverlayStateDict
@@ -79,6 +80,7 @@ from tankpit_bot.sniffer.world_state_combat import (
     peek_our_shot_response,
 )
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
+from tankpit_bot.state import SelfStateDict
 
 # 0x52 Supervisor codes a shoot dispatch can draw. Any of these while a
 # shot is pending is the server's authoritative refusal of THAT shot --
@@ -571,6 +573,93 @@ def _enforce_autoscroll_once(bot: Bot) -> None:
     bot._autoscroll_enforced = True
 
 
+# How long a dead tank waits for its respawn sync before the session
+# exits ``deactivated`` anyway. The real server respawns promptly; a
+# world that never respawns (the sim has no respawn law) must not
+# wait forever on a sync that cannot come.
+_RESPAWN_WAIT_MS = 60_000
+
+
+def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
+    """Reset the corpse's beliefs and start the respawn wait.
+
+    User contract 2026-07-30: "if the tank dies, it should just wait
+    for respawn and then go into collecting mode." Every tactical
+    belief the dead tank carried — combat lock, escape latch,
+    resource locks, in-flight action — describes a tank that no
+    longer exists, so the AI state rebuilds from initial values with
+    only the session-scoped facts carried over (kill count, wind-down
+    flag, greeting latch, config). The dead self record is dropped
+    outright (the post-mortem fuel field reads garbage, e.g. 65482 in
+    run bot-20260730-004144), which turns the loop's self-None early
+    exit into the wait itself.
+
+    Args:
+        bot: Bot instance.
+        self_state: The corpse's final self record, for the receipt.
+    """
+    service = get_world_service()
+    service.self_deactivated = False
+    emit_diagnostic(
+        diagnostic_kind="self_respawn_wait",
+        died_x=self_state["x"],
+        died_y=self_state["y"],
+        session_kills=bot._ai_state["session_kill_count"],
+    )
+    log.info(
+        "Deactivated at (%d,%d) - waiting for respawn, then collecting",
+        self_state["x"],
+        self_state["y"],
+    )
+    fresh = make_initial_ai_state(bot._ai_state["config"])
+    fresh["session_kill_count"] = bot._ai_state["session_kill_count"]
+    fresh["wind_down"] = bot._ai_state["wind_down"]
+    fresh["greeted_target_id"] = bot._ai_state["greeted_target_id"]
+    bot._ai_state = fresh
+    bot._state_data = make_initial_state_data()
+    service.world_state["self_state"] = None
+    bot._respawn_deadline_ms = get_current_time_ms() + _RESPAWN_WAIT_MS
+
+
+def _note_respawn(bot: Bot, self_state: SelfStateDict) -> None:
+    """Clear the respawn wait once fresh self state proves the respawn.
+
+    The tank is back on the field with empty stocks, so the normal
+    arbitration hands the next tick to COLLECT exactly as the
+    contract asks.
+
+    Args:
+        bot: Bot instance.
+        self_state: The freshly synced self record.
+    """
+    if bot._respawn_deadline_ms <= 0:
+        return
+    log.info(
+        "Respawned at (%d,%d) fuel=%d - resuming with collection",
+        self_state["x"],
+        self_state["y"],
+        self_state["fuel"],
+    )
+    bot._respawn_deadline_ms = 0
+
+
+def _check_respawn_deadline(bot: Bot) -> None:
+    """Fail the respawn wait loudly once the deadline passes.
+
+    Args:
+        bot: Bot instance.
+
+    Raises:
+        SessionExitError: When the tank died and no respawn sync
+            arrived within :data:`_RESPAWN_WAIT_MS`.
+    """
+    if bot._respawn_deadline_ms > 0 and get_current_time_ms() >= bot._respawn_deadline_ms:
+        raise SessionExitError(
+            "deactivated",
+            f"no respawn sync within {_RESPAWN_WAIT_MS // 1000}s of the own 0x41",
+        )
+
+
 def _tick_once(bot: Bot) -> None:
     """Execute one sync-decide-execute cycle.
 
@@ -594,21 +683,23 @@ def _tick_once(bot: Bot) -> None:
     world = bot.get_world_state()
     self_state = world["self_state"]
     if self_state is None:
+        _check_respawn_deadline(bot)
         return
 
+    _note_respawn(bot, self_state)
     _enforce_autoscroll_once(bot)
 
-    # 2a. The wire announced OUR OWN death (0x41, victim == self). A
-    # corpse has no decisions left — end the session through the
-    # standard exit path before any wait/decide logic can hang on
-    # responses that will never come (sim CLI 2026-07-22: a killed
-    # bot ticked forever "waiting for radar results").
+    # 2a. The wire announced OUR OWN death (0x41, victim == self).
+    # User contract 2026-07-30 ("if the tank dies, it should just
+    # wait for respawn and then go into collecting mode"): instead of
+    # ending the session, reset every tactical belief the corpse
+    # carried and wait for the respawn sync. The Artax death receipt
+    # (run bot-20260730-004144, fuel read 65482 post-mortem) shows
+    # the dead self_state is garbage, so it is dropped outright and
+    # the loop's self-None early exit becomes the wait.
     if get_world_service().self_deactivated:
-        raise SessionExitError(
-            "deactivated",
-            f"own 0x41 received at ({self_state['x']},{self_state['y']}) "
-            f"fuel={self_state['fuel']} — tank deactivated",
-        )
+        _handle_own_deactivation(bot, self_state)
+        return
 
     bot._update_state_from_world()
     if not _is_ready_for_decision(bot):

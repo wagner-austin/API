@@ -179,6 +179,10 @@ class Bot(DispatchMixin):
         # One-shot latch for the in-game autoscroll enforcement; the
         # tick loop flips it on the first spawned tick.
         self._autoscroll_enforced: bool = False
+        # Non-zero while waiting for the post-death respawn sync; the
+        # tick loop exits ``deactivated`` if the deadline passes with
+        # no fresh self state (a world with no respawn, e.g. the sim).
+        self._respawn_deadline_ms: int = 0
         self._game_log_scraper: GameLogScraper | None = None
         self._game_log_witness: list[GameLogEntryWithTimestamp] = []
         self._shot_screenshot_seq: int = 0
