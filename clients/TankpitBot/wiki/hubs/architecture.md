@@ -1,6 +1,6 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (9 pages)
+Codebase design decisions, patterns, and coding standards. (10 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
@@ -11,5 +11,7 @@ Codebase design decisions, patterns, and coding standards. (9 pages)
 [Executor Rejection Silent Loops](../pages/executor-rejection-loops.md) -- structural pattern behind the 2026-07-06 20:47:31 deadlock class: AI-state rollback + unwired rejection paths let executor validators loop silently; mine class killed at the root 2026-07-20, instances #2/#3 (stale anchors, pickup races) still open
 [Terrain Composition — Single-Owner Walkability](../pages/terrain-composition.md) -- "can I walk here?" has ONE owner: the composed decision terrain (static map + ferries + hostile mines); why the blocked_mines parameter and the executor mine veto are gone, the invariant table, and the rule for future dynamic obstacles
 [Physics Module Roadmap](../pages/physics-module-roadmap.md) -- the wiki-as-executable-truth plan: physics/ module + machine-checked wiki claim binding in make check (Phase 1, IMPLEMENTED 2026-07-20 — see as-built notes), validators vs the capture archive (Phase 2), live divergence counting (Phase 3), executor staleness track
+
+[Diagnostic HUD + Human Flag Channel](../pages/diagnostic-hud.md) -- the fixed-geometry fiesta-styled in-page HUD (2026-07-29 rebuild) and the click-to-flag channel that lands a human_flag diagnostic with an 8-tick lead-up snapshot
 
 [Larder Plan](../pages/larder-plan.md) -- planned (2026-07-27, not implemented): harvest radar-verified containers the bot already remembers as a COLLECT cascade priority; gated on the own-tile equipment pickup probe
