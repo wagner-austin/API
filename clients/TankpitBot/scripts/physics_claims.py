@@ -261,6 +261,33 @@ def _check_probe_claim(
     return violations
 
 
+def _check_law_claim(claim: JSONObject, prefix: str) -> list[str]:
+    """Verify a prose-law claim's shape.
+
+    ``law`` claims bind physics symbols that CANNOT be verified on an
+    int probe grid — predicates and geometry functions whose inputs
+    include protocol objects (e.g. ``line_of_sight.is_shot_line_clear``
+    takes a terrain view) or whose outputs are not scalars
+    (``shot_line_tiles`` returns the Bresenham raster). The
+    computational guarantee degrades, deliberately and visibly, to:
+    the symbol EXISTS (checked by the caller) and the wiki states the
+    game law it implements in prose. Scalar constants and int
+    formulas must keep using ``value``/``probes`` — a law claim on a
+    probe-able symbol is reviewer-rejected drift.
+
+    Args:
+        claim: Claim object carrying ``law``.
+        prefix: ``page#id`` for violation messages.
+
+    Returns:
+        Violations (empty when the law text is a non-empty string).
+    """
+    law = claim.get("law")
+    if not isinstance(law, str) or not law.strip():
+        return [f"{prefix}: 'law' must be a non-empty prose string"]
+    return []
+
+
 def _check_claim(
     claim: JSONObject,
     page: str,
@@ -282,10 +309,9 @@ def _check_claim(
     if not isinstance(claim_id, str) or not isinstance(code, str):
         return "", "", [f"{page}: claim needs string 'id' and 'code' fields"]
     prefix = f"{page}#{claim_id}"
-    has_value = "value" in claim
-    has_probes = "probes" in claim
-    if has_value == has_probes:
-        return claim_id, code, [f"{prefix}: claim needs exactly one of value/probes"]
+    kinds_present = [kind for kind in ("value", "probes", "law") if kind in claim]
+    if len(kinds_present) != 1:
+        return claim_id, code, [f"{prefix}: claim needs exactly one of value/probes/law"]
     if ":" not in code:
         return claim_id, code, [f"{prefix}: code '{code}' is not 'module:symbol'"]
     module_name, _, symbol_name = code.partition(":")
@@ -296,9 +322,11 @@ def _check_claim(
         return claim_id, code, import_violations
     if not hasattr(module, symbol_name):
         return claim_id, code, [f"{prefix}: '{symbol_name}' not found in {module_name}"]
-    if has_value:
+    if kinds_present[0] == "value":
         return claim_id, code, _check_value_claim(claim, module, symbol_name, prefix)
-    return claim_id, code, _check_probe_claim(claim, module, symbol_name, prefix)
+    if kinds_present[0] == "probes":
+        return claim_id, code, _check_probe_claim(claim, module, symbol_name, prefix)
+    return claim_id, code, _check_law_claim(claim, prefix)
 
 
 def _public_symbol_addresses(package_name: str) -> tuple[list[str], list[str]]:
