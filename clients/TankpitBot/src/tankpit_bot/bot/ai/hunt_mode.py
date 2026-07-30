@@ -31,6 +31,7 @@ from tankpit_bot.bot.ai.threats import (
     find_acquisition_target,
     find_locked_target_pursuit,
     find_relay_travel_target,
+    stale_human_exists,
 )
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, ReasonKind
 from tankpit_bot.bot.session_exit import SessionExitError
@@ -325,6 +326,20 @@ def _decide_hunt_acquire_fresh(
                     human_travel["name"],
                     map_target["name"],
                 )
+            elif _stale_human_needs_map_refresh(ctx):
+                # Freshness asymmetry (Yuppler, 2026-07-29 21:19): bots
+                # stay wire-fresh by moving; a quiet human goes stale
+                # 5 s after each map open, and with a fresh bot always
+                # available the map never got reopened -- the human
+                # was invisible outside 5-second windows. A known
+                # rank-window human whose only curable defect is stale
+                # map data forces a refresh BEFORE the bot may settle
+                # for farming; the cooldown gate bounds the cadence.
+                emit_ai(
+                    "known human is map-stale - refreshing map before settling for %s",
+                    map_target["name"],
+                )
+                return search_for_enemies(ctx, ai_state=ai_state, map_reason="find_target")
         emit_ai(
             "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
             map_target["name"],
@@ -361,12 +376,23 @@ def _pick_relay_dot(
 
     A dot qualifies when it is strictly closer to the enemy than the
     bot's current tile (euclidean -- teleport cost geometry), the
-    landing tile is passable, and the hop leaves ``fuel_low_threshold``
+    landing tile is passable, the hop leaves ``fuel_low_threshold``
     behind so a dry dot cannot strand the bot below the COLLECT entry
-    reserve. Among qualifiers the one nearest the enemy wins (maximum
-    progress per hop); ties keep the cheaper hop. Strict progress
-    makes the relay monotone -- it terminates at the enemy or runs out
-    of qualifying dots.
+    reserve, and the leg costs at most ``engagement_fuel_budget`` --
+    the per-leg deficit cap (2026-07-29). Among qualifiers the one
+    nearest the enemy wins (maximum progress per hop); ties keep the
+    cheaper hop. Strict progress makes the relay monotone -- it
+    terminates at the enemy or runs out of qualifying dots.
+
+    The leg cap closes the broke-arrival stall from the first live
+    human pursuit (run bot-20260729-211458 window, 21:17:40): the
+    uncapped max-progress rule picked a dot 131 tiles out, paid 787
+    fuel in ONE leg (1100 -> 313), and landed four tiles from Yuppler
+    unable to fight -- the between-kills restock then foraged AWAY
+    from the target for minutes while the human watched. Capped legs
+    keep every landing a short top-up instead of a full rebuild, so
+    the chain stays "refuel per hop" as the 2026-07-03 contract
+    intended.
 
     Args:
         ctx: Decision context.
@@ -389,6 +415,8 @@ def _pick_relay_dot(
         if ctx.terrain is not None and not ctx.terrain.is_passable(dot_x, dot_y):
             continue
         cost = teleport_cost(sx, sy, dot_x, dot_y)
+        if cost > ctx.config["engagement_fuel_budget"]:
+            continue
         if cost + ctx.config["fuel_low_threshold"] > ctx.fuel:
             continue
         if (
@@ -505,6 +533,40 @@ def _relay_toward(
         "dot_relay",
         ai_state,
         ctx.equip,
+    )
+
+
+def _stale_human_needs_map_refresh(ctx: DecideCtx) -> bool:
+    """Return whether a map refresh is owed to a stale known human.
+
+    True only when BOTH hold: the map itself is older than the
+    cooldown (a fresh snapshot that still shows the human stale means
+    they left the game -- no refresh can cure that), and a rank-window
+    human in the registry is rejected purely for stale map data.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when the acquire path should refresh the map instead of
+        settling for a practice bot.
+    """
+    map_age_ms = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
+    if map_age_ms <= ctx.config["map_open_cooldown_ms"]:
+        return False
+    return stale_human_exists(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.blocked_targets,
+        ctx.killed,
+        ctx.terrain,
+        ctx.timestamp_ms,
+        ctx.config["map_open_cooldown_ms"],
+        engagement_reserve_fuel=(
+            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        ),
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
     )
 
 

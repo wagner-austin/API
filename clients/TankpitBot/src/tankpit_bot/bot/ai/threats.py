@@ -12,6 +12,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.humans import (
     DEFAULT_HUMAN_MAX_RANK,
     DEFAULT_HUMAN_MIN_RANK,
+    is_human_name,
     is_human_rank_protected,
     threat_priority_tier,
 )
@@ -577,6 +578,72 @@ def find_acquisition_target(
     return winner
 
 
+def stale_human_exists(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    blocked: dict[str, int],
+    killed: dict[str, int],
+    terrain: TerrainMapProtocol | None,
+    now_ms: int,
+    map_open_cooldown_ms: int,
+    *,
+    engagement_reserve_fuel: int,
+    human_min_rank: int = DEFAULT_HUMAN_MIN_RANK,
+    human_max_rank: int = DEFAULT_HUMAN_MAX_RANK,
+) -> bool:
+    """Return whether a pursuit-worthy human exists with STALE map data.
+
+    The freshness asymmetry that hid Yuppler (run 2026-07-29 21:19):
+    practice bots move and shoot constantly, so the wire keeps them
+    permanently map-fresh; a QUIET human generates no wire traffic and
+    goes stale ``map_open_cooldown_ms`` after every map open. With a
+    wire-fresh bot always available, acquisition never needed another
+    map open and the human stayed invisible outside 5-second windows.
+    The acquire path uses this predicate to force a map refresh before
+    settling for bot farming (user doctrine: "farm bots but prioritize
+    any human player that logs in").
+
+    A human rejected for any OTHER reason (protected rank, blocked,
+    killed-cooldown, dead) is not worth a refresh -- only the
+    ``stale_map_data`` rejection is curable by a map open.
+
+    Args:
+        world: Filtered world state (killed tanks already removed).
+        self_state: Player's own state.
+        blocked: Tank IDs temporarily un-engageable.
+        killed: Tank IDs on kill cooldown.
+        terrain: Terrain map for passable-adjacent check.
+        now_ms: Current tick timestamp.
+        map_open_cooldown_ms: Freshness window for map-known positions.
+        engagement_reserve_fuel: Fuel that must remain after the
+            approach teleport.
+
+    Returns:
+        True when at least one rank-window human's only curable defect
+        is stale map data.
+    """
+    for tank in world["tanks"].values():
+        if not _is_enemy(tank, self_state["team"]):
+            continue
+        if not is_human_name(tank["name"]):
+            continue
+        rejected_reason = _acquisition_rejection_reason(
+            tank,
+            self_state,
+            blocked,
+            killed,
+            terrain,
+            now_ms,
+            map_open_cooldown_ms,
+            engagement_reserve_fuel,
+            human_min_rank,
+            human_max_rank,
+        )
+        if rejected_reason == "stale_map_data":
+            return True
+    return False
+
+
 def find_relay_travel_target(
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -676,5 +743,6 @@ __all__ = [
     "find_locked_target_pursuit",
     "find_relay_travel_target",
     "manhattan_distance",
+    "stale_human_exists",
     "threats_in_range",
 ]

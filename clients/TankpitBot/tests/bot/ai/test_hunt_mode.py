@@ -1233,13 +1233,13 @@ def test_hunt_relay_prefers_dot_nearest_the_enemy() -> None:
         100000,
         None,
         "",
-        ((180, 100), (130, 100)),
+        ((170, 100), (130, 100)),
     )
 
     decision = decide_hunt_mode(ctx)
 
     assert decision["command"]["cmd_type"] == "teleport"
-    assert decision["command"]["target_x"] == 180
+    assert decision["command"]["target_x"] == 170
     assert decision["command"]["target_y"] == 100
 
 
@@ -1674,3 +1674,190 @@ def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
     # The tick advances (no relay teleport was possible); the exact
     # fallback shape is refuel_for_hunt's contract, not re-tested here.
     assert decision["behavior"]["reason_kind"] != "dot_relay"
+
+
+def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
+    """A max-progress dot costing more than one kill budget is skipped.
+
+    Regression for the 2026-07-29 21:17:40 broke-arrival: the uncapped
+    picker paid 787 fuel in one leg (1100 -> 313) and landed next to
+    Yuppler unable to fight, stranding the pursuit in a minutes-long
+    restock. The near-enemy dot here costs ~780 (affordable under the
+    old floor-only rule at a full tank) and must lose to the cheaper
+    progress dot at ~300.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        # (230,100): most progress, cost ~780 -- beyond the 450 leg cap.
+        # (150,100): cost 300 -- the correct capped leg.
+        ((230, 100), (150, 100)),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 150
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
+
+
+def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
+    """A map-stale rank-window human is refreshed before settling for bots.
+
+    The freshness asymmetry that hid Yuppler (2026-07-29 21:19):
+    practice bots stay wire-fresh by moving; a quiet human goes stale
+    ``map_open_cooldown_ms`` after every map open, and with a fresh
+    bot always available acquisition never reopened the map. Here the
+    bot is map-fresh via the wire, the human's timestamp has aged
+    out, and the map itself is older than the cooldown -- the
+    decision must be a map refresh, not a teleport at red-5.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 90000,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+
+
+def test_fresh_map_showing_stale_human_farms_normally() -> None:
+    """A FRESH map that still shows the human stale means they left.
+
+    No refresh can cure a human absent from the latest snapshot, so
+    the affordable bot is engaged -- the refresh rule cannot loop.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["updated_ai_state"]["combat_target_id"] == 60
+
+
+def test_stale_human_exists_filters_and_reasons() -> None:
+    """The stale-human predicate skips allies, bots, and non-stale humans.
+
+    Direct contract test: an allied human (same team), a wire-fresh
+    practice bot, and a BLOCKED human must all fail to trigger the
+    refresh; only a human whose sole curable defect is stale map data
+    returns True.
+    """
+    from tankpit_bot.bot.ai.threats import stale_human_exists
+
+    ally_human = make_tank_state(
+        tank_id=70,
+        x=110,
+        y=100,
+        team=1,
+        rank=2,
+        name="FriendlyHuman",
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=80000,
+    )
+    fresh_bot = _map_known_enemy(tank_id=60, x=115, y=100, name="red-5")
+    blocked_human = _map_known_enemy(tank_id=80, x=200, y=100, name="Blocked")
+    stale_human = _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000)
+
+    def check(tanks: dict[str, TankStateDict], blocked: dict[str, int]) -> bool:
+        world, self_state = make_world(fuel=1100, tanks=tanks)
+        return stale_human_exists(
+            world,
+            self_state,
+            blocked,
+            {},
+            None,
+            100000,
+            5000,
+            engagement_reserve_fuel=650,
+        )
+
+    assert check({"70": ally_human, "60": fresh_bot}, {}) is False
+    assert check({"80": blocked_human}, {"80": 100000}) is False
+    assert check({"90": stale_human}, {}) is True
+
+
+def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
+    """A capped-cost dot that would dip below the reserve is skipped.
+
+    At fuel 400, the 300-cost progress dot passes the 450 leg cap but
+    would leave 100 < the 200 floor -- the cheaper dot wins instead.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=400, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ((150, 100), (110, 100)),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 110
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
