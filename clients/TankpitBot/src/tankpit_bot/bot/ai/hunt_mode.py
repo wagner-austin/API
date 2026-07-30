@@ -122,6 +122,28 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
         )
     if ctx.mode_state == "CONFIRM_KILL":
         return _decide_hunt_confirm_kill(ctx)
+    latch = ctx.ai_state["break_escape_until_fuel"]
+    if latch > 0:
+        # A holding latch gates EVERY combat phase, not just ENGAGE.
+        # Flag s2-7 (run bot-20260730-000030, 00:11:18-29): the latch
+        # check lived only inside _break_losing_engagement, so CLOSE
+        # ticks kept shooting orange-8 while the escape's larder hop
+        # deferred for a map open -- four shoot/map_open cycles, fuel
+        # 572->462 under fire, the exact oscillation the latch exists
+        # to prevent. Gating at entry means no phase can trade shots
+        # mid-escape and the deferred hop re-dispatches on the very
+        # next tick against the opened map.
+        escape_target = get_locked_target(ctx, _visible_threats(ctx))
+        if escape_target is None:
+            escape_target = _locked_target_pursuit(ctx)
+        if escape_target is not None:
+            emit_ai(
+                "break latch holding for %s (fuel %d < floor %d) - continuing escape",
+                escape_target["name"],
+                ctx.fuel,
+                latch,
+            )
+            return refuel_for_hunt(ctx, escape_target)
     if ctx.mode_state == "SCAN_ON_LANDING":
         return _decide_hunt_scan_on_landing(ctx)
     if ctx.mode_state == "ENGAGE":
@@ -892,23 +914,6 @@ def _break_losing_engagement(
     Returns:
         The lock-held refuel delegation, or ``None`` to keep fighting.
     """
-    latch = ctx.ai_state["break_escape_until_fuel"]
-    if latch > 0 and ctx.fuel < latch:
-        # Break LATCH (2026-07-29): a fired break stays fired until
-        # fuel recovers to its escape floor. The un-latched projection
-        # flickers with the sliding hit window, and the resulting
-        # oscillation was the 21:59 map-fire loop -- the escape's
-        # fuel-hop deferred to a map open, the next tick's shot CLOSED
-        # the map (server behavior), and the pair repeated at 27-36
-        # fuel/tick (user report: "stuck in a map loop... queing both
-        # the map open and fire command").
-        emit_ai(
-            "break latch holding for %s (fuel %d < floor %d) - continuing escape",
-            target["name"],
-            ctx.fuel,
-            latch,
-        )
-        return refuel_for_hunt(ctx, target)
     hits, fuel_lost = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
     assessment = assess_engagement_break(ctx, target, hits, fuel_lost)
     if not assessment["break_engagement"]:
