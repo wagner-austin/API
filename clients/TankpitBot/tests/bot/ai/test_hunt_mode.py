@@ -1915,3 +1915,35 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     assert decision["command"]["target_x"] == 110
     assert decision["command"]["target_y"] == 100
     assert decision["behavior"]["reason_kind"] == "dot_relay"
+
+
+def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
+    """SCAN_ON_LANDING's pursuit branch also respects the homing-trace wall.
+
+    The ENGAGE-path wall has its own pin; this covers the second
+    call-site (audit 2026-07-30): a locked target that left the
+    viewport more than PURSUIT_TRACE_TTL_MS ago gets the map chase
+    instead of a guaranteed-miss shot.
+    """
+    stale = _pursuit_target(x=150, y=150)
+    stale["last_viewport_observation_ms"] = 87000  # 13 s > the 12 s wall
+    tanks: dict[str, TankStateDict] = {"50": stale}
+    world, self_state = make_world(fuel=800, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "SCAN_ON_LANDING",
+            "mode_started_ms": 90000,
+            "combat_target_id": 50,
+            "combat_target_x": 150,
+            "combat_target_y": 150,
+        }
+    )
+    inventory = make_inventory()
+    ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["behavior"]["reason_kind"] == "find_target"
