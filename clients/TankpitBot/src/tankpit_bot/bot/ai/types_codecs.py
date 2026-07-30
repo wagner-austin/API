@@ -366,6 +366,7 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "last_map_open_ms": state["last_map_open_ms"],
         "combat_target_id": state["combat_target_id"],
         "wind_down": state["wind_down"],
+        "break_escape_until_fuel": state["break_escape_until_fuel"],
         "combat_target_x": state["combat_target_x"],
         "combat_target_y": state["combat_target_y"],
         "killed_tank_ids": killed,
@@ -385,6 +386,7 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "manual_mode": manual_value,
         "live_radars_used": state["live_radars_used"],
         "live_teleports": state["live_teleports"],
+        "greeted_target_id": state["greeted_target_id"],
     }
 
 
@@ -486,6 +488,7 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         last_map_open_ms=require_int(data, "last_map_open_ms"),
         combat_target_id=require_int(data, "combat_target_id"),
         wind_down=require_bool(data, "wind_down"),
+        break_escape_until_fuel=require_int(data, "break_escape_until_fuel"),
         combat_target_x=require_int(data, "combat_target_x"),
         combat_target_y=require_int(data, "combat_target_y"),
         killed_tank_ids=_decode_killed_tank_ids(data),
@@ -505,6 +508,7 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         manual_mode=_decode_manual_mode(data),
         live_radars_used=require_int(data, "live_radars_used"),
         live_teleports=require_int(data, "live_teleports"),
+        greeted_target_id=require_int(data, "greeted_target_id"),
     )
 
 

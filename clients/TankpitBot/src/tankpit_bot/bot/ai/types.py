@@ -455,6 +455,19 @@ class AIStateDict(TypedDict):
         last_shoot_ms: Timestamp of last shot fired (milliseconds).
         last_map_open_ms: Timestamp of last map open command (milliseconds).
         combat_target_id: Tank ID of current combat target (-1 if none).
+        break_escape_until_fuel: The engagement-break LATCH (2026-07-29).
+            Zero when no escape is in progress; set to the break's
+            ``escape_floor`` the tick the damage-aware break fires, and
+            held until fuel recovers to that floor. While latched,
+            ENGAGE/CLOSE keep delegating to the lock-held refuel
+            instead of re-litigating the projection each tick -- the
+            projection flickers with its sliding hit window, and the
+            un-latched oscillation produced the 21:59 map-fire loop
+            (break -> fuel-hop defers to map_open -> next tick the
+            projection recovered -> shot fired -> the SHOT CLOSED THE
+            MAP -> break again -> map_open again, bleeding 27-36
+            fuel/tick; user report: "stuck in a map loop... it seems
+            to be queing both the map open and fire command").
         wind_down: True in the session's final stretch — no new
             engagements; disengage, top off, and exit cleanly
             (``session_complete``) once fully stocked.
@@ -508,6 +521,12 @@ class AIStateDict(TypedDict):
             this session. Same rationale as :attr:`live_radars_used` —
             live executor-side counter, not the wire-derived scorecard
             aggregate.
+        greeted_target_id: Tank ID of the last human target greeted
+            with the HELLO chat (-1 before the first). The greeting
+            attaches once per human lock acquisition; the latch stops
+            re-greets while the same lock is re-derived tick after
+            tick — the server's chat flood mute silently swallows
+            spam for the rest of the session ([[chat-messages]]).
     """
 
     config: AIConfigDict
@@ -519,6 +538,7 @@ class AIStateDict(TypedDict):
     last_map_open_ms: int
     combat_target_id: int
     wind_down: bool
+    break_escape_until_fuel: int
     combat_target_x: int
     combat_target_y: int
     killed_tank_ids: dict[str, int]
@@ -538,6 +558,7 @@ class AIStateDict(TypedDict):
     manual_mode: AIMode | None
     live_radars_used: int
     live_teleports: int
+    greeted_target_id: int
 
 
 def make_initial_ai_state(
@@ -561,6 +582,7 @@ def make_initial_ai_state(
         last_map_open_ms=0,
         combat_target_id=-1,
         wind_down=False,
+        break_escape_until_fuel=0,
         combat_target_x=0,
         combat_target_y=0,
         killed_tank_ids={},
@@ -580,6 +602,7 @@ def make_initial_ai_state(
         manual_mode=None,
         live_radars_used=0,
         live_teleports=0,
+        greeted_target_id=-1,
     )
 
 

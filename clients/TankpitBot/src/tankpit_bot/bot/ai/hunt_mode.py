@@ -106,6 +106,19 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
     Returns:
         Mode-owned hunt decision.
     """
+    latch = ctx.ai_state["break_escape_until_fuel"]
+    if latch > 0 and ctx.fuel >= latch:
+        emit_ai("break latch released (fuel %d >= floor %d)", ctx.fuel, latch)
+        ctx = DecideCtx(
+            ctx.world,
+            ctx.self_state,
+            AIStateDict(**{**ctx.ai_state, "break_escape_until_fuel": 0}),
+            ctx.inventory,
+            ctx.timestamp_ms,
+            ctx.terrain,
+            ctx.combat_feedback,
+            ctx.map_fuel_dots,
+        )
     if ctx.mode_state == "CONFIRM_KILL":
         return _decide_hunt_confirm_kill(ctx)
     if ctx.mode_state == "SCAN_ON_LANDING":
@@ -878,6 +891,23 @@ def _break_losing_engagement(
     Returns:
         The lock-held refuel delegation, or ``None`` to keep fighting.
     """
+    latch = ctx.ai_state["break_escape_until_fuel"]
+    if latch > 0 and ctx.fuel < latch:
+        # Break LATCH (2026-07-29): a fired break stays fired until
+        # fuel recovers to its escape floor. The un-latched projection
+        # flickers with the sliding hit window, and the resulting
+        # oscillation was the 21:59 map-fire loop -- the escape's
+        # fuel-hop deferred to a map open, the next tick's shot CLOSED
+        # the map (server behavior), and the pair repeated at 27-36
+        # fuel/tick (user report: "stuck in a map loop... queing both
+        # the map open and fire command").
+        emit_ai(
+            "break latch holding for %s (fuel %d < floor %d) - continuing escape",
+            target["name"],
+            ctx.fuel,
+            latch,
+        )
+        return refuel_for_hunt(ctx, target)
     hits, fuel_lost = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
     assessment = assess_engagement_break(ctx, target, hits, fuel_lost)
     if not assessment["break_engagement"]:
@@ -905,7 +935,22 @@ def _break_losing_engagement(
         projected_fuel_at_kill=assessment["projected_fuel_at_kill"],
         escape_floor=assessment["escape_floor"],
     )
-    return refuel_for_hunt(ctx, target)
+    latched_ctx = DecideCtx(
+        ctx.world,
+        ctx.self_state,
+        AIStateDict(
+            **{
+                **ctx.ai_state,
+                "break_escape_until_fuel": assessment["escape_floor"],
+            }
+        ),
+        ctx.inventory,
+        ctx.timestamp_ms,
+        ctx.terrain,
+        ctx.combat_feedback,
+        ctx.map_fuel_dots,
+    )
+    return refuel_for_hunt(latched_ctx, target)
 
 
 def _decide_hunt_confirm_kill(ctx: DecideCtx) -> TickDecisionDict:

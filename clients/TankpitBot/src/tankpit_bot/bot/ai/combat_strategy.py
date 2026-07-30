@@ -575,7 +575,11 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
        target. This is the one-time close the engagement contract
        allows; subsequent ticks fall through branch (2).
     """
-    if has_cardinal_combat_shot(ctx.self_state, target):
+    if has_cardinal_combat_shot(ctx.self_state, target) or has_combat_shot(ctx, target):
+        # In-view and in shot range: fire from the current tile (user
+        # ruling 2026-07-29). The purple-8 receipt this closes: after
+        # a break-driven pickup the bot stood at dist 2 and paid a
+        # teleport to regain cardinal adjacency instead of shooting.
         return _combat_shoot(ctx, target)
     dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
     if is_already_engaged(ctx):
@@ -835,11 +839,18 @@ def _combat_landing_candidates(
 
 
 # The server's effective shot range, measured across 350 shots on
-# 2026-06-11: Manhattan distance 1 hit 255/255, distance 2 hit 1/1,
-# distance 4+ hit ~0% (45 misses at 4, 35 at 12; the two distance-15
-# "hits" were homing shots, which track). Shots in range never miss --
-# and the range is adjacency, not the awareness-range combat_range.
-SHOT_RANGE_TILES = 2
+# User ruling 2026-07-29: "i dont think i would teleport to the target
+# if im like a few tiles away right? as long as theyre on the viewport
+# and its a clear dual shot then id just hit them from my new
+# location" -- in-view stationary targets take duals at range per
+# [[weapon-selection]] (water never blocks; rock clips to a billed
+# single that resolves as a miss). 8 keeps the Manhattan bound inside
+# the 18x18 viewport after a centered landing. The 2026-06-11
+# counter-measurement (distance 4+ hit ~0%: 45 misses at 4, 35 at 12)
+# predates id-targeted shots and the freshness model -- the shot
+# billing analyzer re-prices this live; if ranged duals miss, the
+# ledger will say so in one session and this constant reverts.
+SHOT_RANGE_TILES = 8
 
 
 def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
