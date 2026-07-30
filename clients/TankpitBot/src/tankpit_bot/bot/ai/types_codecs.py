@@ -386,6 +386,8 @@ def encode_ai_state(state: AIStateDict) -> JSONObject:
         "manual_mode": manual_value,
         "live_radars_used": state["live_radars_used"],
         "live_teleports": state["live_teleports"],
+        "mine_clearance_aim_key": state["mine_clearance_aim_key"],
+        "mine_clearance_shot_ms": state["mine_clearance_shot_ms"],
         "greeted_target_id": state["greeted_target_id"],
     }
 
@@ -508,6 +510,8 @@ def decode_ai_state(data: JSONObject) -> AIStateDict:
         manual_mode=_decode_manual_mode(data),
         live_radars_used=require_int(data, "live_radars_used"),
         live_teleports=require_int(data, "live_teleports"),
+        mine_clearance_aim_key=require_str(data, "mine_clearance_aim_key"),
+        mine_clearance_shot_ms=require_int(data, "mine_clearance_shot_ms"),
         greeted_target_id=require_int(data, "greeted_target_id"),
     )
 

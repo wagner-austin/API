@@ -525,6 +525,13 @@ class AIStateDict(TypedDict):
             this session. Same rationale as :attr:`live_radars_used` —
             live executor-side counter, not the wire-derived scorecard
             aggregate.
+        mine_clearance_aim_key: ``"x,y"`` of the last mine-clearance
+            shot's aim tile, or ``""``. Paired with
+            ``mine_clearance_shot_ms`` to keep the planner from
+            re-aiming a tile whose detonation (0x45) has not landed
+            yet -- the live double-shot at (162,94), 01:59:57/:59,
+            run bot-20260730-015x.
+        mine_clearance_shot_ms: Dispatch timestamp of that shot.
         greeted_target_id: Tank ID of the last human target greeted
             with the HELLO chat (-1 before the first). The greeting
             attaches once per human lock acquisition; the latch stops
@@ -562,6 +569,8 @@ class AIStateDict(TypedDict):
     manual_mode: AIMode | None
     live_radars_used: int
     live_teleports: int
+    mine_clearance_aim_key: str
+    mine_clearance_shot_ms: int
     greeted_target_id: int
 
 
@@ -606,6 +615,8 @@ def make_initial_ai_state(
         manual_mode=None,
         live_radars_used=0,
         live_teleports=0,
+        mine_clearance_aim_key="",
+        mine_clearance_shot_ms=0,
         greeted_target_id=-1,
     )
 
