@@ -23,6 +23,7 @@ from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
+    ChatCommandDict,
     MoveCommandDict,
     PickupEquipmentCommandDict,
     PickupFuelCommandDict,
@@ -229,6 +230,7 @@ def _extract_command_target(command: BotCommand) -> tuple[int, int]:
         | PickupFuelCommandDict
         | PickupEquipmentCommandDict
         | TeleportCommandDict
+        | ChatCommandDict
     ) = command
     return (targeted["target_x"], targeted["target_y"])
 
