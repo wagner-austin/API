@@ -239,6 +239,7 @@ def decide_practice_bot(
                 y=landing[1],
                 target_id=0,
                 slot=0,
+                message_id=0,
             )
     if state["has_pending_return"]:
         state["has_pending_return"] = False
@@ -249,6 +250,7 @@ def decide_practice_bot(
             y=state["pending_return_y"],
             target_id=0,
             slot=0,
+            message_id=0,
         )
     return None
 

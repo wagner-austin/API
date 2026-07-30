@@ -39,6 +39,7 @@ from tankpit_bot.sim.combat_emissions import CORPSE_WINDOW_TICKS, CombatLedger
 from tankpit_bot.sim.commands import ClientCommandDict, SimError
 from tankpit_bot.sim.emissions import (
     emit_block_action,
+    emit_chat,
     emit_equipment_pickup,
     emit_equipment_toggle,
     emit_mine_press,
@@ -68,6 +69,7 @@ _SUPPORTED_KINDS = frozenset(
         "pickup_equipment",
         "toggle_equipment",
         "block",
+        "chat",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
@@ -248,6 +250,9 @@ class SimServer:
                 and tank_id == self.client_id
             ):
                 messages.append(self._viewport.build_update())
+            return
+        if kind == "chat":
+            emit_chat(tank_id, command, messages)
             return
         messages.append(build_map_data(self.world))
 

@@ -26,6 +26,7 @@ from tankpit_bot.protocol.constants import (
 from tankpit_bot.protocol.types import (
     BinaryMessage,
     BuildPickupDict,
+    ChatMessageDict,
     EquipmentGainDict,
     EquipmentToggleDict,
     RadarResultDict,
@@ -59,6 +60,36 @@ def _pickup_message(pickups: list[PickupRecordDict]) -> ContainerPickupDict:
             ContainerPickupRecordDict(x=p["x"], y=p["y"], remaining_volume=p["remaining_volume"])
             for p in pickups
         ),
+    )
+
+
+def emit_chat(
+    tank_id: int,
+    command: ClientCommandDict,
+    messages: list[BinaryMessage],
+) -> None:
+    """Echo one chat command as the 0x4D broadcast.
+
+    Mirrors the un-muted real server (sniff-20260729-214411): an
+    accepted chat comes back as ``M + sender_id + message_id + x + y``
+    to everyone, INCLUDING the sender — the echo is the client's
+    delivery receipt. The sim does not model the flood mute; bot
+    policy (one greeting per human lock) keeps live sends far below
+    the mute threshold.
+
+    Args:
+        tank_id: The chatting tank.
+        command: The decoded chat command.
+        messages: This tick's outgoing batch (appended).
+    """
+    messages.append(
+        ChatMessageDict(
+            msg_type=0x4D,
+            sender_id=tank_id,
+            message_type=command["message_id"],
+            x=command["x"],
+            y=command["y"],
+        )
     )
 
 
@@ -337,6 +368,7 @@ def emit_equipment_toggle(
 
 __all__ = [
     "emit_block_action",
+    "emit_chat",
     "emit_equipment_pickup",
     "emit_equipment_toggle",
     "emit_mine_press",

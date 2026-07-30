@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+from tankpit_bot.protocol.chat import CMD_CHAT
 from tankpit_bot.protocol.commands import (
     CMD_BLOCK,
     CMD_MAP_OPEN,
@@ -35,6 +36,7 @@ ClientCommandKind = Literal[
     "pickup_equipment",
     "toggle_equipment",
     "block",
+    "chat",
     "other",
 ]
 
@@ -58,8 +60,9 @@ class ClientCommandDict(TypedDict):
     ``x``/``y`` are 0 for commands without coordinates; ``target_id``
     is the shoot command's optional entity id (0 = positional shot);
     ``slot`` is the equipment-toggle slot (1-5, 0 for every other
-    kind). ``command`` preserves the raw command byte for ``other``
-    kinds.
+    kind); ``message_id`` is the chat command's preset message id
+    (0 for every other kind). ``command`` preserves the raw command
+    byte for ``other`` kinds.
     """
 
     kind: ClientCommandKind
@@ -68,6 +71,7 @@ class ClientCommandDict(TypedDict):
     y: int
     target_id: int
     slot: int
+    message_id: int
 
 
 def decode_client_command(payload: bytes) -> ClientCommandDict:
@@ -95,6 +99,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             y=payload[3],
             target_id=0,
             slot=0,
+            message_id=0,
         )
     if command == CMD_SHOOT:
         require_min_length(payload, 4, "ClientCommand.shoot")
@@ -106,6 +111,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             y=payload[3],
             target_id=target_id,
             slot=0,
+            message_id=0,
         )
     if command == CMD_TOGGLE_EQUIPMENT:
         require_min_length(payload, 3, "ClientCommand.toggle")
@@ -116,6 +122,20 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             y=0,
             target_id=0,
             slot=payload[2] - ord("0"),
+            message_id=0,
+        )
+    if command == CMD_CHAT:
+        # [type][0x6D][message_id][x][y][flag] — the 6-byte Hb frame
+        # (wiki [[chat-messages]], wire-verified sniff-20260729-214411).
+        require_min_length(payload, 5, "ClientCommand.chat")
+        return ClientCommandDict(
+            kind="chat",
+            command=command,
+            x=payload[3],
+            y=payload[4],
+            target_id=0,
+            slot=0,
+            message_id=payload[2],
         )
     if command in _BARE_KINDS:
         return ClientCommandDict(
@@ -125,8 +145,11 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             y=0,
             target_id=0,
             slot=0,
+            message_id=0,
         )
-    return ClientCommandDict(kind="other", command=command, x=0, y=0, target_id=0, slot=0)
+    return ClientCommandDict(
+        kind="other", command=command, x=0, y=0, target_id=0, slot=0, message_id=0
+    )
 
 
 class SimError(Exception):

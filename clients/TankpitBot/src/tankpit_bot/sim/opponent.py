@@ -75,6 +75,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
             y=enemy["y"],
             target_id=0,
             slot=0,
+            message_id=0,
         )
     if beat == 2:
         return None
@@ -85,6 +86,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
         y=client["y"],
         target_id=0,
         slot=0,
+        message_id=0,
     )
 
 
