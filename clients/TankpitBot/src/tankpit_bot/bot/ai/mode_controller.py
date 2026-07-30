@@ -393,16 +393,26 @@ def hunt_entry_permitted(ctx: DecideCtx) -> bool:
     Args:
         ctx: Decision context.
 
+    ``TANKPIT_BOT_WEAPON_RESUME_SLACK`` (default 0 = the verbatim
+    contract) relaxes the weapons bar to ``cap - slack``, mirroring
+    the radar rule's cap-5 shape -- equipment has no map atlas, so an
+    exact-cap bar forces a hop-scan discovery loop after every kill
+    (nine HUD flags on that loop, 2026-07-29 session).
+
     Returns:
         True when duals and homings are at ``inventory_capacity(rank)``
-        and extra radars are at least ``combat_radar_min(rank)``.
+        minus the configured slack and extra radars are at least
+        ``combat_radar_min(rank)``.
     """
+    from tankpit_bot.bot.config import resolve_weapon_resume_slack
+
     rank = ctx.self_state["rank"]
     cap = inventory_capacity(rank)
+    weapon_floor = max(0, cap - resolve_weapon_resume_slack())
     radar_floor = combat_radar_min(rank)
     return (
-        ctx.inventory["dual_shots"]["count"] >= cap
-        and ctx.inventory["homing_shots"]["count"] >= cap
+        ctx.inventory["dual_shots"]["count"] >= weapon_floor
+        and ctx.inventory["homing_shots"]["count"] >= weapon_floor
         and ctx.inventory["extra_radars"]["count"] >= radar_floor
     )
 

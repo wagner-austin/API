@@ -154,3 +154,32 @@ __all__ = [
     "resolve_video_fps",
     "resolve_video_quality",
 ]
+
+
+def resolve_weapon_resume_slack() -> int:
+    """Return the weapons resume slack from ``TANKPIT_BOT_WEAPON_RESUME_SLACK``.
+
+    Default 0 preserves the 2026-07-25 contract verbatim: HUNT entry
+    requires duals and homings at exactly ``inventory_capacity(rank)``
+    ("the bot never hunts below full stock, no exceptions"). Setting a
+    positive slack N relaxes the resume bar to ``cap - N`` -- the same
+    shape as the radar rule's fixed cap-5 floor -- because equipment
+    has no map atlas, so every between-kill top-off to the exact cap
+    forces a hop-scan discovery loop (the 2026-07-29 session where the
+    user flagged that loop nine times from the HUD). The weapon
+    EMERGENCY break (<4) is unaffected; this only moves the resume
+    bar.
+
+    Returns:
+        Non-negative slack subtracted from the weapons resume cap.
+
+    Raises:
+        ValueError: If the env value is set but not a non-negative int.
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_WEAPON_RESUME_SLACK")
+    if raw is None:
+        return 0
+    value = int(raw)
+    if value < 0:
+        raise ValueError(f"TANKPIT_BOT_WEAPON_RESUME_SLACK must be >= 0, got {value}")
+    return value

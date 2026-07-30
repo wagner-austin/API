@@ -761,3 +761,25 @@ def test_apply_dispatch_counters_preserves_untouched_fields() -> None:
     assert updated["behavior"] == decision["behavior"]
     assert updated["desired_equipment"] == decision["desired_equipment"]
     assert updated["secondary_command"] == decision["secondary_command"]
+
+
+def test_weapon_resume_slack_relaxes_the_entry_bar() -> None:
+    """A configured slack admits weapons at cap minus the slack.
+
+    Default 0 keeps the verbatim 2026-07-25 full-stock contract (the
+    cap-25 fixture above refuses at dual_count=25 against cap 30);
+    slack 5 admits that same 25 -- mirroring the radar cap-5 shape --
+    because equipment has no map atlas and an exact-cap bar forces a
+    hop-scan discovery loop after every kill (nine HUD flags,
+    2026-07-29 session).
+    """
+    from tankpit_bot import _test_hooks
+    from tests.conftest import FakeEnv
+
+    original = _test_hooks.get_env
+    _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_WEAPON_RESUME_SLACK": "5"})
+    try:
+        assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=25, radar_count=30)) is True
+        assert should_enter_hunt(_make_ctx(fuel=1200, dual_count=24, radar_count=30)) is False
+    finally:
+        _test_hooks.get_env = original

@@ -16,6 +16,7 @@ from tankpit_bot.bot.config import (
     resolve_idle_exit_seconds,
     resolve_prefer_account,
     resolve_target_url,
+    resolve_weapon_resume_slack,
 )
 from tests.conftest import FakeEnv
 
@@ -154,3 +155,23 @@ class TestResolvePreferAccount:
         """Anything else stays on the guest login path."""
         _test_hooks.get_env = FakeEnv({"TANKPIT_PREFER_ACCOUNT": "false"})
         assert resolve_prefer_account() is False
+
+
+class TestWeaponResumeSlack:
+    """Contract for ``resolve_weapon_resume_slack``."""
+
+    def test_default_is_zero_full_stock_contract(self) -> None:
+        """Unset env keeps the verbatim full-stock resume bar."""
+        _test_hooks.get_env = FakeEnv({})
+        assert resolve_weapon_resume_slack() == 0
+
+    def test_positive_slack_parses(self) -> None:
+        """A configured slack of 5 mirrors the radar cap-5 shape."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_WEAPON_RESUME_SLACK": "5"})
+        assert resolve_weapon_resume_slack() == 5
+
+    def test_negative_slack_is_rejected_loudly(self) -> None:
+        """A negative slack is a config error, not a clamp."""
+        _test_hooks.get_env = FakeEnv({"TANKPIT_BOT_WEAPON_RESUME_SLACK": "-1"})
+        with pytest.raises(ValueError, match="must be >= 0"):
+            resolve_weapon_resume_slack()
