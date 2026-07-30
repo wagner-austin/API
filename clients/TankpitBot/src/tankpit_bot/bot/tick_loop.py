@@ -107,8 +107,10 @@ def run_tick_loop(
 ) -> None:
     """Run the main tick loop.
 
-    A positive ``session_seconds`` bounds the session at
-    ``seconds * 1000 // TICK_RATE_MS`` ticks; the loop then returns so
+    A positive ``session_seconds`` bounds the session by requested
+    wait time (``seconds * 1000`` ms of between-tick sleeping; the
+    early-wake sleep charges only what it actually waited, so busy
+    stretches never shorten a bounded run); the loop then returns so
     ``Bot.run`` saves the capture session and shuts the browser down
     cleanly. Zero or negative runs until stopped. Bounded runs
     previously worked by killing the browser, which ended every session
@@ -134,7 +136,7 @@ def run_tick_loop(
         stop_file_path: Sentinel file whose existence requests a
             graceful shutdown.
     """
-    max_ticks = session_seconds * 1000 // TICK_RATE_MS if session_seconds > 0 else 0
+    budget_ms = session_seconds * 1000 if session_seconds > 0 else 0
     # Wind-down: in the final stretch of a bounded run the AI stops
     # opening engagements, disengages, and tops off so the session
     # ends CLEANLY (``session_complete``) instead of the tick budget
@@ -142,16 +144,19 @@ def run_tick_loop(
     # session boots combat-ready on the leftover stock. Sessions of
     # two windows or less skip it (short diagnostic runs must still
     # exercise the full loop).
-    wind_down_at = (
-        max_ticks - _WIND_DOWN_SECONDS * 1000 // TICK_RATE_MS
-        if session_seconds > 2 * _WIND_DOWN_SECONDS
-        else 0
+    wind_down_at_ms = (
+        budget_ms - _WIND_DOWN_SECONDS * 1000 if session_seconds > 2 * _WIND_DOWN_SECONDS else 0
     )
     ticks_done = 0
+    # The budget counts REQUESTED wait time, not iterations: the
+    # early-wake sleep below can end a wait after a fraction of
+    # TICK_RATE_MS, and charging a full window per iteration would
+    # shorten bounded sessions in proportion to how busy they were.
+    waited_ms = 0
     while True:
         _publish_tick_context(bot, ticks_done + 1)
         _apply_pending_mode_override(bot)
-        if wind_down_at > 0 and ticks_done >= wind_down_at and not bot._ai_state["wind_down"]:
+        if wind_down_at_ms > 0 and waited_ms >= wind_down_at_ms and not bot._ai_state["wind_down"]:
             bot._ai_state["wind_down"] = True
             log.info(
                 "Session wind-down (final %ds): disengaging and topping off for a clean exit",
@@ -180,10 +185,13 @@ def run_tick_loop(
             return
         _publish_session_status(bot)
         ticks_done += 1
-        if max_ticks > 0 and ticks_done >= max_ticks:
+        if budget_ms > 0 and waited_ms + TICK_RATE_MS >= budget_ms:
+            # Exit when the next full window would not fit: a 4 s
+            # session is exactly two ticks and one wait, same as the
+            # tick-counted budget this accounting replaced.
             log.info(
-                "Session tick budget reached (%d ticks / %ds), ending run",
-                max_ticks,
+                "Session budget reached (%d ticks / %ds), ending run",
+                ticks_done,
                 session_seconds,
             )
             _emit_session_scorecard(bot, ticks_done, exit_reason="completed")
@@ -198,11 +206,51 @@ def run_tick_loop(
             _emit_session_scorecard(bot, ticks_done, exit_reason="stop_file")
             return
         try:
-            page.wait_for_timeout(TICK_RATE_MS)
+            waited_ms += _wait_between_ticks(bot, page)
         except TargetClosedError:
             log.info("Browser closed between ticks, ending run gracefully")
             _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
             return
+
+
+# Early-wake slice width. The server processes commands in fixed 2 s
+# windows (TICK_RATE_MS, fire-spam verified), and a completion message
+# that lands just after the loop goes to sleep used to wait out the
+# whole window before the next decision -- a phase drift that cost one
+# full server tick whenever the wakeup missed a window boundary by
+# milliseconds (user observation 2026-07-30: "it seems like we are
+# losing a tick after each equipment pickup sometimes"; measured: 294
+# of 302 completion->dispatch pairs were same-second, so the pipeline
+# is clean and ONLY the sleep is blind). Waking on fresh wire traffic
+# while an action is in flight puts the next decision within one slice
+# of the completion, like a player clicking the moment the tank
+# arrives.
+_WAKE_SLICE_MS = 250
+
+
+def _wait_between_ticks(bot: Bot, page: PageProtocol) -> int:
+    """Sleep up to one tick window, waking early on in-flight progress.
+
+    Args:
+        bot: Bot instance (in-flight state + CDP buffer).
+        page: Playwright page providing the wait primitive.
+
+    Returns:
+        Milliseconds of wait actually requested -- the session budget
+        charges real waiting, so early wakes never shorten a bounded
+        run.
+    """
+    if not has_in_flight_action(bot):
+        page.wait_for_timeout(TICK_RATE_MS)
+        return TICK_RATE_MS
+    waited = 0
+    baseline = len(bot._cdp_message_buffer)
+    while waited < TICK_RATE_MS:
+        page.wait_for_timeout(_WAKE_SLICE_MS)
+        waited += _WAKE_SLICE_MS
+        if len(bot._cdp_message_buffer) > baseline:
+            break
+    return waited
 
 
 def _emit_session_scorecard(bot: Bot, ticks: int, *, exit_reason: str) -> None:
