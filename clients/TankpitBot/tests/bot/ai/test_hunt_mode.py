@@ -864,8 +864,13 @@ def test_scan_on_landing_engages_when_target_present() -> None:
     assert decision["command"]["cmd_type"] == "shoot"
 
 
-def test_scan_on_landing_closes_when_target_not_adjacent() -> None:
-    """SCAN_ON_LANDING re-closes when the target is visible but not adjacent."""
+def test_scan_on_landing_shoots_when_target_in_range() -> None:
+    """SCAN_ON_LANDING fires from position at an in-range visible target.
+
+    User ruling 2026-07-29: in-view + in-range means shoot from the
+    current tile; the close teleport is reserved for beyond
+    ``SHOT_RANGE_TILES``.
+    """
     tanks: dict[str, TankStateDict] = {"50": _enemy_tank(x=105, y=100)}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -884,7 +889,7 @@ def test_scan_on_landing_closes_when_target_not_adjacent() -> None:
 
     decision = decide_hunt_mode(ctx)
 
-    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["cmd_type"] == "shoot"
 
 
 def test_hunt_engage_fires_homing_when_locked_target_left_viewport() -> None:

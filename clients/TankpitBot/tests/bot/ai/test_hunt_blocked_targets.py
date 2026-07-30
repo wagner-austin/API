@@ -50,8 +50,13 @@ class TestDecideBlockedCombatTargets:
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["behavior"]["reason_kind"] == "find_enemies"
 
-    def test_boxed_target_is_teleported_to_directly(self) -> None:
-        """Boxed target is still teleported to directly; server handles displacement."""
+    def test_boxed_target_is_shot_from_position(self) -> None:
+        """A water-boxed target inside shot range is SHOT from the current tile.
+
+        User ruling 2026-07-29: no landing is needed for an in-view
+        target -- the dual fires from here. The old behavior teleported
+        at the boxed tile and relied on server displacement.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -102,7 +107,7 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
         assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
@@ -201,11 +206,11 @@ class TestDecideBlockedCombatTargets:
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
         assert decision["updated_ai_state"]["combat_target_id"] == -1
 
-    def test_walk_close_ringed_target_is_teleported_to_directly(self) -> None:
-        """A walk-range target with water-ringed adjacent tiles is still teleported to.
+    def test_walk_close_ringed_target_is_shot_from_position(self) -> None:
+        """A walk-range water-ringed target is SHOT from the current tile.
 
-        The server handles displacement when the player lands on an
-        occupied or impassable tile.
+        User ruling 2026-07-29: an in-view, in-range target needs no
+        landing at all -- the ring is irrelevant to the shot.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -244,13 +249,13 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 104
         assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_boxed_solo_target_is_teleported_to_directly(self) -> None:
-        """Boxed target with no alternatives is still teleported to; server displaces."""
+    def test_boxed_solo_target_is_shot_from_position(self) -> None:
+        """A boxed solo target inside shot range is SHOT from the current tile."""
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -288,7 +293,7 @@ class TestDecideBlockedCombatTargets:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, terrain)
 
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
         assert decision["command"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50

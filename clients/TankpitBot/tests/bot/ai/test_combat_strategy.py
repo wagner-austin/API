@@ -874,9 +874,9 @@ class TestHasCombatShot:
             None,
             "",
         )
-        target = _enemy_threat(x=102, y=100)  # distance=2
+        target = _enemy_threat(x=108, y=100)  # distance=8
 
-        assert SHOT_RANGE_TILES == 2
+        assert SHOT_RANGE_TILES == 8
         assert has_combat_shot(ctx, target) is True
 
     def test_has_combat_shot_returns_false_beyond_range(self) -> None:
@@ -891,7 +891,7 @@ class TestHasCombatShot:
             None,
             "",
         )
-        target = _enemy_threat(x=103, y=100)  # distance=3
+        target = _enemy_threat(x=109, y=100)  # distance=9
 
         assert has_combat_shot(ctx, target) is False
 

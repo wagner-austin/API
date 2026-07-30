@@ -194,3 +194,74 @@ def test_engage_keeps_fighting_when_no_fire_is_measured() -> None:
 
     assert decision["command"]["cmd_type"] == "shoot"
     assert decision["behavior"]["reason_kind"] == "shoot_target"
+
+
+def test_break_sets_the_escape_latch_on_the_delegated_decision() -> None:
+    """The break decision carries ``break_escape_until_fuel`` = floor.
+
+    The latch is what makes the break STICK across ticks -- without it
+    the projection's sliding hit window oscillated into the 21:59
+    map-fire loop (map_open deferred by the escape hop, closed by the
+    next tick's shot, reopened by the next break, 27-36 fuel/tick).
+    """
+    reset_world_state()
+    _seed_confirmed_incoming(5)
+    try:
+        decision = decide_hunt_mode(_engage_ctx(fuel=800))
+    finally:
+        reset_world_state()
+
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] > 0
+
+
+def test_latched_break_escapes_even_when_the_projection_recovers() -> None:
+    """An active latch keeps escaping with NO measured incoming fire.
+
+    The oscillation regression: tick N broke and started the escape;
+    tick N+1's empty damage book would have re-approved the fight.
+    With the latch (fuel below the stored floor) the tick must stay
+    on the escape -- same fuel-hop shape, lock still held.
+    """
+    reset_world_state()
+    try:
+        base_ctx = _engage_ctx(fuel=300)
+        latched_ctx = DecideCtx(
+            base_ctx.world,
+            base_ctx.self_state,
+            AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
+            base_ctx.inventory,
+            base_ctx.timestamp_ms,
+            base_ctx.terrain,
+            base_ctx.combat_feedback,
+            base_ctx.map_fuel_dots,
+        )
+        decision = decide_hunt_mode(latched_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
+
+
+def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
+    """Fuel at the stored floor clears the latch and the fight resumes."""
+    reset_world_state()
+    try:
+        base_ctx = _engage_ctx(fuel=800)
+        latched_ctx = DecideCtx(
+            base_ctx.world,
+            base_ctx.self_state,
+            AIStateDict(**{**base_ctx.ai_state, "break_escape_until_fuel": 372}),
+            base_ctx.inventory,
+            base_ctx.timestamp_ms,
+            base_ctx.terrain,
+            base_ctx.combat_feedback,
+            base_ctx.map_fuel_dots,
+        )
+        decision = decide_hunt_mode(latched_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["command"]["cmd_type"] == "shoot"
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 0

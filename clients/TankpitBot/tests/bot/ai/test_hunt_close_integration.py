@@ -504,14 +504,15 @@ class TestDecideTeleportToFarTarget:
         assert decision["behavior"]["target_y"] == 100
         assert decision["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_fresh_acquire_at_distance_teleports_to_close(self) -> None:
-        """A never-engaged locked target at distance > 1 teleports to close.
+    def test_fresh_acquire_at_distance_shoots_from_position(self) -> None:
+        """A never-engaged locked target inside shot range is SHOT, not closed.
 
-        Companion to the engaged-stay-put case: a fresh acquire
-        (``last_shot_target_id`` does not match ``combat_target_id``)
-        is the one-time initial close that the engagement contract
-        allows. The bot teleports cardinally adjacent so the next
-        tick's dual shot resolves at point-blank.
+        User ruling 2026-07-29: "i dont think i would teleport to the
+        target if im like a few tiles away right? as long as theyre on
+        the viewport and its a clear dual shot then id just hit them
+        from my new location." The old one-time close teleport is now
+        reserved for targets beyond ``SHOT_RANGE_TILES``; at dist 5
+        the dual fires from the current tile.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -548,7 +549,7 @@ class TestDecideTeleportToFarTarget:
 
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
         assert decision["command"]["target_x"] == 105
         assert decision["command"]["target_y"] == 100
 
