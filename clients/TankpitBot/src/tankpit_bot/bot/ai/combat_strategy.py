@@ -30,6 +30,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
     make_map_open_command,
+    make_move_command,
     make_pickup_equipment_command,
     make_pickup_fuel_command,
     make_shoot_command,
@@ -499,6 +500,13 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
     return _combat_open_map(ctx, target)
 
 
+# Walk-vs-teleport break-even for a combat close (user timing law,
+# 2026-07-30: a walk tile costs ~2 s and no fuel; a teleport ~4 s plus
+# fuel plus a map-open tick mid-fight). At three tiles the walk ties on
+# time and wins on fuel; beyond it the teleport wins on time.
+WALK_CLOSE_TILES = 3
+
+
 def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 1: Teleport to enemy."""
     # In view means no teleport is needed at all (user law 2026-07-29:
@@ -534,6 +542,37 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             target["x"],
             target["y"],
         )
+    close_distance = abs(ctx.self_state["x"] - target["x"]) + abs(
+        ctx.self_state["y"] - target["y"]
+    )
+    if close_distance <= WALK_CLOSE_TILES:
+        # Short closes WALK (user timing law + flag 1 of run
+        # bot-20260730-011x: "i think it should ahve waked back
+        # instead of teleporting"): a walk costs ~2 s per tile and no
+        # fuel, while a mid-fight teleport costs ~4 s plus fuel plus
+        # the map-open precondition tick the last shot closed. Three
+        # walk tiles break even on time and win on everything else.
+        walk_candidates = _combat_landing_candidates(ctx, target)
+        if walk_candidates:
+            walk_x, walk_y = walk_candidates[0]
+            emit_ai(
+                "walking %d tiles to close on %s at (%d,%d)",
+                close_distance,
+                target["name"],
+                target["x"],
+                target["y"],
+            )
+            return make_decision(
+                make_move_command(walk_x, walk_y),
+                "HUNT",
+                800,
+                walk_x,
+                walk_y,
+                "walk_to_target",
+                _set_combat_target(ctx.base, target),
+                ctx.equip,
+                reason_context={"target_name": target["name"]},
+            )
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         # The target is off-view here (in-view targets shot above), so
