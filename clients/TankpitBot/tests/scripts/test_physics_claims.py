@@ -154,7 +154,7 @@ def test_claim_with_value_and_probes_is_reported(
     _write_page(tmp_path, "bad.md", _claims_page(claims))
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
-    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes" in out
+    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
 
 
 def test_claim_with_neither_value_nor_probes_is_reported(
@@ -165,7 +165,7 @@ def test_claim_with_neither_value_nor_probes_is_reported(
     _write_page(tmp_path, "bad.md", _claims_page(claims))
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
-    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes" in out
+    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
 
 
 def test_code_without_colon_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -464,3 +464,53 @@ def test_real_repo_binding_is_green() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     assert (repo_root / "wiki" / "pages").is_dir()
     assert run_physics_claim_rules(repo_root, package_name=PHYSICS_PACKAGE) == 0
+
+
+def test_law_claim_binds_a_symbol_green(tmp_path: Path) -> None:
+    """A prose-law claim satisfies both directions for its symbol.
+
+    ``law`` claims exist for physics symbols that cannot be verified
+    on an int probe grid (predicates over protocol objects, raster
+    geometry) — schema extension 2026-07-30 for
+    ``physics.line_of_sight`` ([[flag-triage-20260729]] F3).
+    """
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer-law", "code": "{FIXTURE_MODULE}:ANSWER",'
+        ' "law": "The answer is pinned by prose."},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [3], "expect": 6}]}'
+        "]}"
+    )
+    _write_page(tmp_path, "law.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_empty_law_string_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A blank law is not a claim."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER", "law": "  "}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: 'law' must be a non-empty prose string" in out
+
+
+def test_non_string_law_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A non-string law field is rejected."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER", "law": 7}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: 'law' must be a non-empty prose string" in out
+
+
+def test_law_with_value_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """law is mutually exclusive with value/probes like the other kinds."""
+    claims = (
+        f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER",'
+        ' "value": 42, "law": "also prose"}]}'
+    )
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
