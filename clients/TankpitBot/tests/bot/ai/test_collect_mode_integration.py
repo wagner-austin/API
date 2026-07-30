@@ -764,6 +764,9 @@ class TestRecoverEquipmentSearch:
         decision = decide(world, self_state, ai_state, make_inventory(), 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["behavior"]["reason_kind"] == "teleport_target"
+        # LiveEnemy sits 7 tiles away inside the viewport, so the
+        # acquire engages from the current tile (in-view shot
+        # short-circuit) rather than teleporting.
+        assert decision["behavior"]["reason_kind"] == "shoot_target"
         assert decision["behavior"]["reason_context"]["target_name"] == "LiveEnemy"
         assert "DeadEnemy" not in decision["behavior"]["reason_kind"]

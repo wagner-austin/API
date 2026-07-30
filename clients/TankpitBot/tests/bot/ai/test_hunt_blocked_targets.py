@@ -454,5 +454,8 @@ class TestDecideBlockedCombatTargets:
         decision = decide(world, self_state, ai_state, inventory, 100000, None)
 
         assert decision["behavior"]["mode"] == "HUNT"
-        assert decision["behavior"]["reason_kind"] == "teleport_target"
+        # The re-acquired enemy sits 3 tiles away inside the viewport,
+        # so the acquire engages from the current tile (flag 1 of run
+        # bot-20260730-000030) instead of paying a close teleport.
+        assert decision["behavior"]["reason_kind"] == "shoot_target"
         assert decision["behavior"]["reason_context"]["target_name"] == "Enemy"
