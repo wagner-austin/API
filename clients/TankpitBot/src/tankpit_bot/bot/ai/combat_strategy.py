@@ -470,21 +470,23 @@ def open_map_for_target(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecision
 
 def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
     """Phase 1: Teleport to enemy."""
-    # In-view and already in shot range: no teleport is needed at all
-    # (flag 1, run bot-20260730-000030: purple-4 stood 2 tiles away in
-    # the freshly scanned viewport and the map-acquire path still paid
-    # a teleport onto him). _combat_close only asks this question for
-    # an EXISTING lock; asking it here covers every acquire path --
-    # fresh viewport, map-known, and locked resume -- and
-    # _combat_shoot latches the lock itself.
+    # In view means no teleport is needed at all (user law 2026-07-29:
+    # "as long as theyre on the viewport and its a clear dual shot then
+    # id just hit them from my new location"; flag s2-13 tightened it:
+    # purple-9 at Manhattan 9 -- in view, beyond the old 8-tile bound --
+    # still got a paid teleport). The server fires at stationary
+    # in-view targets from any range ([[weapon-selection]]): water
+    # never blocks, rock clips to a billed single that resolves as a
+    # miss through the stationary-miss block. This also IS the
+    # mine-ring/ferry counterplay -- a ringed or shore-locked target in
+    # view is shot regardless of landing state -- and it covers every
+    # acquire path (fresh viewport, map-known, locked resume) because
+    # they all funnel through here and _combat_shoot latches the lock
+    # itself.
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-    if (
-        left <= target["x"] <= right
-        and top <= target["y"] <= bottom
-        and has_combat_shot(ctx, target)
-    ):
+    if left <= target["x"] <= right and top <= target["y"] <= bottom:
         emit_ai(
-            "%s already in view at (%d,%d) within shot range - engaging without teleport",
+            "%s already in view at (%d,%d) - engaging without teleport",
             target["name"],
             target["x"],
             target["y"],
@@ -492,28 +494,9 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         return _combat_shoot(ctx, target)
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
-        # Mine-ring counterplay (user ruling 2026-07-29: "fix the bot
-        # so it can hunt even if i put mines around me. if it lands 4
-        # tiles away or more, it can still fire a dual shot right?"):
-        # a ringed target displaces our landing off the mines and the
-        # re-close then fails on the same tile forever -- live proof
-        # 21:35:06, Yuppler blocked from dist 2. When the target is
-        # viewport-visible the shot needs no landing at all: the
-        # server fires duals at stationary targets from any in-view
-        # range ([[weapon-selection]]), hits confirm via the ammo
-        # ledger, and terrain-clipped shots resolve as misses through
-        # the existing stationary-miss block. Only an OFF-view target
-        # with a dead landing still blocks.
-        left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
-        if left <= target["x"] <= right and top <= target["y"] <= bottom:
-            emit_ai(
-                "landing near %s failed but they are in view at (%d,%d) - "
-                "firing from stand-off (mine-ring counter)",
-                target["name"],
-                target["x"],
-                target["y"],
-            )
-            return _combat_shoot(ctx, target)
+        # The target is off-view here (in-view targets shot above), so
+        # with no legal landing and no legal shot, blocking and
+        # replanning is all that is left.
         emit_ai(
             "combat landing (%d,%d) for %s already failed, blocking target",
             landing_x,
