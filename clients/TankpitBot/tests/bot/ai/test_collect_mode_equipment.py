@@ -777,14 +777,16 @@ def test_hop_toward_equipment_picks_nearest_of_multiple_external_candidates() ->
     assert decision["behavior"]["reason_kind"] == "equipment_hop"
 
 
-def test_hop_toward_equipment_skips_in_viewport_containers() -> None:
-    """The equipment hop step ignores containers inside the current viewport.
+def test_hop_toward_equipment_takes_in_viewport_walk_blocked_containers() -> None:
+    """In-viewport equipment the walk step cannot reach is teleport fair game.
 
-    Step 3 of the cascade (``_select_and_pickup_equipment``) already
-    handles viewport-local equipment. The hop step reaches for
-    tracked equipment elsewhere on the map; when every tracked
-    container sits inside the current viewport bounds, the hop
-    declines and the cascade falls through to the search-hop path.
+    The 2026-07-30 flag-4 fix ([[flag-triage-20260729]]): this step
+    runs only after the walk-pickup step declined, so any tracked
+    container left — including one INSIDE the current viewport whose
+    walk path is terrain-blocked — is hopped to instead of being
+    invisible to both steps (run bot-20260730-000038 ticks 121-126
+    dot-hopped away from three identified containers and paid a
+    return trip later).
     """
     containers = {
         "105,105": make_container_state(
@@ -803,7 +805,12 @@ def test_hop_toward_equipment_skips_in_viewport_containers() -> None:
 
     decision = _hop_toward_equipment(ctx, ctx.base)
 
-    assert decision is None
+    if decision is None:
+        raise AssertionError("walk-blocked in-viewport equipment must draw a teleport hop")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 105
+    assert decision["command"]["target_y"] == 105
+    assert decision["behavior"]["reason_kind"] == "equipment_hop"
 
 
 def test_hop_toward_equipment_skips_when_teleport_unaffordable() -> None:
