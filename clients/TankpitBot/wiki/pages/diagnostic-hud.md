@@ -66,6 +66,22 @@ only the flag button opts back in. The HUD lives in the DOM, not on
 the game canvases, so it is invisible to the live-view caster (which
 composites canvases only) — the phone stream shows the clean game.[^1]
 
+## Tracing a flag (triage recipe)
+
+Every `human_flag` event auto-carries `tick_n`, `bot_state`, and the
+runtime timestamp alongside its own fields, so a flag pins an exact
+spot in the event stream:
+
+1. `grep '"human_flag"' runs/bot/<run>.events.jsonl` → note the
+   flag's `flag_seq` and `tick_n` (call it T).
+2. **Before** the click: the event's own `recent_ticks` (last 8 HUD
+   payloads — mode, position, fuel, stocks, decision, reason, target).
+3. **After** the click: filter the same JSONL to `tick_n >= T` — every
+   decision, `hop_selected`/`hop_declined`, `acquisition_candidates`,
+   gain, and outcome that followed, in order.
+4. File findings on a triage page (first: [[flag-triage-20260729]])
+   with a fix-status table; close rows only with run/sim receipts.[^1]
+
 [^1]: `src/tankpit_bot/browser/overlay.py` (payload + slot renderer),
     `overlay_hud.py` (install-once template, `build_hud_expression`),
     tick wiring in `bot/tick_loop.py` step 9.
