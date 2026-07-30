@@ -33,12 +33,26 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode, ReasonKind
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.state.scan_coverage import is_viewport_untouched
+from tankpit_bot.state.scan_coverage import (
+    HARVEST_MEMORY_TTL_MS,
+    is_viewport_scanned_within,
+    is_viewport_untouched,
+)
 from tankpit_bot.state.types import coord_key
+
+_HUNT_BIAS_HALF_SCORE_TILES = 16
+"""Distance at which the pre-hunt top-off bias halves a dot's score.
+
+One viewport-width away from the intended prey costs a factor of two;
+the flag-2 hop (26 tiles away from the target the very next tick's
+acquisition teleported back to) would have been outscored ~2.6:1 by
+an equal-value dot on the target's side.
+"""
 
 
 def _viewport_walkable_fraction(
@@ -75,18 +89,196 @@ def _viewport_walkable_fraction(
     return walkable / (width * height)
 
 
+def _landing_viewport_known_empty(
+    ctx: DecideCtx,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> bool:
+    """Return True when belief says this landing viewport is picked clean.
+
+    True exactly when the bounds hold at least one believed container,
+    every one of them is drained (volume <= 0), and the newest belief
+    is younger than :data:`HARVEST_MEMORY_TTL_MS` — the harvest-memory
+    veto of [[flag-triage-20260729]] F2. Ground with no beliefs at all
+    is unknown, not empty; a single positive-volume belief means the
+    hop has real value; beliefs older than the window may have
+    respawned and the ground goes back to explorable.
+
+    Args:
+        ctx: Decision context.
+        left: Landing viewport left X (inclusive).
+        top: Landing viewport top Y (inclusive).
+        right: Landing viewport right X (inclusive).
+        bottom: Landing viewport bottom Y (inclusive).
+
+    Returns:
+        True when the viewport is a known-empty re-hop candidate.
+    """
+    newest_ms = -1
+    seen = False
+    for container in ctx.world["containers"].values():
+        if not (left <= container["x"] <= right and top <= container["y"] <= bottom):
+            continue
+        if container["volume"] > 0:
+            return False
+        seen = True
+        newest_ms = max(newest_ms, container["timestamp_ms"])
+    return seen and ctx.timestamp_ms - newest_ms <= HARVEST_MEMORY_TTL_MS
+
+
+def _landing_viewport_barren(
+    ctx: DecideCtx,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> bool:
+    """Return True when a recent full sweep found nothing worth landing on.
+
+    The barren-memory veto — the other half of
+    [[flag-triage-20260729]] F2. Ground the radar fully swept within
+    :data:`HARVEST_MEMORY_TTL_MS` that revealed NO containers leaves
+    no belief entries at all, so the known-empty veto cannot see it;
+    once the 180 s forage coverage aged out it read fully clean and
+    got re-hopped for a guaranteed zero-delta scan (the user's "zero
+    deltas indicating they were scanned by us recently"). A single
+    positive-volume belief inside the bounds means the ground has
+    real value and the hop stands.
+
+    Args:
+        ctx: Decision context.
+        left: Landing viewport left X (inclusive).
+        top: Landing viewport top Y (inclusive).
+        right: Landing viewport right X (inclusive).
+        bottom: Landing viewport bottom Y (inclusive).
+
+    Returns:
+        True when the viewport is a known-barren re-hop candidate.
+    """
+    for container in ctx.world["containers"].values():
+        if (
+            left <= container["x"] <= right
+            and top <= container["y"] <= bottom
+            and container["volume"] > 0
+        ):
+            return False
+    return is_viewport_scanned_within(
+        ctx.world["scanned_tiles"],
+        left,
+        top,
+        right,
+        bottom,
+        ctx.timestamp_ms,
+        ttl_ms=HARVEST_MEMORY_TTL_MS,
+    )
+
+
+def _nearest_alive_enemy(ctx: DecideCtx) -> tuple[int, int] | None:
+    """Return the nearest alive enemy's position, or None when none is known.
+
+    Used by the pre-hunt top-off bias: when stocks are hunt-ready and
+    only fuel is short, the final dot hop should top off TOWARD the
+    prey instead of wherever dots are densest ([[flag-triage-20260729]]
+    F1 — the flag-2 hop went 26 tiles NE and the very next acquisition
+    teleported 30 tiles SW straight back).
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        ``(x, y)`` of the closest alive, position-synced enemy tank.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    best: tuple[int, int] | None = None
+    best_dist = 0
+    for tank in ctx.world["tanks"].values():
+        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
+            continue
+        if tank["liveness"] != "alive" or (tank["x"] == 0 and tank["y"] == 0):
+            continue
+        dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
+        if best is None or dist < best_dist:
+            best = (tank["x"], tank["y"])
+            best_dist = dist
+    return best
+
+
+def _dot_hop_rejection(
+    ctx: DecideCtx,
+    target_x: int,
+    target_y: int,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+) -> str | None:
+    """Classify why a dot candidate fails the hop gates.
+
+    The gate order matches the historical loop: own tile, impassable
+    landing, unaffordable teleport, live scan coverage, the
+    known-empty harvest veto, and the barren-scan veto. The returned
+    key doubles as the ``hop_declined`` tally field name so every
+    decline states its arithmetic.
+
+    Args:
+        ctx: Decision context.
+        target_x: Candidate dot X.
+        target_y: Candidate dot Y.
+        left: Landing viewport left X (inclusive).
+        top: Landing viewport top Y (inclusive).
+        right: Landing viewport right X (inclusive).
+        bottom: Landing viewport bottom Y (inclusive).
+
+    Returns:
+        Tally key of the failed gate, or ``None`` when the dot
+        qualifies for scoring.
+    """
+    if (target_x, target_y) == (ctx.self_state["x"], ctx.self_state["y"]):
+        return "own_tile"
+    if ctx.terrain is not None and not ctx.terrain.is_passable(target_x, target_y):
+        return "impassable"
+    if not can_afford_teleport(ctx, target_x, target_y):
+        return "unaffordable"
+    if not is_viewport_untouched(
+        ctx.world["scanned_tiles"],
+        left,
+        top,
+        right,
+        bottom,
+        ctx.timestamp_ms,
+    ):
+        return "already_scanned"
+    if _landing_viewport_known_empty(ctx, left, top, right, bottom):
+        return "known_empty"
+    if _landing_viewport_barren(ctx, left, top, right, bottom):
+        return "barren_scanned"
+    return None
+
+
 def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
     """Return the best-value fuel dot to hop to, or None when none qualify.
 
-    Hard gates (physics only): the dot is not the bot's own tile, its
-    landing tile is passable, the teleport is fuel-affordable, and the
+    Hard gates (physics + memory): the dot is not the bot's own tile,
+    its landing tile is passable, the teleport is fuel-affordable, the
     landing viewport is CLEAN — zero overlap with live scan coverage
     (user ruling, verbatim, 2026-07-26: "when i say it should collect
     on clean viewports, that means zero overlap"; the 2026-07-18
     implementation inverted this to "any unscanned tile counts as
     fresh" and run bot-20260725-235637 spent a third of every radar
-    re-scanning old ground). Coverage marks age out on the forage TTL
-    (180 s), so scanned ground becomes clean again.
+    re-scanning old ground) — and the landing viewport is not KNOWN
+    EMPTY from container beliefs (the harvest-memory veto, 2026-07-30:
+    scan coverage ages out on the 180 s forage TTL so re-scans stay
+    possible, but ground whose believed containers are all drained
+    within :data:`HARVEST_MEMORY_TTL_MS` yields nothing and is
+    skipped — [[flag-triage-20260729]] F2, 63% zero-yield hops).
+
+    Pre-hunt top-off bias ([[flag-triage-20260729]] F1): when stocks
+    are already hunt-ready (only fuel short), each dot's score is
+    scaled by proximity to the nearest alive enemy so the final
+    top-off lands on the prey's side of the map instead of wherever
+    dots are densest.
 
     Qualifying dots are RANKED, not filtered, by hop value (user
     contract 2026-07-18: "the rule was to prioritize viewports with
@@ -109,7 +301,6 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
         ``(target_x, target_y)`` of the highest-value qualifying dot,
         or ``None`` when none pass the hard gates.
     """
-    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     viewport = ctx.world["viewport"]
     half_w = viewport["width"] // 2
     half_h = viewport["height"] // 2
@@ -123,34 +314,32 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             if left <= dot_x <= right and top <= dot_y <= bottom
         )
 
-    own_tile = 0
-    impassable = 0
-    unaffordable = 0
-    already_scanned = 0
+    hunt_bias = _nearest_alive_enemy(ctx) if hunt_entry_permitted(ctx) else None
+    tallies = {
+        "own_tile": 0,
+        "impassable": 0,
+        "unaffordable": 0,
+        "already_scanned": 0,
+        "known_empty": 0,
+        "barren_scanned": 0,
+    }
     best_score = -1.0
     best_cost = 0
     best_dot: tuple[int, int] | None = None
     for target_x, target_y in sorted(ctx.map_fuel_dots):
-        if (target_x, target_y) == (sx, sy):
-            own_tile += 1
-            continue
-        if ctx.terrain is not None and not ctx.terrain.is_passable(target_x, target_y):
-            impassable += 1
-            continue
-        if not can_afford_teleport(ctx, target_x, target_y):
-            unaffordable += 1
-            continue
         landing_left = target_x - half_w
         landing_top = target_y - half_h
-        if not is_viewport_untouched(
-            ctx.world["scanned_tiles"],
+        rejection = _dot_hop_rejection(
+            ctx,
+            target_x,
+            target_y,
             landing_left,
             landing_top,
             landing_left + viewport["width"] - 1,
             landing_top + viewport["height"] - 1,
-            ctx.timestamp_ms,
-        ):
-            already_scanned += 1
+        )
+        if rejection is not None:
+            tallies[rejection] += 1
             continue
         cost = teleport_fuel_cost_to(ctx, target_x, target_y)
         walkable = _viewport_walkable_fraction(
@@ -161,6 +350,9 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             viewport["height"],
         )
         score = _dots_in_viewport(landing_left, landing_top) * walkable / max(cost, 1)
+        if hunt_bias is not None:
+            bias_dist = abs(target_x - hunt_bias[0]) + abs(target_y - hunt_bias[1])
+            score *= _HUNT_BIAS_HALF_SCORE_TILES / (_HUNT_BIAS_HALF_SCORE_TILES + bias_dist)
         better_tie = score == best_score and best_dot is not None and cost < best_cost
         if score > best_score or better_tie:
             best_score = score
@@ -171,11 +363,8 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             diagnostic_kind="hop_declined",
             hop_kind="dot",
             dots_total=len(ctx.map_fuel_dots),
-            own_tile=own_tile,
-            impassable=impassable,
-            unaffordable=unaffordable,
-            already_scanned=already_scanned,
             fuel=ctx.fuel,
+            **tallies,
         )
         return None
     emit_diagnostic(
@@ -185,6 +374,7 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
         target_y=best_dot[1],
         score=round(best_score, 4),
         cost=best_cost,
+        hunt_biased=1 if hunt_bias is not None else 0,
     )
     return best_dot
 
