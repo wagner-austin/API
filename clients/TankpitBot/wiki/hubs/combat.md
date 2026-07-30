@@ -13,3 +13,4 @@ Fighting strategy, weapon behavior, enemy AI patterns, and diagnosed combat bugs
 [Mine Mechanics](../pages/mine-mechanics.md) -- 3x3 placement filter, mine-on-mine destruction, cascade chain detonation, real-combat wire evidence 2026-06-20
 [Game Economy](../pages/game-economy.md) -- empirical fuel costs (walk 1/tile, single shot 6, radar 10), damage taken (single 45, dual 90, mine 45), max fuel cap 1100, container_pickup remaining_volume semantic (2026-06-20)
 [Tournament Strategy (Sigma v3.4)](../pages/tournament-strategy.md) -- preserved 2015 human tournament meta: initial fill, fill-fighting, kill types, PPH, equipment management, endgame shield-fighting
+[Flag Triage 2026-07-29](../pages/flag-triage-20260729.md) -- forage-economy findings from the first flag session: 63% zero-yield hops, direction-blind top-off hop, mine-covered equipment counterplay (rank-gated blast in [[mine-mechanics]])

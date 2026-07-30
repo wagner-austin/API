@@ -1,6 +1,6 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (10 pages)
+Codebase design decisions, patterns, and coding standards. (11 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
@@ -12,6 +12,7 @@ Codebase design decisions, patterns, and coding standards. (10 pages)
 [Terrain Composition — Single-Owner Walkability](../pages/terrain-composition.md) -- "can I walk here?" has ONE owner: the composed decision terrain (static map + ferries + hostile mines); why the blocked_mines parameter and the executor mine veto are gone, the invariant table, and the rule for future dynamic obstacles
 [Physics Module Roadmap](../pages/physics-module-roadmap.md) -- the wiki-as-executable-truth plan: physics/ module + machine-checked wiki claim binding in make check (Phase 1, IMPLEMENTED 2026-07-20 — see as-built notes), validators vs the capture archive (Phase 2), live divergence counting (Phase 3), executor staleness track
 
-[Diagnostic HUD + Human Flag Channel](../pages/diagnostic-hud.md) -- the fixed-geometry fiesta-styled in-page HUD (2026-07-29 rebuild) and the click-to-flag channel that lands a human_flag diagnostic with an 8-tick lead-up snapshot
+[Diagnostic HUD + Human Flag Channel](../pages/diagnostic-hud.md) -- the fixed-geometry fiesta-styled in-page HUD (2026-07-29 rebuild) and the click-to-flag channel that lands a human_flag diagnostic with an 8-tick lead-up snapshot; includes the flag-tracing triage recipe
+[Flag Triage 2026-07-29](../pages/flag-triage-20260729.md) -- first live flag session: 10 flags, 4 root causes (direction-blind top-off hop, 63% zero-yield hop churn, missing mine-shot clearance, mine-ring acquisition cloak), fix-status table
 
 [Larder Plan](../pages/larder-plan.md) -- planned (2026-07-27, not implemented): harvest radar-verified containers the bot already remembers as a COLLECT cascade priority; gated on the own-tile equipment pickup probe
