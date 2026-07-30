@@ -654,7 +654,76 @@ def _dispatch_tank_announcements(ws: WorldService, decoded: protocol.BinaryMessa
             # human-readable channel line; use ``text`` for the payload.
             emit_diagnostic(diagnostic_kind="supervisor_text", text=message)
             return True
+        case {
+            "msg_type": 0x4D,
+            "sender_id": int(sender_id),
+            "message_type": int(chat_message_id),
+            "x": chat_x,
+            "y": chat_y,
+        }:
+            _dispatch_chat_message(
+                ws,
+                sender_id,
+                chat_message_id,
+                chat_x if isinstance(chat_x, int) else None,
+                chat_y if isinstance(chat_y, int) else None,
+            )
+            return True
     return _dispatch_session_broadcasts(ws, decoded)
+
+
+def _dispatch_chat_message(
+    ws: WorldService,
+    sender_id: int,
+    message_id: int,
+    x: int | None,
+    y: int | None,
+) -> None:
+    """Record an inbound 0x4D chat broadcast.
+
+    Two consumers: the events stream (a ``chat_received`` diagnostic
+    with the preset text resolved from the E[] table) and the world
+    service's send-receipt latch -- the server echoes the bot's own
+    chats back as 0x4D, and that echo is the ONLY confirmation a chat
+    survived the server-side flood mute (sniff-20260729-214411: after
+    8 rapid sends every later chat was silently swallowed; wiki
+    [[chat-messages]]). The carried ``x, y`` is whatever the sender's
+    client put in the send frame -- self-reported, not
+    server-verified -- so it never mutates tank positions.
+
+    Args:
+        ws: World service instance.
+        sender_id: Chatting tank's id from the wire.
+        message_id: Preset chat message ID (E[] table index).
+        x: Sender-reported X tile, or None on a coordinate-less frame.
+        y: Sender-reported Y tile, or None on a coordinate-less frame.
+    """
+    from tankpit_bot.protocol.chat import chat_message_text
+
+    text = chat_message_text(message_id)
+    self_state = ws.world_state["self_state"]
+    is_self_echo = self_state is not None and sender_id == self_state["tank_id"]
+    if is_self_echo:
+        ws.last_chat_echo_message_id = message_id
+    sender = ws.world_state["tanks"].get(str(sender_id))
+    sender_name = sender["name"] if sender is not None else ""
+    log.info(
+        "CHAT: %s (id=%d) says %r%s",
+        sender_name if sender_name else f"tank-{sender_id}",
+        sender_id,
+        text,
+        " [self echo]" if is_self_echo else "",
+    )
+    emit_diagnostic(
+        diagnostic_kind="chat_received",
+        sender_id=sender_id,
+        sender_name=sender_name,
+        message_id=message_id,
+        text=text,
+        x=x if x is not None else -1,
+        y=y if y is not None else -1,
+        is_self_echo=is_self_echo,
+    )
 
 
 def _emit_active_players(

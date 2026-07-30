@@ -173,6 +173,11 @@ class WorldService:
         # monitor reads this to detect long server silences without
         # racing the WebSocket layer.
         self.last_ping_response_ms: int = 0
+        # Message ID of the last 0x4D chat the server echoed back for
+        # OUR OWN tank (-1 before the first). The echo is the only
+        # confirmation a sent chat survived the server-side flood
+        # mute ([[chat-messages]], sniff-20260729-214411).
+        self.last_chat_echo_message_id: int = -1
         # 0x4C MapData fuel-dot atlas -- the map's yellow-pixel fuel
         # positions. Server-cached per session (byte-identical across
         # map opens), so each MapData dispatch simply overwrites it.

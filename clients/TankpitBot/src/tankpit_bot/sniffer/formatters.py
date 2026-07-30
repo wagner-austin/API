@@ -241,7 +241,12 @@ def format_misc_details(d: protocol.BinaryMessage) -> str:
     if d["msg_type"] == 0x52:
         return f"reset={d['reset_action']} err={d['error_code']}"
     if d["msg_type"] == 0x4D:
-        return f"sender={d['sender_id']} type={d['message_type']}"
+        from tankpit_bot.protocol.chat import chat_message_text
+
+        return (
+            f"sender={d['sender_id']} type={d['message_type']}"
+            f" text={chat_message_text(d['message_type'])!r}"
+        )
     if d["msg_type"] == 0x2B:
         banner = " (banner)" if d["was_promoted"] else ""
         return f"new_rank={rank_name(d['new_rank'])}{banner}"
