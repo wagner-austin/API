@@ -14,6 +14,7 @@ from tankpit_bot.container.types import ContainerPickupRecordDict
 from tankpit_bot.ledger.ammo_book import record_ammo_enemy_shot, record_ammo_shot
 from tankpit_bot.ledger.damage_book import record_incoming_shot, record_own_shot_echo
 from tankpit_bot.ledger.fuel_book import FuelEntryKind, record_fuel_entry
+from tankpit_bot.ledger.outcome.teleport import pending_teleport_target
 from tankpit_bot.physics.costs import (
     DUAL_SHOT_COST,
     HOMING_SHOT_COST,
@@ -1086,9 +1087,53 @@ def _dispatch_container_message(ws: WorldService, decoded: protocol.BinaryMessag
             return True
         case {"msg_type": "teleport_landed"}:
             emit_world("TELEPORT_LANDED: server confirmed teleport")
+            _emit_teleport_displacement(ws)
             mark_teleport_landed(ws)
             return True
     return False
+
+
+def _emit_teleport_displacement(ws: WorldService) -> None:
+    """Emit a receipt when the server landed the tank off the requested tile.
+
+    Flag s2-7 (run bot-20260730-000030): beside the orange minefield
+    the user watched teleports get "put back to the safe location"
+    with nothing in the stream to prove it. The SelfMovement update
+    precedes the landed confirm on the wire, so at confirm time the
+    self position IS the landed tile; a mismatch against the
+    executor's recorded dispatch target is a server displacement
+    (mines on the landing, occupancy, refused ground). Exact landings
+    stay silent -- the receipt exists to make bounce-backs visible in
+    ``make analyze``, not to echo every teleport; combat closes that
+    aim at the enemy's own tile displace by one routinely, and the
+    ``displacement`` field lets the analyzer bucket those apart from
+    minefield ejections.
+
+    Args:
+        ws: World service instance.
+    """
+    pending = pending_teleport_target()
+    self_state = ws.world_state["self_state"]
+    if pending is None or self_state is None:
+        return
+    requested_x, requested_y = pending
+    if (self_state["x"], self_state["y"]) == (requested_x, requested_y):
+        return
+    emit_world(
+        "TELEPORT_DISPLACED: requested (%d,%d) landed (%d,%d)",
+        requested_x,
+        requested_y,
+        self_state["x"],
+        self_state["y"],
+    )
+    emit_diagnostic(
+        diagnostic_kind="teleport_displacement",
+        requested_x=requested_x,
+        requested_y=requested_y,
+        landed_x=self_state["x"],
+        landed_y=self_state["y"],
+        displacement=abs(self_state["x"] - requested_x) + abs(self_state["y"] - requested_y),
+    )
 
 
 # =============================================================================
