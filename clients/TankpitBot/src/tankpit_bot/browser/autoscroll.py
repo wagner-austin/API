@@ -16,6 +16,14 @@ ack; landing on ``A1`` proves the setting WAS off, so press again and
 require the ``A0`` ack back. Either path ends wire-verified OFF. A
 missing ack is a hard failure -- an unverified toggle must never be
 guessed at (probe precedent, 2026-07-25).
+
+The toggle only works IN-GAME (user ruling 2026-07-29: "you cant
+enable or disable autoscroll til the bot is in the game btw") -- a
+press on the entry screen acks nothing, which is exactly how the
+first live firing failed at 23:08 ("game ready" is still pre-spawn).
+The dance therefore waits for the wire to establish ``self_state``
+(the tank's position broadcast proves the tank is in the game) before
+the first press.
 """
 
 from __future__ import annotations
@@ -32,6 +40,36 @@ log = get_logger(__name__)
 
 _TOGGLE_SETTLE_MS = 1500
 """Wait after the key press for the server ack to land in the capture."""
+
+_IN_GAME_POLL_MS = 500
+"""Poll interval while waiting for the wire to prove the tank spawned."""
+
+_IN_GAME_WAIT_BUDGET_MS = 30_000
+"""Hard budget for the spawn wait; a tank with no position broadcast
+after this long is a broken session, not a slow one."""
+
+
+def _wait_until_in_game(page: AutoscrollPageProtocol) -> None:
+    """Block until the wire establishes ``self_state`` (tank spawned).
+
+    Args:
+        page: Live game page (its wait pumps the event loop so CDP
+            handlers keep filling the world service while we wait).
+
+    Raises:
+        RuntimeError: When no position broadcast arrives within the
+            budget -- the toggle would silently ack nothing pre-spawn,
+            and an unverified toggle must never be guessed at.
+    """
+    from tankpit_bot.sniffer.world_state import get_world_state
+
+    waited_ms = 0
+    while waited_ms < _IN_GAME_WAIT_BUDGET_MS:
+        if get_world_state()["self_state"] is not None:
+            return
+        page.wait_for_timeout(float(_IN_GAME_POLL_MS))
+        waited_ms += _IN_GAME_POLL_MS
+    raise RuntimeError("tank never spawned within the autoscroll wait budget; toggle unverifiable")
 
 
 def _read_autoscroll_ack(messages: list[CapturedMessage], start_index: int) -> bool | None:
@@ -99,10 +137,12 @@ def ensure_autoscroll_off(page: AutoscrollPageProtocol, messages: list[CapturedM
         messages: Capture buffer shared with the CDP service.
 
     Raises:
-        RuntimeError: When an ack is missing or the second press fails
-            to land on ``A0`` -- the toggle protocol drifted and the
-            session must not run on a skewed viewport model.
+        RuntimeError: When the tank never spawns, an ack is missing,
+            or the second press fails to land on ``A0`` -- the toggle
+            protocol drifted and the session must not run on a skewed
+            viewport model.
     """
+    _wait_until_in_game(page)
     enabled = _press_and_read(page, messages)
     if enabled:
         # The setting WAS off; the probe press turned it on -- undo.

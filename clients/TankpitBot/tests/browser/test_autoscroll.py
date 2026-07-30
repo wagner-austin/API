@@ -16,7 +16,16 @@ from tankpit_bot.browser.autoscroll import (
     _read_autoscroll_ack,
     ensure_autoscroll_off,
 )
+from tankpit_bot.sniffer.world_state import get_world_state, reset_world_state
+from tankpit_bot.state.types import make_self_state
 from tankpit_bot.types.message import CapturedMessage
+
+
+def _spawn() -> None:
+    """Seed the global world with a spawned self tank (in-game proof)."""
+    get_world_state()["self_state"] = make_self_state(
+        tank_id=1301, x=100, y=100, fuel=800, team=2, rank=1, leaderboard_position=1
+    )
 
 
 def _frame(body: bytes) -> str:
@@ -62,6 +71,19 @@ class _FakePage:
         self.waits.append(timeout_ms)
 
 
+class _SpawningPage(_FakePage):
+    """Page fake whose Nth settle wait "spawns" the tank on the wire."""
+
+    def __init__(self, keyboard: _FakeKeyboard, *, spawn_after_waits: int) -> None:
+        super().__init__(keyboard)
+        self._spawn_after_waits = spawn_after_waits
+
+    def wait_for_timeout(self, timeout_ms: float) -> None:
+        super().wait_for_timeout(timeout_ms)
+        if len(self.waits) == self._spawn_after_waits:
+            _spawn()
+
+
 class TestReadAutoscrollAck:
     """Frame-walk contract for the plaintext ack scanner."""
 
@@ -96,6 +118,15 @@ class TestReadAutoscrollAck:
 
 class TestEnsureAutoscrollOff:
     """The press-verify dance in every shape."""
+
+    def setup_method(self) -> None:
+        """Seed a spawned tank -- the toggle only works in-game."""
+        reset_world_state()
+        _spawn()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
 
     def test_setting_was_on_single_press_corrects(self) -> None:
         """Ack ``A0`` after the first press means the toggle is fixed."""
@@ -141,10 +172,55 @@ def test_real_hook_delegates_to_the_module() -> None:
     """The ``_test_hooks`` seam's real implementation runs the dance."""
     from tankpit_bot._test_hooks import _real_ensure_autoscroll_off
 
-    messages: list[CapturedMessage] = []
-    keyboard = _FakeKeyboard(messages, [b"A0"])
-    page = _FakePage(keyboard)
+    reset_world_state()
+    _spawn()
+    try:
+        messages: list[CapturedMessage] = []
+        keyboard = _FakeKeyboard(messages, [b"A0"])
+        page = _FakePage(keyboard)
 
-    _real_ensure_autoscroll_off(page, messages)
+        _real_ensure_autoscroll_off(page, messages)
+    finally:
+        reset_world_state()
 
     assert keyboard.presses == ["a"]
+
+
+class TestInGameGate:
+    """The spawn gate in front of the first toggle press."""
+
+    def setup_method(self) -> None:
+        """Start each case from an unspawned world."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        reset_world_state()
+
+    def test_waits_for_spawn_then_presses(self) -> None:
+        """The dance polls until ``self_state`` appears, then toggles.
+
+        User ruling 2026-07-29: "you cant enable or disable autoscroll
+        til the bot is in the game" -- the 23:08 live firing pressed on
+        the entry screen and correctly failed loud. The wait pumps the
+        page loop; here the third poll "spawns" the tank.
+        """
+        messages: list[CapturedMessage] = []
+        keyboard = _FakeKeyboard(messages, [b"A0"])
+        page = _SpawningPage(keyboard, spawn_after_waits=3)
+
+        ensure_autoscroll_off(page, messages)
+
+        assert keyboard.presses == ["a"]
+        assert len(page.waits) >= 3
+
+    def test_never_spawning_raises_within_budget(self) -> None:
+        """A tank that never spawns fails loud instead of blind-pressing."""
+        messages: list[CapturedMessage] = []
+        keyboard = _FakeKeyboard(messages, [b"A0"])
+        page = _FakePage(keyboard)
+
+        with pytest.raises(RuntimeError, match="never spawned"):
+            ensure_autoscroll_off(page, messages)
+
+        assert keyboard.presses == []
