@@ -30,6 +30,9 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks.bot import BotProtocol, BufferedMessageSourceProtocol
 from tankpit_bot._test_hooks.browser import (
+    AutoscrollEnforcerProtocol,
+    AutoscrollKeyProtocol,
+    AutoscrollPageProtocol,
     BrowserContextProtocol,
     BrowserProtocol,
     BrowserTypeLaunchProtocol,
@@ -37,6 +40,8 @@ from tankpit_bot._test_hooks.browser import (
     PlaywrightProtocol,
     SyncPlaywrightContextManagerProtocol,
     SyncPlaywrightFactoryProtocol,
+    _real_ensure_autoscroll_off,
+    ensure_autoscroll_off,
 )
 from tankpit_bot._test_hooks.cdp import (
     CDPSessionProtocol,
@@ -100,6 +105,9 @@ from tankpit_bot._test_hooks.terrain import (
 
 __all__ = [
     "AppendTextProtocol",
+    "AutoscrollEnforcerProtocol",
+    "AutoscrollKeyProtocol",
+    "AutoscrollPageProtocol",
     "BotProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
@@ -127,6 +135,7 @@ __all__ = [
     "WriteTextProtocol",
     "_default_get_env",
     "_real_append_text",
+    "_real_ensure_autoscroll_off",
     "_real_get_argv",
     "_real_get_current_time_ms",
     "_real_get_sync_playwright",
@@ -141,6 +150,7 @@ __all__ = [
     "_real_write_bytes",
     "_real_write_text",
     "append_text",
+    "ensure_autoscroll_off",
     "find_best_static_byte",
     "force_exit",
     "get_argv",

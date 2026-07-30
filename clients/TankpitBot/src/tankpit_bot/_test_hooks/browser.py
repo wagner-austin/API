@@ -15,6 +15,7 @@ from typing import Protocol
 from platform_core.json_utils import JSONObject
 
 from tankpit_bot._test_hooks.cdp import CDPSessionProtocol, PageProtocol
+from tankpit_bot.types.message import CapturedMessage
 
 
 class BrowserContextProtocol(Protocol):
@@ -225,7 +226,71 @@ class SyncPlaywrightFactoryProtocol(Protocol):
         ...
 
 
+class AutoscrollKeyProtocol(Protocol):
+    """The single keyboard member the autoscroll toggle dance uses."""
+
+    def press(self, key: str, *, delay: float | None = None) -> None:
+        """Press a keyboard key."""
+        ...
+
+
+class AutoscrollPageProtocol(Protocol):
+    """The slice of the page surface the autoscroll dance needs.
+
+    Narrower than :class:`PageProtocol` so tests fake exactly the two
+    members involved; the real Playwright page satisfies it
+    structurally.
+    """
+
+    @property
+    def keyboard(self) -> AutoscrollKeyProtocol:
+        """Keyboard interface for the ``a`` toggle press."""
+        ...
+
+    def wait_for_timeout(self, timeout: float) -> None:
+        """Pump the event loop while the server ack lands."""
+        ...
+
+
+class AutoscrollEnforcerProtocol(Protocol):
+    """Session-start autoscroll-off enforcement seam.
+
+    The real implementation presses the ``a`` toggle and verifies the
+    server's plaintext ack (``tankpit_bot.browser.autoscroll``); the
+    run-path tests replace it because their fake pages have no wire to
+    ack from. Save-and-restore on this attribute per the DI testing
+    contract -- never monkey-patch the autoscroll module.
+    """
+
+    def __call__(self, page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> None:
+        """Leave the session with autoscroll wire-verified OFF."""
+        ...
+
+
+def _real_ensure_autoscroll_off(
+    page: AutoscrollPageProtocol,
+    messages: list[CapturedMessage],
+) -> None:
+    """Real implementation -- delegate to the autoscroll module.
+
+    The import is deferred so the hooks package (imported by nearly
+    everything) never drags the browser layer in at import time.
+
+    Args:
+        page: Live game page.
+        messages: Capture buffer shared with the CDP service.
+    """
+    from tankpit_bot.browser.autoscroll import ensure_autoscroll_off as _impl
+
+    _impl(page, messages)
+
+
+ensure_autoscroll_off: AutoscrollEnforcerProtocol = _real_ensure_autoscroll_off
+
 __all__ = [
+    "AutoscrollEnforcerProtocol",
+    "AutoscrollKeyProtocol",
+    "AutoscrollPageProtocol",
     "BrowserContextProtocol",
     "BrowserProtocol",
     "BrowserTypeLaunchProtocol",
@@ -233,4 +298,6 @@ __all__ = [
     "PlaywrightProtocol",
     "SyncPlaywrightContextManagerProtocol",
     "SyncPlaywrightFactoryProtocol",
+    "_real_ensure_autoscroll_off",
+    "ensure_autoscroll_off",
 ]

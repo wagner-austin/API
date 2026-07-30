@@ -112,6 +112,19 @@ class BotProtocol(Protocol):
         """
         ...
 
+    def send_chat(self, message_id: int, x: int, y: int) -> bool:
+        """Send a preset chat message.
+
+        Args:
+            message_id: Preset chat message ID (0-64).
+            x: Sender's current X tile (0-255).
+            y: Sender's current Y tile (0-255).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
     def open_map(self) -> bool:
         """Send map open command to reveal global enemy positions.
 
