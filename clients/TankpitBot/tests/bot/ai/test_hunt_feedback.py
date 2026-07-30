@@ -82,10 +82,10 @@ class TestDecideCombatFeedback:
     def test_hit_feedback_continues_normally(self) -> None:
         """Hit feedback preserves normal combat routing when the target remains visible.
 
-        The enemy carries a fresh wire-sourced position, so normal
-        combat routing teleports directly toward it -- neither
-        ``kill_confirmed`` nor ``miss_relocate`` short-circuits the
-        decision.
+        The enemy carries a fresh wire-sourced position inside the
+        viewport, so normal combat routing engages it from the current
+        tile (in-view law) -- neither ``kill_confirmed`` nor
+        ``miss_relocate`` short-circuits the decision.
         """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
@@ -120,7 +120,7 @@ class TestDecideCombatFeedback:
 
         assert decision["behavior"]["reason_kind"] != "confirm_kill"
         assert decision["behavior"]["reason_kind"] != "find_enemies"
-        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["cmd_type"] == "shoot"
 
     def test_no_feedback_when_no_shot_pending(self) -> None:
         """Empty combat feedback leaves normal planning unchanged."""

@@ -555,13 +555,11 @@ class TestCombatTeleportGuards:
         it can hunt even if i put mines around me... it can still fire
         a dual shot right?"). Live proof of the old hole at 21:35:06:
         the ring displaced the landing, the re-close failed on the
-        same tile, and Yuppler was BLOCKED while in plain view. With
-        the target inside the visible viewport the shot needs no
-        landing: the server fires duals at stationary targets from any
-        in-view range and the ammo ledger confirms the hit. Targets
-        inside ``SHOT_RANGE_TILES`` short-circuit to the shot before
-        the landing check, so this pins the beyond-shot-range corner
-        of the viewport with a dead landing.
+        same tile, and Yuppler was BLOCKED while in plain view. Every
+        in-view target now short-circuits to the shot before the
+        landing check even runs, so a recorded failed landing must
+        never block a visible target -- this pins the viewport corner
+        with a dead landing on record.
         """
         from tankpit_bot.sniffer.world_state import mark_move_target_failed
 
@@ -764,8 +762,15 @@ class TestCombatTeleportGuards:
         assert result["command"]["cmd_type"] == "shoot"
         assert result["updated_ai_state"]["combat_target_id"] == 50
 
-    def test_teleport_to_target_still_teleports_when_in_view_beyond_range(self) -> None:
-        """In view but beyond ``SHOT_RANGE_TILES`` still pays the close teleport."""
+    def test_teleport_to_target_shoots_when_in_view_beyond_shot_range_bound(self) -> None:
+        """In view beyond ``SHOT_RANGE_TILES`` is still a shot, not a teleport.
+
+        Flag s2-13 (run bot-20260730-000030, 00:31:37): purple-9 stood
+        at Manhattan 9 -- inside the viewport, beyond the old 8-tile
+        short-circuit bound -- and the bot paid a teleport to close.
+        User law: in-view is the firing criterion; the server serves
+        any in-view range.
+        """
         tanks: dict[str, TankStateDict] = {
             "50": make_tank_state(
                 tank_id=50,
@@ -794,8 +799,9 @@ class TestCombatTeleportGuards:
         result = teleport_to_target(ctx, _enemy_threat(x=107, y=107, name="FarCornerEnemy"))
 
         if result is None:
-            raise AssertionError("expected teleport decision")
-        assert result["command"]["cmd_type"] == "teleport"
+            raise AssertionError("expected shoot decision")
+        assert result["command"]["cmd_type"] == "shoot"
+        assert result["updated_ai_state"]["combat_target_id"] == 50
 
 
 class TestKillShotWireGate:
