@@ -56,6 +56,11 @@ class _DispatchFailBot:
         """Unused stub."""
         return False
 
+    def send_chat(self, message_id: int, x: int, y: int) -> bool:
+        """Unused stub."""
+        _ = (message_id, x, y)
+        return False
+
     def open_map(self) -> bool:
         """Unused stub."""
         return False

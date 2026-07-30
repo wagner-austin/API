@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, narrow_json_to_dict
 
 from tankpit_bot.bot.ai.types import make_behavior_score, make_initial_ai_state
 from tankpit_bot.bot.tick_loop_types import (
@@ -126,6 +126,22 @@ class TestEncodeDecodeRoundTrip:
         ai_state = make_initial_ai_state()
         original = make_tick_decision(cmd, behavior, ai_state, [1, 5])
         encoded = encode_tick_decision(original)
+        decoded = decode_tick_decision(encoded)
+        assert decoded == original
+
+    def test_roundtrip_chat_secondary(self) -> None:
+        """A chat secondary command round-trips with its message_id."""
+        from tankpit_bot.bot.types import make_chat_command, make_teleport_command
+
+        cmd = make_teleport_command(140, 239)
+        chat = make_chat_command(41, 141, 236)
+        behavior = make_behavior_score("HUNT", 800, 140, 239, "teleport_target")
+        ai_state = make_initial_ai_state()
+        original = make_tick_decision(cmd, behavior, ai_state, [2, 5], secondary_command=chat)
+        encoded = encode_tick_decision(original)
+        secondary = narrow_json_to_dict(encoded["secondary_command"])
+        assert secondary["cmd_type"] == "chat"
+        assert secondary["message_id"] == 41
         decoded = decode_tick_decision(encoded)
         assert decoded == original
 

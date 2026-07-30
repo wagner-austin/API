@@ -1364,8 +1364,12 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        # CDP calls: snapshot read + structure survey + radar dispatch + overlay update.
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 4
+        # CDP calls: snapshot read + structure survey + radar dispatch +
+        # flag-binding arm (first tick on a fresh session) + overlay update.
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 3 + [
+            "Runtime.addBinding",
+            "Runtime.evaluate",
+        ]
         assert bot.get_state() == "SCANNING"
 
     def test_tick_once_critical_equipment_preempts_combat(
@@ -1477,8 +1481,12 @@ class TestBotEquipmentManagement:
 
         _tick_once(bot)
 
-        # CDP calls: snapshot read + structure survey + radar dispatch + overlay update.
-        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 4
+        # CDP calls: snapshot read + structure survey + radar dispatch +
+        # flag-binding arm (first tick on a fresh session) + overlay update.
+        assert fake_cdp._sent_methods == ["Runtime.evaluate"] * 3 + [
+            "Runtime.addBinding",
+            "Runtime.evaluate",
+        ]
         assert bot.get_state() == "SCANNING"
 
     def test_clear_blocked_walk_resets_state(self, fake_env: FakeEnv) -> None:

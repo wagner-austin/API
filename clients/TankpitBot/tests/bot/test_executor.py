@@ -170,6 +170,11 @@ class _WorldOnlyBot:
         """Unused BotProtocol stub."""
         return False
 
+    def send_chat(self, message_id: int, x: int, y: int) -> bool:
+        """Unused BotProtocol stub."""
+        _ = (message_id, x, y)
+        return False
+
     def open_map(self) -> bool:
         """Unused BotProtocol stub."""
         return False
@@ -297,6 +302,24 @@ class TestDispatchCommand:
         result = dispatch_command(bot, make_map_open_command(), _make_snapshot())
         assert result is True
         assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_chat(self, fake_env: FakeEnv) -> None:
+        """Dispatches chat command via bot.send_chat."""
+        from tankpit_bot.bot.types import make_chat_command
+
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(bot, make_chat_command(41, 100, 100), _make_snapshot())
+        assert result is True
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_dispatch_chat_without_cdp_fails(self, fake_env: FakeEnv) -> None:
+        """Chat dispatch reports False when no CDP session is attached."""
+        from tankpit_bot.bot.types import make_chat_command
+
+        bot, _fake_cdp = _make_bot(fake_env)
+        bot._cdp = None
+        result = dispatch_command(bot, make_chat_command(41, 100, 100), _make_snapshot())
+        assert result is False
 
     def test_dispatch_hold_sends_nothing(self, fake_env: FakeEnv) -> None:
         """Hold command returns True and does not touch the wire.

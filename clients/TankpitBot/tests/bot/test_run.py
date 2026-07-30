@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from tankpit_bot._test_hooks import AutoscrollEnforcerProtocol
 from tests.conftest import FakeEnv, FakeFileSystem
 
 _STOP = Path("__nonexistent_stop_file__")
@@ -67,6 +68,28 @@ class TestBotGameLoop:
             resolve_session_seconds([], "soon")
 
 
+def _stub_autoscroll_hook() -> tuple[AutoscrollEnforcerProtocol, list[int]]:
+    """Replace the autoscroll enforcement hook with a call recorder.
+
+    Returns:
+        Tuple of (original hook, recorded call count list) for
+        save-and-restore in the caller's ``finally``.
+    """
+    from tankpit_bot import _test_hooks
+    from tankpit_bot._test_hooks import AutoscrollPageProtocol
+    from tankpit_bot.types.message import CapturedMessage
+
+    calls: list[int] = []
+    original = _test_hooks.ensure_autoscroll_off
+
+    def _recorder(page: AutoscrollPageProtocol, messages: list[CapturedMessage]) -> None:
+        del page, messages
+        calls.append(1)
+
+    _test_hooks.ensure_autoscroll_off = _recorder
+    return original, calls
+
+
 class TestBotRunMethod:
     """Tests for Bot.run method."""
 
@@ -99,6 +122,7 @@ class TestBotRunMethod:
         # Set up the fake Playwright that will raise KeyboardInterrupt in game loop
         original = _test_hooks.sync_playwright
         _test_hooks.sync_playwright = fake_sync_playwright_bot
+        original_autoscroll, autoscroll_calls = _stub_autoscroll_hook()
 
         try:
             bot = Bot("https://test.tankpit.com/", headless=True)
@@ -107,8 +131,11 @@ class TestBotRunMethod:
             # After cleanup, _cdp and _page should be None
             assert bot._cdp is None
             assert bot._page is None
+            # The session-start enforcement fired exactly once.
+            assert autoscroll_calls == [1]
         finally:
             _test_hooks.sync_playwright = original
+            _test_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_run_maximises_via_cdp_on_streamed_display(
         self, fake_env: FakeEnv, fake_fs: FakeFileSystem
@@ -131,6 +158,7 @@ class TestBotRunMethod:
         fake_env.set("SUNSHINE_STREAM_DISPLAY_W", "1920")
         fake_env.set("SUNSHINE_STREAM_DISPLAY_H", "1080")
         _test_hooks.sync_playwright = fake_sync_playwright_bot
+        original_autoscroll, _autoscroll_calls = _stub_autoscroll_hook()
 
         try:
             bot = Bot("https://test.tankpit.com/", headless=True)
@@ -139,6 +167,7 @@ class TestBotRunMethod:
             assert bot._page is None
         finally:
             _test_hooks.sync_playwright = original
+            _test_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_run_saves_capture_session(
         self,
@@ -157,6 +186,7 @@ class TestBotRunMethod:
 
         original = _test_hooks.sync_playwright
         _test_hooks.sync_playwright = fake_sync_playwright_bot
+        original_autoscroll, _autoscroll_calls = _stub_autoscroll_hook()
 
         try:
             configure_bot_runtime_logging(stamp="20260404-000000")
@@ -170,6 +200,7 @@ class TestBotRunMethod:
             assert has_capture
         finally:
             _test_hooks.sync_playwright = original
+            _test_hooks.ensure_autoscroll_off = original_autoscroll
 
     def test_send_graceful_quit_uses_current_cdp(self, fake_env: FakeEnv) -> None:
         """Teardown quit binds the live CDP session and sends quit_game."""
@@ -190,6 +221,34 @@ class TestBotRunMethod:
         bot._send_graceful_quit()
 
         assert sent == [("quit_game", b"\x01\x00-")]
+
+    def test_send_graceful_quit_absorbs_closed_browser(self, fake_env: FakeEnv) -> None:
+        """A dead browser makes the courtesy quit a no-op, not a crash.
+
+        Run bot-20260729-215151: the browser died at 19 kills, the
+        scorecard wrote cleanly, and the teardown quit raised
+        ``TargetClosedError`` through an otherwise-handled shutdown
+        (exit code 2). The socket drop already told the server we
+        left, so the send path absorbs the error with a log line.
+        """
+        from playwright._impl._errors import TargetClosedError
+
+        from tankpit_bot._test_hooks import CDPSessionProtocol
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes.base import FakeCDPSession
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+
+        def _raise_closed(cdp: CDPSessionProtocol, data: bytes, label: str) -> str:
+            _ = (cdp, data, label)
+            raise TargetClosedError("browser is gone")
+
+        bot._commands._send_ws_bytes = _raise_closed
+        bot._cdp = FakeCDPSession()
+
+        bot._send_graceful_quit()
+
+        assert bot._commands.cdp is bot._cdp
 
     def test_save_capture_session_returns_when_runtime_artifacts_missing(
         self,
