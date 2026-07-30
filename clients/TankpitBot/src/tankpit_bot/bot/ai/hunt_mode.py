@@ -24,6 +24,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     target_position_is_fresh,
 )
+from tankpit_bot.bot.ai.humans import is_human_name, is_practice_bot_name
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
@@ -195,6 +196,24 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
         )
         engagement_floor = ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
         if ctx.fuel < return_cost + engagement_floor:
+            if is_human_name(pursuit["name"]):
+                # Unlimited-distance human pursuit (user ruling
+                # 2026-07-29): a locked human who teleported beyond
+                # the fundable range is CHASED via the relay -- each
+                # leg closes distance AND refuels on the landing
+                # pickup, where the plain refuel detour only gets
+                # richer in place. ``ctx.base`` carries the lock, so
+                # never-drop rides through every leg.
+                emit_ai(
+                    "locked human %s beyond fundable range (fuel=%d, needs ~%d) - "
+                    "trying a relay leg with the lock held",
+                    pursuit["name"],
+                    ctx.fuel,
+                    return_cost + engagement_floor,
+                )
+                relay = _relay_toward(ctx, ctx.base, pursuit)
+                if relay is not None:
+                    return relay
             emit_ai(
                 "cannot fund return to locked target %s (fuel=%d, needs ~%d) - "
                 "refueling with the lock held (resume follows)",
@@ -280,6 +299,32 @@ def _decide_hunt_acquire_fresh(
         human_max_rank=ctx.config["human_target_max_rank"],
     )
     if map_target is not None:
+        if is_practice_bot_name(map_target["name"]):
+            # Unlimited-distance human pursuit (user ruling 2026-07-29):
+            # before farming an affordable bot, check whether a
+            # rank-window human is on the fresh map beyond the
+            # affordability horizon -- if so, the relay chain toward
+            # THEM outranks the bot. (An affordable human would already
+            # be the acquisition winner via the tier sort.)
+            human_travel = _human_pursuit_travel_target(ctx)
+            if human_travel is not None:
+                emit_ai(
+                    "human %s (id=%d) at dist %d outranks affordable bot %s - "
+                    "relaying toward them (unlimited-distance human pursuit)",
+                    human_travel["name"],
+                    human_travel["tank_id"],
+                    human_travel["distance"],
+                    map_target["name"],
+                )
+                relay = _relay_toward(ctx, ai_state, human_travel)
+                if relay is not None:
+                    return relay
+                emit_ai(
+                    "no dot or refuel leg helps toward %s right now - "
+                    "farming %s while the map evolves",
+                    human_travel["name"],
+                    map_target["name"],
+                )
         emit_ai(
             "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
             map_target["name"],
@@ -410,6 +455,33 @@ def _relay_toward_unaffordable_enemy(
     )
     if travel is None:
         return None
+    return _relay_toward(ctx, ai_state, travel)
+
+
+def _relay_toward(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+    travel: EnemyThreatDict,
+) -> TickDecisionDict | None:
+    """Produce one relay leg toward ``travel``: progress dot, else refuel.
+
+    The shared core of every relay chain: hop to the fuel dot that
+    best closes distance to the travel target, falling back to the
+    any-direction refuel hop when no dot makes strict progress (the
+    deficit is fuel, not distance). ``ai_state`` passes through to the
+    decision unchanged, so a caller holding a combat lock keeps it
+    across the leg (refuel-then-resume / human pursuit both ride
+    this).
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+        travel: Enemy the relay is travelling toward.
+
+    Returns:
+        Relay teleport decision, refuel-hop decision, or ``None`` when
+        no dot helps (caller decides the fallback).
+    """
     dot = _pick_relay_dot(ctx, travel)
     if dot is None:
         return _refuel_toward_engagement(ctx, ai_state, travel)
@@ -434,6 +506,51 @@ def _relay_toward_unaffordable_enemy(
         ai_state,
         ctx.equip,
     )
+
+
+def _human_pursuit_travel_target(ctx: DecideCtx) -> EnemyThreatDict | None:
+    """Return the human the relay should pursue, or ``None``.
+
+    User ruling 2026-07-29 ("unlimited distance for humans... this is
+    the real deal"): a rank-window human on the map outranks every
+    affordable practice bot at TARGET SELECTION -- even when reaching
+    them takes a fuel-dot relay chain across the whole field. Locks
+    are still never switched mid-fight (same-day follow-up: "finish
+    the kill then the human player will be the next target"); this
+    helper only fires during fresh acquisition.
+
+    :func:`find_relay_travel_target` already sorts human-tier first,
+    so its winner being a bot proves no pursuit-worthy human exists.
+    Born from the Yuppler encounter (run bot-20260729-204708 window:
+    dist 95 rejected ``unaffordable`` while the bot farmed red-3 at
+    dist 19 -- the doctrine said prioritize humans, the code only
+    consulted the relay when NOTHING was affordable).
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        The unaffordable rank-window human worth relaying toward, or
+        ``None`` when no such human is on the fresh map.
+    """
+    travel = find_relay_travel_target(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.blocked_targets,
+        ctx.killed,
+        ctx.terrain,
+        ctx.timestamp_ms,
+        ctx.config["map_open_cooldown_ms"],
+        engagement_reserve_fuel=(
+            ctx.config["engagement_fuel_budget"] + ctx.config["fuel_low_threshold"]
+        ),
+        priority_target_name=ctx.config["priority_target_name"],
+        human_min_rank=ctx.config["human_target_min_rank"],
+        human_max_rank=ctx.config["human_target_max_rank"],
+    )
+    if travel is not None and is_human_name(travel["name"]):
+        return travel
+    return None
 
 
 def _refuel_toward_engagement(

@@ -484,8 +484,13 @@ def test_hunt_acquire_refuels_with_lock_held_when_return_unaffordable() -> None:
     red-1 to a fresh distance race. Firing from stand-off range stays
     forbidden (live run 2026-07-01 20:48: eleven rejected shots at a
     target 92 tiles away) -- the bot collects, it does not shoot.
+
+    2026-07-29: this shape is now BOT-specific -- a locked HUMAN
+    beyond funds relays toward them instead (unlimited-distance
+    human pursuit), covered by
+    ``test_locked_human_beyond_funds_relays_with_lock_held``.
     """
-    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
+    tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150, name="red-4")}
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
         **{
@@ -1423,3 +1428,249 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
     # Registry truth is preserved on the lock.
     assert decision["updated_ai_state"]["combat_target_x"] == 150
     assert decision["updated_ai_state"]["combat_target_y"] == 150
+
+
+def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
+    """A rank-window human beyond the horizon preempts nearby bot farming.
+
+    User ruling 2026-07-29 ("unlimited distance for humans... this is
+    the real deal"), born from the Yuppler encounter: Yuppler at dist
+    95 was rejected ``unaffordable`` while the bot farmed red-3 at
+    dist 19. With an affordable practice bot AND an unaffordable
+    human on the fresh map, the decision must be a dot-relay leg
+    toward the HUMAN, not a teleport at the bot.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        # (150,100) closes distance to Yuppler and is affordable.
+        ((150, 100),),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 150
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
+
+
+def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
+    """With no progress dot and a full tank, the bot farms while waiting.
+
+    The pursuit must not deadlock the session: when no dot closes
+    distance to the human and refuel-in-place is pointless (already
+    at capacity), the affordable bot is engaged and the next map
+    re-evaluates the pursuit.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["updated_ai_state"]["combat_target_id"] == 60
+
+
+def test_recruit_human_is_not_pursued() -> None:
+    """A rank-0 human stays protected -- no relay chain toward them.
+
+    The rank window rejects recruits BEFORE the affordability gate
+    (reason ``protected_human_rank``, not ``unaffordable``), so the
+    pursuit helper can never travel toward one and the affordable bot
+    is farmed normally.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": make_tank_state(
+            tank_id=90,
+            x=240,
+            y=100,
+            team=2,
+            rank=0,
+            name="Yuppler",
+            is_self=False,
+            is_bot=False,
+            damage_state=0,
+            timestamp_ms=99800,
+        ),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ((150, 100),),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["updated_ai_state"]["combat_target_id"] == 60
+
+
+def test_locked_human_beyond_funds_relays_with_lock_held() -> None:
+    """A locked human who teleported beyond funds is chased leg by leg.
+
+    User ruling 2026-07-29: "even if they teleport super far away."
+    The return costs 840 + the 650 engagement floor at fuel 700, so
+    the plain resume cannot fund it -- the decision must be a relay
+    leg toward the human with ``combat_target_id`` retained
+    (never-drop rides through every leg).
+    """
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=700, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+            "combat_target_id": 90,
+            "combat_target_x": 240,
+            "combat_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ((150, 100),),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 150
+    assert decision["command"]["target_y"] == 100
+    assert decision["behavior"]["reason_kind"] == "dot_relay"
+    assert decision["updated_ai_state"]["combat_target_id"] == 90
+
+
+def test_locked_bot_beyond_funds_still_refuels_in_place() -> None:
+    """The relay-resume is human-only: a bot lock keeps the plain refuel.
+
+    Practice bots never flee across the map, so the 2026-07-27
+    refuel-then-resume (get richer in place, return when fundable)
+    remains the right shape for them -- guards the ``is_human_name``
+    gate on the new relay branch.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="red-9"),
+    }
+    world, self_state = make_world(fuel=700, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+            "combat_target_id": 90,
+            "combat_target_x": 240,
+            "combat_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        None,
+        "",
+        ((150, 100),),
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["combat_target_id"] == 90
+
+
+def test_locked_human_with_no_relay_leg_falls_back_to_refuel() -> None:
+    """When no relay leg helps, the locked-human resume uses plain refuel.
+
+    At fuel capacity with no progress dot, ``_relay_toward`` returns
+    ``None`` (refuel-in-place is pointless at a full tank), so the
+    resume falls through to the 2026-07-27 refuel-for-hunt path --
+    whose collect cascade also declines at capacity and terminates
+    via the blocked-target replan rather than deadlocking the tick.
+    """
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+            "combat_target_id": 90,
+            "combat_target_x": 240,
+            "combat_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision = decide_hunt_mode(ctx)
+
+    # The tick advances (no relay teleport was possible); the exact
+    # fallback shape is refuel_for_hunt's contract, not re-tested here.
+    assert decision["behavior"]["reason_kind"] != "dot_relay"
