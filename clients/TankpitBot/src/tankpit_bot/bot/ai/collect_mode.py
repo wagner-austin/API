@@ -223,6 +223,44 @@ def _mine_clearance_decision(
     )
 
 
+# An escape hop must actually ESCAPE: a landing inside the attacker's
+# viewport reach keeps the tank in the firing line (flag 1 of run
+# bot-20260730-025x: the escape teleported ONE tile, then three, both
+# map-open ticks paid, both landings still under red-6's guns --
+# because the larder score min(vol, deficit)/cost structurally favors
+# the NEAREST fuel, i.e. staying in the kill zone). One full viewport
+# of separation is the user-confirmed pursuit horizon: enemies do not
+# quickly follow a tank that leaves their view.
+_ESCAPE_CLEARANCE_TILES = 16
+
+
+def _hop_escapes_attacker(
+    base_state: AIStateDict,
+    decision: TickDecisionDict,
+) -> bool:
+    """Return True when a hop decision leaves the attacker's reach.
+
+    Args:
+        base_state: AI state carrying the held combat lock (the
+            attacker the escape is fleeing).
+        decision: Candidate hop decision.
+
+    Returns:
+        True when there is no known attacker, the decision is not a
+        teleport, or the landing clears the attacker's viewport
+        envelope.
+    """
+    if base_state["combat_target_id"] == -1:
+        return True
+    command = decision["command"]
+    if command["cmd_type"] != "teleport":
+        return True
+    separation = abs(command["target_x"] - base_state["combat_target_x"]) + abs(
+        command["target_y"] - base_state["combat_target_y"]
+    )
+    return separation >= _ESCAPE_CLEARANCE_TILES
+
+
 def _escape_under_fire_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
@@ -250,12 +288,22 @@ def _escape_under_fire_decision(
     fire_hits, _fire_fuel = get_incoming_damage_window(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
     if fire_hits < _SUSTAINED_FIRE_HIT_FLOOR:
         return None
+    # Movement law under fire (user, 2026-07-30, flag 4 of run
+    # bot-20260730-025x): "a tele is 2 ticks. walking is 1 tick. and
+    # even if its a long walk you only take one hit. whereas a
+    # teleport you can take two hits during." Same-viewport fuel is
+    # therefore WALKED -- one action, at most one hit -- and a
+    # teleport is only worth its two-hit window when it actually
+    # leaves the attacker's envelope.
     emit_ai(
-        "collecting under fire (%d hits in window) - escaping by hop, no walking",
+        "collecting under fire (%d hits in window) - walk in-viewport fuel or hop OUT",
         fire_hits,
     )
+    fuel_walk = _select_and_pickup_fuel(ctx, base_state)
+    if fuel_walk is not None:
+        return fuel_walk
     larder_under_fire = _larder_harvest(ctx, base_state)
-    if larder_under_fire is not None:
+    if larder_under_fire is not None and _hop_escapes_attacker(base_state, larder_under_fire):
         return larder_under_fire
     escape_hop = make_resource_search_hop(
         ctx,
@@ -264,6 +312,12 @@ def _escape_under_fire_decision(
         reason="search_collect_local",
         ai_state=base_state,
     )
+    if escape_hop is not None and _hop_escapes_attacker(base_state, escape_hop):
+        return escape_hop
+    # Nothing clears the attacker's envelope: any movement still beats
+    # standing in the firing line drinking dregs.
+    if larder_under_fire is not None:
+        return larder_under_fire
     if escape_hop is not None:
         return escape_hop
     return _exhausted_collect_outcome(ctx, base_state)
