@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.combat_landing import (
+    SHOT_RANGE_TILES,
     choose_combat_landing_tile,
 )
 from tankpit_bot.bot.ai.combat_landing import (
@@ -147,18 +148,33 @@ def _set_combat_target(
     )
 
 
-def has_passable_adjacent(
+def has_standoff_landing(
     x: int,
     y: int,
     terrain: TerrainMapProtocol | None,
 ) -> bool:
-    """Return True when at least one cardinal neighbor is passable ground."""
+    """Return True when a passable landing exists within shot range.
+
+    The engageability question is stand-off, not adjacency: the close
+    teleports onto the target's own tile and the server displaces the
+    bot to the nearest open ground, and duals fire from any in-view
+    tile within ``SHOT_RANGE_TILES`` ([[weapon-selection]]). A target
+    is therefore viable as long as SOME passable tile lies within the
+    shot-range diamond. The stricter passable-adjacent form of this
+    gate made mine-ringed players invisible to acquisition (live
+    2026-07-29: Yuppler ringed himself with mines and every pass
+    rejected him with no_passable_adjacent -- the mine-composed
+    passability view marks the whole ring impassable -- so the human
+    preempt never even saw him while the bot farmed practice bots).
+    """
     if terrain is None:
         return True
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        nx, ny = x + dx, y + dy
-        if 0 <= nx <= 255 and 0 <= ny <= 255 and terrain.is_passable(nx, ny):
-            return True
+    for dx in range(-SHOT_RANGE_TILES, SHOT_RANGE_TILES + 1):
+        remaining = SHOT_RANGE_TILES - abs(dx)
+        for dy in range(-remaining, remaining + 1):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx <= 255 and 0 <= ny <= 255 and terrain.is_passable(nx, ny):
+                return True
     return False
 
 
@@ -183,7 +199,7 @@ def select_new_combat_target(
         for threat in threats
         if str(threat["tank_id"]) not in ctx.blocked_targets
         and str(threat["tank_id"]) not in ctx.killed
-        and has_passable_adjacent(threat["x"], threat["y"], ctx.terrain)
+        and has_standoff_landing(threat["x"], threat["y"], ctx.terrain)
     ]
     if not viable:
         return None
@@ -838,21 +854,6 @@ def _combat_landing_candidates(
     return shared_combat_landing_candidates(ctx.filtered, ctx.self_state, target)
 
 
-# The server's effective shot range, measured across 350 shots on
-# User ruling 2026-07-29: "i dont think i would teleport to the target
-# if im like a few tiles away right? as long as theyre on the viewport
-# and its a clear dual shot then id just hit them from my new
-# location" -- in-view stationary targets take duals at range per
-# [[weapon-selection]] (water never blocks; rock clips to a billed
-# single that resolves as a miss). 8 keeps the Manhattan bound inside
-# the 18x18 viewport after a centered landing. The 2026-06-11
-# counter-measurement (distance 4+ hit ~0%: 45 misses at 4, 35 at 12)
-# predates id-targeted shots and the freshness model -- the shot
-# billing analyzer re-prices this live; if ranged duals miss, the
-# ledger will say so in one session and this constant reverts.
-SHOT_RANGE_TILES = 8
-
-
 def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
     """Return True when the target is within the server's shot range.
 
@@ -898,7 +899,7 @@ __all__ = [
     "get_locked_target",
     "has_cardinal_combat_shot",
     "has_combat_shot",
-    "has_passable_adjacent",
+    "has_standoff_landing",
     "is_already_engaged",
     "open_map_for_target",
     "select_new_combat_target",

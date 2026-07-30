@@ -395,7 +395,7 @@ def _acquisition_rejection_reason(
         self_state: Player's own state.
         blocked: Tank IDs temporarily un-engageable.
         killed: Tank IDs on kill cooldown.
-        terrain: Terrain map for passable-adjacent check.
+        terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
         map_open_cooldown_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
@@ -404,7 +404,7 @@ def _acquisition_rejection_reason(
     Returns:
         Rejection reason string, or ``None`` when the enemy is viable.
     """
-    from tankpit_bot.bot.ai.combat_strategy import has_passable_adjacent
+    from tankpit_bot.bot.ai.combat_strategy import has_standoff_landing
     from tankpit_bot.physics.costs import teleport_cost
 
     if tank["liveness"] != "alive":
@@ -430,8 +430,8 @@ def _acquisition_rejection_reason(
         return "blocked"
     if now_ms - tank["timestamp_ms"] >= map_open_cooldown_ms:
         return "stale_map_data"
-    if not has_passable_adjacent(tank["x"], tank["y"], terrain):
-        return "no_passable_adjacent"
+    if not has_standoff_landing(tank["x"], tank["y"], terrain):
+        return "no_standoff_landing"
     approach_cost = teleport_cost(
         self_state["x"],
         self_state["y"],
@@ -474,8 +474,8 @@ def find_acquisition_target(
     handles viewport confirmation before any shot.
 
     Filters: enemy team, alive, position not (0,0), not on
-    ``killed`` or ``blocked`` lists, has a passable adjacent tile
-    for a combat landing, ``timestamp_ms`` within
+    ``killed`` or ``blocked`` lists, has a passable stand-off
+    landing within shot range, ``timestamp_ms`` within
     ``map_open_cooldown_ms``, and **affordable end-to-end**: current
     fuel must cover the approach teleport plus
     ``engagement_reserve_fuel`` (a realistic kill cost plus the
@@ -490,7 +490,7 @@ def find_acquisition_target(
         self_state: Player's own state.
         blocked: Tank IDs temporarily un-engageable.
         killed: Tank IDs on kill cooldown.
-        terrain: Terrain map for passable-adjacent check.
+        terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
         map_open_cooldown_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
@@ -612,7 +612,7 @@ def stale_human_exists(
         self_state: Player's own state.
         blocked: Tank IDs temporarily un-engageable.
         killed: Tank IDs on kill cooldown.
-        terrain: Terrain map for passable-adjacent check.
+        terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
         map_open_cooldown_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
@@ -667,7 +667,7 @@ def find_relay_travel_target(
     The dot-relay travel planner needs a destination worth travelling
     toward: an enemy that would be a perfectly viable acquisition if
     the bot had the fuel for the end-to-end fight. Every other gate
-    (alive, synced, not blocked/killed, map-fresh, passable-adjacent)
+    (alive, synced, not blocked/killed, map-fresh, stand-off landable)
     must pass -- travelling toward a corpse or a blocked target wastes
     the relay.
 
@@ -676,7 +676,7 @@ def find_relay_travel_target(
         self_state: Player's own state.
         blocked: Tank IDs temporarily un-engageable.
         killed: Tank IDs on kill cooldown.
-        terrain: Terrain map for passable-adjacent check.
+        terrain: Terrain map for the stand-off landing check.
         now_ms: Current tick timestamp.
         map_open_cooldown_ms: Freshness window for map-known positions.
         engagement_reserve_fuel: Fuel that must remain after the
