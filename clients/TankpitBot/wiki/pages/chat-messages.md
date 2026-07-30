@@ -7,9 +7,9 @@ related:
 source_paths:
   - "tpclient.js:243"
   - "tpclient.js:24"
-fact_checked: "2026-06-19"
+fact_checked: "2026-07-29"
 confidence: high
-verified: 2026-06-19 (all 65 entries traced from JS E[] object)
+verified: 2026-07-29 (65 entries from JS E[] 2026-06-19; wire format + M echo + flood mute live-verified sniff-20260729-214411)
 hubs: [js-client]
 ---
 
@@ -153,6 +153,80 @@ or
 
 Position-bearing messages use the 6-byte format with sender's current coordinates.[^1]
 
+## Wire-Verified (sniff-20260729-214411, 44 live sends)
+
+Live capture of every selector message clicked at least once
+(37 unique IDs reached the wire) settles the format:[^2]
+
+- **Every observed send used the 6-byte form** `[6,'m',id,x,y,flag]`
+  — including non-position messages like 41 HELLO. The 4-byte
+  variant never appeared on the wire.
+- **x,y = sender's current tile** for ordinary messages; for the
+  auto-search messages the client substitutes the found target
+  (id 8 "Fuel detected here" went out as `[8,104,212,0]` while the
+  tank sat at 97,212 — the Db() nearest-fuel tile).
+- **flag (byte 6) was 0 in all 44 sends.** The wiki's
+  "use_position" reading is unconfirmed; no send ever set it.
+- Sends are XOR-encoded exactly like every other binary command
+  (`!` prefix + session-table XOR); the same table decodes them.
+- **Server echo = the DOM display.** Each accepted chat comes back
+  as inbound `M` (0x4D, [[decode-coverage]] row Qg):
+  `M + tank_id(2 LE) + message_id + x + y`. The client's
+  "Message sent:" log line follows the echo, not the local click.
+
+### Server-side flood mute (NEW)
+
+The first **8** messages (sent at the client's 2400 ms cooldown
+pace) were echoed and displayed. **Every one of the remaining 36
+sends was silently swallowed** — no `M` echo, no error frame —
+including sends made 2+ minutes later, while other commands
+(teleport, move, radar) kept working. Rapid-fire chat triggers a
+server-side mute that lasted the rest of the session. Continued
+sending may have kept re-arming it; the exact decay is unknown.
+**Bot rule: chat must be rare and never retried on silence.**[^2]
+
+### Client-side gate observed
+
+Team-filter (h=0) messages clicked while solo printed
+"No teammate in the zone" to the DOM and produced **no wire
+frame** — the Bb target validation drops them before send.[^2]
+
+## Bot Implementation (2026-07-29)
+
+The bot speaks and hears chat as of 2026-07-29 (same session as the
+wire crack):[^impl]
+
+- **Outbound**: `protocol/chat.py` — the full 65-entry
+  `CHAT_MESSAGES` table, `CHAT_HELLO = 41`, and
+  `build_chat_command(message_id, x, y)` producing the plaintext
+  frame `! 06 6D id x y 00`; the standard send path XORs it into the
+  exact bytes the page client sends. Dispatch surface:
+  `DispatchMixin.send_chat` (fire-and-forget, no HFSM transition,
+  `chat_sent` diagnostic) behind the `"chat"` BotCommand — usable as
+  a decision `secondary_command` so it rides the same tick as a
+  primary action.
+- **Inbound**: the 0x2E envelope router
+  (`protocol/decoders/tank.py::_dispatch_protocol_misc`) now routes
+  subtype 0x4D (>= 5 inner bytes) to `decode_chat_message`;
+  the world-state dispatcher emits a `chat_received` diagnostic with
+  the resolved preset text and, when `sender_id` is the self tank,
+  latches `WorldService.last_chat_echo_message_id` — the delivery
+  receipt against the flood mute. Chat x/y is sender-supplied and
+  never mutates tank positions.
+- **Behavior**: one HELLO per newly locked human target
+  (`bot/ai/greeting.py`, contract row [[bot-behavior-contract]]
+  §3.2), latched in `ai_state["greeted_target_id"]`; never retried
+  on silence.
+- **Sim**: the sim server decodes `m` sends and echoes the 0x4D
+  broadcast to everyone including the sender (no mute modeled —
+  bot policy keeps live sends far below the threshold).
+
+[^2]: `runs/sniff/sniff-20260729-214411.capture_session.json` —
+    44 decoded `m` sends, 8 inbound `M` echoes, tank_id 1301,
+    solo practice-room session of 2026-07-29; decoded with the
+    session magic + `xor_static_key.txt` table
+    (`capture/xor.py::build_xor_table`).
+
 ## Position-Bearing Messages
 
 These messages include the sender's world coordinates when sent:[^1]
@@ -168,3 +242,5 @@ These messages include the sender's world coordinates when sent:[^1]
 - **54** "I need fuel!"
 
 [^1]: JS truth: `tpclient.js` on disk — the `E[]` message table (line 24, frontmatter-pinned), the `li` display-order array (line 243, frontmatter-pinned), and the `Hb` send / `Bb` controller classes; all 65 entries traced 2026-06-19 (frontmatter `verified:` field) and re-checkable by grep against the file.
+
+[^impl]: Implementation commits 2026-07-29: `a8d015ad` (protocol table + 0x4D tunnel route + outbound builder, wire-verified byte-identical against sniff-20260729-214411's 44 decoded sends), `58b8644a` (inbound dispatch + self-echo latch), `8e586ba6`/`e6eea852` (HELLO greeting + fire-and-forget executor route), `b4dbf0c8` (sim chat law); gate green at 5,339 tests / 100% coverage the same day.
