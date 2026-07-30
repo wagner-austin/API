@@ -17,7 +17,7 @@ source_paths:
   - "src/tankpit_bot/sim"
   - "src/tankpit_bot/validate"
 source_git_blobs:
-  "src/tankpit_bot/physics": "faa71fe416a6b1102603dae2eaca55715fa76b3c"
+  "src/tankpit_bot/physics": "130c17d4a20d81886055bc97dc20140c9656f1c6"
   "src/tankpit_bot/sim": "34ee57c389509666e80d187b26b7e5777f59d754"
   "src/tankpit_bot/validate": "0f9542f68581853517832736b3a063b0bab9f8c2"
 fact_checked: "2026-07-20"

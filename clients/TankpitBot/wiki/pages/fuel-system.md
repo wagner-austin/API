@@ -9,7 +9,7 @@ source_paths:
   - "runs/bot"
   - "src/tankpit_bot/physics"
 source_git_blobs:
-  "src/tankpit_bot/physics": "faa71fe416a6b1102603dae2eaca55715fa76b3c"
+  "src/tankpit_bot/physics": "130c17d4a20d81886055bc97dc20140c9656f1c6"
 fact_checked: "2026-07-25"
 confidence: high
 hubs: [game-mechanics]
