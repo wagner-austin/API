@@ -32,6 +32,7 @@ from tankpit_bot.browser.dom_scraper import (
     GameLogScraper,
     scrape_page_text,
 )
+from tankpit_bot.browser.flag_capture import FlagCaptureService
 from tankpit_bot.browser.lifecycle import (
     cleanup_browser,
     gather_intel,
@@ -196,6 +197,10 @@ class Bot(DispatchMixin):
         # Access gate hangs page→loopback fetches forever, 2026-07-29);
         # the binding handler publishes onto the shared frame bus.
         self._live_view = LiveViewService(publish=self._frame_bus.publish)
+        # Human bug marker (2026-07-29): the HUD flag button delivers
+        # clicks over its own CDP binding; the service turns each into
+        # a human_flag diagnostic carrying the recent-tick ring.
+        self._flag_capture = FlagCaptureService()
         # Gate for the C-panel account stats capture; fired from the
         # first HEALTHY tick rather than at bootstrap because the game
         # client ignores hotkeys until fully loaded (run 20260611-000x
@@ -481,6 +486,15 @@ class Bot(DispatchMixin):
 
             wait_for_game_ready(page, self._messages)
 
+            # Autoscroll must be OFF for the whole scan/landing model
+            # to hold (user ruling 2026-07-29: "make sure autoscroll
+            # is always off... sometimes it resets to on"). The
+            # setting is server-persisted per account, so a stray
+            # toggle would otherwise skew every later session. Hook
+            # seam: run-path tests stub this (their fake pages have
+            # no wire to ack from).
+            _test_hooks.ensure_autoscroll_off(page, self._messages)
+
             # Persist the freshly-issued auth cookies + localStorage
             # before the game loop can crash. Next launch of the bot
             # skips the tankpit login flow entirely and rejoins in
@@ -515,12 +529,23 @@ class Bot(DispatchMixin):
     def _send_graceful_quit(self) -> None:
         """Send the plain quit command so the server sees a lobby exit.
 
-        Runs first in teardown, while the CDP session is still bound;
-        the send path itself handles an already-gone session (logs and
-        returns False), so a crashed browser cannot wedge shutdown.
+        Runs first in teardown, while the CDP session is still bound.
+        A CLOSED browser makes the courtesy send definitionally
+        pointless -- the socket drop already told the server we left
+        -- so ``TargetClosedError`` is absorbed here with a log line.
+        (The old docstring CLAIMED the send path handled a gone
+        session; run bot-20260729-215151 proved it false: the browser
+        died at 19 kills, the scorecard wrote cleanly, and then this
+        send raised through teardown and turned a handled shutdown
+        into exit code 2.)
         """
+        from playwright._impl._errors import TargetClosedError
+
         self._commands.cdp = self._cdp
-        self._commands.quit_game()
+        try:
+            self._commands.quit_game()
+        except TargetClosedError:
+            log.info("Graceful quit skipped: browser already closed (socket drop = lobby exit)")
 
     def _save_capture_session(self) -> None:
         """Save accumulated messages as a replayable capture session.

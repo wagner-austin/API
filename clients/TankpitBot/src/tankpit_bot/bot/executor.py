@@ -137,6 +137,12 @@ def dispatch_command(
         # the tick loop's success accounting honest (the desired
         # effect, "do nothing", was achieved).
         return True
+    if command["cmd_type"] == "chat":
+        # Fire-and-forget social send (the HELLO greeting). No ledger
+        # entry: chat costs nothing, expects no world-state outcome,
+        # and the flood-mute contract forbids retry-on-silence
+        # ([[chat-messages]]) — so nothing downstream should wait on it.
+        return bot.send_chat(command["message_id"], command["target_x"], command["target_y"])
     if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
         return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":

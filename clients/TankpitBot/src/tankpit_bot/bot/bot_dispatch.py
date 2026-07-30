@@ -233,6 +233,35 @@ class DispatchMixin(CompletionsMixin):
 
         return self._send_bytes(build_query_command(CMD_NEAREST_ENEMY), "nearest_enemy")
 
+    def send_chat(self, message_id: int, x: int, y: int) -> bool:
+        """Send a preset chat message. Fire-and-forget: no HFSM transition.
+
+        The server's 0x4D echo is the delivery receipt (surfaced as the
+        ``chat_received`` diagnostic with ``is_self_echo``); silence
+        means the flood mute ate it, and the mute contract forbids a
+        retry (wiki [[chat-messages]]).
+
+        Args:
+            message_id: Preset chat message ID (0-64).
+            x: Sender's current X tile (0-255).
+            y: Sender's current Y tile (0-255).
+
+        Returns:
+            True if command was sent, False if CDP unavailable.
+        """
+        from tankpit_bot.protocol.chat import build_chat_command, chat_message_text
+
+        if not self._send_bytes(build_chat_command(message_id, x, y), f"chat({message_id})"):
+            return False
+        emit_diagnostic(
+            diagnostic_kind="chat_sent",
+            message_id=message_id,
+            text=chat_message_text(message_id),
+            x=x,
+            y=y,
+        )
+        return True
+
     def request_inventory(self) -> bool:
         """Send CMD_INVENTORY to request the inventory snapshot.
 

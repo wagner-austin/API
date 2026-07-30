@@ -108,6 +108,16 @@ def _decode_bot_command(data: JSONObject) -> BotCommand:
         from tankpit_bot.bot.types import TeleportCommandDict
 
         return TeleportCommandDict(cmd_type="teleport", target_x=target_x, target_y=target_y)
+    if cmd_type == "chat":
+        from tankpit_bot.bot.types import ChatCommandDict
+
+        message_id = require_int(data, "message_id")
+        return ChatCommandDict(
+            cmd_type="chat",
+            message_id=message_id,
+            target_x=target_x,
+            target_y=target_y,
+        )
     raise ValueError(f"Unknown cmd_type: {cmd_type!r}")
 
 
@@ -133,6 +143,8 @@ def _encode_bot_command(command: BotCommand) -> JSONObject:
     }
     if command["cmd_type"] == "shoot":
         result["target_id"] = command["target_id"]
+    if command["cmd_type"] == "chat":
+        result["message_id"] = command["message_id"]
     return result
 
 

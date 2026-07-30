@@ -28,7 +28,8 @@ from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.browser.overlay import OverlayStateDict, update_bot_overlay
+from tankpit_bot.browser.overlay import OverlayStateDict
+from tankpit_bot.browser.overlay_hud import update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.runs_index import (
     append_index_row,
@@ -46,6 +47,7 @@ from tankpit_bot.ledger.outcome.shoot import (
     emit_shoot_miss,
 )
 from tankpit_bot.ledger.ring import outcome_counts
+from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.commands import TICK_RATE_MS
 from tankpit_bot.runtime_logging import (
     emit_ai,
@@ -618,25 +620,41 @@ def _tick_once(bot: Bot) -> None:
             )
 
     # 9. Update the in-page HUD so a human watching the browser sees what
-    # the bot decided this tick without tailing artifacts.
-    update_bot_overlay(
-        bot._require_cdp(),
-        OverlayStateDict(
-            hfsm_state=bot.get_state(),
-            ai_mode=bot._ai_state["mode"],
-            ai_mode_state=bot._ai_state["mode_state"],
-            behavior_mode=decision["behavior"]["mode"],
-            behavior_reason=render_reason(decision["behavior"]),
-            command_type=decision["command"]["cmd_type"],
-            target_x=decision["behavior"]["target_x"],
-            target_y=decision["behavior"]["target_y"],
-            command_sent=command_sent,
-            in_flight_kind=bot._state_data["in_flight_action"]["kind"],
-            fuel=self_state["fuel"],
-            self_x=self_state["x"],
-            self_y=self_state["y"],
-        ),
+    # the bot decided this tick without tailing artifacts, keep the flag
+    # binding armed, and ring-buffer the payload so a flag click can
+    # snapshot the ticks that led up to it.
+    overlay = OverlayStateDict(
+        hfsm_state=bot.get_state(),
+        ai_mode=bot._ai_state["mode"],
+        ai_mode_state=bot._ai_state["mode_state"],
+        behavior_mode=decision["behavior"]["mode"],
+        behavior_reason=render_reason(decision["behavior"]),
+        command_type=decision["command"]["cmd_type"],
+        target_x=decision["behavior"]["target_x"],
+        target_y=decision["behavior"]["target_y"],
+        command_sent=command_sent,
+        in_flight_kind=bot._state_data["in_flight_action"]["kind"],
+        fuel=self_state["fuel"],
+        fuel_cap=fuel_capacity(self_state["rank"]),
+        self_x=self_state["x"],
+        self_y=self_state["y"],
+        armor=inventory["armor_shields"]["count"],
+        duals=inventory["dual_shots"]["count"],
+        missiles=inventory["missile_shots"]["count"],
+        homings=inventory["homing_shots"]["count"],
+        radars=inventory["extra_radars"]["count"],
+        inv_cap=inventory_capacity(self_state["rank"]),
+        kills=bot._ai_state["session_kill_count"],
+        hits=bot._ai_state["session_hit_count"],
+        misses=bot._ai_state["session_miss_count"],
+        rejects=bot._ai_state["session_reject_count"],
+        target_id=bot._ai_state["combat_target_id"],
+        target_name=bot._ai_state["last_shot_target_name"],
     )
+    hud_cdp = bot._require_cdp()
+    bot._flag_capture.ensure(hud_cdp)
+    bot._flag_capture.record_tick(overlay)
+    update_bot_overlay(hud_cdp, overlay)
 
 
 def _is_page_client_healthy(snapshot: PageClientSnapshotDict) -> bool:

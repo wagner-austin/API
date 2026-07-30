@@ -211,6 +211,45 @@ def make_teleport_command(target_x: int, target_y: int) -> TeleportCommandDict:
     return TeleportCommandDict(cmd_type="teleport", target_x=target_x, target_y=target_y)
 
 
+class ChatCommandDict(TypedDict):
+    """Chat command parameters (preset message send).
+
+    The wire frame carries the sender's current tile alongside the
+    message ID — the page client fills its own position into every
+    chat send (wiki [[chat-messages]], wire-verified 2026-07-29).
+
+    Attributes:
+        cmd_type: Command type identifier.
+        message_id: Preset chat message ID (0-64, JS E[] table).
+        target_x: Sender's X tile at decision time (0-255).
+        target_y: Sender's Y tile at decision time (0-255).
+    """
+
+    cmd_type: Literal["chat"]
+    message_id: int
+    target_x: int
+    target_y: int
+
+
+def make_chat_command(message_id: int, target_x: int, target_y: int) -> ChatCommandDict:
+    """Create a chat command.
+
+    Args:
+        message_id: Preset chat message ID (0-64).
+        target_x: Sender's X tile at decision time (0-255).
+        target_y: Sender's Y tile at decision time (0-255).
+
+    Returns:
+        ChatCommandDict with the specified message and position.
+    """
+    return ChatCommandDict(
+        cmd_type="chat",
+        message_id=message_id,
+        target_x=target_x,
+        target_y=target_y,
+    )
+
+
 class HoldCommandDict(TypedDict):
     """No-op command: the tick executes but dispatches nothing.
 
@@ -246,12 +285,14 @@ BotCommand = (
     | PickupEquipmentCommandDict
     | MapOpenCommandDict
     | TeleportCommandDict
+    | ChatCommandDict
     | HoldCommandDict
 )
 
 
 __all__ = [
     "BotCommand",
+    "ChatCommandDict",
     "HoldCommandDict",
     "MapOpenCommandDict",
     "MoveCommandDict",
@@ -260,6 +301,7 @@ __all__ = [
     "RadarCommandDict",
     "ShootCommandDict",
     "TeleportCommandDict",
+    "make_chat_command",
     "make_hold_command",
     "make_map_open_command",
     "make_move_command",

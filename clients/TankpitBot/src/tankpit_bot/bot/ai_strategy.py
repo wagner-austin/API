@@ -11,6 +11,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.ferry import compose_decision_terrain
+from tankpit_bot.bot.ai.greeting import attach_human_greeting
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.mode_controller import (
     apply_dispatch_counters,
@@ -108,7 +109,7 @@ def decide(
         derive_hunt_mode_state(decision),
         timestamp_ms,
     )
-    return apply_dispatch_counters(owned)
+    return apply_dispatch_counters(attach_human_greeting(ctx, owned))
 
 
 def _resolve_owner_mode(ctx: DecideCtx, manual: AIMode | None) -> AIMode:
