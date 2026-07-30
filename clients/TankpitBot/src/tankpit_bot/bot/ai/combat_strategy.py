@@ -463,16 +463,27 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             target["name"],
         )
         return block_combat_target_and_replan(ctx, target)
-    # Engaging must leave fuel above fuel_low_threshold, the line where
-    # COLLECT outranks HUNT. Run 20260611-004505: a teleport gated
-    # only on hunt_min_fuel landed at 224 fuel, the fuel mode hijacked
-    # the very next tick, and the ~190 fuel spent to reach purple-8
-    # bought a fight the bot was then forbidden to fight.
+    # Engaging must leave fuel to FIGHT, not merely to exist: the
+    # reserve is fuel_low_threshold (the line where COLLECT outranks
+    # HUNT) plus the full engagement_fuel_budget -- the same
+    # end-to-end funding the acquisition gate demands, so a chase
+    # re-teleport can never slip through cheaper than the fight it
+    # funds. Two priced incidents behind the sum: run 20260611-004505
+    # (a teleport gated only on hunt_min_fuel landed at 224, the fuel
+    # mode hijacked the next tick, and the ~190 spent reaching
+    # purple-8 bought a forbidden fight) and run 20260729-105325 (the
+    # fuel_low_threshold-only reserve passed a 158-cost chase at 372
+    # by 14 fuel, landed at 214, LOW_FUEL hijacked one shot later,
+    # session min 140 -- user ruling 2026-07-29: "we cant kill anyone
+    # if we die... we should fuel before chasing"). Refuel-for-hunt
+    # keeps the lock and prefers in-viewport walk pickups, then the
+    # larder, so the detour is usually one container away.
+    engagement_reserve = ctx.config["fuel_low_threshold"] + ctx.config["engagement_fuel_budget"]
     if not can_afford_teleport(
         ctx,
         landing_x,
         landing_y,
-        reserve_fuel=ctx.config["fuel_low_threshold"],
+        reserve_fuel=engagement_reserve,
     ):
         emit_ai(
             "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)"
@@ -482,7 +493,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             landing_y,
             ctx.fuel,
             teleport_fuel_cost_to(ctx, landing_x, landing_y),
-            ctx.config["fuel_low_threshold"],
+            engagement_reserve,
         )
         return refuel_for_hunt(ctx, target)
     emit_ai(

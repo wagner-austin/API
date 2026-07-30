@@ -517,6 +517,52 @@ class TestCombatTeleportGuards:
         assert "50" in result["updated_ai_state"]["blocked_combat_targets"]
         assert result["updated_ai_state"]["blocked_combat_targets"]["50"] == 100000
 
+    def test_teleport_reserve_includes_the_engagement_budget(self) -> None:
+        """A chase the old reserve passed by 14 fuel now refuels first.
+
+        Regression shape from run 20260729-105325: fuel 372, chase
+        cost 158, and the ``fuel_low_threshold``-only reserve (200)
+        passed the teleport -- the bot landed at 214, LOW_FUEL
+        hijacked one shot later, and the session bottomed at 140.
+        User ruling 2026-07-29: "we cant kill anyone if we die...
+        we should fuel before chasing." The reserve now includes the
+        full ``engagement_fuel_budget`` (matching the acquisition
+        gate), so this teleport delegates to lock-held refueling.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=127,
+                y=100,
+                team=2,
+                rank=1,
+                name="red-7",
+                is_self=False,
+                is_bot=True,
+                damage_state=2,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=372, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=127, y=100, name="red-7"))
+
+        if result is None:
+            raise AssertionError("expected fuel recovery decision")
+        assert result["command"]["cmd_type"] != "teleport"
+        assert result["behavior"]["mode"] == "COLLECT"
+        # Never-drop: the lock rides through the refuel detour.
+        assert result["updated_ai_state"]["combat_target_id"] == 50
+
     def test_teleport_to_target_returns_teleport_for_affordable_close(self) -> None:
         """Combat teleport emits a teleport decision when the landing is affordable."""
         tanks: dict[str, TankStateDict] = {

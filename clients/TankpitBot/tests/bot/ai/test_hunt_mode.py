@@ -978,7 +978,7 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
     teleport instead of firing into the void.
     """
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
-    world, self_state = make_world(fuel=800, tanks=tanks)
+    world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -1001,7 +1001,7 @@ def test_hunt_close_re_teleports_when_lock_was_never_engaged() -> None:
 def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
     """ENGAGE substate re-teleports when lock was set but no shot ever fired."""
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
-    world, self_state = make_world(fuel=800, tanks=tanks)
+    world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
@@ -1024,7 +1024,7 @@ def test_hunt_engage_re_teleports_when_lock_was_never_engaged() -> None:
 def test_hunt_refresh_re_teleports_when_lock_was_never_engaged() -> None:
     """REFRESH substate re-teleports when lock was set but no shot ever fired."""
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(x=150, y=150)}
-    world, self_state = make_world(fuel=800, tanks=tanks)
+    world, self_state = make_world(fuel=1090, tanks=tanks)
     ai_state = AIStateDict(
         **{
             **make_scanned_ai_state(),
