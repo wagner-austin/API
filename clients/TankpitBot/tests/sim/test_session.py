@@ -110,10 +110,38 @@ def test_own_deactivation_ends_the_session_through_the_production_exit() -> None
         is_mine_kill=False,
     )
     deliver_batch(bot._cdp_message_buffer, [death], link)
+    # User contract 2026-07-30: a death is a respawn wait, not an
+    # exit — the corpse's beliefs reset, the dead self record drops,
+    # and the loop idles until fresh sync (or the 60 s deadline).
+    _tick_once(bot)
+    assert get_world_service().self_deactivated is False
+    assert get_world_service().world_state["self_state"] is None
+    assert bot._ai_state["combat_target_id"] == -1
+    assert bot._respawn_deadline_ms > 0
+    # Waiting ticks idle quietly while the deadline is in the future.
+    _tick_once(bot)
+    assert bot._respawn_deadline_ms > 0
+    # A fresh self sync IS the respawn: the wait clears and the next
+    # arbitration runs with a factory-reset tactical state.
+    from tankpit_bot.state import make_self_state
+
+    get_world_service().world_state["self_state"] = make_self_state(
+        tank_id=SEAM_CLIENT_ID,
+        x=10,
+        y=10,
+        team=2,
+        rank=0,
+        fuel=1000,
+        leaderboard_position=1,
+    )
+    _tick_once(bot)
+    assert bot._respawn_deadline_ms == 0
+    # With no respawn law in the sim, the deadline is the exit path.
+    get_world_service().world_state["self_state"] = None
+    bot._respawn_deadline_ms = 1
     with pytest.raises(SessionExitError) as exit_info:
         _tick_once(bot)
     assert exit_info.value.reason == "deactivated"
-    assert get_world_service().self_deactivated is True
 
 
 def test_real_tick_loop_plays_a_session_against_the_sim() -> None:
