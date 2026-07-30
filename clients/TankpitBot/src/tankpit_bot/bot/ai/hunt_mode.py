@@ -1014,6 +1014,38 @@ def _break_losing_engagement(
     release_at = ctx.fuel + shortfall
     capacity = fuel_capacity(ctx.self_state["rank"])
     if release_at >= capacity:
+        if not is_practice_bot_name(target["name"]):
+            # A HUMAN fight is never "unwinnable" (user ruling
+            # 2026-07-30, after the Artax death: "the bot can fight
+            # against a human and win... it should have collected fuel
+            # and then kept fighting and collected as necessary").
+            # Human fights are attrition -- both sides refuel -- so
+            # the one-kill projection that condemns a practice-bot
+            # fight does not apply; blocking Yuppler at fuel 216 and
+            # standing on the map was the death. Latch at capacity:
+            # escape now with the lock held, refuel to full, resume.
+            emit_ai(
+                "human fight with %s projects past capacity (needs %d) - "
+                "refuel to full and keep fighting",
+                target["name"],
+                release_at,
+            )
+            human_latched_ctx = DecideCtx(
+                ctx.world,
+                ctx.self_state,
+                AIStateDict(
+                    **{
+                        **ctx.ai_state,
+                        "break_escape_until_fuel": capacity,
+                    }
+                ),
+                ctx.inventory,
+                ctx.timestamp_ms,
+                ctx.terrain,
+                ctx.combat_feedback,
+                ctx.map_fuel_dots,
+            )
+            return refuel_for_hunt(human_latched_ctx, target)
         # Even a full tank cannot fund this fight -- the projection
         # fails at every reachable fuel level, so latching would pin
         # the bot in COLLECT forever. Block with the standard TTL and

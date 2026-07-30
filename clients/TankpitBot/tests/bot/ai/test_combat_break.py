@@ -103,9 +103,9 @@ def _pursuit_target(*, damage_state: int) -> TankStateDict:
         y=150,
         team=2,
         rank=1,
-        name="Runner",
+        name="red-7",
         is_self=False,
-        is_bot=False,
+        is_bot=True,
         damage_state=damage_state,
         timestamp_ms=100000,
         last_wire_seen_ms=100000,
@@ -413,6 +413,46 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     assert decision["behavior"]["reason_kind"] == "fuel_hop"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
     assert decision["updated_ai_state"]["break_escape_until_fuel"] > 500
+
+
+def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
+    """A human fight is never blocked as unwinnable — refuel and resume.
+
+    User ruling 2026-07-30 after the Artax death ("the bot can fight
+    against a human and win... it should have collected fuel and then
+    kept fighting and collected as necessary"): the one-kill
+    projection that condemns a practice-bot fight does not apply to
+    attrition fights against humans. Past-capacity projections latch
+    at capacity and escape to fuel with the lock held.
+    """
+    reset_world_state()
+    _seed_confirmed_incoming(5)
+    try:
+        base_ctx = _engage_ctx(fuel=800)
+        base_ctx.world["tanks"]["50"] = make_tank_state(
+            tank_id=50,
+            x=150,
+            y=150,
+            team=2,
+            rank=1,
+            name="Yuppler",
+            is_self=False,
+            is_bot=False,
+            damage_state=3,
+            timestamp_ms=100000,
+            last_wire_seen_ms=100000,
+            last_position_update_ms=100000,
+            last_viewport_observation_ms=80000,
+        )
+        decision = decide_hunt_mode(base_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    # Latched at capacity: the fixture's self tank is rank 2, so full
+    # is 1200 — refuel to the brim, then resume the human fight.
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 1200
 
 
 def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
