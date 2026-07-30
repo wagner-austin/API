@@ -54,9 +54,6 @@ CMD_PICKUP_FUEL = 100  # 0x64 / 'd' - Long press - Get fuel
 CMD_PICKUP_EQUIPMENT = 106  # 0x6a / 'j' - Long press - Get equipment
 # Pickup payload: X (1 byte) + Y (1 byte) = target coordinates
 
-# Backwards compatibility for older internal naming.
-CMD_PICKUP_MOVE = CMD_PICKUP_FUEL
-
 CMD_MAP_TELEPORT = 116  # 0x74 - Map click - Teleport via map (fuel cost varies by distance)
 # Teleport payload: X (1 byte) + Y (1 byte) = destination coordinates
 # Requires map to be open first (CMD_MAP_OPEN)
@@ -535,7 +532,6 @@ __all__ = [
     "CMD_NEAREST_ENEMY",
     "CMD_PICKUP_EQUIPMENT",
     "CMD_PICKUP_FUEL",
-    "CMD_PICKUP_MOVE",
     "CMD_PING",
     "CMD_RADAR",
     "CMD_SCOPE",
