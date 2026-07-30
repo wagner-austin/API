@@ -107,21 +107,61 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
     Returns:
         Mode-owned hunt decision.
     """
-    latch = ctx.ai_state["break_escape_until_fuel"]
-    if latch > 0 and ctx.fuel >= latch:
-        emit_ai("break latch released (fuel %d >= floor %d)", ctx.fuel, latch)
-        ctx = DecideCtx(
-            ctx.world,
-            ctx.self_state,
-            AIStateDict(**{**ctx.ai_state, "break_escape_until_fuel": 0}),
-            ctx.inventory,
-            ctx.timestamp_ms,
-            ctx.terrain,
-            ctx.combat_feedback,
-            ctx.map_fuel_dots,
-        )
+    ctx = _release_break_latch(ctx)
     if ctx.mode_state == "CONFIRM_KILL":
         return _decide_hunt_confirm_kill(ctx)
+    escape = _continue_break_escape(ctx)
+    if escape is not None:
+        return escape
+    broken = _assess_locked_engagement(ctx)
+    if broken is not None:
+        return broken
+    if ctx.mode_state == "SCAN_ON_LANDING":
+        return _decide_hunt_scan_on_landing(ctx)
+    if ctx.mode_state == "ENGAGE":
+        return _decide_hunt_engage(ctx)
+    if ctx.mode_state == "CLOSE":
+        return _decide_hunt_close(ctx)
+    if ctx.mode_state == "REFRESH":
+        return _decide_hunt_refresh(ctx)
+    return _decide_hunt_acquire(ctx)
+
+
+def _release_break_latch(ctx: DecideCtx) -> DecideCtx:
+    """Return ctx with the break latch cleared once fuel recovers.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        The same context, or one whose AI state has the latch zeroed.
+    """
+    latch = ctx.ai_state["break_escape_until_fuel"]
+    if latch <= 0 or ctx.fuel < latch:
+        return ctx
+    emit_ai("break latch released (fuel %d >= floor %d)", ctx.fuel, latch)
+    return DecideCtx(
+        ctx.world,
+        ctx.self_state,
+        AIStateDict(**{**ctx.ai_state, "break_escape_until_fuel": 0}),
+        ctx.inventory,
+        ctx.timestamp_ms,
+        ctx.terrain,
+        ctx.combat_feedback,
+        ctx.map_fuel_dots,
+    )
+
+
+def _continue_break_escape(ctx: DecideCtx) -> TickDecisionDict | None:
+    """Return the escape decision while the break latch is holding.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Lock-held refuel decision, or ``None`` when no latch holds
+        (or the escaped target is gone entirely).
+    """
     latch = ctx.ai_state["break_escape_until_fuel"]
     if latch > 0:
         # A holding latch gates EVERY combat phase, not just ENGAGE.
@@ -144,15 +184,37 @@ def decide_hunt_mode(ctx: DecideCtx) -> TickDecisionDict:
                 latch,
             )
             return refuel_for_hunt(ctx, escape_target)
-    if ctx.mode_state == "SCAN_ON_LANDING":
-        return _decide_hunt_scan_on_landing(ctx)
-    if ctx.mode_state == "ENGAGE":
-        return _decide_hunt_engage(ctx)
-    if ctx.mode_state == "CLOSE":
-        return _decide_hunt_close(ctx)
-    if ctx.mode_state == "REFRESH":
-        return _decide_hunt_refresh(ctx)
-    return _decide_hunt_acquire(ctx)
+    return None
+
+
+def _assess_locked_engagement(ctx: DecideCtx) -> TickDecisionDict | None:
+    """Run the break assessment for a held combat lock at phase entry.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        Break decision when the projection says the fight is lost,
+        otherwise ``None``.
+    """
+    if ctx.ai_state["combat_target_id"] != -1:
+        # The break ASSESSMENT gates every combat phase at entry, like
+        # the latch above. It used to live only on the ENGAGE path, and
+        # the Artax death (run bot-20260730-004144, 01:06:55, killed by
+        # Yuppler) ran entirely in CLOSE: point-blank shot ticks looped
+        # through _decide_hunt_close, no assessment ever ran, and the
+        # first break of the whole fight fired at fuel 216 -- four
+        # seconds before deactivation ("he just stood there and tanked
+        # like 4 shots"). Assessed here, the first 3-hit window breaks
+        # the fight near full fuel, while escape is still cheap.
+        break_target = get_locked_target(ctx, _visible_threats(ctx))
+        if break_target is None:
+            break_target = _locked_target_pursuit(ctx)
+        if break_target is not None:
+            broken = _break_losing_engagement(ctx, break_target)
+            if broken is not None:
+                return broken
+    return None
 
 
 def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
@@ -873,21 +935,21 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
 
 
 def _decide_hunt_engage(ctx: DecideCtx) -> TickDecisionDict:
-    """Engage the locked combat target or confirm its disappearance."""
+    """Engage the locked combat target or confirm its disappearance.
+
+    The break assessment and escape latch both gate at
+    :func:`decide_hunt_mode` entry (the Artax death proved per-phase
+    checks always leave a phase uncovered), so this path engages
+    without re-assessing.
+    """
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
     if target is not None:
-        broken = _break_losing_engagement(ctx, target)
-        if broken is not None:
-            return broken
         if has_cardinal_combat_shot(ctx.self_state, target):
             return engage_target(ctx, target)
         return close_target(ctx, target)
     pursuit = _locked_target_pursuit(ctx)
     if pursuit is not None:
-        broken = _break_losing_engagement(ctx, pursuit)
-        if broken is not None:
-            return broken
         return _resume_locked_target_off_viewport(ctx, pursuit)
     return _enter_confirm_kill(ctx)
 

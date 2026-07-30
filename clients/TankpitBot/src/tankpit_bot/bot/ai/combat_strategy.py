@@ -35,6 +35,7 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.physics.line_of_sight import is_shot_line_clear
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
@@ -77,6 +78,36 @@ def _clamp_aim_into_viewport(ctx: DecideCtx, aim_x: int, aim_y: int) -> tuple[in
     if not (left <= self_x <= right and top <= self_y <= bottom):
         return (aim_x, aim_y)
     return (max(left, min(right, aim_x)), max(top, min(bottom, aim_y)))
+
+
+def has_clear_shot_line(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
+    """Return True when the straight line to the target has no occluder.
+
+    The user's firing law has always carried a clearance clause ("as
+    long as theyre on the viewport and its a CLEAR dual shot") --
+    enforced since flag s3-16 through the lifted
+    :func:`tankpit_bot.physics.line_of_sight.is_shot_line_clear` test:
+    rock and movable land blocks occlude, water and mines never do,
+    and cardinal adjacency is trivially clear (no intermediate
+    tiles). An in-view target behind terrain is NOT shot from here --
+    spending an over-terrain homing where a re-close buys point-blank
+    duals is the F11 weapon-economy hole ([[flag-triage-20260729]]).
+
+    Args:
+        ctx: Decision context.
+        target: Enemy threat under aim.
+
+    Returns:
+        True when a dual fired from the current tile flies clean.
+    """
+    return is_shot_line_clear(
+        ctx.self_state["x"],
+        ctx.self_state["y"],
+        target["x"],
+        target["y"],
+        ctx.terrain,
+        ctx.world["terrain"],
+    )
 
 
 def is_already_engaged(ctx: DecideCtx) -> bool:
@@ -485,13 +516,24 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
     # itself.
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     if left <= target["x"] <= right and top <= target["y"] <= bottom:
+        if has_clear_shot_line(ctx, target):
+            emit_ai(
+                "%s already in view at (%d,%d) - engaging without teleport",
+                target["name"],
+                target["x"],
+                target["y"],
+            )
+            return _combat_shoot(ctx, target)
+        # In view but the dual line is occluded (flag s3-16: "we're
+        # shooting over terrain when we should have teleported back
+        # adjacent") -- fall through to the close teleport; adjacency
+        # has no intermediate tiles, so the landing buys a clear shot.
         emit_ai(
-            "%s already in view at (%d,%d) - engaging without teleport",
+            "%s in view at (%d,%d) but the shot line is blocked - closing for a clear shot",
             target["name"],
             target["x"],
             target["y"],
         )
-        return _combat_shoot(ctx, target)
     landing_x, landing_y = combat_landing_tile(ctx, target)
     if is_move_target_failed(landing_x, landing_y, ctx.timestamp_ms):
         # The target is off-view here (in-view targets shot above), so
@@ -594,14 +636,37 @@ def _combat_close(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDict:
        target. This is the one-time close the engagement contract
        allows; subsequent ticks fall through branch (2).
     """
-    if has_cardinal_combat_shot(ctx.self_state, target) or has_combat_shot(ctx, target):
-        # In-view and in shot range: fire from the current tile (user
-        # ruling 2026-07-29). The purple-8 receipt this closes: after
-        # a break-driven pickup the bot stood at dist 2 and paid a
-        # teleport to regain cardinal adjacency instead of shooting.
+    if has_cardinal_combat_shot(ctx.self_state, target) or (
+        has_combat_shot(ctx, target) and has_clear_shot_line(ctx, target)
+    ):
+        # In-view, in range, and the dual line is clean: fire from the
+        # current tile (user ruling 2026-07-29). The purple-8 receipt
+        # this closes: after a break-driven pickup the bot stood at
+        # dist 2 and paid a teleport to regain cardinal adjacency
+        # instead of shooting. Cardinal adjacency is trivially clear
+        # (no intermediate tiles); a ranged shot must pass the lifted
+        # LOS test or the server serves a half-damage over-terrain
+        # homing (flag s3-16 / Artax death: the losing trade).
         return _combat_shoot(ctx, target)
     dist = abs(ctx.self_state["x"] - target["x"]) + abs(ctx.self_state["y"] - target["y"])
     if is_already_engaged(ctx):
+        if not has_clear_shot_line(ctx, target):
+            # Flag s3-16 ("we're shooting over terrain when we should
+            # have teleported back adjacent"): a stay-put shot here is
+            # a half-damage homing arcing over the occluder while the
+            # enemy duals back for 90 -- the trade that killed Artax.
+            # Re-close instead; the landing is adjacent, and adjacency
+            # always has a clear line.
+            emit_ai(
+                "engaged %s at (%d,%d) is behind terrain from (%d,%d) - "
+                "re-closing for a clear shot",
+                target["name"],
+                target["x"],
+                target["y"],
+                ctx.self_state["x"],
+                ctx.self_state["y"],
+            )
+            return _combat_teleport(ctx, target)
         emit_ai(
             "engaged %s moved off cardinal from (%d,%d) target=(%d,%d) dist=%d; staying put",
             target["name"],
@@ -901,6 +966,7 @@ __all__ = [
     "engage_target",
     "get_locked_target",
     "has_cardinal_combat_shot",
+    "has_clear_shot_line",
     "has_combat_shot",
     "has_standoff_landing",
     "is_already_engaged",
