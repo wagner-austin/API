@@ -5,6 +5,7 @@ from __future__ import annotations
 from tankpit_bot.bot.ai.combat_strategy import (
     SHOT_RANGE_TILES,
     _combat_landing_candidates,
+    close_target,
     engage_target,
     get_locked_target,
     has_combat_shot,
@@ -761,6 +762,101 @@ class TestCombatTeleportGuards:
             raise AssertionError("expected shoot decision")
         assert result["command"]["cmd_type"] == "shoot"
         assert result["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_teleport_to_target_closes_when_in_view_shot_line_is_blocked(self) -> None:
+        """An in-view target behind rock gets a close teleport, not a shot.
+
+        The firing law's clearance clause (user verbatim: "...and its a
+        CLEAR dual shot"), enforced after flag s3-16 and the Artax
+        death: shooting through the occluder spends half-damage
+        over-terrain homings while the enemy duals back for 90. The
+        close lands adjacent, and adjacency always has a clear line.
+        """
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=104,
+                y=100,
+                team=2,
+                rank=1,
+                name="BehindRock",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        terrain = InMemoryTerrainMap({(102, 100): InMemoryTerrainMap.ROCK})
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
+
+        if result is None:
+            raise AssertionError("expected close teleport decision")
+        assert result["command"]["cmd_type"] == "teleport"
+        assert result["behavior"]["reason_kind"] == "teleport_target"
+
+    def test_engaged_target_behind_terrain_recloses_for_a_clear_shot(self) -> None:
+        """Mid-fight, an occluded line re-closes instead of arcing homings.
+
+        Flag s3-16 ("we're shooting over terrain when we should have
+        teleported back adjacent") and the Artax death: the stay-put
+        homing trade is 45 out against 90 in. The engaged branch now
+        pays the re-close teleport when the dual line is blocked.
+        """
+        from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=104,
+                y=100,
+                team=2,
+                rank=1,
+                name="BehindRock",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=800, tanks=tanks)
+        terrain = InMemoryTerrainMap({(102, 100): InMemoryTerrainMap.ROCK})
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "combat_target_id": 50,
+                "combat_target_x": 104,
+                "combat_target_y": 100,
+                "last_shot_target_id": 50,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            terrain,
+            "",
+        )
+
+        result = close_target(ctx, _enemy_threat(x=104, y=100, name="BehindRock"))
+
+        if result is None:
+            raise AssertionError("expected re-close teleport decision")
+        assert result["command"]["cmd_type"] == "teleport"
 
     def test_teleport_to_target_shoots_when_in_view_beyond_shot_range_bound(self) -> None:
         """In view beyond ``SHOT_RANGE_TILES`` is still a shot, not a teleport.

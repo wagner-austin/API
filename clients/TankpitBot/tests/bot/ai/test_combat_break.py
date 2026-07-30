@@ -382,6 +382,63 @@ def test_latch_without_a_lock_does_not_hijack_the_tick() -> None:
     assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
 
 
+def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
+    """The break assessment gates CLOSE ticks too — the Artax death pin.
+
+    Run bot-20260730-004144, 01:06:55: the whole Yuppler fight ran in
+    CLOSE phase, where no break assessment existed — the first break
+    of the fight fired at fuel 216, four seconds before deactivation
+    ("he just stood there and tanked like 4 shots"). With the
+    assessment at HUNT entry, the same fight shape breaks on the
+    first sustained-fire window while escape is still cheap.
+    """
+    reset_world_state()
+    _seed_confirmed_incoming(5, weapon=0, damage=-45)
+    try:
+        base_ctx = _engage_ctx(fuel=500, damage_state=1)
+        close_ctx = DecideCtx(
+            base_ctx.world,
+            base_ctx.self_state,
+            AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+            base_ctx.inventory,
+            base_ctx.timestamp_ms,
+            base_ctx.terrain,
+            base_ctx.combat_feedback,
+            base_ctx.map_fuel_dots,
+        )
+        decision = decide_hunt_mode(close_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["behavior"]["reason_kind"] == "fuel_hop"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] > 500
+
+
+def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
+    """A fight no fuel level can fund is blocked from CLOSE ticks too."""
+    reset_world_state()
+    _seed_confirmed_incoming(5)
+    try:
+        base_ctx = _engage_ctx(fuel=800)
+        close_ctx = DecideCtx(
+            base_ctx.world,
+            base_ctx.self_state,
+            AIStateDict(**{**base_ctx.ai_state, "mode_state": "CLOSE"}),
+            base_ctx.inventory,
+            base_ctx.timestamp_ms,
+            base_ctx.terrain,
+            base_ctx.combat_feedback,
+            base_ctx.map_fuel_dots,
+        )
+        decision = decide_hunt_mode(close_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
+    assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
+
+
 def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
     """Fuel at the stored floor clears the latch and the fight resumes."""
     reset_world_state()
