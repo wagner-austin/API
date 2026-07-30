@@ -702,3 +702,13 @@ class TestFindLockedTargetPursuit:
         assert result["tank_id"] == 50
         assert result["x"] == 105
         assert result["y"] == 100
+
+
+def test_pursuit_trace_dead_when_target_missing_from_registry() -> None:
+    """An id absent from the registry has no live trace (audit gap pin)."""
+    from tankpit_bot.bot.ai.threats import pursuit_trace_is_live
+    from tests.bot.ai._support import make_world
+
+    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
+
+    assert pursuit_trace_is_live(world, 999, 100000) is False
