@@ -630,6 +630,33 @@ class TestDecode0x2eMessage:
         assert result["pickups"][0] == {"x": 198, "y": 175, "remaining_volume": 0}
         assert result["pickups"][1] == {"x": 199, "y": 176, "remaining_volume": 37}
 
+    def test_tunneled_chat_routes_through_misc(self) -> None:
+        """Tunneled 0x4D inside 0x2E decodes as a ChatMessage body.
+
+        Corpus sweep 2026-07-29 (320 sessions): chat arrives ONLY
+        0x2E-tunneled, always exactly 5 inner bytes, never top-level.
+        Fixture is the first production echo of
+        sniff-20260729-214411, byte-for-byte: ``4d 15 05 0c 61 d4``
+        — sender 1301 (Artax) saying 12 "Base is here" at (97, 212).
+        """
+        data = bytes.fromhex("4d15050c61d4")
+        result = decode_0x2e_message(data)
+        assert result["msg_type"] == 0x4D
+        assert result["sender_id"] == 1301
+        assert result["message_type"] == 12
+        assert result["x"] == 97
+        assert result["y"] == 212
+
+    def test_short_0x4d_body_falls_through_to_container(self) -> None:
+        """A sub-5-byte 0x4D body is NOT claimed by the chat route.
+
+        The 5-byte gate mirrors the corpus (every tunneled chat body
+        is exactly 5 inner bytes); anything shorter falls through to
+        length-based container identification.
+        """
+        result = decode_0x2e_message(bytes.fromhex("4d150501"))
+        assert result["msg_type"] != 0x4D
+
     def test_tunneled_map_data_routes_through_world(self) -> None:
         """Tunneled 0x4C inside 0x2E decodes as MapData.
 

@@ -452,6 +452,15 @@ class TestFormatFunctions:
         result = format_misc_details(msg)
         assert "sender=100" in result
         assert "type=2" in result
+        assert "text='Attack the blue'" in result
+
+    def test_format_misc_details_chat_unknown_id(self) -> None:
+        """0x4D formatting marks IDs outside the preset table."""
+        from tankpit_bot.protocol import ChatMessageDict
+
+        msg = ChatMessageDict(msg_type=0x4D, sender_id=100, message_type=99, x=None, y=None)
+        result = format_misc_details(msg)
+        assert "text='unknown_99'" in result
 
     def test_format_misc_details_unknown(self) -> None:
         """Test format_misc_details returns empty for unknown type."""

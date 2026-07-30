@@ -200,3 +200,69 @@ class TestDispatchOther:
         if self_state is None:
             raise AssertionError("self_state should be populated")
         assert self_state["fuel"] == initial_fuel
+
+    def test_dispatch_chat_from_other_tank(self) -> None:
+        """A 0x4D chat from another tank never touches the echo latch."""
+        from tankpit_bot.protocol import ChatMessageDict
+        from tankpit_bot.state import make_tank_state
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        new_tanks = dict(ws.world_state["tanks"])
+        new_tanks["1229"] = make_tank_state(
+            tank_id=1229,
+            x=97,
+            y=212,
+            team=1,
+            rank=4,
+            damage_state=0,
+            name="Yuppler",
+            is_bot=False,
+            is_self=False,
+            source="viewport",
+            timestamp_ms=1000,
+        )
+        ws.world_state["tanks"] = new_tanks
+
+        msg = ChatMessageDict(msg_type=0x4D, sender_id=1229, message_type=41, x=97, y=212)
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.last_chat_echo_message_id == -1
+
+    def test_dispatch_chat_self_echo_latches_message_id(self) -> None:
+        """Our own 0x4D echo records the message id — the send receipt.
+
+        sniff-20260729-214411: the server echoes an accepted chat back
+        to the sender; after the flood mute, sends produce NO echo, so
+        the latch staying put is the only signal a chat was swallowed.
+        """
+        from tankpit_bot.protocol import ChatMessageDict
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("self_state should be populated")
+
+        assert ws.last_chat_echo_message_id == -1
+        msg = ChatMessageDict(
+            msg_type=0x4D,
+            sender_id=self_state["tank_id"],
+            message_type=41,
+            x=100,
+            y=100,
+        )
+        dispatch_world_state_update(ws, msg)
+        assert ws.last_chat_echo_message_id == 41
+
+    def test_dispatch_chat_unknown_sender_and_no_position(self) -> None:
+        """A chat from an untracked tank with no x/y still dispatches."""
+        from tankpit_bot.protocol import ChatMessageDict
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+
+        msg = ChatMessageDict(msg_type=0x4D, sender_id=9999, message_type=99, x=None, y=None)
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.last_chat_echo_message_id == -1
