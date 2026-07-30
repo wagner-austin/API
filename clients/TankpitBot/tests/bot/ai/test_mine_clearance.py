@@ -142,6 +142,39 @@ def test_recruit_scores_single_tile_blast_and_takes_the_nearest() -> None:
     assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (102, 100)
 
 
+def test_dreg_fuel_under_mines_is_not_worth_the_shot() -> None:
+    """A covered fuel container below the value floor draws no clearance.
+
+    Flag 8 (run bot-20260730-015x): a shot was spent un-covering a
+    21-volume fuel dreg. Equipment is always worth the tick; fuel
+    must hold a real drink.
+    """
+    world, self_state = _world_with_self()
+    world["containers"]["104,100"] = make_container_state(
+        x=104,
+        y=100,
+        is_fuel=True,
+        volume=21,
+    )
+    world["mines"]["104,100"] = make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1)
+
+    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) is None
+
+
+def test_rich_fuel_under_mines_still_draws_the_shot() -> None:
+    """A covered fuel container at the value floor stays a clearance aim."""
+    world, self_state = _world_with_self()
+    world["containers"]["104,100"] = make_container_state(
+        x=104,
+        y=100,
+        is_fuel=True,
+        volume=100,
+    )
+    world["mines"]["104,100"] = make_mine_state(x=104, y=100, mine_type=0, tank_id=-1, team=1)
+
+    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+
+
 def test_blast_clips_at_the_map_edge() -> None:
     """A corner aim only counts in-bounds blast tiles."""
     world, self_state = _world_with_self()

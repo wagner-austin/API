@@ -36,6 +36,14 @@ from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 # mine plus all 8 cardinal/diagonal neighbors.
 _RECRUIT_RANK = 0
 
+# A clearance shot must expose something worth the tick it costs.
+# Equipment is always worth it (four pieces per pickup, no cap
+# clamp); a fuel container has to hold a real drink -- flag 8 of run
+# bot-20260730-015x spent a shot un-covering a 21-volume dreg ("i
+# could understand if it was a high value container... but 21 value
+# fuel container?").
+_MIN_CLEARANCE_FUEL_VOLUME = 100
+
 
 def _blast_tiles(center_x: int, center_y: int, rank: int) -> list[tuple[int, int]]:
     """Return the tiles a shot at the center clears mines from.
@@ -90,6 +98,8 @@ def find_mine_clearance_shot(
         if container_key not in mines:
             continue
         if not (left <= container["x"] <= right and top <= container["y"] <= bottom):
+            continue
+        if container["is_fuel"] and container["volume"] < _MIN_CLEARANCE_FUEL_VOLUME:
             continue
         covered.append((container["x"], container["y"]))
     if not covered:
