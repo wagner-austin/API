@@ -355,20 +355,27 @@ def _dispatch_protocol_world(subtype: int, inner: bytes) -> BinaryMessage | None
 def _dispatch_protocol_misc(subtype: int, inner: bytes) -> BinaryMessage | None:
     """Subtypes that tunnel a protocol misc message.
 
-    Covers ActionDone (0x54), BuildPickup (0x42), and Statistics
-    (0x56). All three were ground-truthed against production captures
-    (analysis_scripts/crack_tank_update.py): 0x56 fires on 239/239
-    samples in the corpus, 0x42 on 2/2 own-tank build/pickup events,
-    and 0x54 is the ~1-byte ActionDone heartbeat.
+    Covers ActionDone (0x54), BuildPickup (0x42), Statistics (0x56),
+    and ChatMessage (0x4D). The first three were ground-truthed
+    against production captures (analysis_scripts/crack_tank_update.py):
+    0x56 fires on 239/239 samples in the corpus, 0x42 on 2/2 own-tank
+    build/pickup events, and 0x54 is the ~1-byte ActionDone heartbeat.
+    Chat is 0x2E-tunneled like the rest of the event stream: corpus
+    sweep 2026-07-29 (320 sessions) found chat ONLY inside 0x2E,
+    always exactly 5 inner bytes (``sender_id(2 LE) + msg_id + x +
+    y``, sniff-20260729-214411 -- 8 echoed sends), never top-level.
     """
     from tankpit_bot.protocol.decoders.session_events import (
         decode_action_done,
         decode_build_pickup,
+        decode_chat_message,
         decode_statistics,
     )
 
     if subtype == 0x42 and len(inner) >= 9:
         return decode_build_pickup(inner)
+    if subtype == 0x4D and len(inner) >= 5:
+        return decode_chat_message(inner)
     if subtype == 0x54 and len(inner) >= 1:
         return decode_action_done(inner)
     if subtype == 0x56 and len(inner) >= 12:
