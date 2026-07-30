@@ -41,6 +41,21 @@ from tankpit_bot.state.types import WorldStateDict
 # equipment that respawns later is eventually re-discovered.
 FORAGE_COVERAGE_TTL_MS = 180000
 
+HARVEST_MEMORY_TTL_MS = 600000
+"""How long harvested/barren ground stays vetoed for collect dot hops.
+
+The forage TTL above answers "is this ground worth another RADAR" and
+deliberately ages out fast. Harvest memory answers "did we already
+LEARN this ground is worthless" and must outlive it: run
+bot-20260729-232252 re-hopped picked-clean viewports the moment the
+180 s coverage expired (63% zero-yield hops,
+[[flag-triage-20260729]] F2). Two vetoes share this window: drained
+container beliefs (`_landing_viewport_known_empty`) and barren scan
+memory (`is_viewport_scanned_within` — scanned recently, revealed
+nothing). Container respawn cadence is unmeasured — this bound is a
+working assumption, not a wire-derived law.
+"""
+
 
 def tile_key(x: int, y: int) -> str:
     """Return the dict key for a tile.
@@ -322,12 +337,71 @@ def select_best_free_radar_position(
     return best
 
 
+def is_viewport_scanned_within(
+    scanned_tiles: dict[str, int],
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+    *,
+    ttl_ms: int,
+) -> bool:
+    """Return True when every on-map viewport tile was scanned within ``ttl_ms``.
+
+    The barren-memory predicate ([[flag-triage-20260729]] F2): a
+    viewport the radar fully swept within the window is KNOWN ground —
+    if the sweep revealed no containers, hopping back is a guaranteed
+    zero-delta scan. Distinct from :func:`is_viewport_fully_covered`,
+    which asks the forage question ("worth another radar?") on the
+    short :data:`FORAGE_COVERAGE_TTL_MS`; this predicate takes its
+    window explicitly so harvest memory can outlive forage coverage.
+
+    Bounds are clamped to the 0..255 map — off-map tiles can never
+    carry a mark and must not make an edge viewport read unscanned. A
+    viewport with no on-map tiles has no scan knowledge and returns
+    False.
+
+    Args:
+        scanned_tiles: Coverage map keyed by ``"x,y"`` -> scan ms.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+        ttl_ms: Scan-mark lifetime for this question.
+
+    Returns:
+        True when the whole on-map viewport was scanned within
+        ``ttl_ms``.
+    """
+    left = max(viewport_left, 0)
+    top = max(viewport_top, 0)
+    right = min(viewport_right, 255)
+    bottom = min(viewport_bottom, 255)
+    if left > right or top > bottom:
+        return False
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            scanned_ms = scanned_tiles.get(tile_key(x, y))
+            if scanned_ms is None or now_ms - scanned_ms > ttl_ms:
+                return False
+    return True
+
+
 def record_scanned_tiles(
     state: WorldStateDict,
     scanned: list[tuple[int, int]],
     timestamp_ms: int,
 ) -> WorldStateDict:
     """Return state with ``scanned`` tiles marked at ``timestamp_ms`` and stale entries pruned.
+
+    Marks are retained for :data:`HARVEST_MEMORY_TTL_MS` — longer than
+    the forage TTL they serve for coverage checks — because the
+    barren-memory veto must still know "we swept this ground 4 minutes
+    ago" after the 180 s forage window has aged out
+    ([[flag-triage-20260729]] F2). Coverage predicates keep their own
+    windows; retention only bounds how long the raw marks exist.
 
     Args:
         state: Current world state.
@@ -340,7 +414,7 @@ def record_scanned_tiles(
     pruned = {
         key: scanned_ms
         for key, scanned_ms in state["scanned_tiles"].items()
-        if timestamp_ms - scanned_ms <= FORAGE_COVERAGE_TTL_MS
+        if timestamp_ms - scanned_ms <= HARVEST_MEMORY_TTL_MS
     }
     for tx, ty in scanned:
         pruned[tile_key(tx, ty)] = timestamp_ms
@@ -358,10 +432,12 @@ def record_scanned_tiles(
 
 __all__ = [
     "FORAGE_COVERAGE_TTL_MS",
+    "HARVEST_MEMORY_TTL_MS",
     "free_radar_new_coverage",
     "free_radar_revealed_tiles",
     "is_tile_covered",
     "is_viewport_fully_covered",
+    "is_viewport_scanned_within",
     "is_viewport_untouched",
     "record_scanned_tiles",
     "select_best_free_radar_position",
