@@ -31,7 +31,7 @@ from tankpit_bot.ledger.outcome.collect import (
 from tankpit_bot.ledger.outcome.move import emit_move_position_reached
 from tankpit_bot.ledger.outcome.scan import emit_scan_radar_complete
 from tankpit_bot.ledger.outcome.teleport import emit_teleport_landed
-from tankpit_bot.runtime_logging import emit_diagnostic, emit_state
+from tankpit_bot.runtime_logging import emit_state
 from tankpit_bot.sniffer.world_state import (
     check_and_clear_radar_scan_complete,
     get_world_service,
@@ -244,16 +244,16 @@ class CompletionsMixin(SessionBase):
                 world = get_world_service().world_state
                 enemy_on_tile = any(t["x"] == tx and t["y"] == ty for t in world["tanks"].values())
                 if dist > 1 or not enemy_on_tile:
+                    # Consumer only: the tile veto. The single
+                    # ``teleport_displacement`` RECEIPT is emitted at the
+                    # wire layer (``world_state_dispatch.
+                    # _emit_teleport_displacement``) on the landed
+                    # confirm — one diagnostic_kind, one schema; a second
+                    # emission here double-counted every >1-tile bounce
+                    # under a different field set (unified 2026-07-30,
+                    # [[flag-triage-20260729]] F9).
                     now = get_current_time_ms()
                     mark_move_target_failed(tx, ty, now)
-                    emit_diagnostic(
-                        diagnostic_kind="teleport_displacement",
-                        target_x=tx,
-                        target_y=ty,
-                        landed_x=self_state["x"],
-                        landed_y=self_state["y"],
-                        dist=dist,
-                    )
             emit_teleport_landed(
                 duration_ms=self._action_duration_ms(action),
                 target_x=tx,
