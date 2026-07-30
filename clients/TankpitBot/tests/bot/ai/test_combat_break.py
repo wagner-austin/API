@@ -276,6 +276,112 @@ def test_latched_break_escapes_even_when_the_projection_recovers() -> None:
     assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
 
 
+def test_latched_close_phase_stays_on_the_escape() -> None:
+    """A holding latch gates CLOSE ticks too (flag s2-7, bot-20260730-000030).
+
+    The latch check used to live only on the ENGAGE path, so a CLOSE
+    tick kept trading shots with orange-8 while the escape's larder
+    hop deferred for a map open -- four shoot/map_open cycles, fuel
+    572->462 under fire beside the minefield. The entry gate hands
+    every latched tick to the lock-held refuel regardless of phase,
+    so the deferred hop re-dispatches against the opened map on the
+    very next tick.
+    """
+    reset_world_state()
+    try:
+        visible_target = make_tank_state(
+            tank_id=50,
+            x=150,
+            y=150,
+            team=2,
+            rank=1,
+            name="Runner",
+            is_self=False,
+            is_bot=False,
+            damage_state=3,
+            timestamp_ms=100000,
+            last_wire_seen_ms=100000,
+            last_position_update_ms=100000,
+            last_viewport_observation_ms=100000,
+        )
+        world, self_state = make_world(
+            fuel=300,
+            tanks={"50": visible_target},
+            containers={
+                "140,100": make_container_state(
+                    x=140,
+                    y=100,
+                    is_fuel=True,
+                    volume=700,
+                    timestamp_ms=100000,
+                    failed_pickups=0,
+                )
+            },
+        )
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "HUNT",
+                "mode_state": "CLOSE",
+                "mode_started_ms": 90000,
+                "combat_target_id": 50,
+                "combat_target_x": 150,
+                "combat_target_y": 150,
+                "break_escape_until_fuel": 372,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            InMemoryTerrainMap(),
+            "",
+        )
+        decision = decide_hunt_mode(ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["behavior"]["mode"] == "COLLECT"
+    assert decision["command"]["cmd_type"] != "shoot"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
+
+
+def test_latch_without_a_lock_does_not_hijack_the_tick() -> None:
+    """Latch active but no combat lock: the tick runs its phase normally.
+
+    The latch's job is finishing an escape from a LOCKED fight; once
+    the lock is gone the phases proceed (here: acquisition opens the
+    map) and the latch simply waits for its fuel release.
+    """
+    reset_world_state()
+    try:
+        world, self_state = make_world(fuel=300)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "break_escape_until_fuel": 372,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            None,
+            "",
+        )
+        decision = decide_hunt_mode(ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["command"]["cmd_type"] == "map_open"
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 372
+
+
 def test_break_latch_releases_when_fuel_recovers_to_the_floor() -> None:
     """Fuel at the stored floor clears the latch and the fight resumes."""
     reset_world_state()
