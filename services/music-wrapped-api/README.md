@@ -93,7 +93,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `SPOTIFY_CLIENT_ID` | string | Conditional | Spotify app client ID (required for Spotify auth) |
 | `SPOTIFY_CLIENT_SECRET` | string | Conditional | Spotify app client secret (required for Spotify auth) |
 | `APPLE_DEVELOPER_TOKEN` | string | Conditional | Apple Music developer token (required for Apple Music) |
-| `PORT` | int | `8006` | Server port |
+| `PORT` | int | `8000` | Port the server binds inside the container. The platform publishes it on host port 8006 (`docker-compose.yml` maps `8006:8000`) |
 | `LOGGING__LEVEL` | string | `INFO` | Log level |
 
 > **Note:** Service credentials are only required when using that specific service. Only `REDIS_URL` is always required.
@@ -235,8 +235,8 @@ music-wrapped-api/
 # Build
 docker build -t music-wrapped-api:latest .
 
-# Run
-docker run -p 8006:8006 \
+# Run. The container binds ${PORT:-8000}, so publish host 8006 onto 8000.
+docker run -p 8006:8000 \
   -e REDIS_URL=redis://redis:6379/0 \
   -e LASTFM_API_KEY=your-key \
   -e LASTFM_API_SECRET=your-secret \
@@ -248,28 +248,17 @@ docker run -p 8006:8006 \
 
 ### Docker Compose
 
-```yaml
-version: "3.8"
-services:
-  music-wrapped:
-    build: .
-    ports:
-      - "8006:8006"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
+This service ships its own `docker-compose.yml` with two services, `api` and
+`worker`, both built from `Dockerfile` targets of the same name:
 
-  worker:
-    build: .
-    command: music-wrapped-worker
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
+```bash
+make up-music          # from the repository root
+docker compose up -d   # or from this directory
 ```
 
-Network: Requires `platform-network` and `platform-redis` from root docker-compose.
+The API publishes host port **8006** onto container port 8000, and Traefik
+routes `/music` to it. Redis is not in this compose file: it comes from the
+root compose (`make infra`), which also provides `platform-network`.
 
 ### Railway
 
