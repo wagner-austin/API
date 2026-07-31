@@ -8,8 +8,8 @@ source_paths:
   - "tests"
   - "scripts/guard.py"
 source_git_blobs:
-  "tests": "b873ace8539fd91aac675eb90b5a96e933d1ed30"
-  "scripts/guard.py": "508e6328c73be452a042fd00162168a921d7b1b9"
+  "tests": "34568813e5020215afec118c8ecb413eddea01cb"
+  "scripts/guard.py": "77361b8438d412a81430646541eb2161a26e8698"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
@@ -17,7 +17,7 @@ hubs: [codebase]
 
 # Testing Patterns
 
-5,548 tests, 100% coverage, zero mocks, zero monkey-patching.[^1]
+5,603 tests, 100% coverage, zero mocks, zero monkey-patching.[^1]
 
 ## `_test_hooks` DI pattern
 

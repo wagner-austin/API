@@ -11,6 +11,7 @@ source_paths:
   - "src/tankpit_bot/bot/ai/collect_mode.py"
 source_git_blobs:
   "src/tankpit_bot/bot/ai/intent.py": "74bcd19f55ef923ab28a40c02993d19fb7a7cacc"
+  "src/tankpit_bot/bot/ai/collect_mode.py": "81c893b10c143da3c9db8f316d912c225454373b"
 fact_checked: "2026-07-30"
 confidence: high
 hubs: [architecture]

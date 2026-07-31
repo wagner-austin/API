@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/state/scan_coverage.py"
 fact_checked: "2026-07-30"
 confidence: high
-hubs: [architecture]
+hubs: [architecture, combat]
 ---
 
 # Flag Triage — bot-20260729-232252
