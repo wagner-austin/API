@@ -125,11 +125,24 @@ this process, the phone expects the URL to answer at any hour:
 `TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS` (resolver
 `bot/config.py::resolve_idle_exit_seconds`) overrides the 1800 s
 idle window, and `0` disables the self-exit — `exit_when_idle`
-returns immediately. The shell:startup launcher
-(`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\tankpit-bot-service.cmd`)
-runs `make service` minimized at logon with the exit disabled;
-`make service`'s respawn loop covers crashes. Delete the .cmd to
-return to manual starts. Default behavior (no env) is unchanged.[^3]
+returns immediately. **The shell:startup launcher was removed 2026-07-31 —
+the service no longer starts at logon and `tankpit.austinwagner.org` only
+answers while `make service` is running.** Default behavior (no env) is
+unchanged.[^3]
+
+To restore always-on, recreate
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\tankpit-bot-service.cmd`
+with:
+
+```bat
+@echo off
+cd /d C:\Users\Test\PROJECTS\API\clients\TankpitBot
+set TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS=0
+start "TankpitBotService" /min cmd /c "make service"
+```
+
+It runs `make service` minimized at logon with the idle self-exit disabled;
+`make service`'s own respawn loop covers crashes.
 
 No input path exists anywhere in this surface — the buttons are HTTP
 POSTs to the bot service; nothing can touch the host mouse, in the
