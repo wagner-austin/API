@@ -5,12 +5,13 @@ related:
   - "[[cleargbm-perf-experiments-2026-07-21]]"
   - "[[cleargbm-perf-leaf-wise-growth]]"
   - "[[cleargbm-histogram-split-path]]"
-sources:
+source_paths:
   - libs/covenant_ml/src/covenant_ml/benchmarking/
   - libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py
   - libs/covenant_ml/docs/BENCHMARK_MANIFEST_2026-07-24.json
 fact_checked: "2026-07-24"
 confidence: high
+hubs: [libs]
 ---
 
 # ClearGBM vs LightGBM — leaf-normalized benchmarking

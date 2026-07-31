@@ -11,8 +11,6 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/tree/histograms.rs
   - libs/cleargbm/docs/BENCHMARK_MANIFEST_2026-07-21_phase_e.json
-  - ~/PROJECTS/tech-wiki/pages/lightgbm-construct-histogram-inner.md
-  - ~/PROJECTS/tech-wiki/pages/lightgbm-implicit-count-cnt-factor.md
 fact_checked: "2026-07-21"
 confidence: high
 hubs: [libs]
