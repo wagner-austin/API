@@ -25,12 +25,13 @@ from collections.abc import Mapping, Sequence
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.policy.budget import Budget
-from rw_bot.policy.defence import expand_defence
+from rw_bot.policy.defence import AA_TURRET_TYPE, TURRET_TYPE, expand_defence
 from rw_bot.policy.economy import (
     FACTORY_TYPE,
     Expansion,
     expand_economy,
     expand_production,
+    waiting,
 )
 from rw_bot.policy.ledger import Reaches
 from rw_bot.policy.workforce import Workforce
@@ -88,6 +89,8 @@ class Expander:
         catalogue: Mapping[str, UnitStats],
         profiles: Mapping[str, CombatProfile],
         enabled: bool,
+        aa_cover: bool = False,
+        cover: bool = True,
     ) -> None:
         """Open an expander.
 
@@ -97,10 +100,19 @@ class Expander:
             enabled: Whether expansion is being played at all. False is the
                 control arm of the A/B that measures whether it helps, and the
                 mode a probe uses when it wants the economy held still.
+            aa_cover: Whether an anti-air turret joins the cover once the
+                opponent has shown aircraft. Off is the behaviour every
+                measurement so far was taken under -- a defence that cannot
+                touch an aircraft at all ([[policy-holding-ground]]).
+            cover: Whether turrets are bought at all. The on-vs-off A/B
+                became possible only when siting made them land
+                ([[policy-holding-ground]]).
         """
         self.count = 0
         self.factories = 0
         self.enabled = enabled
+        self.aa_cover = aa_cover
+        self.cover = cover
         self.reason = "no sample seen yet" if enabled else "expansion disabled"
         # Which stage was even arrived at, per observation. The final `reason`
         # above is one sentence for a whole match and cannot tell "defence
@@ -110,6 +122,10 @@ class Expander:
         self.reaches = Reaches()
         self._catalogue = catalogue
         self._profiles = profiles
+        # Latched, not sampled: aircraft leave the viewport and come back, and
+        # AA that stands down between sorties is AA that is never finished
+        # when the sortie arrives.
+        self._air_seen = False
 
     def step(
         self,
@@ -119,6 +135,7 @@ class Expander:
         plan_holds_worker: int,
         wanted: Sequence[str],
         workforce: Workforce,
+        plan_wants_worker: bool = False,
     ) -> tuple[BuildOrder, ...]:
         """Ask the economy what to do about this sample.
 
@@ -161,6 +178,9 @@ class Expander:
                 rest of the workforce goes on working.
             wanted: Type names production is trying to make, which is what
                 decides whether throughput is actually short.
+            plan_wants_worker: Whether the plan is waiting for the next free
+                worker, in which case the expander stands down so that worker
+                is the plan's rather than the economy's ([[policy-loop]]).
             workforce: Told what each worker was sent to build, so the next
                 observation can see it working.
 
@@ -172,6 +192,25 @@ class Expander:
         if not self.enabled:
             self.reaches.reached("disabled", False, "expansion disabled")
             return ()
+        if plan_wants_worker:
+            # The plan's worker priority, matching the credit priority it has
+            # always had. Every capable worker is busy and the plan is waiting
+            # for whichever frees first; an expander that took that worker
+            # would starve the plan forever -- measured at Hard as 126 turrets,
+            # no factory, no army, and 1 win of 10 where the same doctrine had
+            # won 10 of 12 (log: 2026-07-31). Standing down entirely is
+            # correct here in the way it was wrong for plan-holds-only-worker:
+            # that gate had five other workers to keep using; this one is, by
+            # its own definition, the state where there is nothing free to
+            # keep using.
+            self.reaches.reached(
+                "plan-first-in-line",
+                False,
+                "the plan is waiting for the next free worker",
+            )
+            self.reason = "the plan is waiting for the next free worker"
+            return ()
+        self._note_air(sample)
         # The plan's worker, and only the plan's worker. Filtering rather than
         # returning is the whole of the fix: the two spenders still never order
         # the same unit, and the other five workers stay available.
@@ -313,14 +352,7 @@ class Expander:
             self.reason = income_reason
             return (*capacity, *self._commit(growth, budget, workforce))
         if not growth["build"]:
-            growth = expand_defence(
-                sample,
-                self._catalogue,
-                self._profiles,
-                available=budget.spendable(),
-                free=free,
-            )
-            self.reaches.reached("defence", growth["build"], growth["reason"])
+            growth = self._cover(sample, budget, free)
         if not growth["build"]:
             growth = expand_production(
                 sample,
@@ -332,6 +364,76 @@ class Expander:
             self.reaches.reached("throughput", growth["build"], growth["reason"])
         self.reason = growth["reason"] if growth["build"] else income_reason
         return (*capacity, *self._commit(growth, budget, workforce))
+
+    def _note_air(self, sample: Sample) -> None:
+        """Latch the sighting that arms anti-air cover.
+
+        Latched, not sampled: aircraft leave the viewport and come back, and
+        AA that stands down between sorties is never finished when the
+        sortie arrives.
+        """
+        if self.aa_cover and not self._air_seen:
+            self._air_seen = any(
+                entity["hostile"] and entity["flying"] for entity in sample["entities"]
+            )
+
+    def _cover(self, sample: Sample, budget: Budget, free: Sequence[Entity]) -> Expansion:
+        """Cover a bare structure: anti-air first once aircraft have been shown.
+
+        Skipped entirely when the doctrine turns cover off -- the arm that
+        asks whether landing turrets was worth landing.
+
+        **AA outranks ground cover on the latch, and the first arm measured
+        why it must.** V1 put anti-air after ground defence in the chain, and
+        its own reach line convicted it in one batch: ``aa-cover reached 50
+        acted 0``, zero AA turrets standing across twelve matches -- reached
+        only when everything above had declined, and never with 600 credits
+        left by then (log: 2026-07-30). The old disease, "a policy that was
+        reached, never one that ran", caught in one batch instead of four
+        because the reach line now exists. The inversion is safe by the same
+        gap that motivates it: ground raiders already have the guard, and
+        nothing else in the bot touches an aircraft at all.
+
+        Anti-air only after the opponent has **shown** aircraft -- it cannot
+        touch the ground ([[mechanics-combat-profile]]), so before that
+        sighting it is 600 credits pointed at a guess. The sighting is
+        latched by :meth:`step`: sorties leave the viewport and come back,
+        and AA that stands down between them is never finished when one
+        arrives.
+
+        Args:
+            sample: One observation of the world.
+            budget: The tick's credits.
+            free: Workers not already carrying out an order.
+
+        Returns:
+            The first cover decision that builds, or the last that declined.
+        """
+        if self.aa_cover and self._air_seen:
+            growth = expand_defence(
+                sample,
+                self._catalogue,
+                self._profiles,
+                available=budget.spendable(),
+                free=free,
+                turret_type=AA_TURRET_TYPE,
+            )
+            self.reaches.reached("aa-cover", growth["build"], growth["reason"])
+            if growth["build"]:
+                return growth
+        if not self.cover:
+            declined = waiting("cover disabled by doctrine", sample, TURRET_TYPE)
+            self.reaches.reached("defence", False, declined["reason"])
+            return declined
+        growth = expand_defence(
+            sample,
+            self._catalogue,
+            self._profiles,
+            available=budget.spendable(),
+            free=free,
+        )
+        self.reaches.reached("defence", growth["build"], growth["reason"])
+        return growth
 
     def _commit(
         self, growth: Expansion, budget: Budget, workforce: Workforce

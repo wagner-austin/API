@@ -56,6 +56,40 @@ def test_a_protected_claim_may_cross_the_reserve() -> None:
     assert budget.claim("produce:c_tank", 950, protected=True)["granted"] is True
 
 
+def test_a_withholding_hides_credits_from_every_later_claim() -> None:
+    """The saving mechanism: a refused conversion keeps its price back.
+
+    Same-tick income can never reach a 4,000-credit conversion when every
+    tick's spenders drain the balance first -- the tier three was asked
+    3,788 times and granted never ([[policy-budget]], log 2026-07-31). The
+    saving binds protected claims too, deliberately: replacing losses is
+    protected and drains the balance to zero each tick, so a saving that
+    only investment respected would never fill. What still fits past the
+    withholding is still spendable either way.
+    """
+    budget = Budget(2000, reserve=0)
+    budget.withhold(1400)
+    assert budget.spendable() == 600
+    assert budget.claim("produce:c_tank", 700)["granted"] is False
+    assert budget.claim("produce:c_tank", 700, protected=True)["granted"] is False
+    assert budget.claim("produce:c_tank", 600, protected=True)["granted"] is True
+
+
+def test_withholdings_accumulate() -> None:
+    budget = Budget(5000, reserve=500)
+    budget.withhold(1400)
+    budget.withhold(1400)
+    assert budget.spendable() == 5000 - 500 - 2800
+
+
+def test_a_negative_withholding_is_refused_loudly() -> None:
+    """A negative would free credits rather than save them."""
+    budget = Budget(1000, reserve=0)
+    with pytest.raises(BudgetError) as caught:
+        budget.withhold(-1)
+    assert caught.value.code == "RW-BUDGET-003"
+
+
 def test_a_reserve_larger_than_the_balance_is_an_ordinary_early_state() -> None:
     """Not an error -- it means every credit is spoken for."""
     budget = Budget(100, reserve=500)

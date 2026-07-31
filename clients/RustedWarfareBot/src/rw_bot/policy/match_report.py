@@ -41,6 +41,23 @@ class MatchReport(TypedDict):
         extractors_end: Finished extractors held at the last.
         attack_orders: Attack orders issued.
         rallied: Move orders issued to gather the reserve.
+        intercepts: Guard engagements issued -- reserve units turned on a
+            raider inside the outpost radius of our own structures. The line
+            that tells "interception never fired" from "fired constantly",
+            which a verdict alone reads identically
+            ([[policy-holding-ground]]).
+        sightings: Hostile sightings recorded by the intel memory. A scout
+            that never saw anything and a scout that was never built read
+            identically in every other figure
+            ([[community-play-strategies]]).
+        raids: Income objectives assaulted by the raid party. The
+            never-fired ambiguity again: a raid that found nothing remembered
+            to hit and a raid switched off read identically without it.
+        marches: Outbound orders sent to raid party members. The conveyor
+            detector: v1's ``raids`` read 2-6 while dozens of lone
+            replacements marched to the same objective and died, because
+            re-drafts against a standing objective count nothing
+            (log: 2026-07-29).
         army_start: Units available to fight at the first observation.
         army_end: Units still available at the last.
         targets_seen: Hostile entities visible at the first observation.
@@ -148,6 +165,10 @@ class MatchReport(TypedDict):
     extractors_end: int
     attack_orders: int
     rallied: int
+    intercepts: int
+    sightings: int
+    raids: int
+    marches: int
     army_start: int
     army_end: int
     targets_seen: int
@@ -219,6 +240,10 @@ def format_report(report: MatchReport) -> tuple[str, ...]:
         f"extractors     {report['extractors_start']} -> {report['extractors_end']}",
         f"attack orders  {report['attack_orders']}",
         f"rallied        {report['rallied']}",
+        f"intercepted    {report['intercepts']}",
+        f"sightings      {report['sightings']}",
+        f"raids          {report['raids']}",
+        f"marches        {report['marches']}",
         f"army           {report['army_start']} -> {report['army_end']}",
         f"army value     {report['army_value_start']} -> {report['army_value_end']}",
         f"total worth    {report['worth_start']} -> {report['worth_end']}",

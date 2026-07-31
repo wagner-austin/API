@@ -99,6 +99,7 @@ def muster(
     released: frozenset[int],
     waves: int,
     ladder: Sequence[int] = WAVE_SIZES,
+    force: bool = False,
 ) -> Muster:
     """Decide which units are cleared to attack, and which keep gathering.
 
@@ -139,6 +140,12 @@ def muster(
             defended ground across a match and sets the leader back by roughly
             a thousand credits, so how much to mass before committing is a
             question rather than a constant ([[policy-combat]]).
+        force: Release the reserve now rather than at the ladder's rung --
+            the riposte: the enemy's attack just burned itself on our ground,
+            and the window before its next group finishes staging is when a
+            stockpile converts ([[policy-combat]], [[ai-opponent-strategy]]).
+            The anti-trickle floor still holds: fewer than a first wave is
+            not a punch, forced or not.
 
     Returns:
         The decision, carrying the state the next call needs.
@@ -151,6 +158,8 @@ def muster(
         survivors = set()
     reserve = alive - survivors
     wanted = wave_size(waves, ladder)
+    if force and len(reserve) >= FIRST_WAVE:
+        wanted = min(wanted, len(reserve))
 
     if len(reserve) >= wanted:
         return Muster(
@@ -176,6 +185,13 @@ def muster(
 #: rather than guessed because the question is identical: when has a unit
 #: finished gathering.
 RALLY_RADIUS = 60.0
+
+#: How many kill-groups may fill at once. Unbounded grouping was measured
+#: (screen-vh9f): trades improved everywhere and the winning seed's kill was
+#: lost -- an army facing many visible targets spreads to the point where
+#: no group has punch density beyond bare lethality. Two keeps the
+#: no-overkill edge in field fights while the army stays a fist.
+MAX_OPEN_GROUPS = 2
 
 
 class Deployment(TypedDict):
@@ -422,32 +438,46 @@ def engagements(
     sample: Sample,
     catalogue: Mapping[str, UnitStats],
     profiles: Mapping[str, CombatProfile],
-    holding: int | None = None,
+    held: Mapping[int, int] | None = None,
     fighting: Sequence[Entity] | None = None,
 ) -> tuple[Engagement, ...]:
-    """Decide who attacks what this sample.
+    """Decide who attacks what this sample: kill-sized groups, held per unit.
 
-    The whole army is sent at one target rather than spread across several, and
-    that target persists across samples, both for the reasons given in
-    :func:`choose_target`.
+    Fire concentrates until one volley kills, and no further. The whole army
+    on one target was measured through five screening rounds at Very Hard:
+    every match ran even to sample 1000 and was lost on trade quality in the
+    window after, with a twenty-five unit wave volleying single tanks while
+    the opponent's spread fire killed efficiently ([[policy-combat]], log
+    2026-07-31). So a target is assigned attackers until their combined
+    volley damage covers its hit points -- the engine's own figures, no
+    invented constant -- and the next attacker starts the next-nearest
+    target's group. When every visible target's group is already lethal, the
+    overflow joins the nearest group rather than standing idle: overkill
+    beats an armed unit watching a fight.
 
-    Only units that can reach the chosen target's layer are ordered at it. The
-    rest are left alone rather than sent: an order a unit cannot carry out is
-    accepted by the engine and then does nothing, which is indistinguishable
-    from a unit that is simply losing ([[mechanics-combat-profile]]).
+    Assignments persist per attacker for :func:`choose_target`'s reason --
+    re-choosing every sample re-tasked the whole army on a centre shift a few
+    world units wide. An attacker keeps its target while that target remains
+    engageable; only freed attackers (their target died or left) are dealt
+    into groups afresh.
+
+    Only units that can reach a target's layer join its group. The rest are
+    left alone rather than sent: an order a unit cannot carry out is accepted
+    by the engine and then does nothing, which is indistinguishable from a
+    unit that is simply losing ([[mechanics-combat-profile]]).
 
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name, for mobility.
+        catalogue: Unit stats by type name, for volley damage.
         profiles: Combat profiles by type name, for armament and reachability.
-        holding: Engine identity of the target already being attacked, if any.
+        held: Target already assigned per attacker, from the previous sample.
         fighting: The units cleared to attack. ``None`` means the whole army,
             which is what a caller with no wave discipline wants; a caller that
             musters passes the released wave so reinforcements still gathering
             are not ordered in alone ([[engine-ai-triggers]]).
 
     Returns:
-        One engagement per unit that can reach the target, empty when there is
+        One engagement per unit with a reachable target, empty when there is
         no army or nothing it can touch.
 
     Raises:
@@ -455,18 +485,98 @@ def engagements(
             visible type.
     """
     army = find_army(sample, catalogue, profiles) if fighting is None else tuple(fighting)
-    target = choose_target(army, engageable(profiles, army, find_targets(sample)), holding)
-    if target is None:
+    candidates = engageable(profiles, army, find_targets(sample))
+    if not army or not candidates:
         return ()
+    ordered = _by_convergence(army, candidates)
+    by_id = {target["unit_id"]: target for target in ordered}
+    committed: dict[int, float] = {target["unit_id"]: 0.0 for target in ordered}
+    assigned: dict[int, Entity] = {}
+    kept = held or {}
+    for unit in army:
+        target = by_id.get(kept.get(unit["unit_id"], -1))
+        if target is not None and can_engage(profiles, unit, target):
+            assigned[unit["unit_id"]] = target
+            committed[target["unit_id"]] += _volley(catalogue, unit)
+    for unit in army:
+        if unit["unit_id"] in assigned:
+            continue
+        reachable = [t for t in ordered if can_engage(profiles, unit, t)]
+        if not reachable:
+            continue
+        # At most two groups exist at once. Unbounded groups were measured
+        # (screen-vh9f): trades improved everywhere -- the hardest seed's
+        # rival fell from 114k to 19k -- and the winning seed's kill was
+        # lost, because an army facing a whole visible base diluted into
+        # many barely-lethal groups and the turret return fire ground it
+        # down. Two keeps the no-overkill edge in field fights, where
+        # targets arrive a few at a time, and keeps the army a fist against
+        # fortifications. Lethal groups still count: a fresh target may open
+        # a group only while fewer than two have been started at all.
+        started = sum(1 for value in committed.values() if value > 0.0)
+        open_groups = [
+            t
+            for t in reachable
+            if committed[t["unit_id"]] < t["hp"]
+            and (committed[t["unit_id"]] > 0.0 or started < MAX_OPEN_GROUPS)
+        ]
+        # Overflow joins the nearest reachable group: overkill beats idling.
+        target = open_groups[0] if open_groups else reachable[0]
+        assigned[unit["unit_id"]] = target
+        committed[target["unit_id"]] += _volley(catalogue, unit)
     return tuple(
         Engagement(
             attacker_id=unit["unit_id"],
-            target_id=target["unit_id"],
-            reason=f"{unit['type_name']} -> {target['type_name']} {target['unit_id']}",
+            target_id=assigned[unit["unit_id"]]["unit_id"],
+            reason=(
+                f"{unit['type_name']} -> "
+                f"{assigned[unit['unit_id']]['type_name']} "
+                f"{assigned[unit['unit_id']]['unit_id']}"
+            ),
         )
         for unit in army
-        if can_engage(profiles, unit, target)
+        if unit["unit_id"] in assigned
     )
+
+
+def _by_convergence(army: Sequence[Entity], targets: Sequence[Entity]) -> tuple[Entity, ...]:
+    """Order targets by distance from the army's centre, health breaking ties.
+
+    **Distance-first survived a measured challenge, and the challenger is
+    recorded.** Ranking visible hostile income structures ahead of distance
+    -- the arithmetically appealing "wallet outranks the war" -- doubled the
+    extractor losses and strangled two of three screening seeds: the army
+    chased extractors past their escorts and ate free damage the whole walk
+    (screen-vh9m, log 2026-07-31). Economy kills convert matches, but the
+    instrument for them is the raid party and the fights the army wins on
+    the way in, not a global preference that ignores what is shooting.
+
+    The key is :func:`choose_target`'s: nearest to the army's centre so a
+    split force converges, health breaking ties so the target closest to
+    dying fills first.
+    """
+    centre_x = sum(unit["x"] for unit in army) / len(army)
+    centre_y = sum(unit["y"] for unit in army) / len(army)
+
+    def convergence_key(target: Entity) -> tuple[float, float]:
+        distance = (target["x"] - centre_x) ** 2 + (target["y"] - centre_y) ** 2
+        return (distance, target["hp"])
+
+    return tuple(sorted(targets, key=convergence_key))
+
+
+def _volley(catalogue: Mapping[str, UnitStats], unit: Entity) -> float:
+    """Return one full volley's damage from a unit, the engine's own figure.
+
+    The larger of the direct and splash volleys: a unit contributes whichever
+    kind of damage it actually deals, and an unarmed unit contributes nothing
+    -- though an unarmed unit never reaches a group, because its profile
+    reaches no layer at all ([[mechanics-combat-profile]]).
+    """
+    weapon = catalogue[unit["type_name"]]["weapon"]
+    if weapon is None:
+        return 0.0
+    return max(weapon["direct_damage_volley"], weapon["area_damage_volley"])
 
 
 __all__ = [

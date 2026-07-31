@@ -106,6 +106,19 @@ def find_anchor(sample: Sample, catalogue: Mapping[str, UnitStats]) -> Entity | 
 #: building would fill two slots.
 RING_SLOT_RADIUS = 60.0
 
+#: Clearance a ring-placed structure needs around its site, in world units.
+#:
+#: Wider than the slot radius because the things the ring places are wide: a
+#: land factory's footprint exceeds 84 units, and a site that passes a
+#: 60-unit occupancy check can still be refused by the engine for a turret
+#: standing 80 away. The first Hard batch after the defence cover ring made
+#: turrets land showed exactly that -- ten identical factory orders at one
+#: ring slot, all silently refused, zero factories and zero army in every
+#: match, where the pre-cover-ring era stood two to four factories
+#: (log: 2026-07-31). The cover ring densified the base; the clearance test
+#: has to see a factory's width, not a turret's.
+RING_CLEARANCE = 130.0
+
 
 def next_ring_site(
     sample: Sample, anchor: Entity, catalogue: Mapping[str, UnitStats]
@@ -134,9 +147,103 @@ def next_ring_site(
     Returns:
         The first free position, or None when every ring slot is taken.
     """
-    limit = RING_SLOT_RADIUS**2
+    limit = RING_CLEARANCE**2
     for offset in PLACEMENT_RING:
         site = (anchor["x"] + offset[0], anchor["y"] + offset[1])
+        if not any(
+            _is_structure(entity, catalogue)
+            and (entity["x"] - site[0]) ** 2 + (entity["y"] - site[1]) ** 2 <= limit
+            for entity in sample["entities"]
+        ):
+            return site
+    return None
+
+
+#: Offsets tried around a structure needing cover, nearest shell first.
+#:
+#: Two shells, both inside the turret's 165-unit reach so the turret placed at
+#: any of them actually covers the structure it was bought for -- the base
+#: ring's slots sit 233 out, which is why defence cannot borrow it. The first
+#: shell is the ring slot radius, the engine's own snapping tolerance
+#: ([[building-structures]]); structure centres 60 apart do not overlap.
+COVER_RING: tuple[tuple[float, float], ...] = (
+    (60.0, 0.0),
+    (0.0, 60.0),
+    (-60.0, 0.0),
+    (0.0, -60.0),
+    (60.0, 60.0),
+    (-60.0, 60.0),
+    (60.0, -60.0),
+    (-60.0, -60.0),
+    (120.0, 0.0),
+    (0.0, 120.0),
+    (-120.0, 0.0),
+    (0.0, -120.0),
+)
+
+
+def clear_site_near(
+    sample: Sample, target: Entity, catalogue: Mapping[str, UnitStats]
+) -> tuple[float, float] | None:
+    """Return the first cover position around a structure with nothing on it.
+
+    The check defence never had: for its whole prior life the turret site was
+    a bare offset reached for without looking, the engine refuses an occupied
+    site silently, and the scorecards priced the habit at 27 paid orders for
+    about five turrets standing (log: 2026-07-30). This is the same occupancy
+    predicate :func:`next_ring_site` already trusts, walked over
+    :data:`COVER_RING` instead of the base ring.
+
+    The covered structure itself is exempt from the occupancy test -- it
+    stands one ring-slot radius from every first-shell site by construction,
+    which is exactly the distance the test would otherwise refuse.
+
+    Args:
+        sample: One observation of the world.
+        target: The structure being covered.
+        catalogue: Unit stats by type name, for telling a structure from a
+            unit.
+
+    Returns:
+        The first clear position, or None when every cover offset is taken.
+    """
+    limit = RING_SLOT_RADIUS**2
+    for offset in COVER_RING:
+        site = (target["x"] + offset[0], target["y"] + offset[1])
+        if not any(
+            entity["unit_id"] != target["unit_id"]
+            and _is_structure(entity, catalogue)
+            and (entity["x"] - site[0]) ** 2 + (entity["y"] - site[1]) ** 2 <= limit
+            for entity in sample["entities"]
+        ):
+            return site
+    return None
+
+
+def clear_point_near(
+    sample: Sample, point: tuple[float, float], catalogue: Mapping[str, UnitStats]
+) -> tuple[float, float] | None:
+    """Return the first clear position at or around a bare map point.
+
+    The point-anchored twin of :func:`clear_site_near`, for callers whose
+    site is a coordinate rather than a structure -- the turret creep advances
+    toward a projected point with nothing of ours standing there yet
+    ([[policy-creep]]). The point itself is tried first, then the same cover
+    offsets, under the same occupancy predicate the other siting paths trust.
+
+    Args:
+        sample: One observation of the world.
+        point: Where the caller would like to build.
+        catalogue: Unit stats by type name, for telling a structure from a
+            unit.
+
+    Returns:
+        The first clear position, or None when the point and every offset
+        around it are taken.
+    """
+    limit = RING_SLOT_RADIUS**2
+    for offset in ((0.0, 0.0), *COVER_RING):
+        site = (point[0] + offset[0], point[1] + offset[1])
         if not any(
             _is_structure(entity, catalogue)
             and (entity["x"] - site[0]) ** 2 + (entity["y"] - site[1]) ** 2 <= limit
@@ -379,10 +486,14 @@ def no_pool_reason(target: str, survey: PoolSurvey) -> str:
 
 
 __all__ = [
+    "COVER_RING",
     "PLACEMENT_RING",
     "POOL_OCCUPIED_RADIUS",
+    "RING_CLEARANCE",
     "RING_SLOT_RADIUS",
     "PoolSurvey",
+    "clear_point_near",
+    "clear_site_near",
     "find_anchor",
     "next_ring_site",
     "no_pool_reason",

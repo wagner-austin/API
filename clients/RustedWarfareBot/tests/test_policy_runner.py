@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Literal
 
 from rw_bot.policy.build_order import Decision
-from rw_bot.policy.runner import DEFAULT_STALL_SAMPLES, OrderTracker
+from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, OrderTracker
 from rw_bot.wire.state import Sample
 from tests.wire_fixtures import entity, sample
 
@@ -27,6 +27,7 @@ def _build(type_name: str = "landFactory", *, unit_id: int = 214) -> Decision:
         unit_id=unit_id,
         x=10.0,
         y=20.0,
+        deficit=0,
     )
 
 
@@ -39,6 +40,7 @@ def _produce(type_name: str = "c_tank", *, unit_id: int = 300) -> Decision:
         unit_id=unit_id,
         x=0.0,
         y=0.0,
+        deficit=0,
     )
 
 
@@ -48,7 +50,20 @@ def _plain(action: Literal["wait", "done", "blocked", "stalled"], reason: str) -
     The verb is typed as the literal union the production type declares rather
     than as ``str``, so a test cannot construct a decision the policy could not.
     """
-    return Decision(action=action, reason=reason, type_name="", unit_id=0, x=0.0, y=0.0)
+    return Decision(action=action, reason=reason, type_name="", unit_id=0, x=0.0, y=0.0, deficit=0)
+
+
+def _saving(deficit: int, *, unit_id: int = 214) -> Decision:
+    """A decision waiting to afford something, carrying its shortfall."""
+    return Decision(
+        action="wait",
+        reason=f"landFactory costs 700, holding {700 - deficit}",
+        type_name="",
+        unit_id=unit_id,
+        x=0.0,
+        y=0.0,
+        deficit=deficit,
+    )
 
 
 def test_two_entries_pending_at_one_count_do_not_share_a_slot() -> None:
@@ -221,3 +236,89 @@ def test_the_default_window_is_the_measured_one() -> None:
     """45 observations, from timing a 609-unit build that took 52 to walk."""
     assert DEFAULT_STALL_SAMPLES == 45
     assert OrderTracker(_PLAN).stall_samples == 45
+
+
+def test_a_shrinking_shortfall_is_a_save_in_progress() -> None:
+    """Every new credit high-water restarts the clock: a save that is happening
+    is allowed to be arbitrarily slow, because the window measures progress
+    rather than duration."""
+    tracker = OrderTracker(_PLAN, afford_samples=3)
+    world = _world()
+    for deficit in (500, 400, 300, 200, 100):
+        assert tracker.assess(world, _saving(deficit), False)["outcome"] == "building"
+
+
+def test_a_shortfall_that_never_shrinks_blocks_the_plan() -> None:
+    """The amphib arm's disease: "waiting to afford" had no ceiling, and a goals
+    entry priced beyond the economy's reach held the only worker hostage for
+    the rest of the match -- plan-holds-only-worker reached 255 and climbing,
+    twelve seeds, none ever affording it. While the plan waits it claims
+    nothing, so production keeps spending the income; under attrition the save
+    is not slow, it is impossible, and this clock is what says so out loud
+    ([[policy-economy]])."""
+    tracker = OrderTracker(_PLAN, afford_samples=3)
+    world = _world()
+    assert tracker.assess(world, _saving(500), False)["outcome"] == "building"
+    outcomes = [tracker.assess(world, _saving(500), False)["outcome"] for _ in range(3)]
+    assert outcomes == ["building", "building", "blocked"]
+
+
+def test_the_blocked_ruling_lifts_when_saving_resumes() -> None:
+    """Not latched, deliberately: the released worker grows the economy, and an
+    economy that recovers enough to set a new high-water has earned the plan
+    back."""
+    tracker = OrderTracker(_PLAN, afford_samples=2)
+    world = _world()
+    tracker.assess(world, _saving(500), False)
+    tracker.assess(world, _saving(500), False)
+    assert tracker.assess(world, _saving(500), False)["outcome"] == "blocked"
+    assert tracker.assess(world, _saving(499), False)["outcome"] == "building"
+
+
+def test_plan_progress_restarts_the_savings_clock() -> None:
+    """A shortfall measured against one entry says nothing about the next --
+    the same rule the stall clock already follows across slots."""
+    tracker = OrderTracker(("extractorT1", "landFactory"), afford_samples=2)
+    bare = sample(entity(214, "builder"))
+    tracker.assess(bare, _saving(500), False)
+    tracker.assess(bare, _saving(500), False)
+    # The extractor finishes; the plan turns to the factory with a fresh window.
+    assert tracker.assess(_world(), _saving(500), False)["outcome"] == "building"
+
+
+def test_a_wait_with_no_shortfall_never_trips_the_savings_clock() -> None:
+    """A full ring and an occupied pool are waits the world can end on its own;
+    only the price wait carries a deficit, and only a deficit is judged."""
+    tracker = OrderTracker(_PLAN, afford_samples=1)
+    world = _world()
+    for _ in range(5):
+        step = tracker.assess(world, _plain("wait", "all ring positions taken"), False)
+        assert step["outcome"] == "building"
+
+
+def test_an_order_between_waits_resets_the_savings_clock() -> None:
+    """Credits arrived and were spent on the entry: whatever shortfall follows
+    belongs to the next save, not the finished one."""
+    tracker = OrderTracker(_PLAN, afford_samples=2)
+    world = _world()
+    tracker.assess(world, _saving(500), False)
+    tracker.assess(world, _saving(500), False)
+    tracker.assess(world, _build(), False)
+    outcomes = [tracker.assess(world, _saving(500), False)["outcome"] for _ in range(2)]
+    assert outcomes == ["building", "building"]
+
+
+def test_the_blocked_reason_names_the_shortfall_and_the_release() -> None:
+    tracker = OrderTracker(_PLAN, afford_samples=1)
+    tracker.assess(_world(), _saving(500), False)
+    reason = tracker.assess(_world(), _saving(500), False)["reason"]
+    assert "500" in reason
+    assert "worker is released" in reason
+
+
+def test_the_afford_window_is_twice_the_refusal_window() -> None:
+    """Savings are slower than orders: a genuine save sets a new high-water
+    whenever anything is banked at all, so ninety samples without one is not
+    slowness, it is income entirely spoken for."""
+    assert AFFORD_STALL_SAMPLES == 90
+    assert OrderTracker(_PLAN).afford_samples == 90

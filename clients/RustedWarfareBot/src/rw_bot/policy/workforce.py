@@ -26,6 +26,25 @@ from rw_bot.wire.state import Entity, Sample
 JOB_RADIUS = RING_SLOT_RADIUS
 
 
+#: The most builders worth holding.
+#:
+#: Set by measurement, not by argument. Uncapped, the bot bought 33 in a
+#: 1500-sample match -- 16,500 credits of labour placing 13 extractors, while the
+#: army it was supposed to be funding stayed at a dozen units
+#: ([[policy-production]]).
+DEFAULT_MAX_WORKERS = 4
+
+#: Samples a stationary builder may sit on an unstarted expansion before the
+#: order is presumed lost and sent again.
+#:
+#: The same reasoning as the plan's stall window, used for the opposite purpose:
+#: there it ends the plan, here it retries. A builder that has neither moved nor
+#: started building for this many samples is not on its way anywhere, and the
+#: cost of being wrong is one duplicate order the engine collapses onto the same
+#: waypoint ([[policy-loop]]).
+EXPAND_RETRY_SAMPLES = 45
+
+
 class Workforce:
     """Which builders are free, and what each was last sent to do.
 
@@ -164,6 +183,21 @@ class Workforce:
         job = self._job.get(unit_id)
         if job is None:
             return True
+        # **A finished job frees its worker on the tick it finishes.** The
+        # freeing used to happen only through the quiet window below, which
+        # requires the site to show nothing rising for the whole retry
+        # window -- and the defence cover ring packs structures densely
+        # enough that a NEIGHBOUR'S rising turret inside the job radius kept
+        # re-marking finished workers busy, chaining into a full-workforce
+        # freeze: four of ten rich Hard matches ended `army 0 -> 0` with the
+        # plan waiting all match on "every unit that can make landFactory is
+        # busy" (log: 2026-07-31). The structure the worker was sent to
+        # build, standing complete at the site, is the one unambiguous
+        # completion signal and it outranks every inference.
+        if _complete_at(sample, job[0], job[1]):
+            del self._job[unit_id]
+            self._quiet[unit_id] = 0
+            return True
         if _rising_at(sample, job[0], job[1]):
             self._quiet[unit_id] = 0
             return False
@@ -192,6 +226,30 @@ class Workforce:
             self._quiet.pop(unit_id, None)
 
 
+def _complete_at(sample: Sample, type_name: str, site: tuple[float, float]) -> bool:
+    """Report whether a finished structure of this type stands at this point.
+
+    The completion signal :meth:`Workforce._is_free` trusts ahead of the
+    quiet-window inference. Ownership checked for the same reason
+    :func:`_rising_at` checks it.
+
+    Args:
+        sample: One observation of the world.
+        type_name: The type that was ordered.
+        site: Where it was ordered.
+
+    Returns:
+        True when an owned finished entity of that type stands there.
+    """
+    limit = JOB_RADIUS**2
+    for entity in sample["entities"]:
+        if not entity["mine"] or not entity["complete"] or entity["type_name"] != type_name:
+            continue
+        if (entity["x"] - site[0]) ** 2 + (entity["y"] - site[1]) ** 2 <= limit:
+            return True
+    return False
+
+
 def _rising_at(sample: Sample, type_name: str, site: tuple[float, float]) -> bool:
     """Report whether something of this type is going up at this point.
 
@@ -215,4 +273,4 @@ def _rising_at(sample: Sample, type_name: str, site: tuple[float, float]) -> boo
     return False
 
 
-__all__ = ["JOB_RADIUS", "Workforce"]
+__all__ = ["EXPAND_RETRY_SAMPLES", "JOB_RADIUS", "Workforce"]

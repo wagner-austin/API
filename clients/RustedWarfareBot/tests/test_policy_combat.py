@@ -224,13 +224,120 @@ def test_a_target_that_is_gone_is_replaced() -> None:
 
 
 def test_the_held_target_carries_through_engagements() -> None:
+    """Held per attacker: the unit keeps ITS target, not the army's."""
     world = _sample(
         _entity(1, "c_tank", 0.0, 0.0),
         _entity(9, "c_tank", 900.0, 0.0, mine=False, hostile=True),
         _entity(10, "c_tank", 10.0, 0.0, mine=False, hostile=True),
     )
-    assert engagements(world, _CATALOGUE, _PROFILES, holding=9)[0]["target_id"] == 9
+    assert engagements(world, _CATALOGUE, _PROFILES, held={1: 9})[0]["target_id"] == 9
     assert engagements(world, _CATALOGUE, _PROFILES)[0]["target_id"] == 10
+
+
+def test_a_group_stops_growing_once_one_volley_kills() -> None:
+    """Kill-sized, not army-sized: the screening plateau's first lever.
+
+    Six 17-damage volleys cover 100 hp; the seventh tank starts the next
+    group instead of piling on ([[policy-combat]], log 2026-07-31).
+    """
+    near = _entity(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    far = _entity(10, "c_tank", 300.0, 0.0, mine=False, hostile=True)
+    world = _sample(
+        *(_entity(n, "c_tank", 0.0, float(n)) for n in range(1, 8)),
+        near,
+        far,
+    )
+    orders = engagements(world, _CATALOGUE, _PROFILES)
+    by_target: dict[int, int] = {}
+    for order in orders:
+        by_target[order["target_id"]] = by_target.get(order["target_id"], 0) + 1
+    assert by_target == {9: 6, 10: 1}
+
+
+def test_overflow_joins_the_nearest_group_rather_than_idling() -> None:
+    """Every group lethal and units to spare: overkill beats watching."""
+    near = _entity(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    world = _sample(
+        *(_entity(n, "c_tank", 0.0, float(n)) for n in range(1, 8)),
+        near,
+    )
+    orders = engagements(world, _CATALOGUE, _PROFILES)
+    assert len(orders) == 7
+    assert {order["target_id"] for order in orders} == {9}
+
+
+def test_a_nearer_escort_outranks_a_distant_extractor() -> None:
+    """The refutation pin for "the wallet outranks the war".
+
+    Ranking visible income structures ahead of distance doubled the drops
+    and strangled two of three screening seeds -- the army chased extractors
+    past their escorts and ate free damage the whole walk (screen-vh9m, log
+    2026-07-31). The fight in front of the army is the fight; the raid party
+    owns the wallet.
+    """
+    catalogue = dict(_CATALOGUE)
+    catalogue["extractorT1"] = _unit("extractorT1", speed=0.0, armed=False)
+    profiles = profiles_for(catalogue)
+    tank = _entity(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    wallet = _entity(10, "extractorT1", 500.0, 0.0, mine=False, hostile=True)
+    world = _sample(_entity(1, "c_tank", 0.0, 0.0), tank, wallet)
+    orders = engagements(world, catalogue, profiles)
+    assert [o["target_id"] for o in orders] == [9]
+
+
+def test_at_most_two_groups_fill_at_once() -> None:
+    """The fist stays a fist: a third target waits until a group is lethal.
+
+    Thirteen tanks and three 100-hp targets: six fill the nearest group, six
+    the second, and the thirteenth reinforces the nearest open group rather
+    than opening a third ([[policy-combat]]).
+    """
+    targets = tuple(
+        _entity(90 + n, "c_tank", 100.0 + 10.0 * n, 0.0, mine=False, hostile=True) for n in range(3)
+    )
+    world = _sample(
+        *(_entity(n, "c_tank", 0.0, float(n)) for n in range(1, 14)),
+        *targets,
+    )
+    orders = engagements(world, _CATALOGUE, _PROFILES)
+    by_target: dict[int, int] = {}
+    for order in orders:
+        by_target[order["target_id"]] = by_target.get(order["target_id"], 0) + 1
+    assert by_target == {90: 7, 91: 6}
+
+
+def test_a_unit_armed_in_profile_but_weaponless_in_catalogue_contributes_nothing() -> None:
+    """The two dumps are independent sources and may disagree.
+
+    The profiles come from the agent's combat dump and the prices from
+    ``-printunits``; a modded type can be armed in one and weaponless in the
+    other. Such a unit still fights -- the profile says its fire reaches --
+    but its volley counts for nothing, so its group keeps filling.
+    """
+    catalogue = dict(_CATALOGUE)
+    catalogue["oddity"] = _unit("oddity", armed=False)
+    profiles = dict(_PROFILES)
+    profiles["oddity"] = profile("oddity", 110.0, land=True)
+    enemy = _entity(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    world = _sample(_entity(1, "oddity", 0.0, 0.0), _entity(2, "c_tank", 0.0, 1.0), enemy)
+    orders = engagements(world, catalogue, profiles)
+    assert {(o["attacker_id"], o["target_id"]) for o in orders} == {(1, 9), (2, 9)}
+
+
+def test_a_freed_attacker_is_dealt_into_a_group_afresh() -> None:
+    """A dead target frees only ITS group; other assignments stand."""
+    near = _entity(9, "c_tank", 100.0, 0.0, mine=False, hostile=True)
+    far = _entity(10, "c_tank", 300.0, 0.0, mine=False, hostile=True)
+    world = _sample(
+        _entity(1, "c_tank", 0.0, 0.0),
+        _entity(2, "c_tank", 0.0, 1.0),
+        near,
+        far,
+    )
+    # Attacker 1's target 11 is gone; attacker 2 holds 10. Attacker 1 is
+    # re-dealt to the nearest open group (9); attacker 2 stays on 10.
+    orders = engagements(world, _CATALOGUE, _PROFILES, held={1: 11, 2: 10})
+    assert {(o["attacker_id"], o["target_id"]) for o in orders} == {(1, 9), (2, 10)}
 
 
 def test_no_army_produces_no_orders() -> None:
@@ -299,6 +406,23 @@ def test_a_bigger_wave_releases_once_it_is_full() -> None:
     state = muster(_wave(25), frozenset(), 5, ladder_to(25))
     assert len(state["released"]) == 25
     assert state["waves"] == 6
+
+
+def test_a_forced_muster_releases_below_the_rung_but_not_below_a_wave() -> None:
+    """The riposte's floor: the ladder yields, the anti-trickle rule does not.
+
+    Four units against a rung of five release when forced -- the window
+    after the enemy's attack burned out is worth more than the fifth unit --
+    but two units are not a punch at any moment, forced or not
+    ([[ai-opponent-strategy]]).
+    """
+    four = _wave(4)
+    forced = muster(four, frozenset(), waves=2, force=True)
+    assert len(forced["released"]) == 4
+    unforced = muster(four, frozenset(), waves=2)
+    assert unforced["released"] == frozenset()
+    two = _wave(2)
+    assert muster(two, frozenset(), waves=2, force=True)["released"] == frozenset()
 
 
 def test_a_reserve_short_of_a_wave_releases_nobody() -> None:

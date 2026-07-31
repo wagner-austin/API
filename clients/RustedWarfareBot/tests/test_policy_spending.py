@@ -13,7 +13,7 @@ from pathlib import Path
 
 from rw_bot.mechanics.catalogue import UnitStats, decode_catalogue
 from rw_bot.policy.budget import Budget
-from rw_bot.policy.spending import upgrade_income
+from rw_bot.policy.spending import unlock_tech, upgrade_income
 from rw_bot.wire.state import Sample
 from tests.wire_fixtures import entity, option, sample
 
@@ -200,3 +200,70 @@ def test_the_reserve_is_not_spent_on_an_upgrade() -> None:
     )
     assert orders == ()
     assert budget.spent() == 0
+
+
+def test_tech_fires_the_real_land_factorys_unlock_once() -> None:
+    """The tech channel against the real catalogue's factory.
+
+    The unlock is a no-type action -- ``produces`` empty, the engine's own
+    selector attached -- priced from the holder's ``upgrade_prices``: 2,000
+    on the land factory ([[mechanics-build-actions]]). One order per
+    factory, and a queued or already-ordered factory is left alone.
+    """
+    catalogue = _catalogue()
+    world = sample(
+        entity(500, "landFactory"),
+        entity(501, "landFactory", queued=1),
+        entity(502, "commandCenter"),
+        credits=10_000,
+        options=(
+            option(500, "", index=0, action=3, placed=False, makes_something=False),
+            # A second no-type option on the same unit: the first one wins.
+            option(500, "", index=1, action=9, placed=False, makes_something=False),
+            option(501, "", index=2, action=3, placed=False, makes_something=False),
+        ),
+    )
+    ordered: set[int] = set()
+    budget = Budget(10_000, reserve=0)
+    orders = unlock_tech(world, catalogue, budget, ordered)
+    assert [(o["unit_id"], o["action"]) for o in orders] == [(500, 3)]
+    assert budget.spent() == 2000
+    # Told once: the same world again orders nothing more.
+    assert unlock_tech(world, catalogue, Budget(10_000, reserve=0), ordered) == ()
+
+
+def test_tech_skips_a_factory_with_no_offer_and_stops_at_a_refusal() -> None:
+    catalogue = _catalogue()
+    silent = sample(entity(500, "landFactory"), credits=10_000)
+    assert unlock_tech(silent, catalogue, Budget(10_000, reserve=0), set()) == ()
+    offering = sample(
+        entity(500, "landFactory"),
+        credits=100,
+        options=(option(500, "", action=3, placed=False, makes_something=False),),
+    )
+    poor = Budget(100, reserve=0)
+    assert unlock_tech(offering, catalogue, poor, set()) == ()
+    assert poor.spent() == 0
+
+
+def test_a_refused_unlock_withholds_its_price_from_later_spenders() -> None:
+    """The unlock saves toward itself, or it never happens.
+
+    Measured live: ``tech:landFactory asked 37 got 0`` -- every spender
+    drained the balance to the reserve each tick, so a 2,000-credit unlock
+    asked every sample was never once funded (log 2026-07-31). A refused
+    unlock withholds its price, later channels this tick see that much
+    less, and the wallet climbs across ticks until the claim fits. Bounded,
+    unlike the income-ladder saving that was refuted: once per factory.
+    """
+    offering = sample(
+        entity(500, "landFactory"),
+        credits=1_500,
+        options=(option(500, "", action=3, placed=False, makes_something=False),),
+    )
+    budget = Budget(1_500, reserve=0)
+    assert unlock_tech(offering, _catalogue(), budget, set()) == ()
+    # The whole balance is now spoken for: even a protected claim is bound,
+    # because replacing losses drains to zero and would empty the saving.
+    assert budget.claim("replace:c_tank", 350, protected=True)["granted"] is False
+    assert budget.claim("expand:extractorT1", 700)["granted"] is False

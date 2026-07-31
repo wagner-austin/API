@@ -30,7 +30,14 @@ from rw_bot.policy.economy import upgradeable
 from rw_bot.policy.production import sustain
 from rw_bot.policy.runner import OrderTracker
 from rw_bot.policy.workforce import Workforce
-from rw_bot.wire.command import BuildOrder, ProduceOrder, build_order, produce_order
+from rw_bot.wire.command import (
+    AbilityOrder,
+    BuildOrder,
+    ProduceOrder,
+    ability_order,
+    build_order,
+    produce_order,
+)
 from rw_bot.wire.state import Entity, Sample
 
 
@@ -119,9 +126,98 @@ def upgrade_income(
             continue
         claim = budget.claim(f"upgrade:{step['produces']}", holder["upgrade_prices"][0])
         if not claim["granted"]:
+            # A refused conversion does NOT save toward itself, and this is a
+            # measured refutation, not an omission. Withholding the price
+            # (:meth:`~rw_bot.policy.budget.Budget.withhold`) bought six T2
+            # and six T3 conversions a match and doubled income to 98/s --
+            # and the army pauses it forced let the enemy's economy live
+            # untouched, rival scores rising to the worst of the whole
+            # screening arc while drops fell. Income that displaces early
+            # pressure is income for a longer strangle ([[policy-budget]],
+            # log 2026-07-31). The gated use the mechanism was kept for is
+            # :func:`unlock_tech` -- one bounded purchase per factory, not
+            # an unbounded ladder of them. Unconditionally, saving lost.
             break
         ordered.add(key)
         orders.append(produce_order(unit_id=step["unit_id"], type_name=step["produces"]))
+    return tuple(orders)
+
+
+#: The factory whose tier-two unlock the tech channel fires.
+#:
+#: One type to start, because it is the one that was measured: the land
+#: factory's 2,000-credit upgrade converts into no type -- it flips a flag on
+#: the same building -- and unlocks the heavy roster behind it
+#: ([[mechanics-build-actions]], log 2026-07-31). The air, sea and mech
+#: factories carry upgrades too; they join this tuple when an arm asks the
+#: question.
+TECH_TYPES: tuple[str, ...] = ("landFactory",)
+
+
+def unlock_tech(
+    sample: Sample,
+    catalogue: Mapping[str, UnitStats],
+    budget: Budget,
+    ordered: set[int],
+) -> tuple[AbilityOrder, ...]:
+    """Order every tech factory to unlock its next tier, when affordable.
+
+    The verb the ability order exists for. The unlock arrives on the option
+    stream as an action concerning no type -- ``produces`` empty, the
+    engine's own selector index attached -- so it is found by that shape on
+    the factory itself, and priced from the holder's ``upgrade_prices``
+    exactly as a conversion is ([[mechanics-build-actions]]).
+
+    Once per structure, for the produce-duplicate reason: the unlock never
+    fills the queue, so the factory keeps offering it while it runs, and a
+    duplicate arriving after completion would name an action that no longer
+    exists.
+
+    **A refused unlock saves toward itself**, and this is the gated use the
+    income-conversion refutation reserved the mechanism for
+    (:meth:`~rw_bot.policy.budget.Budget.withhold`). Without it the unlock
+    is unreachable: measured live, ``tech:landFactory asked 37 got 0`` --
+    every spender drained the balance to the reserve each tick, so 2,000
+    never accumulated (log 2026-07-31). Unlike the income ladder, which
+    paused the army once per conversion across an unbounded run of them,
+    this is a single bounded purchase per factory, and it is the whole
+    point of the arm that carries it.
+
+    Args:
+        sample: One observation of the world.
+        catalogue: Unit stats by type name, for the unlock's price.
+        budget: The tick's credits.
+        ordered: Factories already told to unlock, extended in place.
+
+    Returns:
+        The ability orders to send, in roster order.
+    """
+    offers: dict[int, int] = {}
+    for option in sample["options"]:
+        if (
+            option["produces"] == ""
+            and option["available"]
+            and not option["placed"]
+            and not option["makes_something"]
+            and option["unit_id"] not in offers
+        ):
+            offers[option["unit_id"]] = option["action"]
+    orders: list[AbilityOrder] = []
+    for entity in sample["entities"]:
+        if not entity["mine"] or not entity["complete"] or entity["queued"] != 0:
+            continue
+        if entity["type_name"] not in TECH_TYPES or entity["unit_id"] in ordered:
+            continue
+        selector = offers.get(entity["unit_id"])
+        holder = catalogue.get(entity["type_name"])
+        if selector is None or holder is None or not holder["upgrade_prices"]:
+            continue
+        claim = budget.claim(f"tech:{entity['type_name']}", holder["upgrade_prices"][0])
+        if not claim["granted"]:
+            budget.withhold(holder["upgrade_prices"][0])
+            break
+        ordered.add(entity["unit_id"])
+        orders.append(ability_order(unit_id=entity["unit_id"], action=selector))
     return tuple(orders)
 
 
@@ -264,6 +360,13 @@ class PlanStep(TypedDict):
             were free. Instrumented, that skipped the expander on 572 of 800
             samples while six workers stood idle. Naming the one worker lets the
             rest be used ([[policy-economy]]).
+        wants_worker: Whether the plan is waiting for the next worker to
+            free. The signal that gives the plan worker priority to match its
+            credit priority: without it, a rich match kept all eight workers
+            employed on defence, the plan's factory never met a free worker,
+            and the army was never built -- wins 1/10 at a rung the same
+            doctrine had won 10/12 (log: 2026-07-31). The expander stands
+            down while this is set, so the next freed worker is the plan's.
         build: The structure to place, or None.
         produce: The unit to queue, or None.
     """
@@ -271,6 +374,7 @@ class PlanStep(TypedDict):
     outcome: str
     reason: str
     holds_worker: int
+    wants_worker: bool
     build: BuildOrder | None
     produce: ProduceOrder | None
 
@@ -307,6 +411,9 @@ def build_plan(
     decision = decide(
         sample, tracker.plan, catalogue, placements, profiles, free, workforce.claims()
     )
+    # Movement is judged per worker now, so the plan's own stall clock asks the
+    # workforce whether the unit it ordered is the one that is walking.
+    step = tracker.assess(sample, decision, workforce.working(decision["unit_id"]))
     # The plan holds the builder for as long as it wants something placed,
     # including while it is merely waiting to afford it. Acting on that is what
     # keeps the two off each other: a live run had the economy re-tasking the
@@ -315,15 +422,26 @@ def build_plan(
     # **Which worker, not whether.** A "wait" now names the unit it is holding
     # (:class:`~rw_bot.policy.build_order.Decision`), so the economy can skip
     # that one worker instead of standing down entirely.
-    holds_worker = decision["unit_id"] if decision["action"] in ("build", "wait") else 0
-    # Movement is judged per worker now, so the plan's own stall clock asks the
-    # workforce whether the unit it ordered is the one that is walking.
-    step = tracker.assess(sample, decision, workforce.working(decision["unit_id"]))
+    # **And only while the plan is live.** A blocked ruling exists to end a
+    # hostage situation -- the savings clock's whole point is that the worker
+    # goes back to the economy, so a hold that survived the ruling would undo
+    # the fix ([[policy-economy]]). The tracker lifts the ruling on its own
+    # when saving resumes, and the hold comes back with it.
+    holds_worker = (
+        decision["unit_id"]
+        if decision["action"] in ("build", "wait") and step["outcome"] == "building"
+        else 0
+    )
+    # The every-capable-unit-is-busy wait is the one wait that names no unit:
+    # there is no specific worker to hold, the plan wants WHICHEVER frees
+    # first, and saying so is what lets the campaign grant it one.
+    wants_worker = decision["action"] == "wait" and decision["unit_id"] == 0
     if not step["act"]:
         return PlanStep(
             outcome=step["outcome"],
             reason=step["reason"],
             holds_worker=holds_worker,
+            wants_worker=wants_worker,
             build=None,
             produce=None,
         )
@@ -342,6 +460,7 @@ def build_plan(
             outcome=step["outcome"],
             reason=step["reason"],
             holds_worker=holds_worker,
+            wants_worker=wants_worker,
             build=None,
             produce=produce_order(unit_id=decision["unit_id"], type_name=decision["type_name"]),
         )
@@ -350,6 +469,7 @@ def build_plan(
         outcome=step["outcome"],
         reason=step["reason"],
         holds_worker=holds_worker,
+        wants_worker=wants_worker,
         build=build_order(
             unit_id=decision["unit_id"],
             type_name=decision["type_name"],

@@ -34,6 +34,17 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         reserve=450,
         expand=True,
         counter=counter,
+        cover=True,
+        intercept=False,
+        guard_cap=0,
+        aa_cover=False,
+        forward=False,
+        scout=False,
+        raid=0,
+        rush=False,
+        creep=False,
+        riposte=False,
+        tech=False,
     )
 
 
@@ -58,13 +69,40 @@ def test_the_shipped_default_preset_matches_the_constant() -> None:
     assert parse_doctrine_lines(lines) == DEFAULT_DOCTRINE
 
 
+def _preset(name: str) -> dict[str, str | int | bool]:
+    lines = (_PROJECT_ROOT / "doctrines" / name).read_text(encoding="utf-8").splitlines()
+    return encode_doctrine(parse_doctrine_lines(lines))
+
+
 def test_the_shipped_arms_differ_from_default_in_exactly_one_field() -> None:
     """Two arms that differ in one thing are an A/B; in two, an anecdote."""
     default = encode_doctrine(DEFAULT_DOCTRINE)
     for preset, field in (("counter.doctrine", "counter"), ("no-expand.doctrine", "expand")):
-        lines = (_PROJECT_ROOT / "doctrines" / preset).read_text(encoding="utf-8").splitlines()
-        arm = encode_doctrine(parse_doctrine_lines(lines))
+        arm = _preset(preset)
         differing = [key for key in default if key != "name" and arm[key] != default[key]]
+        assert differing == [field]
+
+
+def test_the_duel_arms_form_a_one_field_chain() -> None:
+    """aa -> aa-counter -> aa-counter-guard, each one field from the last.
+
+    The chain is what lets a result be attributed: whatever moves between two
+    adjacent arms moved because of that field and nothing else.
+    """
+    chain = (
+        ("aa.doctrine", "aa-counter.doctrine", "counter"),
+        ("aa-counter.doctrine", "aa-counter-guard.doctrine", "intercept"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-cap.doctrine", "guard_cap"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-nocover.doctrine", "cover"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-aa.doctrine", "aa_cover"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-fwd.doctrine", "forward"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-scout.doctrine", "scout"),
+        ("aa-counter-guard.doctrine", "aa-counter-guard-raid.doctrine", "raid"),
+    )
+    for base_name, arm_name, field in chain:
+        base = _preset(base_name)
+        arm = _preset(arm_name)
+        differing = [key for key in base if key != "name" and arm[key] != base[key]]
         assert differing == [field]
 
 
@@ -128,6 +166,26 @@ def test_a_reserve_below_the_sentinel_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-007"
+
+
+def test_a_negative_guard_cap_is_refused() -> None:
+    """Zero already means the whole reserve; below it is a typo, not a
+    deeper commitment."""
+    payload = encode_doctrine(_doctrine())
+    payload["guard_cap"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-008"
+
+
+def test_a_negative_raid_size_is_refused() -> None:
+    """Zero already means no raiding; a size below it is a typo, not a
+    deeper restraint."""
+    payload = encode_doctrine(_doctrine())
+    payload["raid"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-009"
 
 
 def test_a_missing_field_is_an_error_not_a_default() -> None:

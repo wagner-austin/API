@@ -18,7 +18,7 @@ from rw_bot.policy.economy import (
     expand_production,
     upgradeable,
 )
-from rw_bot.policy.siting import PLACEMENT_RING, RING_SLOT_RADIUS
+from rw_bot.policy.siting import COVER_RING, PLACEMENT_RING, RING_SLOT_RADIUS
 from rw_bot.wire.state import BuildOption, Entity, ResourcePool, Sample
 from tests.wire_fixtures import entity, profile
 
@@ -266,6 +266,52 @@ def test_defence_places_a_turret_beside_what_it_covers() -> None:
     assert plan["type_name"] == "turret"
     assert plan["unit_id"] == 214
     assert (plan["x"], plan["y"]) == (900.0 + RING_SLOT_RADIUS, 40.0)
+
+
+def test_the_editor_placeholder_is_never_a_structure_to_cover() -> None:
+    """The placeholder trap, sprung in a new consumer: an owned immobile
+    entity parked off-map with 170,000 hp is eternally bare, and the moment
+    cover WORKED everywhere real, it became the only bare structure left --
+    defence poured turrets at an unbuildable point for whole matches and
+    walked 46 of 51 builders to their deaths (log: 2026-07-31)."""
+    world = _defence_world(
+        _entity(999, "editorOrBuilder", -1000.0, -1000.0),
+    )
+    assert undefended(world, _CATALOGUE, _PROFILES, "turret") is None
+
+
+def test_defence_steps_around_an_occupied_cover_slot() -> None:
+    """The check defence never had: the old bare offset was reached for
+    without looking, the engine refuses an occupied site silently, and one
+    scorecard priced the habit at 27 paid orders for about five turrets
+    standing. An occupied first slot now means the second, not a refusal."""
+    world = _defence_world(
+        _entity(400, EXTRACTOR_TYPE, 900.0, 40.0),
+        _entity(402, EXTRACTOR_TYPE, 960.0, 40.0),
+        _entity(403, "turret", 960.0, 140.0),
+    )
+    plan = expand_defence(
+        world, _CATALOGUE, _PROFILES, available=4000, free=_free(world), turret_type="turret"
+    )
+    assert plan["build"]
+    # (60, 0) is occupied by the neighbouring extractor, so (0, 60) is next.
+    assert (plan["x"], plan["y"]) == (900.0, 100.0)
+
+
+def test_defence_waits_when_every_cover_slot_is_taken() -> None:
+    """A refusal with a reason, where the old offset was a silent one."""
+    # Hostile, because an opponent's building fills a position exactly as
+    # firmly as ours -- and because our own would themselves ask for cover.
+    blockers = tuple(
+        _entity(500 + i, EXTRACTOR_TYPE, 900.0 + dx, 40.0 + dy, mine=False)
+        for i, (dx, dy) in enumerate(COVER_RING)
+    )
+    world = _defence_world(_entity(400, EXTRACTOR_TYPE, 900.0, 40.0), *blockers)
+    plan = expand_defence(
+        world, _CATALOGUE, _PROFILES, available=4000, free=_free(world), turret_type="turret"
+    )
+    assert not plan["build"]
+    assert plan["reason"] == "no clear cover position around extractorT1 at 900,40"
 
 
 def test_defence_waits_when_it_cannot_afford_the_turret() -> None:

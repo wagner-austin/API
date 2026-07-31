@@ -62,6 +62,16 @@ def _world(*army: Entity, hostiles: tuple[Entity, ...] = ()) -> Sample:
     return sample(anchor, *army, *hostiles)
 
 
+def test_the_gate_states_its_need_and_it_climbs_with_the_ladder() -> None:
+    """The figure the raid's draft is arbitrated against, read through the
+    same function muster uses so the two cannot drift ([[policy-raid]])."""
+    waves = WaveController(ladder=(3, 5))
+    assert waves.need() == 3
+    army = tuple(_tank(10 + n) for n in range(3))
+    waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    assert waves.need() == 5
+
+
 def test_below_the_first_wave_the_army_gathers_and_nobody_attacks() -> None:
     waves = WaveController()
     army = (_tank(10), _tank(11))
@@ -119,6 +129,32 @@ def test_killed_counts_attacked_targets_no_longer_visible() -> None:
     assert waves.killed(set()) == 1
 
 
+def test_forward_posts_the_reserve_at_the_frontier_extractor() -> None:
+    """Six batches agree matches are decided by extractor drops 688-1,766
+    units from where the army stands ([[policy-holding-ground]]); forward
+    moves the gathering to where the match is decided. The farthest owned
+    extractor from the anchor is the frontier one; an upgraded tier still
+    counts, by the same any-tier test the plan's progress count trusts."""
+    near = entity(30, "extractorT1", x=300.0, y=0.0)
+    far = entity(31, "extractorT2", x=900.0, y=0.0)
+    posted = sample(entity(1, "commandCenter", x=0.0, y=0.0), near, far, _tank(10))
+    waves = WaveController(ladder=(10,), forward=True)
+    moves, _ = waves.command(posted, _CATALOGUE, _PROFILES, (_tank(10),))
+    assert [(m["x"], m["y"]) for m in moves] == [(900.0, 0.0)]
+    # Off, the same world gathers at the anchor -- the measured behaviour.
+    home = WaveController(ladder=(10,))
+    moves, _ = home.command(posted, _CATALOGUE, _PROFILES, (_tank(10),))
+    assert [(m["x"], m["y"]) for m in moves] == [(0.0, 0.0)]
+
+
+def test_forward_falls_back_to_the_anchor_before_any_extractor_stands() -> None:
+    """An opening with no economy yet gathers at the base, not nowhere."""
+    bare = _world(_tank(10))
+    waves = WaveController(ladder=(10,), forward=True)
+    moves, _ = waves.command(bare, _CATALOGUE, _PROFILES, (_tank(10),))
+    assert [(m["x"], m["y"]) for m in moves] == [(0.0, 0.0)]
+
+
 def test_gather_reserve_marks_each_unit_and_never_repeats_it() -> None:
     rallying: set[int] = set()
     world = _world(_tank(10), _tank(11))
@@ -140,3 +176,111 @@ def test_dispatch_attacks_skips_an_attacker_already_on_that_target() -> None:
     assert [order["unit_id"] for order in sent] == [11]
     assert ordered == {10: 9, 11: 9}
     assert attacked == {9}
+
+
+def test_a_raider_inside_our_ground_pulls_the_reserve_onto_it() -> None:
+    """The wave gate stops trickling into defended ground; it was never an
+    argument for watching a raider kill the extractor beside the rally point.
+    """
+    waves = WaveController(intercept=True)
+    army = (_tank(10), _tank(11))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    world = _world(*army, hostiles=(raider,))
+    _, attacks = waves.command(world, _CATALOGUE, _PROFILES, army)
+    assert [attack["target_id"] for attack in attacks] == [9, 9]
+    assert waves.intercepts == 2
+
+
+def test_a_capped_guard_commits_only_the_nearest_detachment() -> None:
+    """The cost case that makes the cap a question: one match logged 870
+    intercepts and never massed an attack. An interception is a race with the
+    damage the intruder is doing, so the detachment is the nearest engageable
+    units and no more; the rest of the reserve keeps gathering toward the
+    wave the offence still needs ([[policy-holding-ground]])."""
+    waves = WaveController(ladder=(10,), intercept=True, guard_cap=2)
+    army = (_tank(10, x=150.0), _tank(11, x=90.0), _tank(12, x=140.0), _tank(13, x=600.0))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    world = _world(*army, hostiles=(raider,))
+    _, attacks = waves.command(world, _CATALOGUE, _PROFILES, army)
+    # 10 (50 away) and 12 (60 away) race; 11 and 13 keep gathering.
+    assert [attack["unit_id"] for attack in attacks] == [10, 12]
+    assert waves.intercepts == 2
+
+
+def test_a_zero_cap_commits_the_whole_reserve() -> None:
+    """Zero is the shipped behaviour both guard A/Bs measured, so it is a
+    value rather than a special case."""
+    waves = WaveController(ladder=(10,), intercept=True, guard_cap=0)
+    army = (_tank(10), _tank(11), _tank(12))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    _, attacks = waves.command(_world(*army, hostiles=(raider,)), _CATALOGUE, _PROFILES, army)
+    assert [attack["unit_id"] for attack in attacks] == [10, 11, 12]
+
+
+def test_the_riposte_releases_the_reserve_when_the_intrusion_ends() -> None:
+    """The human counter-punch, as one flag.
+
+    A raider stands on our ground, dies (or leaves), and the NEXT
+    observation releases the whole gathered reserve below the ladder's rung
+    -- the enemy's attack burned itself out, and the window before its next
+    group finishes staging is when a stockpile converts
+    ([[ai-opponent-strategy]]). Without the flag the same three ticks keep
+    the reserve gathering toward a ten-unit rung it has not reached.
+    """
+    army = (_tank(10), _tank(11), _tank(12), _tank(13))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    intruded = _world(*army, hostiles=(raider,))
+    quiet = _world(*army)
+
+    waves = WaveController(ladder=(10,), intercept=True, riposte=True)
+    waves.command(intruded, _CATALOGUE, _PROFILES, army)
+    waves.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert waves.released() == frozenset()
+    waves.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert waves.released() == {10, 11, 12, 13}
+
+    plain = WaveController(ladder=(10,), intercept=True)
+    plain.command(intruded, _CATALOGUE, _PROFILES, army)
+    plain.command(quiet, _CATALOGUE, _PROFILES, army)
+    plain.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert plain.released() == frozenset()
+
+
+def test_a_riposte_missed_is_not_banked() -> None:
+    """A riposte with too few units is dropped, not saved for a moment that
+    has lost its window: the reserve keeps gathering toward the rung."""
+    army = (_tank(10), _tank(11))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    waves = WaveController(ladder=(10,), intercept=True, riposte=True)
+    waves.command(_world(*army, hostiles=(raider,)), _CATALOGUE, _PROFILES, army)
+    waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    assert waves.released() == frozenset()
+
+
+def test_a_guard_is_sent_home_again_once_the_raid_ends() -> None:
+    """A guard forgets it was ever rallied, so the gather pass re-rallies it
+    rather than leaving it standing where the fight finished.
+    """
+    waves = WaveController(intercept=True)
+    army = (_tank(10), _tank(11))
+    raider = entity(9, "c_tank", mine=False, hostile=True, x=200.0, y=0.0)
+    waves.command(_world(*army, hostiles=(raider,)), _CATALOGUE, _PROFILES, army)
+    # The raid ends: the raider is gone, and the guards get fresh rally orders
+    # on the next observation.
+    _, attacks = waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    assert attacks == ()
+    quiet, _ = waves.command(_world(*army), _CATALOGUE, _PROFILES, army)
+    assert [move["unit_id"] for move in quiet] == [10, 11]
+
+
+def test_a_distant_hostile_does_not_bypass_the_wave_gate() -> None:
+    """Only intrusion bypasses the gate, and only intrusion should: attacking
+    out is the wave's business, on the wave's terms.
+    """
+    waves = WaveController(intercept=True)
+    army = (_tank(10), _tank(11))
+    afar = entity(9, "c_tank", mine=False, hostile=True, x=5000.0, y=5000.0)
+    _, attacks = waves.command(_world(*army, hostiles=(afar,)), _CATALOGUE, _PROFILES, army)
+    assert attacks == ()
+    assert waves.intercepts == 0

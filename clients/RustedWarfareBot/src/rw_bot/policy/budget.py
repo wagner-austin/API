@@ -115,6 +115,7 @@ class Budget:
         self.credits = credits
         self.reserve = reserve
         self._spent = 0
+        self._withheld = 0
         self._ledger: list[Claim] = []
 
     def spent(self) -> int:
@@ -137,10 +138,38 @@ class Budget:
         """Return what is left for an unprotected claim.
 
         Returns:
-            Credits not yet committed and not held back by the reserve, never
-            below zero.
+            Credits not yet committed and not held back by the reserve or by
+            a withholding, never below zero.
         """
-        return max(0, self.remaining() - self.reserve)
+        return max(0, self.remaining() - self.reserve - self._withheld)
+
+    def withhold(self, amount: int) -> None:
+        """Keep credits back from every later claim this tick.
+
+        **The saving mechanism, and why claim order alone could not buy the
+        tier-three conversion.** A budget lives one tick, and income arrives a
+        few credits per tick -- so a 4,000-credit conversion asked first still
+        read ``of 0 available`` every single tick, because the previous tick's
+        spenders had drained the balance to the reserve before it could grow
+        (measured: asked 3,788, granted 0, log 2026-07-31). A spender that is
+        refused withholds its price instead, later channels see that much
+        less, and the balance climbs across ticks until the claim fits.
+        Protected claims are bound too, deliberately: replacing losses is
+        protected and drains the balance to zero each tick, so a saving only
+        investment respected would never fill.
+
+        Args:
+            amount: Credits to keep back. Accumulates across calls.
+
+        Raises:
+            BudgetError: ``RW-BUDGET-003`` when the amount is negative.
+        """
+        if amount < 0:
+            raise BudgetError(
+                _NEGATIVE_CLAIM,
+                f"a withholding of {amount} would free credits rather than save them",
+            )
+        self._withheld += amount
 
     def ledger(self) -> tuple[Claim, ...]:
         """Return every claim made this tick, granted or not, in order.
@@ -175,7 +204,13 @@ class Budget:
                 f"{purpose!r} claimed {amount} credits; a negative claim would refund the "
                 "budget and let a later claim spend credits the player never held",
             )
-        available = self.remaining() if protected else self.spendable()
+        # Withheld credits are invisible to every later claim, protected or
+        # not -- a saving that only investment respected would never fill,
+        # because replacing losses is protected and drains the balance to
+        # zero each tick. The reserve stays crossable: it protects the army
+        # FROM investment, where the withholding protects a purchase FROM
+        # the army, and the two floors are deliberately independent.
+        available = max(0, self.remaining() - self._withheld) if protected else self.spendable()
         if amount > available:
             return self._record(
                 Claim(

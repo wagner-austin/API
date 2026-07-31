@@ -22,8 +22,8 @@ from collections.abc import Mapping, Sequence
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
-from rw_bot.policy.campaign import DEFAULT_MAX_WORKERS
 from rw_bot.policy.combat import WAVE_SIZES
+from rw_bot.policy.workforce import DEFAULT_MAX_WORKERS
 from rw_bot.validation import (
     require_bool,
     require_int,
@@ -38,6 +38,15 @@ _NOT_A_FLAG = "RW-DOCTRINE-004"
 _REPEATED_FIELD = "RW-DOCTRINE-005"
 _BLANK_GOAL = "RW-DOCTRINE-006"
 _BAD_RESERVE = "RW-DOCTRINE-007"
+_BAD_GUARD_CAP = "RW-DOCTRINE-008"
+_BAD_RAID_SIZE = "RW-DOCTRINE-009"
+_BLANK_HEAVY = "RW-DOCTRINE-010"
+
+#: The ``heavies`` value that means "no extra composition entries".
+#:
+#: A word rather than a blank, because a doctrine line cannot carry an empty
+#: value and a missing field is an error by design.
+NO_HEAVIES: Final = "none"
 
 #: The ``reserve`` value that means "derive it from the composition".
 #:
@@ -47,10 +56,22 @@ _BAD_RESERVE = "RW-DOCTRINE-007"
 DERIVE_RESERVE: Final = -1
 
 #: Fields carried as whole numbers in a doctrine file.
-_INT_FIELDS: Final = ("max_workers", "mass", "reserve")
+_INT_FIELDS: Final = ("max_workers", "mass", "reserve", "guard_cap", "raid")
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
-_FLAG_FIELDS: Final = ("expand", "counter")
+_FLAG_FIELDS: Final = (
+    "expand",
+    "counter",
+    "cover",
+    "intercept",
+    "aa_cover",
+    "forward",
+    "scout",
+    "rush",
+    "creep",
+    "riposte",
+    "tech",
+)
 
 #: Fields carried as text in a doctrine file.
 _STR_FIELDS: Final = ("name", "goals")
@@ -89,6 +110,63 @@ class Doctrine(TypedDict):
         counter: Whether production tilts toward what the opponent is seen to
             field, or holds the stated mix regardless
             ([[mechanics-combat-profile]]).
+        cover: Whether the economy buys turrets beside bare structures at
+            all. On is the behaviour every measurement carries somewhere in
+            its lineage -- but for most of that lineage the orders were
+            silently refused, so "defence on" historically meant "defence
+            attempted". The first batch where turrets actually landed spent
+            25-45k a match on them and won 6/24 at a rung the
+            attempted-defence bot won 10/12, which is what makes on-vs-off
+            a question at last ([[policy-holding-ground]]).
+        intercept: Whether the reserve turns on a raider standing inside the
+            outpost radius of one of our structures, or keeps gathering
+            regardless ([[policy-holding-ground]]).
+        aa_cover: Whether an anti-air turret joins the cover once the
+            opponent has shown aircraft. Nothing the bot could place before
+            this touched an aircraft at all -- the whole army and the ground
+            turret declare ``canAttackFlyingUnits: false``
+            ([[policy-holding-ground]]).
+        guard_cap: The most reserve units an interception commits, or zero for
+            all of them -- the behaviour every guard measurement was taken
+            under, so the shipped figure is a value rather than a special
+            case. The cost case that makes it a question: one match logged
+            870 intercepts and never massed an attack
+            ([[policy-holding-ground]]).
+        forward: Whether the reserve posts at the frontier extractor
+            instead of the base. The one invariant six batches have not
+            moved is that matches are decided by extractor drops far from
+            where the army gathers; this is the corpus's forward-posture
+            answer to it ([[policy-holding-ground]],
+            [[community-play-strategies]]).
+        scout: Whether one scout is kept alive walking the pool circuit, its
+            sightings remembered through the fog and fed to the counter tilt
+            ([[community-play-strategies]]).
+        rush: Whether released waves march at the estimated enemy start
+            while nothing is visible to fight. The all-in verb: against an
+            income-multiplier opponent whose advantage compounds with time,
+            the earliest possible fight is the fairest one, and without this
+            the first wave stood at the rally point waiting for an opponent
+            who never needed to come ([[policy-holding-ground]]).
+        raid: The raid party's size, or zero for no raiding. A size rather
+            than a flag, because the size is the open question the v2
+            measure left: at the first-wave size the raid is free and wins
+            nothing, so whether a heavier party converts is a doctrine arm,
+            not a code edit ([[policy-raid]]).
+        creep: Whether the economy walks turrets toward the enemy start, one
+            covered step at a time. The documented human answer to the
+            cheating difficulties: turrets outrange and outlast anything the
+            AI fields inside its thousand-tick opening delay, and ground
+            taken this way is ground its random-target attack groups cannot
+            answer ([[ai-opponent-strategy]], [[community-play-strategies]]).
+        riposte: Whether the whole reserve releases the moment an intrusion
+            ends -- the human counter-punch: let the attack burn itself on
+            the defences, then push into the window before the opponent's
+            next group finishes its thousand-tick delay and seventeen-second
+            staging ([[ai-opponent-strategy]]).
+        tech: Whether factories unlock their next tier. The land factory's
+            2,000-credit upgrade flips a flag on the same building and opens
+            the heavy roster -- reachable only through the ability verb,
+            because it converts into no type ([[mechanics-build-actions]]).
     """
 
     name: str
@@ -98,6 +176,17 @@ class Doctrine(TypedDict):
     reserve: int
     expand: bool
     counter: bool
+    cover: bool
+    intercept: bool
+    guard_cap: int
+    aa_cover: bool
+    forward: bool
+    scout: bool
+    raid: int
+    rush: bool
+    creep: bool
+    riposte: bool
+    tech: bool
 
 
 #: The style everything so far was measured under, exactly.
@@ -123,6 +212,17 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     reserve=DERIVE_RESERVE,
     expand=True,
     counter=False,
+    cover=True,
+    intercept=False,
+    guard_cap=0,
+    aa_cover=False,
+    forward=False,
+    scout=False,
+    raid=0,
+    rush=False,
+    creep=False,
+    riposte=False,
+    tech=False,
 )
 
 
@@ -153,6 +253,18 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             _BAD_RESERVE,
             f"field 'reserve' must be >= 0, or {DERIVE_RESERVE} to derive it, got {reserve}",
         )
+    guard_cap = require_int(payload, "guard_cap")
+    if guard_cap < 0:
+        raise DoctrineError(
+            _BAD_GUARD_CAP,
+            f"field 'guard_cap' must be >= 0, with 0 meaning the whole reserve, got {guard_cap}",
+        )
+    raid = require_int(payload, "raid")
+    if raid < 0:
+        raise DoctrineError(
+            _BAD_RAID_SIZE,
+            f"field 'raid' must be >= 0, a party size with 0 meaning no raiding, got {raid}",
+        )
     return Doctrine(
         name=require_non_empty_str(payload, "name"),
         goals=goals,
@@ -161,6 +273,17 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         reserve=reserve,
         expand=require_bool(payload, "expand"),
         counter=require_bool(payload, "counter"),
+        cover=require_bool(payload, "cover"),
+        intercept=require_bool(payload, "intercept"),
+        guard_cap=guard_cap,
+        aa_cover=require_bool(payload, "aa_cover"),
+        forward=require_bool(payload, "forward"),
+        scout=require_bool(payload, "scout"),
+        raid=raid,
+        rush=require_bool(payload, "rush"),
+        creep=require_bool(payload, "creep"),
+        riposte=require_bool(payload, "riposte"),
+        tech=require_bool(payload, "tech"),
     )
 
 
@@ -183,6 +306,17 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "reserve": doctrine["reserve"],
         "expand": doctrine["expand"],
         "counter": doctrine["counter"],
+        "cover": doctrine["cover"],
+        "intercept": doctrine["intercept"],
+        "guard_cap": doctrine["guard_cap"],
+        "aa_cover": doctrine["aa_cover"],
+        "forward": doctrine["forward"],
+        "scout": doctrine["scout"],
+        "raid": doctrine["raid"],
+        "rush": doctrine["rush"],
+        "creep": doctrine["creep"],
+        "riposte": doctrine["riposte"],
+        "tech": doctrine["tech"],
     }
 
 

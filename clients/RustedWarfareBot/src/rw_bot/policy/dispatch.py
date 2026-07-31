@@ -15,11 +15,69 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence, Set
 
 from rw_bot.mechanics.catalogue import UnitStats
-from rw_bot.mechanics.combat_profile import CombatProfile
-from rw_bot.policy.combat import WAVE_SIZES, Engagement, engagements, muster, rally
+from rw_bot.mechanics.combat_profile import CombatProfile, can_engage
+from rw_bot.mechanics.upgrades import satisfies
+from rw_bot.policy.combat import (
+    WAVE_SIZES,
+    Engagement,
+    engagements,
+    find_targets,
+    muster,
+    rally,
+    wave_size,
+)
+from rw_bot.policy.guard import deepest_intruder
 from rw_bot.policy.siting import find_anchor
 from rw_bot.wire.command import AttackOrder, MoveOrder, attack_order, move_order
 from rw_bot.wire.state import Entity, Sample
+
+
+def rally_post(sample: Sample, catalogue: Mapping[str, UnitStats], forward: bool) -> Entity | None:
+    """Return the structure the reserve gathers at.
+
+    The anchor by default -- the behaviour every measurement so far was taken
+    under. Forward, it is the owned extractor **farthest from the anchor**:
+    the frontier one. The motivation is the one invariant six consecutive
+    batches have not moved: matches are decided by extractor drops, the
+    per-loss table puts each death 688-1,766 world units from the army's own
+    fighting cloud, and the army has spent every one of those matches
+    gathered at the base on the other side of that distance
+    ([[policy-holding-ground]]). The community corpus ranks the same idea
+    second of everything it teaches: military *forward*, between the enemy
+    and the extractors ([[community-play-strategies]]).
+
+    An extractor of any tier qualifies -- :func:`~rw_bot.mechanics.upgrades.
+    satisfies` is the same any-tier test the plan's own progress count
+    trusts. Farthest, with the id as tie-break, so two runs of one seed post
+    the reserve identically.
+
+    Args:
+        sample: One observation of the world.
+        catalogue: Unit stats by type name, for the anchor.
+        forward: Whether the reserve posts at the frontier.
+
+    Returns:
+        The structure to gather at, or None when nothing immobile stands.
+    """
+    anchor = find_anchor(sample, catalogue)
+    if anchor is None or not forward:
+        return anchor
+
+    def frontier(entity: Entity) -> tuple[float, int]:
+        dx = entity["x"] - anchor["x"]
+        dy = entity["y"] - anchor["y"]
+        # Negated id so max() breaks distance ties toward the LOWEST id, the
+        # ordering every other draft in this codebase uses.
+        return (dx * dx + dy * dy, -entity["unit_id"])
+
+    extractors = [
+        entity
+        for entity in sample["entities"]
+        if entity["mine"] and entity["complete"] and satisfies(entity["type_name"], "extractorT1")
+    ]
+    if not extractors:
+        return anchor
+    return max(extractors, key=frontier)
 
 
 def gather_reserve(
@@ -27,8 +85,9 @@ def gather_reserve(
     catalogue: Mapping[str, UnitStats],
     reserve: Sequence[Entity],
     rallying: set[int],
+    forward: bool = False,
 ) -> tuple[MoveOrder, ...]:
-    """Send the units still gathering to the base, once each.
+    """Send the units still gathering to the rally post, once each.
 
     Once each, not once per sample: the engine runs a waypoint until it is
     replaced, so re-issuing at the sampling rate resets the walk and nothing
@@ -45,21 +104,23 @@ def gather_reserve(
 
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name, for finding the anchor.
+        catalogue: Unit stats by type name, for finding the rally post.
         reserve: Units not cleared to attack.
         rallying: Ids already sent, for units currently in the reserve.
             Extended in place.
+        forward: Whether the reserve posts at the frontier extractor instead
+            of the base (:func:`rally_post`).
 
     Returns:
         The move orders to send, in roster order.
     """
-    anchor = find_anchor(sample, catalogue)
-    if anchor is None:
+    post = rally_post(sample, catalogue, forward)
+    if post is None:
         # Nothing immobile left to gather at. A player who has lost every
         # structure has worse problems than formation.
         return ()
     orders: list[MoveOrder] = []
-    for move in rally(reserve, (anchor["x"], anchor["y"])):
+    for move in rally(reserve, (post["x"], post["y"])):
         if move["unit_id"] in rallying:
             continue
         rallying.add(move["unit_id"])
@@ -113,24 +174,91 @@ class WaveController:
     Attributes:
         attack_orders: Attack orders decided so far.
         rallied: Move orders decided so far to gather the reserve.
+        intercepts: Guard engagements decided so far, for the report.
     """
 
-    def __init__(self, ladder: Sequence[int] = WAVE_SIZES) -> None:
+    def __init__(
+        self,
+        ladder: Sequence[int] = WAVE_SIZES,
+        *,
+        intercept: bool = False,
+        guard_cap: int = 0,
+        forward: bool = False,
+        riposte: bool = False,
+    ) -> None:
         """Open a controller.
 
         Args:
             ladder: How many units each successive wave waits for. Defaults to
                 the shipped AI's ([[engine-ai-triggers]]).
+            intercept: Whether the reserve turns on a raider standing inside
+                the outpost radius of one of our structures, or keeps
+                gathering regardless ([[policy-holding-ground]]). False is
+                the behaviour every measurement so far was taken under.
+            guard_cap: The most reserve units an interception commits, or zero
+                for all of them -- the behaviour both guard A/Bs were measured
+                under. The cost case that makes it a question: one match
+                logged 870 intercepts and never massed an attack, so
+                answer-with-everything may be buying defence with the offence
+                ([[policy-holding-ground]]).
+            forward: Whether the reserve posts at the frontier extractor
+                instead of the base (:func:`rally_post`). False is the
+                behaviour every measurement so far was taken under.
+            riposte: Whether the whole reserve releases the moment an
+                intrusion ends -- the counter-punch a human plays: let the
+                attack burn itself on the defences, then push into the
+                window before the opponent's next group finishes staging
+                ([[ai-opponent-strategy]]). False is the behaviour every
+                measurement so far was taken under: waves release on size
+                alone, at a moment that means nothing.
         """
         self._ladder = tuple(ladder)
+        self._intercept = intercept
+        self._guard_cap = guard_cap
+        self._forward = forward
+        self._riposte = riposte
+        # The riposte's memory: whether an intruder stood on our ground last
+        # observation, and whether its departure has armed a counter-punch
+        # that muster has not yet consumed.
+        self._intruding = False
+        self._avenging = False
         self.attack_orders = 0
         self.rallied = 0
-        self._holding: int | None = None
+        self.intercepts = 0
+        # Target held per attacker, so a group persists while its target
+        # lives and only freed units are dealt into groups afresh
+        # ([[policy-combat]]).
+        self._held: dict[int, int] = {}
         self._released: frozenset[int] = frozenset()
         self._waves = 0
         self._rallying: set[int] = set()
+        self._guarding: set[int] = set()
         self._ordered: dict[int, int] = {}
         self._attacked: set[int] = set()
+
+    def released(self) -> frozenset[int]:
+        """Return the ids currently cleared to attack.
+
+        The rush's draft pool: released units with nothing visible to fight
+        are the ones marched at the estimated enemy start, and exposing the
+        set keeps that arbitration in the campaign beside the raid's
+        ([[policy-combat]]).
+        """
+        return self._released
+
+    def need(self) -> int:
+        """Return how many units the next wave waits for.
+
+        The same figure :func:`~rw_bot.policy.combat.muster` will use, read
+        through the same function, so a caller arbitrating against the gate
+        cannot drift from the gate. The raid is that caller: its party is
+        drafted only from units *beyond* this figure, because v1 drafted from
+        the gate itself and was refuted 0/12 for it ([[policy-raid]]).
+
+        Returns:
+            The current rung of the ladder.
+        """
+        return wave_size(self._waves, self._ladder)
 
     def command(
         self,
@@ -158,7 +286,11 @@ class WaveController:
         Returns:
             The move orders and the attack orders to send, in that order.
         """
-        wave = muster(army, self._released, self._waves, self._ladder)
+        wave = muster(army, self._released, self._waves, self._ladder, force=self._avenging)
+        # Consumed whether or not it released: a riposte with too few units
+        # to punch is a riposte missed, not one banked for an arbitrary
+        # later moment that has lost the window.
+        self._avenging = False
         self._released = wave["released"]
         self._waves = wave["waves"]
         # A unit cleared to attack is no longer gathering, so it forgets it was
@@ -166,24 +298,95 @@ class WaveController:
         # rather than standing where it died.
         self._rallying -= self._released
 
-        moves = gather_reserve(
-            sample,
-            catalogue,
-            tuple(unit for unit in army if unit["unit_id"] not in self._released),
-            self._rallying,
-        )
+        reserve = tuple(unit for unit in army if unit["unit_id"] not in self._released)
+        moves = gather_reserve(sample, catalogue, reserve, self._rallying, self._forward)
         self.rallied += len(moves)
 
+        guard_attacks = self._guard(sample, catalogue, profiles, reserve)
+
         if not self._released:
-            return moves, ()
+            return moves, guard_attacks
         fighting = tuple(unit for unit in army if unit["unit_id"] in self._released)
-        # The target the army is already on is carried in, so the choice
-        # persists across samples instead of being remade every observation.
-        current = engagements(sample, catalogue, profiles, self._holding, fighting)
-        self._holding = current[0]["target_id"] if current else None
+        # Each attacker's current target is carried in, so the groups persist
+        # across samples instead of being re-dealt every observation.
+        current = engagements(sample, catalogue, profiles, self._held, fighting)
+        self._held = {e["attacker_id"]: e["target_id"] for e in current}
         attacks = dispatch_attacks(current, self._ordered, self._attacked)
         self.attack_orders += len(attacks)
-        return moves, attacks
+        return moves, (*guard_attacks, *attacks)
+
+    def _guard(
+        self,
+        sample: Sample,
+        catalogue: Mapping[str, UnitStats],
+        profiles: Mapping[str, CombatProfile],
+        reserve: Sequence[Entity],
+    ) -> tuple[AttackOrder, ...]:
+        """Turn the reserve on a raider inside our ground, if there is one.
+
+        The wave gate exists to stop units trickling into *defended* ground;
+        it was never an argument for standing at the rally point while a
+        raider kills the extractor next to it -- inside our own outpost radius
+        there are no enemy turrets and the reserve has local numbers
+        ([[policy-holding-ground]]). So intrusion bypasses the gate, and only
+        intrusion does.
+
+        Guards forget they were ever sent home once the raid ends, so the
+        gather pass re-rallies them instead of leaving them standing where the
+        fight finished -- the same rule a disbanded wave follows.
+
+        Args:
+            sample: One observation of the world.
+            catalogue: Unit stats by type name.
+            profiles: Combat profiles by type name.
+            reserve: Units not released to a wave.
+
+        Returns:
+            The attack orders to send, empty when interception is off or
+            nothing intrudes.
+        """
+        if not self._intercept and not self._riposte:
+            return ()
+        intruder = deepest_intruder(sample, catalogue, profiles, reserve, find_targets(sample))
+        # The riposte arms on the edge, not the state: an intrusion that just
+        # ENDED is the enemy's attack burned out on our ground, and the window
+        # before its next group finishes staging is when a stockpile converts
+        # ([[ai-opponent-strategy]]). Armed here, consumed by the next
+        # muster.
+        if self._riposte and self._intruding and intruder is None:
+            self._avenging = True
+        self._intruding = intruder is not None
+        if intruder is None or not self._intercept:
+            if self._guarding:
+                self._rallying -= self._guarding
+                self._guarding.clear()
+            return ()
+        engageable = [unit for unit in reserve if can_engage(profiles, unit, intruder)]
+        if 0 < self._guard_cap < len(engageable):
+            # The nearest, because an interception is a race with the damage
+            # the intruder is doing: the detachment that arrives first is the
+            # one that was closest when the alarm went. Squared distance --
+            # ranking needs no root -- with the id as the tie-break every
+            # ordering in this codebase uses.
+
+            def closeness(unit: Entity) -> tuple[float, int]:
+                dx = unit["x"] - intruder["x"]
+                dy = unit["y"] - intruder["y"]
+                return (dx * dx + dy * dy, unit["unit_id"])
+
+            engageable = sorted(engageable, key=closeness)[: self._guard_cap]
+        current = tuple(
+            Engagement(
+                attacker_id=unit["unit_id"],
+                target_id=intruder["unit_id"],
+                reason=f"{unit['type_name']} intercepts {intruder['type_name']}",
+            )
+            for unit in engageable
+        )
+        self._guarding |= {engagement["attacker_id"] for engagement in current}
+        attacks = dispatch_attacks(current, self._ordered, self._attacked)
+        self.intercepts += len(attacks)
+        return attacks
 
     def killed(self, visible_now: Set[int]) -> int:
         """Return how many targets ordered against are no longer visible.

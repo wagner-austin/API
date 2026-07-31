@@ -46,6 +46,30 @@ from rw_bot.wire.state import Sample
 #: assumption about map size ([[mechanics-resource-pools]]).
 DEFAULT_STALL_SAMPLES = 45
 
+#: Observations a price wait may persist without the shortfall shrinking before
+#: the plan is ruled blocked.
+#:
+#: A different clock from the refusal window, because it judges a different
+#: silence. A refused order produces nothing forever; a save produces a new
+#: credit high-water every few samples for as long as anything is being banked,
+#: however slowly -- so the window measures *progress*, not duration, and a
+#: genuinely slow save never trips it. Twice the refusal window is generous:
+#: ninety samples without one new high-water is not slowness, it is income
+#: entirely spoken for.
+#:
+#: Why it exists at all: the plan claims nothing while it waits
+#: (:func:`~rw_bot.policy.spending.build_plan` claims only when acting), so
+#: production and expansion keep spending the income every tick. Under army
+#: attrition an expensive entry is then not slow, it is *impossible*, and the
+#: amphib arm measured what that costs -- an 11,000-credit goal against a
+#: 4,000-credit start held the only worker hostage for whole matches:
+#: ``plan-holds-only-worker reached 255`` and climbing, twelve seeds, zero of
+#: them ever affording it (log: 2026-07-29, the amphib arm). Escrowing the
+#: claim instead would starve replacement, which the reserve regression
+#: already priced ([[policy-economy]]); saying "this save is not happening"
+#: out loud and releasing the worker is the honest fix.
+AFFORD_STALL_SAMPLES = 90
+
 
 class BuildStep(TypedDict):
     """What the build plan wants done on this observation.
@@ -81,23 +105,36 @@ class OrderTracker:
         plan: What to make, in order.
         stall_samples: Observations of no visible progress before the plan is
             called stalled.
+        afford_samples: Observations a price wait may persist without its
+            shortfall shrinking before the plan is ruled blocked.
         orders_sent: Orders this tracker has cleared for dispatch.
     """
 
-    def __init__(self, plan: Sequence[str], stall_samples: int = DEFAULT_STALL_SAMPLES) -> None:
+    def __init__(
+        self,
+        plan: Sequence[str],
+        stall_samples: int = DEFAULT_STALL_SAMPLES,
+        afford_samples: int = AFFORD_STALL_SAMPLES,
+    ) -> None:
         """Open a tracker for one plan.
 
         Args:
             plan: What to make, in order.
             stall_samples: Observations of no visible progress before the plan
                 is called stalled.
+            afford_samples: Observations a price wait may persist without its
+                shortfall shrinking before the plan is ruled blocked.
         """
         self.plan = tuple(plan)
         self.stall_samples = stall_samples
+        self.afford_samples = afford_samples
         self.orders_sent = 0
         self._ordered: set[tuple[int, str]] = set()
         self._watching: tuple[int, str] | None = None
         self._quiet = 0
+        self._deficit_floor: int | None = None
+        self._deficit_quiet = 0
+        self._saving_at: int | None = None
 
     def assess(self, sample: Sample, decision: Decision, builder_moved: bool) -> BuildStep:
         """Judge one observation against the order already outstanding.
@@ -118,7 +155,14 @@ class OrderTracker:
         if decision["action"] == "stalled":
             return BuildStep(act=False, outcome="stalled", reason=decision["reason"])
         if decision["action"] == "wait":
+            if decision["deficit"] > 0:
+                return self._assess_saving(sample, decision)
+            self._reset_saving()
             return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        # Any actual order means the last save either completed or was
+        # abandoned by the plan itself; whatever shortfall follows belongs to
+        # the next save, not the finished one.
+        self._reset_saving()
 
         # **Keyed by what is being built, not by the count alone.** The plan
         # defers an entry with nowhere to stand and reaches past it, so two
@@ -160,6 +204,61 @@ class OrderTracker:
                 f"{decision['type_name']} was ordered but never appeared after "
                 f"{self.stall_samples} samples with the builder standing still; "
                 "the engine refused it silently"
+            ),
+        )
+
+    def _reset_saving(self) -> None:
+        """Forget the savings clock; the plan is not waiting on a price."""
+        self._deficit_floor = None
+        self._deficit_quiet = 0
+        self._saving_at = None
+
+    def _assess_saving(self, sample: Sample, decision: Decision) -> BuildStep:
+        """Judge whether a save the plan is waiting on is actually happening.
+
+        The clock measures progress, not duration: every new credit high-water
+        (a shortfall smaller than any seen for this entry) restarts it, so a
+        slow save is allowed to be arbitrarily slow. What it refuses to allow
+        is a shortfall that never shrinks at all -- income entirely spoken for
+        by production and expansion, which the plan cannot see and used to
+        wait on forever, worker in hand (see :data:`AFFORD_STALL_SAMPLES` for
+        the measured cost).
+
+        **Blocked, not latched.** The worker a blocked ruling releases goes to
+        the economy, and an economy that recovers enough to set a new
+        high-water lifts the ruling on its own -- the plan resumes and takes
+        its worker back. Release-while-stuck, reclaim-when-converging.
+
+        Args:
+            sample: One observation of the world.
+            decision: The price wait, carrying its shortfall.
+
+        Returns:
+            Building while the save progresses or the window is open, blocked
+            once the shortfall has sat still for the whole window.
+        """
+        count = completed_count(sample, self.plan)
+        if self._saving_at != count:
+            # A different entry is saving now; its shortfall starts fresh.
+            self._saving_at = count
+            self._deficit_floor = None
+            self._deficit_quiet = 0
+        gap = decision["deficit"]
+        if self._deficit_floor is None or gap < self._deficit_floor:
+            self._deficit_floor = gap
+            self._deficit_quiet = 0
+            return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        self._deficit_quiet += 1
+        if self._deficit_quiet < self.afford_samples:
+            return BuildStep(act=False, outcome="building", reason=decision["reason"])
+        return BuildStep(
+            act=False,
+            outcome="blocked",
+            reason=(
+                f"{decision['reason']}; the shortfall never shrank below "
+                f"{self._deficit_floor} across {self.afford_samples} samples -- "
+                "income is spoken for and this save is not happening; "
+                "the worker is released"
             ),
         )
 
@@ -217,4 +316,4 @@ def _in_flight(sample: Sample, decision: Decision, builder_moved: bool) -> bool:
     return False
 
 
-__all__ = ["DEFAULT_STALL_SAMPLES", "BuildStep", "OrderTracker"]
+__all__ = ["AFFORD_STALL_SAMPLES", "DEFAULT_STALL_SAMPLES", "BuildStep", "OrderTracker"]

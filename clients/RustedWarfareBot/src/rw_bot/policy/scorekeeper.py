@@ -172,6 +172,10 @@ class Scorekeeper:
         expand_reason: str,
         attack_orders: int,
         rallied: int,
+        intercepts: int,
+        sightings: int,
+        raids: int,
+        marches: int,
         killed: int,
         refused_claims: int,
         outlays: tuple[Outlay, ...],
@@ -197,6 +201,10 @@ class Scorekeeper:
             expand_reason: The economy's own words for its last decision.
             attack_orders: Attack orders issued.
             rallied: Move orders issued to gather the reserve.
+            intercepts: Guard engagements issued against raiders.
+            sightings: Hostile sightings the intel memory recorded.
+            raids: Income objectives the raid party assaulted.
+            marches: Outbound orders sent to raid party members.
             killed: Targets ordered against that are no longer visible.
             refused_claims: Credit claims the budget turned down.
             outlays: What each purpose asked for and got.
@@ -221,6 +229,10 @@ class Scorekeeper:
             extractors_end=self.extractors_end,
             attack_orders=attack_orders,
             rallied=rallied,
+            intercepts=intercepts,
+            sightings=sightings,
+            raids=raids,
+            marches=marches,
             army_start=self._army_start,
             army_end=self.army_end,
             targets_seen=self._targets_seen,

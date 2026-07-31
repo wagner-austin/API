@@ -25,9 +25,10 @@ from collections.abc import Mapping, Sequence
 
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile, profile_of
+from rw_bot.policy.build_order import PLACEHOLDER_TYPE
 from rw_bot.policy.combat import is_mobile
 from rw_bot.policy.economy import Expansion, count_extractors, placer, waiting
-from rw_bot.policy.siting import RING_SLOT_RADIUS, find_anchor
+from rw_bot.policy.siting import clear_site_near, find_anchor
 from rw_bot.wire.state import Entity, Sample
 
 #: The defence placed beside a structure that has none.
@@ -38,6 +39,16 @@ from rw_bot.wire.state import Entity, Sample
 #: a Builder can place from the start, which is what makes it reachable at all
 #: ([[policy-holding-ground]]).
 TURRET_TYPE = "c_turret_t1"
+
+#: The defence placed beside a structure once the opponent has shown aircraft.
+#:
+#: The other half of a gap the ground turret cannot close: ``c_turret_t1``
+#: declares ``canAttackFlyingUnits: false`` and so does every unit the opening
+#: plan builds, so before this existed nothing the bot could place touched an
+#: aircraft at all ([[policy-holding-ground]]). 600 credits, 250 reach, 800
+#: hit points, placeable by the Builder from the start -- same reachability
+#: argument as the ground turret's.
+AA_TURRET_TYPE = "c_antiAirTurret"
 
 
 def _range_squared(one: Entity, other: Entity) -> float:
@@ -129,11 +140,21 @@ def undefended(
     def from_anchor(entity: Entity) -> float:
         return _range_squared(entity, anchor)
 
+    # The placeholder exclusion is load-bearing here exactly as it is in
+    # find_producer: the map editor's unit is an owned immobile entity parked
+    # off-map at (-1000, -1000) with 170,000 hit points, and it is eternally
+    # bare. It ranked last by distance, so nothing reached it -- until the
+    # cover ring made defence WORK, every real structure got covered, and the
+    # one bare "structure" left was the placeholder. Defence then poured
+    # turrets at an unbuildable off-map point for the rest of the match,
+    # walking 46 of 51 builders to their deaths and freezing the workforce
+    # the plan was waiting on (log: 2026-07-31).
     bare = [
         entity
         for entity in sample["entities"]
         if entity["mine"]
         and entity["complete"]
+        and entity["type_name"] != PLACEHOLDER_TYPE
         and not is_mobile(entity, catalogue)
         and not any(_range_squared(entity, turret) <= cover for turret in turrets)
     ]
@@ -167,13 +188,20 @@ def expand_defence(
     the choice of site, is what is unexplained.
 
     Placed beside the structure it covers rather than on the base ring, because
-    a turret at the base does not defend a pool on the far side of the map. The
-    offset is the ring slot radius, which is the same distance the engine's own
-    placement snapping tolerates ([[building-structures]]). **Whether that
-    offset is a legal site at a pool is not checked here and has never been
-    verified**: an illegal placement is refused silently by the engine, which
-    would cost the builder a walk and a stall window per attempt and is a
-    candidate for the scarcity above.
+    a turret at the base does not defend a pool on the far side of the map.
+
+    **The site is the covered structure's own ring now, not a bare offset.**
+    For its whole prior life this reached for ``x + RING_SLOT_RADIUS`` without
+    checking whether anything stood there -- at an extractor that offset can be
+    the pool itself or the next structure over, the engine refuses such an
+    order silently, and the scorecards finally priced the damage: 27 paid
+    turret orders in one match with about five ever standing. The refusal cost
+    a builder walk and a stall window per attempt, invisibly, for four
+    measured arms in a row -- so every one of those refutations carries this
+    confound, and the first fair reading of defence arrives with this fix
+    (log: 2026-07-30). :func:`~rw_bot.policy.siting.clear_site_near` walks a
+    cover ring sized inside the turret's own reach with the occupancy
+    predicate every other placement already trusts.
 
     Args:
         sample: One observation of the world.
@@ -204,18 +232,26 @@ def expand_defence(
     builder = placer(sample, turret_type, free)
     if builder is None:
         return waiting(f"no free worker can place {turret_type}", sample, turret_type)
+    site = clear_site_near(sample, target, catalogue)
+    if site is None:
+        return waiting(
+            f"no clear cover position around {target['type_name']} "
+            f"at {target['x']:.0f},{target['y']:.0f}",
+            sample,
+            turret_type,
+        )
     return Expansion(
         build=True,
         priced_out=False,
         reason=f"covering {target['type_name']} at {target['x']:.0f},{target['y']:.0f}",
         type_name=turret_type,
         unit_id=builder["unit_id"],
-        x=target["x"] + RING_SLOT_RADIUS,
-        y=target["y"],
+        x=site[0],
+        y=site[1],
         owned=count_extractors(sample),
         occupied=0,
         exposed=0,
     )
 
 
-__all__ = ["TURRET_TYPE", "expand_defence", "undefended"]
+__all__ = ["AA_TURRET_TYPE", "TURRET_TYPE", "expand_defence", "undefended"]

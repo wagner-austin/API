@@ -238,8 +238,12 @@ def test_a_stage_that_cannot_finish_is_reported_and_exits_nonzero(
 ) -> None:
     """A probe that quietly returned partial windows would be read as an answer."""
     # The extractor never appears and the builder never moves, so the build
-    # stage runs its stall window out and gives up.
-    peer = _ScriptedPeer(_world(1, 1_000, 5_000) + _world(2, 2_000, 5_010) * 60)
+    # stage runs its stall window out and gives up. Two windows now, not one:
+    # while the lone builder is marked busy the plan reads "every unit that
+    # can make extractorT1 is busy" -- a wait, since 2026-07-31 -- so the
+    # refusal is only re-examined after the workforce's own retry frees the
+    # worker, and the stall clock runs from there.
+    peer = _ScriptedPeer(_world(1, 1_000, 5_000) + _world(2, 2_000, 5_010) * 130)
     with _StubbedConnect(peer):
         assert main(_args("1", "1")) == EXIT_INCOMPLETE
     # The whole line, not a substring of it. A substring passes on a report
