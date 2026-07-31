@@ -1,9 +1,10 @@
 """Tests for scripts/live_preview.py.
 
-The preview is a real pygame application. These tests replace only the two
-things a headless run cannot do — opening a window and waiting for input — so
-the surfarray conversion, blits and font rendering all execute for real against
-an offscreen surface.
+The preview is a real pygame application. The loop tests inject the display and
+the event stream so a frame can be driven deterministically without a window,
+while the surfarray conversion, blits and font rendering execute for real
+against an offscreen surface. The display adapter itself is covered separately
+by a test that does open a window, since opening one is its entire job.
 """
 
 from __future__ import annotations
@@ -249,6 +250,27 @@ def test_process_events_ignores_events_that_are_not_keydown_or_quit() -> None:
 
     assert running is True
     assert params["orb_count"] == 4
+
+
+def test_real_display_opens_presents_and_closes_a_window() -> None:
+    """Test the production display adapter against a real pygame window.
+
+    This is the one test that opens a window: the adapter exists to do
+    exactly that, so faking it here would leave it unexercised.
+    """
+    display = _test_hooks._RealDisplay()
+
+    surface = display.create((64, 48), "procart test window")
+    try:
+        assert surface.get_size() == (64, 48)
+        assert pygame.display.get_caption()[0] == "procart test window"
+        assert pygame.display.get_init() is True
+        display.present()
+        assert pygame.display.get_init() is True
+    finally:
+        display.shutdown()
+
+    assert pygame.display.get_init() is False
 
 
 def test_real_event_source_drains_the_pygame_queue() -> None:
