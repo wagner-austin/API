@@ -143,10 +143,11 @@ def _decode_option(record: Mapping[str, str | int | float | bool]) -> BuildOptio
         # published now rather than dropped, because filtering those in the
         # agent is what hid upgrades ([[policy-holding-ground]]).
         produces=require_str(record, "produces"),
-        action=require_int(record, "action"),
+        key=require_str(record, "key"),
         placed=require_bool(record, "placed"),
         available=require_bool(record, "available"),
         makes_something=require_bool(record, "makes_something"),
+        price=require_int(record, "price"),
     )
 
 
@@ -440,13 +441,15 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
         )
     for option in sample["options"]:
         produces = _escape(option["produces"])
+        key = _escape(option["key"])
         lines.append(
             f'{{"kind":"{KIND_OPTION}","frame":{frame},"index":{option["index"]},'
             f'"unit_id":{option["unit_id"]},"produces":"{produces}",'
-            f'"action":{option["action"]},'
+            f'"key":"{key}",'
             f'"placed":{str(option["placed"]).lower()},'
             f'"available":{str(option["available"]).lower()},'
-            f'"makes_something":{str(option["makes_something"]).lower()}}}'
+            f'"makes_something":{str(option["makes_something"]).lower()},'
+            f'"price":{option["price"]}}}'
         )
     for player in sample["players"]:
         lines.append(

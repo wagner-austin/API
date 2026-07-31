@@ -189,13 +189,15 @@ final class StateStream {
         out.append(',');
         appendString(out, "produces", option.produces());
         out.append(',');
-        appendInt(out, "action", option.actionIndex());
+        appendString(out, "key", option.key());
         out.append(',');
         appendBool(out, "placed", option.placed());
         out.append(',');
         appendBool(out, "available", option.available());
         out.append(',');
         appendBool(out, "makes_something", option.makesSomething());
+        out.append(',');
+        appendInt(out, "price", option.price());
         out.append('}');
         return out.toString();
     }

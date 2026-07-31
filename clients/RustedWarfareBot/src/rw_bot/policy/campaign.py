@@ -376,7 +376,7 @@ def play(
             # 2,300 balance where the unlock needs 2,900 -- ordered the other
             # way round, every accrual is sniped just short of the goal and
             # the tech arm never reaches the roster it exists for.
-            _send_tech(channel, tech, sample, catalogue, budget, teched)
+            _send_tech(channel, tech, sample, budget, teched)
             _send_produces(channel, upgrade_income(sample, catalogue, budget, upgraded))
             _advance_creep(
                 channel, creep, sample, catalogue, profiles, budget, free, workforce, creeper
@@ -538,7 +538,6 @@ def _send_tech(
     channel: AgentChannel,
     tech: bool,
     sample: Sample,
-    catalogue: Mapping[str, UnitStats],
     budget: Budget,
     teched: set[int],
 ) -> None:
@@ -550,7 +549,7 @@ def _send_tech(
     """
     if not tech:
         return
-    for unlock in unlock_tech(sample, catalogue, budget, teched):
+    for unlock in unlock_tech(sample, budget, teched):
         channel.send_ability(unlock)
 
 

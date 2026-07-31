@@ -75,12 +75,20 @@ def test_the_real_capture_carries_the_documented_roster() -> None:
 
 
 def test_engine_ids_are_distinct_and_stable_across_samples() -> None:
-    """id is the dispatch handle; index renumbers, id does not."""
+    """id is the dispatch handle; index renumbers, id does not.
+
+    Stability is asserted for the units alive throughout, not for the
+    roster: the capture is a live world, and a factory finishing a unit
+    between samples grows the list without renaming anyone in it.
+    """
     samples = decode_samples(_capture_lines())
     ids = [e["unit_id"] for e in samples[0]["entities"]]
     assert len(set(ids)) == len(ids)
     for later in samples[1:]:
-        assert [e["unit_id"] for e in later["entities"]] == ids
+        later_ids = [e["unit_id"] for e in later["entities"]]
+        assert len(set(later_ids)) == len(later_ids)
+        surviving = [unit_id for unit_id in later_ids if unit_id in set(ids)]
+        assert surviving == ids
 
 
 def test_the_real_capture_advances_at_the_measured_frame_rate() -> None:
@@ -198,8 +206,8 @@ def test_a_sample_short_of_its_declared_options_is_rejected() -> None:
     )
     option = (
         '{"kind":"option","frame":7,"index":0,"unit_id":214,'
-        '"produces":"landFactory","action":1,"placed":true,"available":true,'
-        '"makes_something":true}'
+        '"produces":"landFactory","key":"u_landFactory","placed":true,"available":true,'
+        '"makes_something":true,"price":100}'
     )
     with pytest.raises(WireError) as caught:
         decode_samples([short, option])
@@ -322,10 +330,11 @@ def test_encode_escapes_characters_that_would_break_the_line() -> None:
                 index=0,
                 unit_id=214,
                 produces='a"b\\c\nd\te\rf\x01g',
-                action=1,
+                key='a"b\\c\nd\te\rf\x01g',
                 placed=True,
                 available=False,
                 makes_something=True,
+                price=350,
             ),
         ),
     )

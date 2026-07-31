@@ -61,17 +61,27 @@ def test_a_blank_produce_type_is_rejected() -> None:
 
 
 def test_ability_encodes_to_the_exact_agent_format() -> None:
-    """The tech verb: a unit and the engine's own selector index, nothing
+    """The tech verb: a unit and the engine's interned action key, nothing
     else -- the land factory's tier-two upgrade converts into no type, so
-    neither produce nor build can name it ([[mechanics-build-actions]])."""
-    line = encode_ability(ability_order(unit_id=213, action=1))
-    assert line == '{"kind":"ability","unit_id":213,"action":1}'
+    neither produce nor build can name it. A key rather than the engine's
+    per-action index, because the index is not a selector: every action on
+    a unit answers the same figure, and dispatching by it resolved the
+    rally point four probes running ([[mechanics-build-actions]])."""
+    line = encode_ability(ability_order(unit_id=213, key="c_2"))
+    assert line == '{"kind":"ability","unit_id":213,"key":"c_2"}'
 
 
-def test_a_negative_ability_selector_is_rejected() -> None:
-    """No option stream ever carries one, and the agent would refuse it."""
+def test_a_blank_ability_key_is_rejected() -> None:
+    """A keyless action cannot be dispatched; the agent would refuse it."""
     with pytest.raises(CommandError) as caught:
-        ability_order(unit_id=213, action=-1)
+        ability_order(unit_id=213, key="  ")
+    assert caught.value.code == "RW-CMD-004"
+
+
+@pytest.mark.parametrize("hostile", ['c"2', "c\\2", "c\n2", "c\r2"])
+def test_an_ability_key_the_flat_format_cannot_carry_is_rejected(hostile: str) -> None:
+    with pytest.raises(CommandError) as caught:
+        ability_order(unit_id=213, key=hostile)
     assert caught.value.code == "RW-CMD-004"
 
 

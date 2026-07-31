@@ -70,7 +70,7 @@ def _world(frame: int, clock_ms: int, credits_held: int, *, extractors: int = 0)
     for index, (unit_id, produces) in enumerate(options):
         lines.append(
             f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
-            f'"produces":"{produces}","action":1,"placed":true,"available":true,"makes_something":true}}'
+            f'"produces":"{produces}","key":"u_x","placed":true,"available":true,"makes_something":true,"price":100}}'
         )
     return lines
 

@@ -74,19 +74,19 @@ final class WireChecks {
 
         String option =
                 StateStream.optionRecord(
-                        1918, 0, new BuildOptions.Option(228L, "tank", 3, false, true, true));
+                        1918, 0, new BuildOptions.Option(228L, "tank", "u_tank", false, true, true, 350));
         failures += Check.expect(
                 option.equals(
                         "{\"kind\":\"option\",\"frame\":1918,\"index\":0,\"unit_id\":228,"
-                                + "\"produces\":\"tank\",\"action\":3,\"placed\":false,"
-                                + "\"available\":true,\"makes_something\":true}"),
+                                + "\"produces\":\"tank\",\"key\":\"u_tank\",\"placed\":false,"
+                                + "\"available\":true,\"makes_something\":true,\"price\":350}"),
                 "option record is exact");
         // Reported rather than filtered out. An action a unit has but cannot use
         // yet is a wait; one it does not have at all is a dead plan entry, and
         // the planner can only tell them apart if both are on the wire.
         failures += Check.expect(
                 StateStream.optionRecord(
-                                1, 0, new BuildOptions.Option(1L, "x", 0, true, false, true))
+                                1, 0, new BuildOptions.Option(1L, "x", "u_x", true, false, true, 0))
                         .contains("\"available\":false"),
                 "an option a unit cannot use yet says so rather than being omitted");
         // Which verb orders it. A structure is placed at a chosen point; a unit
@@ -94,7 +94,7 @@ final class WireChecks {
         // differently, so the flag has to survive the wire.
         failures += Check.expect(
                 StateStream.optionRecord(
-                                1, 0, new BuildOptions.Option(1L, "x", 0, true, true, true))
+                                1, 0, new BuildOptions.Option(1L, "x", "u_x", true, true, true, 0))
                         .contains("\"placed\":true"),
                 "a placed option is marked as one");
         // An action that concerns no type at all reaches the wire rather than
@@ -103,14 +103,24 @@ final class WireChecks {
         // action it was never told about (wiki: policy-holding-ground).
         failures += Check.expect(
                 StateStream.optionRecord(
-                                1, 0, new BuildOptions.Option(1L, "", 0, false, true, false))
-                        .contains("\"produces\":\"\",\"action\":0,\"placed\":false"),
+                                1, 0, new BuildOptions.Option(1L, "", "c_2", false, true, false, 2000))
+                        .contains("\"produces\":\"\",\"key\":\"c_2\",\"placed\":false"),
                 "an action concerning no type is published rather than dropped");
         failures += Check.expect(
                 StateStream.optionRecord(
-                                1, 0, new BuildOptions.Option(1L, "x", 0, false, true, false))
-                        .endsWith("\"makes_something\":false}"),
+                                1, 0, new BuildOptions.Option(1L, "x", "u_x", false, true, false, 0))
+                        .endsWith("\"makes_something\":false,\"price\":0}"),
                 "whether an action makes something is the planner's to judge, not the agent's");
+        // The engine's own charge for the action, on the wire. Price is the
+        // only reading that tells a factory's tier upgrade from its rally
+        // point -- both concern no type -- and the first live tech probe
+        // spent four unlock budgets setting rally points for want of it
+        // (wiki: mechanics-build-actions).
+        failures += Check.expect(
+                StateStream.optionRecord(
+                                1, 0, new BuildOptions.Option(1L, "", "c_2", false, true, false, 2000))
+                        .contains("\"price\":2000"),
+                "an action's engine price survives the wire");
 
         // The placement flags are a separate stream with the same constraint.
         failures += Check.expect(
@@ -206,24 +216,27 @@ final class WireChecks {
                 "{\"kind\":\"produce\",\"unit_id\":1,\"type\":\"\"}", "produce with a blank type");
         CommandRecord ability =
                 CommandRecord.parse(
-                        "{\"kind\":\"ability\",\"unit_id\":213,\"action\":1}");
+                        "{\"kind\":\"ability\",\"unit_id\":213,\"key\":\"c_2\"}");
         failures += Check.expect(
                 ability.kind() == CommandRecord.Kind.ABILITY, "ability verb parsed");
-        failures += Check.expect(ability.action() == 1L, "ability selector parsed");
+        failures += Check.expect("c_2".equals(ability.actionKey()), "ability key parsed");
         failures += Check.expect(ability.unitId() == 213L, "ability unit id parsed");
         // The unit and the selector are the whole of the order; anything more
         // is a field nothing reads, refused rather than ignored.
         failures += expectBadCommand(
-                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":1,\"x\":1}",
+                "{\"kind\":\"ability\",\"unit_id\":1,\"key\":\"c_2\",\"x\":1}",
                 "an ability carrying a position");
         failures += expectBadCommand(
-                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":1,\"type\":\"tank\"}",
+                "{\"kind\":\"ability\",\"unit_id\":1,\"key\":\"c_2\",\"type\":\"tank\"}",
                 "an ability carrying a type");
         failures += expectBadCommand(
-                "{\"kind\":\"ability\",\"unit_id\":1}", "an ability with no selector");
+                "{\"kind\":\"ability\",\"unit_id\":1}", "an ability with no key");
         failures += expectBadCommand(
-                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":-1}",
-                "an ability with a negative selector");
+                "{\"kind\":\"ability\",\"unit_id\":1,\"key\":\"\"}",
+                "an ability with a blank key");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability\",\"unit_id\":1,\"key\":\"c_2\",\"action\":1}",
+                "an ability carrying the retired index field");
 
         failures += Check.expect(
                 CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()

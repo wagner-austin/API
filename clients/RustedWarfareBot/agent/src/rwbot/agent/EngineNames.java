@@ -316,6 +316,20 @@ final class EngineNames {
     /** Action predicate: whether the given unit may use it right now. */
     static final String ACTION_AVAILABLE = "b";
 
+    /**
+     * Action accessor: what the action costs in credits.
+     *
+     * <p>Abstract on the action base class, so every action answers it. A
+     * produce action returns its unit's price; a factory's tier upgrade
+     * returns the tier price; a rally or stop returns zero. That last
+     * contrast is what the tech channel selects on -- the upgrade and the
+     * rally are otherwise identical on the wire, both concerning no type,
+     * and the first live probe spent four unlock budgets setting rally
+     * points (decompiled {@code units/a/o.java} vs {@code units/d/n.java},
+     * wiki: mechanics-build-actions).
+     */
+    static final String ACTION_PRICE = "c";
+
     /** Action predicate: whether the given unit has it locked. */
     static final String ACTION_LOCKED = "g";
 

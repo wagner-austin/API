@@ -60,8 +60,11 @@ final class CommandRecord {
          * into nothing -- it flips a flag on the same building and unlocks
          * the heavy roster -- so neither produce's type nor build's position
          * can name it. The option stream publishes such actions with the
-         * engine's own selector index, and this fires that index back
-         * (wiki: mechanics-build-actions).
+         * engine's own interned key, and this fires that key back. It used
+         * to fire an index, and the index turned out not to be one: every
+         * action on a unit reports the same figure, so the dispatch always
+         * resolved the first action on the list -- the rally point (wiki:
+         * mechanics-build-actions).
          */
         ABILITY,
 
@@ -83,7 +86,7 @@ final class CommandRecord {
     private final float y;
     private final String buildType;
     private final long targetId;
-    private final long action;
+    private final String actionKey;
 
     private CommandRecord(
             Kind kind,
@@ -92,14 +95,14 @@ final class CommandRecord {
             float y,
             String buildType,
             long targetId,
-            long action) {
+            String actionKey) {
         this.kind = kind;
         this.unitId = unitId;
         this.x = x;
         this.y = y;
         this.buildType = buildType;
         this.targetId = targetId;
-        this.action = action;
+        this.actionKey = actionKey;
     }
 
     Kind kind() {
@@ -129,9 +132,9 @@ final class CommandRecord {
         return buildType;
     }
 
-    /** The engine's action selector index. Zero unless ABILITY. */
-    long action() {
-        return action;
+    /** The engine's interned action key name. Empty unless ABILITY. */
+    String actionKey() {
+        return actionKey;
     }
 
     /**
@@ -148,7 +151,7 @@ final class CommandRecord {
 
         String kindText = require(fields, "kind", line);
         if ("ack".equals(kindText)) {
-            return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L, 0L);
+            return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L, "");
         }
         long unitId = requireLong(fields, "unit_id", line);
 
@@ -164,7 +167,7 @@ final class CommandRecord {
                     requireFloat(fields, "y", line),
                     "",
                     0L,
-                    0L);
+                    "");
         }
         if ("attack_move".equals(kindText)) {
             reject(fields, "type", line);
@@ -176,7 +179,7 @@ final class CommandRecord {
                     requireFloat(fields, "y", line),
                     "",
                     0L,
-                    0L);
+                    "");
         }
         if ("build".equals(kindText)) {
             return new CommandRecord(
@@ -186,13 +189,13 @@ final class CommandRecord {
                     requireFloat(fields, "y", line),
                     requireType(fields, "build", line),
                     0L,
-                    0L);
+                    "");
         }
         if ("produce".equals(kindText)) {
             reject(fields, "x", line);
             reject(fields, "y", line);
             return new CommandRecord(
-                    Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line), 0L, 0L);
+                    Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line), 0L, "");
         }
         if ("attack".equals(kindText)) {
             // No position and no type: the target's identity is the whole of
@@ -201,21 +204,25 @@ final class CommandRecord {
             reject(fields, "y", line);
             reject(fields, "type", line);
             return new CommandRecord(
-                    Kind.ATTACK, unitId, 0.0f, 0.0f, "", requireLong(fields, "target_id", line), 0L);
+                    Kind.ATTACK, unitId, 0.0f, 0.0f, "", requireLong(fields, "target_id", line), "");
         }
         if ("ability".equals(kindText)) {
             // No position, no type, no target: the unit and the engine's own
-            // selector index are the whole of the order.
+            // action key are the whole of the order. A key rather than the
+            // index the engine also exposes, because the index is not one:
+            // every action on a unit reports the same figure, and dispatching
+            // by it resolved the rally point four matches running.
             reject(fields, "x", line);
             reject(fields, "y", line);
             reject(fields, "type", line);
             reject(fields, "target_id", line);
-            long action = requireLong(fields, "action", line);
-            if (action < 0) {
+            reject(fields, "action", line);
+            String key = require(fields, "key", line);
+            if (key.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "ability command has a negative action selector: " + line);
+                        "ability command has a blank action key: " + line);
             }
-            return new CommandRecord(Kind.ABILITY, unitId, 0.0f, 0.0f, "", 0L, action);
+            return new CommandRecord(Kind.ABILITY, unitId, 0.0f, 0.0f, "", 0L, key);
         }
         throw new IllegalArgumentException(
                 "unknown command kind '" + kindText

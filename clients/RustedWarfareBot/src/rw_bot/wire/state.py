@@ -173,8 +173,14 @@ class BuildOption(TypedDict):
         unit_id: Engine identity of the unit that can make it. This is what an
             order is addressed to, so no second lookup is needed.
         produces: Type name it makes, in the same vocabulary a plan uses.
-        action: The engine's selector index for this action. Distinguishes two
-            actions on one unit that produce the same type.
+        key: The engine's interned key name for the action (``u_builder``,
+            ``c_1``, ...). The dispatch handle an ability order carries. The
+            engine also exposes a per-action index, and it is not a
+            selector -- every action on a unit answers the same figure, so
+            dispatching by it resolved the rally point four probes running.
+            The key is what the engine's own executor resolves actions by
+            ([[mechanics-build-actions]]). Empty when the action has no key,
+            which also marks it undispatchable.
         placed: Whether the thing is put at a position the planner chooses. A
             structure is; a unit rolls out of the building that made it. This
             decides which verb orders it, and it is the engine's own
@@ -193,15 +199,21 @@ class BuildOption(TypedDict):
             published no options at all while opponents were observed holding
             twelve upgraded ones ([[policy-holding-ground]]). Whether an action
             is worth taking is a decision, and decisions belong to this layer.
+        price: What the action costs in credits, from the engine's own
+            accessor. The only reading that tells a factory's tier upgrade
+            from its rally point -- both concern no type -- and the first
+            live tech probe spent four unlock budgets setting rally points
+            for want of it ([[mechanics-build-actions]]).
     """
 
     index: int
     unit_id: int
     produces: str
-    action: int
+    key: str
     placed: bool
     available: bool
     makes_something: bool
+    price: int
 
 
 class PlayerStat(TypedDict):

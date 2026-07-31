@@ -156,7 +156,6 @@ TECH_TYPES: tuple[str, ...] = ("landFactory",)
 
 def unlock_tech(
     sample: Sample,
-    catalogue: Mapping[str, UnitStats],
     budget: Budget,
     ordered: set[int],
 ) -> tuple[AbilityOrder, ...]:
@@ -164,9 +163,15 @@ def unlock_tech(
 
     The verb the ability order exists for. The unlock arrives on the option
     stream as an action concerning no type -- ``produces`` empty, the
-    engine's own selector index attached -- so it is found by that shape on
-    the factory itself, and priced from the holder's ``upgrade_prices``
-    exactly as a conversion is ([[mechanics-build-actions]]).
+    engine's own selector index attached -- **and it is not the only such
+    action**. A rally point is also no-type, non-placed, non-producing, and
+    the first live probe took the first match and spent four unlock budgets
+    setting rally points. Price is the reading that tells them apart: the
+    engine's cost accessor is abstract on the action base class, a rally
+    answers zero and the tier upgrade answers its tier's price, so the
+    unlock is the no-type action that costs something -- and the claim is
+    for the engine's own figure rather than a catalogue guess
+    ([[mechanics-build-actions]]).
 
     Once per structure, for the produce-duplicate reason: the unlock never
     fills the queue, so the factory keeps offering it while it runs, and a
@@ -185,39 +190,40 @@ def unlock_tech(
 
     Args:
         sample: One observation of the world.
-        catalogue: Unit stats by type name, for the unlock's price.
         budget: The tick's credits.
         ordered: Factories already told to unlock, extended in place.
 
     Returns:
         The ability orders to send, in roster order.
     """
-    offers: dict[int, int] = {}
+    offers: dict[int, tuple[str, int]] = {}
     for option in sample["options"]:
         if (
             option["produces"] == ""
             and option["available"]
             and not option["placed"]
             and not option["makes_something"]
+            and option["price"] > 0
+            and option["key"] != ""
             and option["unit_id"] not in offers
         ):
-            offers[option["unit_id"]] = option["action"]
+            offers[option["unit_id"]] = (option["key"], option["price"])
     orders: list[AbilityOrder] = []
     for entity in sample["entities"]:
         if not entity["mine"] or not entity["complete"] or entity["queued"] != 0:
             continue
         if entity["type_name"] not in TECH_TYPES or entity["unit_id"] in ordered:
             continue
-        selector = offers.get(entity["unit_id"])
-        holder = catalogue.get(entity["type_name"])
-        if selector is None or holder is None or not holder["upgrade_prices"]:
+        offer = offers.get(entity["unit_id"])
+        if offer is None:
             continue
-        claim = budget.claim(f"tech:{entity['type_name']}", holder["upgrade_prices"][0])
+        key, price = offer
+        claim = budget.claim(f"tech:{entity['type_name']}", price)
         if not claim["granted"]:
-            budget.withhold(holder["upgrade_prices"][0])
+            budget.withhold(price)
             break
         ordered.add(entity["unit_id"])
-        orders.append(ability_order(unit_id=entity["unit_id"], action=selector))
+        orders.append(ability_order(unit_id=entity["unit_id"], key=key))
     return tuple(orders)
 
 

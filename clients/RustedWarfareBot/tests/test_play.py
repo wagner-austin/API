@@ -55,7 +55,7 @@ _BUILDER_OFFERS = ("extractorT1", "landFactory", "c_tank")
 def _option_line(frame: int, index: int, unit_id: int, produces: str) -> str:
     return (
         f'{{"kind":"option","frame":{frame},"index":{index},"unit_id":{unit_id},'
-        f'"produces":"{produces}","action":1,"placed":true,"available":true,"makes_something":true}}'
+        f'"produces":"{produces}","key":"u_x","placed":true,"available":true,"makes_something":true,"price":100}}'
     )
 
 

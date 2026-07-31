@@ -134,18 +134,22 @@ class AbilityOrder(TypedDict):
     upgrade converts into nothing -- it flips a flag on the same building
     and unlocks the heavy roster -- so it cannot be named by ``produce``'s
     type or placed by ``build``'s position. It arrives on the option stream
-    as ``produces:""`` with the engine's own selector index, and this order
-    fires that index back ([[mechanics-build-actions]]).
+    as ``produces:""`` with the engine's interned key name, and this order
+    fires that key back. It fired the engine's per-action index before, and
+    the index is not a selector: every action on a unit answers the same
+    figure, so four probes running the "unlock" dispatched was the rally
+    point ([[mechanics-build-actions]]).
 
     Attributes:
         kind: Discriminator, always ``"ability"``.
         unit_id: Engine identity of the unit whose action it is.
-        action: The engine's selector index, exactly as the option carried it.
+        key: The action's interned key name, exactly as the option carried
+            it (``c_2``, ``u_builder``, ...).
     """
 
     kind: Literal["ability"]
     unit_id: int
-    action: int
+    key: str
 
 
 def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
@@ -174,26 +178,33 @@ def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
     return AttackOrder(kind="attack", unit_id=unit_id, target_id=target_id)
 
 
-def ability_order(*, unit_id: int, action: int) -> AbilityOrder:
+def ability_order(*, unit_id: int, key: str) -> AbilityOrder:
     """Build a validated ability order.
 
     Args:
         unit_id: Engine identity of the unit whose action it is.
-        action: The engine's selector index, from the option stream.
+        key: The action's interned key name, from the option stream.
 
     Returns:
         The order.
 
     Raises:
-        CommandError: ``RW-CMD-004`` when the selector is negative, which no
-            option stream ever carries and the agent would refuse.
+        CommandError: ``RW-CMD-004`` when the key is blank or carries a
+            character the flat wire format cannot -- a keyless action cannot
+            be dispatched, and the agent would refuse the order.
     """
-    if action < 0:
+    if key.strip() == "":
         raise CommandError(
             _BAD_ACTION,
-            f"an ability order needs the option stream's selector index, got {action}",
+            "an ability order needs the option stream's action key",
         )
-    return AbilityOrder(kind="ability", unit_id=unit_id, action=action)
+    for forbidden in ('"', "\\", "\n", "\r"):
+        if forbidden in key:
+            raise CommandError(
+                _BAD_ACTION,
+                f"action key {key!r} contains a character the wire format does not carry",
+            )
+    return AbilityOrder(kind="ability", unit_id=unit_id, key=key)
 
 
 def encode_ability(order: AbilityOrder) -> str:
@@ -205,7 +216,7 @@ def encode_ability(order: AbilityOrder) -> str:
     Returns:
         One JSON object, without a trailing newline.
     """
-    return f'{{"kind":"ability","unit_id":{order["unit_id"]},"action":{order["action"]}}}'
+    return f'{{"kind":"ability","unit_id":{order["unit_id"]},"key":"{order["key"]}"}}'
 
 
 def encode_ack() -> str:

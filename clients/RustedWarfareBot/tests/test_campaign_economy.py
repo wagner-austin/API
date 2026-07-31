@@ -376,7 +376,7 @@ def test_a_refused_upgrade_does_not_hold_the_armys_credits() -> None:
 
 def test_tech_unlocks_the_factory_and_off_leaves_it_locked() -> None:
     """The tech verb end to end: a factory offering its no-type unlock is
-    told to fire it, once, priced from its own upgrade_prices -- and the
+    told to fire it, once, at the price the wire itself carries -- and the
     same world with the flag off sends nothing ([[mechanics-build-actions]]).
     """
     catalogue = {
@@ -391,13 +391,13 @@ def test_tech_unlocks_the_factory_and_off_leaves_it_locked() -> None:
         CENTRE,
         entity(500, "landFactory"),
         credits=4000,
-        options=(option(500, "", placed=False, makes_something=False),),
+        options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     peer = ScriptedPeer(lines(world, world))
     play(AgentChannel(peer), (), catalogue, placements, PROFILES, 2, tech=True)
     fired = [line for line in peer.sent if '"ability"' in line]
     # Once, not once per observation: the unlock never fills the queue.
-    assert fired == ['{"kind":"ability","unit_id":500,"action":1}']
+    assert fired == ['{"kind":"ability","unit_id":500,"key":"c_2"}']
 
     held = ScriptedPeer(lines(world))
     play(AgentChannel(held), (), catalogue, placements, PROFILES, 1)

@@ -262,10 +262,11 @@ def option(
     produces: str,
     *,
     index: int = 0,
-    action: int = 1,
+    key: str = "u_x",
     placed: bool = False,
     available: bool = True,
     makes_something: bool = True,
+    price: int = 0,
 ) -> BuildOption:
     """Build one build option.
 
@@ -273,9 +274,11 @@ def option(
         unit_id: Engine identity of the unit that can make it.
         produces: Type name it makes.
         index: Position in the option list.
-        action: The engine's selector index.
+        key: The engine's interned key name for the action.
         placed: Whether it is sited by the planner.
         available: Whether it may be used right now.
+        price: The engine's charge for the action. What tells a tier
+            unlock from a rally point among no-type actions.
 
     Returns:
         The option.
@@ -284,10 +287,11 @@ def option(
         index=index,
         unit_id=unit_id,
         produces=produces,
-        action=action,
+        key=key,
         placed=placed,
         available=available,
         makes_something=makes_something,
+        price=price,
     )
 
 

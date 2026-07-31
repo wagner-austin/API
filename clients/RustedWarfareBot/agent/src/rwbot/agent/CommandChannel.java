@@ -312,11 +312,11 @@ final class CommandChannel {
             return;
         }
         if (command.kind() == CommandRecord.Kind.ABILITY) {
-            Orders.ability(engine, unit, command.action());
+            Orders.ability(engine, unit, command.actionKey());
             Log.info(
-                    "channel: ability "
-                            + command.action()
-                            + " by "
+                    "channel: ability '"
+                            + command.actionKey()
+                            + "' by "
                             + command.unitId());
             return;
         }

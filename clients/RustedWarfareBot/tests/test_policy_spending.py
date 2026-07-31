@@ -202,47 +202,57 @@ def test_the_reserve_is_not_spent_on_an_upgrade() -> None:
     assert budget.spent() == 0
 
 
-def test_tech_fires_the_real_land_factorys_unlock_once() -> None:
-    """The tech channel against the real catalogue's factory.
+def test_tech_fires_the_land_factorys_unlock_once_at_the_engines_price() -> None:
+    """The tech channel selects and claims on the wire's own price.
 
     The unlock is a no-type action -- ``produces`` empty, the engine's own
-    selector attached -- priced from the holder's ``upgrade_prices``: 2,000
-    on the land factory ([[mechanics-build-actions]]). One order per
-    factory, and a queued or already-ordered factory is left alone.
+    selector attached -- **and so is a rally point.** The first live probe
+    took the first no-type match and spent four unlock budgets setting
+    rally points, so the free action here is the regression: the unlock is
+    the no-type action that costs something, claimed at the engine's own
+    figure ([[mechanics-build-actions]]). One order per factory, and a
+    queued or already-ordered factory is left alone.
     """
-    catalogue = _catalogue()
     world = sample(
         entity(500, "landFactory"),
         entity(501, "landFactory", queued=1),
         entity(502, "commandCenter"),
         credits=10_000,
         options=(
-            option(500, "", index=0, action=3, placed=False, makes_something=False),
-            # A second no-type option on the same unit: the first one wins.
-            option(500, "", index=1, action=9, placed=False, makes_something=False),
-            option(501, "", index=2, action=3, placed=False, makes_something=False),
+            # The rally point: no type, no price. Choosing it is the bug.
+            option(500, "", index=0, key="c_1", placed=False, makes_something=False),
+            option(500, "", index=1, key="c_2", placed=False, makes_something=False, price=2000),
+            # A second priced no-type option on the same unit: the first wins.
+            option(500, "", index=2, key="c_3", placed=False, makes_something=False, price=4000),
+            option(501, "", index=3, key="c_2", placed=False, makes_something=False, price=2000),
         ),
     )
     ordered: set[int] = set()
     budget = Budget(10_000, reserve=0)
-    orders = unlock_tech(world, catalogue, budget, ordered)
-    assert [(o["unit_id"], o["action"]) for o in orders] == [(500, 3)]
+    orders = unlock_tech(world, budget, ordered)
+    assert [(o["unit_id"], o["key"]) for o in orders] == [(500, "c_2")]
     assert budget.spent() == 2000
     # Told once: the same world again orders nothing more.
-    assert unlock_tech(world, catalogue, Budget(10_000, reserve=0), ordered) == ()
+    assert unlock_tech(world, Budget(10_000, reserve=0), ordered) == ()
 
 
 def test_tech_skips_a_factory_with_no_offer_and_stops_at_a_refusal() -> None:
-    catalogue = _catalogue()
     silent = sample(entity(500, "landFactory"), credits=10_000)
-    assert unlock_tech(silent, catalogue, Budget(10_000, reserve=0), set()) == ()
+    assert unlock_tech(silent, Budget(10_000, reserve=0), set()) == ()
+    # A factory offering only free no-type actions has no unlock to buy.
+    rally_only = sample(
+        entity(500, "landFactory"),
+        credits=10_000,
+        options=(option(500, "", key="c_1", placed=False, makes_something=False),),
+    )
+    assert unlock_tech(rally_only, Budget(10_000, reserve=0), set()) == ()
     offering = sample(
         entity(500, "landFactory"),
         credits=100,
-        options=(option(500, "", action=3, placed=False, makes_something=False),),
+        options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     poor = Budget(100, reserve=0)
-    assert unlock_tech(offering, catalogue, poor, set()) == ()
+    assert unlock_tech(offering, poor, set()) == ()
     assert poor.spent() == 0
 
 
@@ -259,10 +269,10 @@ def test_a_refused_unlock_withholds_its_price_from_later_spenders() -> None:
     offering = sample(
         entity(500, "landFactory"),
         credits=1_500,
-        options=(option(500, "", action=3, placed=False, makes_something=False),),
+        options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     budget = Budget(1_500, reserve=0)
-    assert unlock_tech(offering, _catalogue(), budget, set()) == ()
+    assert unlock_tech(offering, budget, set()) == ()
     # The whole balance is now spoken for: even a protected claim is bound,
     # because replacing losses drains to zero and would empty the saving.
     assert budget.claim("replace:c_tank", 350, protected=True)["granted"] is False

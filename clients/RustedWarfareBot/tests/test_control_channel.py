@@ -233,8 +233,8 @@ def test_an_attack_order_leaves_in_the_agent_format() -> None:
 
 def test_an_ability_order_leaves_in_the_agent_format() -> None:
     peer = _ScriptedPeer([])
-    AgentChannel(peer).send_ability(ability_order(unit_id=213, action=1))
-    assert peer.sent == ['{"kind":"ability","unit_id":213,"action":1}']
+    AgentChannel(peer).send_ability(ability_order(unit_id=213, key="c_2"))
+    assert peer.sent == ['{"kind":"ability","unit_id":213,"key":"c_2"}']
 
 
 def test_an_ack_leaves_in_the_agent_format() -> None:

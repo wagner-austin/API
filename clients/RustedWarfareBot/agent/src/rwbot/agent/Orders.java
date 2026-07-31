@@ -404,14 +404,17 @@ final class Orders {
     }
 
     /**
-     * Has a unit use one of its actions, addressed by the engine's selector.
+     * Has a unit use one of its actions, addressed by the engine's key.
      *
      * <p>The tech verb's dispatch. A no-type action -- the land factory's
      * tier-two upgrade is the motivating one -- cannot be found by the type
-     * it makes, because it makes none; it is found by the selector index the
-     * option stream published, and then dispatched exactly as a production
-     * action is: by its own interned key, through the same command the
-     * game's interface sends (wiki: mechanics-build-actions).
+     * it makes, because it makes none; it is found by the interned key name
+     * the option stream published, and then dispatched exactly as a
+     * production action is: through the same command the game's interface
+     * sends. It was addressed by the engine's per-action index before, and
+     * that index is not a selector -- every action on a unit answers the
+     * same figure, so four probes running the dispatch resolved the first
+     * action on the list, the rally point (wiki: mechanics-build-actions).
      *
      * <p>The same gate check as produce, for the same reason: the engine's
      * enqueue path drops a command it will not run and says nothing, so a
@@ -419,11 +422,11 @@ final class Orders {
      *
      * @param engine The live engine instance.
      * @param unit The unit whose action it is.
-     * @param selector The engine's action index, from the option stream.
-     * @throws IllegalStateException When the unit has no action at that
-     *     selector, naming what it offers instead.
+     * @param keyName The action's key name, from the option stream.
+     * @throws IllegalStateException When the unit has no action under that
+     *     key, naming what it offers instead.
      */
-    static void ability(Object engine, Object unit, long selector) {
+    static void ability(Object engine, Object unit, String keyName) {
         Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to order for");
@@ -433,11 +436,11 @@ final class Orders {
             throw new IllegalStateException("rw-agent: engine has no CommandController yet");
         }
 
-        Object action = BuildOptions.actionBySelector(unit, selector);
+        Object action = BuildOptions.actionByKey(unit, keyName);
         if (action == null) {
             throw new IllegalStateException(
-                    "rw-agent: " + Perception.typeNameOf(unit) + " has no action at selector "
-                            + selector + "; it can make "
+                    "rw-agent: " + Perception.typeNameOf(unit) + " has no action under key '"
+                            + keyName + "'; it can make "
                             + BuildOptions.describeMakeable(unit) + EngineNames.PIN);
         }
 
@@ -447,9 +450,7 @@ final class Orders {
                         action);
         BuildOptions.Gates gates = BuildOptions.gatesOf(action, unit);
         Log.info(
-                "ability: selector "
-                        + selector
-                        + " via action "
+                "ability: key "
                         + describeKey(key)
                         + " on "
                         + action.getClass().getName()
@@ -458,9 +459,9 @@ final class Orders {
         String closed = gates.closed();
         if (closed != null) {
             Log.error(
-                    "ability: refusing selector "
-                            + selector
-                            + " on "
+                    "ability: refusing key '"
+                            + keyName
+                            + "' on "
                             + Perception.typeNameOf(unit)
                             + " -- "
                             + closed);

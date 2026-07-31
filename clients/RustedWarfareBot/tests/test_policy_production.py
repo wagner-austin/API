@@ -72,10 +72,11 @@ def _option(
         index=0,
         unit_id=unit_id,
         produces=produces,
-        action=1,
+        key="u_x",
         placed=placed,
         available=available,
         makes_something=makes_something,
+        price=0,
     )
 
 

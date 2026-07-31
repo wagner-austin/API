@@ -28,33 +28,37 @@ final class BuildOptions {
     /**
      * One thing a unit can make.
      *
-     * <p>Carries the selector index alongside the produced type because the two
-     * answer different questions. The type is what a plan names; the index is
-     * what disambiguates when a unit has more than one action producing the
-     * same type, which is what the build command's integer argument selects.
+     * <p>Carries the engine's interned key name alongside the produced type
+     * because the two answer different questions. The type is what a plan
+     * names; the key is what addresses one action among a unit's several --
+     * including the ones that concern no type at all, which nothing but the
+     * key can name.
      */
     static final class Option {
 
         private final long unitId;
         private final String produces;
-        private final int actionIndex;
+        private final String key;
         private final boolean placed;
         private final boolean available;
         private final boolean makesSomething;
+        private final int price;
 
         Option(
                 long unitId,
                 String produces,
-                int actionIndex,
+                String key,
                 boolean placed,
                 boolean available,
-                boolean makesSomething) {
+                boolean makesSomething,
+                int price) {
             this.unitId = unitId;
             this.produces = produces;
-            this.actionIndex = actionIndex;
+            this.key = key;
             this.placed = placed;
             this.available = available;
             this.makesSomething = makesSomething;
+            this.price = price;
         }
 
         long unitId() {
@@ -65,8 +69,18 @@ final class BuildOptions {
             return produces;
         }
 
-        int actionIndex() {
-            return actionIndex;
+        /**
+         * The engine's interned key name for the action.
+         *
+         * <p>The dispatch handle. The engine also exposes a per-action index,
+         * and it is not a selector: every action on a unit answers the same
+         * figure, so four matches running the "unlock" it dispatched was the
+         * first action on the list -- the rally point. The key is what the
+         * engine's own executor resolves actions by, so it is what the wire
+         * carries (wiki: mechanics-build-actions).
+         */
+        String key() {
+            return key;
         }
 
         /**
@@ -103,6 +117,19 @@ final class BuildOptions {
          */
         boolean makesSomething() {
             return makesSomething;
+        }
+
+        /**
+         * What the action costs in credits.
+         *
+         * <p>The engine's own figure, read from the accessor every action
+         * implements. It is what tells a factory's tier upgrade apart from
+         * its rally point -- the only two readings of an action that
+         * concerns no type -- and the planner's budget claims the same
+         * number the engine will charge (wiki: mechanics-build-actions).
+         */
+        int price() {
+            return price;
         }
     }
 
@@ -143,11 +170,11 @@ final class BuildOptions {
                 EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_PLACED_TYPE);
         Method makesSomething =
                 EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES_SOMETHING);
-        Method index = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_INDEX);
         Method available =
                 EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_AVAILABLE, entityClass);
         Method locked =
                 EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_LOCKED, entityClass);
+        Method price = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_PRICE);
 
         for (Object unit : Perception.ownedUnits(engine)) {
             long id = Perception.idOf(unit);
@@ -167,13 +194,14 @@ final class BuildOptions {
                         new Option(
                                 id,
                                 type == null ? "" : Perception.nameOfType(type),
-                                intOf(
-                                        EngineAccess.invoke(index, action),
-                                        EngineNames.ACTION_INDEX),
+                                keyNameOf(action),
                                 EngineAccess.invoke(placedType, action) != null,
                                 isUsable(action, unit, available, locked),
                                 Boolean.TRUE.equals(
-                                        EngineAccess.invoke(makesSomething, action))));
+                                        EngineAccess.invoke(makesSomething, action)),
+                                intOf(
+                                        EngineAccess.invoke(price, action),
+                                        EngineNames.ACTION_PRICE)));
             }
         }
         return options;
@@ -216,33 +244,59 @@ final class BuildOptions {
     }
 
     /**
-     * Finds a unit's action by the engine's own selector index.
+     * Finds a unit's action by the engine's interned key name.
      *
      * <p>The ability path's lookup: the option stream publishes every action
-     * with the selector the engine assigned it, and an ability order fires
-     * that selector back. Matching on the same figure the listing published
-     * is what keeps the two from drifting -- an action found any other way
-     * could be a different action than the planner saw.
+     * with its key, and an ability order fires that key back. Matching on
+     * the same string the listing published is what keeps the two from
+     * drifting. It matched on the engine's per-action index before, and the
+     * index is not a selector -- every action on a unit answers the same
+     * figure, so the dispatch always resolved the first action on the list,
+     * which is the rally point (wiki: mechanics-build-actions).
      *
      * @param unit The unit to search.
-     * @param selector The engine's action index, from the option stream.
-     * @return The action, or null when the unit has none at that index.
+     * @param key The action's key name, from the option stream.
+     * @return The action, or null when the unit has none under that key.
      */
-    static Object actionBySelector(Object unit, long selector) {
+    static Object actionByKey(Object unit, String key) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
         Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
-        Method index = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_INDEX);
         for (Object action : actionsOf(actions, unit)) {
             if (action == null) {
                 continue;
             }
-            Object value = EngineAccess.invoke(index, action);
-            if (value instanceof Number && ((Number) value).longValue() == selector) {
+            if (key.equals(keyNameOf(action))) {
                 return action;
             }
         }
         return null;
+    }
+
+    /**
+     * Reads an action's interned key name.
+     *
+     * <p>The engine keys every action with an interned object whose name is
+     * the stable identifier its own executor resolves by ({@code u_builder},
+     * {@code c_1}, ...). An action with no key, or a key with no name, reads
+     * as empty -- such an action cannot be dispatched, and publishing the
+     * blank is what lets the planner see that rather than invent it.
+     *
+     * @param action The action.
+     * @return The key's name, or empty when it has none.
+     */
+    static String keyNameOf(Object action) {
+        Object key =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        action);
+        if (key == null) {
+            return "";
+        }
+        Object name =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(key.getClass(), EngineNames.ACTION_KEY_NAME),
+                        key);
+        return name instanceof String ? (String) name : "";
     }
 
     /**
