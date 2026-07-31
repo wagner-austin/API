@@ -47,6 +47,9 @@ poetry run hypercorn transcript_api.asgi:app --bind 0.0.0.0:8000 --reload
 
 # Production
 poetry run hypercorn transcript_api.asgi:app --bind [::]:${PORT:-8000}
+
+# RQ worker (separate terminal). /readyz reports degraded until one is running.
+poetry run transcript-rq-worker
 ```
 
 ### Verify
@@ -54,6 +57,10 @@ poetry run hypercorn transcript_api.asgi:app --bind [::]:${PORT:-8000}
 ```bash
 curl http://localhost:8000/healthz
 # {"status": "ok"}
+
+curl http://localhost:8000/readyz
+# {"status": "ready", "reason": null}
+# 503 {"status": "degraded", "reason": "no-worker"} when no worker is registered
 ```
 
 ## API Reference
@@ -65,6 +72,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe (checks Redis + worker presence; 503 when degraded) |
 | `/v1/captions` | POST | Extract YouTube native captions |
 | `/v1/stt` | POST | Transcribe video audio via Whisper |
 
@@ -77,6 +85,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `OPENAI_API_KEY` | string | **Required** | OpenAI API key for Whisper |
+| `REDIS_URL` | string | **Required** | Redis connection URL, used by `/readyz` and the RQ worker |
 | `PORT` | int | `8000` | Server port |
 | `TRANSCRIPT_MAX_VIDEO_SECONDS` | int | `3600` | Max video duration (1 hour) |
 | `TRANSCRIPT_MAX_FILE_MB` | int | `100` | Max audio file size |
@@ -419,7 +428,10 @@ Set environment variables in Railway dashboard:
 | `youtube-transcript-api` | YouTube caption extraction |
 | `openai` | Whisper STT API |
 | `yt-dlp` | YouTube audio download |
+| `redis` | Readiness checks and the RQ job backend |
+| `rq` | Redis Queue |
 | `platform-core` | Logging, errors, config |
+| `platform-workers` | RQ worker harness, Redis helpers |
 
 ### System Requirements
 
