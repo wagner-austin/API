@@ -41,6 +41,7 @@ _BAD_RESERVE = "RW-DOCTRINE-007"
 _BAD_GUARD_CAP = "RW-DOCTRINE-008"
 _BAD_RAID_SIZE = "RW-DOCTRINE-009"
 _BLANK_HEAVY = "RW-DOCTRINE-010"
+_BAD_TECH_CAP = "RW-DOCTRINE-012"
 
 #: The ``heavies`` value that means "no extra composition entries".
 #:
@@ -162,10 +163,15 @@ class Doctrine(TypedDict):
             the defences, then push into the window before the opponent's
             next group finishes its thousand-tick delay and seventeen-second
             staging ([[ai-opponent-strategy]]).
-        tech: Whether factories unlock their next tier. The land factory's
-            2,000-credit upgrade flips a flag on the same building and opens
-            the heavy roster -- reachable only through the ability verb,
-            because it converts into no type ([[mechanics-build-actions]]).
+        tech: How many factories unlock their next tier, or zero for none.
+            The land factory's 2,000-credit upgrade flips a flag on the same
+            building and opens the heavy roster -- reachable only through
+            the ability verb, because it converts into no type
+            ([[mechanics-build-actions]]). A count rather than a flag,
+            because the unlock is per building and the first one already
+            opens production: the flag form bought all four factories'
+            unlocks in one probe -- 8,000 credits of saving pauses for a
+            roster the first 2,000 had opened ([[policy-budget]]).
         heavies: Composition entries outside the plan, repeats a ratio like
             the goals. The channel the unlocked roster joins the army mix
             through: production orders only what the engine offers, so an
@@ -282,6 +288,12 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         raise DoctrineError(
             _BAD_RAID_SIZE,
             f"field 'raid' must be >= 0, a party size with 0 meaning no raiding, got {raid}",
+        )
+    tech = require_int(payload, "tech")
+    if tech < 0:
+        raise DoctrineError(
+            _BAD_TECH_CAP,
+            f"field 'tech' must be >= 0, factories to unlock with 0 meaning none, got {tech}",
         )
     return Doctrine(
         name=require_non_empty_str(payload, "name"),
