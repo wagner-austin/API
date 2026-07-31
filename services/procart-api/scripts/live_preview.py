@@ -13,10 +13,10 @@ Controls:
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from typing import Final, Literal, Protocol
 
-import numpy as np
 import pygame
+from platform_core.logging import get_logger
 from procart.color import apply_tone_map
 from procart.math_backend import BACKEND, FloatArray
 from procart.modules.background import BlackBackground
@@ -28,6 +28,37 @@ from procart.types import (
     ToneMappingConfigExposureGamma,
 )
 from typing_extensions import TypedDict
+
+from scripts import _test_hooks
+
+
+class _NumpyModule(Protocol):
+    """The numpy surface this script consumes, typed.
+
+    Imported through a protocol rather than `import numpy as np` because every
+    raw numpy call returns `ndarray[Any, dtype[Any]]`, which this repo's mypy
+    settings reject on sight.
+    """
+
+    def stack(self, arrays: list[FloatArray], axis: int) -> FloatArray: ...
+
+    def transpose(self, a: FloatArray, axes: tuple[int, int, int]) -> FloatArray: ...
+
+
+class _SurfarrayModule(Protocol):
+    """pygame.surfarray, typed in terms of FloatArray.
+
+    pygame's own signature names a concrete `ndarray[Any, dtype[Any]]`, so
+    calling it directly reintroduces the Any this module just removed.
+    """
+
+    def make_surface(self, array: FloatArray) -> pygame.Surface: ...
+
+
+_logger = get_logger(__name__)
+
+_np: _NumpyModule = __import__("numpy")
+_surfarray: _SurfarrayModule = __import__("pygame.surfarray", fromlist=["surfarray"])
 
 
 class RenderParams(TypedDict):
@@ -118,7 +149,7 @@ def render_frame(
     b = o_b + bg_b * inv_a
 
     # Manually stack RGB channels using numpy
-    rgb_hdr_np = np.stack([r.tolist(), g.tolist(), b.tolist()], axis=-1)
+    rgb_hdr_np = _np.stack([r, g, b], axis=-1)
 
     # Tone map - numpy ndarray is compatible with FloatArray Protocol
     tone_cfg: ToneMappingConfigExposureGamma = {
@@ -262,7 +293,7 @@ def _process_events(
     quit_event: Final[int] = pygame.QUIT
     keydown_event: Final[int] = pygame.KEYDOWN
 
-    for event in pygame.event.get():
+    for event in _test_hooks.event_source():
         if event.type == quit_event:
             return params, False
         if event.type == keydown_event:
@@ -282,12 +313,12 @@ def main() -> int:
     Returns:
         Exit code (0 for success).
     """
-    pygame.init()
-
     render_w, render_h = 512, 512
-    screen = pygame.display.set_mode((render_w, render_h))
-    pygame.display.set_caption("Procart Live - ESC quit, see console for controls")
+    screen = _test_hooks.display.create(
+        (render_w, render_h), "Procart Live - ESC quit, see console for controls"
+    )
 
+    pygame.font.init()
     font = pygame.font.Font(None, 24)
 
     defaults: RenderParams = {
@@ -305,7 +336,7 @@ def main() -> int:
     t = 0.0
     resolution: Resolution = {"width": render_w, "height": render_h}
 
-    print(__doc__)
+    _logger.info("%s", __doc__)
 
     running = True
     while running:
@@ -326,16 +357,14 @@ def main() -> int:
             params["halo_intensity"],
         )
 
-        # Convert FloatArray to numpy for pygame
-        rgb_list = rgb.tolist()
-        rgb_np = np.array(rgb_list, dtype="uint8")
-        rgb_transposed = np.transpose(rgb_np, (1, 0, 2))
-        surface = pygame.surfarray.make_surface(rgb_transposed)
+        # pygame wants (w, h, 3) uint8; the renderer produces (h, w, 3).
+        rgb_transposed = _np.transpose(rgb.astype("uint8", copy=False), (1, 0, 2))
+        surface = _surfarray.make_surface(rgb_transposed)
         screen.blit(surface, (0, 0))
         _draw_overlay(screen, font, clock, params)
-        pygame.display.flip()
+        _test_hooks.display.present()
 
-    pygame.quit()
+    _test_hooks.display.shutdown()
     return 0
 
 

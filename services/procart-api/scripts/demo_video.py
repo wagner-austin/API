@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 from typing import Final
 
-import httpx
+from platform_core.logging import get_logger
 from procart.types import (
     BlackBackgroundLayerConfig,
     CameraConfigCircular,
@@ -18,23 +18,13 @@ from procart.types import (
 )
 from typing_extensions import TypedDict
 
+from scripts import _test_hooks
+from scripts._test_hooks import RenderRequest
 
-class _FramesRequest(TypedDict):
-    scene: SceneConfig
-    output_dir: str
+# Frames and video post the same body shape, so one type covers both calls.
+_REQUEST_TIMEOUT_SECONDS: Final[float] = 300.0
 
-
-class _VideoRequest(TypedDict):
-    scene: SceneConfig
-    output_dir: str
-
-
-class _FramesResponse(TypedDict):
-    frames_dir: str
-
-
-class _VideoResponse(TypedDict):
-    video_path: str
+_logger = get_logger(__name__)
 
 
 class _Args(TypedDict):
@@ -142,12 +132,13 @@ def _run_demo(
     )
 
     out_dir_abs = out_dir.resolve()
-    frames_req: _FramesRequest = {"scene": scene, "output_dir": str(out_dir_abs)}
-    video_req: _VideoRequest = {"scene": scene, "output_dir": str(out_dir_abs)}
+    frames_req: RenderRequest = {"scene": scene, "output_dir": str(out_dir_abs)}
+    video_req: RenderRequest = {"scene": scene, "output_dir": str(out_dir_abs)}
 
-    # Use a client with a reasonable timeout; service renders synchronously for frames
-    timeout = httpx.Timeout(300.0)
-    with httpx.Client(base_url=base_url, timeout=timeout) as client:
+    # Generous timeout; the service renders frames synchronously.
+    with _test_hooks.http_client_factory(
+        base_url=base_url, timeout_seconds=_REQUEST_TIMEOUT_SECONDS
+    ) as client:
         # Health check
         r_h = client.get("/healthz")
         r_h.raise_for_status()
@@ -224,7 +215,7 @@ def main() -> int:
         fps=args["fps"],
         duration=args["duration"],
     )
-    print(str(video_path))
+    _logger.info("Rendered video: %s", video_path)
     return 0
 
 
