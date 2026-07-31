@@ -74,9 +74,9 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/lora/{job_id}` | GET | Get job status |
 | `/lora/{job_id}/progress` | GET | Get training progress |
 | `/lora/{job_id}/cancel` | POST | Request job cancellation |
-| `/dataset/upload` | POST | Upload images for training |
-| `/dataset/{dataset_id}` | GET | Get dataset info |
-| `/dataset/{dataset_id}/caption` | POST | Caption images with BLIP/Gemini/OpenAI |
+| `/datasets/upload` | POST | Upload images for training |
+| `/datasets/{dataset_id}` | GET | Get dataset info |
+| `/datasets/{dataset_id}/caption` | POST | Caption images with BLIP/Gemini/OpenAI |
 
 ---
 
@@ -101,13 +101,15 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `APP__LOGS_ROOT` | string | `/data/logs` | Logs directory |
 | `APP__KOHYA_SS_PATH` | string | `/opt/kohya_ss` | Path to Kohya-ss installation |
 | `APP__COMFYUI_LORA_PATH` | string | `/opt/ComfyUI/models/loras` | ComfyUI LoRA models directory |
-| `APP__DATA_BANK_API_URL` | string | - | Data-bank API URL |
+| `API_GATEWAY_URL` | string | - | Gateway base URL. When set, the data-bank URL becomes `$API_GATEWAY_URL/data-bank` and `APP__DATA_BANK_API_URL` is ignored |
+| `APP__DATA_BANK_API_URL` | string | - | Data-bank API URL, used only when `API_GATEWAY_URL` is unset |
 | `APP__DATA_BANK_API_KEY` | string | - | Data-bank API key |
 | `APP__BLIP_MODEL_NAME` | string | `Salesforce/blip-image-captioning-base` | BLIP model for captioning |
 | `APP__CAPTION_TRIGGER_WORD` | string | `sks person` | Default trigger word |
 | `GEMINI_API_KEY` | string | - | Google Gemini API key for captioning |
 | `OPENAI_API_KEY` | string | - | OpenAI API key for captioning |
 | `SECURITY__API_KEY` | string | - | Optional API key for authentication |
+| `REDIS_URL` | string | - | Required by `arttrainer-rq-worker`. The API reads `REDIS__URL`; the worker entry point reads this one |
 
 ### Example .env
 
@@ -295,6 +297,23 @@ Art-Trainer/
 | `diffusers` | Stable Diffusion utilities |
 | `safetensors` | Model serialization |
 | `peft` | LoRA implementation |
+| `lycoris-lora` | LoCon / LoHa / LoKr training algorithms |
+| `xformers` | Memory-efficient attention |
+| `bitsandbytes` | 8-bit optimizers and quantization |
+| `timm` | Vision backbones used by the Kohya stack |
+| `torchvision` | Image transforms and dataset utilities |
+| `sentencepiece` | Tokenizer for the caption models |
+| `einops` | Tensor rearrangement |
+| `omegaconf` | Kohya-ss config handling |
+| `huggingface-hub` | Model and dataset downloads |
+| `wandb` | Optional training run logging |
+| `prodigyopt`, `prodigy-plus-schedule-free`, `dadaptation`, `lion-pytorch`, `pytorch-optimizer`, `schedulefree` | Optimizer implementations selectable per training run |
+| `httpx` | Outbound HTTP (data-bank client) |
+| `python-multipart` | Multipart upload parsing |
+| `python-dotenv` | `.env` loading for local runs |
+| `python-json-logger` | JSON log formatting |
+| `rich` | Console output |
+| `typing-extensions` | Backported typing constructs |
 | `platform-core` | Logging, errors, config |
 | `platform-workers` | RQ worker harness |
 | `platform-ml` | Device selection, artifact storage |
