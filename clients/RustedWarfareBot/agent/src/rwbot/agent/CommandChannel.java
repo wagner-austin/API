@@ -48,21 +48,56 @@ final class CommandChannel {
      */
     private static final long ACK_TIMEOUT_MS = 15_000L;
 
+    /**
+     * How long a held simulation waits for the first planner of a match.
+     *
+     * <p>Longer than the ack bound because it covers a process launch rather
+     * than a think: the recipe polls the port, then starts a Python planner.
+     * It matches the recipe's own port-wait bound, so both sides give up on
+     * the same schedule.
+     */
+    private static final long CONNECT_TIMEOUT_MS = 90_000L;
+
     private final int port;
     private final int sampleIntervalMs;
     private final int lockstepFrames;
+
+    /**
+     * Whether arming is owned by the match watcher rather than the sampler.
+     *
+     * <p>True when a match was requested: the watcher arms the hook on the
+     * tick the new game object appears, and the world is then held until the
+     * first planner completes an exchange. False is the legacy path --
+     * {@code -sandbox} and probes -- where the sampler arms on connect and the
+     * world free-runs until then, because holding a sandbox before its own
+     * script has loaded the map would freeze the load itself.
+     */
+    private final boolean externallyArmed;
+
     private final java.util.concurrent.SynchronousQueue<Boolean> acks =
             new java.util.concurrent.SynchronousQueue<Boolean>();
     private int nextSampleFrame = -1;
     private volatile boolean armed = false;
+
+    /**
+     * Whether any planner has ever completed an exchange.
+     *
+     * <p>The hold's off-switch, and deliberately not "has ever connected": the
+     * recipe's readiness probe connects and leaves without reading, and a
+     * probe visit must not release a world that is being held for the real
+     * planner. An ack is the first thing only a planner does.
+     */
+    private volatile boolean everAcked = false;
+
     private final ArrayBlockingQueue<String> outbox =
             new ArrayBlockingQueue<String>(OUTBOX_DEPTH);
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
-    CommandChannel(int port, int sampleIntervalMs, int lockstepFrames) {
+    CommandChannel(int port, int sampleIntervalMs, int lockstepFrames, boolean externallyArmed) {
         this.port = port;
         this.sampleIntervalMs = sampleIntervalMs;
         this.lockstepFrames = lockstepFrames;
+        this.externallyArmed = externallyArmed;
     }
 
     /**
@@ -111,15 +146,22 @@ final class CommandChannel {
             Log.info("channel: planner connected");
             outbox.clear();
             connected.set(true);
-            armed = false;
+            if (!externallyArmed) {
+                // Legacy arming is per connection; a match-mode hook is armed
+                // once by the watcher and survives reconnects.
+                armed = false;
+            }
             nextSampleFrame = -1;
             serveOne(socket);
             connected.set(false);
             // Release a step that is still waiting on the planner that just
             // left, rather than making the simulation serve out the full ack
             // timeout for an answer that can no longer come. A readiness probe
-            // that opens the port and closes it is the ordinary case.
-            acks.offer(Boolean.TRUE);
+            // that opens the port and closes it is the ordinary case -- which
+            // is why the release says FALSE: a departure is not an ack, and a
+            // held step must stay on its frame rather than advance past a
+            // boundary nobody consumed.
+            acks.offer(Boolean.FALSE);
             Log.info("channel: planner disconnected");
         }
     }
@@ -230,6 +272,18 @@ final class CommandChannel {
                             + ")");
             return;
         }
+        if (command.kind() == CommandRecord.Kind.ATTACK_MOVE) {
+            Orders.attackMoveTo(engine, unit, command.x(), command.y());
+            Log.info(
+                    "channel: attack-move "
+                            + command.unitId()
+                            + " -> ("
+                            + command.x()
+                            + ", "
+                            + command.y()
+                            + ")");
+            return;
+        }
         if (command.kind() == CommandRecord.Kind.ATTACK) {
             // The target is looked up among what is visible rather than what is
             // owned, and it is looked up now rather than trusted from the
@@ -253,6 +307,15 @@ final class CommandChannel {
             Log.info(
                     "channel: produce "
                             + command.buildType()
+                            + " by "
+                            + command.unitId());
+            return;
+        }
+        if (command.kind() == CommandRecord.Kind.ABILITY) {
+            Orders.ability(engine, unit, command.action());
+            Log.info(
+                    "channel: ability "
+                            + command.action()
                             + " by "
                             + command.unitId());
             return;
@@ -308,7 +371,28 @@ final class CommandChannel {
      * reading of an ack nobody asked for.
      */
     void ack() {
+        everAcked = true;
         acks.offer(Boolean.TRUE);
+    }
+
+    /**
+     * Arms the lockstep hook and holds the world now, on the caller's tick.
+     *
+     * <p>Must be called on the game thread. The match watcher calls this on
+     * the tick the match becomes live, and the first step runs synchronously
+     * rather than being posted: a posted hook would let the world run free
+     * for however many ticks the queue takes, and those are exactly the
+     * frames this exists to remove. The hook finds its first frame boundary
+     * immediately, waits for the planner, and reposts itself thereafter.
+     * Idempotent, and a no-op without lockstep -- a free-running run has
+     * nothing to hold.
+     */
+    void holdNow() {
+        if (lockstepFrames <= 0 || armed) {
+            return;
+        }
+        armed = true;
+        lockstepTick();
     }
 
     /**
@@ -331,12 +415,29 @@ final class CommandChannel {
         if (nextSampleFrame < 0) {
             nextSampleFrame = frame;
         }
-        if (connected.get() && frame >= nextSampleFrame) {
-            offer(StateStream.sample(engine));
-            nextSampleFrame = frame + lockstepFrames;
-            awaitAck();
+        if (frame >= nextSampleFrame) {
+            if (externallyArmed && !everAcked && !connected.get()) {
+                // A match world that has never exchanged a sample is held for
+                // the first planner, so wall-clock spent launching a Python
+                // process costs zero frames. This was the last measured noise
+                // source: the map used to settle on 22 seconds of free-running
+                // wall clock, and runs began from worlds that already differed
+                // (wiki: policy-determinism).
+                awaitFirstPlanner();
+            }
+            if (connected.get()) {
+                offer(StateStream.sample(engine));
+                nextSampleFrame = frame + lockstepFrames;
+                if (!awaitAck()) {
+                    // Released by a departure, not an ack: the boundary was
+                    // never consumed, so the step stays on its frame rather
+                    // than running a whole interval free because a readiness
+                    // probe visited.
+                    nextSampleFrame = frame;
+                }
+            }
         }
-        if (connected.get()) {
+        if (externallyArmed || connected.get()) {
             Orders.onGameThread(this::lockstepTick);
         }
     }
@@ -352,24 +453,56 @@ final class CommandChannel {
      * routinely. Re-testing the connection makes departure a condition rather
      * than a message.
      */
-    private void awaitAck() {
+    private boolean awaitAck() {
         long deadline = System.nanoTime() + ACK_TIMEOUT_MS * 1_000_000L;
         while (System.nanoTime() < deadline) {
             if (!connected.get()) {
-                return;
+                return false;
             }
             try {
-                if (acks.poll(200L, java.util.concurrent.TimeUnit.MILLISECONDS) != null) {
-                    return;
+                Boolean taken = acks.poll(200L, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (taken != null) {
+                    return taken.booleanValue();
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                return true;
             }
         }
         Log.error(
                 "channel: no ack within " + ACK_TIMEOUT_MS
                         + "ms; running on unlocked, so this run is no longer reproducible");
+        return true;
+    }
+
+    /**
+     * Blocks the simulation until the first planner arrives, or the bound
+     * expires.
+     *
+     * <p>Runs on the game thread, which is the point: a held game thread is a
+     * held world. Bounded like every other wait here, because a planner that
+     * never launches must not freeze the engine forever -- on expiry the hold
+     * is abandoned for the rest of the run and says so as an error, since
+     * every measurement taken from that run is no longer reproducible.
+     */
+    private void awaitFirstPlanner() {
+        Log.info("channel: world held at the first frame, waiting for the planner");
+        long deadline = System.nanoTime() + CONNECT_TIMEOUT_MS * 1_000_000L;
+        while (System.nanoTime() < deadline) {
+            if (connected.get() || everAcked) {
+                return;
+            }
+            try {
+                Thread.sleep(50L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        everAcked = true;
+        Log.error(
+                "channel: no planner within " + CONNECT_TIMEOUT_MS
+                        + "ms; running on unheld, so this run is no longer reproducible");
     }
 
     /** Samples the world on the game thread at a fixed cadence. */
@@ -395,7 +528,7 @@ final class CommandChannel {
                 // took the channel down with it. The condition is tested
                 // directly, so a genuine binding failure still throws instead
                 // of being mistaken for "not started yet".
-                if (!armed && Orders.gameThreadReady()) {
+                if (!externallyArmed && !armed && Orders.gameThreadReady()) {
                     Orders.onGameThread(this::lockstepTick);
                     armed = true;
                     Log.info(

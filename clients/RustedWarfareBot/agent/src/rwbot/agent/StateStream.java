@@ -32,7 +32,8 @@ final class StateStream {
 
     /** Package-visible: the lockstep hook gates on the same counter. */
     static final String FRAME_FIELD = "bx";
-    private static final String CLOCK_FIELD = "by";
+    /** Package-visible: match setup zeroes it beside the frame counter. */
+    static final String CLOCK_FIELD = "by";
 
     private StateStream() {
     }

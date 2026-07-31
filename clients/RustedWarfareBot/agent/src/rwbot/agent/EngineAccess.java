@@ -132,6 +132,62 @@ final class EngineAccess {
     }
 
     /**
+     * Writes an {@code int} field through the same pinned-name machinery.
+     *
+     * <p>Exists for exactly one caller so far: the match setup zeroing the
+     * frame and clock counters on the match's first live tick, which is the
+     * engine's own new-game convention performed at the moment the engine's
+     * own path skips it (wiki: policy-determinism).
+     *
+     * @param target Object to write to.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @param value The value to store.
+     * @throws IllegalStateException When the field is absent or not an int.
+     */
+    static void writeIntField(Object target, String name, int value) {
+        try {
+            pinnedField(target.getClass(), name).setInt(target, value);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot write int " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
+     * Writes a {@code float} field through the same pinned-name machinery.
+     *
+     * @param target Object to write to.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @param value The value to store.
+     * @throws IllegalStateException When the field is absent or not a float.
+     */
+    static void writeFloatField(Object target, String name, float value) {
+        try {
+            pinnedField(target.getClass(), name).setFloat(target, value);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot write float " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
+     * Writes a {@code boolean} field through the same pinned-name machinery.
+     *
+     * @param target Object to write to.
+     * @param name Obfuscated field name, pinned to the recorded build.
+     * @param value The value to store.
+     * @throws IllegalStateException When the field is absent or not a boolean.
+     */
+    static void writeBooleanField(Object target, String name, boolean value) {
+        try {
+            pinnedField(target.getClass(), name).setBoolean(target, value);
+        } catch (IllegalAccessException | IllegalArgumentException e) {
+            throw new IllegalStateException(
+                    "rw-agent: cannot write boolean " + name + EngineNames.PIN, e);
+        }
+    }
+
+    /**
      * Reads a {@code long} field through the same pinned-name machinery.
      *
      * @param target Object to read from.

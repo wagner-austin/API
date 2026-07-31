@@ -782,6 +782,40 @@ final class Perception {
         return stats;
     }
 
+    /**
+     * Counts the occupied slots in the player roster.
+     *
+     * <p>The lobby's join detector: the roster is a static array on the team
+     * class, filled as players connect, so a hosted lobby's "someone joined"
+     * is a second non-absent slot — no engine reference and no live match
+     * needed. Any failure to read counts as zero rather than throwing,
+     * because the poller runs from boot and the roster may simply not exist
+     * yet.
+     */
+    static int rosterCount() {
+        Object roster;
+        int size;
+        try {
+            Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
+            roster = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER).get(null);
+            size = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER_SIZE).getInt(null);
+        } catch (IllegalAccessException | RuntimeException e) {
+            return 0;
+        }
+        if (!(roster instanceof Object[])) {
+            return 0;
+        }
+        Object[] slots = (Object[]) roster;
+        int count = 0;
+        for (int index = 0; index < size && index < slots.length; index++) {
+            Object player = slots[index];
+            if (player != null && !isAbsent(player)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     /** Reports whether a player slot is empty rather than occupied. */
     private static boolean isAbsent(Object player) {
         Object answer =

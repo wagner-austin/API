@@ -21,6 +21,17 @@ final class CommandRecord {
     enum Kind {
         /** Send a unit to a world position. */
         MOVE,
+
+        /**
+         * Send a unit to a world position, engaging whatever it meets.
+         *
+         * <p>The engine's own double-right-click: a move command with the
+         * attack-move flag set, so the unit fights its way to the point
+         * instead of walking past enemies to it (wiki:
+         * community-play-strategies).
+         */
+        ATTACK_MOVE,
+
         /** Have a builder place a structure at a world position. */
         BUILD,
 
@@ -43,6 +54,18 @@ final class CommandRecord {
         ATTACK,
 
         /**
+         * Have a unit use an action that concerns no type.
+         *
+         * <p>The tech verb. The land factory's tier-two upgrade converts
+         * into nothing -- it flips a flag on the same building and unlocks
+         * the heavy roster -- so neither produce's type nor build's position
+         * can name it. The option stream publishes such actions with the
+         * engine's own selector index, and this fires that index back
+         * (wiki: mechanics-build-actions).
+         */
+        ABILITY,
+
+        /**
          * The planner has finished with the current sample.
          *
          * <p>Not an order. It carries no subject, because it is about the
@@ -60,15 +83,23 @@ final class CommandRecord {
     private final float y;
     private final String buildType;
     private final long targetId;
+    private final long action;
 
     private CommandRecord(
-            Kind kind, long unitId, float x, float y, String buildType, long targetId) {
+            Kind kind,
+            long unitId,
+            float x,
+            float y,
+            String buildType,
+            long targetId,
+            long action) {
         this.kind = kind;
         this.unitId = unitId;
         this.x = x;
         this.y = y;
         this.buildType = buildType;
         this.targetId = targetId;
+        this.action = action;
     }
 
     Kind kind() {
@@ -98,6 +129,11 @@ final class CommandRecord {
         return buildType;
     }
 
+    /** The engine's action selector index. Zero unless ABILITY. */
+    long action() {
+        return action;
+    }
+
     /**
      * Parses one command line.
      *
@@ -112,7 +148,7 @@ final class CommandRecord {
 
         String kindText = require(fields, "kind", line);
         if ("ack".equals(kindText)) {
-            return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L);
+            return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L, 0L);
         }
         long unitId = requireLong(fields, "unit_id", line);
 
@@ -127,6 +163,19 @@ final class CommandRecord {
                     requireFloat(fields, "x", line),
                     requireFloat(fields, "y", line),
                     "",
+                    0L,
+                    0L);
+        }
+        if ("attack_move".equals(kindText)) {
+            reject(fields, "type", line);
+            reject(fields, "target_id", line);
+            return new CommandRecord(
+                    Kind.ATTACK_MOVE,
+                    unitId,
+                    requireFloat(fields, "x", line),
+                    requireFloat(fields, "y", line),
+                    "",
+                    0L,
                     0L);
         }
         if ("build".equals(kindText)) {
@@ -136,13 +185,14 @@ final class CommandRecord {
                     requireFloat(fields, "x", line),
                     requireFloat(fields, "y", line),
                     requireType(fields, "build", line),
+                    0L,
                     0L);
         }
         if ("produce".equals(kindText)) {
             reject(fields, "x", line);
             reject(fields, "y", line);
             return new CommandRecord(
-                    Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line), 0L);
+                    Kind.PRODUCE, unitId, 0.0f, 0.0f, requireType(fields, "produce", line), 0L, 0L);
         }
         if ("attack".equals(kindText)) {
             // No position and no type: the target's identity is the whole of
@@ -151,11 +201,26 @@ final class CommandRecord {
             reject(fields, "y", line);
             reject(fields, "type", line);
             return new CommandRecord(
-                    Kind.ATTACK, unitId, 0.0f, 0.0f, "", requireLong(fields, "target_id", line));
+                    Kind.ATTACK, unitId, 0.0f, 0.0f, "", requireLong(fields, "target_id", line), 0L);
+        }
+        if ("ability".equals(kindText)) {
+            // No position, no type, no target: the unit and the engine's own
+            // selector index are the whole of the order.
+            reject(fields, "x", line);
+            reject(fields, "y", line);
+            reject(fields, "type", line);
+            reject(fields, "target_id", line);
+            long action = requireLong(fields, "action", line);
+            if (action < 0) {
+                throw new IllegalArgumentException(
+                        "ability command has a negative action selector: " + line);
+            }
+            return new CommandRecord(Kind.ABILITY, unitId, 0.0f, 0.0f, "", 0L, action);
         }
         throw new IllegalArgumentException(
                 "unknown command kind '" + kindText
-                        + "'; expected move, build, produce, attack or ack: " + line);
+                        + "'; expected move, attack_move, build, produce, attack, ability or ack: "
+                        + line);
     }
 
     /** Reads the unit-type field, which no verb that carries it may leave blank. */

@@ -33,6 +33,8 @@ final class AgentOptions {
     private final String matchMap;
     private final int matchOpponents;
     private final int matchDifficulty;
+    private final String hostMap;
+    private final int pinDeltaMs;
 
     AgentOptions(
             int lockstepFrames,
@@ -52,10 +54,14 @@ final class AgentOptions {
             int sampleIntervalMs,
             String matchMap,
             int matchOpponents,
-            int matchDifficulty) {
+            int matchDifficulty,
+            String hostMap,
+            int pinDeltaMs) {
+        this.pinDeltaMs = pinDeltaMs;
         this.matchMap = matchMap;
         this.matchOpponents = matchOpponents;
         this.matchDifficulty = matchDifficulty;
+        this.hostMap = hostMap;
         this.lockstepFrames = lockstepFrames;
         this.randomSeed = randomSeed;
         this.discoverAtSeconds = discoverAtSeconds;
@@ -233,6 +239,46 @@ final class AgentOptions {
      */
     boolean matchRequested() {
         return !matchMap.isEmpty();
+    }
+
+    /**
+     * Map to host a network game on, as the engine names it. Empty when
+     * hosting was not asked for.
+     */
+    String hostMap() {
+        return hostMap;
+    }
+
+    /**
+     * Whether to host a game a human can join, instead of starting a
+     * skirmish against the built-in AI.
+     *
+     * <p>Keyed on the map for the same reason {@link #matchRequested()} is:
+     * the engine's own fallback is an eight-player map nobody chose.
+     */
+    boolean hostRequested() {
+        return !hostMap.isEmpty();
+    }
+
+    /**
+     * The constant frame delta the simulation is pinned to, in milliseconds,
+     * or zero to leave the clock alone.
+     *
+     * <p>The container measures each frame's real duration and the simulation
+     * advances by that measurement, so OS scheduling jitter IS simulation
+     * divergence -- the one nondeterminism the seed, the hold and the lockstep
+     * cannot touch. {@link MatchSetup} writes the engine's own delta override
+     * from this on the match's first live tick. Pinning trades wall-clock
+     * fidelity for bit-exact repeats, which is the harness's trade and not a
+     * spectator's; watch and host runs leave this off.
+     */
+    int pinDeltaMs() {
+        return pinDeltaMs;
+    }
+
+    /** Whether the frame clock is pinned at all. */
+    boolean pinDeltaRequested() {
+        return pinDeltaMs > 0;
     }
 
     String typeFlagsPath() {

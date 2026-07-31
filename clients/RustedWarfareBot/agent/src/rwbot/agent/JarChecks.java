@@ -105,6 +105,51 @@ final class JarChecks {
     }
 
     /**
+     * Patches the path solver in the real jar and verifies the result links.
+     *
+     * <p>Separate from {@link #checkPatcher} because the edit is different:
+     * this is the delegation rewrite plus a no-op, applied by
+     * {@link SyncPathTransformer#patchSolver} exactly as the live agent
+     * applies it, so what the verifier judges here is what a run loads.
+     *
+     * @param jarPath Path to the pinned {@code game-lib.jar}.
+     * @return The number of failures, zero or one.
+     * @throws java.io.IOException When the jar cannot be read.
+     */
+    static int checkSyncPath(String jarPath) throws java.io.IOException {
+        String internalName = SyncPathTransformer.PATH_SOLVER;
+        PatchingLoader loader = new PatchingLoader(JarChecks.class.getClassLoader());
+        JarFile jar = new JarFile(jarPath);
+        try {
+            java.util.jar.JarEntry entry = jar.getJarEntry(internalName + ".class");
+            if (entry == null) {
+                System.out.println("FAIL " + internalName + ": not present in jar");
+                return 1;
+            }
+            byte[] original = readFully(jar, entry);
+            byte[] patched;
+            try {
+                patched = SyncPathTransformer.patchSolver(original);
+            } catch (ClassFormatError e) {
+                System.out.println("FAIL " + internalName + ": " + e.getMessage());
+                return 1;
+            }
+            try {
+                loader.definePatched(internalName.replace('/', '.'), patched);
+            } catch (LinkageError e) {
+                System.out.println("FAIL " + internalName + ": did not verify: " + e);
+                return 1;
+            }
+            System.out.println(
+                    "ok   " + internalName + " [a()V -> this.b()V, c()V no-op]"
+                            + "  (" + original.length + " -> " + patched.length + " bytes)");
+            return 0;
+        } finally {
+            jar.close();
+        }
+    }
+
+    /**
      * Resolves every obfuscated name the order path uses, against the real jar.
      *
      * <p>No running game is needed: the classes, fields and method signatures

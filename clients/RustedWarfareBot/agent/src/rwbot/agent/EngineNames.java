@@ -162,6 +162,16 @@ final class EngineNames {
     /** The engine's CommandController instance. */
     static final String CONTROLLER = "cf";
 
+    /**
+     * Boolean on the command object that turns a move into an attack-move.
+     *
+     * <p>Read from the engine's own double-right-click dispatch: {@code
+     * gameFramework/f/g.d(float,float,Point)} creates a command, sets {@code
+     * e3.h = true}, sets the point and enqueues -- gated on the
+     * {@code doubleClickToAttackMove} setting, which is what names the flag.
+     */
+    static final String ATTACK_MOVE_FLAG = "h";
+
     /** Credits held by a player. Sits beside the engine's own note to modders. */
     static final String CREDITS = "o";
 

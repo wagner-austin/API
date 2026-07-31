@@ -25,6 +25,7 @@ public final class SelfTest {
         java.util.Map<String, java.util.Set<String>> targets = Targets.byClass();
         int failures = JarChecks.checkPatcher(args[0], targets);
 
+        failures += JarChecks.checkSyncPath(args[0]);
         failures += OptionChecks.checkOptions();
         failures += DiscoveryChecks.checkDiscovery();
         failures += JarChecks.checkOrderBindings();

@@ -204,6 +204,26 @@ final class WireChecks {
                 "{\"kind\":\"produce\",\"unit_id\":1}", "produce with no type");
         failures += expectBadCommand(
                 "{\"kind\":\"produce\",\"unit_id\":1,\"type\":\"\"}", "produce with a blank type");
+        CommandRecord ability =
+                CommandRecord.parse(
+                        "{\"kind\":\"ability\",\"unit_id\":213,\"action\":1}");
+        failures += Check.expect(
+                ability.kind() == CommandRecord.Kind.ABILITY, "ability verb parsed");
+        failures += Check.expect(ability.action() == 1L, "ability selector parsed");
+        failures += Check.expect(ability.unitId() == 213L, "ability unit id parsed");
+        // The unit and the selector are the whole of the order; anything more
+        // is a field nothing reads, refused rather than ignored.
+        failures += expectBadCommand(
+                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":1,\"x\":1}",
+                "an ability carrying a position");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":1,\"type\":\"tank\"}",
+                "an ability carrying a type");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability\",\"unit_id\":1}", "an ability with no selector");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability\",\"unit_id\":1,\"action\":-1}",
+                "an ability with a negative selector");
 
         failures += Check.expect(
                 CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()
@@ -259,7 +279,7 @@ final class WireChecks {
      */
     static int checkChannelBackpressure() {
         int failures = 0;
-        CommandChannel channel = new CommandChannel(0, 250, 0);
+        CommandChannel channel = new CommandChannel(0, 250, 0, false);
         for (int i = 0; i < 4; i++) {
             failures += Check.expect(channel.offer("sample " + i), "sample " + i + " queued without a drop");
         }

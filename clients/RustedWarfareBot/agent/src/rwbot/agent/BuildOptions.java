@@ -216,6 +216,36 @@ final class BuildOptions {
     }
 
     /**
+     * Finds a unit's action by the engine's own selector index.
+     *
+     * <p>The ability path's lookup: the option stream publishes every action
+     * with the selector the engine assigned it, and an ability order fires
+     * that selector back. Matching on the same figure the listing published
+     * is what keeps the two from drifting -- an action found any other way
+     * could be a different action than the planner saw.
+     *
+     * @param unit The unit to search.
+     * @param selector The engine's action index, from the option stream.
+     * @return The action, or null when the unit has none at that index.
+     */
+    static Object actionBySelector(Object unit, long selector) {
+        Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
+        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
+        Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
+        Method index = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_INDEX);
+        for (Object action : actionsOf(actions, unit)) {
+            if (action == null) {
+                continue;
+            }
+            Object value = EngineAccess.invoke(index, action);
+            if (value instanceof Number && ((Number) value).longValue() == selector) {
+                return action;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Lists what a unit can make, for a failure message.
      *
      * <p>An order refused for naming something the subject cannot make is the

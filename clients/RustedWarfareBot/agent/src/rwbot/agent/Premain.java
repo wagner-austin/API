@@ -37,6 +37,23 @@ public final class Premain {
                             + " them against this jar and update Targets.");
         }
 
+        // Synchronous pathfinding: the one patch that touches simulation
+        // timing, deliberately (see SyncPathTransformer). Skipped when hosting
+        // because a private sim change desyncs against a stock-engine peer;
+        // everywhere else it is what makes one seed produce one answer.
+        if (!options.hostRequested()) {
+            SyncPathTransformer syncPath = new SyncPathTransformer();
+            instrumentation.addTransformer(syncPath);
+            forceLoad(java.util.Collections.singleton(SyncPathTransformer.PATH_SOLVER));
+            if (!syncPath.patched()) {
+                throw new IllegalStateException(
+                        "rw-agent: path solver was not patched: "
+                                + SyncPathTransformer.PATH_SOLVER
+                                + " -- the pinned build is 1.15 (code 176, build #28);"
+                                + " re-derive the solver's obfuscated name against this jar.");
+            }
+        }
+
         // Before anything else that could draw from it. Seeding after the
         // engine has already made choices would pin only the tail of a run.
         if (options.seedRequested()) {
@@ -61,24 +78,32 @@ public final class Premain {
                     options.buildType());
         }
         if (options.channelRequested()) {
-            Runnable openChannel =
-                    () ->
-                            new CommandChannel(
-                                            options.channelPort(),
-                                            options.sampleIntervalMs(),
-                                            options.lockstepFrames())
-                                    .start();
+            CommandChannel channel =
+                    new CommandChannel(
+                            options.channelPort(),
+                            options.sampleIntervalMs(),
+                            options.lockstepFrames(),
+                            options.matchRequested());
             // A requested match replaces the engine's game object, so the
             // channel is opened only once that match exists -- see MatchSetup
-            // for what sampling the discarded one cost.
-            if (options.matchRequested()) {
+            // for what sampling the discarded one cost. The watcher also
+            // reseeds and arms the hold on the match's first tick, which is
+            // what pins the run to the seed (wiki: policy-determinism).
+            if (options.hostRequested()) {
+                // Sparring: the bot hosts, a human joins, nothing is held or
+                // reseeded — the reproducibility machinery is a desync against
+                // a real peer (wiki: multiplayer-portability-invariants).
+                MatchSetup.scheduleHost(options.hostMap(), channel);
+            } else if (options.matchRequested()) {
                 MatchSetup.schedule(
                         options.matchMap(),
                         options.matchOpponents(),
                         options.matchDifficulty(),
-                        openChannel);
+                        options.randomSeed(),
+                        channel,
+                        options.pinDeltaMs());
             } else {
-                openChannel.run();
+                channel.start();
             }
         }
         Log.info("ready; patched " + targets.size() + " class(es)");

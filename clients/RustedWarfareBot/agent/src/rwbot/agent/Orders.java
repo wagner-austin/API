@@ -124,6 +124,48 @@ final class Orders {
     }
 
     /**
+     * Orders one unit to fight its way to a world position.
+     *
+     * <p>A move with one flag set, and the flag is the engine's own: the
+     * double-right-click dispatch creates the same command a move does and
+     * writes {@code h = true} on it before enqueueing, which is what makes
+     * the unit engage what it meets instead of walking past it. The flag is
+     * set after the point, exactly as that dispatch orders it.
+     *
+     * <p>Must be called on the game thread; see {@link #onGameThread}.
+     *
+     * @param engine The live engine instance.
+     * @param unit The unit to order. Must be owned by the current player.
+     * @param x Destination world x.
+     * @param y Destination world y.
+     * @throws IllegalStateException When any pinned name is absent or the
+     *     command cannot be constructed.
+     */
+    static void attackMoveTo(Object engine, Object unit, float x, float y) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        if (team == null) {
+            throw new IllegalStateException("rw-agent: engine has no current player to order for");
+        }
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
+        if (controller == null) {
+            throw new IllegalStateException("rw-agent: engine has no CommandController yet");
+        }
+
+        Method create = EngineAccess.pinnedMethod(controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
+        if (command == null) {
+            throw new IllegalStateException("rw-agent: CommandController returned no command");
+        }
+
+        Method addUnit = EngineAccess.pinnedMethod(command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, unit);
+
+        Method setPoint = EngineAccess.pinnedMethod(command.getClass(), "a", float.class, float.class);
+        EngineAccess.invoke(setPoint, command, Float.valueOf(x), Float.valueOf(y));
+        EngineAccess.writeBooleanField(command, EngineNames.ATTACK_MOVE_FLAG, true);
+    }
+
+    /**
      * Orders one builder to place a building of a named type at a world position.
      *
      * <p>Building is not a special action. The special-action vocabulary is
@@ -351,6 +393,94 @@ final class Orders {
             return;
         }
         float[] at = Perception.positionOf(producer);
+        Method setAction =
+                EngineAccess.pinnedMethod(
+                        command.getClass(),
+                        "a",
+                        EngineAccess.pinnedClass(EngineNames.ACTION_KEY_CLASS),
+                        EngineAccess.pinnedClass(EngineNames.POINT_CLASS),
+                        EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS));
+        EngineAccess.invoke(setAction, command, key, newPoint(at[0], at[1]), null);
+    }
+
+    /**
+     * Has a unit use one of its actions, addressed by the engine's selector.
+     *
+     * <p>The tech verb's dispatch. A no-type action -- the land factory's
+     * tier-two upgrade is the motivating one -- cannot be found by the type
+     * it makes, because it makes none; it is found by the selector index the
+     * option stream published, and then dispatched exactly as a production
+     * action is: by its own interned key, through the same command the
+     * game's interface sends (wiki: mechanics-build-actions).
+     *
+     * <p>The same gate check as produce, for the same reason: the engine's
+     * enqueue path drops a command it will not run and says nothing, so a
+     * closed gate is refused here where the answer can be logged.
+     *
+     * @param engine The live engine instance.
+     * @param unit The unit whose action it is.
+     * @param selector The engine's action index, from the option stream.
+     * @throws IllegalStateException When the unit has no action at that
+     *     selector, naming what it offers instead.
+     */
+    static void ability(Object engine, Object unit, long selector) {
+        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
+        if (team == null) {
+            throw new IllegalStateException("rw-agent: engine has no current player to order for");
+        }
+        Object controller = EngineAccess.readField(engine, EngineNames.CONTROLLER);
+        if (controller == null) {
+            throw new IllegalStateException("rw-agent: engine has no CommandController yet");
+        }
+
+        Object action = BuildOptions.actionBySelector(unit, selector);
+        if (action == null) {
+            throw new IllegalStateException(
+                    "rw-agent: " + Perception.typeNameOf(unit) + " has no action at selector "
+                            + selector + "; it can make "
+                            + BuildOptions.describeMakeable(unit) + EngineNames.PIN);
+        }
+
+        Object key =
+                EngineAccess.invoke(
+                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        action);
+        BuildOptions.Gates gates = BuildOptions.gatesOf(action, unit);
+        Log.info(
+                "ability: selector "
+                        + selector
+                        + " via action "
+                        + describeKey(key)
+                        + " on "
+                        + action.getClass().getName()
+                        + " "
+                        + gates);
+        String closed = gates.closed();
+        if (closed != null) {
+            Log.error(
+                    "ability: refusing selector "
+                            + selector
+                            + " on "
+                            + Perception.typeNameOf(unit)
+                            + " -- "
+                            + closed);
+            return;
+        }
+
+        Method create =
+                EngineAccess.pinnedMethod(
+                        controller.getClass(), "a", EngineAccess.pinnedClass(EngineNames.TEAM_CLASS));
+        Object command = EngineAccess.invoke(create, controller, team);
+        if (command == null) {
+            throw new IllegalStateException("rw-agent: CommandController returned no command");
+        }
+
+        Method addUnit =
+                EngineAccess.pinnedMethod(
+                        command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
+        EngineAccess.invoke(addUnit, command, unit);
+
+        float[] at = Perception.positionOf(unit);
         Method setAction =
                 EngineAccess.pinnedMethod(
                         command.getClass(),

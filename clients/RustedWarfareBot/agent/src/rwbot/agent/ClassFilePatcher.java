@@ -44,6 +44,18 @@ final class ClassFilePatcher {
     private final byte[] buf;
     private int pos;
 
+    // The structured pool view, populated by readHeaderAndConstantPool. Only
+    // Class, Methodref and NameAndType operands are meaningful; everything
+    // else keeps zeros. Needed only to find an existing self-call for
+    // delegation -- the no-op path never reads them.
+    private int[] tags;
+    private int[] operandA;
+    private int[] operandB;
+
+    // Constant-pool index of the Methodref a delegating body invokes, or -1
+    // when patching to plain no-ops.
+    private int delegateRef = -1;
+
     private ClassFilePatcher(byte[] buf) {
         this.buf = buf;
         this.pos = 0;
@@ -63,14 +75,50 @@ final class ClassFilePatcher {
      */
     static byte[] noOpMethods(byte[] classFile, java.util.Set<String> targets) {
         ClassFilePatcher patcher = new ClassFilePatcher(classFile);
-        return patcher.patch(targets);
+        return patcher.patch(targets, null, null);
     }
 
-    private byte[] patch(java.util.Set<String> targets) {
+    /**
+     * Returns a copy of {@code classFile} with the body of the method named by
+     * {@code target} (name plus descriptor, e.g. {@code "a()V"}) replaced by
+     * {@code this.<delegate>(); return;}, or {@code null} if the target did
+     * not match.
+     *
+     * <p>No constant-pool entry is added: the class must already invoke the
+     * delegate on itself somewhere, so the Methodref this body needs is found
+     * rather than forged. That keeps the edit as local as the no-op -- the
+     * pool is copied through byte-for-byte, same as ever.
+     *
+     * <p>Both the target and the delegate must be instance methods returning
+     * void: the emitted body is {@code aload_0; invokevirtual; return}, which
+     * is only verifiable under exactly those shapes.
+     *
+     * @throws ClassFormatError if the class cannot be parsed, the delegate
+     *     Methodref is absent from the pool, or a matched target is static or
+     *     non-void. All of these mean the pinned engine build moved under the
+     *     patch, and a loud failure at class load beats a silent skip.
+     */
+    static byte[] delegateToSelf(
+            byte[] classFile, String target, String delegateName, String delegateDescriptor) {
+        if (!delegateDescriptor.endsWith(")V") || !target.endsWith(")V")) {
+            throw new ClassFormatError(
+                    "delegation requires void target and delegate: "
+                            + target + " -> " + delegateName + delegateDescriptor);
+        }
+        ClassFilePatcher patcher = new ClassFilePatcher(classFile);
+        return patcher.patch(
+                java.util.Collections.singleton(target), delegateName, delegateDescriptor);
+    }
+
+    private byte[] patch(
+            java.util.Set<String> targets, String delegateName, String delegateDescriptor) {
         String[] pool = readHeaderAndConstantPool();
 
         skip(2); // access_flags
-        skip(2); // this_class
+        int thisClass = readU2();
+        if (delegateName != null) {
+            delegateRef = findSelfMethodRef(pool, thisClass, delegateName, delegateDescriptor);
+        }
         skip(2); // super_class
         int interfaceCount = readU2();
         skip(interfaceCount * 2);
@@ -105,21 +153,31 @@ final class ClassFilePatcher {
 
         int poolCount = readU2();
         String[] pool = new String[poolCount];
+        tags = new int[poolCount];
+        operandA = new int[poolCount];
+        operandB = new int[poolCount];
         // Index 0 is unused; long/double consume two slots (JVMS 4.4.5).
         for (int i = 1; i < poolCount; i++) {
             int tag = readU1();
+            tags[i] = tag;
             switch (tag) {
                 case CONSTANT_UTF8:
                     int length = readU2();
                     pool[i] = new String(buf, pos, length, java.nio.charset.StandardCharsets.UTF_8);
                     skip(length);
                     break;
+                case CONSTANT_METHODREF:
+                case CONSTANT_NAME_AND_TYPE:
+                    // The two shapes delegation resolves through: a Methodref
+                    // is (class_index, name_and_type_index), a NameAndType is
+                    // (name_index, descriptor_index).
+                    operandA[i] = readU2();
+                    operandB[i] = readU2();
+                    break;
                 case CONSTANT_INTEGER:
                 case CONSTANT_FLOAT:
                 case CONSTANT_FIELDREF:
-                case CONSTANT_METHODREF:
                 case CONSTANT_INTERFACE_METHODREF:
-                case CONSTANT_NAME_AND_TYPE:
                 case CONSTANT_DYNAMIC:
                 case CONSTANT_INVOKE_DYNAMIC:
                     skip(4);
@@ -130,6 +188,8 @@ final class ClassFilePatcher {
                     i++;
                     break;
                 case CONSTANT_CLASS:
+                    operandA[i] = readU2(); // name_index
+                    break;
                 case CONSTANT_STRING:
                 case CONSTANT_METHOD_TYPE:
                 case CONSTANT_MODULE:
@@ -144,6 +204,32 @@ final class ClassFilePatcher {
             }
         }
         return pool;
+    }
+
+    /**
+     * Finds the pool index of a Methodref on this class itself.
+     *
+     * <p>Matched by class <em>name</em> rather than by index identity: a class
+     * file may legally carry duplicate Class entries naming the same type, and
+     * only the name says which type a Methodref really targets.
+     */
+    private int findSelfMethodRef(String[] pool, int thisClass, String name, String descriptor) {
+        String selfName = pool[operandA[thisClass]];
+        for (int i = 1; i < tags.length; i++) {
+            if (tags[i] != CONSTANT_METHODREF) {
+                continue;
+            }
+            int nat = operandB[i];
+            if (pool[operandA[operandA[i]]].equals(selfName)
+                    && name.equals(pool[operandA[nat]])
+                    && descriptor.equals(pool[operandB[nat]])) {
+                return i;
+            }
+        }
+        throw new ClassFormatError(
+                "no Methodref for " + selfName + "." + name + descriptor
+                        + " in the pool -- delegation forges nothing, so the class must"
+                        + " already call the delegate on itself somewhere");
     }
 
     /** Skips a fields_count/methods_count-prefixed member table. */
@@ -181,11 +267,20 @@ final class ClassFilePatcher {
             int lengthOffset = pos;
             int length = readU4();
             if (wanted && "Code".equals(attributeName)) {
+                if (delegateRef >= 0 && (accessFlags & ACC_STATIC) != 0) {
+                    throw new ClassFormatError(
+                            "cannot delegate static " + name + descriptor + " through this");
+                }
                 // Replace from the attribute_length field through the end of
                 // the attribute body. StackMapTable, LineNumberTable and the
                 // exception table live inside Code and go with it -- which is
-                // exactly right, since a no-op body needs no stack map.
-                edit = new Edit(lengthOffset, pos + length, buildCodeAttribute(descriptor, accessFlags));
+                // exactly right, since neither a no-op nor a straight-line
+                // self-call has a branch to map.
+                byte[] body =
+                        delegateRef >= 0
+                                ? buildDelegateCodeAttribute(descriptor, accessFlags, delegateRef)
+                                : buildCodeAttribute(descriptor, accessFlags);
+                edit = new Edit(lengthOffset, pos + length, body);
             }
             skip(length);
         }
@@ -205,6 +300,34 @@ final class ClassFilePatcher {
         int attributeLength = 2 + 2 + 4 + code.length + 2 + 2;
         writeU4(out, attributeLength);
         writeU2(out, maxStack);
+        writeU2(out, maxLocals);
+        writeU4(out, code.length);
+        out.write(code, 0, code.length);
+        writeU2(out, 0); // exception_table_length
+        writeU2(out, 0); // attributes_count
+        return out.toByteArray();
+    }
+
+    /**
+     * Builds a complete Code attribute whose body is {@code this.<delegate>();
+     * return}. Straight-line, so no StackMapTable is needed at any class file
+     * version; one reference on the stack, so max_stack is one.
+     */
+    private static byte[] buildDelegateCodeAttribute(
+            String descriptor, int accessFlags, int methodRef) {
+        byte[] code = {
+            (byte) 0x2a, // aload_0
+            (byte) 0xb6, // invokevirtual
+            (byte) ((methodRef >>> 8) & 0xff),
+            (byte) (methodRef & 0xff),
+            (byte) 0xb1, // return
+        };
+        int maxLocals = argumentSlots(descriptor) + ((accessFlags & ACC_STATIC) != 0 ? 0 : 1);
+
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int attributeLength = 2 + 2 + 4 + code.length + 2 + 2;
+        writeU4(out, attributeLength);
+        writeU2(out, 1); // max_stack
         writeU2(out, maxLocals);
         writeU4(out, code.length);
         out.write(code, 0, code.length);

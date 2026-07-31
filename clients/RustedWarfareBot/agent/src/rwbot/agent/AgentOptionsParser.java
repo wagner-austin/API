@@ -36,8 +36,19 @@ final class AgentOptionsParser {
     private static final String CHANNEL_PORT = "channelPort";
     private static final String SAMPLE_MS = "sampleIntervalMs";
     private static final String MATCH_MAP = "matchMap";
+    private static final String HOST_MAP = "hostMap";
     private static final String MATCH_OPPONENTS = "matchOpponents";
     private static final String MATCH_DIFFICULTY = "matchDifficulty";
+    private static final String PIN_DELTA = "pinDeltaMs";
+
+    /**
+     * Ceiling on a pinned frame delta, in milliseconds.
+     *
+     * <p>17 is one 60 Hz step per frame; anything past that asks every frame
+     * to advance more than the engine's own baseline step, which no real
+     * container produces and no tuning has ever seen.
+     */
+    private static final int MAX_PIN_DELTA_MS = 17;
 
     /** Bounds of the engine's difficulty scale: Very Easy to Impossible. */
     private static final int MIN_DIFFICULTY = -2;
@@ -82,10 +93,13 @@ final class AgentOptionsParser {
                     DEFAULT_SAMPLE_MS,
                     "",
                     0,
+                    0,
+                    "",
                     0);
         }
 
         String matchMap = "";
+        String hostMap = "";
         int matchOpponents = 0;
         int matchDifficulty = 0;
         int lockstep = 0;
@@ -103,6 +117,7 @@ final class AgentOptionsParser {
         String buildType = "";
         int channelPort = 0;
         int sampleIntervalMs = DEFAULT_SAMPLE_MS;
+        int pinDeltaMs = 0;
         for (String pair : argument.split(";")) {
             String trimmed = pair.trim();
             if (trimmed.isEmpty()) {
@@ -157,6 +172,8 @@ final class AgentOptionsParser {
                 lockstep = parseLockstep(value);
             } else if (SAMPLE_MS.equals(key)) {
                 sampleIntervalMs = parseInterval(value);
+            } else if (HOST_MAP.equals(key)) {
+                hostMap = value;
             } else if (MATCH_MAP.equals(key)) {
                 if (value.isEmpty()) {
                     throw new IllegalArgumentException(MATCH_MAP + " expects a map path");
@@ -166,6 +183,8 @@ final class AgentOptionsParser {
                 matchOpponents = parseOpponents(value);
             } else if (MATCH_DIFFICULTY.equals(key)) {
                 matchDifficulty = parseDifficulty(value);
+            } else if (PIN_DELTA.equals(key)) {
+                pinDeltaMs = parsePinDelta(value);
             } else {
                 throw new IllegalArgumentException(
                         "unknown agent option " + key + "; supported: " + DISCOVER_AT + ", "
@@ -173,7 +192,8 @@ final class AgentOptionsParser {
                                 + TYPE_FLAGS_OUT + ", " + AI_ZONES + ", "
                                 + ORDER_AT + ", " + ORDER_BY + ", " + ORDER_INDEX + ", " + BUILD_TYPE + ", " + CHANNEL_PORT + ", "
                                 + SAMPLE_MS + ", " + RANDOM_SEED + ", " + LOCKSTEP + ", "
-                                + MATCH_MAP + ", " + MATCH_OPPONENTS + ", " + MATCH_DIFFICULTY);
+                                + MATCH_MAP + ", " + MATCH_OPPONENTS + ", " + MATCH_DIFFICULTY + ", " + HOST_MAP
+                                + ", " + PIN_DELTA);
             }
         }
         return new AgentOptions(
@@ -194,7 +214,30 @@ final class AgentOptionsParser {
                 sampleIntervalMs,
                 matchMap,
                 matchOpponents,
-                matchDifficulty);
+                matchDifficulty,
+                hostMap,
+                pinDeltaMs);
+    }
+
+    /**
+     * Parses the pinned frame delta, in whole milliseconds.
+     *
+     * <p>Zero is what "leave the clock alone" means everywhere else in the
+     * options, so it is rejected as a value; omit the key instead.
+     */
+    private static int parsePinDelta(String value) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    PIN_DELTA + " expects whole milliseconds, got " + value, e);
+        }
+        if (parsed <= 0 || parsed > MAX_PIN_DELTA_MS) {
+            throw new IllegalArgumentException(
+                    PIN_DELTA + " expects 1-" + MAX_PIN_DELTA_MS + " milliseconds, got " + parsed);
+        }
+        return parsed;
     }
 
     /**
