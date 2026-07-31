@@ -18,9 +18,9 @@ source_paths:
   - "src/tankpit_bot/validate"
 source_git_blobs:
   "src/tankpit_bot/physics": "130c17d4a20d81886055bc97dc20140c9656f1c6"
-  "src/tankpit_bot/sim": "34ee57c389509666e80d187b26b7e5777f59d754"
+  "src/tankpit_bot/sim": "bb788868e45c84cac3352a8268b2ff331c035d50"
   "src/tankpit_bot/validate": "0f9542f68581853517832736b3a063b0bab9f8c2"
-fact_checked: "2026-07-20"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
@@ -677,9 +677,12 @@ per-client viewport model the step-(d) assumptions listed as missing:[^2]
   from stale coordinates resolves as homing, not a miss). An id-shot
   at a DEPARTED tank keeps firing guaranteed homing hits — ammo
   debited, damage applied, position dark — while
-  ``departed_age_ms <= REROUTE_TTL_MS`` (`physics.combat`, the
-  machine-checked 12 000 ms midpoint of the measured [11.0, 13.0] s
-  boundary); past the TTL the id no longer resolves and the shot is
+  ``departed_age_ms <= REROUTE_TTL_MS`` (`physics.combat`; this
+  section originally recorded the 12 000 ms midpoint of the measured
+  [11.0, 13.0] s boundary — the constant was corpus-swept the same
+  week to **12 920 ms**, boundary [12.91, 12.93] s, and that is the
+  machine-checked value on disk); past the TTL the id no longer
+  resolves and the shot is
   the measured free single miss with nothing debited. A shooter
   without a ready homing slot cannot reroute (the human analogue
   needs homing enabled).
@@ -1151,6 +1154,30 @@ the lower id; a pinning test
 (`test_round_resolution_orders_by_ascending_tank_id`) guards the
 law. Gate green (4,955 tests, 100%); all 7 shadow laws still
 PASS.[^2]
+
+### Emission layer split out of `server.py` (recorded retroactively 2026-07-31)
+
+Not previously logged on this page — found by an anchor audit, so the
+date it landed is the git history's to tell, not this entry's. `server.py`
+had accumulated every wire-emission concern alongside its tick
+orchestration; four modules now own those pieces, and the page's earlier
+sections still describe the behaviour correctly, just not its address:[^2]
+
+- **`wire_statements.py`** — pure builders: one decoded `BinaryMessage`
+  per function from world state, no side effects.
+- **`emissions.py`** — per-command wire emission for the non-combat
+  actions (each already-routed command through its law).
+- **`combat_emissions.py`** — the combat side plus the two clocks the
+  server defers across ticks: shooter debits landing next tick, the kill
+  mercy bundle, and the corpse windows.
+- **`viewport_window.py`** — the client viewport model as one owner:
+  the stored 16×16 window, its 0x5A patch memory, and visibility
+  queries. This is the model the law-4 as-built above introduced;
+  it now has its own home rather than living inside the server.
+
+`server.py` keeps routing and orchestration. No law changed in the
+split — the fidelity statement and every shadow verdict above stand as
+written.
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 

@@ -8,8 +8,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "e581e606d90ca531dfdf7298453a37ba49c27357"
-fact_checked: "2026-06-16"
+  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
 ---
@@ -22,10 +22,15 @@ Three injectable services, composed via constructor kwargs on `SessionBase`. No 
 
 Owns CDP (Chrome DevTools Protocol) event handling and message capture.[^1]
 
-- Buffers received WebSocket messages (`_cdp_message_buffer`)
-- Builds XOR key table from magic bytes (`_on_magic_captured`)
+- Accumulates captured frames on the public `messages` / `ws_urls` / `magic`
+  attributes (`__init__`); `_record_frame` appends both directions
+- Extracts the session magic in `_extract_magic_and_notify` and fires the
+  `_on_magic_captured` callback; `SessionBase._on_magic_captured` is what
+  turns that into the XOR key table via `init_trackers_with_magic`
 - Sets up console listeners and CDP handlers
-- Property delegations: `_messages`, `_ws_urls`, `_magic`
+- `SessionBase` re-exposes the three attributes as `_messages`, `_ws_urls`,
+  and `_magic` properties (getter + setter) so consumers never reach into
+  the service directly[^2]
 
 Created by `CDPService()` (no args). Injected as `cdp_service=` kwarg on SessionBase subclasses.[^1]
 
@@ -57,7 +62,7 @@ cdp_service = CDPService()
 commands = CommandService(send_ws_bytes=send_websocket_bytes)
 probe = probe_class(target_url=url, cdp_service=cdp_service, command_service=commands)
 ```
-All 6 probe types go through this factory.[^3]
+All 14 probe entry points go through this factory: combat, density, enemy-teleport, enemy-tracking, fuel, key, larder, mine-landing, movement, queue, radar-watch, respawn-watch, teleport, viewport.[^3]
 
 **BrowserSession**: same pattern — SessionBase constructor accepts the kwargs.[^2]
 

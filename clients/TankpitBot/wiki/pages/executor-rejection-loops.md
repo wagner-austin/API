@@ -10,8 +10,8 @@ source_paths:
   - "src/tankpit_bot/bot"
   - "runs/bot"
 source_git_blobs:
-  "src/tankpit_bot/bot": "cd7792680c822ef7f72386ea365b66fe1feb36b3"
-fact_checked: "2026-07-17"
+  "src/tankpit_bot/bot": "b43c4b757f188792926ee32e42f3a2eb5e877994"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
@@ -26,7 +26,7 @@ Executor client-side validation rejects a planner-produced command every tick wi
 
 Two independent mechanisms combine to make executor rejections invisible to the planner:[^1][^2]
 
-1. **AI state rolls back on rejection.** `tick_loop.py:490-491` persists `bot._ai_state` only when `command_sent` is True. When `execute` returns False, the updated AI state (including `blocked_combat_targets`, `resource_target_kind`, `last_shot_target_id`) is thrown away. Next tick's planner runs against the same base state and re-produces the same or similar command.[^1]
+1. **AI state rolls back on rejection.** `tick_loop.py:817-822` persists `bot._ai_state` only when `command_sent` is True. When `execute` returns False, the updated AI state (including `blocked_combat_targets`, `resource_target_kind`, `last_shot_target_id`) is thrown away. Next tick's planner runs against the same base state and re-produces the same or similar command.[^1]
 2. **Rejections are not wired to the block/replan machinery.** `mark_move_target_failed` is called from `tick_loop_actions.py` (walk failures and wire 0x52 code-0/1 rejections; the `game_log_feedback.py` DOM call site was deleted 2026-07-19 when the channel went witness-only) and `completions.py:232` (completion timeouts), but never from any of the executor's nine `emit_ai("rejecting ...")` sites. The `is_move_target_failed` guard at `combat_strategy.py:440` that would route into `block_combat_target_and_replan` is unreachable from executor rejections.[^2]
 
 Together: rejection → no state persisted → no tile marked failed → same tick next iteration → same rejection. The loop breaks only when world state itself changes (target moves, mine detonates, container regenerates).[^1][^2]
@@ -79,25 +79,35 @@ cut, item 4).
 
 `_is_valid_pickup` rejections at `executor.py:307/:314/:326/:333` fire when the world-state container view disagrees between planner and executor (container consumed, kind mismatch). Same silent-loop shape as #1 if the disagreement persists across ticks — e.g., a stale planner cache or a wire-order race where the pickup response arrives after the planner already re-picked the same container.[^6]
 
-## Latent (not a loop today but same shape)
+## Latent — RESOLVED 2026-07-20 (fix option C landed with the root cut)
 
-`find_teleport_landing_tile` (`equipment_search.py:35-73`) accepts a `blocked_mines` parameter and deletes it at line 62. The parameter is dead code across five callers. Container-teleport landing therefore never consults mines; if a container ever ended up on a mine tile the executor's mine rejection would silently loop the pickup pursuit.[^5]
+Formerly: `find_teleport_landing_tile` accepted a `blocked_mines`
+parameter and deleted it unread, dead code across five callers, so
+container-teleport landing never consulted mines.
+
+`blocked_mines` no longer exists anywhere in the tree — the end-to-end
+deletion described under the 2026-07-20 resolution above took it out
+along with the rest of the parallel threading. The function's signature
+is now `find_teleport_landing_tile(terrain, goal_x, goal_y)`: it
+receives the **composed** decision terrain, in which hostile mines are
+already impassable, so the landing selector consults mines by
+construction rather than through a side parameter.[^5]
 
 ## Fix options
 
 - **A.** Wire `_is_valid_move_destination` rejection to `mark_move_target_failed(target_x, target_y, now)`. Plugs the mine loop (and every future tile-rejection loop) into the existing block-and-replan pathway.
 - **B.** Same for the two `_is_valid_teleport` rejection paths.
-- **C.** Delete the dead `blocked_mines` parameter on `find_teleport_landing_tile` (or wire it through).
+- **C.** Delete the dead `blocked_mines` parameter on `find_teleport_landing_tile` (or wire it through). — **DONE** 2026-07-20, as part of the root cut rather than as a standalone fix.
 - **D.** Add a per-target-id block for `_is_valid_shoot` rejections — kills the 20:47:31 class fully.
 - **E.** Remove the position-match in `_tracked_combat_target` (matches Phase 0 philosophy: aim is a hint, `target_id` is the truth channel).
 
 The structural fix is Phase 1 of [[self-observing-architecture]] — every rejection becomes a contract violation with the planner's `Decision` correlated, so silent loops are impossible by construction. A/B are the minimal wiring fix that closes the currently-known instances.
 
-[^1]: `src/tankpit_bot/bot/tick_loop.py:490-491` — `if command_sent: bot._ai_state = decision["updated_ai_state"]`; when `execute` returns False the updated AI state is discarded and the next tick re-plans from the same base state.
+[^1]: `src/tankpit_bot/bot/tick_loop.py:817-822` — `command_sent = executor.execute(...)` then `if command_sent:` persists `decision["updated_ai_state"]`; when `execute` returns False the updated AI state is discarded and the next tick re-plans from the same base state. (Was `:490-491` at the 2026-07-17 fact-check; the gate itself is unchanged, only its position.)
 [^2]: grep of `mark_move_target_failed` across `src/`, 2026-07-17 (call-site list re-verified 2026-07-19 after the game-log teardown): `tick_loop_actions.py` walk-failure and 0x52-rejection sites plus `completions.py:232` — none in `executor.py`. The former `game_log_feedback.py:93` site is gone with the module.
 [^3]: `choose_combat_landing_tile` at `src/tankpit_bot/bot/ai/combat_landing.py:46-69` (line 68: `del world, self_state, terrain`); executor rejection at `src/tankpit_bot/bot/executor.py:360`; commit `4d11980b` narrowed the mine check from `world["mines"]` to `hostile_mines(world)` for same-team passability but did not consider planner-executor consistency on hostile tiles.
 [^4]: `_tracked_combat_target` at `src/tankpit_bot/bot/executor.py:371-394`, position-match at line 392; called from `_is_valid_teleport` at line 449.
-[^5]: `find_teleport_landing_tile` at `src/tankpit_bot/bot/ai/equipment_search.py:35-73`; line 62: `del start_x, start_y, blocked_mines`; five callers pass the arg (`bot/ai/movement.py:262/:391/:451/:538`, `bot/ai/equipment_search.py:146/:212/:262/:304/:380`).
+[^5]: historical shape recorded at the 2026-07-17 fact-check: `find_teleport_landing_tile` at `equipment_search.py:35-73`, line 62 `del start_x, start_y, blocked_mines`, five callers passing the arg. Current state re-verified 2026-07-31: the function is at `equipment_search.py:33` with signature `(terrain, goal_x, goal_y)`, and `grep -rn blocked_mines src/` returns zero hits tree-wide.
 [^6]: rejection sites verified by direct read of `executor.py` at fact-check 2026-07-17 (line refs in the paragraph); the whole validator family was deleted 2026-07-21 by commit `59fce8e1` ("bot: executor is pure dispatch"), so these line refs are historical — the deletion diff in git history is the current receipt.
 [^7]: commit `59fce8e1` (2026-07-21) — the deletion diff carries every symbol named here; zero-discard archive confirmation re-derivable by scanning `runs/bot/*.events.jsonl` for `discarded_` outcomes after 2026-07-20; deletion recorded in the wiki-log entry "[2026-07-21] refactor | Executor is pure dispatch"; erratum recorded in "[2026-07-21] erratum + finding | The pursuit volley already exists — and has been firing all along".
 

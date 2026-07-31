@@ -8,7 +8,7 @@ source_paths:
   - "Makefile"
 source_git_blobs:
   "Makefile": "69e5afb93cc425deb68ee28a75c8863e8cf18e12"
-fact_checked: "2026-07-25"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
 ---
@@ -22,9 +22,10 @@ hubs: [codebase]
 | Target | What it does |
 |--------|-------------|
 | `make check` | `lint` + `test` — **the gate**; run before every commit |
-| `make lint` | guard + ruff + mypy |
-| `make test` | pytest + coverage (100% required) |
+| `make lint` | guard (typing + mock-ban + contract rules + physics claims) + undecoded-field check + ruff check/format + mypy strict over `src tests scripts` |
+| `make test` | pytest + branch coverage (`fail_under = 100`) |
 | `make install` | poetry install + playwright install chromium |
+| `make help` | print every target with a one-line description |
 
 ## Live bot (needs browser + accounts.json, touches live server)
 
@@ -35,6 +36,9 @@ hubs: [codebase]
 | `make sim-run` | Production bot vs the simulator on real field01 terrain — no server, no browser, no fuel spent. Artifacts: `runs/probe/latest.sim.*` + `runs/sim/sim-<stamp>.capture_session.json` (standard CaptureSession — `tankpit-audit --runs-dir` can price it). `tankpit-sim-run --rounds N --no-opponent` for variants. See [[physics-module-roadmap]]. |
 | `make sim-run-practice` | Production bot vs a REAL practice room (2026-07-25 rework): a stamp-selected mined layout seeds the full 36-bot roster (ids 500-535, 9/team) at archive-observed positions plus the client's real join spawn, on a static container field (~620-dot exposure atlas at the live ~40% hold rate + measured hidden population (840 fuel, half drained + 180 equipment); no runtime spawning — the respawn law was falsified). Bots driven by the certified `sim/bot_policy`. The fidelity soak: 150/150 rounds sustainably, kills across the map, exposure law 18/18 on the sim's own capture. `tankpit-sim-run --practice`. |
 | `make sniff` | WebSocket capture to disk — also the human-session recorder (you play, it records). `OUTPUT=<path>` overrides the capture file location. The former `make play` alias was removed 2026-07-01 (identical command). |
+| `make service` | Long-running SPA-driven HTTP + SSE server on `0.0.0.0:27100` (nginx proxies `/api/tankbot/*`). The phone's Start Bot button POSTs `/start`. Respawn discipline: exit 0 = graceful (stop the loop), nonzero = crash (retry after 5 s, cap 3 consecutive). See [[bot-service-architecture]]. |
+| `make smoke` | Shortest live join-and-quit check (`scripts/smoke.py`) |
+| `make debug-run` | Live bot run with protocol frame logging turned up |
 
 ## Live probes (need browser + accounts.json, touches live server)
 
@@ -47,6 +51,12 @@ hubs: [codebase]
 | `make fuel-probe` | 3 fuel pickups via 9 attempts |
 | `make fuel-drill` | Fill tank to 1100 (long-running) |
 | `make equipment-probe` | 3 equipment pickups via 9 attempts |
+| `make combat-probe` | 3 combat engagements, 20 shots each. Coverage-omitted in `pyproject.toml` (live-only path). |
+| `make track` | Enemy tracking probe — wire-derived positions vs the JS client's truth. Knobs: `TANKPIT_ENEMY_TRACKING_*`. |
+| `make enemy-teleport-probe` | 3 enemy-directed teleports; `-map` and `-nearest` variants pin the acquisition strategy |
+| `make teleport-probe-full` | The full teleport probe sweep (all targets, no strategy split) |
+| `make larder-probe` | Own-tile equipment pickup vs adjacent control — the probe gating [[larder-plan]]. Knobs: `TANKPIT_LARDER_*`. |
+| `make mine-landing-probe` | Teleport onto enemy mines and read the fuel bill off the wire. Knobs: `TANKPIT_MINE_LANDING_*`. |
 | `make queue-probe` | Test multi-command batching against server |
 | `make respawn-watch` | Teleport adjacent to a bot, fire a single at its registry position every 2 s for up to 30 s (kills already-damaged bots; full-fuel ones teleport off at 7-8 hits either way), then map-poll every 2 s for 60 s so the 0x4C snapshots pin the same-id reactivation tick and tile. Up to 4 targets per session. Analysis is offline from the capture (0x41 kill vs 0x58 flee). Knobs: `TANKPIT_RESPAWN_WATCH_*`. |
 | `make key-probe` | Press each safe physical key once (own capture window per press) and attribute sent frames to keys. Settled R=radar 2026-07-24. |
@@ -67,10 +77,11 @@ hubs: [codebase]
 | `make decode` | Replay a capture through real decoders |
 | `make discover` | Extract command constants from JS client |
 | `make analyze-viewport` | Analyze viewport bounds in captures |
+| `make download-fields` | Fetch the field GIFs the terrain loader decodes |
 
 ## Output
 
-Bot runs save to `runs/bot/`, sniffer to `runs/sniff/`. `latest.events.jsonl` and `latest.capture_session.json` are symlinks to the most recent run.[^2]
+Bot runs save to `runs/bot/`, sniffer to `runs/sniff/`, probes to `runs/probe/`. Each run writes a stable `latest.*` file **and** a timestamped archive copy (`bot-YYYYMMDD-HHMMSS.*`) — these are independent files, not symlinks, so the archive is never clobbered by the next run.[^2] Full layout in `docs/run-artifacts.md`.
 
 [^1]: Makefile line 1 — `SHELL := powershell.exe`; Make handles PowerShell internally
-[^2]: runtime_artifacts.py — creates run directories and latest symlinks
+[^2]: `runtime_artifacts.py` — `build_bot_run_artifacts` / `build_sniff_run_artifacts` / `build_probe_run_artifacts` each return both an archive path and a `latest_*_path`; no symlink is created anywhere in the module

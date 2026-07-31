@@ -7,8 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "e581e606d90ca531dfdf7298453a37ba49c27357"
-fact_checked: "2026-07-25"
+  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
 ---
@@ -21,10 +21,11 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 
 | Package | Purpose | Key files |
 |---------|---------|-----------|
-| `bot/` | The game-playing bot — HFSM states, command dispatch, tick loop | `base.py` (Bot class), `ai/` (all decision logic), `tick_loop.py` (orchestrator) |
+| `bot/` | The game-playing bot — HFSM states, command dispatch, tick loop | `base.py` (Bot class), `ai/` (all decision logic), `tick_loop.py` (orchestrator), `executor.py` (dispatch + ledger recording), `config.py` (env-resolved launch settings) |
+| `bot/ai/` | The two durable mode owners and every planner they delegate to | `mode_controller.py` (entry/exit rules), `hunt_mode.py`, `collect_mode.py`, `ferry.py` (`compose_decision_terrain` — the single walkability owner, see [[terrain-composition]]), `intent.py` (see [[committed-intent]]) |
 | `browser/` | Browser automation — Playwright, CDP, login, room join | `session_base.py` (shared composition), `lifecycle.py` (standalone functions), `login.py` + `room_join.py` |
 | `state/` | World state types and mutations — tanks, containers, viewport | `types/` (TypedDicts), `mutations.py`, `viewport_geometry.py` |
-| `protocol/` | Wire protocol — framing, encoding, decoding, command constants | `commands.py` (CMD_* constants), `codec.py` (XOR encode/decode), `decoders/` |
+| `protocol/` | Wire protocol — framing, encoding, decoding, command constants | `commands.py` (CMD_* constants), `codec.py` (XOR encode/decode), `decoders/` + `encoders/` (mirrored; byte-identity proven by `make roundtrip`) |
 | `sniffer/` | Passive WebSocket sniffer — captures traffic without playing | `core.py` (entry point), `world_state.py` + `world_state_*.py` (state machine) |
 | `capture/` | Post-hoc capture analysis — shot correlation, viewport analysis | `stats.py`, `viewport_analysis.py`, `trackers/` |
 | `action_lab/` | Live probes — isolated experiments against the real server | `probe_base.py` (ProbeBase), `probe_factory.py` (DI), teleport/fuel/equipment/movement probes |
@@ -33,8 +34,10 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `physics/` | The game's measured laws, one symbol per machine-checked wiki claim | `costs.py`, `capacity.py`, `damage.py`, `combat.py`, `map.py` (see [[physics-module-roadmap]] Phase 1) |
 | `sim/` | The server twin — laws, world, transport, practice room | `server.py` (routing/orchestration), `viewport_window.py` (stored 0x5A window + patch memory + visibility), `combat_emissions.py` (shots, mercy bundle, deferred debits, corpse windows), `emissions.py` (per-command wire emission), `wire_statements.py` (pure builders), `world.py` + `world_seed.py` (static population + mined layouts), `bot_policy.py` + `practice_room.py` (certified bot minds), `opponent.py` (scripted harness) |
 | `validate/` | Archive-priced law validators — `make audit` / `make shadow` / roundtrip | `audit.py`, `shadow*.py`, `roundtrip.py`, `wire_timeline.py` |
-| `ledger/` | Live physics bookkeeping — fuel, ammo, and per-enemy damage books, divergence verdicts | `fuel_book.py` (windows + per-kind session totals), `ammo_book.py`, `damage_book.py` (dealt/taken per enemy by weapon) |
-| `service/` | The phone-driven bot service — aiohttp + SSE around the tick loop | `http_server.py`, `session_runner.py`, `mode_bridge.py`, `status_bus.py` |
+| `ledger/` | Live physics bookkeeping — fuel, ammo, and per-enemy damage books, divergence verdicts | `fuel_book.py` (windows + per-kind session totals), `ammo_book.py`, `damage_book.py` (dealt/taken per enemy by weapon), `outcome/` (per-command outcome resolvers) |
+| `facts/` | Provenance and confidence for every observed entity — the Facts layer of [[self-observing-architecture]] | `fact.py`, `provenance.py`, `confidence.py`, `tank_facts.py`, `container_facts.py`, `world_facts.py` |
+| `service/` | The phone-driven bot service — aiohttp + SSE around the tick loop | `http_server.py`, `session_runner.py`, `mode_bridge.py`, `status_bus.py`, `watch_page.py`, `frame_bus.py` |
+| `contracts/` | Enforcement decorators backing the `scripts/contract_rules.py` guard rule | `base.py`, `enforcement.py` |
 
 ## Support modules (top-level, not packages)
 
@@ -46,7 +49,6 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | `parser.py` + `parser_messages.py` | CDP message parsing |
 | `decoder.py` + `state_decoder.py` | Wire blob decoders |
 | `terrain.py` | Terrain map loader (from GIF files) |
-| `game_state.py` | Top-level game state container |
 | `combat.py` + `combat_tracker.py` | Combat event tracking |
 | `inventory.py` | Inventory state management |
 | `runtime_logging.py` | Structured logging setup |
@@ -67,9 +69,16 @@ sniffer/ ──→ browser/ ──→ protocol/
   │
   └──→ state/
 
-capture/ ──→ state/ (no browser dependency)
-replay/  ──→ bot/ai/ + state/ (no browser dependency)
+service/ ──→ bot/ (owns the tick loop on a worker thread)
+
+capture/     ──→ state/              (no browser)
+replay/      ──→ bot/ai/ + state/    (no browser)
+sim/         ──→ bot/ai/ + protocol/ (no browser, no server)
+validate/    ──→ sim/ + physics/     (offline, reads the runs archive)
+diagnostics/ ──→ ledger/ + state/    (offline, reads events.jsonl)
 ```
+
+`physics/`, `facts/`, `ledger/`, and `contracts/` are leaf layers — anything above may import them; they import nothing from the bot.
 
 All three consumers (Bot, ProbeBase, BrowserSession) inherit from `SessionBase` in `browser/session_base.py`. See [[services]] for how the DI wires together.[^1]
 

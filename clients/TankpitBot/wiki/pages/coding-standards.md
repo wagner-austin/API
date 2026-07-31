@@ -7,9 +7,9 @@ source_paths:
   - "src/tankpit_bot"
   - "tests"
 source_git_blobs:
-  "src/tankpit_bot": "e581e606d90ca531dfdf7298453a37ba49c27357"
-  "tests": "301ab356bd87a4758f7ad3c73595ac7deb66a656"
-fact_checked: "2026-06-16"
+  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+  "tests": "b873ace8539fd91aac675eb90b5a96e933d1ed30"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
@@ -28,7 +28,7 @@ hubs: [architecture]
 
 - No `unittest.mock` anywhere in the test suite[^2]
 - `MonkeyPatchBanRule` guard enforces save-and-restore DI pattern, 0 violations[^2]
-- `_test_hooks` DI pattern: production code declares `_test_hooks` dict with injectable callables; tests swap in protocol-matching implementations[^2]
+- `_test_hooks` DI pattern: `tankpit_bot/_test_hooks/` is a package of 8 domain submodules exposing module-level injectable callables and Protocols; tests swap in protocol-matching implementations by save-and-restore ([[testing-patterns]])[^2]
 - No weak assertions (`assert len(x) >= 0` etc.) — concrete assertions on specific values[^2]
 - 100% coverage required (`fail_under = 100` in `pyproject.toml`)[^2]
 
@@ -49,5 +49,5 @@ hubs: [architecture]
 - Create new commits rather than amending[^3]
 
 [^1]: user (Austin), enforced across all sessions — "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias, no duplicate code"
-[^2]: MonkeyPatchBanRule in monorepo-guards; _test_hooks pattern verified across 3,923 tests at 100% coverage
+[^2]: MonkeyPatchBanRule in monorepo-guards; _test_hooks pattern verified across 5,548 tests at 100% coverage. `poetry run python -m scripts.guard` 2026-07-31: 0 violations across every rule group, `mock-ban` and `monkey-patch-ban` included
 [^3]: user (Austin), 2026-06-13 — incident destroyed uncommitted work; absolute rule since

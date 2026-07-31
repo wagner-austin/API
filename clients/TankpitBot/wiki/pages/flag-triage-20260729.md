@@ -1007,3 +1007,91 @@ re-derivation — new finding, needs a landing-serves-the-plan guard
 or the intent layer; (b) s8-3's mid-duel find_target map_open (F12
 family). The engagement-break projection numbers were consistent
 across all three breaks (27/tick over 3 observed hits, floor 354).
+
+**s8-2 FIXED (2026-07-30, committed-intent phase 1,
+[[committed-intent]]):** the root fix is structural, not a point
+latch. New `bot/ai/intent.py` owns collect-plan semantics over the
+EXISTING lock fields (no new state): the under-fire escape now
+finishes a held plan that completes within auto-pick reach (the
+pickup IS the escape continuation), `_hop_toward_equipment` refuses
+landings equal to the current position (`own_ground` tally — the
+cost-0 candidate that structurally wins cost ranking is exactly how
+the self-teleport got selected), and every plan release emits a
+`plan_released` diagnostic with a closed-vocabulary reason
+(`superior_candidate`, `not_executable`, `tank_at_capacity`,
+`landing_scan_reset`, `walk_for_fuel_override`, `target_gone`,
+`target_not_pursuable`, `kind_invalid`) so plan churn is measurable
+per run instead of silent. `normalize_resource_target` lifted from
+`context.py` into `intent.validate_collect_plan` with the same
+pursuability predicate. Pins: `test_intent.py` (22),
+`TestEscapePlanContinuity` (s8-2 scenario byte-for-byte: under fire,
+lock on own tile → `pickup_equipment`/`equipment_locked`, never a
+hop; far lock does NOT hijack the walk law), own-ground gate tests.
+Gate: 5,481 tests, 100.00% statements+branches. Phase 2 (hunt +
+clearance plans, supersede visibility) specified on
+[[committed-intent]] — the s8-3 mid-duel map_open (F12) belongs to
+the hunt-plan phase.
+
+**F22 (found AND fixed same hour by the plan_released channel):**
+the new events stream exposed three `not_executable` releases (run
+bot-20260730-032x ticks 361/366/371) that all fired mid-approach
+WITH the plan's own map_open in flight — and each released target
+was re-locked and served 2-3 ticks later. Transient "no executable
+route this tick" was being read as plan invalidity. Fix: the lock
+continuations now HOLD the plan on a transient `walk_or_teleport`
+None (yield the tick, keep the lock) and release with
+`not_executable` only on the structural server-confirmed
+move-failed mark (`is_move_target_failed`). Water-boxed plans now
+survive for a later ferry/approach; the genuine release gates
+(superior candidate, validity, at-capacity, move-failed) are
+unchanged. Repinned: water-locked hold ×3, move-failed release ×2.
+Gate: 5,484 tests, 100.00%.
+
+**Same-run F14 quantification (ticks 360-448):** five phantom
+pickups on distinct drained beliefs, each exactly one wasted tick
+followed by a clean `target_gone` release — the feedback loop is
+correct; the cost is purely the pending belief-age ruling.
+
+**F23 (found by monitor cluster-trace, FIXED same hour): the
+movement-dead escape loop.** Run bot-20260730-110x ticks 95-107:
+mid-duel with purple-1 the under-fire escape dispatched a walk-pickup
+every tick and the server rejected every one with `cant_go` — TWELVE
+consecutive rejected ticks standing still in the firing line (fuel
+972→663), each rejection burning that container (`failed_pickups` →
+`target_not_pursuable`) and the next tick planning a walk to a
+different container. The tank was movement-boxed (every direction
+refused) and nothing recorded the shared fact "the server is
+refusing this tank's movement" — collect-kind rejections only fed
+the per-container marks, so the walk-first escape law kept assuming
+walking works. The hop rung finally won at t112 (+437 refuel saved
+the duel), but survival came from burn-through, not detection. Fix:
+(1) `WorldService.movement_rejections` — every `cant_go` on a
+move/collect/teleport dispatch records a timestamp
+(`record_movement_rejection`), counted via
+`recent_movement_rejections(now, window)` with in-place pruning;
+(2) the under-fire escape checks the count against
+`_MOVEMENT_DEAD_REJECTION_FLOOR = 2` inside the fire window — at the
+floor the walk rungs are declared dead and the escape jumps straight
+to the hop (a teleport needs no walk path and lands
+displacement-safe). Pins: service record/count/prune, cant_go-on-
+collect records + code-0 does NOT, movement-dead skips the walkable
+in-viewport fuel for the larder hop, single rejection keeps the walk
+law. Gate: 5,491 tests, 100.00%.
+
+**F20 FIXED (2026-07-30, forced by a live 110-tick livelock):** run
+bot-20260730-110x ticks 904-1017+: HUNT/CLOSE walked to (240,46)
+adjacent to orange-6, the server rejected the move with `cant_go`,
+the tile was marked failed — and the next tick dispatched the
+IDENTICAL move, over 110 consecutive ticks, because the walk-close
+branch takes `combat_landing_candidates[0]` which consulted neither
+the composed terrain nor the failed-move marks (the teleport path
+below it checks the mark, but the walk path returns first). Fix at
+the candidate source: `combat_landing_candidates` now takes
+`(terrain, now_ms)` and filters impassable composed tiles and
+live-marked failed tiles; an unwalkable adjacency ring falls
+through to the teleport path, whose failed-landing gate blocks and
+replans. Pins: terrain-blocked candidate skipped, marked candidate
+skipped, signature updated at all call sites. Gate: 5,493 tests,
+100.00%. The stuck session was cycled via the stop file so the
+relaunch runs the fix; the withheld red-test spec published earlier
+under F20 is superseded by these landed pins.

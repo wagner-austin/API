@@ -12,9 +12,9 @@ source_paths:
   - "src/tankpit_bot/state"
   - "src/tankpit_bot/bot/ai"
 source_git_blobs:
-  "src/tankpit_bot/state": "474b28f74ce32e4b0409d6694cfe8a1757c1b525"
-  "src/tankpit_bot/bot/ai": "c4a1b52f76cf44e48ab64034551703afa69b8ebe"
-fact_checked: "2026-07-27"
+  "src/tankpit_bot/state": "c7709222fffa03aaca07d68e87e2a0a648772d81"
+  "src/tankpit_bot/bot/ai": "15e99c69d071cba99f5214df9f14de712355dba3"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
@@ -71,10 +71,16 @@ fixed-container errands** — the score picks, not a queue.[^1]
    larder is empty or unprofitable; radar is spent only when
    knowledge is exhausted.[^4]
 
-HUNT is untouched: locks, chases, break thresholds unchanged. The
-future under-fire teleport-refuel (PvP doctrine, [[bot-behavior-contract]])
-is a second client of the same query — nearest known container
-covering the deficit is a zero-command emergency refuel.[^4]
+HUNT is untouched: locks, chases, break thresholds unchanged.
+
+The under-fire teleport-refuel (PvP doctrine, [[bot-behavior-contract]])
+has since LANDED as the predicted second client of the same query:
+`collect_mode.py:328` calls the same `_larder_harvest` on the
+under-fire path and takes the hop only when `_hop_escapes_attacker`
+confirms it clears the attacker's envelope — so the escape and the
+refuel are one command instead of two. It sits after the walk-pickup
+attempt (skipped outright when movement rejections say the walk rungs
+are dead) and before the generic escape hop.[^4]
 
 ## Harvest mechanics (all measured laws)
 

@@ -6,8 +6,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "e581e606d90ca531dfdf7298453a37ba49c27357"
-fact_checked: "2026-06-16"
+  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
@@ -23,20 +23,20 @@ Bot → DispatchMixin → CompletionsMixin → SessionBase
 | Module | Lines | Concern |
 |--------|-------|---------|
 | `browser/session_base.py` | 196 | CDPService + CommandService composition, property delegations |
-| `bot/completions.py` | 340 | HFSM state data, `_transition`, `_maybe_complete_*` methods |
-| `bot/bot_dispatch.py` | 397 | Command dispatch, equipment, map operations |
-| `bot/base.py` | 465 | Init, state access, game log, account stats, run loop |
+| `bot/completions.py` | 361 | HFSM state data, `_transition`, `_maybe_complete_*` methods |
+| `bot/bot_dispatch.py` | 440 | Command dispatch, equipment, map operations |
+| `bot/base.py` | 621 | Init, state access, game log, account stats, run loop |
 
 ## Shared composition
 
 `SessionBase` provides CDPService + CommandService DI via constructor kwargs. Three consumers share it with zero duplicate code:[^1]
 - `Bot(DispatchMixin)` — the game-playing bot
-- `ProbeBase(SessionBase)` — action lab probes (6 probe types via `create_probe()` factory)
-- `BrowserSession(SessionBase)` — sniffer-specific scrapers only (134 lines)
+- `ProbeBase(SessionBase)` — action lab probes (14 probe entry points via the `create_probe()` factory)
+- `BrowserSession(SessionBase)` — sniffer-specific scrapers only (130 lines)
 
 ## Factory DI
 
-Bot accepts `cdp_service` and `command_service` as constructor kwargs. `create_probe()` injects both into all 6 probes. No service locator, no global state.[^1]
+Bot accepts `cdp_service` and `command_service` as constructor kwargs. `create_probe()` injects both into all 14 probes. No service locator, no global state.[^1]
 
 ## Standalone lifecycle
 

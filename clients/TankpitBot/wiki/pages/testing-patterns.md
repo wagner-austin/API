@@ -8,16 +8,16 @@ source_paths:
   - "tests"
   - "scripts/guard.py"
 source_git_blobs:
-  "tests": "301ab356bd87a4758f7ad3c73595ac7deb66a656"
+  "tests": "b873ace8539fd91aac675eb90b5a96e933d1ed30"
   "scripts/guard.py": "508e6328c73be452a042fd00162168a921d7b1b9"
-fact_checked: "2026-06-16"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
 ---
 
 # Testing Patterns
 
-3,923 tests, 100% coverage, zero mocks, zero monkey-patching.[^1]
+5,548 tests, 100% coverage, zero mocks, zero monkey-patching.[^1]
 
 ## `_test_hooks` DI pattern
 
@@ -74,7 +74,13 @@ finally:
 
 ## Coverage
 
-`fail_under = 100` in `pyproject.toml`. Branch coverage enabled. `concurrency = ["greenlet"]` to handle Playwright's sync API context switches.[^1]
+`fail_under = 100` in `pyproject.toml`. Branch coverage enabled.
+`concurrency = ["greenlet", "thread"]` — `greenlet` keeps the tracer
+across Playwright sync-API context switches; `thread` was added for the
+bot service, whose `StatusBus` / `ModeBridge` primitives cross the
+aiohttp thread and the tick-loop thread by design ([[bot-service-architecture]]).
+Four live-only probe paths are `omit`-ed: `action_lab/combat_probe.py`,
+`action_lab/enemy_tracking.py`, and their two `scripts/` wrappers.[^1]
 
 [^1]: pyproject.toml [tool.coverage.report] — fail_under=100, branch=true, concurrency=greenlet
 [^2]: tankpit_bot/_test_hooks/__init__.py — 8 submodules, all protocol-based

@@ -11,25 +11,36 @@ source_paths:
   - "runs/bot/bot-20260620-191622.capture_session.json"
   - "src/tankpit_bot/state"
 source_git_blobs:
-  "src/tankpit_bot/state": "474b28f74ce32e4b0409d6694cfe8a1757c1b525"
-fact_checked: "2026-06-20"
+  "src/tankpit_bot/state": "c7709222fffa03aaca07d68e87e2a0a648772d81"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
 ---
 
 # Tank Registry Freshness Model
 
-Every tank in `world_state.tanks` carries **three independent freshness
+Every tank in `world_state.tanks` carries **four independent freshness
 timestamps**.[^1] Each gates a different decision tier; conflating them
 caused the historical stale-registry combat bug.[^2]
 
-## The three timestamps
+## The four timestamps
 
 | Field | Advances on | Gate |
 |---|---|---|
-| `timestamp_ms` | ANY observation (wire, map snapshot, radar, DOM refinement) | Acquisition (HUNT candidate) |
+| `timestamp_ms` | ANY observation (wire, map snapshot, radar, DOM refinement) | Registry retention |
 | `last_wire_seen_ms` | WIRE-sourced observations only | Wire presence (anti-ghost) |
 | `last_position_update_ms` | Observations with `position_is_authoritative=True` AND non-null `position` | Kill-shot |
+| `last_viewport_observation_ms` | Observations with `storage_source == "viewport"` only | **HUNT acquisition** |
+
+The fourth was added after the 2026-06-21 tracking probe showed the
+first three were not sufficient to answer "can I actually see this
+tank?": **26 of 27 tanks passed `timestamp_ms`, `last_wire_seen_ms`,
+AND `last_position_update_ms` while the JS client's own registry had
+none of them in view.** 0x4C MapData refreshes everyone's position-and-
+wire stamps and 0x2E TankStatusSync broadcasts globally for every alive
+tank, so without a viewport-scoped stamp the threat list is the global
+roster rather than the visible one. `analyze_threats` filters on this
+timestamp first.[^1]
 
 Production cadences differ by message kind, which is why one timestamp
 is not enough:[^1]
@@ -100,16 +111,23 @@ from the registry self-tank id.[^1]
 
 ## Gates
 
-- **`is_wire_present(last_wire_seen_ms, now_ms)`** -- TTL 7000 ms (two
-  fight-cadence periods). Acquisition / HUNT candidate selection.[^1]
-- **`is_position_fresh(last_position_update_ms, now_ms)`** -- TTL
-  7000 ms (matched to wire-presence TTL after the 2026-06-20
-  target-block loop). **Kill-shot gate.** A wire-fresh but
+The gates are TTL constants in `bot/ai/threats.py`, applied inline at
+their decision sites -- there are no `is_wire_present()` /
+`is_position_fresh()` helper functions:[^1]
+
+- **`VIEWPORT_PRESENCE_TTL_MS`** -- 5000 ms against
+  `last_viewport_observation_ms`. **Acquisition gate**, applied first in
+  `analyze_threats`; also gates the greeting approach
+  (`bot/ai/greeting.py`).
+- **`WIRE_PRESENCE_TTL_MS`** -- 7000 ms (two fight-cadence periods)
+  against `last_wire_seen_ms`. Ghost gate.
+- **`POSITION_FRESHNESS_TTL_MS`** -- 7000 ms against
+  `last_position_update_ms`, matched to the wire TTL after the
+  2026-06-20 target-block loop. **Kill-shot gate.** A wire-fresh but
   position-stale target is blocked, not fired at.
 
-Both gates live in `bot/ai/threats.py`. Combat strategy reads them in
-order: first `is_wire_present` (ghost gate), then `is_position_fresh`
-(stale-position gate), then the miss-on-moved-target re-aim path.[^1]
+Order at the combat site: viewport presence, then wire presence, then
+position freshness, then the miss-on-moved-target re-aim path.[^1]
 
 ## How the historical bug manifested
 
@@ -196,15 +214,21 @@ Every rule above is pinned by a test in
 
 - `TestInvariantTimestampAlwaysAdvances` -- rule 1.
 - `TestInvariantWireSeenRequiresWire` -- rule 2.
-- `TestInvariantPositionFreshnessRequiresBoth` -- rule 3.
+- `TestInvariantPositionFreshnessRequiresAuthoritativePosition` -- rule 3.
+- `TestStorageSourceIsRecorded` -- the `storage_source` that drives rule 4.
 - `TestFieldMergeSemantics` -- present overwrites, `None` preserves.
 - `TestTankCreationOnFirstObservation` -- the create path.
+- `TestOuterTimestampAdvances`, `TestTankObservationCodec` -- outer-stamp
+  and round-trip coverage.
 
-The combat-strategy regression test for the kill-shot gate lives in
-`tests/bot/ai/test_combat_strategy.py::TestWirePresenceGate::test_position_stale_adjacent_target_is_blocked_not_shot`.
-Removing or weakening any of these tests is a deliberate contract
-change and must come with a docstring and an update to
-[[tank-freshness-model]] itself.
+The combat-side regression tests for the kill-shot gate live in
+`tests/bot/ai/test_combat_strategy.py::TestKillShotWireGate` and
+`tests/integration/test_combat_gates.py` (which exercises
+`WIRE_PRESENCE_TTL_MS` and `POSITION_FRESHNESS_TTL_MS` directly);
+target stickiness across the wire TTL is pinned by
+`tests/scenarios/test_target_stickiness.py`. Removing or weakening any
+of these tests is a deliberate contract change and must come with a
+docstring and an update to this page.
 
 [^1]: code truth: `state/mutations.py` (`apply_tank_observation`) + `state/types/tank_observation.py` + `bot/ai/threats.py` gates + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by `tests/world_state/test_tank_observation.py` and `tests/bot/ai/test_combat_strategy.py`
 [^2]: runs/bot/bot-20260619-050303.capture_session.json (frontmatter-pinned) — the 25-miss stale-registry loop; three-timestamp fix landed 2026-06-19/20
