@@ -51,9 +51,23 @@ src/procart_api/
   main.py        # production entrypoint; sets real hooks
   routes/
     health.py    # /healthz + /readyz via add_api_route
-scripts/guard.py  # monorepo guard harness
+scripts/
+  guard.py       # monorepo guard harness
+  _test_hooks.py # injectable hooks (http client, display, event source)
+  demo_video.py  # renders a demo scene through a running service
+  live_preview.py # interactive pygame tuner for the neon-orb parameters
 tests/            # ASGI tests via httpx.ASGITransport
 docs/PLAN.md      # service integration plan
+```
+
+## Scripts
+
+```bash
+# Render a demo scene end to end against a running service
+poetry run python -m scripts.demo_video --base-url http://127.0.0.1:8000 --out demo_output
+
+# Interactive parameter tuner (opens a window; keys are listed in its docstring)
+poetry run python -m scripts.live_preview
 ```
 
 ## Hooks
