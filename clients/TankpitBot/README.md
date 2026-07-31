@@ -1,19 +1,48 @@
 # TankpitBot
 
-Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol, with XOR codec for message encoding/decoding. Includes a modular AI behavior system for autonomous tank control.
+Automated bot client for the Tankpit.com browser game. Playwright + Chrome DevTools
+Protocol drive a real browser session; the game's WebSocket is captured and decoded
+through a fully reverse-engineered XOR wire protocol, and a durable HFSM plans and
+executes tank actions autonomously.
+
+The project also ships a server twin (`sim/`), a machine-checked physics layer bound
+to the wiki, an archive-priced law validator, and a phone-driven HTTP + SSE service.
+
+## Wiki first
+
+**`wiki/index.md` is the source of truth** for game mechanics, wire protocol, combat
+strategy, and architecture decisions — 6 hubs, 67 content pages. This README is an
+orientation layer; when it and the wiki disagree, the wiki wins.
+
+| Hub | Covers |
+|-----|--------|
+| [Game Mechanics](wiki/hubs/game-mechanics.md) | viewport, teleport, radar, fuel, ferries, map, equipment, walk mechanics |
+| [Protocol](wiki/hubs/protocol.md) | wire format, decode coverage, MAP_DATA, viewport shift, push gating |
+| [Combat](wiki/hubs/combat.md) | shot range, enemy behavior, weapon selection, gameplay loop, economy |
+| [JS Client](wiki/hubs/js-client.md) | reverse-engineered `tpclient.js` — V table, commands, XOR, terrain |
+| [Architecture](wiki/hubs/architecture.md) | inheritance chain, DI, freshness model, behavior contract, service |
+| [Codebase](wiki/hubs/codebase.md) | [module map](wiki/pages/module-map.md), services, testing patterns, make targets |
 
 ## Features
 
-- **Autonomous AI Bot**: Durable HFSM owner routing with HUNT, RECOVER_FUEL, and RECOVER_EQUIPMENT modes, pathfinding, threat analysis, and executor-side command validation
-- **Protocol Discovery**: Captures WebSocket traffic via Playwright CDP integration
-- **WebSocket Injection**: Sends commands via captured WebSocket (synthetic JS events don't work)
-- **XOR Codec**: Full encode/decode with static + session magic keys
-- **Container Decoder**: Length-based message identification for 22 container subtypes
-- **Intel Gathering**: Console listener, WebSocket URLs, JS debug info, script URLs
-- **Shared Architecture**: BrowserSession base class for sniffer, probe, and bot
-- **Type Safety**: mypy strict mode, zero `Any` types, immutable TypedDict models
-- **100% Test Coverage**: statements and branches, no mocks
-- **Monorepo Integration**: Guard rules, platform_core utilities
+- **Autonomous HFSM bot** — two durable mode owners (`HUNT`, `COLLECT`) with
+  rank-derived readiness thresholds, committed collect intents, ferry-aware
+  pathfinding, and mine-as-terrain walkability
+- **Complete wire coverage** — every message type in the client's V table has exactly
+  one decoder reachable from `protocol.decode_message`; encoders round-trip
+  byte-identically against the capture archive (`make roundtrip`)
+- **Server twin** (`sim/`) — the production bot plays full sessions against a
+  simulated server on real terrain, with no browser and no live server
+- **Executable physics** (`physics/`) — one symbol per machine-checked wiki claim,
+  re-derived from the runs archive on every `make check` and `make audit`
+- **Phone-driven service** — long-running aiohttp + SSE server with a live MJPEG
+  view, mode pinning, and a self-contained watch page
+- **Live diagnostics** — in-page HUD, click-to-flag channel with lead-up snapshots,
+  issue reports, ledger audits, and cross-session stats
+- **Type safety** — mypy strict, zero `Any`/`cast`/`type: ignore`, immutable TypedDicts
+- **100% test coverage** — statements and branches, no mocks, `_test_hooks` DI only
+
+---
 
 ## Quick Start
 
@@ -29,707 +58,350 @@ cd clients/TankpitBot
 poetry install --with dev
 ```
 
-This installs dependencies and Playwright's Chromium browser.
+`make install` does the same plus `playwright install chromium`. Copy
+`accounts.json.example` to `accounts.json` and `.env.example` to `.env` before any
+live run.
 
-### Run the Bot
+### Run the bot
 
 ```bash
-make bot
+make bot     # live HFSM bot, runs until stopped
+make run     # 5-min timed session (TANKPIT_BOT_SESSION_SECONDS) + scorecard
+make analyze # issue report + forage economy + run audit + cross-session stats
 ```
 
-The bot joins a game, captures the WebSocket, and runs the AI behavior loop autonomously.
-Each run is saved to:
+Every run writes canonical artifacts plus a timestamped archive copy:
 
-- `runs/bot/latest.log`
-- `runs/bot/latest.events.jsonl`
-- `runs/bot/latest.capture_session.json`
+```text
+runs/bot/latest.log                     # operator-readable timeline
+runs/bot/latest.events.jsonl            # AI / SYNC / STATE / WIRE / WORLD records
+runs/bot/latest.capture_session.json    # raw wire capture
+```
 
-plus timestamped archive copies for all three.
+See [`docs/run-artifacts.md`](docs/run-artifacts.md) for the full layout.
 
-### Capture the Protocol
+### Run without a live server
+
+```bash
+make sim-run           # production bot vs the simulator on real terrain
+make sim-run-practice  # production bot vs the certified practice-bot roster
+```
+
+Free soak testing — no browser, no server, no account. The sim's laws are priced
+against the real capture archive by `make shadow`.
+
+### Capture the protocol
 
 ```bash
 make sniff
 ```
 
-This will:
-1. Launch a Chromium browser
-2. Navigate to tankpit.com
-3. Capture all WebSocket messages
-4. Save the session to `runs/sniff/latest.capture_session.json` by default
-5. Save companion files `runs/sniff/latest.raw_capture.json` and
-   `runs/sniff/latest.session_summary.json`
+Writes `runs/sniff/latest.{log,events.jsonl,capture_session.json,raw_capture.json,session_summary.json}`
+plus archives. Setting `TANKPIT_OUTPUT` (or `OUTPUT=`) writes the requested path
+*and* mirrors into the canonical paths.
 
-If `TANKPIT_OUTPUT` is set, that requested output is still written, and the same
-run is mirrored into the canonical `runs/sniff/latest.*` paths.
+### Live probes
 
-### Probe Input Commands
+Isolated protocol-level experiments against the real server. Each one answers a
+single question without the planner in the way — see
+[Adding a Probe](wiki/pages/adding-a-probe.md).
 
 ```bash
-make probe
+make movement-probe    # walk to 3 targets — cheapest smoke test
+make teleport-probe    # safe + aggressive teleport strategies
+make fuel-probe        # 3 fuel pickups via 9 attempts
+make equipment-probe   # 3 equipment pickups via 9 attempts
+make combat-probe      # 3 engagements, 20 shots each
+make radar-watch       # free-radar spawn watch
+make larder-probe      # own-tile pickup vs adjacent control
+make mine-landing-probe# teleport onto enemy mines, read the bill
 ```
 
-This will:
-1. Join a game using account credentials
-2. Capture the game's WebSocket via prototype hook
-3. Send known commands via WebSocket injection:
-   - `f` - Map open (XOR command via WebSocket)
-   - `f` - Map close (JavaScript keypress toggle)
-   - `s` - Radar (XOR command)
-   - `d` - Mine (XOR command)
-   - `q` - Quit (plain command)
-4. Record WebSocket responses from the server
-5. Save results to `probe_session.json`
+`make help` lists all of them with one-line descriptions.
 
-**Note**: Synthetic JavaScript KeyboardEvents don't work because browsers set `isTrusted: false` on programmatically created events. The probe uses WebSocket injection instead.
-
-### Teleport Probes
+### Offline tools
 
 ```bash
-make teleport-probe          # Run safe + aggressive strategies
-make teleport-probe-safe     # sync_before_teleport only
-make teleport-probe-aggressive  # immediate_after_map_open only
-make enemy-teleport-probe    # Enemy-directed combat approach
-make fuel-probe              # Fuel container pickup sequences
-```
+make decode            # replay a capture through the real decoders
+make discover          # extract commands from the JS client
+make analyze-viewport  # viewport bounds analysis
+make analyze-timing    # command-response latencies
 
-These live diagnostic probes isolate transport-level server acceptance from
-planner logic. Results are saved to `teleport_probe.json`,
-`enemy_teleport_probe.json`, and `fuel_probe.json` with companion capture
-session files.
-
-### Replay Bot
-
-```bash
 poetry run python -m scripts.replay_bot [session.json] [--json]
 ```
 
-Loads a captured WebSocket session and replays it offline through the protocol
-decoders and AI planner tick-by-tick, outputting structured decision traces
-without a live browser.
-
-### Decode Captured Session
-
-```bash
-make decode
-```
-
-Loads a capture session JSON, extracts the magic key, builds the XOR table, and decodes all command messages.
+`replay_bot` re-runs a captured session through the decoders and planner tick by
+tick, emitting decision traces with no browser involved.
 
 ---
 
-## AI Behavior System
+## Bot service
 
-The bot uses a tick-based planning pipeline built on pure functions, immutable
-TypedDicts, and a durable HFSM owner model. The important layers are:
+`make service` starts the long-running SPA-driven server on `0.0.0.0:27100`
+(nginx proxies `/api/tankbot/*` to it in production). Nine routes:
 
-- **World sync**: CDP WebSocket frames are drained each tick and decoded into
-  world state. Every tracked entity (tank, container, mine) carries a `source`
-  field (`viewport`, `radar`, or `world_state`) for freshness validation.
-- **Planning**: `bot/ai_strategy.py` selects exactly one durable mode owner per
-  tick (`RECOVER_FUEL`, `RECOVER_EQUIPMENT`, or `HUNT`) and delegates to the
-  corresponding owner module.
-- **Execution**: `bot/executor.py` validates commands against live world state
-  before dispatching. AI state is only persisted after successful dispatch.
-- **Action lifecycle**: `bot/states.py` and `bot/tick_loop.py` track in-flight
-  actions and completion/timeouts.
+| Route | Purpose |
+|-------|---------|
+| `GET /health` | liveness probe |
+| `POST /start` / `POST /stop` | session lifecycle (`202`, `409` if already running) |
+| `POST /mode` | pin a durable mode (`HUNT`, `COLLECT`, `UNSET`) from the phone |
+| `GET /status` | SSE stream of `SessionStatusDict` frames, one per tick |
+| `POST /shutdown` | stop the session and the service |
+| `GET /watch` | self-contained phone watch page |
+| `GET /video` / `GET /frame` | MJPEG live view / one-shot JPEG snapshot |
 
-The control architecture is documented in
-[`docs/bot-control-model.md`](docs/bot-control-model.md) and the HFSM
-migration plan is in
-[`docs/bot-hfsm-refactor-plan.md`](docs/bot-hfsm-refactor-plan.md).
+Three threadsafe primitives cross the aiohttp-loop ↔ tick-loop boundary:
+`ModeBridge` (latest-wins mode slot), `StatusBus` (latest-wins fan-out), and
+`SessionRunner` (one active session, stop via the same sentinel `Bot.run` polls).
+Details in [Bot Service Architecture](wiki/pages/bot-service-architecture.md).
 
-### Durable Mode Owners
+---
 
-| Mode | Entry | Exit | Description |
-|------|-------|------|-------------|
-| `RECOVER_FUEL` | fuel <= low threshold (500) | fuel >= full threshold (1100) | SENSE, SEARCH, APPROACH, PICKUP, DONE substates |
-| `RECOVER_EQUIPMENT` | any combat reserve <= break (12) | all reserves >= resume (20) | SENSE, SEARCH, APPROACH, PICKUP, DONE substates |
-| `HUNT` | no recovery needed | recovery takes priority | ACQUIRE, REFRESH, CLOSE, ENGAGE, CONFIRM_KILL substates |
+## AI behavior system
 
-### Executor Validation
+Tick-based planning over pure functions and immutable TypedDicts, with a durable
+HFSM owner model. Each tick: sync world state → select exactly one owner → plan →
+execute. AI state persists only after a successful dispatch.
 
-Before dispatching any command, the executor validates against current world
-state:
+### Durable mode owners
 
-- **Shoots**: target must be tracked, at the expected coordinates, and
-  viewport-confirmed
-- **Pickups**: container must exist and match the expected kind (fuel/equipment)
-- **Moves/Teleports**: destination must not be a known mine
-- **Combat teleports**: locked combat target must still be tracked with a valid
-  source
-- **Resource teleports**: locked resource target must still exist with a locally
-  trustworthy source
+| Mode | Owns the tick when | Substates |
+|------|--------------------|-----------|
+| `HUNT` | fully stocked and no COLLECT trigger pending | ACQUIRE, REFRESH, CLOSE, SCAN_ON_LANDING, ENGAGE, CONFIRM_KILL |
+| `COLLECT` | fuel low, weapon/radar break, or short of full between kills | SENSE, SEARCH, APPROACH, PICKUP, DONE |
+| `UNSET` | the SPA has pinned idle | — (holds position, stays armed) |
 
-### Current Planner Notes
+Thresholds are **rank-derived, not fixed**: `hunt_fuel_floor` is
+`fuel_capacity(rank)` (1000 at recruit through 1800 at general), and HUNT entry
+requires duals and homings at `inventory_capacity(rank)` with extra radars within 5
+of cap. Entry-at-break / exit-at-full gives hysteresis, so the bot rebuilds a full
+stock rather than leaving the moment it scrapes together one radar. Nothing bypasses
+the readiness gate — the bot never hunts below full stock.
 
-- Combat uses map-open as the known fallback for global enemy refresh.
-- Radar is used for local resource search, not global enemy positions.
-- Extra radar scans the full 18x18 viewport envelope; built-in radar scans a
-  7x7 area centered on the tank. Viewport-scanned state is only set by extra
-  radar, not built-in radar.
-- World viewport state tracks the real visible 16x16 viewport. Direct move and
-  pickup commands are allowed on visible edge tiles; only tiles beyond the
-  visible viewport are treated as non-actionable.
-- Movement uses viewport-bounded A* pathfinding. Paths that would leave the
-  current visible viewport fall back to teleport instead of waypoint walking.
-- The bot only trusts current-viewport fuel/equipment targets after extra radar
-  has confirmed that viewport. Sparse `0x5A` cache entries remain unconfirmed
-  until radar refreshes the current screen.
-- Repeated radar in the same already-confirmed viewport is intentionally
-  skipped.
-- Teleport affordability uses the exact in-game fuel formula
-  `floor(6 * sqrt(dx^2 + dy^2))` rather than a flat estimated cost.
-- `0x5A` is a sparse tile patch, not a full visible-tank snapshot. It is
-  authoritative for viewport origin and tile cache updates, but absence from a
-  single `0x5A` patch does not imply tank absence.
-- Fresh enemy-mine reveal is proven through tunneled `0x2E -> 0x4F` radar
-  results, and local mine placement through tunneled `0x2E -> 0x4B` placement
-  updates.
-- The bot tracks in-flight actions explicitly (`move`, `collect`, `teleport`,
-  `scan`, `shoot`, `map_open`) and waits for completion or timeout before
-  replanning.
-- Teleport completion validates the actual landed position against the requested
-  landing target and blacklists mismatched teleport landings immediately.
-- Equipment recovery uses break/resume thresholds rather than a single
-  hard-coded “critical” level.
+`manual_mode` from the service surface overrides auto-arbitration when set.
 
-### Documentation Status
+### Planner facts worth knowing
 
-- Protocol/decode docs are in `docs/protocol-discovery.md`,
-  `docs/protocol-reference.md`, `docs/protocol-decoding-status.md`, and
-  `docs/protocol-pipeline.md`.
-- The current bot control model is documented in `docs/bot-control-model.md`.
-- The HFSM/control-architecture migration plan is in
-  `docs/bot-hfsm-refactor-plan.md`.
-- Run output locations are documented in `docs/run-artifacts.md`.
-- Bot terminal/event channels are documented in `docs/bot-logging.md`.
-- The old README descriptions of `DEFEND`, `PATROL`, `DEPOSIT_FUEL`, and
-  evaluator-based AI layers were stale and should not be used as the current
-  architecture reference.
+- **Walkability has one owner.** `compose_decision_terrain` (`bot/ai/ferry.py`)
+  layers the static minimap, wire ferry tiles, and hostile mines into a single
+  `is_passable` that every consumer reads. There is no separate executor mine veto.
+  See [Terrain Composition](wiki/pages/terrain-composition.md).
+- **Collect plans survive the tick boundary.** `bot/ai/intent.py` owns typed
+  collect plans with explicit validity and reasoned release (`plan_released` events).
+- **Teleports need an open map.** The open and the teleport never share a tick — a
+  same-tick pair races the server's open processing and is silently dropped.
+- **Teleport cost is exact**: `floor(6 * sqrt(dx² + dy²))`, computed with integer
+  sqrt (`physics/costs.py`). The server charges to the *actual* landing tile, so
+  drift off the requested target changes the bill.
+- **Viewport is 16×16 visible**; the radar patch envelope is 18×18 (one tile of
+  margin per side). Direct moves and pickups are allowed on visible edge tiles.
+- **`0x5A` is a sparse tile patch**, not a full snapshot — authoritative for
+  viewport origin and tile-cache updates, but absence from one patch does not imply
+  tank absence.
+- **Rank-windowed human targeting**: `TANKPIT_BOT_HUMAN_MIN_RANK`/`_MAX_RANK`
+  default to `(1, 8)` — recruits are protected. Practice bots are farmed at any rank.
+
+### Supporting layers
+
+`facts/` carries provenance and confidence for every observed entity. `ledger/`
+keeps live fuel, ammo, and per-enemy damage books with divergence verdicts.
+`physics/` holds the measured game laws, each symbol bound to a wiki claim.
+`diagnostics/` turns the event stream into issue reports, alignment checks, and
+scorecards.
+
+Read the [Bot Behavior Contract](wiki/pages/bot-behavior-contract.md) before
+proposing any behavior fix — it is a MUST / MUST NOT / verified-by table.
+
+---
+
+## Protocol
+
+Every wire byte has exactly one decoder, reachable from
+`protocol.decode_message(msg_type, body)`. The `0x2E` container envelope is handled
+by a subtype-first dispatcher that routes tunneled subtypes to their protocol
+decoders and leaves only the container-only subtypes (`0x43` ContainerPickup,
+`0x45` MineDetonation, `0x4B` MinePlacement, and 1-byte TeleportLanded) to the
+container path. No dual paths, no length-based blob fallbacks.
+
+Encoders mirror the decoders: `make roundtrip` asserts `encode(decode(x)) == x` for
+every archived binary message.
+
+The per-message-type status table — every V-table type with its JS handler name,
+field list, and known gaps — lives in
+[Wire Decode Coverage Map](wiki/pages/decode-coverage.md). Protocol prose docs are
+in [`docs/`](docs/): `protocol-reference.md`, `protocol-decoding-status.md`,
+`protocol-discovery.md`, `protocol-pipeline.md`.
 
 ---
 
 ## Configuration
 
-Copy `.env.example` to `.env` and customize:
+Copy `.env.example` to `.env` and customize.
 
-```bash
-cp .env.example .env
-```
-
-### Environment Variables
+### Core
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TANKPIT_URL` | `https://tankpit.com` | Target URL (sniffer default; bot uses `/`, probe uses `/play`) |
-| `TANKPIT_OUTPUT` | `capture_session.json` | Capture output path (also mirrored to `runs/sniff/latest.*`) |
+| `TANKPIT_URL` | `https://tankpit.com/` | Target URL |
+| `TANKPIT_ROOM` | `Practice` | Room to join |
 | `TANKPIT_HEADLESS` | `false` | Run browser headlessly |
-| `TANKPIT_DURATION_MS` | `0` | Capture duration in ms (0 = indefinite) |
-| `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real-time |
 | `TANKPIT_PREFER_ACCOUNT` | `false` | Skip guest login, use account directly |
 | `TANKPIT_ACCOUNT` | (none) | Account name or index from `accounts.json` |
-| `TANKPIT_USERNAME` | (none) | Account username (overrides `accounts.json`) |
-| `TANKPIT_PASSWORD` | (none) | Account password (overrides `accounts.json`) |
-| `TANKPIT_PROBE_OUTPUT` | `probe_session.json` | Probe output path |
-| `TANKPIT_WAIT_JOIN_MS` | `5000` | Probe join wait time |
-| `TANKPIT_WAIT_INPUT_MS` | `1000` | Probe input wait time |
+| `TANKPIT_USERNAME` / `TANKPIT_PASSWORD` | (none) | Override `accounts.json` |
 | `PYTHONUTF8` | `1` | Windows console UTF-8 support |
 
-**Note**: Guest accounts are rate-limited per IP. If you hit the limit, the sniffer will automatically attempt to log in using account credentials. Set `TANKPIT_ACCOUNT` to select from `accounts.json`, or set both `TANKPIT_USERNAME` and `TANKPIT_PASSWORD` to override.
+### Bot
 
----
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TANKPIT_BOT_SESSION_SECONDS` | `0` (unbounded) | Session length; `make run` sets `300` |
+| `TANKPIT_BOT_SESSION_KILLS` | `0` (no bound) | Stop after N kills |
+| `TANKPIT_BOT_HUMAN_MIN_RANK` | `1` | Lowest human rank the bot may engage |
+| `TANKPIT_BOT_HUMAN_MAX_RANK` | `8` | Highest human rank the bot may engage |
+| `TANKPIT_BOT_PRIORITY_TARGET` | (none) | Account name to hunt preferentially |
+| `TANKPIT_BOT_WEAPON_RESUME_SLACK` | `0` | Relax the weapons bar to `cap - slack` |
+| `TANKPIT_SHOT_SCREENSHOTS` | (off) | Capture screenshots around shots |
 
-## Protocol Status
+### Service
 
-**94% signature coverage, 92% fully decoded**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TANKPIT_BOT_SERVICE_IDLE_EXIT_SECONDS` | `1800` | Idle window before the service exits |
+| `TANKPIT_BOT_VIDEO_FPS` | `12.0` | Live-view capture rate |
+| `TANKPIT_BOT_VIDEO_QUALITY` | `0.8` | Live-view JPEG quality |
 
-- 31+ message types documented in `protocol/types.py`
-- Length-based identification for session-independent decoding
-- Container decoder (`container/`) for 0x2E subtypes
-- See `docs/protocol-decoding-status.md` for detailed message formats
+### Sniffer
 
-### Fully Decoded Messages
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TANKPIT_OUTPUT` | (canonical paths) | Capture output path; also mirrored to `runs/sniff/latest.*` |
+| `TANKPIT_DURATION_MS` | `0` | Capture duration in ms (0 = indefinite) |
+| `TANKPIT_LIVE_DECODE` | `true` | Show decoded messages in real time |
 
-| Sig | Name | Description |
-|-----|------|-------------|
-| 0x21 | tank_info | Tank metadata (team, id, decoration, score, name) |
-| 0x2B | promotion | Promotion event (text format) |
-| 0x2E | container | Container wrapping 13+ subtypes |
-| 0x3D | movement_response | Movement confirmation with position |
-| 0x3E | tank_status | Full tank status (22 bytes) |
-| 0x41 | deactivation | Kill/death event |
-| 0x47 | movement | Movement command response |
-| 0x49 | item_pickup | Equipment pickup notification |
-| 0x4F | radar_result | Radar scan results |
-| 0x53 | shooting | Shot fired event |
-| 0x5A | viewport_update | Delta-compressed map update |
+Each probe reads its own `TANKPIT_<PROBE>_*` variables (output path, timeouts,
+attempt counts) — see the probe's module docstring or
+[Make Targets](wiki/pages/make-targets.md).
 
-### Container Subtypes (0x2E)
-
-| Length | Type | Description |
-|--------|------|-------------|
-| 1 | teleport_landed | Teleport completion confirmation |
-| 2-3 | tank_status_sync | Heartbeat/sync |
-| 4 | player_list_short | Player list response |
-| 5 | deactivation_kill / container_pickup | Kill event (0x41) or container pickup (0x43) |
-| 6 | tank_leave | Player exits game |
-| 7 | deactivation_death / player_list_extended | Death event (0x43) or multi-player response |
-| 9 | tank_status_short | Enemy HP/rank update |
-| 10 | tank_update_compact | Compact tank update |
-| 11 | combat_hit | Combat hit event |
-| 13 | position_update | Position/status update |
-| 14 | tank_update_extended | Extended tank update |
-| 14+ | movement | Movement with waypoint path (0x47 subtype or direction tail) |
-| 15 | tank_update_full | Full tank update (or mine_placed 0x4B) |
-| 16-20 | tank_registry | Tank registry entry |
-| variable | radar_response (0x4F) | Radar scan results (containers + mines) |
-| variable | mine_placed (0x4B) / mine_explode (0x45) | Mine placement or detonation |
-| 29-79 | tip_notification | UI tips and notifications |
-| 80-130 | chunk_data | Map/terrain chunk data |
-| 500+ | world_state | Full world/map state |
+**Note**: guest accounts are rate-limited per IP. On hitting the limit the session
+falls back to account credentials from `accounts.json`.
 
 ---
 
 ## Development
 
-### Commands
+### Gate
 
 ```bash
-make install          # Install dependencies + Playwright
-make lint             # Run guards + ruff + mypy
-make test             # Run pytest with coverage
-make check            # Run lint + test
-make sniff            # Run WebSocket sniffer
-make probe            # Run input probe
-make teleport-probe   # Run teleport timing probes (safe + aggressive)
-make teleport-probe-full  # Run full teleport probe
-make enemy-teleport-probe  # Run enemy-directed teleport probe
-make enemy-teleport-probe-map      # Enemy teleport (map strategy)
-make enemy-teleport-probe-nearest  # Enemy teleport (nearest strategy)
-make fuel-probe       # Run fuel pickup probe
-make movement-probe   # Run movement probe
-make bot              # Run bot client
-make decode           # Decode captured session
-make discover         # Run command discovery
-make analyze-viewport # Run viewport analysis
+make check   # lint | test — the gate
+make lint    # guard + undecoded-field check + ruff + mypy
+make test    # pytest with branch coverage
 ```
 
-Bot terminal logging is documented in [docs/bot-logging.md](docs/bot-logging.md).
+`make lint` runs `scripts/guard.py`, which enforces:
 
-### Quality Gates
+1. **Typing rules** — no `Any`, `cast`, `type: ignore`, `TYPE_CHECKING`, `.pyi`, `noqa`
+2. **Mock ban** — no mocks, no monkey-patching; `_test_hooks` DI only
+3. **Contract rules** — `contracts/` enforcement decorators are present
+4. **Physics claims** — every `physics/` symbol re-derives from its bound wiki claim
+5. **Undecoded-field check** — no silently dropped wire fields
 
-All code must pass:
+then ruff (check + format) and mypy strict over `src`, `tests`, `scripts`.
 
-1. **Guard Scripts**: No `Any`, no `cast`, no `type: ignore`, no mocks, no weak assertions
-2. **Ruff**: Linting and formatting
-3. **Mypy**: Strict type checking (src, tests, scripts)
-4. **Pytest**: 100% statement and branch coverage (src, scripts)
+`make test` requires **100% statement and branch coverage** (`fail_under = 100`).
 
-### Running Tests
+### Archive validators
 
 ```bash
-# Run all tests (parallel via xdist)
-make test
+make audit      # re-derive every wiki physics claim from the runs archive
+make shadow     # price the sim's laws against the real archive
+make roundtrip  # encode(decode(x)) == x for every archived binary message
+```
 
-# Run specific test file
-poetry run pytest tests/bot/ai/test_tactics.py -v
+### Running tests
 
-# Run with coverage report
+```bash
+make test                                            # all, parallel via xdist
+poetry run pytest tests/bot/ai/test_tactics.py -v     # one file
 poetry run pytest --cov=src --cov=scripts --cov-branch --cov-report=html
 ```
 
----
-
-## Project Structure
-
-```
-TankpitBot/
-├── src/tankpit_bot/
-│   ├── __init__.py           # Package exports
-│   ├── _hooks_guard.py       # Hook guard rules
-│   ├── _pillow.py            # Typed Pillow image adapter
-│   ├── _test_hooks.py        # Dependency injection hooks
-│   ├── combat.py             # Combat event tracking
-│   ├── decoder.py            # Session decoder for captured data
-│   ├── game_state.py         # Game state management
-│   ├── inventory.py          # Inventory tracking
-│   ├── parser.py             # Lobby message parser (room list, etc.)
-│   ├── probe.py              # Input injection and command discovery
-│   ├── runtime_artifacts.py  # Canonical run artifact paths
-│   ├── runtime_logging.py    # Runtime logging channels and emitters
-│   ├── state_decoder.py      # Game state message decoder
-│   ├── terrain.py            # Terrain/map decoding
-│   │
-│   ├── action_lab/           # Live protocol-level action probes (31 files)
-│   │   ├── teleport.py       # Teleport timing probe
-│   │   ├── enemy_teleport.py # Enemy-directed teleport probe
-│   │   ├── fuel_probe.py     # Fuel pickup probe
-│   │   ├── movement_probe.py # Movement probe
-│   │   ├── capture.py        # Session capture helpers
-│   │   ├── session.py        # Probe session management
-│   │   ├── types.py          # Probe type definitions
-│   │   └── ...               # Probe phases, runners, diagnostics
-│   │
-│   ├── replay/               # Offline bot decision replay
-│   │   ├── engine.py         # Session replay engine
-│   │   └── types.py          # Replay trace types
-│   │
-│   ├── bot/                  # Bot client package
-│   │   ├── __init__.py       # Re-exports Bot and all AI types
-│   │   ├── ai_strategy.py    # Durable owner selection orchestrator
-│   │   ├── base.py           # Bot class (state machine, CDP, commands)
-│   │   ├── combat_feedback.py# Combat event feedback
-│   │   ├── commands.py       # Command encoding helpers
-│   │   ├── executor.py       # Command validation and dispatch
-│   │   ├── states.py         # Execution state machine + in-flight actions
-│   │   ├── tick_loop.py      # Sync -> decide -> execute orchestrator
-│   │   ├── tick_loop_types.py# Tick decision types
-│   │   ├── types.py          # Command TypedDicts
-│   │   ├── vision.py         # Vision/world-state fallback helpers
-│   │   ├── world_sync.py     # CDP buffer drain into decoder pipeline
-│   │   └── ai/                      # AI decision modules
-│   │       ├── __init__.py          # Re-exports
-│   │       ├── types.py             # AI config/state/behavior types
-│   │       ├── modes.py             # HFSM mode/substate literals + validation
-│   │       ├── mode_controller.py   # Entry/exit rules, substate derivation
-│   │       ├── context.py           # DecideCtx and shared helpers
-│   │       ├── hunt_mode.py         # Durable HUNT owner
-│   │       ├── recover_fuel_mode.py # Durable RECOVER_FUEL owner
-│   │       ├── recover_equipment_mode.py # Durable RECOVER_EQUIPMENT owner
-│   │       ├── combat_strategy.py   # Combat route primitives
-│   │       ├── combat_landing.py    # Shared combat landing helpers
-│   │       ├── movement.py          # Walk/teleport/exploration planning
-│   │       ├── equipment.py         # Fuel/equipment target selection
-│   │       ├── reachability.py      # Viewport-bounded reachability
-│   │       ├── resource_search.py   # Shared resource search hop logic
-│   │       ├── teleport_cost.py     # Exact teleport fuel cost formula
-│   │       ├── threats.py           # Enemy analysis from world state
-│   │       ├── pathfinding.py       # Terrain-aware path helpers
-│   │       └── tactics.py           # Equipment/radar helper logic
-│   │
-│   ├── browser/              # Browser automation package
-│   │   ├── __init__.py
-│   │   ├── accounts.py       # Account management (accounts.json)
-│   │   ├── dom_scraper.py    # DOM scraping for game log
-│   │   ├── fuel_probe.py     # Fuel bar probing
-│   │   ├── key_discovery.py  # Key binding discovery
-│   │   ├── login.py          # Guest/account login logic
-│   │   ├── session.py        # BrowserSession base class
-│   │   └── types.py          # Browser-specific types
-│   │
-│   ├── capture/              # WebSocket capture package
-│   │   ├── __init__.py
-│   │   ├── protocol_census.py# Protocol census
-│   │   ├── shot_viewport_correlation.py # Shot/viewport correlation
-│   │   ├── signature.py      # Message signature extraction
-│   │   ├── stats.py          # Capture statistics
-│   │   ├── summary.py        # Session summary generation
-│   │   ├── viewport_analysis.py     # Viewport analysis
-│   │   ├── viewport_entities.py     # Viewport entity extraction
-│   │   ├── xor.py            # XOR utilities for capture
-│   │   └── trackers/         # Message trackers
-│   │       ├── combat.py     # Combat event tracker
-│   │       ├── container.py  # Container message tracker
-│   │       ├── equipment.py  # Equipment tracker
-│   │       ├── fuel.py       # Fuel deposit tracker
-│   │       ├── items.py      # Item pickup tracker
-│   │       ├── mine.py       # Mine event tracker
-│   │       ├── position.py   # Position tracker
-│   │       ├── radar.py      # Radar result tracker
-│   │       └── tank.py       # Tank info tracker
-│   │
-│   ├── container/            # Container decoder package
-│   │   ├── __init__.py
-│   │   ├── helpers.py        # Container decoding helpers
-│   │   ├── identification.py # Length-based identification
-│   │   ├── mapper.py         # Container type mapping
-│   │   ├── types.py          # Container TypedDicts (22 subtypes)
-│   │   └── decoders/         # Subtype decoders
-│   │       ├── combat.py     # Combat container decoder
-│   │       ├── misc.py       # Misc container decoders
-│   │       ├── position.py   # Position container decoder
-│   │       ├── radar.py      # Radar container decoder
-│   │       └── tank.py       # Tank container decoder
-│   │
-│   ├── protocol/             # Protocol encoding package
-│   │   ├── __init__.py
-│   │   ├── codec.py          # XOR encode/decode with static + session keys
-│   │   ├── commands.py       # Command type definitions
-│   │   ├── constants.py      # Protocol constants
-│   │   ├── framing.py        # 2-byte length framing encode/decode
-│   │   ├── helpers.py        # Protocol helpers
-│   │   ├── lobby.py          # Lobby protocol helpers
-│   │   ├── types.py          # Protocol TypedDicts
-│   │   └── decoders/         # Message decoders
-│   │       ├── combat.py     # Combat message decoder
-│   │       ├── misc.py       # Misc message decoders
-│   │       ├── movement.py   # Movement message decoder
-│   │       ├── radar.py      # Radar message decoder
-│   │       ├── resources.py  # Resource message decoder
-│   │       ├── tank.py       # Tank message decoder
-│   │       ├── text.py       # Text message decoder
-│   │       └── world.py      # World/viewport decoder
-│   │
-│   ├── sniffer/              # WebSocket sniffer package
-│   │   ├── __init__.py
-│   │   ├── constants.py      # Sniffer constants
-│   │   ├── core.py           # Core sniffer logic
-│   │   ├── decoders.py       # Sniffer message decoders
-│   │   ├── formatters.py     # Output formatters
-│   │   ├── player_tracking.py# Player tracking
-│   │   ├── trackers.py       # Tracker coordination
-│   │   ├── viewport.py       # Viewport handling
-│   │   ├── world_state.py           # Core state, accessors, reset
-│   │   ├── world_state_combat.py    # Combat hit and kill tracking
-│   │   ├── world_state_containers.py# Container and fuel updates
-│   │   ├── world_state_dispatch.py  # Protocol message routing
-│   │   ├── world_state_inventory.py # Inventory sync/gain/toggle
-│   │   ├── world_state_radar.py     # Radar scan and cache promotion
-│   │   ├── world_state_tanks.py     # Tank state mutations
-│   │   ├── world_state_tiles.py     # Viewport and tile patches
-│   │   └── xor.py                   # XOR utilities for sniffer
-│   │
-│   ├── state/                       # Game state package
-│   │   ├── __init__.py
-│   │   ├── mutations.py             # Immutable state mutations
-│   │   ├── renderer.py              # ASCII state rendering
-│   │   ├── types.py                 # State TypedDicts (WorldState, SelfState, etc.)
-│   │   └── viewport_geometry.py     # Viewport dimension constants and helpers
-│   │
-│   └── types/                # Shared types package
-│       ├── __init__.py       # Re-exports all types
-│       ├── cdp.py            # CDP WebSocket frame types
-│       ├── config.py         # SnifferConfig, BotConfig
-│       ├── literals.py       # Literal types + validation helpers
-│       ├── message.py        # CapturedMessage, WebSocketInfo
-│       ├── probe.py          # Probe input/result types
-│       └── session.py        # CaptureSession, SessionSummary
-│
-├── tests/
-│   ├── conftest.py           # Test fixtures (FakeEnv, FakeFileSystem)
-│   ├── fakes/                # Shared Playwright fakes used by bot/probe/browser/sniffer tests
-│   │   ├── base.py           # FakeCDPSession, FakePage, InMemoryTerrainMap, FakeKeyboard
-│   │   ├── bot.py            # Bot-specific fakes
-│   │   └── probe.py          # Probe-specific fakes
-│   ├── action_lab/           # Action-lab probe tests (replay-driven, no Playwright fakes)
-│   │   ├── _replay_core.py   # ReplayClock, ClockAdvancingPage, StubSnapshotCDPSession,
-│   │   │                     # StubbedBootstrapMixin, WorldStateOverrideMixin,
-│   │   │                     # DispatchCaptureMixin, FrameBatchSource, ReplayResult[T]
-│   │   ├── _replay_browser.py # RecordedChromiumSession (drives execute_probe via real
-│   │   │                     # PlaywrightProtocol stack against a captured session)
-│   │   ├── _replay_harness.py / _replay_fuel.py / _replay_equipment.py /
-│   │   │   _replay_teleport.py / _replay_enemy_teleport.py # Per-probe replay attempts
-│   │   └── test_*.py         # Movement/fuel/equipment/teleport/enemy-teleport probe tests
-│   ├── bot/                  # Bot tests
-│   │   ├── ai/               # AI behavior tests (25 files)
-│   │   ├── test_cdp.py       # CDP session + equipment + AI integration
-│   │   ├── test_class.py     # Bot initialization
-│   │   ├── test_combat_feedback.py # Combat feedback
-│   │   ├── test_commands.py  # Command encoding
-│   │   ├── test_executor.py  # Executor validation
-│   │   ├── test_main.py      # Entry point
-│   │   ├── test_run.py       # Game loop
-│   │   ├── test_state_machine.py
-│   │   ├── test_tick_loop_types.py
-│   │   └── test_world_state.py
-│   ├── browser/              # Browser session tests
-│   ├── capture/              # Capture tracker tests
-│   ├── container/            # Container decoder tests
-│   ├── game_state/           # Game state tests
-│   ├── login/                # Login flow tests
-│   ├── probe/                # Probe tests
-│   ├── protocol/             # Protocol decoder tests
-│   ├── sniffer/              # Sniffer tests
-│   │   └── trackers/         # Sniffer tracker tests
-│   ├── types/                # Type tests
-│   └── world_state/          # World state tests
-│
-├── scripts/
-│   ├── guard.py              # Monorepo guard orchestrator
-│   ├── decode.py             # Session decode script
-│   ├── teleport_probe.py     # Live teleport probe entry point
-│   ├── enemy_teleport_probe.py # Enemy-directed teleport probe
-│   ├── fuel_probe.py         # Fuel pickup probe entry point
-│   ├── movement_probe.py     # Movement probe entry point
-│   ├── replay_bot.py         # Offline session replay
-│   ├── analyze_protocol.py   # Protocol analysis
-│   ├── analyze_viewport.py   # Viewport analysis
-│   ├── analyze_viewport_entities.py # Viewport entity analysis
-│   ├── analyze_shot_viewport.py     # Shot/viewport correlation
-│   └── _test_hooks.py        # Guard test hooks
-│
-├── docs/
-│   ├── bot-control-model.md         # Current bot control model
-│   ├── bot-hfsm-refactor-plan.md    # HFSM migration plan (6 phases)
-│   ├── bot-logging.md               # Logging channels and layout
-│   ├── protocol-decoding-status.md  # Message decoding status + formats
-│   ├── protocol-discovery.md        # Protocol discovery process
-│   ├── protocol-pipeline.md         # Runtime protocol pipeline
-│   ├── protocol-reference.md        # Protocol message reference
-│   └── run-artifacts.md             # Run artifact layout
-│
-├── pyproject.toml            # Poetry + tool config
-└── Makefile                  # Development commands
-```
+Tests mirror the source layout under `tests/` (359 test files across 24 packages).
+Fakes live in `tests/fakes/`; probe tests replay real captured sessions through the
+production Playwright stack rather than faking the wire. See
+[Testing Patterns](wiki/pages/testing-patterns.md).
 
 ---
 
-## Architecture
+## Project structure
 
-### Modular Package Design
+All source lives under `src/tankpit_bot/`; tests mirror it under `tests/`.
+Per-file detail is maintained in [Module Map](wiki/pages/module-map.md) — this table
+is the package-level orientation.
 
-The codebase is organized into focused packages:
+| Package | Purpose | Key files |
+|---------|---------|-----------|
+| `bot/` | The game-playing bot — tick loop, dispatch, executor | `base.py`, `tick_loop.py`, `executor.py`, `ai_strategy.py` |
+| `bot/ai/` | All decision logic — mode owners and planners | `mode_controller.py`, `hunt_mode.py`, `collect_mode.py`, `ferry.py`, `intent.py`, `movement.py`, `pathfinding.py` |
+| `browser/` | Playwright automation — CDP, login, room join, HUD, live view | `session_base.py`, `lifecycle.py`, `login.py`, `room_join.py`, `overlay_hud.py` |
+| `protocol/` | Wire protocol — framing, XOR codec, decoders, encoders | `codec.py`, `framing.py`, `commands.py`, `decoders/`, `encoders/` |
+| `container/` | `0x2E` container-only subtypes | `identification.py`, `decoders/`, `encoders.py` |
+| `state/` | World state types and mutations | `types/`, `mutations.py`, `viewport_geometry.py` |
+| `sniffer/` | Passive WebSocket sniffer and the live world-state machine | `core.py`, `world_service.py`, `world_state_*.py` |
+| `capture/` | Post-hoc capture analysis | `stats.py`, `viewport_analysis.py`, `trackers/` |
+| `action_lab/` | Live probes — isolated experiments against the real server | probe base, factory, per-probe modules |
+| `sim/` | The server twin — laws, world, transport, practice room | `server.py`, `viewport_window.py`, `combat_emissions.py`, `bot_policy.py` |
+| `physics/` | Measured game laws, one symbol per machine-checked wiki claim | `costs.py`, `capacity.py`, `damage.py`, `combat.py`, `map.py` |
+| `ledger/` | Live bookkeeping — fuel, ammo, per-enemy damage, outcomes | `fuel_book.py`, `ammo_book.py`, `damage_book.py`, `outcome/` |
+| `facts/` | Provenance and confidence for observed entities | `fact.py`, `provenance.py`, `tank_facts.py` |
+| `validate/` | Archive-priced law validators | `audit.py`, `shadow*.py`, `roundtrip.py`, `wire_timeline.py` |
+| `diagnostics/` | Issue reports, alignment checks, scorecards, CLIs | `issue_report.py`, `run_audit.py`, `session_stats.py` |
+| `service/` | Phone-driven aiohttp + SSE service | `http_server.py`, `session_runner.py`, `mode_bridge.py`, `status_bus.py` |
+| `replay/` | Offline replay of captures through bot decision logic | `engine.py` |
+| `contracts/` | Enforcement decorators backing the contract guard rule | `enforcement.py` |
+| `types/` | Shared TypedDict models and validation | `cdp.py`, `config.py`, `literals.py`, `session.py` |
+| `_test_hooks/` | Protocol interfaces for DI, 8 submodules by domain | `bot.py`, `browser.py`, `cdp.py`, `env.py`, `fs.py` |
 
-| Package | Purpose |
-|---------|---------|
-| `bot/` | Bot client, state machine, executor validation, command dispatch |
-| `bot/ai/` | Durable HFSM owners (HUNT, RECOVER_FUEL, RECOVER_EQUIPMENT), mode controller, combat, movement, pathfinding |
-| `action_lab/` | Live protocol-level action probes (teleport, enemy teleport, fuel) |
-| `replay/` | Offline session replay engine and decision trace types |
-| `browser/` | Playwright automation, CDP setup, login flows |
-| `protocol/` | XOR codec, framing, command encoding |
-| `capture/` | Message capture, trackers, statistics |
-| `container/` | 0x2E container subtype decoding |
-| `sniffer/` | Live WebSocket analysis, entity source tracking, radar geometry |
-| `state/` | Game state management, entity source fields, rendering |
-| `types/` | Shared TypedDict models and validation |
+Top-level support modules: `decoder.py` / `state_decoder.py` (wire blob decoders),
+`parser.py` / `parser_messages.py` (CDP message parsing), `terrain.py` (minimap GIF
+loader), `combat.py` / `combat_tracker.py`, `inventory.py`, `runtime_logging.py`,
+`runtime_artifacts.py`, `_hooks_guard.py`.
 
-### AI Decision Architecture
+`scripts/` holds standalone entry points reached two ways: the live probes and the
+smoke test are registered in `pyproject.toml` under `[tool.poetry.scripts]` as
+`tankpit-*` commands, while the guard rule modules (`guard.py`, `contract_rules.py`,
+`wiki_rules.py`, `physics_claims.py`) and the offline analysis utilities
+(`analyze_*.py`, `decode.py`, `download_fields.py`, `trace_vtable.py`,
+`replay_bot.py`, `queue_probe.py`) are invoked through `make` targets instead.
 
-```
-┌──────────────────────────────────────────────┐
-│  decide() — Durable owner selection          │
-│  Select one owner per tick, delegate routing │
-└──────────────┬───────────────────────────────┘
-               │
-     ┌─────────┼──────────────────┐
-     ▼         ▼                  ▼
-┌──────────┐ ┌──────────────┐ ┌──────────────────┐
-│RECOVER_  │ │ RECOVER_     │ │ HUNT             │
-│FUEL      │ │ EQUIPMENT    │ │ decide_hunt_mode │
-│fuel<=500 │ │ reserve<=brk │ │ default owner    │
-└────┬─────┘ └──────┬───────┘ └────────┬─────────┘
-     │              │                  │
-     ▼              ▼                  ▼
-┌──────────────────────────────────────────────┐
-│  Owner route: locked target → visible target │
-│  → known registry → radar sense → hop/edge   │
-└──────────────┬───────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────┐
-│  executor._is_dispatchable() — World-state   │
-│  validation before command dispatch          │
-└──────────────────────────────────────────────┘
-```
+### Dependency flow
 
-### Shared BrowserSession Base Class
+```text
+bot/ai/ ──→ bot/ ──→ browser/ ──→ protocol/
+  │           │         │
+  └───────────┴─────────┴──→ state/
 
-Bot, sniffer, and probe inherit from `browser.BrowserSession` which provides:
-
-- **CDP Setup**: WebSocket event handlers for frame capture
-- **WebSocket Prototype Hook**: Captures game's WebSocket instance via `Page.addScriptToEvaluateOnNewDocument`
-- **Intel Gathering**:
-  - Console listener (filters for WS/Hook/WebSocket keywords)
-  - WebSocket URL logging
-  - JavaScript WebSocket debug check
-  - Script URL logging
-- **Magic Key Capture**: Reads `tankpit.magic` for XOR encoding
-- **Login Integration**: Guest or account authentication
-
-### Sniffer Flow
-
-```
-┌─────────────────┐
-│  Playwright     │
-│  sync_api       │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  BrowserSession │  Console listener
-│  CDP Handlers   │  Intel gathering
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  CDP Session    │  Network.enable
-│  Event Handlers │  webSocketCreated
-└────────┬────────┘  webSocketFrameSent
-         │           webSocketFrameReceived
-         ▼
-┌─────────────────┐
-│  CaptureSession │
-│  JSON output    │
-└─────────────────┘
+action_lab/ ─→ browser/ ──→ protocol/ ──→ state/
+sniffer/    ─→ browser/ ──→ protocol/ ──→ state/
+capture/    ─→ state/                    (no browser)
+replay/     ─→ bot/ai/ + state/          (no browser)
+sim/        ─→ bot/ai/ + protocol/       (no browser, no server)
 ```
 
-### Probe Flow
+Bot, `ProbeBase`, and `BrowserSession` all inherit from `SessionBase`
+(`browser/session_base.py`) — see [Inheritance Chain](wiki/pages/inheritance-chain.md)
+and [Services](wiki/pages/services.md) for the DI wiring.
 
-```
-┌─────────────────┐
-│  BrowserSession │  WebSocket prototype hook
-│  CDP Handlers   │  Console + intel gathering
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  XOR Encoding   │  Static key + session magic
-│  Command Build  │  encode_frame(XOR'd bytes)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  WebSocket      │  window.__capturedWS.send()
-│  Injection      │  (or fallback to tankpit.ws)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Toggle Keys    │  First press: WS open
-│  State Machine  │  Second press: JS close
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  ProbeSession   │
-│  JSON output    │
-└─────────────────┘
-```
+### Test hooks pattern
 
-### Test Hooks Pattern (`_test_hooks.py`)
-
-Dependency injection via hooks for testability without mocks:
+Dependency injection without mocks. Production code sets hooks to real
+implementations; tests save, replace with a fake, and restore. Monkey-patching is
+banned by `MonkeyPatchBanRule` in the guard.
 
 ```python
-# In _test_hooks.py — production code sets hooks to real implementations
+# _test_hooks/env.py — production default
 get_env: Callable[[str], str | None] = lambda key: os.environ.get(key)
 
-path_exists: PathExistsProtocol  # (path: Path) -> bool
-read_text: ReadTextProtocol      # (path: Path) -> str
-
-# Tests replace hooks with fakes — no conditional logic in production code
-```
-
-### Type Models (`types/` package)
-
-```python
-# types/message.py - Captured WebSocket message
-class CapturedMessage(TypedDict):
-    timestamp_ms: int
-    direction: MessageDirection  # Literal["sent", "received"]
-    payload: str
-    ws_url: str
-
-# types/session.py - Complete capture session
-class CaptureSession(TypedDict):
-    session_id: str
-    start_timestamp_ms: int
-    end_timestamp_ms: int | None
-    base_url: str
-    messages: list[CapturedMessage]
-    magic: str | None  # XOR key from tankpit.magic
+# tests swap the attribute, restore in teardown — no conditional logic in prod code
 ```
 
 ---
@@ -742,37 +414,35 @@ class CaptureSession(TypedDict):
 |---------|---------|
 | `playwright` | Browser automation |
 | `websockets` | Direct WebSocket client |
+| `aiohttp` | Bot service HTTP + SSE server |
 | `httpx` | HTTP client |
 | `rich` | Console output formatting |
-| `python-dotenv` | .env file support |
-| `pillow` | Image processing (minimap terrain) |
+| `python-dotenv` | `.env` support |
+| `pillow` | Image processing (minimap terrain, live view) |
 | `platform-core` | JSON utilities, logging |
 | `monorepo-guards` | Guard rule enforcement |
 
 ### Development
 
-| Package | Purpose |
-|---------|---------|
-| `pytest` | Test runner |
-| `pytest-asyncio` | Async test support |
-| `pytest-cov` | Coverage reporting |
-| `pytest-xdist` | Parallel tests |
-| `mypy` | Type checking |
-| `ruff` | Linting/formatting |
+`pytest`, `pytest-asyncio`, `pytest-cov`, `pytest-xdist`, `mypy`, `ruff`.
 
 ---
 
-## Quality Standards
+## Quality standards
 
-- **Type Safety**: mypy strict mode, no `Any`, no `cast`, no `type: ignore`
-- **Coverage**: 100% statements and branches
-- **Guard Rules**: Enforced via `scripts/guard.py` (typing, patterns, test-quality, mock-ban)
-- **Test Hooks**: Dependency injection for testing, no mocks
-- **Immutable State**: All TypedDicts with encode/decode and require_* validation
-- **Google-style Docstrings**: Args, Returns, Raises sections
+- **Type safety** — mypy strict; no `Any`, `cast`, `type: ignore`, `TYPE_CHECKING`
+- **Coverage** — 100% statements and branches, enforced in CI config
+- **No mocks, no monkey-patching** — `_test_hooks` DI exclusively
+- **No back-compat shims, wrappers, fallbacks, or legacy code**
+- **Immutable state** — TypedDicts with encode/decode and `require_*` validation
+- **Google-style docstrings** — Args, Returns, Raises
+- **Files under 400 lines** where possible
+
+Full list: [Coding Standards](wiki/pages/coding-standards.md).
 
 ---
 
 ## License
 
 Apache-2.0
+</content>
