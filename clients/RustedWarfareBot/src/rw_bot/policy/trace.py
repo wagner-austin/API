@@ -27,6 +27,7 @@ writes the file.
 
 from __future__ import annotations
 
+import zlib
 from collections.abc import Mapping, Sequence
 from typing import TypedDict
 
@@ -76,6 +77,13 @@ class Tick(TypedDict):
             because the endpoints cannot show a dip, and a dip is the only
             evidence in the whole report that the army ever cost an opponent
             anything ([[policy-verdict]]).
+        world: A deterministic digest of every visible entity's identity,
+            position and health -- CRC32 over a canonical rendering, never
+            Python's randomised ``hash``. The divergence detector: two
+            replicas of one seed agree on this column up to the exact sample
+            the simulation forks, which turns "runs do not reproduce" into a
+            sample number and a first divergent unit
+            ([[policy-determinism]]).
     """
 
     frame: int
@@ -90,6 +98,7 @@ class Tick(TypedDict):
     refused: int
     worth: int
     rival: int
+    world: int
 
 
 def owned_by_id(sample: Sample) -> Mapping[int, Entity]:
@@ -157,13 +166,13 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
     lines = [
         f"{'frame':>8}{'army':>6}{'credits':>9}{'enemies':>9}{'extractors':>12}"
         f"{'lost':>6}{'producers':>11}{'idle':>6}{'orders':>8}{'refused':>9}"
-        f"{'worth':>9}{'rival':>9}"
+        f"{'worth':>9}{'rival':>9}{'world':>12}"
     ]
     lines.extend(
         f"{t['frame']:>8}{t['army']:>6}{t['credits']:>9}"
         f"{t['enemies']:>9}{t['extractors']:>12}{t['lost']:>6}"
         f"{t['producers']:>11}{t['idle']:>6}{t['orders']:>8}{t['refused']:>9}"
-        f"{t['worth']:>9}{t['rival']:>9}"
+        f"{t['worth']:>9}{t['rival']:>9}{t['world']:>12}"
         for t in ticks
     )
     lines.append("")
@@ -176,4 +185,34 @@ def format_trace(ticks: Sequence[Tick], losses: Sequence[Loss]) -> tuple[str, ..
     return tuple(lines)
 
 
-__all__ = ["Loss", "Tick", "format_trace", "losses_between", "owned_by_id"]
+def world_digest(sample: Sample) -> int:
+    """Digest every visible entity into one deterministic number.
+
+    CRC32 over a canonical rendering of (id, type, position, health), in id
+    order. Never Python's ``hash``: that is salted per process, and the whole
+    point is comparing two processes. Positions at a tenth of a world unit --
+    coarser would hide slow drift, finer would flag float noise below what
+    the simulation acts on.
+
+    Args:
+        sample: One observation of the world.
+
+    Returns:
+        The digest, stable across processes and platforms.
+    """
+    parts = [
+        (
+            f"{e['unit_id']}:{e['type_name']}:{e['x']:.1f}:{e['y']:.1f}"
+            f":{e['hp']:.1f}:{int(e['complete'])}"
+        )
+        for e in sorted(sample["entities"], key=_by_unit_id)
+    ]
+    return zlib.crc32("|".join(parts).encode("utf-8"))
+
+
+def _by_unit_id(entity: Entity) -> int:
+    """Order entities by engine id, the one cross-run-stable ordering."""
+    return entity["unit_id"]
+
+
+__all__ = ["Loss", "Tick", "format_trace", "losses_between", "owned_by_id", "world_digest"]

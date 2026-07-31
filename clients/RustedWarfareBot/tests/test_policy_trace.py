@@ -103,6 +103,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
                 refused=0,
                 worth=3500,
                 rival=9000,
+                world=123456789,
             ),
         ),
         (Loss(frame=7, unit_id=1, type_name="c_tank", x=900.0, y=250.0),),
@@ -120,6 +121,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "refused",
         "worth",
         "rival",
+        "world",
     ]
     assert lines[1].split() == [
         "7",
@@ -134,6 +136,7 @@ def test_both_tables_are_rendered_with_a_blank_line_between() -> None:
         "0",
         "3500",
         "9000",
+        "123456789",
     ]
     assert lines[2] == ""
     assert lines[3].split() == ["frame", "unit", "type", "x", "y"]
@@ -157,6 +160,7 @@ def test_a_run_that_lost_nothing_still_renders_both_headers() -> None:
                 refused=0,
                 worth=0,
                 rival=0,
+                world=0,
             ),
         ),
         (),

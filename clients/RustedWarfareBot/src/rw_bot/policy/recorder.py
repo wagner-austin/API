@@ -11,7 +11,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from rw_bot.policy.trace import Loss, Tick, format_trace, losses_between, owned_by_id
+from rw_bot.policy.trace import (
+    Loss,
+    Tick,
+    format_trace,
+    losses_between,
+    owned_by_id,
+    world_digest,
+)
 from rw_bot.wire.state import Entity, Sample
 
 
@@ -86,14 +93,26 @@ class Recorder:
                 refused=refused,
                 worth=worth,
                 rival=rival,
+                world=world_digest(sample),
             )
         )
 
     def write(self) -> None:
-        """Write both tables, if a path was given."""
+        """Write both tables, if a path was given.
+
+        Frames are rebased to **match age** -- the first sample is age zero --
+        because the absolute counter runs from engine boot and carries the
+        wall-clock length of the menu in it. Two runs of one seed now produce
+        the same match one or two boot frames apart, and rebasing is what
+        makes their traces byte-comparable: age is the coordinate the match
+        actually evolves in ([[policy-determinism]]).
+        """
         if self._path is None:
             return
-        lines = format_trace(self.ticks, self.losses)
+        base = self.ticks[0]["frame"] if self.ticks else 0
+        ticks = [Tick(**{**t, "frame": t["frame"] - base}) for t in self.ticks]
+        losses = [Loss(**{**one, "frame": one["frame"] - base}) for one in self.losses]
+        lines = format_trace(ticks, losses)
         self._path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
