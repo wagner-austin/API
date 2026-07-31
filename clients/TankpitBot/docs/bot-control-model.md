@@ -191,6 +191,20 @@ Current migration contract:
 - unsupported or invalid durable modes are ignored for the tick, then owner
   selection re-runs from the current world state
 
+Manual override: `ai_state["manual_mode"]` is written by the bot service when
+the phone SPA pins a mode (`POST /mode`). Auto-arbitration runs only when that
+field is `None`; otherwise the pinned mode wins outright. A pin of `UNSET`
+produces a `hold` command — no wire traffic — while keeping the tank armed
+(the first idle-pin implementation requested an empty equipment set, which
+actively disarmed the tank and persisted across logout).
+
+Exit/entry thresholds are **rank-derived, not fixed constants**:
+`hunt_fuel_floor()` returns `physics.capacity.fuel_capacity(rank)` (1000 at
+recruit → 1800 at general), and `hunt_entry_permitted()` requires duals and
+homings at `inventory_capacity(rank)` (minus
+`TANKPIT_BOT_WEAPON_RESUME_SLACK`, default 0) with extra radars at least
+`inventory_capacity(rank) - 5`. Both live in `bot/ai/mode_controller.py`.
+
 ## Tick Flow
 
 ### Sync
@@ -260,31 +274,47 @@ Implemented in:
 Behavior:
 
 - apply equipment toggles
-- dispatch chosen command
+- record the decision into the ledger
+- dispatch chosen command (plus an optional secondary, gated on the primary)
 
 Important point:
 
-- executor runs `_is_dispatchable()` validation before every dispatch
-- **shoots**: target must be tracked, at the expected coordinates, and
-  viewport-confirmed
-- **pickups**: container must still exist and match expected kind
-  (fuel/equipment)
-- **moves/teleports**: destination must not be a known mine
-- **combat teleports**: locked combat target must still be tracked with a
-  valid source
-- **resource teleports**: locked resource target must still exist with a
-  locally trustworthy source
+The executor no longer runs a pre-dispatch veto. The old `_is_dispatchable()`
+world-state validator was removed: its responsibilities moved to the layers
+that actually own the facts, and its rollback-on-reject path was the
+structural cause of the silent rejection loops documented in
+`wiki/pages/executor-rejection-loops.md`.
+
+Where each former check lives now:
+
+- **walkability / mines**: `compose_decision_terrain()` in `bot/ai/ferry.py`
+  is the single owner. Hostile mines are impassable *terrain*, so no planner
+  can propose a move onto one in the first place. See
+  `wiki/pages/terrain-composition.md`.
+- **target freshness**: the planners read freshness off the tank observation
+  model (`wiki/pages/tank-freshness-model.md`) before proposing a shot.
+- **plan validity**: `bot/ai/intent.py` owns collect-plan validity and
+  releases a plan with a recorded reason (`plan_released`) rather than
+  letting the executor drop it silently.
+- **server rejections**: `0x52` error codes resolve against the in-flight
+  action's recorded target, so a rejected command is attributed and consumed
+  instead of being re-proposed.
+
+The executor's own remaining precondition is the teleport/map-open ordering:
+a teleport requires an already-open map, and the open never shares a tick
+with the teleport it enables.
 
 ## Combat Model
 
 Combat now runs under a durable `HUNT` owner. The combat target fields and the
 durable `mode_state` are the authoritative combat memory.
 
-Current durable HUNT substates:
+Current durable HUNT substates (`bot/ai/modes.py`, `HUNT_MODE_STATES`):
 
 - `ACQUIRE`
 - `REFRESH`
 - `CLOSE`
+- `SCAN_ON_LANDING`
 - `ENGAGE`
 - `CONFIRM_KILL`
 
