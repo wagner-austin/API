@@ -82,6 +82,24 @@ The agent publishes the owned-entity roster and dispatches against an index into
 
 The roster is short at skirmish start: the Command Center, one Builder, and an entity parked at (-1000, -1000).[^7] That third one is unexplained and is a lead, not a finding.
 
+## Attack-move — the fifth verb, and the flag that makes it
+
+The wire's verbs were move, build, produce and attack; attack-move is the
+engine's own double-right-click, and the dispatch reads out of the decompile
+as **a move command with one boolean set** — `gameFramework/f/g.d` creates the
+command, writes `e.h = true`, sets the point and enqueues, gated on the
+`doubleClickToAttackMove` setting that names the flag. The agent encodes it
+identically: `Orders.attackMoveTo` is `moveTo` plus one field write.
+
+Proven live rather than assumed: the probe (`scripts/attackmove_probe.py`)
+produced a scout, ordered it 300 units past the enemy base, and read the
+ruling off the sample series — at frame 13,500 an enemy extractor's health
+fell 800 → 769 with the scout holding 88 world units away and far short of
+its destination. It engaged what it met, then fought past the land factory
+toward the Command Center, 350 hp to 70. A plain move walks through without
+a shot. Raids and forward rallies are expressible in one order
+([[policy-raid]]).
+
 ## Drift
 
 Every name above is obfuscated and moves between releases. `Orders.verifyBindings` resolves all of them — seven classes, four fields and five method signatures — against the jar with no game running, and `make check` fails on any that moved.[^8] After a game update the failure names the whole broken surface at once rather than the first item.

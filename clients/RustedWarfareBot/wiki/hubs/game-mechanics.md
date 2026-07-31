@@ -23,3 +23,4 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 [Combat Profiles — What Can Shoot What](../pages/mechanics-combat-profile.md) -- the engine's own attackability test, and the four submarines that cannot shoot the shore
 [What a Credit Buys — The Unit Value Table](../pages/mechanics-unit-value.md) -- price against dps, hit points, reach and whether it can shoot at aircraft, joined from the catalogue and the combat dump
 [Holding Ground - 44 of 46 Pools, and Why the Bot Loses](../pages/policy-holding-ground.md) -- who ends up owning the map's resource pools, and what that costs
+[The Tech Tree, Priced](../pages/mechanics-tech-tree.md) -- every builder-reachable upgrade and unit path with its cost and reach, mined for the unfielded weapons

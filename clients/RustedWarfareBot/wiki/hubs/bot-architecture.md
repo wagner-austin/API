@@ -22,6 +22,11 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [The Verdict — Asking the Engine Who Won](../pages/policy-verdict.md) -- the engine's own flags, and why they replaced every proxy for them
 [The Policy Loop](../pages/policy-loop.md) -- the bot plays: pure decisions from observed state, one order per plan slot, and a scorecard
 
+[Doctrine — A Gameplay Style as One File](../pages/policy-doctrine.md) -- every knob in one required-field file; one-field arms, in-batch controls, the pinned default
+[Interception — Mobile Defence at the Engine's Own Radius](../pages/policy-interception.md) -- the reserve turns on intruders inside the AI's own outpost radius; measured at two rungs
+[Intel and Scouting — Remembering the Fog, Carefully](../pages/policy-intel-and-scouting.md) -- the sighting memory and the scout circuit, with v1's refutation and the two fixes it forced
+[The Raid — Remembered Income as an Objective](../pages/policy-raid.md) -- a first-wave party attack-moved at the frontier remembered extractor; ghosts reported back to the memory
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 [The Build Tree, and Planning From Goals](../pages/mechanics-build-tree.md) -- goals in, executable plan out: prerequisites derived rather than hand-written
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership
@@ -33,3 +38,7 @@ Two inherited principles from the sibling TankpitBot project, adopted here delib
 [Production — Keeping the Queues Full](../pages/policy-production.md) -- why a priority list cannot express an army, and the three measured failures behind the composition rule
 [Playing Matches in Parallel](../pages/harness-parallel-matches.md) -- the sweep harness: jobs as data, resumable by construction, one result file per match
 [Holding Ground - 44 of 46 Pools, and Why the Bot Loses](../pages/policy-holding-ground.md) -- the bot loses at full length; expansion without defence is a credit shredder
+[Determinism — One Seed, One Answer](../pages/policy-determinism.md) -- the seed, the hold, the lockstep, the pinned frame delta: what makes a solo run bit-identical, and the parallel residual that is not
+[The Economy — Measured Credits per Second](../pages/policy-economy.md) -- 12.01 credits/s per extractor, the conversion ladder's paybacks, and the rules argued from them
+[The Trace — A Match as Data](../pages/policy-trace.md) -- one row per sample with a world digest, the file every verdict and autopsy reads
+[Community Play Strategies](../pages/community-play-strategies.md) -- what human players report works, kept at low confidence until measured

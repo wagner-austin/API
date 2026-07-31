@@ -8,6 +8,7 @@ related:
   - "[[engine-entity-model]]"
   - "[[multiplayer-portability-invariants]]"
 source_paths:
+  - "runs/decompiled/com/corrodinggames/rts/gameFramework/f.java:117"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:84"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:87"
   - "wiki/sources/m3-discovery/gameengine-tick-method.txt:74"
@@ -50,6 +51,12 @@ Rate alone could not distinguish a simulation tick from a rendered frame, and th
 
 Five other methods write `bx`, and none of them advance it. `gameFramework.ba.h()`, `j.ad.w()` and `j.ad.a(j.au)` all read the pair into locals, call the state (de)serialiser `y.a(k,…)`, and write the saved values back — they preserve the clock across a state load rather than move it.[^6] `j.ad.aD()` stores literal zero into both, which is the new-game reset.[^6] Mistaking any of these for the tick would put the agent's clock read on a path that fires only on load.
 
+## The frame counter is part of the randomness
+
+The engine's synced random — the one lockstep multiplayer requires, whose error string reads `notRandInt` — is not a generator at all but an arithmetic hash, and `bx` is one of its inputs. `gameFramework.f.a(min, max, salt)` mixes the seed field `l.bJ` with the caller's salt and then folds `bx` in four ways — `n6 += n4 * (l2.bx * 13131313); n6 += l2.bx * 1313131313 + l2.bx % 10`.[^9]
+
+The consequence took five acceptance iterations to isolate: two runs whose menus lasted a different number of boot frames arrive at the match with different `bx`, and every synced draw then differs however thoroughly the seeded generators were pinned ([[policy-determinism]]). The agent therefore zeroes `bx` and `by` on the match's first live tick — the same reset `j.ad.aD()` performs on the load path this start path skips.
+
 ## Consequence for the agent
 
 `gameFramework.l.B()` returns the engine singleton and its whole body is `return al;`, so reading state through it cannot advance or mutate the simulation — which is what makes a probe thread safe.[^7] With `bx` identified, a decimated planner has a real tick basis to decimate against rather than wall-clock guessing ([[runtime-split-java-agent-python-brain]]).
@@ -66,3 +73,4 @@ Resolved, and not where this page first guessed: the master list is the static `
 [^6]: `javap -p -c -cp .game/game-lib.jar` over every class in the jar [synthesis] — a scan for `putfield` of `bx` returns exactly six methods. `game.i.a(float)` is the increment; `gameFramework.ba.h()`, `j.ad.w()` and `j.ad.a(j.au)` each restore a saved pair after `y.a(Lj/k;ZZZ)Z`; `j.ad.aD()` writes `iconst_0` to both; `gameFramework.l.<init>` initialises them. The `.game/` tree is untracked by design, so the command is the reproduction path rather than an archived artifact.
 [^7]: `agent/src/rwbot/agent/EngineHandle.java` — the reflective accessor and the pinned-build failure contract; `javap` of `gameFramework.l.B()` shows a two-instruction body, `getstatic al` then `areturn`.
 [^8]: `wiki/sources/m4-commands/engine-tick-decompiled.txt:6` — the debug line naming `this.bx` as `frame:` and `this.bX.c()` as `network.currentStepRate:`, with `++this.bx;` at `:17` and `this.by = (int)((float)this.by + f2 * 16.666666f);` at `:14`.
+[^9]: `runs/decompiled/com/corrodinggames/rts/gameFramework/f.java:117`–`135` — `public static final strictfp int a(int n2, int n3, int n4)`, reading `l2.bJ` at `:126` and folding `l2.bx` at `:129`–`:130`, with the `notRandInt` range check at `:135`.
