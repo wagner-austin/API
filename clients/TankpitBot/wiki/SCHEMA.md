@@ -116,6 +116,13 @@ verified. The guard checks that anchored paths exist and hashes are well-formed
 that would redden the gate on every source commit and reward exactly the
 bump-without-audit it is meant to prevent.
 
+Drift is surfaced by a report instead: **`make wiki-anchors`**
+(`scripts/wiki_anchors.py`) resolves every anchor against HEAD and lists the
+pages owed an audit, with each page's `fact_checked` date for triage order.
+It always exits 0 unless you pass `--exit-code`. Note that a whole-package
+anchor (`src/tankpit_bot`) goes stale on ANY change inside that package, so
+expect churn there; a file-level anchor is narrower and quieter.
+
 ## Cross-references
 
 Internal links use `[[slug]]` syntax. **Link rather than restate.** If a fact about radar lives in `radar-mechanics.md`, don't repeat it in `fuel-system.md` — link to it.

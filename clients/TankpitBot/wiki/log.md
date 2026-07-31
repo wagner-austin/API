@@ -2393,3 +2393,18 @@ Reconciled by moving the doc to practice rather than practice to the doc:
 `index.md` still advertised **schema v0.1** while `SCHEMA.md` said v1.0 — corrected to v1.1 with a pointer to the enforcement.
 
 All 67 pages now carry all five required keys and a `hubs` field; hub links resolve 1:1 against `pages/`; guard 0 violations.
+
+---
+## [2026-07-31] build | `make wiki-anchors` — the drift report, and the rank range the docstrings had wrong
+
+Two outstanding items from the day's audits, closed.
+
+**1. `Military rank (0-7)` was wrong in eight docstrings.** The `Rank` IntEnum runs RECRUIT=0 through **GENERAL=8**, `combat_radar_min` documents 0-8, and `fuel_capacity` has nine entries — but `state/types/tank.py` (2), `state/types/self_state.py` (2), `bot/ai/types.py` (2), `facts/tank_facts.py` (1), and `facts/world_facts.py` (1) all told readers the top rank was 7. Docstrings only, no logic touched; all now read `(0 recruit .. 8 general)`. Found during the tank-registry audit and — my error — left unsurfaced until asked for a recap.
+
+**2. The anchor-drift report is no longer an ad-hoc shell loop.** `scripts/wiki_anchors.py` + `tankpit-wiki-anchors` + `make wiki-anchors`: resolves every `source_git_blobs` entry against HEAD and prints STALE / UNRESOLVED / CURRENT with each page's `fact_checked` date for triage order. It reuses the guard rule's frontmatter parser through a new public `parse_page_frontmatter` rather than restating the grammar, and the git call is injected via a new `resolve_tree_hash` hook in `scripts/_test_hooks.py` — the repo's first subprocess, behind a Protocol, so no test shells out.
+
+**It always exits 0** (`--exit-code` opts in to nonzero). That is the whole point: the report exists BECAUSE the drift must not gate. Its first run proved it — 8 anchors already stale, including five pages audited hours earlier, because the day's own commits moved `src/tankpit_bot`, `tests`, and `scripts/guard.py` underneath them. Had this been a gate, `make check` would have been red before the work was even finished. Recorded in SCHEMA: whole-package anchors go stale on any change inside the package, so expect churn there; file-level anchors are quieter.
+
+The guard caught three weak assertions in the new tests before they landed — substring-in-output checks and an `is not None` — all replaced with exact comparisons against `format_report` output (`isinstance` is banned too; the optional is narrowed with `or ""` so a None still fails the length check). The test-quality rule doing its job on brand-new tests is the same enforcement loop the wiki-structure rule now closes for the wiki.
+
+Gate: guard 0 violations, mypy clean over 816 files, **5,603 tests at 100.00% statement + branch coverage**. New module 72 statements / 26 branches at 100%, 22 tests.

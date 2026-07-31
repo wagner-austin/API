@@ -25,6 +25,7 @@ hubs: [codebase]
 | `make lint` | guard (typing + mock-ban + contract rules + physics claims + **wiki structure**) + undecoded-field check + ruff check/format + mypy strict over `src tests scripts` |
 | `make test` | pytest + branch coverage (`fail_under = 100`) |
 | `make install` | poetry install + playwright install chromium |
+| `make wiki-anchors` | report which wiki pages have drifted from the trees they were audited against (`tankpit-wiki-anchors`; `ARGS=--all` lists current anchors too, `ARGS=--exit-code` exits 1 on drift). **Never gates** — a stale anchor is a to-do marker, not a defect, so `make check` does not depend on it. |
 | `make help` | print every target with a one-line description |
 
 ## Live bot (needs browser + accounts.json, touches live server)
