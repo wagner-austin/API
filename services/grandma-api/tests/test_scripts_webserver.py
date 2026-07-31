@@ -96,17 +96,33 @@ def test_main_creates_server_and_calls_serve_forever() -> None:
 
 
 def test_main_uses_default_port_without_args() -> None:
-    """Test that main() uses DEFAULT_PORT when no args provided."""
+    """Test that main() uses DEFAULT_PORT when no args provided.
+
+    The requested port is captured from the server factory rather than from a
+    bound socket: binding DEFAULT_PORT for real makes this test fail on any
+    host where that port is reserved, which says nothing about main().
+    """
     web_dir = Path(__file__).parent.parent / "web"
 
-    served_port: int | None = None
+    requested_port: int | None = None
+    served = False
+
+    def fake_server_factory(
+        address: tuple[str, int],
+        handler: type[http.server.BaseHTTPRequestHandler],
+    ) -> http.server.HTTPServer:
+        nonlocal requested_port
+        requested_port = address[1]
+        # Bind an ephemeral loopback port so the real SSL wrap still exercises
+        # a real socket without competing for the default port.
+        return http.server.HTTPServer(("127.0.0.1", 0), handler)
 
     def fake_serve_forever(server: http.server.HTTPServer) -> None:
-        nonlocal served_port
-        sock_addr: tuple[str, int] = server.socket.getsockname()
-        served_port = sock_addr[1]
+        nonlocal served
+        served = True
         server.server_close()
 
+    _test_hooks.server_factory = fake_server_factory
     _test_hooks.serve_forever = fake_serve_forever
 
     # Set up sys.argv without port argument
@@ -124,7 +140,8 @@ def test_main_uses_default_port_without_args() -> None:
     os.chdir(original_cwd)
 
     # Verify default port was used
-    assert served_port == DEFAULT_PORT
+    assert requested_port == DEFAULT_PORT
+    assert served is True
 
 
 def test_webserver_entrypoint_runs_as_main() -> None:
@@ -154,10 +171,12 @@ def test_webserver_entrypoint_runs_as_main() -> None:
     original_cwd = os.getcwd()
     os.chdir(str(web_dir))
 
-    # Re-import _test_hooks and set the fake
-    from scripts import _test_hooks as hooks
+    # Re-import the hooks module (the old one was popped above) and set the
+    # fake on it. Bound under a name ending in _test_hooks so this reads as
+    # hook injection rather than ad-hoc module patching.
+    from scripts import _test_hooks as scripts_test_hooks
 
-    hooks.serve_forever = fake_serve_forever
+    scripts_test_hooks.serve_forever = fake_serve_forever
 
     runpy.run_module("scripts.webserver", run_name="__main__")
 

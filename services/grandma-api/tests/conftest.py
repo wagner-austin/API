@@ -13,6 +13,7 @@ from platform_stt import VerboseResponse, VerboseSegment
 from platform_stt._test_hooks import STTClientProtocol
 from platform_translate.backends.protocol import TranslationBackendProtocol
 from platform_translate.types import TranslationResult, TranslatorConfig
+from scripts import _test_hooks as scripts_test_hooks
 
 from grandma_api.api import _test_hooks as api_hooks
 from grandma_api.config import GrandmaApiSettings
@@ -292,6 +293,22 @@ def _restore_api_hooks() -> Generator[None, None, None]:
     original_stt_factory = api_hooks.stt_client_factory
     yield
     api_hooks.stt_client_factory = original_stt_factory
+
+
+@pytest.fixture(autouse=True)
+def _restore_scripts_hooks() -> Generator[None, None, None]:
+    """Restore scripts hooks after each test.
+
+    The webserver tests inject a server factory and a serve function; without
+    this the fakes outlive the test that set them.
+    """
+    original_serve_forever = scripts_test_hooks.serve_forever
+    original_is_dir = scripts_test_hooks.is_dir
+    original_server_factory = scripts_test_hooks.server_factory
+    yield
+    scripts_test_hooks.serve_forever = original_serve_forever
+    scripts_test_hooks.is_dir = original_is_dir
+    scripts_test_hooks.server_factory = original_server_factory
 
 
 def generate_test_wav() -> bytes:
