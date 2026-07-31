@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
+from procart.ffmpeg_runner import RealFfmpegRunner
+
 from procart_api import _test_hooks as _hooks
 
 
@@ -12,9 +14,9 @@ def test_hooks_default_and_main_startup_sets_runner() -> None:
     import procart_api.main as main_mod
 
     importlib.reload(main_mod)
-    assert _hooks.FFMPEG_RUNNER is not None
     runner = _hooks.FFMPEG_RUNNER
-    # Verify protocol-style attribute exists without using Any.
+    # Reloading main() must install the real runner, not merely something.
+    assert type(runner).__name__ == RealFfmpegRunner.__name__
     has_attr = hasattr(runner, "encode_frames_to_video")
     assert has_attr is True
 

@@ -11,6 +11,7 @@ from procart.types import (
 )
 
 from procart_api.app import create_app
+from procart_api.routes.render import _FramesRequest, _PreviewRequest, _VideoRequest
 
 
 def _scene_minimal() -> SceneConfig:
@@ -41,14 +42,14 @@ async def test_preview_and_frames_endpoints_roundtrip(tmp_path: str | bytes) -> 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         scene = _scene_minimal()
-        req_prev: dict[str, object] = {"scene": scene, "frame_index": 0, "width": 8, "height": 6}
+        req_prev: _PreviewRequest = {"scene": scene, "frame_index": 0, "width": 8, "height": 6}
         r_prev = await ac.post("/render/preview", json=req_prev)
         assert r_prev.status_code == 200
         data_prev: dict[str, str] = r_prev.json()
         assert data_prev["path"].endswith(".png")
 
         out_dir = str(tmp_path)
-        req_frames: dict[str, object] = {"scene": scene, "output_dir": out_dir}
+        req_frames: _FramesRequest = {"scene": scene, "output_dir": out_dir}
         r_frames = await ac.post("/render/frames", json=req_frames)
         assert r_frames.status_code == 200
         data_frames: dict[str, str] = r_frames.json()
@@ -77,7 +78,7 @@ async def test_render_video_endpoint_invokes_hook(tmp_path: str | bytes) -> None
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         scene = _scene_minimal()
         out_dir = str(tmp_path)
-        req_video: dict[str, object] = {"scene": scene, "output_dir": out_dir}
+        req_video: _VideoRequest = {"scene": scene, "output_dir": out_dir}
         r_video = await ac.post("/render/video", json=req_video)
         assert r_video.status_code == 200
         data_vid: dict[str, str] = r_video.json()
@@ -101,13 +102,8 @@ async def test_render_video_endpoint_missing_hook_raises(tmp_path: str | bytes) 
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
         scene = _scene_minimal()
         out_dir = str(tmp_path)
-        req_video: dict[str, object] = {"scene": scene, "output_dir": out_dir}
-        # Some environments surface exceptions directly rather than a response.
-        try:
-            r_video = await ac.post("/render/video", json=req_video)
-        except ValueError as exc:
-            # Accept direct exception with the expected message.
-            assert "FFMPEG_RUNNER is not set" in str(exc)
-        else:
-            # Or accept a 4xx/5xx response returned by installed handlers.
-            assert 400 <= r_video.status_code < 600
+        req_video: _VideoRequest = {"scene": scene, "output_dir": out_dir}
+        # ASGITransport re-raises application exceptions rather than turning
+        # them into a response, so the missing runner surfaces here directly.
+        with pytest.raises(ValueError, match="FFMPEG_RUNNER is not set"):
+            await ac.post("/render/video", json=req_video)
