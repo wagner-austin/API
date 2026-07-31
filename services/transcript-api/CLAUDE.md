@@ -53,10 +53,21 @@ curl -X POST https://transcript-api-production-2753.up.railway.app/v1/captions \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "preferred_langs": ["en"]}'
 
-# Transcribe a video (STT/Whisper, requires OPENAI_API_KEY)
+# Transcribe a video (STT/Whisper, requires OPENAI_API_KEY) - synchronous,
+# blocks for the length of the transcription
 curl -X POST https://transcript-api-production-2753.up.railway.app/v1/stt \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID"}'
+
+# Async alternative for long videos: enqueue, then poll. Requires the RQ
+# worker (transcript-rq-worker) to be running.
+curl -X POST https://transcript-api-production-2753.up.railway.app/v1/stt/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=VIDEO_ID", "user_id": 42}'
+# 202 {"job_id": "...", "user_id": 42, "status": "queued", "url": "..."}
+
+curl https://transcript-api-production-2753.up.railway.app/v1/stt/jobs/{job_id}
+# status: queued -> processing -> completed | failed; `text` appears on completion
 ```
 
 ## Local Development

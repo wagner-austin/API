@@ -74,7 +74,9 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/healthz` | GET | Liveness probe |
 | `/readyz` | GET | Readiness probe (checks Redis + worker presence; 503 when degraded) |
 | `/v1/captions` | POST | Extract YouTube native captions |
-| `/v1/stt` | POST | Transcribe video audio via Whisper |
+| `/v1/stt` | POST | Transcribe video audio via Whisper (synchronous) |
+| `/v1/stt/jobs` | POST | Enqueue an async STT job; returns 202 with a `job_id` |
+| `/v1/stt/jobs/{job_id}` | GET | Poll job status; 404 for an unknown id |
 
 ---
 

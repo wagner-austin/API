@@ -243,7 +243,10 @@ curl -X POST http://localhost:8000/v1/stt/jobs \
 
 ### GET /v1/stt/jobs/{job_id}
 
-Get the status of an async STT job.
+Get the status of an async STT job. The record exists as soon as `POST
+/v1/stt/jobs` returns, with status `queued`, so polling immediately after
+submitting is safe; the worker moves it to `processing` when it picks the job
+up. A 404 therefore means the id is unknown, not that the job is still waiting.
 
 **Path Parameters:**
 
@@ -272,7 +275,7 @@ Get the status of an async STT job.
 |-------|------|-------------|
 | `job_id` | string | Job identifier |
 | `user_id` | int | User ID |
-| `status` | string | `queued`, `started`, `completed`, `failed` |
+| `status` | string | `queued`, `processing`, `completed`, `failed` |
 | `progress` | int | Progress percentage (0-100) |
 | `message` | string\|null | Current processing step description |
 | `url` | string | YouTube URL |
