@@ -104,7 +104,9 @@ A path outside it is rejected with 400 and no file is opened.
 ### 6. Regression Endpoints
 
 Continuous-target counterparts of the classification routes. Backends are
-`xgboost_reg`, `lightgbm_reg`, `mlp_reg`, `lstm_reg`.
+`xgboost_reg`, `lightgbm_reg`, `mlp_reg`, `lstm_reg` — except
+`/ml/train-external-regression`, which accepts only `xgboost_reg` and
+`lightgbm_reg`.
 
 ```bash
 # Optimize hyperparameters for a regressor
@@ -160,9 +162,9 @@ Tree/linear backends live in `covenant_ml`. PyTorch backends (`mlp`, `lstm`) liv
 |---------|---------|--------|-----|-------------------|----------|
 | `xgboost` | covenant_ml | `.ubj` | CUDA | Yes (ranked, shap_tree, permutation) | Tabular data |
 | `lightgbm` | covenant_ml | `.txt` | CUDA | Yes (ranked, shap_tree, permutation) | Large datasets |
-| `cleargbm` | covenant_ml | `.pkl` | No | Yes (shap, permutation) | Interpretable boosting |
+| `cleargbm` | covenant_ml | `.json` | No | Yes (shap_tree, permutation) | Interpretable boosting |
 | `logreg` | covenant_ml | `.joblib` | No | Yes (permutation) | Linear baselines |
-| `random_forest` | covenant_ml | `.joblib` | No | Yes (permutation) | Ensemble baselines |
+| `random_forest` | covenant_ml | `.joblib` | No | Yes (shap_tree, permutation) | Ensemble baselines |
 | `mlp` | covenant_nn | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Non-linear patterns |
 | `lstm` | covenant_nn | `.pt` | CUDA (fp16/bf16) | Yes (gradient, integrated_gradients, permutation) | Temporal sequences |
 
@@ -173,6 +175,12 @@ Tree/linear backends live in `covenant_ml`. PyTorch backends (`mlp`, `lstm`) liv
 | `taiwan` | 6,819 | 95 | Taiwan Economic Journal bankruptcy |
 | `us` | 78,682 | 18 | American bankruptcy |
 | `polish` | 7,027 | 64 | Polish companies |
+
+Also registered and accepted by `/ml/train-external` and `/ml/optimize`:
+`kaggle_company_bankruptcy`, `kaggle_credit_default`, `kaggle_credit_risk`,
+`kaggle_heloc`, `kaggle_give_me_credit`, `kaggle_loan_default`, plus the
+time-series `kaggle_amex_default`. The regression routes use their own
+registry — currently `financial_distress`.
 
 ## Feature Engineering Presets
 
