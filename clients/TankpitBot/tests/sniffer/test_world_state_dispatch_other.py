@@ -266,3 +266,31 @@ class TestDispatchOther:
         dispatch_world_state_update(ws, msg)
 
         assert ws.last_chat_echo_message_id == -1
+
+
+class TestDispatchLivenessStamp:
+    """Tests for the wire-liveness stamp on the dispatch entry point."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_every_dispatched_message_stamps_liveness(self) -> None:
+        """Any dispatched binary message refreshes last_game_message_ms.
+
+        The stamp is the connection-lost watchdog's only input: lobby
+        text (ROOM_LIST/SELECT) takes the text route and must NOT
+        refresh it, while every in-game binary message must -- even
+        ones no handler consumes.
+        """
+        from tankpit_bot.protocol import SyncDict
+
+        assert get_world_service().last_game_message_ms == 0
+
+        dispatch_world_state_update(get_world_service(), SyncDict(msg_type=0x3F))
+
+        assert get_world_service().last_game_message_ms > 0

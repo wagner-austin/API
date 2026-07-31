@@ -23,6 +23,14 @@ analyzable reason. Three conditions are terminal:
   2026-07-22 sim CLI run showed a killed bot ticking forever,
   waiting for radar results that can never come. Raised by the tick
   loop, not a decision owner -- a corpse has no decisions left.
+* ``connection_lost`` -- the game wire went silent past the silence
+  limit while a session was live. Session 3 of run 20260730: the
+  game socket died mid-move at 11:58:32, the page auto-reconnected
+  to the LOBBY (new socket read OPEN, so the ws-ready health gate
+  passed), and the bot injected map_open into a dead session for 43
+  minutes -- 243 consecutive stalls, zero inbound world messages.
+  Raised by the tick loop's wire-silence watchdog; the harness
+  relaunches a fresh session, which is the actual recovery.
 
 ``run_tick_loop`` converts the request into the same graceful shutdown
 path as a tick-budget exit: scorecard emitted, summary written, index
@@ -38,6 +46,7 @@ SessionExitReason = Literal[
     "out_of_fuel",
     "no_productive_collect",
     "deactivated",
+    "connection_lost",
     "session_complete",
 ]
 

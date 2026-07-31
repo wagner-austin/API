@@ -1358,3 +1358,57 @@ class TestEarlyWakeSleep:
 
         assert waited == TICK_RATE_MS
         assert waits == [float(_WAKE_SLICE_MS)] * (TICK_RATE_MS // _WAKE_SLICE_MS)
+
+
+class TestWireSilenceWatchdog:
+    """Tests for the connection-lost wire-silence watchdog."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_disarmed_before_first_game_message(self) -> None:
+        """A zero stamp (boot, lobby) never trips the watchdog."""
+        from tankpit_bot.bot.tick_loop import _check_wire_silence
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        assert get_world_service().last_game_message_ms == 0
+
+        _check_wire_silence(bot)
+
+    def test_fresh_traffic_passes(self) -> None:
+        """A recent game message keeps the session alive."""
+        from tankpit_bot.bot.tick_loop import _check_wire_silence
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        get_world_service().last_game_message_ms = get_current_time_ms() - 1_000
+
+        _check_wire_silence(bot)
+
+    def test_silence_past_limit_raises_connection_lost(self) -> None:
+        """Wire silence past the limit ends the session with a receipt.
+
+        Session 3 of run 20260730: the game socket died at 11:58:32,
+        the page auto-reconnected to the lobby (socket OPEN, so the
+        ws-ready gate passed), and the bot injected map_open into a
+        dead session for 43 minutes -- 243 consecutive stalls, zero
+        inbound world messages. The watchdog turns that zombie into a
+        90-second clean exit the harness can relaunch from.
+        """
+        from tankpit_bot.bot.session_exit import SessionExitError
+        from tankpit_bot.bot.tick_loop import _WIRE_SILENCE_LIMIT_MS, _check_wire_silence
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        get_world_service().last_game_message_ms = (
+            get_current_time_ms() - _WIRE_SILENCE_LIMIT_MS - 1
+        )
+
+        with pytest.raises(SessionExitError) as exc_info:
+            _check_wire_silence(bot)
+
+        assert exc_info.value.reason == "connection_lost"
+        assert "no game wire message" in exc_info.value.detail

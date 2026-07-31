@@ -131,6 +131,16 @@ class WorldService:
         self.teleport_landed: bool = False
         self.radar_scan_complete: bool = False
         self.map_data_processed: bool = False
+        # Stamped on every dispatched binary world message -- the only
+        # truthful liveness signal for the GAME session. Session 3 of
+        # run 20260730: the game socket died at 11:58:32, the page
+        # auto-reconnected to the LOBBY (its new socket read OPEN, so
+        # the page-health gate passed every tick), and the bot injected
+        # map_open into a session the server no longer recognized for
+        # 43 minutes (243 consecutive stalls, zero inbound world
+        # traffic). Lobby text (ROOM_LIST/SELECT) takes the text route
+        # and deliberately does NOT refresh this stamp.
+        self.last_game_message_ms: int = 0
         self.pending_radar_empty_delta_ms: int = 0
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}

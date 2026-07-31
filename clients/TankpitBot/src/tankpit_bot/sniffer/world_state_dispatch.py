@@ -1172,6 +1172,7 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
         ws: World service instance.
         decoded: Decoded binary protocol message.
     """
+    ws.last_game_message_ms = browser.get_current_time_ms()
     if _dispatch_resource_update(ws, decoded):
         return
     if _dispatch_tank_update(ws, decoded):

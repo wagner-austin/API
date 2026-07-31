@@ -660,6 +660,50 @@ def _check_respawn_deadline(bot: Bot) -> None:
         )
 
 
+# Wire-silence limit for the connection-lost watchdog. Live game
+# traffic is near-continuous (fuel ticks, tank movement, viewport
+# churn arrive many times a minute), and the longest sanctioned quiet
+# stretch is the 60 s respawn wait (_RESPAWN_WAIT_MS) -- during which
+# the corpse's viewport still streams other tanks. 90 s sits safely
+# above both while turning session 3's 43-minute zombie into a
+# 90-second clean exit.
+_WIRE_SILENCE_LIMIT_MS = 90_000
+
+
+def _check_wire_silence(bot: Bot) -> None:
+    """End the session when the game wire has gone silent.
+
+    The ws-ready page-health gate cannot catch this failure: session 3
+    of run 20260730 lost its game socket mid-move at 11:58:32, the
+    page auto-reconnected to the LOBBY -- a perfectly OPEN socket the
+    server no longer associates with an in-game tank -- and every
+    injected map_open vanished for 43 minutes (243 consecutive stalls,
+    zero inbound world messages). Inbound game traffic is the only
+    truthful liveness signal, so its absence past the limit is
+    terminal. A zero stamp means no game message has EVER arrived
+    (boot, lobby) and the watchdog stays disarmed.
+
+    Args:
+        bot: Bot instance (unused state anchor; the stamp lives on the
+            world service singleton the sniffer writes).
+
+    Raises:
+        SessionExitError: When the last dispatched game message is
+            older than :data:`_WIRE_SILENCE_LIMIT_MS`.
+    """
+    last_ms = get_world_service().last_game_message_ms
+    if last_ms <= 0:
+        return
+    silence_ms = get_current_time_ms() - last_ms
+    if silence_ms < _WIRE_SILENCE_LIMIT_MS:
+        return
+    raise SessionExitError(
+        "connection_lost",
+        f"no game wire message for {silence_ms // 1000}s "
+        f"(limit {_WIRE_SILENCE_LIMIT_MS // 1000}s) - game session is dead",
+    )
+
+
 def _tick_once(bot: Bot) -> None:
     """Execute one sync-decide-execute cycle.
 
@@ -668,6 +712,7 @@ def _tick_once(bot: Bot) -> None:
     """
     # 1. SYNC — drain CDP message buffer
     world_sync.drain_messages(bot)
+    _check_wire_silence(bot)
 
     # 1b. Record the in-game text log as a capture witness. The DOM log
     # is the client's rendering of wire messages the bot already decodes
