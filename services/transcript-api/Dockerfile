@@ -57,6 +57,14 @@ WORKDIR /app
 
 USER app
 
+# ---------- Worker target ----------
+# Runs the RQ worker that drains /v1/stt/jobs. docker-compose.yml has always
+# asked for this stage; without it `docker compose up` fails to build the whole
+# service, not just the worker.
+FROM runtime-base AS worker
+
+CMD ["sh", "-c", "exec transcript-rq-worker"]
+
 # ---------- API target (default) ----------
 FROM runtime-base AS api
 
