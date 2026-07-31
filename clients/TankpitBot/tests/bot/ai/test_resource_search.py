@@ -531,11 +531,11 @@ class TestHarvestMemoryVeto:
 class TestPreHuntTopOffBias:
     """The pre-hunt top-off direction bias ([[flag-triage-20260729]] F1)."""
 
-    def _ctx_with_enemy(self, *, hunt_ready: bool) -> DecideCtx:
+    def _ctx_with_enemy(self, *, hunt_ready: bool, fuel: int = 900) -> DecideCtx:
         """Two-dot world: a far pair vs a lone dot next to the enemy."""
         from tankpit_bot.state.types import make_tank_state
 
-        world, self_state = make_world(self_x=100, self_y=100, fuel=900)
+        world, self_state = make_world(self_x=100, self_y=100, fuel=fuel)
         world["tanks"]["50"] = make_tank_state(
             tank_id=50,
             x=100,
@@ -574,7 +574,7 @@ class TestPreHuntTopOffBias:
         assert decision["command"]["target_y"] == 120
 
     def test_understocked_forage_ignores_enemy_direction(self) -> None:
-        """Below combat-ready the denser far cluster still wins."""
+        """Below combat-ready with fuel headroom the denser far cluster wins."""
         ctx = self._ctx_with_enemy(hunt_ready=False)
 
         decision = make_resource_search_hop(
@@ -586,6 +586,27 @@ class TestPreHuntTopOffBias:
         assert decision["command"]["cmd_type"] == "teleport"
         assert decision["command"]["target_x"] == 120
         assert decision["command"]["target_y"] == 100
+
+    def test_capped_fuel_understocked_runs_the_loot_bias(self) -> None:
+        """Equipment-hungry at fuel cap drifts toward the fights.
+
+        Session 7 of run 20260730: radar-broke at fuel 1100 (cap), the
+        hop ranking kept touring dense fuel-dot viewports whose fuel
+        the tank could not absorb. At cap the dots' only value is
+        location, and equipment comes from kills -- the lone dot next
+        to the enemy must outrank the far dense pair.
+        """
+        ctx = self._ctx_with_enemy(hunt_ready=False, fuel=1200)
+
+        decision = make_resource_search_hop(
+            ctx, mode="COLLECT", score=500, reason="search_collect_local"
+        )
+
+        if decision is None:
+            raise AssertionError("capped understocked forage must still produce a hop")
+        assert decision["command"]["cmd_type"] == "teleport"
+        assert decision["command"]["target_x"] == 100
+        assert decision["command"]["target_y"] == 120
 
 
 class TestNearestAliveEnemy:

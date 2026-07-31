@@ -37,6 +37,7 @@ from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode, ReasonKind
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.state.scan_coverage import (
     HARVEST_MEMORY_TTL_MS,
@@ -280,6 +281,14 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
     top-off lands on the prey's side of the map instead of wherever
     dots are densest.
 
+    Loot-run bias (2026-07-30): the same enemy-proximity scaling also
+    applies when the tank is equipment-hungry with fuel AT CAP --
+    session 7 wandered barren fuel-dot viewports at fuel 1100 with
+    zero radars, ranking hops by fuel it could not absorb. Equipment
+    comes from kills, so a capped tank restocks fastest near the
+    fights. Below cap the dots still fund the trip and the ranking
+    stays unbiased.
+
     Qualifying dots are RANKED, not filtered, by hop value (user
     contract 2026-07-18: "the rule was to prioritize viewports with
     more dots, more walkable area. but not a 100% rule"):
@@ -314,7 +323,24 @@ def _pick_fresh_dot_hop(ctx: DecideCtx) -> tuple[int, int] | None:
             if left <= dot_x <= right and top <= dot_y <= bottom
         )
 
-    hunt_bias = _nearest_alive_enemy(ctx) if hunt_entry_permitted(ctx) else None
+    # Two bias regimes share the same mechanism and the same anchor
+    # (the nearest alive enemy), for opposite deficits:
+    # * hunt-ready, only fuel short -- the pre-hunt top-off bias
+    #   ([[flag-triage-20260729]] F1): land the final fuel stop on the
+    #   prey's side of the map.
+    # * equipment-hungry with fuel AT CAP -- the loot-run bias
+    #   (2026-07-30, session 7: radar-broke at fuel 1100, every hop
+    #   ranked by fuel dots the tank could not even absorb, wandering
+    #   barren ground while 8 tracked equipment drops sat water-locked).
+    #   Fuel dots at cap carry zero pickup value; their only worth is
+    #   WHERE they are, and equipment comes from kills -- so the search
+    #   drifts toward the fights, which is also where the next hunt
+    #   starts. Below cap the dots still refuel the restock trip, so
+    #   the ranking stays unbiased.
+    if hunt_entry_permitted(ctx) or ctx.fuel >= fuel_capacity(ctx.self_state["rank"]):
+        hunt_bias = _nearest_alive_enemy(ctx)
+    else:
+        hunt_bias = None
     tallies = {
         "own_tile": 0,
         "impassable": 0,
