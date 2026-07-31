@@ -478,7 +478,7 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     """
     reason = decision["behavior"]["reason_kind"]
     command_type = decision["command"]["cmd_type"]
-    if reason in ("forage_radar", "forage_sweep", "scan_on_landing"):
+    if reason in ("forage_radar", "forage_sweep", "scan_on_landing", "desync_rescan"):
         return "SENSE"
     if reason == "search_collect_local":
         return "SEARCH"

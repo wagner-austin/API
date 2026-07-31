@@ -141,6 +141,25 @@ def recent_movement_rejections(now_ms: int, window_ms: int) -> int:
     return _service.recent_movement_rejections(now_ms, window_ms)
 
 
+def mark_container_desync(timestamp_ms: int) -> None:
+    """Record a disproven remembered-container belief (code=4 pickup).
+
+    Args:
+        timestamp_ms: When the empty-container rejection arrived.
+    """
+    _service.container_desync_ms = timestamp_ms
+
+
+def container_desync_pending() -> bool:
+    """Check whether a container desync awaits its radar resync.
+
+    Returns:
+        True while a code=4 disproof has not yet been answered by a
+        radar response (which reconciles the viewport and clears it).
+    """
+    return _service.container_desync_ms > 0
+
+
 def recent_own_mine_hit(now_ms: int) -> bool:
     """Check whether a walk-over mine hit landed within the flip window.
 
@@ -209,12 +228,14 @@ def is_scan_viewport_failed(viewport_left: int, viewport_top: int, now_ms: int) 
 
 __all__ = [
     "check_and_clear_radar_scan_complete",
+    "container_desync_pending",
     "get_incoming_damage_window",
     "get_terrain_map",
     "get_world_service",
     "get_world_state",
     "is_move_target_failed",
     "is_scan_viewport_failed",
+    "mark_container_desync",
     "mark_move_target_failed",
     "mark_radar_scan_complete",
     "mark_scan_viewport_failed",

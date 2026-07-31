@@ -10,6 +10,7 @@ from platform_core.json_utils import JSONValue
 from tankpit_bot import _test_hooks
 from tankpit_bot._test_hooks import KeyboardProtocol, ResponseProtocol
 from tankpit_bot._test_hooks.cdp import RouteFulfillHandler
+from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.states import ActionKind, InFlightActionDict
 from tankpit_bot.bot.tick_loop_actions import _clear_rejected_movement
@@ -1064,6 +1065,10 @@ class TestClearCommandError:
         assert bot.get_state() == "IDLE"
         assert ws.last_command_error == -1
         assert ws.world_state["containers"] == {}
+        # The disproof also marks the container memory desynced so the
+        # collect cascade radars before pursuing further remembered
+        # stock (user ruling 2026-07-30: one stale item = one radar).
+        assert ws.container_desync_ms > 0
         from tankpit_bot.ledger.ring import outcome_counts
 
         assert outcome_counts("collect") == {"pickup_empty": 1}
@@ -1412,3 +1417,61 @@ class TestWireSilenceWatchdog:
 
         assert exc_info.value.reason == "connection_lost"
         assert "no game wire message" in exc_info.value.detail
+
+
+class TestFriendlyFireDisproof:
+    """Tests for consuming err=3 friendly_fire as target disproof."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_friendly_fire_blocks_target_and_releases_matching_lock(self) -> None:
+        """One err=3 blocklists the id and clears the matching combat lock.
+
+        Session 4 of run 20260730 (20:36): Yuppler left the game, the
+        0x58 grace kept his registry entry, every map open re-stamped
+        the ghost's freshness, and the bot fired 43 consecutive
+        rejected shots. The disproof turns the first rejection into a
+        block + lock release.
+        """
+        from tankpit_bot.bot.tick_loop import _disprove_target_by_friendly_fire
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "combat_target_id": 1229,
+                "combat_target_x": 245,
+                "combat_target_y": 76,
+            }
+        )
+
+        _disprove_target_by_friendly_fire(bot, 1229, "Yuppler")
+
+        assert "1229" in bot._ai_state["blocked_combat_targets"]
+        assert bot._ai_state["combat_target_id"] == -1
+        assert bot._ai_state["combat_target_x"] == 0
+
+    def test_friendly_fire_keeps_unrelated_lock(self) -> None:
+        """Disproving a non-locked target leaves the held lock alone."""
+        from tankpit_bot.bot.tick_loop import _disprove_target_by_friendly_fire
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state = AIStateDict(
+            **{
+                **bot._ai_state,
+                "combat_target_id": 514,
+                "combat_target_x": 117,
+                "combat_target_y": 139,
+            }
+        )
+
+        _disprove_target_by_friendly_fire(bot, 1229, "Yuppler")
+
+        assert "1229" in bot._ai_state["blocked_combat_targets"]
+        assert bot._ai_state["combat_target_id"] == 514

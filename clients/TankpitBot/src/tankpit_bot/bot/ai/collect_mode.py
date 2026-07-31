@@ -55,6 +55,7 @@ from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import (
+    container_desync_pending,
     get_incoming_damage_window,
     is_move_target_failed,
     recent_movement_rejections,
@@ -371,6 +372,10 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
 
     Cascade:
 
+    0. Desync rescan: while a code=4 disproof of a remembered
+       container awaits its radar resync, one radar outranks every
+       pursuit branch (user ruling 2026-07-30: one stale item is
+       worth a radar, never a second blind hop).
     1. Continue a held equipment or fuel lock from a previous tick.
     2. Scan-on-landing: fire one radar when the current viewport has
        zero scan coverage. Mirrors HUNT's scan_on_landing so the
@@ -416,20 +421,9 @@ def decide_collect_mode(ctx: DecideCtx) -> TickDecisionDict | None:
             session ends with ``out_of_fuel`` (user contract
             2026-07-02).
     """
-    base_state = ctx.base
-    # Landing scan gates BEFORE lock continuation (reordered 2026-07-30,
-    # flag s4-3): the user policy is "always radar right on landing,
-    # before any pickup" (2026-07-03), and a DISPLACED harvest landing
-    # keeps its lock — running the lock first walked blind into the
-    # unobserved minefield three ticks straight. Clean suppressed
-    # landings still latch silently here and fall through to the lock.
-    landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
-    if landing_scan is not None:
-        return landing_scan
-
-    under_fire = _escape_under_fire_decision(ctx, base_state)
-    if under_fire is not None:
-        return under_fire
+    gate_decision, base_state = _sense_and_safety_gates(ctx, ctx.base)
+    if gate_decision is not None:
+        return gate_decision
 
     locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
     if locked_decision is not None:
@@ -741,6 +735,85 @@ def _walk_for_fuel_last_resort(
             ctx.equip,
         )
     return None
+
+
+def _sense_and_safety_gates(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> tuple[TickDecisionDict | None, AIStateDict]:
+    """Run the pre-pursuit gates: landing scan, escape, desync rescan.
+
+    Landing scan gates BEFORE lock continuation (reordered 2026-07-30,
+    flag s4-3): the user policy is "always radar right on landing,
+    before any pickup" (2026-07-03), and a DISPLACED harvest landing
+    keeps its lock -- running the lock first walked blind into the
+    unobserved minefield three ticks straight. Clean suppressed
+    landings still latch silently and fall through to the lock. The
+    under-fire escape and the desync rescan follow in that order:
+    survival beats resync, resync beats pursuit.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state threaded through the gates.
+
+    Returns:
+        ``(decision, base_state)`` -- the first gate's decision (or
+        ``None`` when all gates pass) and the state the remaining
+        cascade must thread.
+    """
+    landing_scan, base_state = _scan_on_landing_decision(ctx, base_state)
+    if landing_scan is not None:
+        return landing_scan, base_state
+
+    under_fire = _escape_under_fire_decision(ctx, base_state)
+    if under_fire is not None:
+        return under_fire, base_state
+
+    return _desync_rescan_decision(ctx, base_state), base_state
+
+
+def _desync_rescan_decision(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Return a radar decision while a container desync awaits resync.
+
+    A code=4 empty-container rejection disproves the belief the
+    planner acted on, and the user ruling (2026-07-30) is that ONE
+    disproof is worth a radar -- never a second blind hop to another
+    remembered container. Session 4 receipt: three larder hops in a
+    row landed on containers Yuppler had already collected, each
+    landing scan suppressed as verified stock, three teleports wasted.
+    The latch (``mark_container_desync``) is set by the rejection
+    consumer and cleared by the radar response itself, which
+    reconciles the viewport authoritatively (volume==0 entries are
+    removals) -- so this gate fires exactly once per disproof.
+
+    Args:
+        ctx: Decision context.
+        base_state: Base AI state for the produced command.
+
+    Returns:
+        The ``desync_rescan`` radar decision, or ``None`` when no
+        disproof is pending.
+    """
+    if not container_desync_pending():
+        return None
+    emit_ai(
+        "remembered container disproved (code=4) - radar resync before "
+        "pursuing further memory (extras=%d)",
+        ctx.inventory["extra_radars"]["count"],
+    )
+    return make_decision(
+        make_radar_command(),
+        "COLLECT",
+        _COLLECT_SCORE,
+        0,
+        0,
+        "desync_rescan",
+        base_state,
+        ctx.equip,
+    )
 
 
 def _scan_on_landing_decision(

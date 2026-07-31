@@ -22,6 +22,7 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     capture_page_client_snapshot,
 )
 from tankpit_bot.bot import ai_strategy, executor, world_sync
+from tankpit_bot.bot.ai.combat_strategy import clear_combat_target
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_reason
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -95,6 +96,12 @@ _SHOT_REJECTING_COMMAND_ERRORS = frozenset(
         8,  # "Insufficient fuel"
     }
 )
+
+# The err=3 member of the set above, named because it carries target
+# semantics the other two do not: a friendly-fire rejection on an
+# id-targeted shot disproves the TARGET (departed player, team truth),
+# not the aim geometry or the fuel state.
+_COMMAND_ERROR_FRIENDLY_FIRE = 3
 
 log = get_logger(__name__)
 
@@ -938,15 +945,15 @@ def _merge_protocol_kills(ai_state: AIStateDict) -> AIStateDict:
     # kill produces no damage-change feedback, so this is the kill
     # shot's only resolution path). The classifier clears the fields
     # itself after emitting the outcome.
-    clear_combat_target = ai_state["combat_target_id"] in new_kills
+    target_was_killed = ai_state["combat_target_id"] in new_kills
     return AIStateDict(
         **{
             **ai_state,
             "killed_tank_ids": merged,
             "session_kill_count": ai_state["session_kill_count"] + len(new_kills),
-            "combat_target_id": -1 if clear_combat_target else ai_state["combat_target_id"],
-            "combat_target_x": 0 if clear_combat_target else ai_state["combat_target_x"],
-            "combat_target_y": 0 if clear_combat_target else ai_state["combat_target_y"],
+            "combat_target_id": -1 if target_was_killed else ai_state["combat_target_id"],
+            "combat_target_x": 0 if target_was_killed else ai_state["combat_target_x"],
+            "combat_target_y": 0 if target_was_killed else ai_state["combat_target_y"],
         }
     )
 
@@ -1121,8 +1128,49 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
                 "session_reject_count": bot._ai_state["session_reject_count"] + 1,
             }
         )
+        if error_code == _COMMAND_ERROR_FRIENDLY_FIRE:
+            _disprove_target_by_friendly_fire(bot, target_id, target_name)
         return "rejected"
     return ""
+
+
+def _disprove_target_by_friendly_fire(bot: Bot, target_id: int, target_name: str) -> None:
+    """Consume a friendly-fire rejection as proof the target is not engageable.
+
+    The server's err=3 on an id-targeted shot is the only unfakeable
+    receipt that the id no longer resolves to an enemy. Session 4 of
+    run 20260730 (20:36): Yuppler left the game, the 0x58 grace kept
+    his registry entry (by design -- it powers the pursuit volley),
+    and every subsequent map open re-stamped the ghost's map
+    freshness, so acquisition re-selected him and the bot fired 43
+    consecutive rejected shots ("Friendly fire!" client spam). One
+    rejection now blocklists the id for the block TTL and releases the
+    combat lock, so the next tick re-acquires from live truth. The
+    registry entry itself is deliberately NOT deleted -- 0x58
+    semantics (tracking churn, reroute grace) stay intact.
+
+    Args:
+        bot: Bot instance.
+        target_id: The shot's intended target id.
+        target_name: The shot's intended target name (log receipt).
+    """
+    blocked = dict(bot._ai_state["blocked_combat_targets"])
+    blocked[str(target_id)] = get_current_time_ms()
+    updated = AIStateDict(**{**bot._ai_state, "blocked_combat_targets": blocked})
+    if updated["combat_target_id"] == target_id:
+        updated = clear_combat_target(updated)
+    bot._ai_state = updated
+    log.info(
+        "AI: shot at %s (id=%d) rejected as friendly fire - "
+        "target disproved, blocked and lock released",
+        target_name,
+        target_id,
+    )
+    emit_diagnostic(
+        diagnostic_kind="target_disproved_by_friendly_fire",
+        target_id=target_id,
+        target_name=target_name,
+    )
 
 
 __all__ = [

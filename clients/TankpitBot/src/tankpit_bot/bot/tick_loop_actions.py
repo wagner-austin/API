@@ -52,6 +52,7 @@ from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
     get_world_service,
     is_move_target_failed,
+    mark_container_desync,
     mark_move_target_failed,
     mark_scan_viewport_failed,
     record_movement_rejection,
@@ -354,8 +355,15 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             )
         elif error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
             remove_container_at(get_world_service(), tx, ty)
+            # One disproven belief means the local container memory is
+            # desynced (user ruling 2026-07-30: "if one item is stale
+            # or out of sync then its worth a radar. not, 3 items") --
+            # the collect cascade answers the latch with a radar
+            # before pursuing any further remembered container.
+            mark_container_desync(get_current_time_ms())
             emit_sync(
-                "container at (%d,%d) rejected code=4 (empty) -- belief removed",
+                "container at (%d,%d) rejected code=4 (empty) -- belief removed, "
+                "container memory marked desynced",
                 tx,
                 ty,
             )

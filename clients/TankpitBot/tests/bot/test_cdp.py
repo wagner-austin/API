@@ -2295,6 +2295,40 @@ class TestBotEquipmentManagement:
         assert bot._ai_state["session_miss_count"] == 0
         # The error was consumed so nothing else double-handles it.
         assert get_world_service().last_command_error == -1
+        # Code 0 (aim geometry) carries no target semantics -- the
+        # friendly-fire disproof must NOT fire for it.
+        assert bot._ai_state["blocked_combat_targets"] == {}
+
+    def test_get_combat_feedback_friendly_fire_disproves_target(
+        self,
+        fake_env: FakeEnv,
+    ) -> None:
+        """An err=3 rejection blocklists the target and releases the lock.
+
+        Session 4 of run 20260730 (20:36): Yuppler left the game and
+        the bot fired 43 consecutive rejected shots at his ghost --
+        the 0x58 grace keeps the registry entry and every map open
+        re-stamps its freshness, so the server's friendly-fire receipt
+        is the only truth that the id is not an engageable enemy.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop import _get_combat_feedback
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 1229
+        bot._ai_state["last_shot_target_name"] = "Yuppler"
+        bot._ai_state["combat_target_id"] = 1229
+        bot._ai_state["combat_target_x"] = 245
+        bot._ai_state["combat_target_y"] = 76
+        get_world_service().last_command_error = 3
+
+        result = _get_combat_feedback(bot)
+
+        assert result == "rejected"
+        assert "1229" in bot._ai_state["blocked_combat_targets"]
+        assert bot._ai_state["combat_target_id"] == -1
 
     def test_get_combat_feedback_ignores_non_shot_command_error(
         self,

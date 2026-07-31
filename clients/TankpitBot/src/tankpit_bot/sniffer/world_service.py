@@ -145,6 +145,16 @@ class WorldService:
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
         self.movement_rejections: list[int] = []
+        # Stamped when a remembered container pickup comes back
+        # code=4 (empty) -- the belief the planner acted on is
+        # disproven, so the local memory of this area is desynced.
+        # User ruling 2026-07-30 ("if one item is stale or out of
+        # sync then its worth a radar. not, 3 items"): session 4 spent
+        # three larder hops on containers Yuppler had already
+        # collected, each landing scan suppressed as verified stock.
+        # Cleared by the next radar response, which reconciles the
+        # viewport authoritatively.
+        self.container_desync_ms: int = 0
         self.failed_scan_viewports: dict[str, int] = {}
         self.last_command_error: int = -1
         # Set by the 0x41 dispatch when the wire announces OUR OWN
