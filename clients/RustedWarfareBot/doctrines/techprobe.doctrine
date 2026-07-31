@@ -1,13 +1,9 @@
-# The champion with reach: c_artillery joins the composition.
-#
-# The siege arm, remade on the nocover champion. Its first measurement (0/12,
-# all-arms batch) predates every defence-era fix AND rode the cover flag that
-# cover24-hard later refuted outright, so it tells us nothing about this
-# lineage. The case is unchanged and sharper after the Impossible autopsy
-# (log 2026-07-30): non-wins end against turret walls that out-range every
-# unit we field, and c_artillery (landFactory, 290 reach) out-ranges them
-# back ([[mechanics-tech-tree]]). In the goals means in the sustained
-# production mix, so waves arrive with standoff fire behind them.
+# The tech arm on the champion: arty + raid + one land factory unlocked
+# through the ability verb, heavyTank joining the mix when the tier opens.
+# The unlock saves toward itself (a refused claim withholds its price), so
+# the cost is 2,000 credits plus the saving pause it forces; the first
+# unlock already opens production, which is why the count is one
+# ([[policy-budget]], [[mechanics-build-actions]]).
 
 name techprobe
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
@@ -23,7 +19,7 @@ guard_cap 0
 aa_cover 0
 forward 0
 scout 0
-raid 0
+raid 3
 rush 0
 creep 0
 riposte 0
