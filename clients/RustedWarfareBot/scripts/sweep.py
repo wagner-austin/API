@@ -17,7 +17,14 @@ from pathlib import Path
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.match import decode_match_config, describe
-from rw_bot.harness.runner import SweepConfig, decode_sweep_config, outstanding, run_worker
+from rw_bot.harness.runner import (
+    TREE_DIR,
+    SweepConfig,
+    decode_sweep_config,
+    outstanding,
+    prepare_tree,
+    run_worker,
+)
 from rw_bot.harness.sweep import parse_jobs
 
 #: Opponents asked for when a match is given. One, because the goal is to beat
@@ -50,8 +57,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Read a job file, play what is outstanding, and report.
 
     Args:
-        argv: ``<job-file> <name> [workers] [lockstep]``. ``None`` reads the
-            process arguments.
+        argv: ``<job-file> <name> [workers] [lockstep] [map difficulty
+            [pin-delta-ms]]``. ``None`` reads the process arguments.
 
     Returns:
         ``EXIT_OK`` when every match in the file has a result, ``EXIT_INCOMPLETE``
@@ -65,9 +72,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         OSError: When the job file cannot be read or a result cannot be written.
     """
     args = list(argv) if argv is not None else _test_hooks.read_argv()
-    if len(args) not in (2, 3, 4, 6):
+    if len(args) not in (2, 3, 4, 6, 7):
         _test_hooks.write_line(
-            "usage: sweep <job-file> <name> [workers] [lockstep] [map difficulty]"
+            "usage: sweep <job-file> <name> [workers] [lockstep] [map difficulty [pin-delta-ms]]"
         )
         return EXIT_BAD_USAGE
 
@@ -78,7 +85,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         decode_match_config(
             {"map_path": args[4], "opponents": DUEL_OPPONENTS, "difficulty": int(args[5])}
         )
-        if len(args) == 6
+        if len(args) >= 6
         else None
     )
 
@@ -97,6 +104,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             "lockstep": int(args[3]) if len(args) >= 4 else DEFAULT_LOCKSTEP,
             "clone_prefix": CLONE_PREFIX,
             "source_game_dir": SOURCE_GAME_DIR,
+            # Under the results directory, so a batch and the code it ran are
+            # one artifact -- resuming a batch resumes its code, whatever has
+            # happened to the working tree since ([[policy-loop]]).
+            "tree": str(out_dir / TREE_DIR),
+            # Zero leaves the engine on the wall clock, which is what a tree
+            # frozen before the option existed requires; a pinned batch says
+            # so explicitly ([[policy-determinism]]).
+            "pin_delta": int(args[6]) if len(args) == 7 else 0,
         },
         match,
     )
@@ -111,6 +126,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     played = 0
     if todo:
+        # Frozen before the first worker starts, so no thread races the copy
+        # and the whole batch imports one tree. Skipped when nothing is left
+        # to play: a completed batch's re-run should not freeze anything.
+        prepare_tree(config)
         with ThreadPoolExecutor(max_workers=config["workers"]) as pool:
             counts = pool.map(partial(run_worker, todo, config=config), range(config["workers"]))
             played = sum(counts)

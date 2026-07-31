@@ -22,6 +22,7 @@ from rw_bot.harness.runner import (
     outstanding,
     play_job,
     prepare_clone,
+    prepare_tree,
     reset_volatile_files,
     run_worker,
 )
@@ -35,6 +36,7 @@ def _config(
     workers: int = 2,
     out_dir: str = "runs/sweeps/demo",
     match: MatchConfig | None = None,
+    pin_delta: int = 0,
 ) -> SweepConfig:
     return SweepConfig(
         out_dir=out_dir,
@@ -42,6 +44,8 @@ def _config(
         lockstep=75,
         clone_prefix=".game-w",
         source_game_dir=_SOURCE,
+        tree=f"{out_dir}/.tree",
+        pin_delta=pin_delta,
         match=match,
     )
 
@@ -53,6 +57,36 @@ def _job(label: str = "tank", seed: int = 1) -> SweepJob:
         doctrine="doctrines/default.doctrine",
         samples=1500,
     )
+
+
+def test_the_batch_freezes_the_tree_its_matches_will_import() -> None:
+    """Frozen once, at launch: the working tree is editable the moment the
+    batch starts, and the batch records exactly what its matches ran."""
+    with FakeHost() as host:
+        host.dirs.add("src/rw_bot")
+        host.dirs.add("scripts")
+        host.dirs.add("doctrines")
+        host.files["agent/build/rw-agent.jar"] = ()
+        prepare_tree(_config())
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/src/rw_bot"))
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/scripts"))
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/doctrines"))
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/rw-agent.jar"))
+        assert host.path_exists(Path("runs/sweeps/demo/.tree/.complete"))
+        assert "[sweep] tree frozen at runs/sweeps/demo/.tree" in host.printed
+
+
+def test_an_existing_frozen_tree_is_reused_never_refreshed() -> None:
+    """Resuming a batch resumes its code: matches played after an interruption
+    import the same tree as the ones played before it, whatever has happened
+    to the working tree in between."""
+    with FakeHost() as host:
+        host.dirs.add("runs/sweeps/demo/.tree")
+        host.files["runs/sweeps/demo/.tree/.complete"] = ("frozen",)
+        host.dirs.add("src/rw_bot")
+        prepare_tree(_config())
+        assert not host.path_exists(Path("runs/sweeps/demo/.tree/src/rw_bot"))
+        assert "[sweep] reusing the frozen tree at runs/sweeps/demo/.tree" in host.printed
 
 
 def test_a_clone_is_a_copy_of_the_game_without_the_trees_it_rewrites() -> None:

@@ -46,6 +46,16 @@ DEFAULT_GOALS: tuple[str, ...] = DEFAULT_DOCTRINE["goals"]
 
 DEFAULT_MAX_SAMPLES = 120
 
+#: Samples the opening may stay unit-less before the world is called broken.
+#:
+#: The opening roster is what plan expansion reads, so the planner acks
+#: samples until something owned and finished appears. Bounded because an
+#: empty world that never populates is a failed match start, not a slow one:
+#: forty samples at lockstep 75 is 3,000 frames -- ten seconds of game time --
+#: and the starting units spawn with the map, so a world still empty after
+#: that is not going to fill.
+OPENING_SETTLE_SAMPLES = 40
+
 EXIT_OK = 0
 EXIT_INCOMPLETE = 1
 EXIT_BAD_USAGE = 2
@@ -265,15 +275,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     tree = load_build_tree(Path(args[2]))
 
     # Expansion needs to know what the player already has, so it runs against a
-    # real observation rather than an assumed opening roster. One sample is
-    # spent on it, which costs nothing: the loop reads its own.
+    # real observation rather than an assumed opening roster.
+    #
+    # **Settled by content, not by clock.** The world used to settle on 22
+    # seconds of free-running wall time before the planner attached, and runs
+    # began from worlds that already differed ([[policy-determinism]]). A match
+    # world is now held at its first frame, so the planner may arrive before
+    # the starting units have spawned -- the roster is the thing being waited
+    # for, so the roster is the condition, and every acked sample advances the
+    # simulation by the same locked interval on every run. Each sample is
+    # acknowledged like any other: in lockstep the agent holds the simulation
+    # until the ack arrives.
     channel = open_channel(int(args[0]))
     opening = channel.next_sample()
-    # Acknowledged like any other sample. In lockstep the agent holds the
-    # simulation until this arrives, and an unacked opening stalled the game
-    # for the full ack timeout before it ran on unlocked
-    # ([[policy-determinism]]).
     channel.send_ack()
+    settled = 0
+    while (
+        not any(e["mine"] and e["complete"] for e in opening["entities"])
+        and settled < OPENING_SETTLE_SAMPLES
+    ):
+        opening = channel.next_sample()
+        channel.send_ack()
+        settled += 1
     owned = [e["type_name"] for e in opening["entities"] if e["mine"] and e["complete"]]
     goals = doctrine["goals"]
     plan = expand(goals, tree, owned, catalogue)
@@ -284,6 +307,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name in plan:
         site = "on a resource pool" if placements[name]["needs_pool"] else "on the ring"
         sys.stdout.write(f"  {name} costs {catalogue[name]['price']}, goes {site}\n")
+    # The whole bill against the opening balance, so a plan priced beyond the
+    # start is line three of every log instead of a forensic discovery -- the
+    # amphib arm's 11,000-credit prerequisite sat invisible in per-entry costs
+    # for twelve matches (log: 2026-07-29). Income closes the gap over time;
+    # the savings clock is what judges whether it actually is
+    # (:mod:`rw_bot.policy.runner`).
+    total = sum(catalogue[name]["price"] for name in plan)
+    sys.stdout.write(f"plan total: {total} credits, holding {opening['credits']}\n")
 
     reinforce = reinforcements(goals, catalogue)
     # The derive-or-fix choice the reserve override existed for, now carried by
@@ -306,6 +337,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         expand=doctrine["expand"],
         max_workers=doctrine["max_workers"],
         counter=doctrine["counter"],
+        cover=doctrine["cover"],
+        intercept=doctrine["intercept"],
+        guard_cap=doctrine["guard_cap"],
+        aa_cover=doctrine["aa_cover"],
+        forward=doctrine["forward"],
+        scout=doctrine["scout"],
+        raid=doctrine["raid"],
+        rush=doctrine["rush"],
+        creep=doctrine["creep"],
+        riposte=doctrine["riposte"],
+        tech=doctrine["tech"],
         ladder=ladder_to(doctrine["mass"]),
         trace=trace,
     )

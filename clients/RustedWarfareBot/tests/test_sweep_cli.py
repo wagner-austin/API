@@ -57,6 +57,26 @@ def test_a_duel_is_asked_for_by_map_and_difficulty() -> None:
         assert any("0.4x AI income" in line for line in host.printed)
 
 
+def test_a_pinned_batch_passes_the_delta_to_every_match() -> None:
+    """The seventh positional: a constant frame delta for the whole batch.
+
+    Batch-level like the match, because a pinned and an unpinned run of one
+    seed are different simulations ([[policy-determinism]]). Unpinned batches
+    must stay silent -- a tree frozen before the option existed runs an agent
+    that rejects the unknown key.
+    """
+    with FakeHost() as host:
+        _plant(host, "duel|1|doctrines/default.doctrine|1500")
+        code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3"])
+        assert code == EXIT_OK
+        assert "PLAY_PINDELTA=3" in host.commands[0]
+        host.commands.clear()
+        del host.files["runs/sweeps/demo/duel-s1.txt"]
+
+        assert main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1"]) == EXIT_OK
+        assert not [part for part in host.commands[0] if part.startswith("PLAY_PINDELTA")]
+
+
 def test_every_match_in_the_file_is_played_once() -> None:
     with FakeHost() as host:
         _plant(

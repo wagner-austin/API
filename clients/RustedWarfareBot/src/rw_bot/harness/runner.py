@@ -34,7 +34,7 @@ from rw_bot.harness.sweep import (
     scorecard,
     trace_path,
 )
-from rw_bot.validation import require_non_empty_str, require_positive_int
+from rw_bot.validation import require_int, require_non_empty_str, require_positive_int
 
 
 class SweepConfig(TypedDict):
@@ -52,11 +52,21 @@ class SweepConfig(TypedDict):
             ([[policy-determinism]]).
         clone_prefix: Leading part of every worker copy's directory name.
         source_game_dir: The pinned game directory copies are taken from.
+        tree: Where the batch's frozen copy of the code lives, under
+            ``out_dir``. Every match imports from it instead of the working
+            tree, so the tree is editable the moment the batch starts and the
+            batch records exactly what its matches ran
+            (:func:`prepare_tree`).
         match: Which match every job in the batch plays, or None for the
             engine's own default. Batch-level rather than per-job because the
             map decides the opponent count -- the engine caps teams by the
             map's own -- so an arm that varies the opponent varies the map, and
             that is what a batch *is* ([[policy-determinism]]).
+        pin_delta: Constant frame delta in milliseconds, or zero to leave the
+            engine on the wall clock. Batch-level like the match: a pinned and
+            an unpinned run of one seed are different simulations, so mixing
+            them inside a batch would be an uncontrolled arm
+            ([[policy-determinism]]).
     """
 
     out_dir: str
@@ -64,6 +74,8 @@ class SweepConfig(TypedDict):
     lockstep: int
     clone_prefix: str
     source_game_dir: str
+    tree: str
+    pin_delta: int
     match: MatchConfig | None
 
 
@@ -105,6 +117,8 @@ def decode_sweep_config(
         lockstep=require_positive_int(payload, "lockstep"),
         clone_prefix=require_non_empty_str(payload, "clone_prefix"),
         source_game_dir=require_non_empty_str(payload, "source_game_dir"),
+        tree=require_non_empty_str(payload, "tree"),
+        pin_delta=require_int(payload, "pin_delta"),
         match=match,
     )
 
@@ -124,6 +138,8 @@ def encode_sweep_config(config: SweepConfig) -> dict[str, str | int]:
         "lockstep": config["lockstep"],
         "clone_prefix": config["clone_prefix"],
         "source_game_dir": config["source_game_dir"],
+        "tree": config["tree"],
+        "pin_delta": config["pin_delta"],
     }
 
 
@@ -161,6 +177,58 @@ def encode_sweep_outcome(outcome: SweepOutcome) -> dict[str, int]:
         "already": outcome["already"],
         "played": outcome["played"],
     }
+
+
+#: What a batch freezes: everything a match imports or reads at launch that is
+#: also under active development. The archived registry dumps (catalogue, type
+#: flags) are deliberately absent -- they are generated artifacts pinned to the
+#: game build, not code that changes between batches.
+TREE_SOURCES = ("scripts", "doctrines", "agent/build/rw-agent.jar")
+
+#: The frozen tree's directory name, under the batch's results directory.
+TREE_DIR = ".tree"
+
+#: Written into the tree last, so its presence certifies a complete freeze.
+TREE_MARKER = ".complete"
+
+
+def prepare_tree(config: SweepConfig) -> None:
+    """Freeze the code the batch's matches will import, once, at launch.
+
+    A match imports the source tree at launch, so before this existed an edit
+    landed mid-batch meant later matches ran different code from earlier ones
+    -- an arm's twelve seeds were only one experiment if nobody touched the
+    tree for the batch's whole runtime, and the working tree was frozen for
+    hours at a stretch. The batch copies what its matches need into its own
+    results directory instead: the tree is editable the moment the sweep
+    starts, and the batch carries a record of exactly what it ran.
+
+    **An existing snapshot is reused, never refreshed.** That is what makes a
+    resumed batch a continuation rather than a new experiment: the matches
+    played after the interruption import the same frozen code as the ones
+    played before it, whatever has happened to the working tree in between.
+
+    Args:
+        config: How the batch is being played.
+
+    Raises:
+        OSError: When a copy fails.
+    """
+    tree = Path(config["tree"])
+    # Judged by the marker, not by the directory: a directory can survive a
+    # partial delete -- Windows file locks kept one alive with its doctrines
+    # gone -- and reusing a gutted tree fails ten matches at once with the
+    # freeze reporting success (log: 2026-07-31). The marker is written last,
+    # so its presence certifies every copy before it finished.
+    if _test_hooks.path_exists(tree / TREE_MARKER):
+        _test_hooks.write_line(f"[sweep] reusing the frozen tree at {config['tree']}")
+        return
+    _test_hooks.make_dirs(tree / "src")
+    _test_hooks.copy_entry(Path("src/rw_bot"), tree / "src")
+    for entry in TREE_SOURCES:
+        _test_hooks.copy_entry(Path(entry), tree)
+    _test_hooks.write_text_lines(tree / TREE_MARKER, ("frozen",))
+    _test_hooks.write_line(f"[sweep] tree frozen at {config['tree']}")
 
 
 def prepare_clone(index: int, config: SweepConfig) -> str:
@@ -243,14 +311,29 @@ def play_job(job: SweepJob, game_dir: str, config: SweepConfig) -> bool:
     """
     name = job_name(job)
     out_dir = Path(config["out_dir"])
+    # Traces are namespaced by batch, and the batch is named by where its
+    # results are filed -- one name for both artifacts, so a result and its
+    # trace can never belong to different experiments.
+    batch = out_dir.name
     # The planner opens the trace for writing and does not create its parent,
     # so the directory has to exist before the match starts rather than after
     # it has run for twenty minutes and failed to file anything.
-    _test_hooks.make_dirs(Path(trace_path(job)).parent)
+    _test_hooks.make_dirs(Path(trace_path(job, batch)).parent)
+    # The game redirects its stdout into the log path's directory at launch
+    # and does not create it.
+    _test_hooks.make_dirs(out_dir / "logs")
     reset_volatile_files(game_dir, config)
     _test_hooks.write_line(f"[sweep] {game_dir} playing {name}")
     _, output = _test_hooks.run_capture(
-        make_argv(job, game_dir, config["lockstep"], config["match"])
+        make_argv(
+            job,
+            game_dir,
+            config["lockstep"],
+            batch,
+            config["match"],
+            config["tree"],
+            config["pin_delta"],
+        )
     )
     card = scorecard(output)
     if not is_complete(card):
@@ -313,6 +396,9 @@ def outstanding(jobs: Sequence[SweepJob], out_dir: Path) -> tuple[SweepJob, ...]
 
 
 __all__ = [
+    "TREE_DIR",
+    "TREE_MARKER",
+    "TREE_SOURCES",
     "SweepConfig",
     "SweepOutcome",
     "decode_sweep_config",
@@ -322,6 +408,7 @@ __all__ = [
     "outstanding",
     "play_job",
     "prepare_clone",
+    "prepare_tree",
     "reset_volatile_files",
     "run_worker",
 ]

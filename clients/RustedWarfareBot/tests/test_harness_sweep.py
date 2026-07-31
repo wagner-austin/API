@@ -139,8 +139,8 @@ def test_a_worker_index_outside_the_pool_is_refused(index: int) -> None:
 def test_the_planner_argument_list_carries_every_arm_variable() -> None:
     """Samples, the doctrine that is the whole of the style, and the trace."""
     assert (
-        play_args(_job(doctrine="doctrines/mass25.doctrine"))
-        == "1500 doctrines/mass25.doctrine runs/traces/tank-s1.ndjson"
+        play_args(_job(doctrine="doctrines/mass25.doctrine"), "demo")
+        == "1500 doctrines/mass25.doctrine runs/traces/demo/tank-s1.ndjson"
     )
 
 
@@ -152,7 +152,7 @@ def test_a_chosen_match_is_carried_to_every_job_in_the_batch() -> None:
     rather than to a job line ([[policy-determinism]]).
     """
     duel = MatchConfig(map_path="maps/skirmish/[p2]duel_lake.tmx", opponents=1, difficulty=-2)
-    argv = make_argv(_job(seed=777), ".game-w2", 75, duel)
+    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", duel)
     assert argv[-3:] == (
         "PLAY_MAP=maps/skirmish/[p2]duel_lake.tmx",
         "PLAY_OPPONENTS=1",
@@ -164,7 +164,7 @@ def test_no_chosen_match_leaves_the_engines_own_default() -> None:
     """Absent means the hardcoded ten-player free-for-all, which is what every
     measurement before the duel was taken in ([[policy-determinism]]).
     """
-    argv = make_argv(_job(seed=777), ".game-w2", 75)
+    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo")
     assert not [element for element in argv if element.startswith("PLAY_MAP")]
 
 
@@ -176,24 +176,60 @@ def test_every_match_records_a_trace_named_after_its_job() -> None:
     before collapsing. None of that survives in the scorecard, and re-running
     to recover it produces a different match ([[policy-trace]]).
     """
-    assert trace_path(_job(seed=777)) == "runs/traces/tank-s777.ndjson"
-    assert trace_path(_job(label="air")) == "runs/traces/air-s1.ndjson"
+    assert trace_path(_job(seed=777), "demo") == "runs/traces/demo/tank-s777.ndjson"
+    assert trace_path(_job(label="air"), "other") == "runs/traces/other/air-s1.ndjson"
 
 
 def test_the_command_pins_the_seed_the_clone_and_the_lockstep() -> None:
     """Lockstep is passed per job rather than left to the recipe: free running,
     parallel matches under CPU contention sample at different game-times.
     """
-    assert make_argv(_job(seed=777), ".game-w2", 75) == (
+    assert make_argv(_job(seed=777), ".game-w2", 75, "demo") == (
         "make",
         "play",
         "GAME_DIR=.game-w2",
         "PLAY_SEED=777",
         "PLAY_SAMPLES=1500",
         "PLAY_LOCKSTEP=75",
-        "PLAY_LOG=runs/tank-s777.log",
-        "PLAY_ARGS=1500 doctrines/default.doctrine runs/traces/tank-s777.ndjson",
+        "PLAY_LOG=runs/sweeps/demo/logs/tank-s777.log",
+        "PLAY_ARGS=1500 doctrines/default.doctrine runs/traces/demo/tank-s777.ndjson",
     )
+
+
+def test_a_frozen_tree_is_carried_to_every_job_in_the_batch() -> None:
+    """A match imports the source tree at launch, so without this an edit
+    landed mid-batch meant later matches ran different code from earlier ones
+    -- the working tree was frozen for the batch's whole runtime
+    ([[policy-loop]])."""
+    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", tree="runs/sweeps/demo/.tree")
+    assert "PLAY_TREE=runs/sweeps/demo/.tree" in argv
+
+
+def test_a_pinned_batch_says_so_and_an_unpinned_one_stays_silent() -> None:
+    """Silence is load-bearing: a tree frozen before the option existed runs
+    an agent that rejects the unknown key, so an unpinned batch must not
+    mention the variable at all ([[policy-determinism]]).
+    """
+    pinned = make_argv(_job(seed=777), ".game-w2", 75, "demo", pin_delta=3)
+    assert "PLAY_PINDELTA=3" in pinned
+    unpinned = make_argv(_job(seed=777), ".game-w2", 75, "demo")
+    assert not [element for element in unpinned if element.startswith("PLAY_PINDELTA")]
+
+
+def test_a_frozen_tree_owns_the_doctrine_path_too() -> None:
+    """The first snapshot batch proved this within the hour: matches imported
+    frozen code but read the working tree's doctrine file, a field was added
+    mid-batch, and the frozen parser refused it on sixteen straight matches.
+    A doctrine file is as much the experiment as the code is."""
+    frozen = play_args(_job(doctrine="doctrines/mass25.doctrine"), "demo", "runs/sweeps/demo/.tree")
+    assert frozen == (
+        "1500 runs/sweeps/demo/.tree/doctrines/mass25.doctrine runs/traces/demo/tank-s1.ndjson"
+    )
+    argv = make_argv(_job(seed=777), ".game-w2", 75, "demo", tree="runs/sweeps/demo/.tree")
+    assert (
+        "PLAY_ARGS=1500 runs/sweeps/demo/.tree/doctrines/default.doctrine "
+        "runs/traces/demo/tank-s777.ndjson"
+    ) in argv
 
 
 def _report() -> MatchReport:
@@ -213,6 +249,10 @@ def _report() -> MatchReport:
         extractors_end=13,
         attack_orders=208,
         rallied=27,
+        intercepts=12,
+        sightings=41,
+        raids=3,
+        marches=9,
         army_start=0,
         army_end=20,
         targets_seen=16,

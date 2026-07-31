@@ -238,19 +238,27 @@ def assigned(jobs: Sequence[SweepJob], index: int, workers: int) -> tuple[SweepJ
 TRACE_ROOT = "runs/traces"
 
 
-def trace_path(job: SweepJob) -> str:
+def trace_path(job: SweepJob, batch: str) -> str:
     """Return where one job's per-sample trace is written.
+
+    Namespaced by batch, because a job's own name is only unique within one.
+    Two sweeps that shared an arm label used to overwrite each other's traces
+    -- re-running an arm for a new A/B silently destroyed the record the old
+    batch's findings were read from, and only run-to-run determinism kept
+    that from mattering ([[policy-trace]]).
 
     Args:
         job: The job.
+        batch: The sweep this job belongs to, as the results directory names
+            it.
 
     Returns:
-        A path under :data:`TRACE_ROOT`, named after the job.
+        A path under :data:`TRACE_ROOT`, named after the batch and the job.
     """
-    return f"{TRACE_ROOT}/{job_name(job)}.ndjson"
+    return f"{TRACE_ROOT}/{batch}/{job_name(job)}.ndjson"
 
 
-def play_args(job: SweepJob) -> str:
+def play_args(job: SweepJob, batch: str, tree: str = "") -> str:
     """Return the planner's positional argument list for one job.
 
     **Every match records a trace now, where sweeps used to pass ``-``.** The
@@ -264,17 +272,36 @@ def play_args(job: SweepJob) -> str:
     It is also what makes the results tabular rather than prose. One row per
     sample per match, against one text scorecard per match parsed by shape.
 
+    **The doctrine is read from the frozen tree, not the working one.** The
+    first snapshot batch proved why within the hour: matches imported frozen
+    code but read the job line's doctrine path from the repository root, a
+    doctrine field was added to the working tree mid-batch, and the frozen
+    parser refused the new field on sixteen straight matches -- the freeze
+    exists precisely so a mid-batch edit cannot reach a running experiment,
+    and a doctrine file is as much the experiment as the code is
+    (log: 2026-07-29).
+
     Args:
         job: The job.
+        batch: The sweep this job belongs to, for the trace namespace.
+        tree: The batch's frozen snapshot, or empty to read the job's doctrine
+            path as written.
 
     Returns:
         The value of ``PLAY_ARGS``: samples, doctrine path, trace path.
     """
-    return f"{job['samples']} {job['doctrine']} {trace_path(job)}"
+    doctrine = f"{tree}/{job['doctrine']}" if tree else job["doctrine"]
+    return f"{job['samples']} {doctrine} {trace_path(job, batch)}"
 
 
 def make_argv(
-    job: SweepJob, game_dir: str, lockstep: int, match: MatchConfig | None = None
+    job: SweepJob,
+    game_dir: str,
+    lockstep: int,
+    batch: str,
+    match: MatchConfig | None = None,
+    tree: str = "",
+    pin_delta: int = 0,
 ) -> tuple[str, ...]:
     """Return the command that plays one match.
 
@@ -291,11 +318,24 @@ def make_argv(
     plays the engine's own hardcoded ten-player free-for-all, which is what
     every measurement before this was taken in.
 
+    **So is the tree.** A match imports the source tree at launch, so an edit
+    landed mid-batch used to mean later matches ran different code from
+    earlier ones -- the whole working tree was frozen for the length of every
+    sweep. The batch freezes its own copy instead and every job points at it
+    ([[policy-loop]]).
+
     Args:
         job: The job.
         game_dir: The cloned game directory this worker owns.
         lockstep: Engine frames between samples.
         match: Which match to play, or None for the engine's own default.
+        tree: The batch's frozen code snapshot, or empty to import the working
+            tree -- the single-match entry points' behaviour.
+        pin_delta: Constant frame delta in milliseconds, or zero to leave the
+            engine on the wall clock. Zero is also what a tree frozen before
+            the option existed requires -- its agent rejects the unknown key
+            -- so the default stays off until those trees retire
+            ([[policy-determinism]]).
 
     Returns:
         The argument vector, program first.
@@ -307,9 +347,17 @@ def make_argv(
         f"PLAY_SEED={job['seed']}",
         f"PLAY_SAMPLES={job['samples']}",
         f"PLAY_LOCKSTEP={lockstep}",
-        f"PLAY_LOG=runs/{job_name(job)}.log",
-        f"PLAY_ARGS={play_args(job)}",
+        # Into the batch directory, not the shared runs/ floor: engine and
+        # agent logs are the deep-debug layer -- one of them named the
+        # placeholder bug outright -- and the shared floor overwrote them
+        # across batches and replays (log: 2026-07-31).
+        f"PLAY_LOG=runs/sweeps/{batch}/logs/{job_name(job)}.log",
+        f"PLAY_ARGS={play_args(job, batch, tree)}",
     ]
+    if tree:
+        argv.append(f"PLAY_TREE={tree}")
+    if pin_delta:
+        argv.append(f"PLAY_PINDELTA={pin_delta}")
     if match is not None:
         argv.extend(
             [

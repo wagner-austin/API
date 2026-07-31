@@ -166,6 +166,7 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         "  c_tank costs 350, goes on the ring",
         "  c_tank costs 350, goes on the ring",
         "  c_tank costs 350, goes on the ring",
+        "plan total: 3500 credits, holding 9000",
         "verdict        survived (sample_limit)",
         "plan           7/7 -- done: all 7 plan entries satisfied",
         "build orders   0",
@@ -180,6 +181,10 @@ def test_a_completed_plan_exits_zero(capsys: pytest.CaptureFixture[str]) -> None
         "extractors     3 -> 3",
         "attack orders  0",
         "rallied        0",
+        "intercepted    0",
+        "sightings      0",
+        "raids          0",
+        "marches        0",
         "army           4 -> 4",
         # The scripted world carries no player records, so the engine's own
         # scoreboard reads as absent rather than as a measurement of nothing.
@@ -224,7 +229,9 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
     peer = ScriptedPeer(_sample_lines(1, 10, _BUILDER) * 2)
     with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"]) == EXIT_INCOMPLETE
-    assert capsys.readouterr().out.splitlines()[11:] == [
+    # One more header line than before: the plan now announces its total price
+    # against the opening balance.
+    assert capsys.readouterr().out.splitlines()[12:] == [
         "verdict        survived (sample_limit)",
         # The extractor has no pool in this scripted world, so the plan reaches
         # past it to the factory and reports what blocks *that* -- an entry
@@ -242,6 +249,10 @@ def test_an_unfinished_plan_exits_nonzero(capsys: pytest.CaptureFixture[str]) ->
         "extractors     0 -> 0",
         "attack orders  0",
         "rallied        0",
+        "intercepted    0",
+        "sightings      0",
+        "raids          0",
+        "marches        0",
         "army           0 -> 0",
         "army value     0 -> 0",
         "total worth    0 -> 0",
@@ -278,7 +289,9 @@ def test_the_sample_budget_defaults_when_not_given(
     peer = ScriptedPeer(_sample_lines(1, 9000, _BUILDER, *built) * 200)
     with StubbedConnect(peer):
         assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH)]) == EXIT_OK
-    assert capsys.readouterr().out.splitlines()[10:] == [
+    # One more header line than before: the plan now announces its total price
+    # against the opening balance.
+    assert capsys.readouterr().out.splitlines()[11:] == [
         "verdict        survived (sample_limit)",
         "plan           7/7 -- done: all 7 plan entries satisfied",
         "build orders   0",
@@ -293,6 +306,10 @@ def test_the_sample_budget_defaults_when_not_given(
         "extractors     3 -> 3",
         "attack orders  0",
         "rallied        0",
+        "intercepted    0",
+        "sightings      0",
+        "raids          0",
+        "marches        0",
         "army           4 -> 4",
         # The scripted world carries no player records, so the engine's own
         # scoreboard reads as absent rather than as a measurement of nothing.
@@ -381,6 +398,17 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     reserve=-1,
                     expand=True,
                     counter=False,
+                    cover=True,
+                    intercept=False,
+                    guard_cap=0,
+                    aa_cover=False,
+                    forward=False,
+                    scout=False,
+                    raid=0,
+                    rush=False,
+                    creep=False,
+                    riposte=False,
+                    tech=False,
                 )
             )
         )
@@ -436,3 +464,43 @@ def test_the_reserve_covers_the_dearest_thing_the_bot_keeps_making() -> None:
 def test_nothing_to_reinforce_reserves_nothing() -> None:
     """No army to protect means every spare credit belongs to the economy."""
     assert expansion_reserve((), load_catalogue(_CATALOGUE_PATH)) == 0
+
+
+def test_the_opening_settles_by_content_not_by_clock(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A held match world may be sampled before its units spawn.
+
+    The world used to settle on 22 seconds of free-running wall clock, and
+    runs began from worlds that already differed ([[policy-determinism]]).
+    The roster is what plan expansion reads, so the roster is the condition:
+    empty samples are acknowledged and the plan is expanded against the first
+    observation that owns something finished.
+    """
+    built = [(300 + i, name) for i, name in enumerate(_EXPANDED)]
+    empty = _sample_lines(1, 4000)
+    populated = _sample_lines(2, 9000, _BUILDER, *built)
+    # Two empty observations, one populated one the settle consumes, then the
+    # loop's own two samples.
+    peer = ScriptedPeer(empty + empty + populated * 3)
+    with StubbedConnect(peer):
+        assert main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "2"]) == EXIT_OK
+    printed = capsys.readouterr().out.splitlines()
+    # The plan was expanded against the populated world, not the empty one.
+    assert printed[2] == (
+        "plan:  extractorT1 -> extractorT1 -> extractorT1 -> c_tank -> c_tank -> c_tank -> c_tank"
+    )
+
+
+def test_a_world_that_never_populates_is_a_failed_start_not_a_slow_one() -> None:
+    """The settle is bounded: a match whose units never spawn is broken, and
+    expanding a plan against an empty world says so loudly rather than
+    waiting forever.
+    """
+    from rw_bot.policy.expand import ExpansionError
+
+    empty = _sample_lines(1, 4000)
+    peer = ScriptedPeer(empty * 60)
+    with StubbedConnect(peer), pytest.raises(ExpansionError) as caught:
+        main(["27200", str(_CATALOGUE_PATH), str(_PLACEMENT_PATH), "1"])
+    assert caught.value.code == "RW-EXPAND-001"
