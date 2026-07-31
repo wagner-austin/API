@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe decompile play income sweep
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch income sweep
 
 help:
 	@Write-Host ""
@@ -25,6 +25,7 @@ help:
 	@Write-Host "  make type-flags                  placement rules from the live type registry"
 	@Write-Host "  make wire-capture                regenerate the archived world-stream fixture"
 	@Write-Host "  make sandbox-probe               live skirmish with the agent attached"
+	@Write-Host "  make discover-probe              reflective engine-state snapshots at timed offsets"
 	@Write-Host ""
 	@Write-Host "Play:" -ForegroundColor Yellow
 	@Write-Host "  make play                        start a game, play a whole match, stop it"
@@ -34,6 +35,10 @@ help:
 	@Write-Host "                                   INCOME_STAGES=4 INCOME_IDLE=200 INCOME_LOG=runs/income.log"
 	@Write-Host "  make sweep                       play a batch of matches in parallel, resumably"
 	@Write-Host "                                   SWEEP_JOBS=sweeps/x.txt SWEEP_NAME=x SWEEP_WORKERS=4"
+	@Write-Host "  make watch                       one windowed match a human can watch"
+	@Write-Host "                                   WATCH_DIFFICULTY=3 WATCH_DOCTRINE=doctrines/aa-counter-guard.doctrine"
+	@Write-Host "  make host                        bot-hosted LAN game a human can join"
+	@Write-Host "                                   HOST_MAP=maps/skirmish/[p2]duel_lake.tmx"
 	@Write-Host ""
 	@Write-Host "Java agent:" -ForegroundColor Yellow
 	@Write-Host "  make agent                       compile + jar the javaagent"
@@ -361,6 +366,22 @@ host:
 	@Write-Host ""
 	@Write-Host "==> host (bot-hosted LAN game on port 5123, log: $(HOST_LOG))" -ForegroundColor Cyan
 	& scripts/make/host.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(HOST_LOG)" -HostMap "$(HOST_MAP)" -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(HOST_SAMPLES) $(HOST_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
+
+# One match with the window on, so a human can watch the bot fight. The same
+# agent-driven skirmish as `play` with rendering on and the reproducibility
+# machinery off: lockstep would hold frames on the planner's acks and a fixed
+# logic step is pointless when the point is to watch it in real time. Difficulty
+# defaults to the rung the champion is measured against.
+WATCH_MAP ?= maps/skirmish/[p2]duel_lake.tmx
+WATCH_OPPONENTS ?= 1
+WATCH_DIFFICULTY ?= 3
+WATCH_SAMPLES ?= 20000
+WATCH_DOCTRINE ?= doctrines/aa-counter-guard.doctrine
+WATCH_LOG ?= runs/watch.log
+watch:
+	@Write-Host ""
+	@Write-Host "==> watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))" -ForegroundColor Cyan
+	& scripts/make/watch.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(WATCH_LOG)" -Map "$(WATCH_MAP)" -Opponents $(WATCH_OPPONENTS) -Difficulty $(WATCH_DIFFICULTY) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
 
 # A batch of matches, played several at a time. Each worker gets its own copy of
 # the game directory because a running match writes three fixed-name paths
