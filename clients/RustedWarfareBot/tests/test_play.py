@@ -19,9 +19,9 @@ from scripts.play import (
     expansion_reserve,
     heavy_reinforcements,
     load_catalogue,
-    reinforcements,
     load_placements,
     main,
+    reinforcements,
 )
 
 from rw_bot.policy.doctrine import Doctrine, DoctrineError, format_doctrine
