@@ -71,7 +71,7 @@ def test_combat_landing_candidates_orders_by_distance_and_filters_dynamic_tiles(
         team=1,
     )
 
-    assert combat_landing_candidates(world, self_state, target) == [(103, 100)]
+    assert combat_landing_candidates(world, self_state, target, None, 100000) == [(103, 100)]
 
 
 def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
@@ -98,7 +98,10 @@ def test_combat_landing_candidates_skip_out_of_bounds_tiles() -> None:
         timestamp_ms=1000,
     )
 
-    assert combat_landing_candidates(world, self_state, target) == [(1, 0), (0, 1)]
+    assert combat_landing_candidates(world, self_state, target, None, 100000) == [
+        (1, 0),
+        (0, 1),
+    ]
 
 
 def test_choose_combat_landing_tile_returns_target_coords_with_terrain() -> None:
@@ -234,3 +237,47 @@ def test_has_cardinal_enemy_adjacency_matches_exact_distance_one() -> None:
     assert has_cardinal_enemy_adjacency(self_state, target) is True
     self_state["x"] = 102
     assert has_cardinal_enemy_adjacency(self_state, target) is False
+
+
+def test_combat_landing_candidates_skip_terrain_blocked_tiles() -> None:
+    """Impassable composed terrain removes a candidate (F20).
+
+    Run bot-20260730-110x ticks 904-949: the walk-close re-dispatched
+    a move onto unwalkable ground forty-plus consecutive ticks because
+    candidates never consulted terrain.
+    """
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    world, self_state, target = _world()
+    terrain = InMemoryTerrainMap(
+        terrain_data={
+            (103, 100): InMemoryTerrainMap.ROCK,
+            (104, 101): "W",
+            (104, 99): "W",
+        }
+    )
+
+    assert combat_landing_candidates(world, self_state, target, terrain, 100000) == [(105, 100)]
+
+
+def test_combat_landing_candidates_skip_failed_move_marked_tiles() -> None:
+    """A live failed-move mark removes a candidate.
+
+    The server already said "you can't go there" — re-selecting the
+    tile inside the mark's TTL re-derives the identical rejected move.
+    """
+    from tankpit_bot.sniffer.world_state import (
+        mark_move_target_failed,
+        reset_world_state,
+    )
+
+    reset_world_state()
+    world, self_state, target = _world()
+    mark_move_target_failed(103, 100, 99000)
+
+    try:
+        result = combat_landing_candidates(world, self_state, target, None, 100000)
+    finally:
+        reset_world_state()
+
+    assert result == [(105, 100), (104, 101), (104, 99)]

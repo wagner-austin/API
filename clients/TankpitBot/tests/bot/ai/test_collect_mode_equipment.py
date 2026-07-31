@@ -875,3 +875,70 @@ def test_hop_toward_equipment_skips_when_landing_tile_impassable() -> None:
     decision = _hop_toward_equipment(ctx, ctx.base)
 
     assert decision is None
+
+
+def test_hop_toward_equipment_never_teleports_to_its_own_tile() -> None:
+    """A landing equal to the current position is not travel.
+
+    Flag s8-2 (run bot-20260730-025337, 03:00:00): the escape hop
+    landed ON its target and the next derivation selected a fresh
+    teleport to the tile the tank was standing on, deferring a
+    map open for a zero-distance jump. Ground the tank already owns
+    belongs to the pickup steps, so the sole own-tile candidate
+    declines the hop entirely.
+    """
+    containers = {
+        "100,100": make_container_state(
+            x=100,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain = InMemoryTerrainMap()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    assert _hop_toward_equipment(ctx, ctx.base) is None
+
+
+def test_hop_toward_equipment_skips_own_tile_for_a_real_candidate() -> None:
+    """The zero-cost own-tile candidate never outbids actual travel.
+
+    Cost ranking structurally favors the own-tile candidate (cost 0),
+    so without the own-ground gate the (100,100) container would win
+    over the external (130,100) one and produce the s8-2 self-teleport.
+    """
+    containers = {
+        "100,100": make_container_state(
+            x=100,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    inventory = make_inventory(default_count=15)
+    terrain = InMemoryTerrainMap()
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = _hop_toward_equipment(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected equipment-hop decision")
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["command"]["target_x"] == 130
+    assert decision["command"]["target_y"] == 100

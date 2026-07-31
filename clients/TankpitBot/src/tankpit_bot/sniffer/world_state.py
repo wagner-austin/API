@@ -119,6 +119,28 @@ def is_move_target_failed(x: int, y: int, now_ms: int) -> bool:
     return _service.is_move_target_failed(x, y, now_ms)
 
 
+def record_movement_rejection(timestamp_ms: int) -> None:
+    """Record a server cant_go refusal of any movement leg.
+
+    Args:
+        timestamp_ms: When the rejection arrived.
+    """
+    _service.record_movement_rejection(timestamp_ms)
+
+
+def recent_movement_rejections(now_ms: int, window_ms: int) -> int:
+    """Count movement rejections inside the trailing window.
+
+    Args:
+        now_ms: Current wall-clock ms.
+        window_ms: Trailing window length.
+
+    Returns:
+        Number of rejections newer than ``now_ms - window_ms``.
+    """
+    return _service.recent_movement_rejections(now_ms, window_ms)
+
+
 def recent_own_mine_hit(now_ms: int) -> bool:
     """Check whether a walk-over mine hit landed within the flip window.
 
@@ -196,6 +218,8 @@ __all__ = [
     "mark_move_target_failed",
     "mark_radar_scan_complete",
     "mark_scan_viewport_failed",
+    "recent_movement_rejections",
+    "record_movement_rejection",
     "register_room_image",
     "reset_world_state",
     "set_selected_room",

@@ -826,6 +826,56 @@ class TestClearCommandError:
         assert bot.get_state() == "IDLE"
         assert get_world_service().last_command_error == -1
 
+    def test_cant_go_on_collect_records_a_movement_rejection(self, fake_env: FakeEnv) -> None:
+        """A cant_go rejecting a walk-pickup lands in the movement record.
+
+        Run bot-20260730-110x ticks 95-107: twelve consecutive
+        rejected walk-pickups under fire were invisible to the
+        per-tile move marks because collect rejections only fed
+        ``failed_pickups`` — the escape's movement-dead detector
+        needs the shared "the server refused a move" fact regardless
+        of the command kind.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import (
+            get_world_service,
+            recent_movement_rejections,
+        )
+
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("collect", target_x=150, target_y=150)
+
+        get_world_service().last_command_error = 1  # "You can't go there!"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert recent_movement_rejections(get_current_time_ms(), 10000) == 1
+
+    def test_non_movement_rejection_is_not_recorded(self, fake_env: FakeEnv) -> None:
+        """A code-0 collect rejection is not a movement refusal."""
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import (
+            get_world_service,
+            recent_movement_rejections,
+        )
+
+        update_world_state_from_position(100, 100)
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = self._make_pending_action("collect", target_x=150, target_y=150)
+
+        get_world_service().last_command_error = 0  # "You can't do this"
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert recent_movement_rejections(get_current_time_ms(), 10000) == 0
+
     def test_command_error_clears_collect_on_inventory_full(self, fake_env: FakeEnv) -> None:
         """A 0x52 ``Inventory full`` (code 7) aborts the pickup, keeps the container.
 

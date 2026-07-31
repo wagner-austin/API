@@ -54,6 +54,7 @@ from tankpit_bot.sniffer.world_state import (
     is_move_target_failed,
     mark_move_target_failed,
     mark_scan_viewport_failed,
+    record_movement_rejection,
 )
 from tankpit_bot.sniffer.world_state_combat import check_and_clear_command_error
 from tankpit_bot.sniffer.world_state_containers import (
@@ -364,6 +365,15 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     if kind in ("move", "teleport"):
         mark_move_target_failed(tx, ty, get_current_time_ms())
         emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)
+    if error_code == _COMMAND_ERROR_CANT_GO_THERE and kind in ("move", "collect", "teleport"):
+        # The shared fact behind a cant_go on ANY movement-bearing
+        # command is "the tank tried to move and the server said no"
+        # -- a walk-pickup's leg is a move even though its kind is
+        # collect. Run bot-20260730-110x ticks 95-107: twelve
+        # consecutive rejected walk-pickups under fire, invisible to
+        # the per-tile marks because collect rejections only fed
+        # failed_pickups.
+        record_movement_rejection(get_current_time_ms())
     bot._transition("IDLE", in_flight_action=make_no_action())
     return True
 

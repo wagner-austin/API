@@ -10,16 +10,13 @@ from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict, make_enemy_threat
 from tankpit_bot.inventory import InventoryState
-from tankpit_bot.ledger.damage_book import (
-    confirm_incoming_damage,
-    record_incoming_shot,
-)
-from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state import reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_container_state, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
     make_world,
+    seed_confirmed_incoming,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -117,21 +114,6 @@ def _pursuit_target(*, damage_state: int) -> TankStateDict:
     )
 
 
-def _seed_confirmed_incoming(count: int, weapon: int = 1, damage: int = -90) -> None:
-    """Confirm ``count`` hits into the live world book.
-
-    Defaults model dual fire (weapon 1, -90); pass ``weapon=0`` with
-    ``damage=-45`` for the practice-room single-shot rate -- the
-    confirm budget must cover the recorded weapon's cost or the book
-    confirms nothing.
-    """
-    book = get_world_service().damage_book
-    for i in range(count):
-        ts = 95000 + i * 1000
-        record_incoming_shot(book, 60, "ganker", weapon, ts)
-        confirm_incoming_damage(book, damage, ts + 100)
-
-
 def _engage_ctx(*, fuel: int, damage_state: int = 3) -> DecideCtx:
     tanks: dict[str, TankStateDict] = {"50": _pursuit_target(damage_state=damage_state)}
     world, self_state = make_world(
@@ -181,7 +163,7 @@ def test_engage_blocks_the_unwinnable_two_attacker_fight() -> None:
     break blocks the target with the standard TTL and replans.
     """
     reset_world_state()
-    _seed_confirmed_incoming(5)
+    seed_confirmed_incoming(5)
     try:
         decision = decide_hunt_mode(_engage_ctx(fuel=800))
     finally:
@@ -201,7 +183,7 @@ def test_engage_breaks_under_moderate_fire_and_keeps_the_lock() -> None:
     (never-drop) and latches the release level.
     """
     reset_world_state()
-    _seed_confirmed_incoming(5, weapon=0, damage=-45)
+    seed_confirmed_incoming(5, weapon=0, damage=-45)
     try:
         decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
     finally:
@@ -235,7 +217,7 @@ def test_break_sets_the_escape_latch_on_the_delegated_decision() -> None:
     next tick's shot, reopened by the next break, 27-36 fuel/tick).
     """
     reset_world_state()
-    _seed_confirmed_incoming(5, weapon=0, damage=-45)
+    seed_confirmed_incoming(5, weapon=0, damage=-45)
     try:
         decision = decide_hunt_mode(_engage_ctx(fuel=500, damage_state=1))
     finally:
@@ -396,7 +378,7 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     first sustained-fire window while escape is still cheap.
     """
     reset_world_state()
-    _seed_confirmed_incoming(5, weapon=0, damage=-45)
+    seed_confirmed_incoming(5, weapon=0, damage=-45)
     try:
         base_ctx = _engage_ctx(fuel=500, damage_state=1)
         close_ctx = DecideCtx(
@@ -429,7 +411,7 @@ def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
     at capacity and escape to fuel with the lock held.
     """
     reset_world_state()
-    _seed_confirmed_incoming(5)
+    seed_confirmed_incoming(5)
     try:
         base_ctx = _engage_ctx(fuel=800)
         base_ctx.world["tanks"]["50"] = make_tank_state(
@@ -461,7 +443,7 @@ def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
 def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:
     """A fight no fuel level can fund is blocked from CLOSE ticks too."""
     reset_world_state()
-    _seed_confirmed_incoming(5)
+    seed_confirmed_incoming(5)
     try:
         base_ctx = _engage_ctx(fuel=800)
         close_ctx = DecideCtx(

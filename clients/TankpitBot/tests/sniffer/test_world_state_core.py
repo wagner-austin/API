@@ -652,3 +652,50 @@ class TestFailedMoveTargets:
         mark_move_target_failed(73, 158, 90000)
         update_world_state_from_radar(get_world_service(), [], [], [])
         assert is_move_target_failed(73, 158, 100000) is False
+
+
+class TestMovementRejections:
+    """Tests for the movement-rejection record."""
+
+    def setup_method(self) -> None:
+        """Reset shared world-state globals before each test."""
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset shared world-state globals after each test."""
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+
+    def test_recorded_rejections_count_inside_the_window(self) -> None:
+        """Rejections inside the trailing window are counted."""
+        from tankpit_bot.sniffer.world_state import (
+            recent_movement_rejections,
+            record_movement_rejection,
+        )
+
+        record_movement_rejection(95000)
+        record_movement_rejection(97000)
+
+        assert recent_movement_rejections(100000, 10000) == 2
+
+    def test_stale_rejections_fall_out_of_the_window(self) -> None:
+        """Rejections older than the window are pruned and not counted."""
+        from tankpit_bot.sniffer.world_state import (
+            recent_movement_rejections,
+            record_movement_rejection,
+        )
+
+        record_movement_rejection(80000)
+        record_movement_rejection(97000)
+
+        assert recent_movement_rejections(100000, 10000) == 1
+        assert recent_movement_rejections(120000, 10000) == 0
+
+    def test_empty_record_counts_zero(self) -> None:
+        """A fresh service has no rejections on record."""
+        from tankpit_bot.sniffer.world_state import recent_movement_rejections
+
+        assert recent_movement_rejections(100000, 10000) == 0

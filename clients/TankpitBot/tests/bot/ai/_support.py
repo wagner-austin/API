@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state
 from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.ledger.damage_book import confirm_incoming_damage, record_incoming_shot
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import (
     ContainerStateDict,
     SelfStateDict,
@@ -13,6 +15,26 @@ from tankpit_bot.state.types import (
     make_self_state,
     make_viewport_state,
 )
+
+
+def seed_confirmed_incoming(count: int, weapon: int = 1, damage: int = -90) -> None:
+    """Confirm ``count`` hits into the live world damage book.
+
+    Defaults model dual fire (weapon 1, -90); pass ``weapon=0`` with
+    ``damage=-45`` for the practice-room single-shot rate -- the
+    confirm budget must cover the recorded weapon's cost or the book
+    confirms nothing. Callers own ``reset_world_state`` bracketing.
+
+    Args:
+        count: Number of hits to record and confirm.
+        weapon: Wire weapon byte for each recorded shot.
+        damage: Fuel delta covering each confirmation.
+    """
+    book = get_world_service().damage_book
+    for i in range(count):
+        ts = 95000 + i * 1000
+        record_incoming_shot(book, 60, "ganker", weapon, ts)
+        confirm_incoming_damage(book, damage, ts + 100)
 
 
 def make_scanned_ai_state(

@@ -559,8 +559,14 @@ def test_collect_takes_visible_equipment_at_critical_fuel() -> None:
     assert decision["behavior"]["target_x"] == 103
 
 
-def test_locked_fuel_clears_when_water_locked() -> None:
-    """A locked fuel target on water clears when fully boxed in."""
+def test_locked_fuel_holds_when_water_locked() -> None:
+    """A water-boxed fuel plan survives the tick it cannot execute.
+
+    Committed-intent law ([[committed-intent]]): transient
+    inexecutability holds the plan — the tick goes to the rest of
+    the cascade, and only a genuine release gate (superior
+    candidate, validity, the move-failed mark) drops it.
+    """
     terrain_data: dict[tuple[int, int], str] = {}
     for x in range(92, 108):
         for y in range(92, 108):
@@ -606,7 +612,8 @@ def test_locked_fuel_clears_when_water_locked() -> None:
 
     if decision is None:
         raise AssertionError("expected collect decision")
-    assert decision["updated_ai_state"]["resource_target_kind"] == ""
+    assert decision["behavior"]["reason_kind"] != "fuel_locked"
+    assert decision["updated_ai_state"]["resource_target_kind"] == "fuel"
 
 
 def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:

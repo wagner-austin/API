@@ -988,7 +988,13 @@ def _combat_landing_candidates(
     target: EnemyThreatDict,
 ) -> list[tuple[int, int]]:
     """Return usable adjacent landing tiles ordered by distance to self."""
-    return shared_combat_landing_candidates(ctx.filtered, ctx.self_state, target)
+    return shared_combat_landing_candidates(
+        ctx.filtered,
+        ctx.self_state,
+        target,
+        ctx.terrain,
+        ctx.timestamp_ms,
+    )
 
 
 def has_combat_shot(ctx: DecideCtx, target: EnemyThreatDict) -> bool:

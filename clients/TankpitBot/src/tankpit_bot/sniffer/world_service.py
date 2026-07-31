@@ -134,6 +134,7 @@ class WorldService:
         self.pending_radar_empty_delta_ms: int = 0
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
+        self.movement_rejections: list[int] = []
         self.failed_scan_viewports: dict[str, int] = {}
         self.last_command_error: int = -1
         # Set by the 0x41 dispatch when the wire announces OUR OWN
@@ -353,6 +354,39 @@ class WorldService:
     def clear_failed_move_targets(self) -> None:
         """Clear all failed move targets. Called on fresh radar data."""
         self.failed_move_targets.clear()
+
+    def record_movement_rejection(self, timestamp_ms: int) -> None:
+        """Record a server cant_go refusal of a movement leg.
+
+        Every move, walk-pickup, or teleport dispatch the server
+        answers with ``cant_go`` lands here regardless of the
+        command's kind — the shared fact is "the tank tried to move
+        and the server said no." Consumers count refusals in a
+        trailing window to detect a movement-dead tank (run
+        bot-20260730-110x ticks 95-107: twelve consecutive rejected
+        walk-pickups under fire while the escape kept planning walks).
+
+        Args:
+            timestamp_ms: When the rejection arrived.
+        """
+        self.movement_rejections.append(timestamp_ms)
+
+    def recent_movement_rejections(self, now_ms: int, window_ms: int) -> int:
+        """Count movement rejections inside the trailing window.
+
+        Prunes entries older than the window so the record never
+        grows beyond live relevance.
+
+        Args:
+            now_ms: Current wall-clock ms.
+            window_ms: Trailing window length.
+
+        Returns:
+            Number of rejections with ``timestamp > now - window``.
+        """
+        floor = now_ms - window_ms
+        self.movement_rejections = [ts for ts in self.movement_rejections if ts > floor]
+        return len(self.movement_rejections)
 
     def mark_scan_viewport_failed(
         self,

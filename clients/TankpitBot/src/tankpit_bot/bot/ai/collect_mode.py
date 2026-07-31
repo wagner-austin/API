@@ -54,7 +54,11 @@ from tankpit_bot.inventory import inventory_all_full
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
-from tankpit_bot.sniffer.world_state import get_incoming_damage_window
+from tankpit_bot.sniffer.world_state import (
+    get_incoming_damage_window,
+    is_move_target_failed,
+    recent_movement_rejections,
+)
 from tankpit_bot.state.types import ContainerStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -159,6 +163,15 @@ _MINE_CLEARANCE_EFFECT_MS = 5_000
 # assessment's own 3-hit window floor so "under fire" means the same
 # thing in both places.
 _SUSTAINED_FIRE_HIT_FLOOR = 3
+
+# Movement-dead floor: this many server cant_go refusals inside the
+# fire window mean the tank cannot walk ANYWHERE right now (boxed by
+# terrain, tanks, or unrevealed mines), so the escape skips every
+# walk rung and jumps straight to the hop -- a teleport needs no walk
+# path and its landing is displacement-safe. Run bot-20260730-110x
+# ticks 95-107: twelve consecutive rejected walk-pickups under
+# purple-1's fire, fuel 972->663, before the hop rung finally won.
+_MOVEMENT_DEAD_REJECTION_FLOOR = 2
 
 
 def _mine_clearance_decision(
@@ -315,9 +328,24 @@ def _escape_under_fire_decision(
         locked_decision, base_state = _continue_or_release_lock(ctx, base_state)
         if locked_decision is not None:
             return locked_decision
-    fuel_walk = _select_and_pickup_fuel(ctx, base_state)
-    if fuel_walk is not None:
-        return fuel_walk
+    # Movement-dead check: when the server has refused this tank's
+    # movement _MOVEMENT_DEAD_REJECTION_FLOOR times inside the fire
+    # window, every further walk plan is fantasy — the walk rung is
+    # skipped and the hop (which needs no walk path and lands
+    # displacement-safe) is the only escape verb left.
+    movement_dead = (
+        recent_movement_rejections(ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS)
+        >= _MOVEMENT_DEAD_REJECTION_FLOOR
+    )
+    if movement_dead:
+        emit_ai(
+            "movement rejected %d+ times in window - walk rungs dead, hopping OUT",
+            _MOVEMENT_DEAD_REJECTION_FLOOR,
+        )
+    if not movement_dead:
+        fuel_walk = _select_and_pickup_fuel(ctx, base_state)
+        if fuel_walk is not None:
+            return fuel_walk
     larder_under_fire = _larder_harvest(ctx, base_state)
     if larder_under_fire is not None and _hop_escapes_attacker(base_state, larder_under_fire):
         return larder_under_fire
@@ -871,8 +899,25 @@ def _continue_or_release_equipment_lock(
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
     if locked_command is None:
-        emit_ai("locked equipment target at (%d,%d) no longer executable", target_x, target_y)
-        return None, release_collect_plan(base_state, reason="not_executable")
+        # Transient inexecutability HOLDS the plan ([[committed-intent]];
+        # run bot-20260730-032x ticks 361/366/371: three not_executable
+        # releases fired mid-approach with the plan's own map_open in
+        # flight, and each target was re-locked and served 2-3 ticks
+        # later — the plan was never invalid, the executor was busy).
+        # Only the server-confirmed move-failed mark is structural.
+        if is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
+            emit_ai(
+                "locked equipment target at (%d,%d) marked move-failed - releasing",
+                target_x,
+                target_y,
+            )
+            return None, release_collect_plan(base_state, reason="not_executable")
+        emit_ai(
+            "locked equipment target at (%d,%d) not executable this tick - holding plan",
+            target_x,
+            target_y,
+        )
+        return None, base_state
     emit_ai("continue locked equipment target at (%d,%d)", target_x, target_y)
     decision = make_decision(
         locked_command,
@@ -919,8 +964,20 @@ def _continue_or_release_fuel_lock(
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
     if locked_command is None:
-        emit_ai("locked fuel target at (%d,%d) no longer executable", target_x, target_y)
-        return None, release_collect_plan(base_state, reason="not_executable")
+        # Same transient-vs-structural law as the equipment lock.
+        if is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
+            emit_ai(
+                "locked fuel target at (%d,%d) marked move-failed - releasing",
+                target_x,
+                target_y,
+            )
+            return None, release_collect_plan(base_state, reason="not_executable")
+        emit_ai(
+            "locked fuel target at (%d,%d) not executable this tick - holding plan",
+            target_x,
+            target_y,
+        )
+        return None, base_state
     emit_ai(
         "continue locked fuel target at (%d,%d) vol=%d (fuel=%d)",
         target_x,

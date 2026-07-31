@@ -8,6 +8,7 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.bot.ai.types import EnemyThreatDict
+from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state import SelfStateDict, WorldStateDict
 
 # The server's effective shot range. User ruling 2026-07-29: "i dont
@@ -31,13 +32,25 @@ def combat_landing_candidates(
     world: WorldStateDict,
     self_state: SelfStateDict,
     target: EnemyThreatDict,
+    terrain: TerrainMapProtocol | None,
+    now_ms: int,
 ) -> list[tuple[int, int]]:
     """Return usable adjacent landing tiles ordered by self distance.
+
+    Usable means inside the map, not dynamically occupied, passable on
+    the composed terrain, and not carrying a live failed-move mark.
+    The last two filters are the F20 fix (run bot-20260730-110x ticks
+    904-949: the walk-close dispatched a move to (240,46) forty-plus
+    consecutive ticks — the server rejected every one and marked the
+    tile failed every tick, but neither terrain nor the mark was ever
+    consulted, so the identical move re-derived forever).
 
     Args:
         world: Current world state.
         self_state: Player state.
         target: Enemy threat to approach.
+        terrain: Composed decision terrain; ``None`` trusts the server.
+        now_ms: Current timestamp for the failed-move TTL check.
 
     Returns:
         Ordered usable landing tiles adjacent to the target.
@@ -53,6 +66,10 @@ def combat_landing_candidates(
         if not (0 <= candidate_x <= 255 and 0 <= candidate_y <= 255):
             continue
         if _is_dynamically_occupied(world, candidate_x, candidate_y):
+            continue
+        if terrain is not None and not terrain.is_passable(candidate_x, candidate_y):
+            continue
+        if is_move_target_failed(candidate_x, candidate_y, now_ms):
             continue
         usable.append((candidate_x, candidate_y))
     usable.sort(key=_distance_key(self_state["x"], self_state["y"]))

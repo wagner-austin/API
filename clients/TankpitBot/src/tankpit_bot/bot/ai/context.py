@@ -103,7 +103,11 @@ class DecideCtx:
                 "last_shot_target_name": "",
             },
         )
-        self.base = normalize_resource_target(self.base, self.filtered)
+        # Late import: intent.py imports this module's raw lock
+        # accessors, so the validity pass resolves at call time.
+        from tankpit_bot.bot.ai.intent import validate_collect_plan
+
+        self.base = validate_collect_plan(self.base, self.filtered)
 
 
 # =============================================================================
@@ -200,38 +204,6 @@ def set_resource_target(
             "resource_target_y": ty,
         },
     )
-
-
-def normalize_resource_target(
-    ai_state: AIStateDict,
-    world: WorldStateDict,
-) -> AIStateDict:
-    """Drop locked resource targets that are no longer pursuable.
-
-    Applies the SAME pursuability predicate as candidate selection
-    (kind match, failed pickups). A drained or failed container clears
-    the lock so the cascade re-derives from live registry truth.
-
-    Args:
-        ai_state: Current AI state with resource target fields.
-        world: Current world state with container positions.
-
-    Returns:
-        AI state with a no-longer-pursuable target cleared, or unchanged.
-    """
-    from tankpit_bot.bot.ai.equipment import is_container_pursuable
-
-    kind = ai_state["resource_target_kind"]
-    if kind not in ("fuel", "equipment"):
-        return clear_resource_target(ai_state)
-    tx = ai_state["resource_target_x"]
-    ty = ai_state["resource_target_y"]
-    target = world["containers"].get(f"{tx},{ty}")
-    if target is None:
-        return clear_resource_target(ai_state)
-    if not is_container_pursuable(target, want_fuel=kind == "fuel"):
-        return clear_resource_target(ai_state)
-    return ai_state
 
 
 def locked_resource_target(
@@ -485,7 +457,6 @@ __all__ = [
     "local_actionable_bounds",
     "locked_resource_target",
     "make_decision",
-    "normalize_resource_target",
     "require_command",
     "set_resource_target",
     "target_position_is_fresh",

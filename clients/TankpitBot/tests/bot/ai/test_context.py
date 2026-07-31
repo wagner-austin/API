@@ -6,7 +6,6 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     can_afford_teleport,
     locked_resource_target,
-    normalize_resource_target,
     set_resource_target,
     teleport_fuel_cost_to,
 )
@@ -49,76 +48,6 @@ def _world_with_container(
         scanned_tiles={},
         timestamp_ms=0,
     )
-
-
-class TestNormalizeResourceTarget:
-    """Tests for normalize_resource_target."""
-
-    def test_clears_invalid_kind(self) -> None:
-        """Non-fuel/equipment kind is cleared."""
-        state = make_initial_ai_state()
-        state = set_resource_target(state, "bogus", 10, 20)
-        result = normalize_resource_target(
-            state,
-            _world_with_container(10, 20, True, 100),
-        )
-        assert result["resource_target_kind"] == ""
-
-    def test_clears_missing_container(self) -> None:
-        """Target cleared when container no longer in world."""
-        state = set_resource_target(make_initial_ai_state(), "fuel", 99, 99)
-        world = _world_with_container(10, 20, True, 100)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == ""
-
-    def test_clears_fuel_targeting_equipment(self) -> None:
-        """Fuel target pointing at equipment container is cleared."""
-        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
-        world = _world_with_container(10, 20, False, 0)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == ""
-
-    def test_clears_equipment_targeting_fuel(self) -> None:
-        """Equipment target pointing at fuel container is cleared."""
-        state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
-        world = _world_with_container(10, 20, True, 500)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == ""
-
-    def test_clears_failed_pickup(self) -> None:
-        """Target with failed_pickups > 0 is cleared."""
-        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
-        world = _world_with_container(10, 20, True, 500, failed_pickups=1)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == ""
-
-    def test_preserves_old_target(self) -> None:
-        """A lock on an old but tracked container survives.
-
-        The 30 s freshness TTL was removed 2026-07-06: in-viewport
-        containers are wire-truthful under the truth layer, so age
-        alone never invalidates a lock.
-        """
-        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
-        world = _world_with_container(10, 20, True, 500)
-        world["timestamp_ms"] = 31000
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == "fuel"
-
-    def test_preserves_valid_fuel_target(self) -> None:
-        """Valid fuel target is preserved."""
-        state = set_resource_target(make_initial_ai_state(), "fuel", 10, 20)
-        world = _world_with_container(10, 20, True, 500)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == "fuel"
-        assert result["resource_target_x"] == 10
-
-    def test_preserves_valid_equipment_target(self) -> None:
-        """Valid equipment target is preserved."""
-        state = set_resource_target(make_initial_ai_state(), "equipment", 10, 20)
-        world = _world_with_container(10, 20, False, 0)
-        result = normalize_resource_target(state, world)
-        assert result["resource_target_kind"] == "equipment"
 
 
 class TestLockedResourceTarget:
