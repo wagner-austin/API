@@ -8,7 +8,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+  "src/tankpit_bot": "eade4f75f4a72733d539a9faeb6991857c41ed3e"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
@@ -16,7 +16,7 @@ hubs: [codebase]
 
 # Services — DI Architecture
 
-Three injectable services, composed via constructor kwargs on `SessionBase`. No service locator, no global state.[^1]
+Three services, injected two different ways. `CDPService` and `CommandService` are constructor kwargs on `SessionBase` (`cdp_service=` / `command_service=`, each defaulting to a self-constructed instance when omitted).[^1] `WorldService` is **not** a `SessionBase` kwarg — it is a module-level singleton in `sniffer/world_state.py` reached through `get_world_service()`, with `reset_world_state()` rebinding it for test isolation.[^4]
 
 ## CDPService (`browser/cdp_service.py`)
 
@@ -77,3 +77,4 @@ Standalone hookable functions in `browser/lifecycle.py`, used by both bot and sn
 [^1]: architecture phases A-C (WorldService, CommandService, CDPService) — 2026-06-14
 [^2]: architecture phase D + bot decomposition — SessionBase composition, 2026-06-16
 [^3]: action_lab/probe_factory.py — create_probe() and create_probe_services()
+[^4]: sniffer/world_state.py:18-33 — `_service = WorldService()` at module scope; `get_world_service()` returns it; `reset_world_state()` rebinds the global for tests. Verified 2026-07-31 against `browser/session_base.py:38-45`, whose `__init__` keyword-only parameters are `headless`, `prefer_account`, `cdp_service`, `command_service` — no `world_service`.

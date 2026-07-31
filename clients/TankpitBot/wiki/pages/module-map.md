@@ -7,7 +7,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "978d8c6c59543870d2fb73b6e2888ea9cd0456a2"
+  "src/tankpit_bot": "eade4f75f4a72733d539a9faeb6991857c41ed3e"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
@@ -45,6 +45,7 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 |--------|---------|
 | `_test_hooks/` | Protocol interfaces for DI — 8 submodules by domain (bot, browser, cdp, env, fs, etc.) |
 | `_hooks_guard.py` | MonkeyPatchBanRule enforcement |
+| `_pillow.py` | Typed Pillow boundary — `PillowImageProtocol` / `PillowImageModuleProtocol` + `load_pillow_image_module()`, so the dynamic PIL import stays strict-typed without a mypy import exception (consumed by `terrain.py`) |
 | `protocol/` | Wire constants, framing, encode/decode |
 | `parser.py` + `parser_messages.py` | CDP message parsing |
 | `decoder.py` + `state_decoder.py` | Wire blob decoders |
