@@ -302,6 +302,10 @@ def test_insufficient_credits_waits_rather_than_ordering() -> None:
     assert decision["action"] == "wait"
     assert decision["reason"] == "airFactory costs 900, holding 899"
     assert decision["type_name"] == ""
+    # The shortfall rides as a number, because the savings clock cannot judge
+    # a save it cannot see and parsing it back out of the reason would be the
+    # same figure laundered through prose ([[policy-economy]]).
+    assert decision["deficit"] == 1
 
 
 def test_exactly_enough_credits_orders() -> None:
@@ -454,6 +458,19 @@ def test_a_produced_unit_still_has_to_be_afforded() -> None:
     decision = decide(world, ("builder",), _CATALOGUE, _PLACEMENTS, _PROFILES, _free(world))
     assert decision["action"] == "wait"
     assert decision["reason"] == "builder costs 500, holding 499"
+    assert decision["deficit"] == 1
+
+
+def test_only_the_price_wait_carries_a_shortfall() -> None:
+    """A full ring and a missing action are waits the world can end on its
+    own; only a deficit is judged for convergence, so only the price wait
+    carries one."""
+    unready = _sample(
+        _BUILDER, credits=9000, options=(_option(214, "airFactory", available=False),)
+    )
+    decision = decide(unready, ("airFactory",), _CATALOGUE, _PLACEMENTS, _PROFILES, _free(unready))
+    assert decision["action"] == "wait"
+    assert decision["deficit"] == 0
 
 
 def test_no_builder_is_blocked_not_a_wait() -> None:
@@ -688,12 +705,18 @@ def test_no_free_worker_means_no_placed_order() -> None:
     A structure is only ever ordered from a worker the loop reports as free, so
     two rules can no longer re-task the same one off each other
     ([[policy-loop]]).
+
+    **A busy workforce is a wait now, not a block.** Ruling it "not playable
+    from here" cost every Hard win in a batch: defence kept all eight workers
+    employed, the factory never met a free one, and the plan stayed blocked
+    over a state the world leaves the moment a worker frees
+    (log: 2026-07-31).
     """
     world = _sample(_BUILDER)
-    assert (
-        decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _PROFILES, ())["action"]
-        == "blocked"
-    )
+    busy = decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _PROFILES, ())
+    assert busy["action"] == "wait"
+    assert busy["reason"] == "every unit that can make landFactory is busy"
+    assert busy["unit_id"] == 0
     assert (
         decide(world, ("landFactory",), _CATALOGUE, _PLACEMENTS, _PROFILES, _free(world))["action"]
         == "build"

@@ -26,7 +26,11 @@ from typing import Literal, TypedDict
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.placement import TypePlacement
-from rw_bot.mechanics.upgrades import satisfies
+from rw_bot.policy.progress import (
+    completed_count,
+    next_unsatisfied_index,
+    unsatisfied_indices,
+)
 from rw_bot.policy.siting import (
     find_anchor,
     next_ring_site,
@@ -76,6 +80,14 @@ class Decision(TypedDict):
             produced unit appears where the engine puts it, not where the
             planner asks.
         y: Placement world y. Zero unless ``action`` is ``"build"``.
+        deficit: Credits still missing for the entry being waited on; zero for
+            every other decision. Carried as a number because the tracker
+            cannot judge a save it cannot see -- the shortfall was already in
+            the wait's reason string, and parsing it back out would be the
+            same figure laundered through prose. What the tracker does with
+            it: a shortfall that never shrinks is a save that is not
+            happening, and the plan is ruled blocked rather than holding its
+            worker hostage forever ([[policy-economy]]).
     """
 
     action: Literal["build", "produce", "wait", "done", "blocked", "stalled"]
@@ -84,117 +96,7 @@ class Decision(TypedDict):
     unit_id: int
     x: float
     y: float
-
-
-def completed_count(sample: Sample, plan: Sequence[str]) -> int:
-    """Count how much of the plan the world already shows.
-
-    Progress is read from the roster rather than tracked in a counter, so a
-    structure that was destroyed is no longer counted as built and the policy
-    will replace it. Counting from observation is also what makes the policy
-    resumable: a planner that reconnects mid-match sees the same progress as
-    one that watched the whole thing.
-
-    Only owned entities count. The stream carries every visible entity, so
-    without the ownership check an opponent building the same structure in
-    view would advance this plan.
-
-    Only **finished** ones count, which is a distinction the roster alone
-    cannot make. A building joins the roster the moment construction starts,
-    so presence is not completion: counting on presence reported a plan done
-    while a factory was still a shell, and an unfinished factory produces
-    nothing, so the next entry could be ordered against a building that could
-    not accept it.
-
-    Args:
-        sample: One observation of the world.
-        plan: What to make, in order. Entries may be structures or units.
-
-    Returns:
-        How many plan entries are satisfied by finished structures the player
-        owns.
-    """
-    remaining: list[str] = list(plan)
-    built = 0
-    for entity in sample["entities"]:
-        if not entity["mine"] or not entity["complete"]:
-            continue
-        # An upgraded structure still answers the entry that asked for it. This
-        # matched the type name exactly, which was right until a structure
-        # could convert itself: an extractor that upgraded stopped satisfying
-        # the plan that built it, so the plan ordered another and did that
-        # forever, and the builder was never free again
-        # ([[policy-holding-ground]]).
-        match = next((name for name in remaining if satisfies(entity["type_name"], name)), None)
-        if match is not None:
-            remaining.remove(match)
-            built += 1
-    return built
-
-
-def next_unsatisfied_index(sample: Sample, plan: Sequence[str]) -> int:
-    """Return the index of the first plan entry the world does not already show.
-
-    This is deliberately not the same question as :func:`completed_count`, and
-    conflating them is a real defect rather than a hypothetical one. The count
-    answers "how many entries are satisfied"; using it as "which entry is next"
-    is only correct when the satisfied entries form a prefix of the plan.
-
-    They diverge the moment a plan names something the player already owns.
-    Every game starts with a builder, so the plan ``("landFactory", "builder")``
-    counts as one-satisfied, jumps straight to index 1, builds a second builder
-    and never builds the factory at all. Scanning for the first unsatisfied
-    entry fixes the order while keeping the inventory reading that makes
-    progress resumable.
-
-    Unfinished structures do not satisfy an entry, for the same reason they do
-    not advance :func:`completed_count`. That keeps the two answers consistent
-    -- a half-built factory leaves the plan pointing at the same entry, and the
-    caller's once-per-position rule is what stops it being ordered twice while
-    it goes up.
-
-    An upgraded structure satisfies the entry that asked for it, by the same
-    :func:`~rw_bot.mechanics.upgrades.satisfies` rule the count uses. The two
-    answers have to agree about what counts as satisfied or the plan reports
-    progress it will not act on ([[policy-holding-ground]]).
-
-    Args:
-        sample: One observation of the world.
-        plan: What to make, in order. Entries may be structures or units.
-
-    Returns:
-        The index to build next, or ``len(plan)`` when the plan is satisfied.
-    """
-    pending = unsatisfied_indices(sample, plan)
-    return pending[0] if pending else len(plan)
-
-
-def unsatisfied_indices(sample: Sample, plan: Sequence[str]) -> tuple[int, ...]:
-    """Return every plan entry the world does not already show, in order.
-
-    All of them rather than only the first, because an entry with nowhere to
-    stand defers to the next one: a plan that waited on whichever entry it had
-    reached stopped dead when the third extractor had no free pool, and never
-    built the factory that funds everything after it
-    ([[policy-holding-ground]]).
-
-    Args:
-        sample: One observation of the world.
-        plan: What to make, in order. Entries may be structures or units.
-
-    Returns:
-        The indices still wanted, in plan order. Empty when the plan is
-        satisfied.
-    """
-    owned: list[str] = [e["type_name"] for e in sample["entities"] if e["mine"] and e["complete"]]
-    pending: list[int] = []
-    for index, wanted in enumerate(plan):
-        held = next((name for name in owned if satisfies(name, wanted)), None)
-        if held is None:
-            pending.append(index)
-            continue
-        owned.remove(held)
-    return tuple(pending)
+    deficit: int
 
 
 def find_producer(sample: Sample, target: str, free: Sequence[Entity] = ()) -> BuildOption | None:
@@ -251,6 +153,33 @@ def find_producer(sample: Sample, target: str, free: Sequence[Entity] = ()) -> B
         if fallback is None:
             fallback = option
     return fallback
+
+
+def _any_producer_exists(sample: Sample, target: str) -> bool:
+    """Report whether anything the player owns offers ``target`` at all.
+
+    The busy-blind twin of :func:`find_producer`: same option scan, same
+    placeholder exclusion, no idle filter. It exists to split "not playable
+    from here" (nothing owned makes it -- a dead plan entry) from "every
+    capable unit has its hands full" (a wait the world resolves the moment a
+    worker frees), which one Hard batch showed are a match apart
+    ([[policy-loop]]).
+
+    Args:
+        sample: One observation of the world.
+        target: Type name the plan asks for.
+
+    Returns:
+        True when some owned, non-placeholder entity offers the target.
+    """
+    owned = {
+        entity["unit_id"]
+        for entity in sample["entities"]
+        if entity["mine"] and entity["type_name"] != PLACEHOLDER_TYPE
+    }
+    return any(
+        option["produces"] == target and option["unit_id"] in owned for option in sample["options"]
+    )
 
 
 def _undescribed(
@@ -389,6 +318,23 @@ def _attempt(
     # hundred samples reporting progress ([[policy-loop]]).
     producer = find_producer(sample, target, free)
     if producer is None:
+        # **A busy workforce is a wait, not a block, and conflating them cost
+        # every Hard win in a batch.** The moment defence siting stopped being
+        # silently refused, a rich match kept all eight workers employed on
+        # turrets, the plan's Land Factory never met a free worker, and this
+        # branch ruled the plan "not playable from here" -- permanently, for a
+        # plan that needed one worker for one order: army 0 -> 0, attack
+        # orders 0, wins 1/10 where the same doctrine had won 10/12
+        # (log: 2026-07-31). Playable-from-here is a fact about what the
+        # player OWNS; whose hands are full right now is not it. The wait
+        # carries no unit -- there is no specific worker to hold -- and the
+        # campaign answers it by sending the plan the next worker that frees
+        # ([[policy-loop]]).
+        if _any_producer_exists(sample, target):
+            return (
+                _waiting_on(f"every unit that can make {target} is busy", 0),
+                False,
+            )
         return (
             _decision(
                 "blocked",
@@ -399,7 +345,9 @@ def _attempt(
     if not producer["available"]:
         # Available is a property of the world, not of the plan. A prerequisite
         # can still be built and tech can still be researched, so this is a
-        # wait and the stall detector bounds it.
+        # wait -- and an unbounded one today: only the price wait carries a
+        # deficit for the savings clock to judge, and the raid batch showed a
+        # pool wait holding a worker 335 samples (log: 2026-07-29). Open.
         return (
             _waiting_on(
                 f"unit {producer['unit_id']} can make {target} but the action is not available yet",
@@ -434,6 +382,7 @@ def _attempt(
             _waiting_on(
                 f"{target} costs {stats['price']}, holding {sample['credits']}",
                 producer["unit_id"],
+                deficit=stats["price"] - sample["credits"],
             ),
             False,
         )
@@ -450,6 +399,7 @@ def _attempt(
                 unit_id=producer["unit_id"],
                 x=0.0,
                 y=0.0,
+                deficit=0,
             ),
             False,
         )
@@ -462,6 +412,7 @@ def _attempt(
             unit_id=producer["unit_id"],
             x=site[0],
             y=site[1],
+            deficit=0,
         ),
         False,
     )
@@ -509,7 +460,7 @@ def _placed_site(
         if site is None:
             # Every ring position is taken. A wait rather than a block: a
             # structure destroyed frees its slot, so the world can leave this
-            # state on its own and the stall detector bounds the wait.
+            # state on its own. Unbounded today -- see the producer wait above.
             return _waiting_on(
                 f"{target} needs a ring position and all are taken", builder["unit_id"]
             )
@@ -521,7 +472,7 @@ def _placed_site(
         # Not "blocked". No pool being usable is a state the world can leave on
         # its own -- fog lifts as units move, a destroyed extractor frees its
         # pool, and a killed enemy stops covering the route to one -- so this is
-        # a wait, and the stall detector is what stops it waiting forever.
+        # a wait. Unbounded today -- see the producer wait above.
         return _waiting_on(no_pool_reason(target, survey), builder["unit_id"])
     return (chosen["x"], chosen["y"])
 
@@ -538,10 +489,10 @@ def _decision(
     Returns:
         The decision, with the order fields zeroed.
     """
-    return Decision(action=action, reason=reason, type_name="", unit_id=0, x=0.0, y=0.0)
+    return Decision(action=action, reason=reason, type_name="", unit_id=0, x=0.0, y=0.0, deficit=0)
 
 
-def _waiting_on(reason: str, unit_id: int) -> Decision:
+def _waiting_on(reason: str, unit_id: int, deficit: int = 0) -> Decision:
     """Build a wait that still names the unit the plan is holding.
 
     **A wait used to name nothing, and that cost the economy most of the match.**
@@ -554,11 +505,16 @@ def _waiting_on(reason: str, unit_id: int) -> Decision:
     Args:
         reason: Why the plan is waiting.
         unit_id: The unit it intends to order once it can.
+        deficit: Credits still missing, for the price wait and only it -- the
+            site waits carry zero because the world can end them on its own,
+            and only a shortfall is judged for convergence.
 
     Returns:
         The decision, carrying the unit and no position.
     """
-    return Decision(action="wait", reason=reason, type_name="", unit_id=unit_id, x=0.0, y=0.0)
+    return Decision(
+        action="wait", reason=reason, type_name="", unit_id=unit_id, x=0.0, y=0.0, deficit=deficit
+    )
 
 
 __all__ = [
