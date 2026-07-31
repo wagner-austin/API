@@ -66,7 +66,8 @@ API/
 │   └── turkic-api/                # Turkic language processing
 ├── clients/                       # Client applications
 │   ├── DiscordBot/                # Discord bot integrating all services
-│   └── TankpitBot/                # Tankpit.com WebSocket bot
+│   ├── TankpitBot/                # Tankpit.com WebSocket bot
+│   └── RustedWarfareBot/          # Headless Rusted Warfare client (JVM agent + planner)
 └── docs/                          # Monorepo documentation
 ```
 
@@ -577,6 +578,11 @@ model-artifact.tar.xz
 | procart-api | ✓ | | | | | | | | | | | | ✓ |
 | DiscordBot | ✓ | ✓ | | ✓ | | | | | | | | | |
 | TankpitBot | ✓ | | | | | | | | | | | | |
+| RustedWarfareBot | | | | | | | | | | | | | |
+
+Every service and client additionally depends on `monorepo_guards` (not a
+column above) for lint-rule enforcement. RustedWarfareBot is deliberately
+standalone — `monorepo_guards` is its only in-repo dependency.
 
 ---
 

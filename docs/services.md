@@ -413,11 +413,27 @@ make up-discord
 Automated bot client for Tankpit.com browser game. Uses Playwright and Chrome DevTools Protocol (CDP) to capture and reverse-engineer the game's WebSocket protocol, with a durable HFSM AI system for autonomous tank control.
 
 **Features:**
-- Autonomous AI bot with durable HFSM (HUNT, RECOVER_FUEL, RECOVER_EQUIPMENT modes)
+- Autonomous AI bot with durable HFSM — two mode owners (`HUNT`, `COLLECT`) plus an SPA-pinnable `UNSET` idle, with rank-derived readiness thresholds
 - WebSocket traffic capture via Chrome DevTools Protocol
 - XOR codec for message encoding/decoding (static + session keys)
-- Length-based container decoder with 22 message subtypes
-- Executor-side command validation against live world state
-- 7 CLI entry points: `tankpit-sniff`, `tankpit-probe`, `tankpit-bot`, `tankpit-teleport-probe`, `tankpit-enemy-teleport-probe`, `tankpit-fuel-probe`, `tankpit-movement-probe`
+- Complete wire coverage: every V-table message type has exactly one decoder, and encoders round-trip byte-identically against the capture archive
+- A server twin (`sim/`) the production bot plays full sessions against — no browser, no live server
+- Machine-checked physics: each `physics/` symbol is bound to a wiki claim and re-derived from the runs archive on every `make check`
+- Long-running aiohttp + SSE bot service (`tankpit-bot-service`, port 27100) driven by a phone SPA, with MJPEG live view
+- 30+ CLI entry points; the main ones are `tankpit-bot`, `tankpit-bot-service`, `tankpit-sniff`, `tankpit-sim-run`, `tankpit-audit`, `tankpit-shadow`, `tankpit-roundtrip`
 
-**Docs:** [README](../clients/TankpitBot/README.md)
+**Docs:** [README](../clients/TankpitBot/README.md) — the client's own [wiki](../clients/TankpitBot/wiki/index.md) (6 hubs, 67 pages) is the source of truth for protocol and game mechanics
+
+---
+
+### RustedWarfareBot
+
+Headless Rusted Warfare client. A Java agent inside the game's JVM dispatches orders and serialises simulation state; a Python package plans and evaluates. The game boots fully headless via `-nodisplay`, so there is no virtual framebuffer, no screen scraping, and no input synthesis.
+
+**Features:**
+- In-JVM Java agent (`agent/`) for order dispatch and state streaming
+- Python planning and evaluation layer with doctrine files (`doctrines/`)
+- Sweep harness for batch match evaluation
+- Standing goal: measured 100% win rate against the built-in AI at Impossible and below, with champion matches watchable live
+
+**Docs:** [README](../clients/RustedWarfareBot/README.md) — the client's own [wiki](../clients/RustedWarfareBot/wiki/index.md) is the source of truth for engine internals; claims are pinned to a game build because the jar is obfuscated

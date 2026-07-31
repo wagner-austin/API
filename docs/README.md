@@ -41,4 +41,5 @@ Each service has its own documentation:
 | transcript-api | [README](../services/transcript-api/README.md), [API](../services/transcript-api/docs/api.md) |
 | turkic-api | [README](../services/turkic-api/README.md), [API](../services/turkic-api/docs/api.md), [Design](../services/turkic-api/DESIGN.md) |
 | DiscordBot | [README](../clients/DiscordBot/README.md) |
-| TankpitBot | [README](../clients/TankpitBot/README.md) |
+| TankpitBot | [README](../clients/TankpitBot/README.md), [Wiki](../clients/TankpitBot/wiki/index.md) |
+| RustedWarfareBot | [README](../clients/RustedWarfareBot/README.md), [Wiki](../clients/RustedWarfareBot/wiki/index.md) |

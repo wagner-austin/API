@@ -152,7 +152,8 @@ API/
 │   └── turkic-api/
 ├── clients/                 # Client applications
 │   ├── DiscordBot/          # Discord bot integrating all services
-│   └── TankpitBot/          # Tankpit.com WebSocket bot
+│   ├── TankpitBot/          # Tankpit.com WebSocket bot
+│   └── RustedWarfareBot/    # Headless Rusted Warfare client
 ├── docs/                    # Documentation
 ├── docker-compose.yml       # Shared infrastructure
 ├── Makefile                 # Root orchestration
