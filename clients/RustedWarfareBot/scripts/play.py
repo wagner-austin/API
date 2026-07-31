@@ -363,20 +363,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     total = sum(catalogue[name]["price"] for name in plan)
     sys.stdout.write(f"plan total: {total} credits, holding {opening['credits']}\n")
 
+    # The derive-or-fix choice the reserve override existed for, now carried by
+    # the doctrine: a fixed figure keeps a composition A/B from silently also
+    # being a reserve A/B ([[policy-economy]]).
+    #
+    # Derived from the goals alone, deliberately. Heavies join the mix below,
+    # but a heavy is unbuildable until its factory's tier opens -- and deriving
+    # the reserve from it starved the very unlock that opens it: a 3,100-credit
+    # heavyArtillery in the mix raised the floor to 3,100, the unprotected tech
+    # claim then needed 5,100 in the bank, and the roster probe never bought
+    # its unlock at all ([[policy-budget]]).
+    reserve = (
+        expansion_reserve(reinforcements(goals, catalogue), catalogue)
+        if doctrine["reserve"] == DERIVE_RESERVE
+        else doctrine["reserve"]
+    )
     # Heavies join the composition after the goals: the ratio counts them
     # from the start, and production leaves them alone until the unlock
     # makes the engine offer them.
     reinforce = (
         *reinforcements(goals, catalogue),
         *heavy_reinforcements(doctrine["heavies"], catalogue),
-    )
-    # The derive-or-fix choice the reserve override existed for, now carried by
-    # the doctrine: a fixed figure keeps a composition A/B from silently also
-    # being a reserve A/B ([[policy-economy]]).
-    reserve = (
-        expansion_reserve(reinforce, catalogue)
-        if doctrine["reserve"] == DERIVE_RESERVE
-        else doctrine["reserve"]
     )
     report = play(
         channel,

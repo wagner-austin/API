@@ -19,6 +19,7 @@ from scripts.play import (
     expansion_reserve,
     heavy_reinforcements,
     load_catalogue,
+    reinforcements,
     load_placements,
     main,
 )
@@ -466,6 +467,27 @@ def test_the_reserve_covers_the_dearest_thing_the_bot_keeps_making() -> None:
 def test_nothing_to_reinforce_reserves_nothing() -> None:
     """No army to protect means every spare credit belongs to the economy."""
     assert expansion_reserve((), load_catalogue(_CATALOGUE_PATH)) == 0
+
+
+def test_the_derived_reserve_ignores_the_heavies() -> None:
+    """A heavy is unbuildable until its tier opens, so reserving its
+    replacement price is dead capital -- and worse: a 3,100-credit
+    heavyArtillery in the mix raised the floor to 3,100 and the unprotected
+    tech claim then needed 5,100 in the bank, starving the very unlock that
+    would have made the heavy buildable. Measured: the roster probe never
+    bought its unlock at all ([[policy-budget]]).
+    """
+    catalogue = load_catalogue(_CATALOGUE_PATH)
+    goals = ("c_tank", "c_artillery")
+    assert catalogue["heavyArtillery"]["price"] > catalogue["c_artillery"]["price"]
+    with_heavies = (*reinforcements(goals, catalogue), "heavyArtillery")
+    assert expansion_reserve(with_heavies, catalogue) == catalogue["heavyArtillery"]["price"]
+    # The entry point derives from the goals alone, so the doctrine's heavies
+    # never move the floor.
+    assert (
+        expansion_reserve(reinforcements(goals, catalogue), catalogue)
+        == catalogue["c_artillery"]["price"]
+    )
 
 
 def test_heavies_are_verified_against_the_real_catalogue() -> None:
