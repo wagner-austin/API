@@ -2,15 +2,19 @@
 
 Modular CLI for multi-backend hyperparameter optimization using Optuna TPE (Tree-structured Parzen Estimator).
 
-Supports four ML backends:
+Supports five ML backends (`-b all` runs every one of them):
 - **XGBoost**: Gradient boosting with feature importance
 - **MLP**: Neural network with configurable architecture
 - **LightGBM**: Fast gradient boosting for large datasets
 - **LSTM**: Recurrent network for temporal sequences
+- **ClearGBM**: From-scratch interpretable gradient boosting
 
 Supports two dataset types:
-- **Standard Datasets**: Single-observation tabular data (taiwan, us, polish)
+- **Standard Datasets**: Single-observation tabular data (taiwan, us, polish, kaggle_give_me_credit)
 - **Time-Series Datasets**: Multi-observation per entity over time (kaggle_amex_default)
+
+The best model is trained and saved after optimization by default; pass
+`--no-save-model` to skip that step.
 
 ## Usage
 
@@ -34,8 +38,43 @@ poetry run python -m scripts.optimize -b lstm -n 50 -d polish
 
 # Examples - Multi-Backend Comparison
 poetry run python -m scripts.optimize -b lightgbm,xgboost -n 50  # Compare two backends
-poetry run python -m scripts.optimize -b all -n 50               # Compare all four backends
+poetry run python -m scripts.optimize -b all -n 50               # Compare all five backends
 ```
+
+## CLI Options
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--backend` | `-b` | `xgboost` | Backend(s): `xgboost`, `mlp`, `lightgbm`, `lstm`, `cleargbm`, or `all`. Comma-separated for several: `-b lightgbm,xgboost` |
+| `--dataset` | `-d` | `taiwan` | Dataset name (standard or time-series) |
+| `--n-trials` | `-n` | `300` | Number of Optuna trials per backend |
+| `--feature-preset` | `-f` | `full` | Features: `none`, `log_only`, `ratios_only`, `full` |
+| `--device` | | `cuda` | Device: `cpu`, `cuda`, `auto` |
+| `--timeout` | `-t` | None | Timeout in seconds per backend |
+| `--compare-presets` | `-c` | False | Compare all 4 feature presets |
+| `--all-datasets` | `-a` | False | Run on all standard datasets |
+| `--save-model` | `-s` | True | Train and save the best model after optimization |
+| `--no-save-model` | | | Skip training and saving the best model |
+| `--verbose` | `-v` | False | Show Optuna trial logs |
+| `--help` | `-h` | | Show help message |
+
+**Feature Presets:**
+
+| Preset | Description |
+|--------|-------------|
+| `none` | Original features only |
+| `log_only` | Original + log transforms |
+| `ratios_only` | Original + pairwise ratios (capped at 500) |
+| `full` | Original + log + ratios + products (max ~800 features) |
+
+Note the CLI default differs from the API: `/ml/optimize` defaults
+`feature_preset` to `none`, while this CLI defaults to `full`.
+
+**History Tracking:**
+
+The CLI tracks all optimization runs in `models/optimization_history.jsonl` and
+displays progression — current run vs. previous run for the same
+dataset/preset, all-time best AUC with delta indicators, and new-record markers.
 
 ## Package Structure
 

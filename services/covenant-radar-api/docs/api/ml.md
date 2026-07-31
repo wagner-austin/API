@@ -194,16 +194,31 @@ Poll `/ml/jobs/{job_id}` to get the result:
 
 ---
 
+## Automatic Preprocessing
+
+Every backend applies the same preprocessing pipeline before training. It is
+fitted on the training split only, to prevent leakage, and the fitted state is
+applied unchanged to validation and test. No configuration needed.
+
+| Step | Description |
+|------|-------------|
+| Special Code Detection | Replaces sentinel values (96, 98, 999, -1, -9, -999) with NaN |
+| Outlier Capping | Caps extreme values at 1st/99th percentile bounds |
+| Missing Imputation | Fills NaN with per-feature median from training data |
+| Z-Score Normalization | Standardizes features to mean=0, std=1 |
+
+---
+
 ## POST /ml/train-external
 
-Train on external CSV datasets (Taiwan, US, Polish bankruptcy data) with pluggable ML backends. Supports four backends: XGBoost, MLP, LightGBM, and LSTM.
+Train on external CSV datasets with pluggable ML backends. Supports all seven classification backends: XGBoost, LightGBM, ClearGBM, LogReg, Random Forest, MLP, and LSTM.
 
 **Common Request Fields:**
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `dataset` | string | Yes | - | Dataset to use: `taiwan`, `us`, or `polish` |
-| `backend` | string | No | `xgboost` | Backend: `xgboost`, `mlp`, `lightgbm`, or `lstm` |
+| `dataset` | string | Yes | - | Dataset to use — `taiwan`, `us`, `polish`, `kaggle_company_bankruptcy`, `kaggle_credit_default`, `kaggle_credit_risk`, `kaggle_heloc`, `kaggle_give_me_credit`, `kaggle_loan_default`, or the time-series `kaggle_amex_default` |
+| `backend` | string | No | `xgboost` | Backend: `xgboost`, `lightgbm`, `cleargbm`, `logreg`, `random_forest`, `mlp`, or `lstm` |
 | `learning_rate` | float | Yes | - | Learning rate |
 | `random_state` | int | Yes | - | Random seed |
 | `device` | string | No | `auto` | `cpu`, `cuda`, or `auto` |
@@ -903,9 +918,9 @@ Run feature importance explanation on a trained model using various explainer me
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `dataset` | string | Yes | - | Dataset: `taiwan`, `us`, or `polish` |
-| `backend` | string | Yes | - | Backend: `xgboost`, `mlp`, `lightgbm`, or `lstm` |
-| `model_path` | string | Yes | - | Path to trained model file |
+| `dataset` | string | Yes | - | Dataset name (see `/ml/train-external` for the full list) |
+| `backend` | string | Yes | - | Backend: `xgboost`, `lightgbm`, `cleargbm`, `logreg`, `random_forest`, `mlp`, or `lstm` |
+| `model_path` | string | Yes | - | Path to trained model file; must resolve inside `APP__MODELS_ROOT` |
 | `explainer` | string | Yes | - | Explainer method (see compatibility below) |
 | `target_class` | int | No | `1` | Target class for importance computation |
 | `n_samples` | int | No | `1000` | Number of samples for explanation |
@@ -915,10 +930,13 @@ Run feature importance explanation on a trained model using various explainer me
 
 | Explainer | Description | Compatible Backends |
 |-----------|-------------|---------------------|
-| `permutation` | Permutation feature importance | All (xgboost, mlp, lightgbm, lstm) |
+| `permutation` | Permutation feature importance | All seven backends |
 | `gradient` | Gradient-based importance | Neural networks only (mlp, lstm) |
 | `integrated_gradients` | Integrated gradients | Neural networks only (mlp, lstm) |
-| `shap_tree` | SHAP TreeExplainer | Tree models only (xgboost, lightgbm) |
+| `shap_tree` | SHAP TreeExplainer | Tree models only (xgboost, lightgbm, cleargbm, random_forest) — not logreg |
+
+`model_path` must resolve inside the configured models root (`APP__MODELS_ROOT`).
+A path outside it is rejected with 400 and no file is opened.
 
 **Request Example:**
 ```json
@@ -1022,7 +1040,56 @@ Get information about the currently active model.
 ```json
 {
   "model_id": "default",
-  "model_path": "/data/models/active.ubj",
+  "model_path": "/data/models/active_xgb.ubj",
   "is_loaded": true
 }
+```
+
+---
+
+## Regression Endpoints
+
+Continuous-target counterparts of the classification routes. Backends are
+`xgboost_reg`, `lightgbm_reg`, `mlp_reg`, and `lstm_reg`.
+
+| Endpoint | Method | Backends accepted |
+|----------|--------|-------------------|
+| `/ml/optimize-regression` | POST | all four |
+| `/ml/train-external-regression` | POST | `xgboost_reg`, `lightgbm_reg` only |
+| `/ml/explain-regression` | POST | all four |
+| `/ml/predict-regression` | POST | all four |
+
+The regression routes use their own dataset registry — currently
+`financial_distress`. The neural-net optimizer is selected with `optimizer`
+(`adamw` | `adam` | `sgd`), the same wire key the classification routes use;
+`nn_optimizer` is the internal field name and is not accepted on the wire.
+
+**Optimize hyperparameters:**
+```bash
+curl -X POST http://localhost:8007/ml/optimize-regression \
+  -H "Content-Type: application/json" \
+  -d '{"dataset": "financial_distress", "backend": "xgboost_reg", "n_trials": 50}'
+```
+
+**Train a regressor:**
+```bash
+curl -X POST http://localhost:8007/ml/train-external-regression \
+  -H "Content-Type: application/json" \
+  -d '{"dataset": "financial_distress", "backend": "xgboost_reg"}'
+```
+
+**Explain a trained regressor:**
+```bash
+curl -X POST http://localhost:8007/ml/explain-regression \
+  -H "Content-Type: application/json" \
+  -d '{"dataset": "financial_distress", "backend": "xgboost_reg",
+       "model_path": "/data/models/model.ubj", "explainer": "permutation"}'
+```
+
+**Predict continuous values from a feature matrix:**
+```bash
+curl -X POST http://localhost:8007/ml/predict-regression \
+  -H "Content-Type: application/json" \
+  -d '{"backend": "xgboost_reg", "model_path": "/data/models/model.ubj",
+       "features": [[1.0, 2.0, 3.0]]}'
 ```
