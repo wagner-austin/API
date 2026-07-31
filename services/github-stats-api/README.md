@@ -72,6 +72,9 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `/health` | GET | Health check |
 | `/api` | GET | Generate user stats SVG card |
 | `/api/top-langs` | GET | Generate top languages SVG card |
+| `/api/capabilities` | GET | Generate a repo capabilities SVG card |
+| `/api/hero` | GET | Generate a hero banner SVG |
+| `/api/skills` | GET | Generate a skills SVG card |
 
 ### Example Usage
 
@@ -325,6 +328,9 @@ The `RAILWAY_DOCKERFILE_PATH` tells Railway to use the service's Dockerfile whil
 | `hypercorn` | ASGI server |
 | `httpx` | Async HTTP client |
 | `platform-core` | Logging, errors, config, HTTP client protocols |
+| `platform-codebase` | Repo capability detection behind `/api/capabilities` |
+| `platform-kaggle` | Competition capability matching |
+| `typing-extensions` | Backported typing constructs |
 
 ### Development
 
