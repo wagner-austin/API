@@ -124,3 +124,18 @@ Notes: `clients/RustedWarfareBot/` has its own README, Makefile, `agent/` JVM tr
 Its matrix row is deliberately all-blank: RustedWarfareBot depends on `monorepo_guards` alone, no `platform_*` lib. Added a note under the matrix saying so, since a blank row otherwise reads as "not yet filled in" rather than "standalone by design".
 
 The wiki's own structure needed no repair — 4 hubs, 11 pages, hub links resolve 1:1 against `pages/`, and every index count was already correct.
+
+---
+## [2026-07-31] audit | service README drift sweep; /healthz + /readyz contract made real
+Pages written: none
+Pages updated: pages/service-port-map.md (footnote 1 only — the "doc-extract-api is absent from the root README table" claim was stale; it is listed now)
+Hubs updated: none
+Index updated: none
+
+Audited all 14 service READMEs against their code (routes registered, env vars read, pyproject deps, compose port mappings). Findings and fixes landed in the service docs, not here; the wiki-relevant part:
+
+**The wiki's "every service exposes /healthz and /readyz" claim was false for four services** — grandma-api, transcript-api and opportunity-radar-api registered only `/healthz`, and procart-api registered `/health` and neither of the standard two. Rather than weaken the claim, the endpoints were added, so `pages/service-port-map.md` now describes the real contract: all 14 services expose both. transcript-api's `/readyz` checks Redis and worker presence (it enqueues STT jobs, so a reachable Redis with no worker is not ready); the other three have no queue or database and report ready whenever they serve, with the reasoning recorded in each handler's docstring. procart-api's `/health` was renamed rather than aliased, per the repo's no-backwards-compatibility rule, and its five referencing sites updated.
+
+Also corrected in `transcript-api/src/transcript_api/api/routes/__init__.py:6`: its docstring had documented `GET /readyz — Readiness probe (checks Redis + workers)` for a route that was never registered. The docstring is now true rather than deleted.
+
+Root cause worth recording: the health contract lived only in prose — the root README, this wiki, and each service's own README asserted it, but nothing enforced it. Four services drifted out of it without any check failing. A `monorepo_guards` rule asserting that every FastAPI service registers both routes would make the claim self-enforcing; not written this session.
