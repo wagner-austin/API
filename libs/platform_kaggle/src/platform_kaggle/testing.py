@@ -27,6 +27,18 @@ from platform_kaggle.types import (
 )
 
 # -----------------------------------------------------------------------------
+# Fixture Defaults
+# -----------------------------------------------------------------------------
+
+# The default deadline has to outlive the suite. A fixed date in the near
+# future silently expires: every consumer that filters on `active_only` starts
+# seeing an empty result set the day it passes, and the failure surfaces far
+# from this file.
+_FAR_FUTURE_DEADLINE = "2999-12-31"
+_FAR_FUTURE_DEADLINE_DT = datetime(2999, 12, 31, 23, 59, 59)
+
+
+# -----------------------------------------------------------------------------
 # Hook Types
 # -----------------------------------------------------------------------------
 
@@ -406,7 +418,7 @@ def make_fake_competition(
     title: str = "Test Competition",
     category: CompetitionCategory = "Playground",
     reward: str = "Knowledge",
-    deadline: str = "2025-12-31",
+    deadline: str = _FAR_FUTURE_DEADLINE,
     team_count: int = 100,
     tags: tuple[str, ...] = ("tabular",),
     description: str = "Test description",
@@ -459,7 +471,7 @@ def make_fake_kaggle_competition(
         title: Competition title.
         category: Competition category string.
         reward: Prize description.
-        deadline: Deadline as datetime (defaults to 2025-12-31).
+        deadline: Deadline as datetime (defaults to the far-future date).
         team_count: Number of teams.
         tags: Tuple of tag strings (converted to FakeApiTag objects).
         description: Short description.
@@ -469,7 +481,7 @@ def make_fake_kaggle_competition(
     """
     url = f"https://www.kaggle.com/competitions/{ref}"
     if deadline is None:
-        deadline = datetime(2025, 12, 31, 23, 59, 59)
+        deadline = _FAR_FUTURE_DEADLINE_DT
     return FakeKaggleCompetition(
         ref=url,  # Kaggle API 1.8.3 returns full URL in ref field
         title=title,

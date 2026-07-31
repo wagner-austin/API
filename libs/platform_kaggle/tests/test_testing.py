@@ -265,7 +265,9 @@ class TestMakeFakeCompetition:
         assert comp.title == "Test Competition"
         assert comp.category == "Playground"
         assert comp.reward == "Knowledge"
-        assert comp.deadline == "2025-12-31"
+        # Far future on purpose: a default deadline that expires turns every
+        # active_only consumer red on a date rather than on a change.
+        assert comp.deadline == "2999-12-31"
         assert comp.team_count == 100
         assert comp.tags == ("tabular",)
         assert comp.description == "Test description"

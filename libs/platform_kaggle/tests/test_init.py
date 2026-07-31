@@ -8,9 +8,11 @@ from platform_kaggle import (
     InterestFilter,
     find_competitions,
     get_codebase_profile,
-    hooks,
     make_fake_competition,
     make_fake_competition_pages,
+)
+from platform_kaggle import (
+    hooks as kaggle_hooks,
 )
 from platform_kaggle.testing import FakeKaggleClient, FakeKagglePageFetcher
 
@@ -25,7 +27,7 @@ class TestFindCompetitions:
             make_fake_competition(ref="comp2", title="Competition 2"),
         )
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         matches = find_competitions(codebase_root=tmp_path, fetch_descriptions=False)
         assert len(matches) == 2
@@ -37,7 +39,7 @@ class TestFindCompetitions:
             make_fake_competition(ref="comp2", tags=("image", "computer-vision")),
         )
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         interests = InterestFilter(
             include_tags=("tabular",),
@@ -70,7 +72,7 @@ lightgbm = "^4.0.0"
 
         competitions = (make_fake_competition(ref="comp1", tags=("tabular", "classification")),)
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         matches = find_competitions(
             match_codebase=True, codebase_root=tmp_path, fetch_descriptions=False
@@ -83,7 +85,7 @@ lightgbm = "^4.0.0"
         """Test find_competitions returns default matches when match_codebase=False."""
         competitions = (make_fake_competition(ref="comp1", title="Competition 1"),)
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         matches = find_competitions(match_codebase=False, codebase_root=tmp_path)
         assert len(matches) == 1
@@ -116,7 +118,7 @@ python = "^3.11"
             ),
         )
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         # Set up page fetcher with empty pages
         pages = make_fake_competition_pages(description="A deep learning competition")
@@ -124,7 +126,7 @@ python = "^3.11"
             competition_ids={"comp1": 1},
             pages={1: pages},
         )
-        hooks.page_fetcher = lambda: fake_fetcher
+        kaggle_hooks.page_fetcher = lambda: fake_fetcher
 
         # With high min_score, no matches
         matches = find_competitions(
@@ -139,7 +141,7 @@ python = "^3.11"
         # This will use the real codebase root (parent of parent of ...)
         competitions = (make_fake_competition(ref="comp1"),)
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         # Set up page fetcher
         pages = make_fake_competition_pages(description="A test competition")
@@ -147,7 +149,7 @@ python = "^3.11"
             competition_ids={"comp1": 1},
             pages={1: pages},
         )
-        hooks.page_fetcher = lambda: fake_fetcher
+        kaggle_hooks.page_fetcher = lambda: fake_fetcher
 
         # Don't pass codebase_root, let it auto-detect
         matches = find_competitions(match_codebase=True)
@@ -162,7 +164,7 @@ python = "^3.11"
         # Use a past deadline
         competitions = (make_fake_competition(ref="expired", deadline="2020-01-01"),)
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         # With active_only=False, should include expired competition
         matches = find_competitions(
@@ -193,7 +195,7 @@ transformers = "^4.0.0"
         # Competition with tags that would normally match transformers
         competitions = (make_fake_competition(ref="gemma-comp", tags=("text",)),)
         fake_client = FakeKaggleClient(competitions=competitions)
-        hooks.kaggle_client = lambda: fake_client
+        kaggle_hooks.kaggle_client = lambda: fake_client
 
         # Pages that mention Gemma (hard requirement we don't have)
         pages = make_fake_competition_pages(
@@ -204,7 +206,7 @@ transformers = "^4.0.0"
             competition_ids={"gemma-comp": 12345},
             pages={12345: pages},
         )
-        hooks.page_fetcher = lambda: fake_fetcher
+        kaggle_hooks.page_fetcher = lambda: fake_fetcher
 
         # With fetch_descriptions=True, should detect hard requirement
         matches = find_competitions(
