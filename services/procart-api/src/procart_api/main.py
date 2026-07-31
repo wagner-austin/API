@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from platform_core.logging import setup_logging
+from platform_core.request_context import install_request_id_middleware
 from procart.ffmpeg_runner import RealFfmpegRunner
 
 from procart_api import _test_hooks as _hooks
@@ -25,6 +26,10 @@ def _setup_logging() -> None:
 _setup_logging()
 _set_hooks()
 app = create_app()
+# Installed here rather than inside create_app: a second install would add a
+# second middleware layer, and with no inbound x-request-id header each layer
+# mints its own id — the response header would then disagree with the logs.
+install_request_id_middleware(app)
 
 
 if __name__ == "__main__":

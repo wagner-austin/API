@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import logging
 import os
 
 from fastapi import APIRouter
+from platform_core.logging import get_logger
 from procart.images_io import write_frame_png
 from procart.registry import build_module
 from procart.render import render_frame_at_resolution, render_scene_to_frames
 from procart.types import RenderJobConfig, Resolution, SceneConfig
 from typing_extensions import TypedDict
 
-_logger = logging.getLogger(__name__)
+_logger = get_logger(__name__)
 
 
 class _PreviewRequest(TypedDict):
