@@ -109,7 +109,7 @@ class TankStateDict(TypedDict):
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         team: Team ID (0=red, 1=purple, 2=blue, 3=orange).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         damage_state: Fuel-quartile health tier (0=near death ..
             3=full; corpus-fitted 2026-07-23, [[deactivation-format]]).
         direction: Sprite direction byte. Low nibble (0-15) = facing
@@ -219,7 +219,7 @@ def make_tank_state(
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         team: Team ID (0-3).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         damage_state: Fuel-quartile health tier (0=near death .. 3=full).
         name: Player name.
         is_bot: Whether this is a bot.

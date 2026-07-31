@@ -33,7 +33,7 @@ class TankValueDict(TypedDict):
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         team: Team ID (0-3).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         damage_state: Health state (0-3).
         direction: Sprite direction byte.
         name: Player name.

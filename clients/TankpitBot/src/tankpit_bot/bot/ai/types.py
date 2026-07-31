@@ -199,7 +199,7 @@ class EnemyThreatDict(TypedDict):
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
         damage_state: Fuel-quartile health tier (0=near death .. 3=full).
-        rank: Military rank (0-7). Lower rank = weaker.
+        rank: Military rank (0 recruit .. 8 general). Lower rank = weaker.
         team: Enemy team id (0-3).
         name: Enemy player name.
         is_bot: Whether this enemy is a bot.
@@ -266,7 +266,7 @@ def make_enemy_threat(
         y: Enemy Y coordinate.
         distance: Manhattan distance from self.
         damage_state: Fuel-quartile health tier (0=near death .. 3=full).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         team: Team id (0-3).
         name: Player name.
         is_bot: Whether this is a bot.

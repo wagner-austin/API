@@ -37,7 +37,7 @@ class SelfStateDict(TypedDict):
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         team: Team ID (0-3).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         fuel: Current fuel (also health).
         leaderboard_position: Position on leaderboard.
         observed_ms: When the self state was last refreshed by a wire
@@ -78,7 +78,7 @@ def make_self_state(
         x: X coordinate (0-255).
         y: Y coordinate (0-255).
         team: Team ID (0-3).
-        rank: Military rank (0-7).
+        rank: Military rank (0 recruit .. 8 general).
         fuel: Current fuel amount.
         leaderboard_position: Leaderboard position.
         observed_ms: When the self state was refreshed.
