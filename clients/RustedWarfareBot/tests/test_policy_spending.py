@@ -229,31 +229,56 @@ def test_tech_fires_the_land_factorys_unlock_once_at_the_engines_price() -> None
     )
     ordered: set[int] = set()
     budget = Budget(10_000, reserve=0)
-    orders = unlock_tech(world, budget, ordered)
+    orders = unlock_tech(world, budget, ordered, limit=9)
     assert [(o["unit_id"], o["key"]) for o in orders] == [(500, "c_2")]
     assert budget.spent() == 2000
     # Told once: the same world again orders nothing more.
-    assert unlock_tech(world, Budget(10_000, reserve=0), ordered) == ()
+    assert unlock_tech(world, Budget(10_000, reserve=0), ordered, limit=9) == ()
 
 
 def test_tech_skips_a_factory_with_no_offer_and_stops_at_a_refusal() -> None:
     silent = sample(entity(500, "landFactory"), credits=10_000)
-    assert unlock_tech(silent, Budget(10_000, reserve=0), set()) == ()
+    assert unlock_tech(silent, Budget(10_000, reserve=0), set(), limit=9) == ()
     # A factory offering only free no-type actions has no unlock to buy.
     rally_only = sample(
         entity(500, "landFactory"),
         credits=10_000,
         options=(option(500, "", key="c_1", placed=False, makes_something=False),),
     )
-    assert unlock_tech(rally_only, Budget(10_000, reserve=0), set()) == ()
+    assert unlock_tech(rally_only, Budget(10_000, reserve=0), set(), limit=9) == ()
     offering = sample(
         entity(500, "landFactory"),
         credits=100,
         options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     poor = Budget(100, reserve=0)
-    assert unlock_tech(offering, poor, set()) == ()
+    assert unlock_tech(offering, poor, set(), limit=9) == ()
     assert poor.spent() == 0
+
+
+def test_the_tech_count_caps_how_many_factories_ever_unlock() -> None:
+    """The unlock is per building and the first already opens production.
+
+    The flag form bought all four factories' unlocks in one probe -- 8,000
+    credits of saving pauses for a roster the first 2,000 had opened -- so
+    how many factories' throughput the heavy mix deserves is the doctrine's
+    number, not a side effect of how many factories exist.
+    """
+    world = sample(
+        entity(500, "landFactory"),
+        entity(501, "landFactory"),
+        credits=10_000,
+        options=(
+            option(500, "", index=0, key="c_2", placed=False, makes_something=False, price=2000),
+            option(501, "", index=1, key="c_2", placed=False, makes_something=False, price=2000),
+        ),
+    )
+    ordered: set[int] = set()
+    orders = unlock_tech(world, Budget(10_000, reserve=0), ordered, limit=1)
+    assert [o["unit_id"] for o in orders] == [500]
+    # The cap holds across ticks, not just within one: the second factory is
+    # never bought, however rich the later world.
+    assert unlock_tech(world, Budget(10_000, reserve=0), ordered, limit=1) == ()
 
 
 def test_a_refused_unlock_withholds_its_price_from_later_spenders() -> None:
@@ -272,7 +297,7 @@ def test_a_refused_unlock_withholds_its_price_from_later_spenders() -> None:
         options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     budget = Budget(1_500, reserve=0)
-    assert unlock_tech(offering, budget, set()) == ()
+    assert unlock_tech(offering, budget, set(), limit=9) == ()
     # The whole balance is now spoken for: even a protected claim is bound,
     # because replacing losses drains to zero and would empty the saving.
     assert budget.claim("replace:c_tank", 350, protected=True)["granted"] is False

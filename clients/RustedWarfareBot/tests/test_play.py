@@ -410,7 +410,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     rush=False,
                     creep=False,
                     riposte=False,
-                    tech=False,
+                    tech=0,
                 )
             )
         )

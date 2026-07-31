@@ -394,7 +394,7 @@ def test_tech_unlocks_the_factory_and_off_leaves_it_locked() -> None:
         options=(option(500, "", key="c_2", placed=False, makes_something=False, price=2000),),
     )
     peer = ScriptedPeer(lines(world, world))
-    play(AgentChannel(peer), (), catalogue, placements, PROFILES, 2, tech=True)
+    play(AgentChannel(peer), (), catalogue, placements, PROFILES, 2, tech=1)
     fired = [line for line in peer.sent if '"ability"' in line]
     # Once, not once per observation: the unlock never fills the queue.
     assert fired == ['{"kind":"ability","unit_id":500,"key":"c_2"}']

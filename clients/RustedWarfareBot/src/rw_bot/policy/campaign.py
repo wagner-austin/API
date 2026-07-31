@@ -176,7 +176,7 @@ def play(
     rush: bool = False,
     creep: bool = False,
     riposte: bool = False,
-    tech: bool = False,
+    tech: int = 0,
     stop_when_plan_done: bool = False,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
     afford_samples: int = AFFORD_STALL_SAMPLES,
@@ -228,7 +228,7 @@ def play(
         raid: The raid party's size, or zero for no raiding.
         creep: Walk turrets toward the enemy start, one covered step each.
         riposte: Release the whole reserve the moment an intrusion ends.
-        tech: Unlock the factories' next tier through the ability verb.
+        tech: Factories to unlock a tier on, zero for none. See Doctrine.
 
         Each of these is one doctrine field; the reasoning and the
         measurements behind every flag live on
@@ -536,20 +536,20 @@ def _draft_raid(
 
 def _send_tech(
     channel: AgentChannel,
-    tech: bool,
+    tech: int,
     sample: Sample,
     budget: Budget,
     teched: set[int],
 ) -> None:
-    """Fire the factories' tier unlocks, when the doctrine plays tech.
+    """Fire the factories' tier unlocks, up to the doctrine's count.
 
-    The flag is judged here rather than in the loop so the loop stays under
+    The gate is judged here rather than in the loop so the loop stays under
     its complexity bound; an arm without the verb costs one call and no
     claim ([[mechanics-build-actions]]).
     """
-    if not tech:
+    if len(teched) >= tech:
         return
-    for unlock in unlock_tech(sample, budget, teched):
+    for unlock in unlock_tech(sample, budget, teched, limit=tech):
         channel.send_ability(unlock)
 
 

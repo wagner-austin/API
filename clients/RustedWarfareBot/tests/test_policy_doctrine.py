@@ -45,7 +45,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         rush=False,
         creep=False,
         riposte=False,
-        tech=False,
+        tech=0,
     )
 
 
@@ -208,6 +208,15 @@ def test_a_negative_raid_size_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-009"
+
+
+def test_a_negative_tech_count_is_refused() -> None:
+    """Zero already means no unlocking; below it is a typo, not restraint."""
+    payload = encode_doctrine(_doctrine())
+    payload["tech"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-012"
 
 
 def test_a_missing_field_is_an_error_not_a_default() -> None:

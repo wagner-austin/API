@@ -158,6 +158,8 @@ def unlock_tech(
     sample: Sample,
     budget: Budget,
     ordered: set[int],
+    *,
+    limit: int,
 ) -> tuple[AbilityOrder, ...]:
     """Order every tech factory to unlock its next tier, when affordable.
 
@@ -178,6 +180,13 @@ def unlock_tech(
     duplicate arriving after completion would name an action that no longer
     exists.
 
+    **At most ``limit`` structures, ever.** The unlock is per building, and
+    the first one already opens production of the tier behind it -- the flag
+    form bought all four factories' unlocks in one probe, 8,000 credits of
+    saving pauses for a roster the first 2,000 had opened. How many
+    factories' throughput the heavy mix deserves is the doctrine's question
+    ([[policy-budget]]).
+
     **A refused unlock saves toward itself**, and this is the gated use the
     income-conversion refutation reserved the mechanism for
     (:meth:`~rw_bot.policy.budget.Budget.withhold`). Without it the unlock
@@ -192,6 +201,7 @@ def unlock_tech(
         sample: One observation of the world.
         budget: The tick's credits.
         ordered: Factories already told to unlock, extended in place.
+        limit: The most factories the arm ever unlocks.
 
     Returns:
         The ability orders to send, in roster order.
@@ -210,6 +220,8 @@ def unlock_tech(
             offers[option["unit_id"]] = (option["key"], option["price"])
     orders: list[AbilityOrder] = []
     for entity in sample["entities"]:
+        if len(ordered) >= limit:
+            break
         if not entity["mine"] or not entity["complete"] or entity["queued"] != 0:
             continue
         if entity["type_name"] not in TECH_TYPES or entity["unit_id"] in ordered:
