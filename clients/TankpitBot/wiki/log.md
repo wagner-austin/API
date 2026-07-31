@@ -2351,3 +2351,26 @@ Follow-up to the anchor sweep in the previous entry. All 10 pages read in full a
 **Anchor left deliberately unmoved:** [[tank-registry]]'s `fact_checked` stays 2026-06-11. Its claims are run-verified statements about the JS client's `activeGame.P.j`, and only the code-side link (team/rank/damage_state still modelled in `state/types/tank.py`) was re-checked — the runs were not re-derived. The blob anchor moved; the fact stamp did not.
 
 **Why `make check` caught none of this:** the gate's only wiki-aware rule is `scripts/physics_claims.py`, which validates ` ```json claims ` blocks against `tankpit_bot.physics` symbols — 6 of 67 pages, and rigorous only there. Nothing in `scripts/` reads `source_git_blobs`, `fact_checked`, hub links, or index counts (grep returns zero hits). Anchor freshness, count integrity, and frontmatter-path existence are all mechanically checkable and currently unchecked — a guard rule for those would have caught most of this sweep and the previous one.
+
+---
+## [2026-07-31] build | `wiki-structure` guard rule: the wiki's own bookkeeping is now gated
+
+Answer to "how come `make check` didn't catch this?" — it couldn't. The gate's only wiki-aware rule was `scripts/physics_claims.py`, which validates ` ```json claims ` blocks against `tankpit_bot.physics` symbols: rigorous, but 6 of 67 pages. Nothing read `source_git_blobs`, `fact_checked`, hub links, or index counts. Every drift both of today's audits found was structurally invisible.
+
+**New: `scripts/wiki_rules.py::run_wiki_rules`**, wired into `scripts/guard.py` beside `contract_rules` and `physics_claims`. Four check families:
+
+* **Frontmatter** — parseable block, SCHEMA's required keys (`title`/`tags`/`related`/`fact_checked`/`confidence`), a real `YYYY-MM-DD` date (rejects `2026-02-30`, not just bad shapes), a known confidence level.
+* **Provenance** — every `source_paths` entry exists on disk, and every `source_git_blobs` key is one of them carrying a well-formed 40-hex object id. A trailing `:line` / `:start-end` locator is stripped first and `http(s)://` sources are skipped — both are established conventions the first run surfaced (35 false positives from `tpclient.js:243`-style locators, fixed before landing).
+* **Navigation** — every hub inclusion link resolves; every page is linked from at least one hub (SCHEMA's orphan ban).
+* **Counts** — each index row's `(N pages)` equals that hub's real link count; the `N content pages` total equals the files on disk.
+
+**Deliberately NOT gated: blob-hash equality with HEAD.** A lagging anchor is not a defect — it is the marker for "not audited since this tree," and the honest response is an audit. Gating on it would redden the gate on every `src/` commit and would reward bumping anchors without re-reading the page, which is precisely the laundering the two audit entries above refused. Drift stays a report. The rule instead catches the anchor failure that IS unambiguous: a path that no longer exists, or a hash that was never a real object id.
+
+First run against the real wiki found exactly one genuine violation: **`committed-intent.md` had no frontmatter at all** — hub-linked and readable, but carrying no provenance, no date, no confidence. Now fixed (anchored to `bot/ai/intent.py`, blob `74bcd19f`).
+
+Two unrelated defects fixed along the way, both surfaced by running the gate rather than by reading:
+
+1. **`scripts/guard.py` duplication** — three near-identical `if violations > 0 and rc == 0` blocks. Collapsed to one summed check. Behaviour is identical (all rules still run unconditionally, a nonzero orchestrator rc is still preserved), and the third block had been literally unreachable in tests: the physics rule always sets `rc = 1` first on any synthetic tree.
+2. **A real file-descriptor leak in `terrain.py`** — `Image.open(path).convert("RGB")` never released the handle, one descriptor per `TerrainMap` load, raising `ResourceWarning` on 16 tests. `PillowImageProtocol` gained `__enter__`/`__exit__` and the loader now scopes the source image in a `with`. Verified under `-W error::ResourceWarning`.
+
+Gate at close: guard 0 violations across every rule group, mypy clean over 814 files, **5,581 tests at 100.00% statement + branch coverage, zero warnings**. New module is 180 statements / 82 branches at 100%, covered by 31 tests plus two guard-escalation tests.

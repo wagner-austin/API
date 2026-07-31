@@ -22,7 +22,7 @@ hubs: [codebase]
 | Target | What it does |
 |--------|-------------|
 | `make check` | `lint` + `test` — **the gate**; run before every commit |
-| `make lint` | guard (typing + mock-ban + contract rules + physics claims) + undecoded-field check + ruff check/format + mypy strict over `src tests scripts` |
+| `make lint` | guard (typing + mock-ban + contract rules + physics claims + **wiki structure**) + undecoded-field check + ruff check/format + mypy strict over `src tests scripts` |
 | `make test` | pytest + branch coverage (`fail_under = 100`) |
 | `make install` | poetry install + playwright install chromium |
 | `make help` | print every target with a one-line description |
