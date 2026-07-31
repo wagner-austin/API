@@ -87,12 +87,10 @@ def update_world_state_from_radar(
     """
     ts = get_current_time_ms()
     ws.pending_radar_empty_delta_ms = 0
+    # mark_radar_scan_complete also answers any pending
+    # container-desync latch -- every radar response shape counts.
     ws.mark_radar_scan_complete()
     ws.clear_failed_move_targets()
-    # The radar response is the resync a code=4 container disproof
-    # asked for: the delta below reconciles the viewport (volume==0
-    # entries are authoritative removals), so the desync is answered.
-    ws.container_desync_ms = 0
     reconcile_radar_viewport_resources(ws, containers, mines)
     viewport = ws.world_state["viewport"]
     ws.world_state = record_scanned_tiles(ws.world_state, _radar_revealed_tiles(ws), ts)

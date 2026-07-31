@@ -239,8 +239,18 @@ class WorldService:
     # -----------------------------------------------------------------
 
     def mark_radar_scan_complete(self) -> None:
-        """Record that the server completed a radar scan."""
+        """Record that the server completed a radar scan.
+
+        Also answers any pending container-desync latch: EVERY radar
+        response shape lands here (full 0x4F delta, cache refresh,
+        empty-delta resolution), and the ruling is one radar per
+        desync. Session 5 of run 20260730 burned all 22 extra radars
+        in a 2 s loop because the first latch clear lived only on the
+        full-delta path while the server answered with cache
+        refreshes.
+        """
         self.radar_scan_complete = True
+        self.container_desync_ms = 0
 
     def check_and_clear_radar_scan_complete(self) -> bool:
         """Check if a radar scan completed since last check, then clear.

@@ -106,3 +106,23 @@ class TestDesyncRescan:
         update_world_state_from_radar(get_world_service(), [], [], [])
 
         assert container_desync_pending() is False
+
+    def test_radar_cache_refresh_clears_the_latch(self) -> None:
+        """A cache-refresh radar answer also clears the latch.
+
+        Session 5 of run 20260730 burned all 22 extra radars in a 2 s
+        loop: the server answered every rescan with "Radar cache
+        refresh" and the first latch clear lived only on the
+        full-delta path. Every response shape lands in
+        ``mark_radar_scan_complete``, which now owns the clear.
+        """
+        from tankpit_bot.sniffer.world_state_radar import (
+            update_world_state_from_radar_cache,
+        )
+
+        mark_container_desync(99000)
+        assert container_desync_pending() is True
+
+        update_world_state_from_radar_cache(get_world_service())
+
+        assert container_desync_pending() is False
