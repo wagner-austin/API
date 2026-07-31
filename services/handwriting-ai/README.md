@@ -112,6 +112,7 @@ api_key_enabled = false
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
+| `API_GATEWAY_URL` | string | - | Gateway base URL. When set, the data-bank URL becomes `$API_GATEWAY_URL/data-bank` and `APP__DATA_BANK_API_URL` is ignored |
 | `APP__PORT` | int | `8000` | Server port |
 | `APP__THREADS` | int | `0` | Worker threads (0 = auto) |
 | `DIGITS__MODEL_DIR` | string | `models` | Model directory |
@@ -509,24 +510,16 @@ docker run \
 
 ### Docker Compose
 
-```yaml
-version: "3.8"
-services:
-  handai:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./config:/app/config:ro
-      - ./models:/data/digits/models
-    environment:
-      - HANDWRITING_DATA_ROOT=/data
-      - HANDWRITING_ARTIFACTS_ROOT=/data/artifacts
-      - HANDWRITING_LOGS_ROOT=/data/logs
-      - HANDWRITING_MODEL_ID=mnist_resnet18_v1
-      - HANDWRITING_API_KEY=your-api-key
-      - REDIS_URL=redis://redis:6379/0
+This service ships its own `docker-compose.yml` with two services, `api` and
+`worker`, built from the Dockerfile targets of the same name:
+
+```bash
+make up-handwriting    # from the repository root
+docker compose up -d   # or from this directory
 ```
+
+The API publishes host port **8004** onto container port 8000. Redis comes from
+the root compose (`make infra`), not this file.
 
 ### Railway
 
