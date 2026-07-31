@@ -43,6 +43,17 @@ dist/
 *.egg
 *.whl
 
+# Compiled Python extensions and their debug symbols.
+# maturin writes these into the SOURCE tree (cleargbm_rs sets
+# python-source = "python", so `maturin develop` drops the artifacts next to
+# __init__.py, which build/ and target/ do not cover). They must not be
+# committed: cleargbm_rs builds with -C target-cpu=native, so the binary is
+# not portable across CPU generations, and every consumer installs from the
+# maturin wheel or a develop path-dep rather than from these files.
+*.pyd
+*.so
+*.pdb
+
 # Logs
 logs/
 *.log
