@@ -149,7 +149,7 @@ def _run_demo(
     timeout = httpx.Timeout(300.0)
     with httpx.Client(base_url=base_url, timeout=timeout) as client:
         # Health check
-        r_h = client.get("/health")
+        r_h = client.get("/healthz")
         r_h.raise_for_status()
 
         # Render frames

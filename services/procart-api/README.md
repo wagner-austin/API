@@ -21,10 +21,13 @@ poetry run hypercorn procart_api.main:app --bind [::]:${PORT:-8000}
 
 ## Endpoints
 
-- GET /health — liveness
+- GET /healthz — liveness
+- GET /readyz — readiness
 - GET /registries/modules — list available visual modules
 - GET /registries/camera-paths — list camera path types
 - GET /registries/tone-mappers — list tone mapping types
+- GET /registries/post-effects — list post-processing effects
+- GET /registries/composite-ops — list composite operations
 - POST /render/preview — render a single frame preview
 - POST /render/frames — render all frames to disk
 - POST /render/video — encode frames to video via ffmpeg
@@ -47,7 +50,7 @@ src/procart_api/
   _test_hooks.py # injectable hooks (ffmpeg runner)
   main.py        # production entrypoint; sets real hooks
   routes/
-    health.py    # /health via add_api_route
+    health.py    # /healthz + /readyz via add_api_route
 scripts/guard.py  # monorepo guard harness
 tests/            # ASGI tests via httpx.ASGITransport
 docs/PLAN.md      # service integration plan

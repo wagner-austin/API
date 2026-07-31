@@ -10,9 +10,15 @@ Strict, typed endpoints for previewing frames, rendering frames to disk, and enc
 
 ## Endpoints
 
-### GET /health
+### GET /healthz
 
-Liveness probe.
+Liveness probe. Returns `{"status": "ok"}`.
+
+### GET /readyz
+
+Readiness probe. Returns `{"status": "ready", "reason": null}`. Rendering runs
+in-process, so there is no external dependency whose reachability could make
+this differ from liveness.
 
 ### GET /registries/modules
 ### GET /registries/camera-paths
