@@ -294,3 +294,47 @@ class TestDispatchLivenessStamp:
         dispatch_world_state_update(get_world_service(), SyncDict(msg_type=0x3F))
 
         assert get_world_service().last_game_message_ms > 0
+
+
+class TestChatConsentRecording:
+    """Chat senders are recorded for the human-consent contract."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_other_tank_chat_marks_consent(self) -> None:
+        """A non-self 0x4D sender lands in chat_seen_tank_ids."""
+        from tankpit_bot.protocol import ChatMessageDict
+
+        update_world_state_from_position(100, 100)
+        msg = ChatMessageDict(msg_type=0x4D, sender_id=1229, message_type=41, x=110, y=100)
+
+        dispatch_world_state_update(get_world_service(), msg)
+
+        assert 1229 in get_world_service().chat_seen_tank_ids
+
+    def test_self_echo_is_not_consent(self) -> None:
+        """The bot's own echoed chat never marks anyone consenting."""
+        from tankpit_bot.protocol import ChatMessageDict
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        state = ws.world_state["self_state"]
+        if state is None:
+            raise AssertionError("self state must exist after position update")
+        msg = ChatMessageDict(
+            msg_type=0x4D,
+            sender_id=state["tank_id"],
+            message_type=41,
+            x=100,
+            y=100,
+        )
+
+        dispatch_world_state_update(ws, msg)
+
+        assert ws.chat_seen_tank_ids == set()

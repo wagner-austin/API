@@ -706,6 +706,10 @@ def _dispatch_chat_message(
     is_self_echo = self_state is not None and sender_id == self_state["tank_id"]
     if is_self_echo:
         ws.last_chat_echo_message_id = message_id
+    else:
+        # Any chat from another tank marks them as a responsive,
+        # combat-consenting player (human-consent contract 2026-07-30).
+        ws.chat_seen_tank_ids.add(sender_id)
     sender = ws.world_state["tanks"].get(str(sender_id))
     sender_name = sender["name"] if sender is not None else ""
     log.info(

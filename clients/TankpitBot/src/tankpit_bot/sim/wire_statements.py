@@ -108,7 +108,11 @@ def identity_statement(world: SimWorldDict, tank_id: int) -> TankInfoDict:
         team=tank["team"],
         decoration_state=bytes(4),
         persistent_tank_id=0,
-        name=f"sim-{tank_id}",
+        # Practice-bot name shape: the sim models the practice room,
+        # and a human-classified name would put every sim opponent
+        # behind the human-consent combat gate (2026-07-30) -- the bot
+        # would greet the fleet instead of fighting it.
+        name=f"red-{tank_id}",
     )
 
 

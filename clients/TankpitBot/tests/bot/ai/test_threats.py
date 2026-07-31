@@ -51,10 +51,11 @@ def _tank(
     Returns:
         TankStateDict with the provided values.
     """
-    # rank=1 (private): the default ``tank-{key}`` names classify as
-    # HUMAN under the 2026-07-28 rank-window rule, and rank-0 humans
-    # are protected from targeting -- these fixtures test the
-    # distance/freshness/liveness gates, so they sit inside the window.
+    # Default names are practice-bot style (``red-{key}``): these
+    # fixtures test the distance/freshness/liveness gates, and bot
+    # classification keeps them clear of BOTH human-only gates (the
+    # 2026-07-28 rank window and the 2026-07-30 consent contract).
+    # Tests about the human gates pass explicit human names.
     return make_tank_state(
         tank_id=int(key),
         x=x,
@@ -63,7 +64,7 @@ def _tank(
         rank=1,
         damage_state=damage_state,
         direction=direction,
-        name=name or f"tank-{key}",
+        name=name or f"red-{key}",
         is_bot=is_bot,
         is_self=is_self,
         liveness=liveness,
@@ -217,7 +218,7 @@ class TestAnalyzeThreats:
                     y=130,
                     team=2,
                     damage_state=1,
-                    name="enemy-42",
+                    name="red-42",
                     is_bot=False,
                 ),
             }
@@ -231,7 +232,7 @@ class TestAnalyzeThreats:
         assert t["distance"] == 50
         assert t["damage_state"] == 1
         assert t["team"] == 2
-        assert t["name"] == "enemy-42"
+        assert t["name"] == "red-42"
         assert t["is_bot"] is False
 
     def test_filters_deactivated_tanks(self) -> None:

@@ -6,6 +6,7 @@ from tankpit_bot.bot.ai.combat_break import (
     INCOMING_RATE_WINDOW_MS,
     assess_engagement_break,
 )
+from tankpit_bot.bot.ai.combat_landing import choose_greeting_landing_tile
 from tankpit_bot.bot.ai.combat_strategy import (
     block_combat_target_and_replan,
     clear_combat_target,
@@ -21,17 +22,25 @@ from tankpit_bot.bot.ai.combat_strategy import (
 )
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
+    can_afford_teleport,
     can_use_radar,
     make_decision,
     target_position_is_fresh,
 )
-from tankpit_bot.bot.ai.humans import is_human_name, is_practice_bot_name
+from tankpit_bot.bot.ai.humans import (
+    is_human_name,
+    is_human_rank_protected,
+    is_practice_bot_name,
+)
 from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
     find_acquisition_target,
     find_locked_target_pursuit,
     find_relay_travel_target,
+    human_combat_consented,
+    make_enemy_threat_from_tank,
+    manhattan_distance,
     pursuit_trace_is_live,
     stale_human_exists,
 )
@@ -343,6 +352,115 @@ def _decide_hunt_acquire(ctx: DecideCtx) -> TickDecisionDict:
     return _decide_hunt_acquire_fresh(ctx, threats, ctx.base)
 
 
+def _ungreeted_unconsented_human(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+) -> EnemyThreatDict | None:
+    """Return the nearest human owed a greeting visit, or ``None``.
+
+    A candidate is an alive, position-synced, map-fresh enemy human
+    inside the configured rank window who has neither consented to
+    combat nor been greeted yet.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state (the ``greeted_target_id`` latch).
+
+    Returns:
+        The nearest qualifying human as a threat record.
+    """
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    candidate: EnemyThreatDict | None = None
+    best_dist = 0
+    for tank in ctx.filtered["tanks"].values():
+        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
+            continue
+        if tank["liveness"] != "alive" or (tank["x"] == 0 and tank["y"] == 0):
+            continue
+        if not is_human_name(tank["name"]):
+            continue
+        if is_human_rank_protected(
+            tank["name"],
+            tank["rank"],
+            min_rank=ctx.config["human_target_min_rank"],
+            max_rank=ctx.config["human_target_max_rank"],
+        ):
+            continue
+        if tank["tank_id"] == ai_state["greeted_target_id"]:
+            continue
+        if human_combat_consented(tank["tank_id"]):
+            continue
+        if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:
+            continue
+        dist = manhattan_distance(sx, sy, tank["x"], tank["y"])
+        if candidate is None or dist < best_dist:
+            candidate = make_enemy_threat_from_tank(tank, dist)
+            best_dist = dist
+    return candidate
+
+
+def _greeting_approach(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+) -> TickDecisionDict | None:
+    """Teleport a few tiles off an ungreeted human to say HELLO.
+
+    The human-consent contract's first move (user ruling 2026-07-30:
+    "make sure we teleport to them. and that we've said hello first,
+    then that is when the consent contract must be returned. but we
+    want to see them. and not an adjacent teleport. a few tiles off"):
+    an unconsented human is never ACQUIRED, but the bot still comes to
+    them once -- landing in the greeting stand-off band so both sides
+    see each other, with the HELLO attaching on arrival (the greeting
+    hook fires on viewport presence). The ``greeted_target_id`` latch
+    makes this a one-shot per human: after the visit the bot resumes
+    farming until they respond (chat) or strike first, either of which
+    consents them into normal acquisition.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+
+    Returns:
+        The greeting-approach teleport, or ``None`` when no map-fresh,
+        rank-window, unconsented, ungreeted human exists or no legal
+        stand-off landing is affordable.
+    """
+    candidate = _ungreeted_unconsented_human(ctx, ai_state)
+    if candidate is None:
+        return None
+    landing = choose_greeting_landing_tile(ctx.filtered, ctx.self_state, candidate, ctx.terrain)
+    if landing is None:
+        return None
+    landing_x, landing_y = landing
+    if not can_afford_teleport(ctx, landing_x, landing_y):
+        return None
+    emit_ai(
+        "greeting approach: teleporting %d tiles off %s (id=%d) to say HELLO",
+        abs(landing_x - candidate["x"]) + abs(landing_y - candidate["y"]),
+        candidate["name"],
+        candidate["tank_id"],
+    )
+    emit_diagnostic(
+        diagnostic_kind="greeting_approach",
+        target_id=candidate["tank_id"],
+        target_name=candidate["name"],
+        landing_x=landing_x,
+        landing_y=landing_y,
+    )
+    return make_decision(
+        make_teleport_command(landing_x, landing_y),
+        "HUNT",
+        800,
+        landing_x,
+        landing_y,
+        "greet_approach",
+        ai_state,
+        ctx.equip,
+        reason_context={"target_name": candidate["name"]},
+    )
+
+
 def _decide_hunt_acquire_fresh(
     ctx: DecideCtx,
     threats: list[EnemyThreatDict],
@@ -375,6 +493,9 @@ def _decide_hunt_acquire_fresh(
         SessionExitError: When fresh map intel shows no viable
             target anywhere.
     """
+    greet = _greeting_approach(ctx, ai_state)
+    if greet is not None:
+        return greet
     target = select_new_combat_target(ctx, threats)
     if target is not None:
         emit_ai("new target %s (id=%d)", target["name"], target["tank_id"])
@@ -399,54 +520,7 @@ def _decide_hunt_acquire_fresh(
         human_max_rank=ctx.config["human_target_max_rank"],
     )
     if map_target is not None:
-        if is_practice_bot_name(map_target["name"]):
-            # Unlimited-distance human pursuit (user ruling 2026-07-29):
-            # before farming an affordable bot, check whether a
-            # rank-window human is on the fresh map beyond the
-            # affordability horizon -- if so, the relay chain toward
-            # THEM outranks the bot. (An affordable human would already
-            # be the acquisition winner via the tier sort.)
-            human_travel = _human_pursuit_travel_target(ctx)
-            if human_travel is not None:
-                emit_ai(
-                    "human %s (id=%d) at dist %d outranks affordable bot %s - "
-                    "relaying toward them (unlimited-distance human pursuit)",
-                    human_travel["name"],
-                    human_travel["tank_id"],
-                    human_travel["distance"],
-                    map_target["name"],
-                )
-                relay = _relay_toward(ctx, ai_state, human_travel)
-                if relay is not None:
-                    return relay
-                emit_ai(
-                    "no dot or refuel leg helps toward %s right now - "
-                    "farming %s while the map evolves",
-                    human_travel["name"],
-                    map_target["name"],
-                )
-            elif _stale_human_needs_map_refresh(ctx):
-                # Freshness asymmetry (Yuppler, 2026-07-29 21:19): bots
-                # stay wire-fresh by moving; a quiet human goes stale
-                # 5 s after each map open, and with a fresh bot always
-                # available the map never got reopened -- the human
-                # was invisible outside 5-second windows. A known
-                # rank-window human whose only curable defect is stale
-                # map data forces a refresh BEFORE the bot may settle
-                # for farming; the cooldown gate bounds the cadence.
-                emit_ai(
-                    "known human is map-stale - refreshing map before settling for %s",
-                    map_target["name"],
-                )
-                return search_for_enemies(ctx, ai_state=ai_state, map_reason="find_target")
-        emit_ai(
-            "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
-            map_target["name"],
-            map_target["tank_id"],
-            map_target["x"],
-            map_target["y"],
-        )
-        return teleport_to_target(ctx, map_target)
+        return _acquire_map_target(ctx, ai_state, map_target)
 
     map_age_ms = ctx.timestamp_ms - ctx.ai_state["last_map_open_ms"]
     if ctx.ai_state["last_map_open_ms"] > 0 and map_age_ms <= ctx.config["map_open_cooldown_ms"]:
@@ -465,6 +539,62 @@ def _decide_hunt_acquire_fresh(
         ai_state=ai_state,
         map_reason="find_enemies",
     )
+
+
+def _acquire_map_target(
+    ctx: DecideCtx,
+    ai_state: AIStateDict,
+    map_target: EnemyThreatDict,
+) -> TickDecisionDict:
+    """Resolve a map-known acquisition winner into a decision.
+
+    A practice-bot winner first defers to the human-pursuit overrides:
+    the unlimited-distance relay toward a rank-window human (user
+    ruling 2026-07-29) and the stale-human map refresh (the freshness
+    asymmetry -- a quiet human goes map-stale in 5 s while bots stay
+    wire-fresh by moving). Otherwise the winner is teleport-acquired.
+
+    Args:
+        ctx: Decision context.
+        ai_state: Base AI state for the produced command.
+        map_target: The acquisition winner.
+
+    Returns:
+        Relay, map-refresh, or teleport-acquire decision.
+    """
+    if is_practice_bot_name(map_target["name"]):
+        human_travel = _human_pursuit_travel_target(ctx)
+        if human_travel is not None:
+            emit_ai(
+                "human %s (id=%d) at dist %d outranks affordable bot %s - "
+                "relaying toward them (unlimited-distance human pursuit)",
+                human_travel["name"],
+                human_travel["tank_id"],
+                human_travel["distance"],
+                map_target["name"],
+            )
+            relay = _relay_toward(ctx, ai_state, human_travel)
+            if relay is not None:
+                return relay
+            emit_ai(
+                "no dot or refuel leg helps toward %s right now - farming %s while the map evolves",
+                human_travel["name"],
+                map_target["name"],
+            )
+        elif _stale_human_needs_map_refresh(ctx):
+            emit_ai(
+                "known human is map-stale - refreshing map before settling for %s",
+                map_target["name"],
+            )
+            return search_for_enemies(ctx, ai_state=ai_state, map_reason="find_target")
+    emit_ai(
+        "map-known target %s (id=%d) at (%d,%d) - teleport-acquiring",
+        map_target["name"],
+        map_target["tank_id"],
+        map_target["x"],
+        map_target["y"],
+    )
+    return teleport_to_target(ctx, map_target)
 
 
 def _pick_relay_dot(

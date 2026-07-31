@@ -1,12 +1,15 @@
-"""One-shot HELLO greeting when a human combat target is acquired.
+"""One-shot HELLO greeting when a human is encountered in the viewport.
 
-User request (2026-07-29): when the bot finishes collecting and locks
-onto the human player, it says HELLO. The hook rides the decision
-pipeline: every HUNT decision that carries a combat lock on a
-human-classified tank the bot has not yet greeted gets the chat
-attached as its ``secondary_command`` — the executor dispatches it in
-the same tick window as the acquisition move, so the greeting lands as
-the bot comes for them.
+User contract (2026-07-30, superseding the 2026-07-29 lock-trigger):
+the bot never engages a human who has not consented -- "the human must
+respond hello or engage the bot first" -- so the HELLO cannot wait for
+a combat lock that the consent gate now forbids. Instead the greeting
+fires on ENCOUNTER: any viewport-present enemy human the bot has not
+yet greeted gets the chat attached as the tick's
+``secondary_command``, whatever the primary decision is. The
+greeting-approach step (``hunt_mode._greeting_approach``) teleports
+the bot a few tiles off a map-known human precisely so this hook
+fires with both tanks in sight of each other.
 
 Flood-mute discipline ([[chat-messages]], sniff-20260729-214411: after
 8 rapid sends the server silently swallowed chat for the rest of the
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.humans import is_human_name
+from tankpit_bot.bot.ai.threats import VIEWPORT_PRESENCE_TTL_MS
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_chat_command
@@ -26,36 +30,54 @@ from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 
 
 def attach_human_greeting(ctx: DecideCtx, decision: TickDecisionDict) -> TickDecisionDict:
-    """Attach a one-shot HELLO to the decision that locks a new human.
+    """Attach a one-shot HELLO when an ungreeted human is in view.
 
-    Fires when the decision's updated AI state carries a combat lock on
-    a registry tank whose name classifies as human and whose id differs
-    from the last greeted id. The greeting never displaces a planned
-    secondary command — those ticks skip, and the unchanged latch
-    retries on the next locked tick.
+    Scans the registry for enemy humans with live viewport presence
+    (``last_viewport_observation_ms`` inside the presence TTL -- the
+    same proof the threat list demands) whose id differs from the last
+    greeted id, and greets the nearest one. The greeting never
+    displaces a planned secondary command -- those ticks skip, and the
+    unchanged latch retries on the next tick with the human still in
+    view.
 
     Args:
         ctx: Decision context (registry lookup + self position).
-        decision: HUNT-owner decision leaving the arbitrator.
+        decision: The decision leaving the arbitrator this tick.
 
     Returns:
         The decision unchanged, or with the HELLO chat attached as
         ``secondary_command`` and ``greeted_target_id`` latched.
     """
     state = decision["updated_ai_state"]
-    target_id = state["combat_target_id"]
-    if target_id == -1 or target_id == state["greeted_target_id"]:
-        return decision
     if decision["secondary_command"] is not None:
         return decision
-    tank = ctx.world["tanks"].get(str(target_id))
-    if tank is None or not is_human_name(tank["name"]):
+    sx, sy = ctx.self_state["x"], ctx.self_state["y"]
+    target_id = -1
+    target_name = ""
+    best_dist = 0
+    for tank in ctx.world["tanks"].values():
+        if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
+            continue
+        if tank["liveness"] != "alive":
+            continue
+        if not is_human_name(tank["name"]):
+            continue
+        if tank["tank_id"] == state["greeted_target_id"]:
+            continue
+        if ctx.timestamp_ms - tank["last_viewport_observation_ms"] > VIEWPORT_PRESENCE_TTL_MS:
+            continue
+        dist = abs(tank["x"] - sx) + abs(tank["y"] - sy)
+        if target_id == -1 or dist < best_dist:
+            target_id = tank["tank_id"]
+            target_name = tank["name"]
+            best_dist = dist
+    if target_id == -1:
         return decision
-    emit_ai("greeting human %s (id=%d) with HELLO", tank["name"], target_id)
+    emit_ai("greeting human %s (id=%d) with HELLO", target_name, target_id)
     emit_diagnostic(
         diagnostic_kind="chat_greeting",
         target_id=target_id,
-        target_name=tank["name"],
+        target_name=target_name,
         message_id=CHAT_HELLO,
     )
     chat = make_chat_command(CHAT_HELLO, ctx.self_state["x"], ctx.self_state["y"])

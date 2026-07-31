@@ -70,7 +70,7 @@ def _seed_self_and_enemy() -> int:
             msg_type=0x21,
             tank_id=1229,
             team=1,
-            name="Yuppler",
+            name="red-77",
             decoration_state=b"",
             persistent_tank_id=0,
         ),

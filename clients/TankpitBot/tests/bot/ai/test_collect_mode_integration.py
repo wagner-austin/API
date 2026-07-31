@@ -27,7 +27,7 @@ def _enemy(
     tank_id: int = 50,
     x: int = 103,
     y: int = 103,
-    name: str = "Enemy",
+    name: str = "red-1",
     timestamp_ms: int = 100000,
 ) -> TankStateDict:
     """Create a visible enemy tank for recovery arbitration tests.
@@ -721,7 +721,7 @@ class TestRecoverEquipmentSearch:
         }
         tanks: dict[str, TankStateDict] = {
             "50": _enemy(timestamp_ms=100000),
-            "60": _enemy(tank_id=60, x=105, y=105, name="Enemy2", timestamp_ms=100000),
+            "60": _enemy(tank_id=60, x=105, y=105, name="red-23", timestamp_ms=100000),
         }
         world, self_state = make_world(fuel=150, tanks=tanks, containers=containers)
         ai_state = AIStateDict(
@@ -750,8 +750,8 @@ class TestRecoverEquipmentSearch:
         depends on per-target freshness, not on this test's intent.
         """
         tanks: dict[str, TankStateDict] = {
-            "50": _enemy(name="DeadEnemy", timestamp_ms=100000),
-            "60": _enemy(tank_id=60, x=104, y=103, name="LiveEnemy", timestamp_ms=100000),
+            "50": _enemy(name="red-24", timestamp_ms=100000),
+            "60": _enemy(tank_id=60, x=104, y=103, name="red-25", timestamp_ms=100000),
         }
         world, self_state = make_world(fuel=1200, tanks=tanks)
         ai_state = AIStateDict(
@@ -768,5 +768,5 @@ class TestRecoverEquipmentSearch:
         # acquire engages from the current tile (in-view shot
         # short-circuit) rather than teleporting.
         assert decision["behavior"]["reason_kind"] == "shoot_target"
-        assert decision["behavior"]["reason_context"]["target_name"] == "LiveEnemy"
-        assert "DeadEnemy" not in decision["behavior"]["reason_kind"]
+        assert decision["behavior"]["reason_context"]["target_name"] == "red-25"
+        assert "red-24" not in decision["behavior"]["reason_kind"]

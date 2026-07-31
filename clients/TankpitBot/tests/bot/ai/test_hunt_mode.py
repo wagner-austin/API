@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.hunt_mode import decide_hunt_mode
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.session_exit import SessionExitError
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state.types import TankStateDict, make_tank_state
 from tests.bot.ai._support import (
     make_inventory,
@@ -16,12 +19,30 @@ from tests.bot.ai._support import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _clean_world_service() -> Generator[None, None, None]:
+    """Isolate the world-service singleton (consent marks) per test."""
+    reset_world_state()
+    yield
+    reset_world_state()
+
+
+def _consent_human(tank_id: int) -> None:
+    """Mark a human as combat-consented for pursuit scenarios.
+
+    The human-consent contract (2026-07-30) requires a chat response
+    or a first strike before any human is targeted; these pursuit
+    tests model a human who has already responded.
+    """
+    get_world_service().chat_seen_tank_ids.add(tank_id)
+
+
 def _enemy_tank(
     *,
     tank_id: int = 50,
     x: int = 120,
     y: int = 100,
-    name: str = "Enemy",
+    name: str = "red-40",
 ) -> TankStateDict:
     """Create a visible enemy tank for HUNT tests.
 
@@ -61,7 +82,7 @@ def _pursuit_target(
     tank_id: int = 50,
     x: int = 120,
     y: int = 100,
-    name: str = "Runner",
+    name: str = "red-9",
 ) -> TankStateDict:
     """Create an off-viewport but wire-fresh locked target.
 
@@ -328,7 +349,7 @@ def test_hunt_acquire_refuels_when_fresh_position_teleport_is_unaffordable() -> 
     the regression guard expects.
     """
     tanks: dict[str, TankStateDict] = {
-        "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
+        "50": _enemy_tank(x=190, y=100, name="red-50"),
     }
     world, self_state = make_world(fuel=520, tanks=tanks)
     ai_state = AIStateDict(
@@ -565,7 +586,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
         y=100,
         team=2,
         rank=1,
-        name="Runner",
+        name="red-9",
         is_self=False,
         is_bot=False,
         damage_state=0,
@@ -598,7 +619,7 @@ def test_hunt_acquire_refreshes_a_stale_locked_position_via_map() -> None:
 def test_hunt_refresh_refuels_when_close_action_is_not_legal() -> None:
     """Refresh delegates to fuel recovery when combat teleport is unaffordable."""
     tanks: dict[str, TankStateDict] = {
-        "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
+        "50": _enemy_tank(x=190, y=100, name="red-50"),
     }
     world, self_state = make_world(fuel=520, tanks=tanks)
     ai_state = AIStateDict(
@@ -673,7 +694,7 @@ def test_hunt_close_returns_close_decision_for_visible_target() -> None:
 def test_hunt_close_refuels_when_close_action_is_not_legal() -> None:
     """Close state delegates to fuel recovery when combat teleport is unaffordable."""
     tanks: dict[str, TankStateDict] = {
-        "50": _enemy_tank(x=190, y=100, name="FarEnemy"),
+        "50": _enemy_tank(x=190, y=100, name="red-50"),
     }
     world, self_state = make_world(fuel=520, tanks=tanks)
     ai_state = AIStateDict(
@@ -800,7 +821,7 @@ def test_hunt_confirm_kill_reacquires_after_target_state_clears() -> None:
     teleport rather than a map_open refresh.
     """
     tanks: dict[str, TankStateDict] = {
-        "50": _enemy_tank(name="Respawned"),
+        "50": _enemy_tank(name="red-8"),
     }
     world, self_state = make_world(fuel=800, tanks=tanks)
     ai_state = AIStateDict(
@@ -1073,7 +1094,7 @@ def test_pursuit_fire_stops_when_the_homing_trace_expires() -> None:
         y=150,
         team=2,
         rank=1,
-        name="Runner",
+        name="red-9",
         is_self=False,
         is_bot=False,
         damage_state=0,
@@ -1131,7 +1152,7 @@ def _map_known_enemy(
     tank_id: int = 60,
     x: int = 240,
     y: int = 100,
-    name: str = "FarEnemy",
+    name: str = "red-50",
     timestamp_ms: int = 99800,
 ) -> TankStateDict:
     """Create a map-known enemy with no viewport confirmation.
@@ -1209,7 +1230,7 @@ def test_hunt_acquire_relays_via_dot_toward_unaffordable_enemy() -> None:
         "60": _map_known_enemy(),
         # Stale map entry: rejected for a non-affordability reason, so
         # the relay must not travel toward it.
-        "70": _map_known_enemy(tank_id=70, x=110, y=100, name="Ghost", timestamp_ms=10),
+        "70": _map_known_enemy(tank_id=70, x=110, y=100, name="red-26", timestamp_ms=10),
     }
     world, self_state = make_world(fuel=700, tanks=tanks)
     ai_state = AIStateDict(
@@ -1465,7 +1486,7 @@ def test_hunt_pursuit_aim_is_clamped_into_viewport() -> None:
             "combat_target_x": 150,
             "combat_target_y": 150,
             "last_shot_target_id": 50,
-            "last_shot_target_name": "Runner",
+            "last_shot_target_name": "red-9",
         }
     )
     inventory = make_inventory()
@@ -1494,6 +1515,7 @@ def test_unaffordable_human_outranks_affordable_bot_at_acquisition() -> None:
     human on the fresh map, the decision must be a dot-relay leg
     toward the HUMAN, not a teleport at the bot.
     """
+    _consent_human(90)
     tanks: dict[str, TankStateDict] = {
         "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -1536,6 +1558,7 @@ def test_human_pursuit_falls_back_to_bot_when_no_leg_helps() -> None:
     at capacity), the affordable bot is engaged and the next map
     re-evaluates the pursuit.
     """
+    _consent_human(90)
     tanks: dict[str, TankStateDict] = {
         "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
@@ -1740,6 +1763,7 @@ def test_relay_leg_cost_is_capped_at_the_engagement_budget() -> None:
     old floor-only rule at a full tank) and must lose to the cheaper
     progress dot at ~300.
     """
+    _consent_human(90)
     tanks: dict[str, TankStateDict] = {
         "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -1785,6 +1809,7 @@ def test_stale_known_human_forces_a_map_refresh_over_bot_farming() -> None:
     out, and the map itself is older than the cooldown -- the
     decision must be a map refresh, not a teleport at red-5.
     """
+    _consent_human(90)
     tanks: dict[str, TankStateDict] = {
         "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
         "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler", timestamp_ms=80000),
@@ -1843,6 +1868,7 @@ def test_stale_human_exists_filters_and_reasons() -> None:
     refresh; only a human whose sole curable defect is stale map data
     returns True.
     """
+    _consent_human(90)
     from tankpit_bot.bot.ai.threats import stale_human_exists
 
     ally_human = make_tank_state(
@@ -1885,6 +1911,7 @@ def test_relay_skips_progress_dot_below_the_fuel_floor() -> None:
     At fuel 400, the 300-cost progress dot passes the 450 leg cap but
     would leave 100 < the 200 floor -- the cheaper dot wins instead.
     """
+    _consent_human(90)
     tanks: dict[str, TankStateDict] = {
         "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
     }
@@ -1947,3 +1974,193 @@ def test_scan_on_landing_pursuit_past_the_trace_wall_chases_via_map() -> None:
 
     assert decision["command"]["cmd_type"] == "map_open"
     assert decision["behavior"]["reason_kind"] == "find_target"
+
+
+def test_greeting_approach_lands_a_few_tiles_off_an_unconsented_human() -> None:
+    """The greet visit teleports to the stand-off band, no lock taken.
+
+    User ruling 2026-07-30: "make sure we teleport to them. and that
+    we've said hello first ... we want to see them. and not an
+    adjacent teleport. a few tiles off." The approach fires for a
+    map-fresh unconsented human before any bot farming; the HELLO
+    itself attaches on arrival via the viewport-encounter greeting.
+    """
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "greet_approach"
+    ring = abs(decision["command"]["target_x"] - 140) + abs(decision["command"]["target_y"] - 100)
+    assert 5 <= ring <= 7
+    assert decision["updated_ai_state"]["combat_target_id"] == -1
+
+
+def test_greeted_unconsented_human_is_left_alone() -> None:
+    """After the visit the latch stops re-approaching; farming resumes."""
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+            "greeted_target_id": 90,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["behavior"]["reason_kind"] != "greet_approach"
+    assert decision["behavior"]["reason_context"].get("target_name") != "Yuppler"
+
+
+def test_greeting_approach_declines_when_teleport_unaffordable() -> None:
+    """A greet visit the tank cannot pay for is skipped, not forced."""
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=101, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=240, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=60, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    # At fuel 60 nothing is affordable: the greet visit is skipped
+    # (never forced) and the acquire path exits no_viable_targets.
+    with pytest.raises(SessionExitError) as exc_info:
+        decide_hunt_mode(ctx)
+
+    assert exc_info.value.reason == "no_viable_targets"
+
+
+def test_greeting_scan_ignores_map_stale_humans() -> None:
+    """A stale human gets no blind visit; the nearest fresh one wins.
+
+    The second fresh human sits farther than the first so the scan's
+    keep-the-nearest branch is exercised both ways.
+    """
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    tanks: dict[str, TankStateDict] = {
+        "60": _map_known_enemy(tank_id=60, x=115, y=100, name="red-5"),
+        "90": _map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler", timestamp_ms=10),
+        "91": _map_known_enemy(tank_id=91, x=130, y=100, name="guest"),
+        "92": _map_known_enemy(tank_id=92, x=200, y=100, name="Visitor"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["behavior"]["reason_kind"] == "greet_approach"
+    assert decision["behavior"]["reason_context"]["target_name"] == "guest"
+
+
+def test_consented_human_map_winner_is_teleport_acquired() -> None:
+    """A consented human as the map winner takes the normal acquire path."""
+    from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+    _consent_human(90)
+    tanks: dict[str, TankStateDict] = {
+        "90": _map_known_enemy(tank_id=90, x=140, y=100, name="Yuppler"),
+    }
+    world, self_state = make_world(fuel=1100, tanks=tanks)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "HUNT",
+            "mode_state": "ACQUIRE",
+            "mode_started_ms": 90000,
+            "last_map_open_ms": 99500,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    decision = decide_hunt_mode(ctx)
+
+    assert decision["command"]["cmd_type"] == "teleport"
+    assert decision["behavior"]["reason_kind"] == "teleport_target"
+    assert decision["behavior"]["reason_context"]["target_name"] == "Yuppler"

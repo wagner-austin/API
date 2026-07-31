@@ -28,7 +28,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -64,7 +64,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Boxed",
+                name="red-2",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -77,7 +77,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Reachable",
+                name="red-3",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -121,7 +121,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="FailedLanding",
+                name="red-4",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -134,7 +134,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Reachable",
+                name="red-3",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -158,7 +158,7 @@ class TestDecideBlockedCombatTargets:
 
         assert decision["command"]["cmd_type"] == "map_open"
         assert decision["behavior"]["reason_kind"] == "find_target"
-        assert decision["behavior"]["reason_context"]["target_name"] == "Reachable"
+        assert decision["behavior"]["reason_context"]["target_name"] == "red-3"
         assert "50" in decision["updated_ai_state"]["blocked_combat_targets"]
 
     def test_failed_combat_landing_blocks_target_and_reopens_map_when_no_viable_threat(
@@ -179,7 +179,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="OnlyTarget",
+                name="red-5",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -219,7 +219,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="RingedNear",
+                name="red-6",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -263,7 +263,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Boxed",
+                name="red-2",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -316,7 +316,7 @@ class TestDecideBlockedCombatTargets:
             damage_state=0,
             rank=1,
             team=2,
-            name="Enemy",
+            name="red-1",
             is_bot=False,
             timestamp_ms=100000,
         )
@@ -334,7 +334,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Blocker",
+                name="red-8",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -355,7 +355,7 @@ class TestDecideBlockedCombatTargets:
             damage_state=0,
             rank=1,
             team=2,
-            name="Enemy",
+            name="red-1",
             is_bot=False,
             timestamp_ms=100000,
         )
@@ -386,7 +386,7 @@ class TestDecideBlockedCombatTargets:
             damage_state=0,
             rank=1,
             team=2,
-            name="Enemy",
+            name="red-1",
             is_bot=False,
             timestamp_ms=100000,
         )
@@ -415,7 +415,7 @@ class TestDecideBlockedCombatTargets:
             damage_state=0,
             rank=1,
             team=2,
-            name="Enemy",
+            name="red-1",
             is_bot=False,
             timestamp_ms=100000,
         )
@@ -433,7 +433,7 @@ class TestDecideBlockedCombatTargets:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -458,4 +458,4 @@ class TestDecideBlockedCombatTargets:
         # so the acquire engages from the current tile (flag 1 of run
         # bot-20260730-000030) instead of paying a close teleport.
         assert decision["behavior"]["reason_kind"] == "shoot_target"
-        assert decision["behavior"]["reason_context"]["target_name"] == "Enemy"
+        assert decision["behavior"]["reason_context"]["target_name"] == "red-1"

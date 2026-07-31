@@ -134,6 +134,74 @@ def choose_combat_landing_tile(
     return (target_x, target_y)
 
 
+GREETING_STANDOFF_TILES = 6
+"""Manhattan distance band center for a greeting approach landing.
+
+User ruling 2026-07-30: before any combat with a human the bot
+teleports to them so both sides can SEE each other, says HELLO, and
+waits for consent -- "not an adjacent teleport. a few tiles off." Six
+tiles is unmistakably visible inside the 16x16 viewport and equally
+unmistakably non-hostile (outside auto-engage adjacency); the chooser
+accepts one tile of slack either side before giving up.
+"""
+
+_GREETING_BAND_SLACK = 1
+
+
+def choose_greeting_landing_tile(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    target: EnemyThreatDict,
+    terrain: TerrainMapProtocol | None,
+) -> tuple[int, int] | None:
+    """Choose a visible, non-adjacent landing near a human to greet.
+
+    Scans the Manhattan ring band ``GREETING_STANDOFF_TILES ±
+    _GREETING_BAND_SLACK`` around the target for a passable,
+    dynamically unoccupied tile, preferring the band center and then
+    the tile nearest self (cheapest teleport). Unlike the combat
+    landing chooser this never falls back to the target's own tile --
+    landing on or beside an unconsented human reads as an attack.
+
+    Args:
+        world: Current world state (dynamic occupancy).
+        self_state: Player state (tie-break toward self).
+        target: The human to greet.
+        terrain: Terrain map; ``None`` means passability is unknown
+            and no greeting landing can be vouched for.
+
+    Returns:
+        Landing coordinates a few tiles off the human, or ``None``
+        when terrain is unknown or no band tile qualifies.
+    """
+    if terrain is None:
+        return None
+    target_x, target_y = target["x"], target["y"]
+    best: tuple[int, int] | None = None
+    best_key: tuple[int, int, int] | None = None
+    max_d = GREETING_STANDOFF_TILES + _GREETING_BAND_SLACK
+    for dx in range(-max_d, max_d + 1):
+        for dy in range(-(max_d - abs(dx)), max_d - abs(dx) + 1):
+            ring = abs(dx) + abs(dy)
+            if ring < GREETING_STANDOFF_TILES - _GREETING_BAND_SLACK:
+                continue
+            tile_x, tile_y = target_x + dx, target_y + dy
+            if not (0 <= tile_x <= 255 and 0 <= tile_y <= 255):
+                continue
+            if not terrain.is_passable(tile_x, tile_y):
+                continue
+            if _is_dynamically_occupied(world, tile_x, tile_y):
+                continue
+            key = (
+                abs(ring - GREETING_STANDOFF_TILES),
+                manhattan_distance(self_state["x"], self_state["y"], tile_x, tile_y),
+                ring,
+            )
+            if best_key is None or key < best_key:
+                best, best_key = (tile_x, tile_y), key
+    return best
+
+
 def has_cardinal_enemy_adjacency(
     self_state: SelfStateDict,
     target: EnemyThreatDict,
@@ -194,8 +262,10 @@ def _distance_key(self_x: int, self_y: int) -> Callable[[tuple[int, int]], int]:
 
 
 __all__ = [
+    "GREETING_STANDOFF_TILES",
     "SHOT_RANGE_TILES",
     "choose_combat_landing_tile",
+    "choose_greeting_landing_tile",
     "combat_landing_candidates",
     "has_cardinal_enemy_adjacency",
 ]

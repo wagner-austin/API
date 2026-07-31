@@ -33,7 +33,7 @@ class TestDecideCombatFeedback:
                 y=110,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -50,7 +50,7 @@ class TestDecideCombatFeedback:
             **{
                 **ai_state,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -69,7 +69,7 @@ class TestDecideCombatFeedback:
             **{
                 **ai_state,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -94,7 +94,7 @@ class TestDecideCombatFeedback:
                 y=105,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -110,7 +110,7 @@ class TestDecideCombatFeedback:
             **{
                 **ai_state,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
                 "last_map_open_ms": 94000,
             }
         )
@@ -150,7 +150,7 @@ class TestDecideShotTracking:
                 y=103,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -176,7 +176,7 @@ class TestDecideShotTracking:
 
         if decision["command"]["cmd_type"] == "shoot":
             assert decision["updated_ai_state"]["last_shot_target_id"] == 50
-            assert decision["updated_ai_state"]["last_shot_target_name"] == "Enemy"
+            assert decision["updated_ai_state"]["last_shot_target_name"] == "red-1"
 
 
 class TestDecideKillCooldown:
@@ -195,7 +195,7 @@ class TestDecideKillCooldown:
                 y=105,
                 team=2,
                 rank=1,
-                name="KilledEnemy",
+                name="red-19",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -244,7 +244,7 @@ class TestDecideKillCooldown:
                 y=110,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -263,7 +263,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 110,
                 "combat_target_y": 110,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -290,7 +290,7 @@ class TestDecideKillCooldown:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -312,7 +312,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -337,7 +337,7 @@ class TestDecideKillCooldown:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -356,7 +356,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -383,7 +383,7 @@ class TestDecideKillCooldown:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -405,7 +405,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -424,7 +424,7 @@ class TestDecideKillCooldown:
                 y=99,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -484,7 +484,7 @@ class TestDecideKillCooldown:
                 y=110,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -503,7 +503,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 110,
                 "combat_target_y": 110,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         inventory = make_inventory()
@@ -536,7 +536,7 @@ class TestDecideKillCooldown:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -568,7 +568,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         # Ammo exhausted: dual + homing both at 0 -- the weapon break
@@ -606,7 +606,7 @@ class TestDecideKillCooldown:
                 y=100,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,
@@ -638,7 +638,7 @@ class TestDecideKillCooldown:
                 "combat_target_x": 101,
                 "combat_target_y": 100,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Enemy",
+                "last_shot_target_name": "red-1",
             }
         )
         disabled_slot = InventoryItem(count=30, enabled=False)
@@ -678,7 +678,7 @@ class TestDepartedTargetFollowUp:
                 y=110,
                 team=2,
                 rank=1,
-                name="Runner",
+                name="red-9",
                 is_self=False,
                 is_bot=False,
                 damage_state=1,
@@ -697,7 +697,7 @@ class TestDepartedTargetFollowUp:
                 "combat_target_x": 110,
                 "combat_target_y": 110,
                 "last_shot_target_id": 50,
-                "last_shot_target_name": "Runner",
+                "last_shot_target_name": "red-9",
             }
         )
         inventory = make_inventory()
@@ -717,7 +717,7 @@ class TestDepartedTargetFollowUp:
             y=100,
             team=2,
             rank=1,
-            name="Runner",
+            name="red-9",
             is_self=False,
             is_bot=False,
             damage_state=1,

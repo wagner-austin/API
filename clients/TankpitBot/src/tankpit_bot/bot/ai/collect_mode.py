@@ -8,6 +8,7 @@ remains here.
 
 from __future__ import annotations
 
+from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.combat_break import INCOMING_RATE_WINDOW_MS
 from tankpit_bot.bot.ai.context import (
     DecideCtx,
@@ -28,6 +29,7 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_nearest_equipment,
     find_teleport_landing_tile,
 )
+from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.forage import plan_forage_search
 from tankpit_bot.bot.ai.intent import (
     current_collect_plan,
@@ -1121,6 +1123,40 @@ def _emit_hop_declined(hop_kind: str, **tallies: int) -> None:
     emit_diagnostic(diagnostic_kind="hop_declined", hop_kind=hop_kind, **tallies)
 
 
+def _equipment_hop_landing(
+    ctx: DecideCtx,
+    terrain: TerrainMapProtocol,
+    container: ContainerStateDict,
+) -> tuple[int, int] | None:
+    """Resolve an equipment hop's landing: own ground, else a ferry.
+
+    Water-locked equipment gets the ferry boarding-tile fallback
+    exactly as the fuel larder does ([[flag-triage-20260729]] F5).
+    Radar-situation receipt (2026-07-30 session 7): ALL 8 tracked
+    equipment containers were water drops with every neighbor
+    impassable, so the radar-broke tank had no reachable restock at
+    all until this fallback.
+
+    Args:
+        ctx: Decision context (ferry beliefs + clock).
+        terrain: Composed decision terrain (caller-narrowed non-None).
+        container: Tracked equipment container.
+
+    Returns:
+        Landing coordinates, or ``None`` when neither ground nor a
+        fresh believed ferry serves the container.
+    """
+    landing = find_teleport_landing_tile(terrain, container["x"], container["y"])
+    if landing is not None:
+        return landing
+    return find_ferry_boarding_tile(
+        ctx.world,
+        container["x"],
+        container["y"],
+        ctx.timestamp_ms,
+    )
+
+
 def _hop_toward_equipment(
     ctx: DecideCtx,
     base_state: AIStateDict,
@@ -1165,7 +1201,8 @@ def _hop_toward_equipment(
     """
     if hunt_entry_permitted(ctx):
         return None
-    if ctx.terrain is None:
+    terrain = ctx.terrain
+    if terrain is None:
         return None
     candidates = find_all_tracked_equipment(ctx.world)
     if not candidates:
@@ -1189,11 +1226,7 @@ def _hop_toward_equipment(
     best_landing_y = 0
     best_container: ContainerStateDict | None = None
     for container in candidates:
-        landing = find_teleport_landing_tile(
-            ctx.terrain,
-            container["x"],
-            container["y"],
-        )
+        landing = _equipment_hop_landing(ctx, terrain, container)
         if landing is None:
             no_landing += 1
             continue

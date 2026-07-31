@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.humans import (
     threat_priority_tier,
 )
 from tankpit_bot.bot.ai.threats import find_acquisition_target
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.state.types import (
     SelfStateDict,
     TankStateDict,
@@ -100,6 +101,12 @@ def _acquire(
     *,
     priority_target_name: str = "",
 ) -> tuple[SelfStateDict, str]:
+    # These priority-tier scenarios model humans who have already
+    # responded (human-consent contract 2026-07-30) -- consent every
+    # human in the fixture so the tier ordering is what is under test.
+    reset_world_state()
+    for tank in tanks.values():
+        get_world_service().chat_seen_tank_ids.add(tank["tank_id"])
     world, self_state = make_world(fuel=1100, tanks=tanks)
     winner = find_acquisition_target(
         world,

@@ -38,9 +38,9 @@ def test_bot_acquires_the_closer_of_two_visible_enemies() -> None:
     scenario = BotScenario()
     scenario.place_self(x=100, y=100, fuel=1200)
     # Closer enemy 1 tile west of self.
-    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="closer")
+    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="red-51")
     # Rival enemy 3 tiles south-east of self.
-    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="farther")
+    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="red-52")
 
     decision = scenario.decide()
 
@@ -60,8 +60,8 @@ def test_bot_stays_on_target_after_one_shot_when_target_is_still_alive() -> None
     """
     scenario = BotScenario()
     scenario.place_self(x=100, y=100, fuel=1200)
-    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="locked")
-    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="rival")
+    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="red-51")
+    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="red-52")
 
     tick0 = scenario.decide()
     assert tick0["updated_ai_state"]["combat_target_id"] == TARGET_TANK_ID
@@ -108,8 +108,8 @@ def test_bot_holds_lock_when_target_drops_off_threat_list() -> None:
     """
     scenario = BotScenario()
     scenario.place_self(x=100, y=100, fuel=1200)
-    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="locked")
-    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="rival")
+    scenario.place_enemy(tank_id=TARGET_TANK_ID, x=99, y=100, name="red-51")
+    scenario.place_enemy(tank_id=RIVAL_TANK_ID, x=103, y=103, name="red-52")
 
     tick0 = scenario.decide()
     assert tick0["updated_ai_state"]["combat_target_id"] == TARGET_TANK_ID

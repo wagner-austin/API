@@ -145,6 +145,13 @@ class WorldService:
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
         self.movement_rejections: list[int] = []
+        # Tank ids that have sent any (non-self-echo) chat this
+        # session. One half of the human-consent combat contract
+        # (user ruling 2026-07-30, session 8 killed over it: "to
+        # engage in combat, the human must respond hello or engage
+        # the bot first"); the other half is the damage book's
+        # "taken" side recording who shot us.
+        self.chat_seen_tank_ids: set[int] = set()
         # Stamped when a remembered container pickup comes back
         # code=4 (empty) -- the belief the planner acted on is
         # disproven, so the local memory of this area is desynced.

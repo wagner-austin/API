@@ -48,7 +48,7 @@ class TestDecideMapOpen:
                 y=105,
                 team=2,
                 rank=1,
-                name="Enemy",
+                name="red-1",
                 is_self=False,
                 is_bot=False,
                 damage_state=0,

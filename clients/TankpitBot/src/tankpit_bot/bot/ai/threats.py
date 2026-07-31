@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.humans import (
     threat_priority_tier,
 )
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
 
 
@@ -92,6 +93,68 @@ _POSITION_FRESHNESS_TTL_MS = 7000
 
 #: Public alias for cross-module consumers (combat_strategy).
 POSITION_FRESHNESS_TTL_MS = _POSITION_FRESHNESS_TTL_MS
+
+
+def make_enemy_threat_from_tank(tank: TankStateDict, distance: int) -> EnemyThreatDict:
+    """Build an enemy-threat record from a registry tank.
+
+    The single construction path from registry truth to a threat --
+    used by map acquisition, the relay travel scan, and the greeting
+    approach, so a new registry field lands in every consumer at once.
+
+    Args:
+        tank: Registry tank record.
+        distance: Precomputed Manhattan distance from self.
+
+    Returns:
+        Threat record mirroring the tank's registry fields.
+    """
+    return make_enemy_threat(
+        tank_id=tank["tank_id"],
+        x=tank["x"],
+        y=tank["y"],
+        distance=distance,
+        damage_state=tank["damage_state"],
+        rank=tank["rank"],
+        team=tank["team"],
+        name=tank["name"],
+        is_bot=tank["is_bot"],
+        timestamp_ms=tank["timestamp_ms"],
+        last_wire_seen_ms=tank["last_wire_seen_ms"],
+        last_position_update_ms=tank["last_position_update_ms"],
+        last_aim_x=tank["last_aim_x"],
+        last_aim_y=tank["last_aim_y"],
+        last_aim_weapon=tank["last_aim_weapon"],
+        last_aim_ms=tank["last_aim_ms"],
+    )
+
+
+def human_combat_consented(tank_id: int) -> bool:
+    """Return True when a human target has consented to combat.
+
+    User ruling 2026-07-30 (session 8 killed over it: "i felt bad, we
+    were gonna kill a defenseless human there. to engage in combat.
+    the human must respond hello or engage the bot first"). Consent is
+    either signal the wire can prove:
+
+    * they CHATTED this session -- any non-self-echo 0x4D from their
+      id (the HELLO response, or anything else they say), or
+    * they SHOT US -- the damage book's ``taken`` side holds a row
+      for their id.
+
+    Practice bots never pass through this predicate; callers gate it
+    behind :func:`~tankpit_bot.bot.ai.humans.is_human_name`.
+
+    Args:
+        tank_id: The human tank's id.
+
+    Returns:
+        True when the human has responded or struck first.
+    """
+    service = get_world_service()
+    if tank_id in service.chat_seen_tank_ids:
+        return True
+    return str(tank_id) in service.damage_book["taken"]
 
 
 def analyze_threats(
@@ -170,6 +233,12 @@ def analyze_threats(
             min_rank=human_min_rank,
             max_rank=human_max_rank,
         ):
+            continue
+        # Human-consent contract (2026-07-30): a human who has neither
+        # chatted nor shot us never enters the threat list -- no lock,
+        # no fire. An attacker consents by attacking (their id lands
+        # in the damage book), so defense is never blocked.
+        if is_human_name(tank["name"]) and not human_combat_consented(tank["tank_id"]):
             continue
         dist = manhattan_distance(self_x, self_y, tank["x"], tank["y"])
         threats.append(
@@ -454,6 +523,12 @@ def _acquisition_rejection_reason(
         # accepts only "unaffordable" rejections) can never travel
         # toward one.
         return "protected_human_rank"
+    if is_human_name(tank["name"]) and not human_combat_consented(tank["tank_id"]):
+        # Human-consent contract (2026-07-30): no acquisition of a
+        # human who has neither responded to the HELLO nor engaged
+        # first. Placed before the affordability gate for the same
+        # relay-path reason as the rank window above.
+        return "human_not_consented"
     if tank["x"] == 0 and tank["y"] == 0:
         return "unsynced_position"
     if str(tank["tank_id"]) in killed:
@@ -571,26 +646,7 @@ def find_acquisition_target(
         )
         if rejected_reason is not None:
             continue
-        candidates.append(
-            make_enemy_threat(
-                tank_id=tank["tank_id"],
-                x=tank["x"],
-                y=tank["y"],
-                distance=dist,
-                damage_state=tank["damage_state"],
-                rank=tank["rank"],
-                team=tank["team"],
-                name=tank["name"],
-                is_bot=tank["is_bot"],
-                timestamp_ms=tank["timestamp_ms"],
-                last_wire_seen_ms=tank["last_wire_seen_ms"],
-                last_position_update_ms=tank["last_position_update_ms"],
-                last_aim_x=tank["last_aim_x"],
-                last_aim_y=tank["last_aim_y"],
-                last_aim_weapon=tank["last_aim_weapon"],
-                last_aim_ms=tank["last_aim_ms"],
-            )
-        )
+        candidates.append(make_enemy_threat_from_tank(tank, dist))
 
     candidates.sort(key=_threat_sort_key_for(priority_target_name))
     winner = candidates[0] if candidates else None
@@ -741,23 +797,9 @@ def find_relay_travel_target(
         if rejected_reason != "unaffordable":
             continue
         candidates.append(
-            make_enemy_threat(
-                tank_id=tank["tank_id"],
-                x=tank["x"],
-                y=tank["y"],
-                distance=manhattan_distance(self_x, self_y, tank["x"], tank["y"]),
-                damage_state=tank["damage_state"],
-                rank=tank["rank"],
-                team=tank["team"],
-                name=tank["name"],
-                is_bot=tank["is_bot"],
-                timestamp_ms=tank["timestamp_ms"],
-                last_wire_seen_ms=tank["last_wire_seen_ms"],
-                last_position_update_ms=tank["last_position_update_ms"],
-                last_aim_x=tank["last_aim_x"],
-                last_aim_y=tank["last_aim_y"],
-                last_aim_weapon=tank["last_aim_weapon"],
-                last_aim_ms=tank["last_aim_ms"],
+            make_enemy_threat_from_tank(
+                tank,
+                manhattan_distance(self_x, self_y, tank["x"], tank["y"]),
             )
         )
 
