@@ -218,6 +218,38 @@ def test_dreg_gain_completing_the_deficit_is_taken() -> None:
     assert selection["dreg"] == 0
 
 
+def test_dreg_waiver_needs_hunt_ready_inventory() -> None:
+    """Below combat-ready the deficit-completing waiver does not apply.
+
+    Flag s8-1 (2026-07-30): at fuel 1076/1100 with zero radars the
+    larder spent a map open + teleport on a 24-fuel top-off that
+    unlocked nothing -- hunting was blocked by equipment regardless,
+    and the walk step had just refused the same area's fuel as not
+    worth a 5-tile walk. Topping the last points only matters when
+    fuel is the FINAL hunt requirement.
+    """
+    containers = {
+        "110,100": make_container(110, 100, 900, is_fuel=True),
+    }
+    world, self_state = make_world(
+        self_x=100, self_y=100, fuel=_fuel_at_deficit(80), containers=containers
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(default_count=0),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+
+    assert selection["container"] is None
+    assert selection["dreg"] == 1
+
+
 def test_desperation_fuel_is_reserve_blocked_not_dreg_gated() -> None:
     """At or below fuel_low_threshold the reserve gate owns the decline.
 

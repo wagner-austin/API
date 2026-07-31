@@ -22,6 +22,7 @@ from typing_extensions import TypedDict
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
+from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict
@@ -44,8 +45,11 @@ Flag s3-9's chain teleported to a 35-volume remnant (net ~23 after
 cost) while a 355-volume container sat one real hop away —
 ``gain/cost`` structurally favors close dregs because the denominator
 shrinks faster than the numerator. One exception: a gain that
-COMPLETES the deficit is always worth taking (the F1 top-off
-microscope: refusing the last 17 points forces a wasteful dot hop).
+COMPLETES the deficit while the inventory is already hunt-ready (the
+F1 top-off microscope: refusing the last 17 points forces a wasteful
+dot hop). The waiver is scoped to hunt-ready stock (flag s8-1): at
+radars=0 it spent a map open + teleport on a 24-fuel top-off that
+unlocked nothing.
 No desperation exemption is needed HERE: since the F16 net-of-gain
 reserve, a payable hop onto a RICH container is allowed at any fuel
 (that refuel is exactly what survives lethal pressure), while a
@@ -204,7 +208,15 @@ def select_fuel_larder_hop(
         if gain <= cost:
             unprofitable += 1
             continue
-        if gain < _LARDER_MIN_GAIN and gain != deficit:
+        # The deficit-completing waiver is scoped to hunt-ready
+        # inventory (flag s8-1, 2026-07-30): topping the last points
+        # only matters when fuel is the FINAL hunt requirement. At
+        # radars=0 the waiver spent a map open + teleport on a
+        # 24-fuel top-off that unlocked nothing -- the walk step had
+        # just refused the same area's fuel as "clamped gain 24 not
+        # worth 5-tile walk".
+        completes_hunt_readiness = gain == deficit and hunt_entry_permitted(ctx)
+        if gain < _LARDER_MIN_GAIN and not completes_hunt_readiness:
             dreg += 1
             continue
         score = gain / max(cost, 1)
