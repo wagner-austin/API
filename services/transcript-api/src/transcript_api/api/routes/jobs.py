@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -53,6 +54,29 @@ def build_router() -> APIRouter:
         parsed = _parse_stt_job_request(raw_payload)
 
         job_id = str(uuid.uuid4())
+
+        # Record the job before enqueuing it. The worker writes the first
+        # "processing" record when it picks the job up, so without this a
+        # client that polls immediately after submitting gets a 404 that is
+        # indistinguishable from an unknown id. Saving before the enqueue
+        # rather than after avoids overwriting the worker's own status if it
+        # starts while this handler is still running.
+        submitted_at = datetime.utcnow()
+        TranscriptJobStore(redis).save(
+            {
+                "job_id": job_id,
+                "user_id": parsed.user_id,
+                "status": "queued",
+                "progress": 0,
+                "message": "queued",
+                "url": parsed.url,
+                "video_id": extract_video_id(parsed.url),
+                "text": None,
+                "created_at": submitted_at,
+                "updated_at": submitted_at,
+                "error": None,
+            }
+        )
 
         # Enqueue the STT processing job
         job = queue.enqueue(
