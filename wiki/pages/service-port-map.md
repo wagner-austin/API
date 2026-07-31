@@ -64,5 +64,5 @@ Traefik routes by hostname / path prefix, not by port directly. Ports matter for
 
 Consistency across dev / staging / prod: the same service is always on the same port. Runbooks, log queries, and troubleshooting scripts can hardcode the tuple `(service, port)` without a lookup. When Traefik or the docker network fails, you can still `curl localhost:8003/healthz` and get a useful signal.
 
-[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim (rows for 8000-8011 + procart-api). doc-extract-api is currently absent from the root README table; its assignment is authoritative in [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml) instead.
+[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim (rows for 8000-8012 + procart-api). doc-extract-api's 8012 is listed there and independently confirmed by [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml), which is where it was authoritative before the root README row was added.
 [^2]: [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml) — `ports: "8012:8000"` maps host 8012 → container 8000. The compose file declares "Requires root docker-compose to be running first (provides platform-redis + network)."
