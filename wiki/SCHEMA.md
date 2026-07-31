@@ -47,14 +47,35 @@ Every page opens with YAML frontmatter:
 ---
 title: Human-readable title
 tags: [topic-tag, ...]              # cross-cutting, lowercase
-related: [[other-slug]], ...        # explicit cross-refs
-sources: [primary-source-1, ...]    # see Citations
+related:                            # explicit cross-refs, one "[[slug]]" per line
+  - "[[other-slug]]"
+source_paths:                       # see Citations
+  - libs/covenant_ml/src/...        # workspace-relative repo path
+source_git_blobs:                   # optional; see Blob pinning
+  libs/covenant_ml/src/...: <blob-sha>
 fact_checked: YYYY-MM-DD            # when claims were last confirmed current
 confidence: high | medium | low     # how confident we are in this page's claims
+hubs: [libs]                        # every hub whose file links this page
 ---
 ```
 
+The field is `source_paths:`, **not** `sources:`. This wiki runs the `code-paths` source contract in `corvis-wiki-check`; the other contracts reserve `sources:` for CSL-JSON bibliographic objects, so a `sources:` list of plain path strings fails the audit with a `load-error` (`expected object, got string`) and the whole page drops out of the corpus — taking every `[[wikilink]]` that targets it down with it. Canonical key names: `packages/wiki-check/src/pure/canonical-contracts.ts::CODE_PATHS_FRONTMATTER_KEYS`.
+
+`hubs:` must list exactly the hubs whose files link this page — `hubs-membership-consistent` compares the two directions and fails on either-way drift.
+
 `fact_checked` = when someone last confirmed the claims are still true against the code. Git tracks edit history; no `updated:` field needed. Pages without `fact_checked` have never been independently verified.
+
+### Blob pinning
+
+`source_git_blobs:` maps a `source_paths:` entry to the `git ls-tree HEAD` blob-hash it was verified against. It is opt-in per page, but **all-or-nothing once opted in**: a page that declares the field must pin every git-tracked entry in its `source_paths:` (untracked artifacts are exempt — they are unpinnable by nature). When the file changes, `git-blob-hash-pin` fails; the fix is to re-verify the page's claims against the new content and *then* repin, never to repin alone.
+
+### Verifying a page
+
+Run the audit chain before finishing any page edit:
+
+```
+wiki_audit_page(wikiSlug="api-codebase", pageSlug="<slug>")
+```
 
 ## Cross-references
 
