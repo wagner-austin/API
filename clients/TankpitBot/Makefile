@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -19,6 +19,7 @@ help:
 	@Write-Host "  make lint                        guard + ruff + mypy"
 	@Write-Host "  make test                        pytest + coverage"
 	@Write-Host "  make audit                       re-derive wiki physics claims from the runs archive"
+	@Write-Host "  make wiki-anchors                report wiki pages owed an audit (never gates)"
 	@Write-Host "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@Write-Host "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
 	@Write-Host "  make install                     poetry install + playwright chromium"
@@ -291,6 +292,14 @@ audit:
 	@Write-Host "==> audit (re-derive wiki physics claims from the runs archive)" -ForegroundColor Cyan
 	poetry run tankpit-audit --stamp; if ($$LASTEXITCODE -ne 0) { Write-Host "[audit] a claim failed re-derivation" -ForegroundColor Red; exit $$LASTEXITCODE }
 	@Write-Host "[audit] every validated claim re-derived from the archive" -ForegroundColor Green
+
+# Reports which wiki pages are owed an audit. NOT part of `make check`:
+# a stale anchor is a to-do marker, not a defect, and gating on it would
+# redden the build on every source commit. See wiki/SCHEMA.md.
+wiki-anchors:
+	@Write-Host ""
+	@Write-Host "==> wiki-anchors (which pages have drifted from their audited trees)" -ForegroundColor Cyan
+	poetry run tankpit-wiki-anchors $(ARGS)
 
 shadow:
 	@Write-Host ""

@@ -186,6 +186,25 @@ def _absorb_line(
     return ""
 
 
+def parse_page_frontmatter(page_path: Path) -> ParsedFrontmatter | None:
+    """Read and parse one wiki page's frontmatter.
+
+    The public entry point onto this module's parser, so tools that need
+    frontmatter (notably the anchor-drift report in
+    ``scripts/wiki_anchors.py``) reuse it instead of restating the
+    grammar.
+
+    Args:
+        page_path: Path to the wiki content page.
+
+    Returns:
+        Parsed frontmatter, or None when the page has no parseable
+        block (which the guard rule reports separately).
+    """
+    matter, _violations = _parse_frontmatter(page_path.read_text(encoding="utf-8"), page_path.name)
+    return matter
+
+
 def _frontmatter_violations(matter: ParsedFrontmatter, page: str) -> list[str]:
     """Check required keys, the date format, and the confidence level.
 
@@ -382,5 +401,6 @@ __all__ = [
     "CONFIDENCE_VALUES",
     "REQUIRED_FRONTMATTER_KEYS",
     "ParsedFrontmatter",
+    "parse_page_frontmatter",
     "run_wiki_rules",
 ]

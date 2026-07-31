@@ -194,6 +194,50 @@ def _real_http_get(url: str) -> HttpGetResponseProtocol:
 http_get: HttpGetProtocol = _real_http_get
 
 
+class ResolveTreeHashProtocol(Protocol):
+    """Protocol for resolving a repo path to its committed object id."""
+
+    def __call__(self, project_root: Path, repo_path: str) -> str | None:
+        """Resolve one path to the object id HEAD records for it.
+
+        Args:
+            project_root: Repository directory to resolve within.
+            repo_path: Path relative to ``project_root``.
+
+        Returns:
+            The 40-hex tree or blob id, or None when the path is not in
+            HEAD (untracked, deleted, or outside a git work tree).
+        """
+        ...
+
+
+def _real_resolve_tree_hash(project_root: Path, repo_path: str) -> str | None:
+    """Real implementation shelling out to ``git rev-parse``.
+
+    Args:
+        project_root: Repository directory to resolve within.
+        repo_path: Path relative to ``project_root``.
+
+    Returns:
+        The 40-hex tree or blob id, or None when git cannot resolve it.
+    """
+    import subprocess
+
+    completed = subprocess.run(
+        ["git", "rev-parse", f"HEAD:./{repo_path}"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip() or None
+
+
+resolve_tree_hash: ResolveTreeHashProtocol = _real_resolve_tree_hash
+
+
 __all__ = [
     "HttpGetProtocol",
     "HttpGetResponseProtocol",
@@ -201,11 +245,13 @@ __all__ = [
     "LogLevel",
     "PathExistsProtocol",
     "ReadTextProtocol",
+    "ResolveTreeHashProtocol",
     "SessionDecoderProtocol",
     "SetupRichLoggingProtocol",
     "http_get",
     "load_and_decode_session",
     "path_exists",
     "read_text",
+    "resolve_tree_hash",
     "setup_rich_logging",
 ]
