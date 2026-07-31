@@ -1,0 +1,29 @@
+# The siege arm that refuses to chase: arty with interception off.
+#
+# Every screened match logs six hundred to seventeen hundred intercepts --
+# the fist spends the decisive window scattered after raiders it mostly
+# cannot catch, and the trace autopsies put the loss exactly there: trades
+# go bad at samples 1000-1500 while the army is dispersed (log 2026-07-31).
+# One field from the round-one leader: the waves ignore raiders entirely
+# and the fist stays whole. The extractors will eat more raids; the
+# question is whether a whole fist converts more than scattered coverage
+# saves.
+
+name aa-counter-guard-arty-noicpt
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 0
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

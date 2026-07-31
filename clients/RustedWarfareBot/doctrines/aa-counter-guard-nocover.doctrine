@@ -1,0 +1,25 @@
+# One line away from aa-counter-guard: no turrets, ever. The question the
+# working siting finally made askable -- "defence on" historically meant
+# "defence attempted and silently refused", and the first batch where
+# turrets actually LANDED spent 25-45k a match on them and won 6/24 at a
+# rung the attempted-defence bot won 10/12. This arm asks whether landing
+# them was worth landing ([[policy-holding-ground]]).
+
+name aa-counter-guard-nocover
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

@@ -1,0 +1,28 @@
+# The all-terrain fist: hover-primary, artillery behind it.
+#
+# Round three killed the side-channel air answers: scout memory and AA roofs
+# both slowed the bleeding and lost the winning seed -- defensive spend
+# blunts the mid-game snowball that is the only converting shape measured
+# (log 2026-07-31). The remaining move is the answer INSIDE the fist:
+# hoverTank hits land AND air AND crosses the water the navy hides behind,
+# so a hover-primary mix fights everything the air seeds field, and the
+# artillery keeps the reach that beats the turret lines.
+
+name aa-counter-guard-hovarty
+goals extractorT1,extractorT1,extractorT1,hoverTank,hoverTank,hoverTank,c_tank,c_artillery
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

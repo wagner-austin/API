@@ -1,0 +1,30 @@
+# The siege arm with a roof: arty + AA turrets over the extractors, and
+# NOTHING else standing -- cover stays off, so the ground-turret waste that
+# cover24-hard refuted never rides along. The AA branch runs before the
+# cover gate, so this combination is exactly "turrets that shoot up, only
+# once aircraft have been shown, and no others".
+#
+# screen-vh9's strangled seed loses half its economy to one air strike at
+# ~sample 1400 (log 2026-07-31). aa_cover was refuted at Hard -- where the
+# enemy rarely fields air -- but Very Hard's 1.8x income reaches an air
+# fleet reliably. The narrow question: does a roof over the extractors stop
+# the strike that decides the match?
+
+name aa-counter-guard-arty-aa
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 1
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

@@ -1,0 +1,29 @@
+# The one-punch all-in: everything the screens taught, aimed at Impossible's
+# window.
+#
+# The old rush died feeding three-tank waves into a 3.7x economy -- mass 3
+# was the design error, not the timing (log 2026-07-30). The compounding
+# arithmetic says Impossible is beatable only before it compounds: one
+# twenty-five unit fist, artillery behind it for the turret line, arriving
+# inside the s500-1200 window, with wallet-first targeting burning the
+# income row on arrival. Two extractors fund it; the economy that matters
+# is the one the punch removes.
+
+name punch
+goals extractorT1,extractorT1,c_tank,c_tank,c_tank,c_artillery
+max_workers 3
+mass 25
+reserve 0
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 1
+creep 0
+riposte 0
+tech 0

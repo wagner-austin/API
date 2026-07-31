@@ -1,0 +1,24 @@
+# One line away from aa-counter: a raider standing inside the engine's own
+# outpost radius (360, [[engine-ai-zones]]) of one of our structures pulls the
+# reserve onto it, instead of the reserve gathering while the extractor next
+# to it dies. The A/B arm for the interception question
+# ([[policy-holding-ground]]).
+
+name aa-counter-guard
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 1
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

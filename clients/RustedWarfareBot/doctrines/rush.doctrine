@@ -1,0 +1,32 @@
+# The all-in: fight in the first minutes or not at all.
+#
+# Built for the Impossible question (3.7x income): every measured match at
+# that rung ended defeated or wiped -- 0/12, and the bot never reached the
+# enemy base ([[policy-holding-ground]]). Against an opponent whose advantage
+# compounds with time, the earliest possible fight is the fairest one, so
+# this doctrine spends nothing on a future it will not have: one extractor,
+# tanks immediately, three-tank waves, and the rush verb marching every
+# released wave at the mirror of our base until contact.
+#
+# Deliberately NOT one field from the champion. This is a composition
+# question -- "can any doctrine beat Impossible" -- and the champion rides in
+# the same batch as its control.
+
+name rush
+goals extractorT1,c_tank,c_tank,c_tank
+max_workers 2
+mass 3
+reserve 0
+expand 1
+counter 0
+cover 0
+intercept 0
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 1
+creep 0
+riposte 0
+tech 0

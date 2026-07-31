@@ -1,0 +1,28 @@
+# One line away from aa-counter-guard: an interception commits a detachment
+# of the three nearest engageable reserve units instead of the whole reserve.
+# The guard measure's own cost case is the motivation -- one match logged 870
+# intercepts and never massed an attack, so answer-with-everything may be
+# buying defence with the offence ([[policy-holding-ground]]).
+#
+# Three because below the first-wave size a force is a trickle by the
+# engine's own rule and ours ([[engine-ai-triggers]]) -- a detachment smaller
+# than a wave would re-create at home exactly what raid v1 died of abroad.
+
+name aa-counter-guard-cap
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 1
+intercept 1
+guard_cap 3
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

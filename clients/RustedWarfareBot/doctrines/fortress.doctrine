@@ -1,0 +1,29 @@
+# The community fortress: the turtle-and-counter meta, all pieces at once.
+#
+# The documented human answer to Impossible (wiki: ai-opponent-strategy,
+# community guides, log 2026-07-31): fortify with turrets AND repair bays
+# AND artillery behind, let the AI feed its 17-second-bound attack groups
+# into a self-healing kill zone, counter-punch when a wave breaks. Our
+# cover24 turtle lost WITHOUT repair -- turrets that are never healed are
+# turrets bought twice. The pieces are a system, so this arm takes them
+# together: cover on, AA roof on, a repair bay in the goals, artillery in
+# the mix, waves at 25 for the counter.
+
+name fortress
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery,repairbay
+max_workers 8
+mass 40
+reserve -1
+expand 1
+counter 1
+cover 1
+intercept 1
+guard_cap 0
+aa_cover 1
+forward 0
+scout 0
+raid 3
+rush 0
+creep 0
+riposte 1
+tech 0

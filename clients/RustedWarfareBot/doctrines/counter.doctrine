@@ -1,6 +1,11 @@
 # One line away from default: production tilts toward the layers the
 # opponent is seen fielding, instead of holding the stated mix regardless.
-# The A/B arm for the counter-composition question.
+#
+# NOTE: against these all-tank goals the flag is inert -- the tilt only ever
+# repeats anti-air already in the mix, and this mix has none. The live
+# counter experiment is doctrines/aa.doctrine vs doctrines/aa-counter.doctrine
+# (sweeps/counter-ab.txt). This file exists as the minimal one-field arm
+# against default, pinned by test.
 
 name counter
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
@@ -9,3 +14,14 @@ mass 7
 reserve -1
 expand 1
 counter 1
+cover 1
+intercept 0
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

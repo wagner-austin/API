@@ -8,3 +8,14 @@ mass 7
 reserve -1
 expand 0
 counter 0
+cover 1
+intercept 0
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 0
+rush 0
+creep 0
+riposte 0
+tech 0

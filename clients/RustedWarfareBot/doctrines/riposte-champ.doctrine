@@ -1,0 +1,24 @@
+# The champion economy carrying the riposte: Austin's counter-punch on
+# the arm that can afford it. The fortress screen showed the riposte never
+# arming because fortress goals ate the economy that funds the horde
+# (screen-vh9n, log 2026-07-31) -- so the trigger rides the arty+raid
+# champion instead, whole reserve released on the intruder-gone edge.
+
+name riposte-champ
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+max_workers 8
+mass 25
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 3
+rush 0
+creep 0
+riposte 1
+tech 0
