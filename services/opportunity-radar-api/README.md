@@ -93,6 +93,7 @@ curl "http://localhost:8000/devpost/hackathons?themes=AI&themes=Machine%20Learni
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe. Always ready while serving: upstream credentials are optional, so their absence degrades individual routes rather than the service |
 
 ### Codebase
 
