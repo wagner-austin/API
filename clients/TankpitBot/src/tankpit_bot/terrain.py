@@ -105,7 +105,12 @@ class TerrainMap:
         Raises:
             ValueError: If image is not 256x256.
         """
-        img = _IMAGE.open(gif_path).convert("RGB")
+        # ``Image.open`` is lazy and holds the file handle open until the
+        # image is closed; ``convert`` loads the data into an independent
+        # image, so the source can be released immediately. Without this
+        # the loader leaked one descriptor per call (ResourceWarning).
+        with _IMAGE.open(gif_path) as source:
+            img = source.convert("RGB")
         if img.size != (256, 256):
             raise ValueError(f"Expected 256x256 image, got {img.size}")
         raw = img.tobytes()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from types import TracebackType
 from typing import Protocol
 
 
@@ -34,6 +35,19 @@ class PillowImageProtocol(Protocol):
 
     def save(self, fp: str | Path) -> None:
         """Save the image to disk."""
+        ...
+
+    def __enter__(self) -> PillowImageProtocol:
+        """Enter the image context, returning the image itself."""
+        ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Close the image and release its underlying file handle."""
         ...
 
 
