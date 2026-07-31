@@ -6,10 +6,10 @@ import pytest
 
 from tankpit_bot.bot.ai.collect_mode import (
     _continue_or_release_fuel_lock,
+    _first_walkworthy_fuel,
     _pickup_not_worth_walk,
     _select_and_pickup_fuel,
     decide_collect_mode,
-    select_fuel_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -377,7 +377,7 @@ def test_select_fuel_target_returns_none_for_unreachable_off_viewport_target() -
         "",
     )
 
-    assert select_fuel_target(ctx) is None
+    assert _first_walkworthy_fuel(ctx) is None
     reset_world_state()
 
 
@@ -415,7 +415,7 @@ def test_select_fuel_target_rejects_walk_unreachable_in_viewport() -> None:
         "",
     )
 
-    assert select_fuel_target(ctx) is None
+    assert _first_walkworthy_fuel(ctx) is None
 
 
 def test_selects_low_volume_fuel_when_critically_low() -> None:
@@ -915,3 +915,72 @@ def test_select_and_pickup_fuel_refuses_when_projected_pickup_overflows() -> Non
 
     assert decision is None
     assert world["containers"]["103,100"]["failed_pickups"] == 0
+
+
+def test_walkworthy_iteration_takes_the_next_candidate_after_a_veto() -> None:
+    """The best-scored container failing the walk rate does not end the search.
+
+    Flag s9-2/3: the 1183-volume container 13 tiles away was vetoed
+    ("clamped gain 24 not worth 13-tile walk") and the single-candidate
+    logic sent the cascade into an in-viewport larder teleport while a
+    walk-worthy container sat 3 tiles away.
+    """
+    world, self_state = make_world(
+        fuel=1076,
+        containers={
+            "87,100": make_container_state(
+                x=87,
+                y=100,
+                is_fuel=True,
+                volume=1183,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+            "103,100": make_container_state(
+                x=103,
+                y=100,
+                is_fuel=True,
+                volume=762,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        make_scanned_ai_state(),
+        make_inventory(),
+        100000,
+        None,
+        "",
+    )
+
+    selection = _first_walkworthy_fuel(ctx)
+
+    if selection is None:
+        raise AssertionError("the 3-tile candidate must be selected")
+    container, command = selection
+    assert (container["x"], container["y"]) == (103, 100)
+    assert command["cmd_type"] in ("move", "pickup_fuel")
+
+
+def test_low_volume_candidates_stay_out_of_the_ranked_list() -> None:
+    """The minimum-volume floor filters candidates before ranking."""
+    from tankpit_bot.bot.ai.equipment_search import find_fuel_candidates
+
+    world, self_state = make_world(
+        fuel=500,
+        containers={
+            "103,100": make_container_state(
+                x=103,
+                y=100,
+                is_fuel=True,
+                volume=40,
+                timestamp_ms=100000,
+                failed_pickups=0,
+            ),
+        },
+    )
+
+    assert find_fuel_candidates(world, self_state, None, minimum_volume=100) == []

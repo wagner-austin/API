@@ -216,6 +216,40 @@ def is_viewport_fully_covered(
     return True
 
 
+def viewport_uncovered_count(
+    scanned_tiles: dict[str, int],
+    viewport_left: int,
+    viewport_top: int,
+    viewport_right: int,
+    viewport_bottom: int,
+    now_ms: int,
+) -> int:
+    """Return how many viewport tiles carry no live scan mark.
+
+    The expected-reveal input for the radar-spend economics
+    ([[flag-triage-20260729]] s9-2/4/5): an extra radar reveals
+    exactly the uncovered tiles of the visible viewport, so this
+    count IS the spend's yield.
+
+    Args:
+        scanned_tiles: Coverage map.
+        viewport_left: Viewport left X (inclusive).
+        viewport_top: Viewport top Y (inclusive).
+        viewport_right: Viewport right X (inclusive).
+        viewport_bottom: Viewport bottom Y (inclusive).
+        now_ms: Current timestamp for TTL evaluation.
+
+    Returns:
+        Count of viewport tiles without live coverage.
+    """
+    uncovered = 0
+    for y in range(viewport_top, viewport_bottom + 1):
+        for x in range(viewport_left, viewport_right + 1):
+            if not is_tile_covered(scanned_tiles, x, y, now_ms):
+                uncovered += 1
+    return uncovered
+
+
 def free_radar_new_coverage(
     scanned_tiles: dict[str, int],
     tile_x: int,
@@ -443,4 +477,5 @@ __all__ = [
     "select_best_free_radar_position",
     "tile_key",
     "viewport_tiles",
+    "viewport_uncovered_count",
 ]

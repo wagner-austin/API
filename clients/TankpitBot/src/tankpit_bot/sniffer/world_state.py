@@ -150,6 +150,17 @@ def mark_container_desync(timestamp_ms: int) -> None:
     _service.container_desync_ms = timestamp_ms
 
 
+def clear_container_desync() -> None:
+    """Answer a container desync without a scan.
+
+    Used when live coverage already tells the whole story (radar-spend
+    economics, s9-4): rescanning ground scanned seconds earlier buys
+    nothing, so the disproof is considered answered by the existing
+    coverage.
+    """
+    _service.container_desync_ms = 0
+
+
 def container_desync_pending() -> bool:
     """Check whether a container desync awaits its radar resync.
 
@@ -228,6 +239,7 @@ def is_scan_viewport_failed(viewport_left: int, viewport_top: int, now_ms: int) 
 
 __all__ = [
     "check_and_clear_radar_scan_complete",
+    "clear_container_desync",
     "container_desync_pending",
     "get_incoming_damage_window",
     "get_terrain_map",

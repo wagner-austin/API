@@ -34,6 +34,7 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     clear_resource_target,
     make_decision,
+    radar_spend_worthwhile,
 )
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.types import AIStateDict, BehaviorMode
@@ -147,7 +148,13 @@ def plan_forage_search(
     sx, sy = ctx.self_state["x"], ctx.self_state["y"]
     has_extras = ctx.inventory["extra_radars"]["count"] > 0
     tank_in_viewport = left <= sx <= right and top <= sy <= bottom
-    if has_extras or not tank_in_viewport:
+    if has_extras:
+        # An extra-radar scan consumes an item; the shared spend
+        # economics decide, not mere non-full coverage (flag s9-5:
+        # a stocked forage radar bought a sliver of tiles and the
+        # tank hopped away the next tick).
+        radar_productive = radar_spend_worthwhile(ctx)
+    elif not tank_in_viewport:
         radar_productive = True
     else:
         next_radar_gain = free_radar_new_coverage(

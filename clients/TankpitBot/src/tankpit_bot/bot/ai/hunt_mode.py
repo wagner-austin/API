@@ -25,6 +25,7 @@ from tankpit_bot.bot.ai.context import (
     can_afford_teleport,
     can_use_radar,
     make_decision,
+    radar_spend_worthwhile,
     target_position_is_fresh,
 )
 from tankpit_bot.bot.ai.humans import (
@@ -56,7 +57,6 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_incoming_damage_window
-from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
@@ -1039,20 +1039,15 @@ def _decide_hunt_close(ctx: DecideCtx) -> TickDecisionDict:
     threats = _visible_threats(ctx)
     target = get_locked_target(ctx, threats)
     if target is not None:
-        viewport_left, viewport_top, viewport_right, viewport_bottom = viewport_visible_bounds(
-            ctx.filtered["viewport"],
-        )
+        viewport_left, viewport_top, _, _ = viewport_visible_bounds(ctx.filtered["viewport"])
         if (
             has_cardinal_combat_shot(ctx.self_state, target)
             and can_use_radar(ctx)
-            and not is_viewport_fully_covered(
-                ctx.filtered["scanned_tiles"],
-                viewport_left,
-                viewport_top,
-                viewport_right,
-                viewport_bottom,
-                ctx.timestamp_ms,
-            )
+            # Shared radar-spend economics (s9 flags): a stocked scan
+            # must buy a real reveal, not a coverage sliver -- the
+            # fully-covered check alone let 1-tile holes spend extras
+            # mid-combat.
+            and radar_spend_worthwhile(ctx)
         ):
             emit_ai("landed adjacent to %s, scanning viewport first", target["name"])
             return make_decision(

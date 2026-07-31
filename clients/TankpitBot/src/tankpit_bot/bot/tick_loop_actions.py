@@ -62,6 +62,7 @@ from tankpit_bot.sniffer.world_state_containers import (
     increment_container_failed_pickups,
     remove_container_at,
 )
+from tankpit_bot.sniffer.world_state_dispatch import was_recent_pickup_at
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full_signal
 
 # Supervisor (0x52) error codes from tpclient.js ``Gb[]``. The bot
@@ -355,18 +356,32 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             )
         elif error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
             remove_container_at(get_world_service(), tx, ty)
-            # One disproven belief means the local container memory is
-            # desynced (user ruling 2026-07-30: "if one item is stale
-            # or out of sync then its worth a radar. not, 3 items") --
-            # the collect cascade answers the latch with a radar
-            # before pursuing any further remembered container.
-            mark_container_desync(get_current_time_ms())
-            emit_sync(
-                "container at (%d,%d) rejected code=4 (empty) -- belief removed, "
-                "container memory marked desynced",
-                tx,
-                ty,
-            )
+            if was_recent_pickup_at(get_world_service(), tx, ty, get_current_time_ms()):
+                # Drain receipt (flag s9-4): the code=4 rode our own
+                # successful pickup -- the ContainerPickup broadcast
+                # for this tile fired within the click. Nothing about
+                # memory is wrong; the belief removal is the whole
+                # correction.
+                emit_sync(
+                    "container at (%d,%d) rejected code=4 (empty) -- drain "
+                    "receipt of own pickup, belief removed",
+                    tx,
+                    ty,
+                )
+            else:
+                # A genuinely vanished container: no pickup broadcast
+                # ever fired for the tile, so the belief the planner
+                # acted on was stale (user ruling 2026-07-30: "if one
+                # item is stale or out of sync then its worth a radar.
+                # not, 3 items") -- the collect cascade answers the
+                # latch, subject to the radar-spend economics.
+                mark_container_desync(get_current_time_ms())
+                emit_sync(
+                    "container at (%d,%d) rejected code=4 (empty) -- belief "
+                    "removed, container memory marked desynced",
+                    tx,
+                    ty,
+                )
         else:
             increment_container_failed_pickups(get_world_service(), tx, ty)
             emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)

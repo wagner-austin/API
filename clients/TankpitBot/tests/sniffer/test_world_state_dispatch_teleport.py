@@ -135,3 +135,92 @@ class TestTeleportDisplacementReceipt:
         records = _dispatch_landed_and_capture()
 
         assert not [r for r in records if r.getMessage() == _DIAGNOSTIC_LINE]
+
+
+class TestFerryBeliefDisproof:
+    """A displaced boarding landing expires the ferry belief it rode."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        from tankpit_bot.sniffer.world_state import reset_world_state
+
+        reset_world_state()
+
+    def test_displaced_landing_deletes_the_ferry_belief(self) -> None:
+        """Flags s9-7/8: the loop root -- the stale belief must die.
+
+        The hop teleported to a 60-second-old ferry tile, the server
+        displaced the landing (its receipt that nothing boardable is
+        there), and the surviving belief re-derived the identical
+        boarding plan every lap -- a teleport plus a landing radar per
+        lap, 17 extras to 0.
+        """
+        from tankpit_bot.ledger.outcome.teleport import record_teleport_dispatch
+        from tankpit_bot.sniffer.world_state import (
+            get_world_service,
+            update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+        from tankpit_bot.state.types import make_terrain_tile
+        from tankpit_bot.state.types.constants import TERRAIN_FERRY
+
+        update_world_state_from_position(118, 108)
+        ws = get_world_service()
+        ws.world_state["terrain"]["111,104"] = make_terrain_tile(
+            111, 104, TERRAIN_FERRY, observed_ms=100000
+        )
+        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+
+        landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
+        dispatch_world_state_update(ws, landed)
+
+        assert "111,104" not in ws.world_state["terrain"]
+
+    def test_exact_landing_keeps_the_ferry_belief(self) -> None:
+        """Landing ON the requested ferry tile proves the belief right."""
+        from tankpit_bot.ledger.outcome.teleport import record_teleport_dispatch
+        from tankpit_bot.sniffer.world_state import (
+            get_world_service,
+            update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+        from tankpit_bot.state.types import make_terrain_tile
+        from tankpit_bot.state.types.constants import TERRAIN_FERRY
+
+        update_world_state_from_position(111, 104)
+        ws = get_world_service()
+        ws.world_state["terrain"]["111,104"] = make_terrain_tile(
+            111, 104, TERRAIN_FERRY, observed_ms=100000
+        )
+        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+
+        landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
+        dispatch_world_state_update(ws, landed)
+
+        assert "111,104" in ws.world_state["terrain"]
+
+    def test_displaced_landing_on_plain_ground_expires_nothing(self) -> None:
+        """A displacement off ordinary ground touches no beliefs."""
+        from tankpit_bot.ledger.outcome.teleport import record_teleport_dispatch
+        from tankpit_bot.sniffer.world_state import (
+            get_world_service,
+            update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+        from tankpit_bot.state.types import make_terrain_tile
+
+        update_world_state_from_position(118, 108)
+        ws = get_world_service()
+        ws.world_state["terrain"]["111,104"] = make_terrain_tile(111, 104, 0, observed_ms=100000)
+        record_teleport_dispatch(target_x=111, target_y=104, message_index=0, sent_window="")
+
+        landed = TeleportLandedDict(msg_type="teleport_landed", subtype=0x0C)
+        dispatch_world_state_update(ws, landed)
+
+        assert "111,104" in ws.world_state["terrain"]

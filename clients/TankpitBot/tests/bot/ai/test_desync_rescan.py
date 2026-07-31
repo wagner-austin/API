@@ -37,6 +37,7 @@ class TestDesyncRescan:
     def test_pending_desync_outranks_remembered_container_pursuit(self) -> None:
         """A pending disproof produces one radar before any pickup."""
         world, self_state = make_world(
+            scanned=False,
             fuel=150,
             containers={
                 "105,105": make_container_state(
@@ -126,3 +127,120 @@ class TestDesyncRescan:
         update_world_state_from_radar_cache(get_world_service())
 
         assert container_desync_pending() is False
+
+
+class TestRadarSpendEconomics:
+    """The shared radar-spend rule and its consumers."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_covered_viewport_answers_the_desync_without_a_scan(self) -> None:
+        """Live coverage clears the latch instead of spending a radar.
+
+        Flag s9-4: two desync rescans of ground radared seconds
+        earlier each consumed an extra and revealed nothing.
+        """
+        world, self_state = make_world(
+            fuel=150,
+            containers={
+                "105,105": make_container_state(
+                    x=105,
+                    y=105,
+                    is_fuel=True,
+                    volume=700,
+                    timestamp_ms=100000,
+                    failed_pickups=0,
+                )
+            },
+        )
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "mode": "COLLECT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+            }
+        )
+        mark_container_desync(99000)
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        decision = decide_collect_mode(ctx)
+
+        if decision is None:
+            raise AssertionError("expected collect decision")
+        assert decision["behavior"]["reason_kind"] != "desync_rescan"
+        assert container_desync_pending() is False
+
+    def test_spend_floor_only_binds_with_extras_stocked(self) -> None:
+        """A radar-broke tank scans any uncovered sliver for free."""
+        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+
+        world, self_state = make_world(scanned=True)
+        left = world["viewport"]["left"]
+        top = world["viewport"]["top"]
+        del world["scanned_tiles"][f"{left + 2},{top + 2}"]
+        ai_state = make_scanned_ai_state()
+
+        stocked = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+        broke = DecideCtx(
+            world, self_state, ai_state, make_inventory(default_count=0), 100000, None, ""
+        )
+
+        assert radar_spend_worthwhile(stocked) is False
+        assert radar_spend_worthwhile(broke) is True
+
+
+class TestDisplacedLandingScanEconomics:
+    """The displaced-harvest radar obeys the spend economics."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_displaced_landing_in_live_coverage_skips_the_radar(self) -> None:
+        """Flag s9-2: a displaced harvest landing in fully-scanned
+        ground latched WITHOUT spending an extra."""
+        from tankpit_bot.bot.ai.collect_mode import _scan_on_landing_decision
+
+        world, self_state = make_world(
+            fuel=900,
+            containers={
+                "104,100": make_container_state(
+                    x=104,
+                    y=100,
+                    is_fuel=True,
+                    volume=700,
+                    timestamp_ms=100000,
+                    failed_pickups=0,
+                )
+            },
+        )
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(landing_scan_viewport=""),
+                "mode": "COLLECT",
+                "mode_state": "APPROACH",
+                "mode_started_ms": 90000,
+                "suppress_landing_scan": True,
+                "resource_target_kind": "fuel",
+                "resource_target_x": 104,
+                "resource_target_y": 100,
+            }
+        )
+        ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+        decision, updated = _scan_on_landing_decision(ctx, ctx.base)
+
+        assert decision is None
+        assert updated["last_landing_scan_viewport"] != ""
+        assert updated["suppress_landing_scan"] is False

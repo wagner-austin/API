@@ -15,6 +15,7 @@ from tankpit_bot.bot.ai.context import (
     can_use_radar,
     locked_resource_target,
     make_decision,
+    radar_spend_worthwhile,
     set_resource_target,
 )
 from tankpit_bot.bot.ai.equipment import (
@@ -26,6 +27,7 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_all_tracked_equipment,
     find_best_fuel,
     find_equipment_candidates,
+    find_fuel_candidates,
     find_nearest_equipment,
     find_teleport_landing_tile,
 )
@@ -57,6 +59,7 @@ from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import (
+    clear_container_desync,
     container_desync_pending,
     get_incoming_damage_window,
     is_move_target_failed,
@@ -124,33 +127,6 @@ def select_equipment_target(
 
     container = candidates[0]
     command = walk_or_teleport(ctx, container["x"], container["y"], pickup_kind="equipment")
-    if command is None:
-        return None
-    return (container, command)
-
-
-def select_fuel_target(
-    ctx: DecideCtx,
-) -> tuple[ContainerStateDict, BotCommand] | None:
-    """Return the best executable walk-reachable fuel target.
-
-    Args:
-        ctx: Decision context.
-
-    Returns:
-        ``(container, command)`` for the best executable fuel target, or
-        ``None`` when no visible fuel target can currently be executed.
-    """
-    container = find_best_fuel(
-        ctx.filtered,
-        ctx.self_state,
-        ctx.terrain,
-        minimum_volume=1,
-    )
-    if container is None:
-        return None
-
-    command = walk_or_teleport(ctx, container["x"], container["y"], pickup_kind="fuel")
     if command is None:
         return None
     return (container, command)
@@ -801,6 +777,13 @@ def _desync_rescan_decision(
     """
     if not container_desync_pending():
         return None
+    if not radar_spend_worthwhile(ctx):
+        # Live coverage already tells the whole story (radar-spend
+        # economics, flag s9-4: two rescans of ground radared seconds
+        # earlier) -- the disproof is answered by the existing scan.
+        emit_ai("container desync answered by live coverage - no rescan needed")
+        clear_container_desync()
+        return None
     emit_ai(
         "remembered container disproved (code=4) - radar resync before "
         "pursuing further memory (extras=%d)",
@@ -886,6 +869,22 @@ def _scan_on_landing_decision(
                     "suppress_landing_scan": False,
                 }
             )
+        if not radar_spend_worthwhile(ctx):
+            # Radar-spend economics (flag s9-2): the displaced landing
+            # sits in ground live coverage already explains -- the
+            # mines the un-suppression exists to reveal are known, so
+            # the scan buys nothing. Latch and proceed.
+            emit_ai(
+                "harvest landing displaced but viewport coverage is live - "
+                "no radar spend, proceeding",
+            )
+            return None, AIStateDict(
+                **{
+                    **base_state,
+                    "last_landing_scan_viewport": origin_key,
+                    "suppress_landing_scan": False,
+                }
+            )
         emit_ai(
             "harvest landing displaced: self (%d,%d) is %d tiles from lock (%d,%d)"
             " - un-suppressing landing radar",
@@ -912,6 +911,22 @@ def _scan_on_landing_decision(
             ctx.equip,
         )
         return displaced_scan, base_state
+    if not radar_spend_worthwhile(ctx):
+        # Radar-spend economics (flags s9-2/4/5, superseding the
+        # 2026-07-03 "always radar right on landing, unconditionally"
+        # ruling): a landing in ground live coverage already explains
+        # does not buy an extra radar. The latch still records the
+        # viewport so the landing is not re-evaluated every tick.
+        emit_ai(
+            "landing viewport coverage is live - skipping landing radar (extras=%d)",
+            ctx.inventory["extra_radars"]["count"],
+        )
+        return None, AIStateDict(
+            **{
+                **base_state,
+                "last_landing_scan_viewport": origin_key,
+            }
+        )
     emit_ai(
         "scan-on-landing (mode=COLLECT, extras=%d, viewport=(%d,%d)-(%d,%d))",
         ctx.inventory["extra_radars"]["count"],
@@ -1458,39 +1473,72 @@ def _pickup_not_worth_walk(
     return effective_gain < _FUEL_GAIN_PER_WALK_TILE * walk_tiles
 
 
+def _first_walkworthy_fuel(
+    ctx: DecideCtx,
+) -> tuple[ContainerStateDict, BotCommand] | None:
+    """Return the best fuel candidate that is worth its walk.
+
+    Iterates the ranked candidate list instead of vetoing only the
+    single best -- flag s9-2/3 (2026-07-30): the best-scored container
+    (volume 1183, 13 tiles) failed the worth-the-walk rate while a
+    762-volume container sat 3 tiles away, and the single-candidate
+    veto sent the cascade into an in-viewport larder teleport (map
+    open + displaced landing + spent radar) for ground a 3-tile walk
+    served. The worth-the-walk rate stays an efficiency rule for a
+    healthy tank; at or below the fuel-low break any reachable fuel
+    is taken (run bot-20260728-090813: exited out_of_fuel at 98 with
+    a pickable 39-fuel container two tiles away).
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        ``(container, command)`` for the best walk-worthy executable
+        fuel target, or ``None`` when none qualifies.
+    """
+    fuel_critical = ctx.fuel <= ctx.config["fuel_low_threshold"]
+    cap = fuel_capacity(ctx.self_state["rank"])
+    for container in find_fuel_candidates(
+        ctx.filtered,
+        ctx.self_state,
+        ctx.terrain,
+        minimum_volume=1,
+    ):
+        if not fuel_critical and _pickup_not_worth_walk(ctx, container):
+            walk_tiles = abs(container["x"] - ctx.self_state["x"]) + abs(
+                container["y"] - ctx.self_state["y"]
+            )
+            emit_ai(
+                "skip fuel at (%d,%d) vol=%d: clamped gain %d not worth "
+                "%d-tile walk (fuel=%d cap=%d)",
+                container["x"],
+                container["y"],
+                container["volume"],
+                min(container["volume"], cap - ctx.fuel),
+                walk_tiles,
+                ctx.fuel,
+                cap,
+            )
+            continue
+        command = walk_or_teleport(ctx, container["x"], container["y"], pickup_kind="fuel")
+        if command is None:
+            continue
+        return (container, command)
+    return None
+
+
 def _select_and_pickup_fuel(
     ctx: DecideCtx,
     base_state: AIStateDict,
 ) -> TickDecisionDict | None:
     if ctx.fuel >= fuel_capacity(ctx.self_state["rank"]):
         return None
-    selection = select_fuel_target(ctx)
+    selection = _first_walkworthy_fuel(ctx)
     if selection is None:
         return None
     container, command = selection
     target_x = container["x"]
     target_y = container["y"]
-    # The worth-the-walk rate predicate is an EFFICIENCY rule for a
-    # healthy tank; below the fuel-low break the alternative to a
-    # "wasteful" walk is the out_of_fuel exit, so any reachable fuel
-    # is taken (run bot-20260728-090813: exited at fuel 98 with a
-    # pickable 39-fuel container two tiles away, refused as
-    # "not worth 2-tile walk").
-    fuel_critical = ctx.fuel <= ctx.config["fuel_low_threshold"]
-    if not fuel_critical and _pickup_not_worth_walk(ctx, container):
-        cap = fuel_capacity(ctx.self_state["rank"])
-        walk_tiles = abs(target_x - ctx.self_state["x"]) + abs(target_y - ctx.self_state["y"])
-        emit_ai(
-            "skip fuel at (%d,%d) vol=%d: clamped gain %d not worth %d-tile walk (fuel=%d cap=%d)",
-            target_x,
-            target_y,
-            container["volume"],
-            min(container["volume"], cap - ctx.fuel),
-            walk_tiles,
-            ctx.fuel,
-            cap,
-        )
-        return None
     emit_ai(
         "collect fuel at (%d,%d) vol=%d (fuel=%d)",
         target_x,
@@ -1560,5 +1608,4 @@ __all__ = [
     "is_container_blacklisted",
     "reset_container_blacklist",
     "select_equipment_target",
-    "select_fuel_target",
 ]

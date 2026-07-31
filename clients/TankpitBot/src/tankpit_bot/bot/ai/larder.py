@@ -26,6 +26,7 @@ from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict
+from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 _WALK_DOMINANT_RANGE = 2
 """Manhattan distance at or below which walking beats a larder hop.
@@ -125,6 +126,36 @@ def _live_fuel_beliefs(
     ]
 
 
+def _is_walk_territory(
+    ctx: DecideCtx,
+    container: ContainerStateDict,
+    sx: int,
+    sy: int,
+) -> bool:
+    """Return True when the container belongs to the walk economics.
+
+    Movement law (user 2026-07-30, flag s9-2/3): same-viewport
+    destinations are WALKED -- an in-viewport larder teleport pays a
+    map open + jump + displacement risk for ground a few walk ticks
+    serve. Off-viewport but within :data:`_WALK_DOMINANT_RANGE` is
+    equally walk territory (a tank at its viewport edge two tiles
+    from off-frame stock). The larder is cross-viewport machinery.
+
+    Args:
+        ctx: Decision context (viewport bounds).
+        container: Candidate fuel container.
+        sx: Self X.
+        sy: Self Y.
+
+    Returns:
+        True when the walk step owns this container.
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    if left <= container["x"] <= right and top <= container["y"] <= bottom:
+        return True
+    return abs(container["x"] - sx) + abs(container["y"] - sy) <= _WALK_DOMINANT_RANGE
+
+
 def select_fuel_larder_hop(
     ctx: DecideCtx,
     *,
@@ -169,7 +200,7 @@ def select_fuel_larder_hop(
     best_score = 0.0
     for container in _live_fuel_beliefs(ctx, is_blacklisted):
         candidates += 1
-        if abs(container["x"] - sx) + abs(container["y"] - sy) <= _WALK_DOMINANT_RANGE:
+        if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1
             continue
         landing = find_teleport_landing_tile(terrain, container["x"], container["y"])

@@ -22,6 +22,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.costs import teleport_cost
+from tankpit_bot.state.scan_coverage import viewport_uncovered_count
 from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
@@ -358,6 +359,49 @@ def target_position_is_fresh(ctx: DecideCtx, target: EnemyThreatDict) -> bool:
         ``map_open_cooldown_ms`` of the current tick.
     """
     return ctx.timestamp_ms - target["timestamp_ms"] < ctx.config["map_open_cooldown_ms"]
+
+
+RADAR_SPEND_REVEAL_FLOOR_TILES = 32
+"""Minimum uncovered viewport tiles that justify spending an extra radar.
+
+The single radar-economics rule every discretionary radar site
+consults ([[flag-triage-20260729]] s9-2/4/5, user 2026-07-30: "im
+worried ... the viewport freshness handling is not properly wired to
+the collecting system"). With extras stocked every scan CONSUMES an
+item, and session 9 spent them on slivers: a displaced-landing rescan
+of a fully-scanned viewport, a desync rescan of ground radared
+seconds earlier, and a forage radar for a handful of tiles the tank
+then hopped away from. 32 tiles is an eighth of the 256-tile
+viewport — below that the reveal does not buy an item; the free
+built-in radar (extras=0) stays gated only on "any uncovered tile"
+because it costs nothing but the tick.
+"""
+
+
+def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
+    """Return True when a radar dispatch is worth its cost right now.
+
+    Args:
+        ctx: Decision context (coverage map + inventory).
+
+    Returns:
+        With extra radars stocked: True when the current viewport has
+        at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
+        tiles. Without extras: True when any tile is uncovered (the
+        built-in radar is free).
+    """
+    left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
+    uncovered = viewport_uncovered_count(
+        ctx.world["scanned_tiles"],
+        left,
+        top,
+        right,
+        bottom,
+        ctx.timestamp_ms,
+    )
+    if ctx.inventory["extra_radars"]["count"] > 0:
+        return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES
+    return uncovered > 0
 
 
 def can_use_radar(ctx: DecideCtx) -> bool:

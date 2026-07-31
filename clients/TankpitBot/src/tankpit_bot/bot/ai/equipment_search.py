@@ -260,6 +260,61 @@ def find_best_fuel(
     return best
 
 
+def find_fuel_candidates(
+    world: WorldStateDict,
+    self_state: SelfStateDict,
+    terrain: TerrainMapProtocol | None = None,
+    *,
+    minimum_volume: int = 100,
+) -> list[ContainerStateDict]:
+    """Return walk-reachable fuel candidates ordered best-first.
+
+    The same eligibility gates as :func:`find_best_fuel`, returning
+    the FULL ranked list (``volume - distance`` descending) instead of
+    only the winner -- flag s9-2/3 (2026-07-30): the walk step's
+    single-best pick was vetoed as not worth its 13-tile walk while a
+    762-volume container sat 3 tiles away, and with no second look
+    the cascade fell through to an in-viewport larder TELEPORT (map
+    open + displaced landing + spent radar). The walk step now
+    iterates this list and takes the first walk-worthy candidate.
+
+    Args:
+        world: Current world state with container positions.
+        self_state: Player's own state for position.
+        terrain: Optional terrain map for reachability checks.
+        minimum_volume: Minimum fuel volume that counts as actionable.
+
+    Returns:
+        Ranked walk-reachable fuel containers, best score first.
+    """
+    sx, sy = self_state["x"], self_state["y"]
+    scored: list[tuple[int, ContainerStateDict]] = []
+    for container in world["containers"].values():
+        if not _is_visible_candidate(container, world, want_fuel=True):
+            continue
+        if container["volume"] < minimum_volume:
+            continue
+        cx, cy = container["x"], container["y"]
+        dist = manhattan_distance(sx, sy, cx, cy)
+        if not _is_actionable_with_terrain(world, terrain, sx, sy, cx, cy):
+            continue
+        scored.append((container["volume"] - dist, container))
+    scored.sort(key=_fuel_candidate_score, reverse=True)
+    return [container for _, container in scored]
+
+
+def _fuel_candidate_score(entry: tuple[int, ContainerStateDict]) -> int:
+    """Sort key: the candidate's volume-minus-distance score.
+
+    Args:
+        entry: ``(score, container)`` pair.
+
+    Returns:
+        The score component.
+    """
+    return entry[0]
+
+
 def find_adjacent_container(
     world: WorldStateDict,
     self_state: SelfStateDict,
@@ -507,6 +562,7 @@ __all__ = [
     "find_all_tracked_equipment",
     "find_best_fuel",
     "find_equipment_candidates",
+    "find_fuel_candidates",
     "find_nearest_deposit",
     "find_nearest_equipment",
     "find_nearest_fuel",

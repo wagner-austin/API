@@ -63,6 +63,7 @@ from tankpit_bot.state import (
     remove_mine,
     set_self_rank,
 )
+from tankpit_bot.state.types.constants import TERRAIN_FERRY
 
 log = get_logger(__name__)
 
@@ -998,6 +999,35 @@ def _dispatch_mine_detonation(
 PICKUP_DEDUP_WINDOW_MS: int = 500
 
 
+def was_recent_pickup_at(ws: WorldService, x: int, y: int, now_ms: int) -> bool:
+    """Return True when a pickup broadcast just fired for this tile.
+
+    The code=4 drain-receipt discriminator (flag s9-4, 2026-07-30): a
+    pickup that DRAINS a container produces a ContainerPickup
+    broadcast for the tile followed by the 0x52 code=4 in the same
+    click -- that is a receipt of our own success, not a memory
+    desync. A genuinely vanished container (someone else took it
+    before we arrived) produces no pickup broadcast at all.
+
+    Args:
+        ws: World service carrying the recent-pickup ledger.
+        x: Container tile X.
+        y: Container tile Y.
+        now_ms: Current wall-clock ms.
+
+    Returns:
+        True when a pickup record for the tile is inside the ledger's
+        retention window.
+    """
+    cutoff = now_ms - 2 * PICKUP_DEDUP_WINDOW_MS
+    for signature, seen_ms in ws.recent_pickup_signatures.items():
+        if seen_ms < cutoff:
+            continue
+        if any(record[0] == x and record[1] == y for record in signature):
+            return True
+    return False
+
+
 def _is_duplicate_pickup_broadcast(
     ws: WorldService,
     pickups: tuple[ContainerPickupRecordDict, ...],
@@ -1158,6 +1188,41 @@ def _emit_teleport_displacement(ws: WorldService) -> None:
         landed_x=self_state["x"],
         landed_y=self_state["y"],
         displacement=abs(self_state["x"] - requested_x) + abs(self_state["y"] - requested_y),
+    )
+    _expire_disproven_ferry_belief(ws, requested_x, requested_y)
+
+
+def _expire_disproven_ferry_belief(ws: WorldService, requested_x: int, requested_y: int) -> None:
+    """Delete a ferry belief the displaced landing just disproved.
+
+    Flags s9-7/8 (2026-07-30, 17 extras burned): the equipment hop
+    teleported to a 60-second-old ferry belief, the server displaced
+    the landing -- its receipt that nothing boardable sits there --
+    but the belief survived, so the identical boarding plan re-derived
+    every lap. Ferries move; a displacement off a believed ferry tile
+    is the wire's own proof the belief is stale, and consuming it here
+    means the next derivation plans from truth (the same
+    receipt-consumption discipline as code=4 and friendly-fire).
+
+    Args:
+        ws: World service instance.
+        requested_x: The teleport's requested landing X.
+        requested_y: The teleport's requested landing Y.
+    """
+    key = f"{requested_x},{requested_y}"
+    tile = ws.world_state["terrain"].get(key)
+    if tile is None or tile["terrain_type"] != TERRAIN_FERRY:
+        return
+    del ws.world_state["terrain"][key]
+    emit_world(
+        "FERRY_BELIEF_EXPIRED: displaced landing disproved ferry at (%d,%d)",
+        requested_x,
+        requested_y,
+    )
+    emit_diagnostic(
+        diagnostic_kind="ferry_belief_expired",
+        x=requested_x,
+        y=requested_y,
     )
 
 

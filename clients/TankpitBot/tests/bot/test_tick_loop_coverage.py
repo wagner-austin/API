@@ -1475,3 +1475,70 @@ class TestFriendlyFireDisproof:
 
         assert "1229" in bot._ai_state["blocked_combat_targets"]
         assert bot._ai_state["combat_target_id"] == 514
+
+
+class TestDrainReceipt:
+    """A code=4 riding our own pickup is a drain receipt, not a desync."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_own_drain_code4_does_not_mark_desync(self, fake_env: FakeEnv) -> None:
+        """Flag s9-4: a +241 pickup drained the container, the same
+        click's code=4 marked memory desynced, and a paid rescan
+        re-learned what the bot had just done itself.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service
+        from tankpit_bot.state.types import WorldStateDict, make_container_state
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        ws.world_state = WorldStateDict(
+            **{
+                **ws.world_state,
+                "self_state": make_self_state(
+                    tank_id=1,
+                    x=100,
+                    y=100,
+                    team=1,
+                    rank=0,
+                    fuel=1000,
+                    leaderboard_position=0,
+                ),
+                "containers": {
+                    "150,150": make_container_state(
+                        x=150,
+                        y=150,
+                        is_fuel=True,
+                        volume=400,
+                        timestamp_ms=get_current_time_ms(),
+                        failed_pickups=0,
+                    )
+                },
+            }
+        )
+        # The pickup broadcast for the tile fired within the click.
+        ws.recent_pickup_signatures[((150, 150, 0),)] = get_current_time_ms()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "MOVING"
+        action = InFlightActionDict(
+            kind="collect",
+            target_x=150,
+            target_y=150,
+            started_ms=get_current_time_ms(),
+            outcome="pending",
+        )
+        ws.last_command_error = 4
+
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert ws.container_desync_ms == 0

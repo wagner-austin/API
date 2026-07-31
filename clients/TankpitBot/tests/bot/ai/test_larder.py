@@ -182,14 +182,15 @@ def test_empty_registry_returns_no_candidates() -> None:
 
 
 def test_dreg_below_floor_is_skipped_for_the_real_container() -> None:
-    """The flag s3-9 shape: a close 35-volume dreg loses to a far 355.
+    """The flag s3-9 shape: a close sub-floor dreg loses to a far 355.
 
-    ``gain/cost`` favored the dreg 2.9:1 before the floor
+    ``gain/cost`` favored the dreg before the floor
     ([[flag-triage-20260729]] F13); the dreg now tallies and the
-    355-volume container wins outright.
+    355-volume container wins outright. (Both sit outside the
+    viewport -- in-viewport stock is the walk step's business.)
     """
     containers = {
-        "104,100": make_container(104, 100, 35, is_fuel=True),
+        "110,100": make_container(110, 100, 90, is_fuel=True),
         "131,100": make_container(131, 100, 355, is_fuel=True),
     }
     selection = select_fuel_larder_hop(
@@ -270,22 +271,43 @@ def test_desperation_fuel_is_reserve_blocked_not_dreg_gated() -> None:
     assert selection["dreg"] == 0
 
 
-def test_walk_dominant_range_excludes_two_tile_teleports() -> None:
-    """Manhattan <= 2 is the walk step's business, never a hop's.
+def test_in_viewport_containers_belong_to_the_walk_step() -> None:
+    """Same-viewport stock is never a larder hop (movement law).
 
-    Session-3 receipts (flags s3-1/3/4/9): 2-tile larder teleports
-    cost the same ticks as walking plus fuel plus a map churn.
+    Flag s9-2/3 (2026-07-30): a 3-tile in-viewport larder teleport
+    paid a map open, got displaced, and spent a landing radar for
+    ground a walk served. The larder is cross-viewport machinery.
     """
     containers = {
         "102,100": make_container(102, 100, 500, is_fuel=True),
-        "103,100": make_container(103, 100, 400, is_fuel=True),
+        "106,103": make_container(106, 103, 400, is_fuel=True),
     }
     selection = select_fuel_larder_hop(
         _ctx(fuel=_fuel_at_deficit(600), containers=containers),
         is_blacklisted=_never_blacklisted,
     )
+    assert selection["too_close"] == 2
+    assert selection["container"] is None
+
+
+def test_walk_dominant_range_excludes_close_offscreen_containers() -> None:
+    """Manhattan <= 2 stays the walk step's business even off-viewport.
+
+    A tank that walked to its viewport edge can stand 2 tiles from a
+    container just outside the frame -- still a walk, never a hop.
+    """
+    containers = {
+        "109,100": make_container(109, 100, 500, is_fuel=True),
+        "131,100": make_container(131, 100, 400, is_fuel=True),
+    }
+    ctx = _ctx(fuel=_fuel_at_deficit(600), containers=containers)
+    ctx.world["viewport"]["left"] = 92
+    ctx.self_state["x"] = 107
+
+    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+
     assert selection["too_close"] == 1
-    assert selection["container"] == containers["103,100"]
+    assert selection["container"] == containers["131,100"]
 
 
 def _ferry_tile(x: int, y: int, observed_ms: int) -> TerrainTileDict:

@@ -338,3 +338,27 @@ class TestChatConsentRecording:
         dispatch_world_state_update(ws, msg)
 
         assert ws.chat_seen_tank_ids == set()
+
+
+class TestRecentPickupLedgerLookup:
+    """The drain-receipt discriminator's ledger scan."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_stale_entries_and_other_tiles_do_not_match(self) -> None:
+        """Only a fresh signature covering the tile counts."""
+        from tankpit_bot.sniffer.world_state_dispatch import was_recent_pickup_at
+
+        ws = get_world_service()
+        ws.recent_pickup_signatures[((150, 150, 0),)] = 90000
+        ws.recent_pickup_signatures[((10, 10, 5),)] = 100000
+
+        assert was_recent_pickup_at(ws, 150, 150, 100000) is False
+        assert was_recent_pickup_at(ws, 150, 150, 90100) is True
+        assert was_recent_pickup_at(ws, 60, 60, 100000) is False
