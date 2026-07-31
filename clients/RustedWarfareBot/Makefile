@@ -139,7 +139,7 @@ AGENT_CP := $(AGENT_JAR);$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*
 agent:
 	@Write-Host ""
 	@Write-Host "==> agent (javac --release 11, zero third-party deps)" -ForegroundColor Cyan
-	$$dir = "agent/build/classes-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$tmp = "$(AGENT_JAR)." + [System.Guid]::NewGuid().ToString("N").Substring(0,8) + ".new"; $$failed = ""; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { $$failed = "javac failed" } else { & "$(JAR)" cfm $$tmp agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { $$failed = "jar failed" } else { try { Move-Item -Force -ErrorAction Stop -LiteralPath $$tmp -Destination "$(AGENT_JAR)" } catch { $$failed = "cannot replace $(AGENT_JAR): a JVM has it attached with -javaagent. Stop the running game, then retry." } } } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; if (Test-Path $$tmp) { Remove-Item -Force $$tmp } }; if ($$failed) { Write-Host "[agent] $$failed" -ForegroundColor Red; exit 1 }
+	& scripts/make/agent.ps1 -Javac "$(JAVAC)" -Jar "$(JAR)" -AgentJar "$(AGENT_JAR)"
 	@Write-Host "[agent] built $(AGENT_JAR)" -ForegroundColor Green
 
 # Patches every Targets entry in the real pinned jar and DEFINES each result,
@@ -157,7 +157,7 @@ agent:
 agent-selftest:
 	@Write-Host ""
 	@Write-Host "==> agent-selftest (JVM verifier as oracle)" -ForegroundColor Cyan
-	$$dir = "agent/build/verify-" + [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$failed = ""; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { $$failed = "javac failed" } else { & "$(JAVA)" -cp "$$dir;$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*" rwbot.agent.SelfTest "$(GAME_DIR)/game-lib.jar"; if ($$LASTEXITCODE -ne 0) { $$failed = "self-checks failed" } } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir } }; if ($$failed) { Write-Host "[agent-selftest] $$failed" -ForegroundColor Red; exit 1 }
+	& scripts/make/selftest.ps1 -Javac "$(JAVAC)" -Java "$(JAVA)" -GameDir "$(GAME_DIR)"
 	@Write-Host "[agent-selftest] passed" -ForegroundColor Green
 
 # Live skirmish with the agent attached. Runs until killed -- the engine logs
@@ -167,7 +167,7 @@ sandbox-probe: agent
 	@Write-Host ""
 	@Write-Host "==> sandbox-probe (live skirmish, agent attached, log: $(SANDBOX_LOG))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force (Split-Path -Parent "$(SANDBOX_LOG)") | Out-Null
-	$$root = (Resolve-Path -LiteralPath ".").Path; $$agent = $$root + "\\$(AGENT_JAR)"; $$log = $$root + "\\$(SANDBOX_LOG)"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." "-javaagent:$$agent" -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -sandbox -width 800 -height 600 -log $$log } finally { Pop-Location }
+	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -Log "$(SANDBOX_LOG)"
 
 # Reflective snapshot of the live engine at each requested elapsed time. Two
 # times by default because the comparison is the point: fields that change
@@ -179,7 +179,7 @@ discover-probe: agent
 	@Write-Host ""
 	@Write-Host "==> discover-probe (snapshots at $(DISCOVER_AT)s -> $(DISCOVER_OUT))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force (Split-Path -Parent "$(DISCOVER_OUT)") | Out-Null
-	$$root = (Resolve-Path -LiteralPath ".").Path; $$agent = $$root + "\\$(AGENT_JAR)"; $$log = $$root + "\\$(DISCOVER_OUT)"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." "-javaagent:$$agent=discoverAtSeconds=$(DISCOVER_AT);exitAfterDiscovery=true" -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -sandbox -width 800 -height 600 -log $$log } finally { Pop-Location }
+	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(DISCOVER_AT);exitAfterDiscovery=true" -Log "$(DISCOVER_OUT)"
 	@Write-Host "[discover-probe] snapshots written to $(DISCOVER_OUT)" -ForegroundColor Green
 
 # Decompile the pinned jar into a readable source tree.
@@ -227,7 +227,7 @@ wire-capture: agent
 	@Write-Host "==> wire-capture (live world stream at $(WIRE_CAPTURE_AT)s -> $(WIRE_CAPTURE_OUT))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force (Split-Path -Parent "$(WIRE_CAPTURE_OUT)") | Out-Null
 	if (Test-Path "$(WIRE_CAPTURE_OUT)") { Remove-Item -Force "$(WIRE_CAPTURE_OUT)" }
-	$$root = (Resolve-Path -LiteralPath ".").Path; $$agent = $$root + "\\$(AGENT_JAR)"; $$out = $$root + "\\$(WIRE_CAPTURE_OUT)"; $$log = $$root + "\\runs\\wire-capture.log"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." "-javaagent:$$agent=discoverAtSeconds=$(WIRE_CAPTURE_AT);stateOutPath=$$out;exitAfterDiscovery=true" -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -sandbox -width 800 -height 600 -log $$log } finally { Pop-Location }
+	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(WIRE_CAPTURE_AT);stateOutPath={OUT};exitAfterDiscovery=true" -Out "$(WIRE_CAPTURE_OUT)" -Log "runs/wire-capture.log"
 	$$n = (Get-Content "$(WIRE_CAPTURE_OUT)" | Measure-Object -Line).Lines; Write-Host "[wire-capture] $$n record(s) written to $(WIRE_CAPTURE_OUT)" -ForegroundColor Green
 
 # The placement rules -printunits does not print.
@@ -247,7 +247,7 @@ type-flags: agent
 	@Write-Host ""
 	@Write-Host "==> type-flags (placement rules from the live registry -> $(TYPE_FLAGS_OUT))" -ForegroundColor Cyan
 	New-Item -ItemType Directory -Force (Split-Path -Parent "$(TYPE_FLAGS_OUT)") | Out-Null
-	$$root = (Resolve-Path -LiteralPath ".").Path; $$agent = $$root + "\\$(AGENT_JAR)"; $$out = $$root + "\\$(TYPE_FLAGS_OUT)"; $$log = $$root + "\\runs\\type-flags.log"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." "-javaagent:$$agent=discoverAtSeconds=$(TYPE_FLAGS_AT);typeFlagsPath=$$out;exitAfterDiscovery=true" -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -sandbox -width 800 -height 600 -log $$log } finally { Pop-Location }
+	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(TYPE_FLAGS_AT);typeFlagsPath={OUT};exitAfterDiscovery=true" -Out "$(TYPE_FLAGS_OUT)" -Log "runs/type-flags.log"
 	$$n = (Get-Content "$(TYPE_FLAGS_OUT)" | Measure-Object -Line).Lines; Write-Host "[type-flags] $$n type(s) written to $(TYPE_FLAGS_OUT)" -ForegroundColor Green
 
 unit-dump:
@@ -320,6 +320,19 @@ PLAY_DIFFICULTY ?= 0
 PLAY_MODULE ?= scripts.play
 PLAY_ARGS ?= $(PLAY_SAMPLES)
 
+# A frozen code snapshot to play from, or empty to import the working tree.
+# Sweeps always pass one (rw_bot.harness.runner.prepare_tree): the planner then
+# runs with -P so the repository root cannot outrank the snapshot on sys.path,
+# and the agent jar is the snapshot's prebuilt copy rather than a per-match
+# compile. The working directory stays the repository root either way, so
+# catalogue, type-dump, doctrine and trace paths resolve unchanged.
+PLAY_TREE ?=
+
+# Constant frame delta in ms, 0 to leave the engine on wall clock. What makes
+# one seed produce one answer ([[policy-determinism]]); trees frozen before the
+# option exists must run with 0, so the default stays off until they retire.
+PLAY_PINDELTA ?= 0
+
 # How many extractors the income probe builds, and how long it stands still
 # between each one. Target-specific variables rather than a recursive $(MAKE):
 # the argument list contains a space, and quoting it through a sub-make under
@@ -328,11 +341,26 @@ INCOME_STAGES ?= 4
 INCOME_IDLE ?= 200
 INCOME_LOG ?= runs/income.log
 
+# The body lives in scripts/make/play.ps1 -- launch plumbing, read from the
+# working tree like this Makefile itself, while what the match RUNS comes from
+# the frozen tree when PLAY_TREE is set ([[policy-loop]]).
 play:
 	@Write-Host ""
 	@Write-Host "==> play (headless match on port $(PLAY_PORT), log: $(PLAY_LOG))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$stamp = [System.Guid]::NewGuid().ToString("N").Substring(0,8); $$dir = "agent/build/play-$$stamp"; $$jar = "agent/build/rw-agent-play-$$stamp.jar"; $$root = (Resolve-Path -LiteralPath ".").Path; $$log = $$root + "\$(PLAY_LOG)"; try { New-Item -ItemType Directory -Force $$dir | Out-Null; & "$(JAVAC)" --release 11 -Xlint:all -Werror -d $$dir (Get-ChildItem "agent/src/rwbot/agent/*.java" | ForEach-Object { $$_.FullName }); if ($$LASTEXITCODE -ne 0) { Write-Host "[play] javac failed" -ForegroundColor Red; exit 1 }; & "$(JAR)" cfm $$jar agent/manifest.mf -C $$dir .; if ($$LASTEXITCODE -ne 0) { Write-Host "[play] jar failed" -ForegroundColor Red; exit 1 }; $$agentArgs = "channelPort=$(PLAY_PORT)"; if ($(PLAY_SEED) -ne 0) { $$agentArgs = $$agentArgs + ";randomSeed=$(PLAY_SEED)"; Write-Host "[play] engine random pinned to seed $(PLAY_SEED)" -ForegroundColor DarkGray }; if ($(PLAY_LOCKSTEP) -ne 0) { $$agentArgs = $$agentArgs + ";lockstepFrames=$(PLAY_LOCKSTEP)"; Write-Host "[play] lockstep every $(PLAY_LOCKSTEP) frames" -ForegroundColor DarkGray }; if ("$(PLAY_MAP)" -ne "") { $$agentArgs = $$agentArgs + ";matchMap=$(PLAY_MAP);matchOpponents=$(PLAY_OPPONENTS);matchDifficulty=$(PLAY_DIFFICULTY)"; Write-Host "[play] $(PLAY_OPPONENTS) opponent(s) at difficulty $(PLAY_DIFFICULTY) on $(PLAY_MAP)" -ForegroundColor DarkGray }; $$gameArgs = @("-Xmx1000M", "--add-opens", "java.base/java.lang=ALL-UNNAMED", "-Djava.library.path=.", "-javaagent:$$root\$$jar=$$agentArgs", "-cp", "game-lib.jar;libs/*", "com.corrodinggames.rts.java.Main", "-nodisplay", "-nosound"); if ("$(PLAY_MAP)" -eq "") { $$gameArgs += "-sandbox" } else { Write-Host "[play] -sandbox withheld; the agent starts the match" -ForegroundColor DarkGray }; $$gameArgs += @("-width", "800", "-height", "600", "-log", "$$log"); $$game = Start-Process -FilePath "$$root\$(GAME_DIR)\jvm64\bin\java.exe" -ArgumentList $$gameArgs -WorkingDirectory "$$root\$(GAME_DIR)" -PassThru -RedirectStandardOutput "$$root\$(PLAY_LOG).agent" -RedirectStandardError "$$root\$(PLAY_LOG).err"; try { $$sw = [Diagnostics.Stopwatch]::StartNew(); $$open = $$false; while ($$sw.Elapsed.TotalSeconds -lt 90) { try { $$c = New-Object Net.Sockets.TcpClient("127.0.0.1", $(PLAY_PORT)); $$c.Close(); $$open = $$true; break } catch { Start-Sleep -Milliseconds 1000 } }; if (-not $$open) { Write-Host "[play] the agent never opened port $(PLAY_PORT)" -ForegroundColor Red; exit 1 }; Write-Host "[play] channel open; letting the map settle $(PLAY_SETTLE)s" -ForegroundColor DarkGray; Start-Sleep -Seconds $(PLAY_SETTLE); poetry run python -m $(PLAY_MODULE) $(PLAY_PORT) "$(CATALOGUE)" "$(TYPE_DUMP)" $(PLAY_ARGS) } finally { Stop-Process -Id $$game.Id -Force -ErrorAction SilentlyContinue; Write-Host "[play] game stopped" -ForegroundColor DarkGray } } finally { if (Test-Path $$dir) { Remove-Item -Recurse -Force $$dir }; Start-Sleep -Milliseconds 500; if (Test-Path $$jar) { Remove-Item -Force $$jar -ErrorAction SilentlyContinue } }
+	& scripts/make/play.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -Seed $(PLAY_SEED) -Lockstep $(PLAY_LOCKSTEP) -Settle $(PLAY_SETTLE) -PlayLog "$(PLAY_LOG)" -Map "$(PLAY_MAP)" -Opponents $(PLAY_OPPONENTS) -Difficulty $(PLAY_DIFFICULTY) -Tree "$(PLAY_TREE)" -PinDelta $(PLAY_PINDELTA) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(PLAY_ARGS)" -Javac "$(JAVAC)" -Jar "$(JAR)"
+
+# Host a LAN game the bot plays in, for a human to join. The join address is
+# printed at launch; the match starts the moment a player connects. Sparring
+# is realtime by necessity -- no lockstep, no hold, no seed
+# ([[multiplayer-portability-invariants]]).
+HOST_MAP ?= maps/skirmish/[p2]duel_lake.tmx
+HOST_SAMPLES ?= 20000
+HOST_DOCTRINE ?= doctrines/aa-counter-guard.doctrine
+HOST_LOG ?= runs/host.log
+host:
+	@Write-Host ""
+	@Write-Host "==> host (bot-hosted LAN game on port 5123, log: $(HOST_LOG))" -ForegroundColor Cyan
+	& scripts/make/host.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(HOST_LOG)" -HostMap "$(HOST_MAP)" -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(HOST_SAMPLES) $(HOST_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
 
 # A batch of matches, played several at a time. Each worker gets its own copy of
 # the game directory because a running match writes three fixed-name paths
@@ -359,10 +387,18 @@ SWEEP_LOCKSTEP ?= 75
 #   make sweep SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx -2"
 SWEEP_MATCH ?=
 
-sweep:
+# Constant frame delta for every match in the batch, empty to leave the engine
+# on the wall clock. Only meaningful with SWEEP_MATCH set (it is the seventh
+# positional); trees frozen before the option exists must leave it empty.
+SWEEP_PINDELTA ?=
+
+# Depends on the agent jar because the batch freezes a copy of it: matches
+# play from the snapshot, so the jar has to be current when the snapshot is
+# taken rather than compiled per match ([[policy-loop]]).
+sweep: agent
 	@Write-Host ""
 	@Write-Host "==> sweep $(SWEEP_NAME) ($(SWEEP_WORKERS) workers, jobs: $(SWEEP_JOBS))" -ForegroundColor Cyan
-	poetry run python -m scripts.sweep "$(SWEEP_JOBS)" "$(SWEEP_NAME)" $(SWEEP_WORKERS) $(SWEEP_LOCKSTEP) $(SWEEP_MATCH)
+	poetry run python -m scripts.sweep "$(SWEEP_JOBS)" "$(SWEEP_NAME)" $(SWEEP_WORKERS) $(SWEEP_LOCKSTEP) $(SWEEP_MATCH) $(SWEEP_PINDELTA)
 
 income: PLAY_MODULE = scripts.income
 income: PLAY_ARGS = $(INCOME_STAGES) $(INCOME_IDLE)
