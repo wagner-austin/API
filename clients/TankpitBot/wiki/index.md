@@ -19,4 +19,4 @@
 
 **After a live run:** update existing content pages with new findings (run IDs, verified constants). Create a bug page if a new behavior is diagnosed. Log the operation in `log.md`.
 
-**Schema:** v0.1 (2026-06-16). Karpathy LLM-wiki + IWE pattern. See SCHEMA.md.
+**Schema:** v1.1 (2026-07-31). Karpathy LLM-wiki + IWE pattern. See SCHEMA.md — frontmatter, provenance, navigation, and counts are guard-enforced on every `make check`.

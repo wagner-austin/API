@@ -6,9 +6,13 @@ related:
   - "[[mine-mechanics]]"
   - "[[bot-behavior-contract]]"
   - "[[game-economy]]"
-sources: ["runs/bot/bot-20260729-232252.events.jsonl (human_flag events, tick_n 49-778)", "src/tankpit_bot/bot/ai/resource_search.py::_pick_fresh_dot_hop", "src/tankpit_bot/state/scan_coverage.py"]
+source_paths:
+  - "runs/bot/bot-20260729-232252.events.jsonl"
+  - "src/tankpit_bot/bot/ai/resource_search.py"
+  - "src/tankpit_bot/state/scan_coverage.py"
 fact_checked: "2026-07-30"
 confidence: high
+hubs: [architecture]
 ---
 
 # Flag Triage — bot-20260729-232252

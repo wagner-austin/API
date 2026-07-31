@@ -2374,3 +2374,22 @@ Two unrelated defects fixed along the way, both surfaced by running the gate rat
 2. **A real file-descriptor leak in `terrain.py`** — `Image.open(path).convert("RGB")` never released the handle, one descriptor per `TerrainMap` load, raising `ResourceWarning` on 16 tests. `PillowImageProtocol` gained `__enter__`/`__exit__` and the loader now scopes the source image in a `with`. Verified under `-W error::ResourceWarning`.
 
 Gate at close: guard 0 violations across every rule group, mypy clean over 814 files, **5,581 tests at 100.00% statement + branch coverage, zero warnings**. New module is 180 statements / 82 branches at 100%, covered by 31 tests plus two guard-escalation tests.
+
+---
+## [2026-07-31] schema | v1.1 — the frontmatter contract now matches practice, and says what the gate enforces
+
+`SCHEMA.md` had drifted from its own wiki. Rule 5 required a `sources` field that **one** page of 67 used, while 65 used `source_paths` — a field the SCHEMA never mentioned, alongside `source_git_blobs`, `hubs`, and `verified`, none of them documented. The new `wiki-structure` guard rule made the mismatch untenable: the doc named a required key nobody wrote.
+
+Reconciled by moving the doc to practice rather than practice to the doc:
+
+* **Required** is now `title` / `tags` / `related` / `fact_checked` / `confidence` — what 67/67 pages carry and what the guard enforces. `sources:` is retired.
+* **Conventional** fields documented for the first time: `source_paths`, `source_git_blobs`, `hubs`, `verified`.
+* **`source_paths` semantics written down**: checkable repo-relative paths only; a trailing `:line` / `:start-end` locator is allowed and stripped; `http(s)://` is skipped; prose qualifiers belong in footnotes, not frontmatter.
+* **`source_git_blobs` semantics written down**: a staleness marker, not a version pin. Added to both the field docs and the common-mistakes list: **never bump an anchor without re-reading the page** — that launders unverified prose as verified. Records why the guard checks existence and hash shape but deliberately not equality with HEAD.
+* **New "What is machine-checked" section** — a four-row table of what actually fails `make check` (frontmatter, provenance, navigation, counts) plus the physics claim binding, and an explicit statement that atomicity, citation quality, and link-don't-restate are human-reviewed, not gated. Future sessions no longer have to guess which rules have teeth.
+
+`flag-triage-20260729.md` — the lone `sources:` user, and the lone page missing `source_paths` and `hubs` — migrated: three checkable paths (the events file it was triaged from plus the two modules it names), `hubs: [architecture]`. Nothing was lost: the `tick_n 49-778` range and the `_pick_fresh_dot_hop` symbol it carried in frontmatter prose already live in the body table and footnotes 1/2/5, which is where the citation rules put locators.
+
+`index.md` still advertised **schema v0.1** while `SCHEMA.md` said v1.0 — corrected to v1.1 with a pointer to the enforcement.
+
+All 67 pages now carry all five required keys and a `hubs` field; hub links resolve 1:1 against `pages/`; guard 0 violations.

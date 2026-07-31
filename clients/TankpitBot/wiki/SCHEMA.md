@@ -10,7 +10,7 @@ The wiki is the **synthesis layer**. Raw sources live in capture files (`runs/`)
 2. **Polyhierarchy via inclusion links.** A content page can be linked from multiple hubs. Hubs link to pages with `[Title](../pages/<slug>.md) -- one-line description`. Tags say "this is about X"; inclusion links from a hub show HOW it relates.
 3. **Atomicity: one concept per page, 30-80 lines.** When a page exceeds ~3,000 words or covers more than one distinct concept, split. "Atomic, not shallow" — a page carries full analytical depth on its one topic. Reference catalogs (the V-table, the JS source map, the client-constants table) are one concept and stay whole even when long.
 4. **Every new page MUST be hub-linked.** A page in `pages/` that no hub links to is an orphan: readers navigating from `index.md` never reach it. After writing a page, add an inclusion link from at least one hub and bump that hub's page count in `index.md`.
-5. **Frontmatter required on every page.** Minimum: `title`, `tags`, `related`, `sources`, `fact_checked` (YYYY-MM-DD), `confidence` (high | medium | low).
+5. **Frontmatter required on every page.** Minimum: `title`, `tags`, `related`, `fact_checked` (YYYY-MM-DD), `confidence` (high | medium | low). Machine-enforced by the `wiki-structure` guard rule on every `make check` — see Frontmatter below for the full field set and what is checked.
 6. **Citations travel with claims.** Every non-common-knowledge factual claim carries a footnote citation with a locator (file path + function/line, run ID + event, capture timestamp, URL fragment). No "per a prior source"; no "as documented earlier." Either inline the citation or weaken the claim.
 7. **Cite primary sources, not downstream artifacts of the wiki itself.** The wiki is the synthesis layer. If a brief / report / summary is GENERATED from wiki content, that artifact is never cited back as a source. Cite whatever the artifact originally cited. (We do not currently render artifacts from wiki content; this rule is here to keep us honest if that ever changes.)
 8. **Wiki-first retrieval.** Future AIs read `index.md` first, then follow the relevant hub link, then read the page. Do not re-derive facts the wiki already carries.
@@ -69,12 +69,24 @@ Every page opens with YAML frontmatter:
 ---
 title: Human-readable title
 tags: [topic-tag, ...]
-related: [[other-slug]], ...
-sources: [run IDs, client JS refs, or "see footnotes"]
-fact_checked: YYYY-MM-DD            # when claims were last confirmed against live data
-confidence: high | medium | low
+related:
+  - "[[other-slug]]"
+source_paths:                       # repo-relative paths this page rests on
+  - "src/tankpit_bot/bot/ai"
+  - "runs/bot/bot-20260619-053210.capture_session.json"
+source_git_blobs:                   # tree/blob the page was last audited against
+  "src/tankpit_bot/bot/ai": "15e99c69d071cba99f5214df9f14de712355dba3"
+fact_checked: "2026-07-31"          # when claims were last confirmed
+confidence: high                    # high | medium | low
+hubs: [architecture]                # hub(s) linking this page
 ---
 ```
+
+**Required** (guard-enforced): `title`, `tags`, `related`, `fact_checked`, `confidence`.
+
+**Conventional** (not required, but check the neighbours before omitting):
+`source_paths`, `source_git_blobs`, `hubs`, and `verified:` (a free-text note on
+what the verification consisted of).
 
 **Confidence levels:**
 - **high** — wire-verified against multiple live captures, cross-confirmed
@@ -82,6 +94,27 @@ confidence: high | medium | low
 - **low** — inferred, user-reported without wire confirmation, or stale
 
 `fact_checked` = when someone confirmed the claims are still true against current game behavior. Git tracks when the file was last edited.
+
+### `source_paths` and `source_git_blobs`
+
+`source_paths` entries are **checkable repo-relative paths** — files or
+directories under `src/`, `tests/`, `runs/`, or a client JS blob. The guard
+verifies every one exists. A trailing `:line` or `:start-end` locator is
+allowed and stripped before the check (`tpclient.js:243`); an `http(s)://`
+source is skipped. Prose qualifiers do NOT belong here — "(human_flag events,
+tick_n 49-778)" is footnote material, per the citation rules above. The legacy
+free-text `sources:` field was retired 2026-07-31; its one remaining user
+migrated to `source_paths` plus footnotes.
+
+`source_git_blobs` maps a `source_paths` entry to the git tree/blob hash the
+page was **last audited against**. It is a staleness marker, not a version pin:
+a lagging anchor means "nobody has re-read this page since that tree," and the
+honest response is to audit the page and then move the anchor. **Never bump an
+anchor without re-reading the page** — that launders unverified prose as
+verified. The guard checks that anchored paths exist and hashes are well-formed
+40-hex ids; it deliberately does NOT require the hash to equal HEAD, because
+that would redden the gate on every source commit and reward exactly the
+bump-without-audit it is meant to prevent.
 
 ## Cross-references
 
@@ -142,6 +175,25 @@ Notes: <one-line summary>
 - **Citing without a locator.** "Per a live run" is not a citation. "run 20260611-004505, 255/255 at distance 1" is.
 - **Creating a page without a hub link.** Always link from at least one hub immediately — orphans accumulate fast and become invisible.
 - **Putting operational scratch in `wiki/`.** Handoff briefs, raw analysis traces, and one-off planning docs go in the project's `docs/` tree, not under `wiki/`.
+- **Bumping a `source_git_blobs` anchor without re-reading the page.** The anchor asserts "audited against this tree." Moving it on a page you did not audit launders unverified prose as verified.
+
+## What is machine-checked
+
+Most of this document is a discipline, but four families are enforced by the
+`wiki-structure` guard rule (`scripts/wiki_rules.py`, wired into
+`scripts/guard.py`) and fail `make check`:
+
+| Family | Checked |
+|---|---|
+| Frontmatter | block parses; required keys present; `fact_checked` is a real `YYYY-MM-DD`; `confidence` is one of the three levels |
+| Provenance | every `source_paths` entry exists on disk; every `source_git_blobs` key is one of them, with a well-formed 40-hex id |
+| Navigation | every hub inclusion link resolves; every page is linked from ≥1 hub (rule 4) |
+| Counts | each index row's `(N pages)` equals that hub's real link count; the `N content pages` total equals the files in `pages/` |
+
+Separately, `scripts/physics_claims.py` machine-checks the ` ```json claims `
+blocks on physics pages against the `tankpit_bot.physics` package, in both
+directions. Everything else here — atomicity, citation quality, link-don't-restate
+— is reviewed by humans and AIs, not by the gate.
 
 ## Storage
 
@@ -152,5 +204,7 @@ Wiki pages are markdown files in `wiki/` within the TankpitBot repo, tracked by 
 The wiki **replaces** the `.claude/projects/.../memory/` files for game mechanics, protocol, and architecture knowledge. Memory files may still hold user preferences and AI behavior feedback (things about how to work, not what the game does). Any game-knowledge memory file should be migrated to the wiki and then removed.
 
 ## Schema version
+
+v1.1 — 2026-07-31. Frontmatter contract reconciled with practice and made machine-checkable: the free-text `sources:` field is retired in favour of checkable `source_paths` (it had one user left against 65 using `source_paths`), `source_git_blobs` / `hubs` / `verified` are documented as conventional fields, the anchor's staleness-marker semantics and the never-bump-without-audit rule are written down, and the new "What is machine-checked" section records which rules the `wiki-structure` guard enforces on every `make check`.
 
 v1.0 — 2026-06-26. Aligned with the `/wiki-init` v1.0 spec: critical rules block, explicit no-extra-top-level-dirs, downstream-artifact citation ban, atomicity exception for reference catalogs. Prior v0.1 (2026-06-16) bootstrapped the three-tier graph; v1.0 codifies the rules and removes the `artifacts/` + `handoffs/` dirs that had accreted outside the spec layout.
