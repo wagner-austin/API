@@ -19,3 +19,16 @@ def test_healthz_endpoint(fake_container: ServiceContainer) -> None:
     assert response.status_code == 200
     data = narrow_json_to_dict(load_json_str(response.text))
     assert data["status"] == "ok"
+
+
+def test_readyz_endpoint(fake_container: ServiceContainer) -> None:
+    """Test readyz endpoint reports ready with no failure reason."""
+    app = create_app(container=fake_container)
+    client = TestClient(app)
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    data = narrow_json_to_dict(load_json_str(response.text))
+    assert data["status"] == "ready"
+    assert data["reason"] is None

@@ -34,3 +34,18 @@ def test_healthz_route_returns_ok() -> None:
     assert response.status_code == 200
     body = narrow_json_to_dict(load_json_str(response.text))
     assert body.get("status") == "ok"
+
+
+def test_readyz_route_returns_ready() -> None:
+    """Test /readyz route reports ready with no failure reason."""
+    set_fake_env({"OPENAI_API_KEY": "sk-test", "API_TOKEN": "token"})
+
+    app = create_app(_make_test_settings())
+    client = TestClient(app)
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    body = narrow_json_to_dict(load_json_str(response.text))
+    assert body.get("status") == "ready"
+    assert body.get("reason") is None
