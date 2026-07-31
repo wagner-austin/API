@@ -24,7 +24,7 @@ Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless c
 | [transcript-api](services/transcript-api) | 8003 | YouTube video transcription |
 | [qr-api](services/qr-api) | 8002 | QR code generation |
 | [music-wrapped-api](services/music-wrapped-api) | 8006 | Music listening analytics (Spotify, Apple, YouTube Music, Last.fm) |
-| [covenant-radar-api](services/covenant-radar-api) | 8007 | Multi-domain risk prediction with pluggable domains (Covenant, Weather/McKinnon), Kafka streaming (XGBoost, LightGBM, ClearGBM, LogReg, RF, MLP, LSTM) |
+| [covenant-radar-api](services/covenant-radar-api) | 8007 | Multi-domain risk prediction with pluggable domains (Covenant, Weather/McKinnon, Esports), Kafka streaming (XGBoost, LightGBM, ClearGBM, LogReg, RF, MLP, LSTM) |
 | [grandma-api](services/grandma-api) | 8008 | Multi-language audio-to-English translation (Whisper STT + language detection, GPT-4o-mini translation) |
 | [github-stats-api](services/github-stats-api) | 8009 | GitHub stats SVG card generation |
 | [opportunity-radar-api](services/opportunity-radar-api) | 8010 | Hackathon and competition discovery |
@@ -37,6 +37,7 @@ Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless c
 |--------|-------------|
 | [DiscordBot](clients/DiscordBot) | Discord bot integrating all platform services |
 | [TankpitBot](clients/TankpitBot) | Tankpit.com WebSocket protocol reverse-engineering and game bot |
+| [RustedWarfareBot](clients/RustedWarfareBot) | Headless Rusted Warfare client — JVM agent + Python planner, no screen scraping |
 
 ## Shared Libraries
 
