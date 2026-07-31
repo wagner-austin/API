@@ -1,0 +1,13 @@
+# Screening round ten (log 2026-07-31): income before army. The tier-three
+# conversion was asked ~1800 times a match and never granted; upgrades now
+# claim before production (reserve still protects loss replacement). Same
+# doctrine, same seeds; the code is the variable.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9j.txt SWEEP_NAME=screen-vh9j \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+upfirst|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+upfirst|777|doctrines/aa-counter-guard-arty.doctrine|4000
+upfirst|4242|doctrines/aa-counter-guard-arty.doctrine|4000

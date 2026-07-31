@@ -1,0 +1,15 @@
+# Screening round four (log 2026-07-31): the air answer moves inside the
+# fist. Hover-primary mixes -- with and without the artillery -- against the
+# same three seeds every arm has faced.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9d.txt SWEEP_NAME=screen-vh9d \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+hovarty|12345|doctrines/aa-counter-guard-hovarty.doctrine|4000
+hovarty|777|doctrines/aa-counter-guard-hovarty.doctrine|4000
+hovarty|4242|doctrines/aa-counter-guard-hovarty.doctrine|4000
+hover|12345|doctrines/aa-counter-guard-hover.doctrine|4000
+hover|777|doctrines/aa-counter-guard-hover.doctrine|4000
+hover|4242|doctrines/aa-counter-guard-hover.doctrine|4000

@@ -1,0 +1,22 @@
+# The first screening batch under the new protocol (log 2026-07-31): three
+# seeds per arm, iterate on the loss shape, promote only what starts winning.
+# Twenty-four seeds are for decision boundaries; three falsify.
+#
+# Very Hard (difficulty 2), the rung below the goal: the posture family
+# parked at ~8-10/24 here with cover on, and the nocover flip has never been
+# measured at this rung. Control rides as always.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9.txt SWEEP_NAME=screen-vh9 \
+#     SWEEP_WORKERS=9 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+control|12345|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|777|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|4242|doctrines/aa-counter-guard-nocover.doctrine|4000
+arty|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|777|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|4242|doctrines/aa-counter-guard-arty.doctrine|4000
+mass40|12345|doctrines/aa-counter-guard-mass40.doctrine|4000
+mass40|777|doctrines/aa-counter-guard-mass40.doctrine|4000
+mass40|4242|doctrines/aa-counter-guard-mass40.doctrine|4000

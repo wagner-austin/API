@@ -1,0 +1,57 @@
+# The arc's confirmation batch (log 2026-07-31): twelve screening rounds
+# distilled to one question -- does arty+raid on the kill-group fire code
+# beat the pre-arc champion at Very Hard over the full 24 seeds?
+#
+#   make sweep SWEEP_JOBS=sweeps/vh24-arc.txt SWEEP_NAME=vh24-arc \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+candidate|12345|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|777|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|4242|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|31337|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|8675309|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|90210|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|555|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|1337|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|24601|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|8128|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|60613|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|99991|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|2718|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|31415|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|16180|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|6674|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|42424|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|271828|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|141421|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|173205|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|223606|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|244948|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|264575|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+candidate|282842|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+control|12345|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|777|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|4242|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|31337|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|8675309|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|90210|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|555|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|1337|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|24601|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|8128|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|60613|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|99991|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|2718|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|31415|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|16180|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|6674|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|42424|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|271828|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|141421|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|173205|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|223606|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|244948|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|264575|doctrines/aa-counter-guard-nocover.doctrine|4000
+control|282842|doctrines/aa-counter-guard-nocover.doctrine|4000

@@ -1,0 +1,13 @@
+# Screening round eleven (log 2026-07-31): the saving mechanism. A refused
+# conversion withholds its price from every later claim, so the balance
+# climbs across ticks and the tier-three income actually gets bought. The
+# army pauses while each conversion saves -- that trade is the experiment.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9k.txt SWEEP_NAME=screen-vh9k \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+saving|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+saving|777|doctrines/aa-counter-guard-arty.doctrine|4000
+saving|4242|doctrines/aa-counter-guard-arty.doctrine|4000

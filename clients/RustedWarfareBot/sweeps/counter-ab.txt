@@ -1,0 +1,45 @@
+# Does reading the opponent's air share beat a fixed anti-air ratio?
+#
+# label | seed | doctrine | samples
+#
+# The loop has recorded enemy_types_end on every report while production stayed
+# blind to it. counter_composition closes that loop: the hovertank share of the
+# mix rises until it covers the share of the visible threat that flies, and
+# armed ground-only types are dropped while everything in sight is airborne
+# ([[mechanics-combat-profile]]). This batch asks whether that tilt is worth
+# anything, against the fixed 3:1 mix duel-aa measured.
+#
+# The arms are doctrines/aa.doctrine and doctrines/aa-counter.doctrine, one
+# field apart (counter 0 -> 1). Same twelve seeds as every duel batch.
+#
+#   make sweep SWEEP_JOBS=sweeps/counter-ab.txt SWEEP_NAME=counter-ab-hard \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+#
+# Hard (1.4x AI income) because it is the most sensitive rung: the ladder
+# table has the bot at 6/12 there -- maximum headroom in both directions.
+# Judge on wins and extractor drops ([[policy-holding-ground]]); the engageable
+# gap at the end says whether the tilt actually changed what was fielded.
+aa|12345|doctrines/aa.doctrine|4000
+aa|777|doctrines/aa.doctrine|4000
+aa|4242|doctrines/aa.doctrine|4000
+aa|31337|doctrines/aa.doctrine|4000
+aa|8675309|doctrines/aa.doctrine|4000
+aa|90210|doctrines/aa.doctrine|4000
+aa|555|doctrines/aa.doctrine|4000
+aa|1337|doctrines/aa.doctrine|4000
+aa|24601|doctrines/aa.doctrine|4000
+aa|8128|doctrines/aa.doctrine|4000
+aa|60613|doctrines/aa.doctrine|4000
+aa|99991|doctrines/aa.doctrine|4000
+counter|12345|doctrines/aa-counter.doctrine|4000
+counter|777|doctrines/aa-counter.doctrine|4000
+counter|4242|doctrines/aa-counter.doctrine|4000
+counter|31337|doctrines/aa-counter.doctrine|4000
+counter|8675309|doctrines/aa-counter.doctrine|4000
+counter|90210|doctrines/aa-counter.doctrine|4000
+counter|555|doctrines/aa-counter.doctrine|4000
+counter|1337|doctrines/aa-counter.doctrine|4000
+counter|24601|doctrines/aa-counter.doctrine|4000
+counter|8128|doctrines/aa-counter.doctrine|4000
+counter|60613|doctrines/aa-counter.doctrine|4000
+counter|99991|doctrines/aa-counter.doctrine|4000

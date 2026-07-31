@@ -1,0 +1,13 @@
+# Screening round seven (log 2026-07-31): kill-groups capped at two. Round
+# six's unbounded groups improved every trade and lost the kill; the cap
+# keeps the no-overkill edge while the army stays a fist. Same doctrine,
+# same seeds; the code is the variable.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9g.txt SWEEP_NAME=screen-vh9g \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+capped|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+capped|777|doctrines/aa-counter-guard-arty.doctrine|4000
+capped|4242|doctrines/aa-counter-guard-arty.doctrine|4000

@@ -1,0 +1,52 @@
+# Two one-field questions behind one shared control, at Very Hard.
+#
+# label | seed | doctrine | samples
+#
+# cap: the interception cost case -- a three-unit detachment races the
+# intruder instead of the whole reserve turning (one match logged 870
+# intercepts and never massed an attack; log 2026-07-29 "guard_cap").
+#
+# raid5: the size question the v2 measure posed -- at the first-wave size the
+# raid is free and toothless (3/12 vs 3/12, log 2026-07-30); five units ask
+# whether a party heavy enough to kill covered extractors converts.
+#
+# Second frozen-tree batch; the working tree stays editable throughout.
+#
+#   make sweep SWEEP_JOBS=sweeps/cap-raid5.txt SWEEP_NAME=cap-raid5-veryhard \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+control|12345|doctrines/aa-counter-guard.doctrine|4000
+control|777|doctrines/aa-counter-guard.doctrine|4000
+control|4242|doctrines/aa-counter-guard.doctrine|4000
+control|31337|doctrines/aa-counter-guard.doctrine|4000
+control|8675309|doctrines/aa-counter-guard.doctrine|4000
+control|90210|doctrines/aa-counter-guard.doctrine|4000
+control|555|doctrines/aa-counter-guard.doctrine|4000
+control|1337|doctrines/aa-counter-guard.doctrine|4000
+control|24601|doctrines/aa-counter-guard.doctrine|4000
+control|8128|doctrines/aa-counter-guard.doctrine|4000
+control|60613|doctrines/aa-counter-guard.doctrine|4000
+control|99991|doctrines/aa-counter-guard.doctrine|4000
+cap|12345|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|777|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|4242|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|31337|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|8675309|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|90210|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|555|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|1337|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|24601|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|8128|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|60613|doctrines/aa-counter-guard-cap.doctrine|4000
+cap|99991|doctrines/aa-counter-guard-cap.doctrine|4000
+raid5|12345|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|777|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|4242|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|31337|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|8675309|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|90210|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|555|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|1337|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|24601|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|8128|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|60613|doctrines/aa-counter-guard-raid5.doctrine|4000
+raid5|99991|doctrines/aa-counter-guard-raid5.doctrine|4000

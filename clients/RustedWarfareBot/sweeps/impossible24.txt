@@ -1,0 +1,63 @@
+# The Impossible question: can the earliest possible fight beat a 3.7x cheat?
+#
+# label | seed | doctrine | samples
+#
+# Historical record at this rung: 0/12, four defeats and eight wipes, the
+# bot never reaching the enemy base. Against an income multiplier whose
+# advantage compounds with time, the rush doctrine spends nothing on a
+# future it will not have: one extractor, tanks immediately, three-tank
+# waves marched at the mirror of our base from first release (the rush
+# verb, log 2026-07-31). The champion rides as the in-batch control --
+# the NOCOVER variant, per cover24-hard's 14/24 vs 4/24 (log 2026-07-30):
+# turret cover is a measured regression, so the flag is off everywhere now.
+#
+#   make sweep SWEEP_JOBS=sweeps/impossible24.txt SWEEP_NAME=impossible24 \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3"
+champion|12345|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|777|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|4242|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|31337|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|8675309|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|90210|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|555|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|1337|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|24601|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|8128|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|60613|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|99991|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|2718|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|31415|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|16180|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|6674|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|42424|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|271828|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|141421|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|173205|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|223606|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|244948|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|264575|doctrines/aa-counter-guard-nocover.doctrine|4000
+champion|282842|doctrines/aa-counter-guard-nocover.doctrine|4000
+rush|12345|doctrines/rush.doctrine|4000
+rush|777|doctrines/rush.doctrine|4000
+rush|4242|doctrines/rush.doctrine|4000
+rush|31337|doctrines/rush.doctrine|4000
+rush|8675309|doctrines/rush.doctrine|4000
+rush|90210|doctrines/rush.doctrine|4000
+rush|555|doctrines/rush.doctrine|4000
+rush|1337|doctrines/rush.doctrine|4000
+rush|24601|doctrines/rush.doctrine|4000
+rush|8128|doctrines/rush.doctrine|4000
+rush|60613|doctrines/rush.doctrine|4000
+rush|99991|doctrines/rush.doctrine|4000
+rush|2718|doctrines/rush.doctrine|4000
+rush|31415|doctrines/rush.doctrine|4000
+rush|16180|doctrines/rush.doctrine|4000
+rush|6674|doctrines/rush.doctrine|4000
+rush|42424|doctrines/rush.doctrine|4000
+rush|271828|doctrines/rush.doctrine|4000
+rush|141421|doctrines/rush.doctrine|4000
+rush|173205|doctrines/rush.doctrine|4000
+rush|223606|doctrines/rush.doctrine|4000
+rush|244948|doctrines/rush.doctrine|4000
+rush|264575|doctrines/rush.doctrine|4000
+rush|282842|doctrines/rush.doctrine|4000

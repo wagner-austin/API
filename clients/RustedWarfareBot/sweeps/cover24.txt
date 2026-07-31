@@ -1,0 +1,60 @@
+# Was landing the turrets worth landing them? Cover on vs off at Hard.
+#
+# label | seed | doctrine | samples
+#
+# For its whole measured history 'defence on' meant 'defence attempted and
+# silently refused' -- the blind offset wasted the orders and freed the
+# workers. The first batch where turrets actually landed spent 25-45k a
+# match on them and won 6/24 at a rung the attempted-defence bot won 10/12.
+# One field, 24 seeds, >=4-win verdict margin (log 2026-07-31).
+#
+#   make sweep SWEEP_JOBS=sweeps/cover24.txt SWEEP_NAME=cover24-hard \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+covered|12345|doctrines/aa-counter-guard.doctrine|4000
+covered|777|doctrines/aa-counter-guard.doctrine|4000
+covered|4242|doctrines/aa-counter-guard.doctrine|4000
+covered|31337|doctrines/aa-counter-guard.doctrine|4000
+covered|8675309|doctrines/aa-counter-guard.doctrine|4000
+covered|90210|doctrines/aa-counter-guard.doctrine|4000
+covered|555|doctrines/aa-counter-guard.doctrine|4000
+covered|1337|doctrines/aa-counter-guard.doctrine|4000
+covered|24601|doctrines/aa-counter-guard.doctrine|4000
+covered|8128|doctrines/aa-counter-guard.doctrine|4000
+covered|60613|doctrines/aa-counter-guard.doctrine|4000
+covered|99991|doctrines/aa-counter-guard.doctrine|4000
+covered|2718|doctrines/aa-counter-guard.doctrine|4000
+covered|31415|doctrines/aa-counter-guard.doctrine|4000
+covered|16180|doctrines/aa-counter-guard.doctrine|4000
+covered|6674|doctrines/aa-counter-guard.doctrine|4000
+covered|42424|doctrines/aa-counter-guard.doctrine|4000
+covered|271828|doctrines/aa-counter-guard.doctrine|4000
+covered|141421|doctrines/aa-counter-guard.doctrine|4000
+covered|173205|doctrines/aa-counter-guard.doctrine|4000
+covered|223606|doctrines/aa-counter-guard.doctrine|4000
+covered|244948|doctrines/aa-counter-guard.doctrine|4000
+covered|264575|doctrines/aa-counter-guard.doctrine|4000
+covered|282842|doctrines/aa-counter-guard.doctrine|4000
+nocover|12345|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|777|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|4242|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|31337|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|8675309|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|90210|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|555|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|1337|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|24601|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|8128|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|60613|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|99991|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|2718|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|31415|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|16180|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|6674|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|42424|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|271828|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|141421|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|173205|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|223606|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|244948|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|264575|doctrines/aa-counter-guard-nocover.doctrine|4000
+nocover|282842|doctrines/aa-counter-guard-nocover.doctrine|4000

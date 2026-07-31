@@ -1,0 +1,12 @@
+# Screening round thirteen (log 2026-07-31): the wallet outranks the war.
+# Kill-groups now rank visible hostile income structures ahead of distance;
+# the champion doctrine is unchanged, the targeting is the variable.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9m.txt SWEEP_NAME=screen-vh9m \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+wallet|12345|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+wallet|777|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+wallet|4242|doctrines/aa-counter-guard-arty-raid.doctrine|4000

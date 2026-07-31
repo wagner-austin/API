@@ -1,0 +1,45 @@
+# Does mobile defence hold the extractors that decide the ladder?
+#
+# label | seed | doctrine | samples
+#
+# The counter A/B settled what the non-wins die of: even until mid-match, then
+# extractors bleed 5-7 -> 0-2 while the rival compounds, with the rival first
+# 2x ahead around sample 2,200-2,340 on every losing seed. Four turret arms
+# are refuted; the engine's own AI answers raids with *mobile* defensive
+# groups tied to zones ([[engine-ai-zones]]). Interception is the bot's
+# minimal equivalent: a hostile inside the engine's own outpost radius (360)
+# of any of our structures pulls the reserve onto it.
+#
+# Arms are doctrines/aa-counter.doctrine and doctrines/aa-counter-guard.doctrine,
+# one field apart (intercept 0 -> 1). Same twelve seeds as every duel batch.
+#
+#   make sweep SWEEP_JOBS=sweeps/guard-ab.txt SWEEP_NAME=guard-ab-hard \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+#
+# Judge on wins and extractor drops (peak minus end over the traces); the new
+# `intercepted` report line says whether the behaviour fired at all, which is
+# the ambiguity defence was misjudged on ([[policy-holding-ground]]).
+counter|12345|doctrines/aa-counter.doctrine|4000
+counter|777|doctrines/aa-counter.doctrine|4000
+counter|4242|doctrines/aa-counter.doctrine|4000
+counter|31337|doctrines/aa-counter.doctrine|4000
+counter|8675309|doctrines/aa-counter.doctrine|4000
+counter|90210|doctrines/aa-counter.doctrine|4000
+counter|555|doctrines/aa-counter.doctrine|4000
+counter|1337|doctrines/aa-counter.doctrine|4000
+counter|24601|doctrines/aa-counter.doctrine|4000
+counter|8128|doctrines/aa-counter.doctrine|4000
+counter|60613|doctrines/aa-counter.doctrine|4000
+counter|99991|doctrines/aa-counter.doctrine|4000
+guard|12345|doctrines/aa-counter-guard.doctrine|4000
+guard|777|doctrines/aa-counter-guard.doctrine|4000
+guard|4242|doctrines/aa-counter-guard.doctrine|4000
+guard|31337|doctrines/aa-counter-guard.doctrine|4000
+guard|8675309|doctrines/aa-counter-guard.doctrine|4000
+guard|90210|doctrines/aa-counter-guard.doctrine|4000
+guard|555|doctrines/aa-counter-guard.doctrine|4000
+guard|1337|doctrines/aa-counter-guard.doctrine|4000
+guard|24601|doctrines/aa-counter-guard.doctrine|4000
+guard|8128|doctrines/aa-counter-guard.doctrine|4000
+guard|60613|doctrines/aa-counter-guard.doctrine|4000
+guard|99991|doctrines/aa-counter-guard.doctrine|4000

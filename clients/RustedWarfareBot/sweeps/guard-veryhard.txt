@@ -1,0 +1,40 @@
+# Does interception move the rung where the headroom is?
+#
+# label | seed | doctrine | samples
+#
+# At Hard, interception cut extractor drops 35 -> 20 and removed the
+# zero-extractor death-spiral endings without moving wins past the noise
+# floor -- the matches it rescued were already non-losses. Very Hard (1.8x AI
+# income) is where the ladder table sits at 5/11 and non-wins are the
+# majority, so a defence that holds income mid-game has the most to convert.
+#
+# Arms one field apart (intercept 0 -> 1), same twelve seeds. Run AFTER the
+# noise-held certification has set the new floor: at a floor near zero these
+# twelve pairs resolve what used to take noise-floor hedging.
+#
+#   make sweep SWEEP_JOBS=sweeps/guard-veryhard.txt SWEEP_NAME=guard-ab-veryhard \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+counter|12345|doctrines/aa-counter.doctrine|4000
+counter|777|doctrines/aa-counter.doctrine|4000
+counter|4242|doctrines/aa-counter.doctrine|4000
+counter|31337|doctrines/aa-counter.doctrine|4000
+counter|8675309|doctrines/aa-counter.doctrine|4000
+counter|90210|doctrines/aa-counter.doctrine|4000
+counter|555|doctrines/aa-counter.doctrine|4000
+counter|1337|doctrines/aa-counter.doctrine|4000
+counter|24601|doctrines/aa-counter.doctrine|4000
+counter|8128|doctrines/aa-counter.doctrine|4000
+counter|60613|doctrines/aa-counter.doctrine|4000
+counter|99991|doctrines/aa-counter.doctrine|4000
+guard|12345|doctrines/aa-counter-guard.doctrine|4000
+guard|777|doctrines/aa-counter-guard.doctrine|4000
+guard|4242|doctrines/aa-counter-guard.doctrine|4000
+guard|31337|doctrines/aa-counter-guard.doctrine|4000
+guard|8675309|doctrines/aa-counter-guard.doctrine|4000
+guard|90210|doctrines/aa-counter-guard.doctrine|4000
+guard|555|doctrines/aa-counter-guard.doctrine|4000
+guard|1337|doctrines/aa-counter-guard.doctrine|4000
+guard|24601|doctrines/aa-counter-guard.doctrine|4000
+guard|8128|doctrines/aa-counter-guard.doctrine|4000
+guard|60613|doctrines/aa-counter-guard.doctrine|4000
+guard|99991|doctrines/aa-counter-guard.doctrine|4000

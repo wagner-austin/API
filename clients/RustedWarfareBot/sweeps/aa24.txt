@@ -1,0 +1,61 @@
+# The aa question at twenty-four seeds: the first A/B sized for a 2-win effect.
+#
+# label | seed | doctrine | samples
+#
+# aa v2 doubled its 12-seed control (4/12 vs 2/12, drops 32 vs 37) with the
+# mechanism running (99 aa-cover actions vs v1's zero) -- but the champion's
+# own controls have swung 2-6 wins across batches on identical code, so a
+# +2 margin at 12 seeds is inside what noise alone produces. Twelve familiar
+# seeds plus twelve fresh ones; the verdict standard is a >=4-win margin at
+# 24 seeds (log 2026-07-30).
+#
+#   make sweep SWEEP_JOBS=sweeps/aa24.txt SWEEP_NAME=aa24-veryhard \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+control|12345|doctrines/aa-counter-guard.doctrine|4000
+control|777|doctrines/aa-counter-guard.doctrine|4000
+control|4242|doctrines/aa-counter-guard.doctrine|4000
+control|31337|doctrines/aa-counter-guard.doctrine|4000
+control|8675309|doctrines/aa-counter-guard.doctrine|4000
+control|90210|doctrines/aa-counter-guard.doctrine|4000
+control|555|doctrines/aa-counter-guard.doctrine|4000
+control|1337|doctrines/aa-counter-guard.doctrine|4000
+control|24601|doctrines/aa-counter-guard.doctrine|4000
+control|8128|doctrines/aa-counter-guard.doctrine|4000
+control|60613|doctrines/aa-counter-guard.doctrine|4000
+control|99991|doctrines/aa-counter-guard.doctrine|4000
+control|2718|doctrines/aa-counter-guard.doctrine|4000
+control|31415|doctrines/aa-counter-guard.doctrine|4000
+control|16180|doctrines/aa-counter-guard.doctrine|4000
+control|6674|doctrines/aa-counter-guard.doctrine|4000
+control|42424|doctrines/aa-counter-guard.doctrine|4000
+control|271828|doctrines/aa-counter-guard.doctrine|4000
+control|141421|doctrines/aa-counter-guard.doctrine|4000
+control|173205|doctrines/aa-counter-guard.doctrine|4000
+control|223606|doctrines/aa-counter-guard.doctrine|4000
+control|244948|doctrines/aa-counter-guard.doctrine|4000
+control|264575|doctrines/aa-counter-guard.doctrine|4000
+control|282842|doctrines/aa-counter-guard.doctrine|4000
+aa|12345|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|777|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|4242|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|31337|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|8675309|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|90210|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|555|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|1337|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|24601|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|8128|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|60613|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|99991|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|2718|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|31415|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|16180|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|6674|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|42424|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|271828|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|141421|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|173205|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|223606|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|244948|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|264575|doctrines/aa-counter-guard-aa.doctrine|4000
+aa|282842|doctrines/aa-counter-guard-aa.doctrine|4000

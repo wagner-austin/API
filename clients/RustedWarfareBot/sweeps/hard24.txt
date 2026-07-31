@@ -1,0 +1,38 @@
+# The Hard-rung baseline at twenty-four seeds, under current champion code.
+#
+# label | seed | doctrine | samples
+#
+# The training-target pivot's first measurement (log 2026-07-31): Very Hard
+# is a 1.8x income cheat, arithmetically unbeatable through economy, and
+# not the thing the project wants to beat. Hard (1.4x) is the rung where
+# wins are common (champion last read 10/12 there, pre-protocol, pre-fixes)
+# and where transferable-skill improvements can show up as margin. One arm:
+# this is a baseline, not an A/B -- the reference figure future Hard
+# verdicts compare against, sized like the aa24/fwd24 controls.
+#
+#   make sweep SWEEP_JOBS=sweeps/hard24.txt SWEEP_NAME=hard24-baseline \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+champion|12345|doctrines/aa-counter-guard.doctrine|4000
+champion|777|doctrines/aa-counter-guard.doctrine|4000
+champion|4242|doctrines/aa-counter-guard.doctrine|4000
+champion|31337|doctrines/aa-counter-guard.doctrine|4000
+champion|8675309|doctrines/aa-counter-guard.doctrine|4000
+champion|90210|doctrines/aa-counter-guard.doctrine|4000
+champion|555|doctrines/aa-counter-guard.doctrine|4000
+champion|1337|doctrines/aa-counter-guard.doctrine|4000
+champion|24601|doctrines/aa-counter-guard.doctrine|4000
+champion|8128|doctrines/aa-counter-guard.doctrine|4000
+champion|60613|doctrines/aa-counter-guard.doctrine|4000
+champion|99991|doctrines/aa-counter-guard.doctrine|4000
+champion|2718|doctrines/aa-counter-guard.doctrine|4000
+champion|31415|doctrines/aa-counter-guard.doctrine|4000
+champion|16180|doctrines/aa-counter-guard.doctrine|4000
+champion|6674|doctrines/aa-counter-guard.doctrine|4000
+champion|42424|doctrines/aa-counter-guard.doctrine|4000
+champion|271828|doctrines/aa-counter-guard.doctrine|4000
+champion|141421|doctrines/aa-counter-guard.doctrine|4000
+champion|173205|doctrines/aa-counter-guard.doctrine|4000
+champion|223606|doctrines/aa-counter-guard.doctrine|4000
+champion|244948|doctrines/aa-counter-guard.doctrine|4000
+champion|264575|doctrines/aa-counter-guard.doctrine|4000
+champion|282842|doctrines/aa-counter-guard.doctrine|4000

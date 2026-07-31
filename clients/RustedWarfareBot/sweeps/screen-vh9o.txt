@@ -1,0 +1,14 @@
+# Riposte on the champion (log 2026-07-31): the fortress screen showed the
+# counter-punch never arming because fortress goals ate the economy that
+# funds it. This screen puts the trigger on the arty+raid champion economy
+# instead. Three seeds at Very Hard; the champion's own figures are the
+# in-batch control from vh24-arc.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9o.txt SWEEP_NAME=screen-vh9o \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+riposte-champ|12345|doctrines/riposte-champ.doctrine|4000
+riposte-champ|777|doctrines/riposte-champ.doctrine|4000
+riposte-champ|4242|doctrines/riposte-champ.doctrine|4000

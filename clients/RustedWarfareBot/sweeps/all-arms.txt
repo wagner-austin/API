@@ -1,0 +1,73 @@
+# Four answers to the Very Hard endgames, one shared control.
+#
+# label | seed | doctrine | samples
+#
+# The guard non-wins end three ways: turret fortresses (arty answers range),
+# submarine flotillas (amphib asks the mode question), and rebuild engines
+# behind the fog (raid attacks income; scout-v2 feeds the tilt without
+# starving the economy). One control arm serves all four because cross-batch
+# comparison is dead ([[policy-determinism]]); every arm is one doctrine
+# field from control except the goals arms, which are one goals entry.
+#
+#   make sweep SWEEP_JOBS=sweeps/all-arms.txt SWEEP_NAME=all-arms-veryhard \
+#     SWEEP_WORKERS=4 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+control|12345|doctrines/aa-counter-guard.doctrine|4000
+control|777|doctrines/aa-counter-guard.doctrine|4000
+control|4242|doctrines/aa-counter-guard.doctrine|4000
+control|31337|doctrines/aa-counter-guard.doctrine|4000
+control|8675309|doctrines/aa-counter-guard.doctrine|4000
+control|90210|doctrines/aa-counter-guard.doctrine|4000
+control|555|doctrines/aa-counter-guard.doctrine|4000
+control|1337|doctrines/aa-counter-guard.doctrine|4000
+control|24601|doctrines/aa-counter-guard.doctrine|4000
+control|8128|doctrines/aa-counter-guard.doctrine|4000
+control|60613|doctrines/aa-counter-guard.doctrine|4000
+control|99991|doctrines/aa-counter-guard.doctrine|4000
+arty|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|777|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|4242|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|31337|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|8675309|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|90210|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|555|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|1337|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|24601|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|8128|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|60613|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|99991|doctrines/aa-counter-guard-arty.doctrine|4000
+amphib|12345|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|777|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|4242|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|31337|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|8675309|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|90210|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|555|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|1337|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|24601|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|8128|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|60613|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|99991|doctrines/aa-counter-guard-amphib.doctrine|4000
+raid|12345|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|777|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|4242|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|31337|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|8675309|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|90210|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|555|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|1337|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|24601|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|8128|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|60613|doctrines/aa-counter-guard-raid.doctrine|4000
+raid|99991|doctrines/aa-counter-guard-raid.doctrine|4000
+scout|12345|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|777|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|4242|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|31337|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|8675309|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|90210|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|555|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|1337|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|24601|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|8128|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|60613|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|99991|doctrines/aa-counter-guard-scout.doctrine|4000

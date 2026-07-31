@@ -1,0 +1,12 @@
+# Screening round five (log 2026-07-31): the scatter hypothesis. One field
+# from the round-one leader -- interception off, the fist stays whole
+# through the decisive window. Same three seeds as every round.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9e.txt SWEEP_NAME=screen-vh9e \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+noicpt|12345|doctrines/aa-counter-guard-arty-noicpt.doctrine|4000
+noicpt|777|doctrines/aa-counter-guard-arty-noicpt.doctrine|4000
+noicpt|4242|doctrines/aa-counter-guard-arty-noicpt.doctrine|4000

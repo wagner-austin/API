@@ -1,0 +1,15 @@
+# Screening round two (log 2026-07-31): the round-one levers combined and
+# dosed. Same three seeds as round one, so every figure is comparable
+# match-for-match against round one's arms.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9b.txt SWEEP_NAME=screen-vh9b \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+combo|12345|doctrines/aa-counter-guard-arty-mass40.doctrine|4000
+combo|777|doctrines/aa-counter-guard-arty-mass40.doctrine|4000
+combo|4242|doctrines/aa-counter-guard-arty-mass40.doctrine|4000
+arty2|12345|doctrines/aa-counter-guard-arty2.doctrine|4000
+arty2|777|doctrines/aa-counter-guard-arty2.doctrine|4000
+arty2|4242|doctrines/aa-counter-guard-arty2.doctrine|4000

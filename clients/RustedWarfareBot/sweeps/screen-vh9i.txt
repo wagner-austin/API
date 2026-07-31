@@ -1,0 +1,12 @@
+# Screening round nine (log 2026-07-31): the dedicated air answer. One
+# field from the leader -- mechMissile in the goals, and with it the mech
+# factory the plan inserts on its own.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9i.txt SWEEP_NAME=screen-vh9i \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+mm|12345|doctrines/aa-counter-guard-arty-mm.doctrine|4000
+mm|777|doctrines/aa-counter-guard-arty-mm.doctrine|4000
+mm|4242|doctrines/aa-counter-guard-arty-mm.doctrine|4000

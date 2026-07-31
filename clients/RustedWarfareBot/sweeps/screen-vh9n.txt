@@ -1,0 +1,14 @@
+# The fortress screen (log 2026-07-31): Austin's own playstyle as one
+# doctrine -- turrets and AA and repair bays to burn the enemy's attacks on,
+# a forty-unit horde stockpiled behind them, and the riposte releasing it
+# the moment an intrusion ends. Three seeds at Very Hard first; Impossible
+# if it converts.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9n.txt SWEEP_NAME=screen-vh9n \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+fortress|12345|doctrines/fortress.doctrine|4000
+fortress|777|doctrines/fortress.doctrine|4000
+fortress|4242|doctrines/fortress.doctrine|4000

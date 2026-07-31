@@ -1,0 +1,45 @@
+# Does remembered intel beat gun-range reaction?
+#
+# label | seed | doctrine | samples
+#
+# The counter tilt reacts to visible hostiles; with scouting on, one scout
+# walks the pool circuit farthest-first and its sightings persist through the
+# fog for a trust window, so production counters what was SEEN rather than
+# what is already shooting ([[community-play-strategies]]). The corpus ranks
+# continuous scouting as the win condition itself; this batch asks what the
+# minimal version is worth on the rung where the guard arm's non-wins are
+# healthy economies that never convert.
+#
+# Arms are doctrines/aa-counter-guard.doctrine and
+# doctrines/aa-counter-guard-scout.doctrine, one field apart (scout 0 -> 1).
+#
+#   make sweep SWEEP_JOBS=sweeps/scout-ab.txt SWEEP_NAME=scout-ab-veryhard \
+#     SWEEP_WORKERS=4 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+#
+# Judge on wins and drops; the new `sightings` line says whether the intel
+# ever existed, which is the never-fired ambiguity again
+# ([[policy-holding-ground]]).
+guard|12345|doctrines/aa-counter-guard.doctrine|4000
+guard|777|doctrines/aa-counter-guard.doctrine|4000
+guard|4242|doctrines/aa-counter-guard.doctrine|4000
+guard|31337|doctrines/aa-counter-guard.doctrine|4000
+guard|8675309|doctrines/aa-counter-guard.doctrine|4000
+guard|90210|doctrines/aa-counter-guard.doctrine|4000
+guard|555|doctrines/aa-counter-guard.doctrine|4000
+guard|1337|doctrines/aa-counter-guard.doctrine|4000
+guard|24601|doctrines/aa-counter-guard.doctrine|4000
+guard|8128|doctrines/aa-counter-guard.doctrine|4000
+guard|60613|doctrines/aa-counter-guard.doctrine|4000
+guard|99991|doctrines/aa-counter-guard.doctrine|4000
+scout|12345|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|777|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|4242|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|31337|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|8675309|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|90210|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|555|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|1337|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|24601|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|8128|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|60613|doctrines/aa-counter-guard-scout.doctrine|4000
+scout|99991|doctrines/aa-counter-guard-scout.doctrine|4000

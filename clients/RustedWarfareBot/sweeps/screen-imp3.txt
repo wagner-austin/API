@@ -1,0 +1,12 @@
+# The Impossible punch screen (log 2026-07-31): one 25-unit fist with
+# artillery, wallet-first targeting, inside the pre-compounding window.
+# Three seeds at difficulty 3.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-imp3.txt SWEEP_NAME=screen-imp3 \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+punch|12345|doctrines/punch.doctrine|4000
+punch|777|doctrines/punch.doctrine|4000
+punch|4242|doctrines/punch.doctrine|4000

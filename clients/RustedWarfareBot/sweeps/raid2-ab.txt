@@ -1,0 +1,41 @@
+# Raid v2 against the refutation that designed it, one shared control.
+#
+# label | seed | doctrine | samples
+#
+# V1 finished 0/12 against its in-batch control's 5/12: a permanent
+# three-unit attrition conveyor -- lone replacements marching across the map
+# forever -- that bled the mid-game economy without buying kills (log:
+# 2026-07-29, "raid v1 refuted at 0/12"). V2 keeps the doctrine file
+# identical; what changed is the code's arbitration: a party or nothing,
+# drafted whole from the gathered, and only from surplus above the wave
+# gate's need. The scorecard's new `marches` line is the conveyor detector.
+#
+# First batch played from a frozen tree (runs/sweeps/<name>/.tree), so the
+# working tree is editable the moment this launches.
+#
+#   make sweep SWEEP_JOBS=sweeps/raid2-ab.txt SWEEP_NAME=raid2-ab-veryhard \
+#     SWEEP_WORKERS=4 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+control|12345|doctrines/aa-counter-guard.doctrine|4000
+control|777|doctrines/aa-counter-guard.doctrine|4000
+control|4242|doctrines/aa-counter-guard.doctrine|4000
+control|31337|doctrines/aa-counter-guard.doctrine|4000
+control|8675309|doctrines/aa-counter-guard.doctrine|4000
+control|90210|doctrines/aa-counter-guard.doctrine|4000
+control|555|doctrines/aa-counter-guard.doctrine|4000
+control|1337|doctrines/aa-counter-guard.doctrine|4000
+control|24601|doctrines/aa-counter-guard.doctrine|4000
+control|8128|doctrines/aa-counter-guard.doctrine|4000
+control|60613|doctrines/aa-counter-guard.doctrine|4000
+control|99991|doctrines/aa-counter-guard.doctrine|4000
+raid2|12345|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|777|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|4242|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|31337|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|8675309|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|90210|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|555|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|1337|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|24601|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|8128|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|60613|doctrines/aa-counter-guard-raid.doctrine|4000
+raid2|99991|doctrines/aa-counter-guard-raid.doctrine|4000

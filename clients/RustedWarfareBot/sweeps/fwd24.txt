@@ -1,0 +1,61 @@
+# Forward posture at twenty-four seeds: the army moves to where the match
+# is decided.
+#
+# label | seed | doctrine | samples
+#
+# Six batches agree on one invariant: matches are decided by extractor
+# drops 688-1,766 world units from where the army gathers. The fwd arm
+# posts the reserve at the frontier extractor instead of the base -- the
+# corpus's second-ranked advice, never tried. Verdict standard: >=4-win
+# margin at 24 seeds (log 2026-07-31); baseline reference control 10/24.
+#
+#   make sweep SWEEP_JOBS=sweeps/fwd24.txt SWEEP_NAME=fwd24-veryhard \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+control|12345|doctrines/aa-counter-guard.doctrine|4000
+control|777|doctrines/aa-counter-guard.doctrine|4000
+control|4242|doctrines/aa-counter-guard.doctrine|4000
+control|31337|doctrines/aa-counter-guard.doctrine|4000
+control|8675309|doctrines/aa-counter-guard.doctrine|4000
+control|90210|doctrines/aa-counter-guard.doctrine|4000
+control|555|doctrines/aa-counter-guard.doctrine|4000
+control|1337|doctrines/aa-counter-guard.doctrine|4000
+control|24601|doctrines/aa-counter-guard.doctrine|4000
+control|8128|doctrines/aa-counter-guard.doctrine|4000
+control|60613|doctrines/aa-counter-guard.doctrine|4000
+control|99991|doctrines/aa-counter-guard.doctrine|4000
+control|2718|doctrines/aa-counter-guard.doctrine|4000
+control|31415|doctrines/aa-counter-guard.doctrine|4000
+control|16180|doctrines/aa-counter-guard.doctrine|4000
+control|6674|doctrines/aa-counter-guard.doctrine|4000
+control|42424|doctrines/aa-counter-guard.doctrine|4000
+control|271828|doctrines/aa-counter-guard.doctrine|4000
+control|141421|doctrines/aa-counter-guard.doctrine|4000
+control|173205|doctrines/aa-counter-guard.doctrine|4000
+control|223606|doctrines/aa-counter-guard.doctrine|4000
+control|244948|doctrines/aa-counter-guard.doctrine|4000
+control|264575|doctrines/aa-counter-guard.doctrine|4000
+control|282842|doctrines/aa-counter-guard.doctrine|4000
+fwd|12345|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|777|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|4242|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|31337|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|8675309|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|90210|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|555|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|1337|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|24601|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|8128|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|60613|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|99991|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|2718|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|31415|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|16180|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|6674|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|42424|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|271828|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|141421|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|173205|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|223606|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|244948|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|264575|doctrines/aa-counter-guard-fwd.doctrine|4000
+fwd|282842|doctrines/aa-counter-guard-fwd.doctrine|4000

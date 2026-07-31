@@ -1,0 +1,13 @@
+# Screening round six (log 2026-07-31): the first behavior change. Same
+# arty doctrine as the round-one leader, same three seeds -- what changed is
+# the code: fire concentrates until one volley kills and no further, held
+# per attacker, overflow to the nearest group ([[policy-combat]]).
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9f.txt SWEEP_NAME=screen-vh9f \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+groups|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+groups|777|doctrines/aa-counter-guard-arty.doctrine|4000
+groups|4242|doctrines/aa-counter-guard-arty.doctrine|4000

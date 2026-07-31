@@ -1,0 +1,29 @@
+# The noise floor after the settle fix: one job specification, twelve times.
+#
+# label | seed | doctrine | samples
+#
+# The predecessor batches are the baseline: sweeps/noise.txt measured a 25%
+# survival rate on an identical specification, and seeding alone did not move
+# it ([[policy-determinism]]). The settle fix holds the match world at its
+# first live tick and rebases traces to match age, so if the last noise
+# source is truly closed, these twelve scorecards should be identical -- and
+# any pair of differing rows is a measurement of what still varies.
+#
+#   make sweep SWEEP_JOBS=sweeps/noise-held.txt SWEEP_NAME=noise-held \
+#     SWEEP_WORKERS=12 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+#
+# Twelve in parallel is deliberate: it also certifies that CPU contention
+# cannot leak into a held, locked match. Full length, because divergence
+# compounds -- agreeing for 600 samples is not agreeing for 4,000.
+rep01|12345|doctrines/aa-counter-guard.doctrine|4000
+rep02|12345|doctrines/aa-counter-guard.doctrine|4000
+rep03|12345|doctrines/aa-counter-guard.doctrine|4000
+rep04|12345|doctrines/aa-counter-guard.doctrine|4000
+rep05|12345|doctrines/aa-counter-guard.doctrine|4000
+rep06|12345|doctrines/aa-counter-guard.doctrine|4000
+rep07|12345|doctrines/aa-counter-guard.doctrine|4000
+rep08|12345|doctrines/aa-counter-guard.doctrine|4000
+rep09|12345|doctrines/aa-counter-guard.doctrine|4000
+rep10|12345|doctrines/aa-counter-guard.doctrine|4000
+rep11|12345|doctrines/aa-counter-guard.doctrine|4000
+rep12|12345|doctrines/aa-counter-guard.doctrine|4000

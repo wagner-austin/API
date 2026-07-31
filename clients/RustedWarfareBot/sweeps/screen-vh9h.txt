@@ -1,0 +1,12 @@
+# Screening round eight (log 2026-07-31): hit the wallet. One field from
+# the leader -- raid 3 -- on the capped kill-group fire code. Against 1.8x
+# income the only trades that pay are the ones against extractors.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9h.txt SWEEP_NAME=screen-vh9h \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+raid|12345|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+raid|777|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+raid|4242|doctrines/aa-counter-guard-arty-raid.doctrine|4000

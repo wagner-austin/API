@@ -1,0 +1,16 @@
+# Screening round three (log 2026-07-31): the air answer, two ways. Round
+# two's trace autopsy showed the losing seeds die to air the mix could
+# answer but forgets (counter tilt is sighting-scoped without scout) and to
+# one economy strike (half the extractors in one pass). Same three seeds.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9c.txt SWEEP_NAME=screen-vh9c \
+#     SWEEP_WORKERS=6 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+scoutmem|12345|doctrines/aa-counter-guard-arty-scout.doctrine|4000
+scoutmem|777|doctrines/aa-counter-guard-arty-scout.doctrine|4000
+scoutmem|4242|doctrines/aa-counter-guard-arty-scout.doctrine|4000
+roof|12345|doctrines/aa-counter-guard-arty-aa.doctrine|4000
+roof|777|doctrines/aa-counter-guard-arty-aa.doctrine|4000
+roof|4242|doctrines/aa-counter-guard-arty-aa.doctrine|4000

@@ -1,0 +1,39 @@
+# The two composition answers the Very Hard endgames name, priced together.
+#
+# label | seed | doctrine | samples
+#
+# Guard non-wins at Very Hard end against turret fortresses (8-11 ground
+# turrets out-ranging everything we field) and submarine flotillas (5-7 subs
+# nothing in the mix can shoot). Both answers are goals-only arms one field
+# from aa-counter-guard: c_artillery out-ranges every ground turret (290
+# against 165-185, registry-verified) and is immune to AA turrets; the
+# amphibious jet's underwater mode is the sub question the registry left
+# open. Judged against the guard arm of scout-ab-veryhard as the shared
+# control -- same seeds, same rung, same batch conditions.
+#
+#   make sweep SWEEP_JOBS=sweeps/comp-arms.txt SWEEP_NAME=comp-arms-veryhard \
+#     SWEEP_WORKERS=4 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2"
+arty|12345|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|777|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|4242|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|31337|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|8675309|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|90210|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|555|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|1337|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|24601|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|8128|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|60613|doctrines/aa-counter-guard-arty.doctrine|4000
+arty|99991|doctrines/aa-counter-guard-arty.doctrine|4000
+amphib|12345|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|777|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|4242|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|31337|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|8675309|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|90210|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|555|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|1337|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|24601|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|8128|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|60613|doctrines/aa-counter-guard-amphib.doctrine|4000
+amphib|99991|doctrines/aa-counter-guard-amphib.doctrine|4000

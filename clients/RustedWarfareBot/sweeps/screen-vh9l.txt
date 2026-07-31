@@ -1,0 +1,13 @@
+# Screening round twelve (log 2026-07-31): the composite. Grow ours (the
+# saving mechanism buys the conversion ladder, 98/s measured), deny theirs
+# (the raid party hits extractors, best aggregate of the doctrine rounds),
+# on the capped kill-group fire code. Same three seeds.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9l.txt SWEEP_NAME=screen-vh9l \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+composite|12345|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+composite|777|doctrines/aa-counter-guard-arty-raid.doctrine|4000
+composite|4242|doctrines/aa-counter-guard-arty-raid.doctrine|4000

@@ -1,0 +1,27 @@
+# The determinism certification: one seed, twelve replicas, twelve identical
+# scorecards -- or the sync-path patch has not closed the fork.
+#
+# label | seed | doctrine | samples
+#
+# Twelve distinct labels because the sweep keys output files on label-seed;
+# the seed is the same on purpose. Launch AFTER impossible24 finishes (fresh
+# tree wanted: the batch must freeze the patched agent, and prepare_tree
+# reuses any existing tree):
+#
+#   make sweep SWEEP_JOBS=sweeps/certify12.txt SWEEP_NAME=certify12 \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 1"
+#
+# Then: every scorecard byte-identical, every trace's world-digest column
+# identical line-for-line ([[policy-determinism]]).
+rep01|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep02|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep03|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep04|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep05|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep06|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep07|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep08|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep09|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep10|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep11|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
+rep12|12345|doctrines/aa-counter-guard-nocover.doctrine|1200
