@@ -10,6 +10,7 @@ from ..service import Clients, Config, TranscriptService
 from ..stt_provider import ProbeDownloadClient, STTClient
 from ..types import CaptionsPayload, STTPayload, TranscriptOut
 from .routes import health as routes_health
+from .routes import jobs as routes_jobs
 from .routes import transcripts as routes_transcripts
 from .routes.transcripts import build_captions_handler, build_stt_handler
 
@@ -28,6 +29,7 @@ def create_app(deps: AppDeps) -> FastAPI:
     # Include standardized route modules
     app.include_router(routes_health.build_router())
     app.include_router(routes_transcripts.build_router(service))
+    app.include_router(routes_jobs.build_router())
 
     return app
 

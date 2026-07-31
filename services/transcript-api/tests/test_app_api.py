@@ -221,6 +221,56 @@ def test_healthz_endpoint(tmp_path: Path) -> None:
     assert out == {"status": "ok"}
 
 
+def test_stt_job_routes_are_mounted_on_the_app(tmp_path: Path) -> None:
+    """Test the async STT job endpoints are reachable through create_app.
+
+    The router was fully implemented and unit-tested for a long time while
+    create_app never included it, so every one of these URLs 404'd in the
+    running service. This exercises them through the production app factory.
+    """
+    from platform_workers.testing import FakeLogger, FakeQueue, FakeRedis
+
+    from transcript_api.dependencies import provider_context
+
+    app, _ = _mk_service(tmp_path)
+    redis = FakeRedis()
+    queue = FakeQueue()
+    provider_context.redis_provider = lambda: redis
+    provider_context.queue_provider = lambda: queue
+    provider_context.logger_provider = lambda: FakeLogger()
+    try:
+        client = TestClient(app)
+
+        submit_payload: dict[str, str | int] = {
+            "url": "https://youtu.be/dQw4w9WgXcQ",
+            "user_id": 42,
+        }
+        created = client.post("/v1/stt/jobs", json=submit_payload)
+        assert created.status_code == 202
+        body: dict[str, str | int] = created.json()
+        job_id = body["job_id"]
+        assert body["status"] == "queued"
+        assert queue.jobs[0].func == "transcript_api.jobs.process_stt"
+
+        # The status route resolves the id the create route just handed back.
+        status = client.get(f"/v1/stt/jobs/{job_id}")
+        assert status.status_code == 200
+        status_body: dict[str, str | int | None] = status.json()
+        assert status_body["job_id"] == job_id
+        assert status_body["status"] == "queued"
+        assert status_body["user_id"] == 42
+
+        missing = client.get("/v1/stt/jobs/no-such-job")
+        assert missing.status_code == 404
+
+        # Submit writes the record (hset + expire); both reads are a hgetall.
+        redis.assert_only_called({"hset", "expire", "hgetall"})
+    finally:
+        provider_context.redis_provider = None
+        provider_context.queue_provider = None
+        provider_context.logger_provider = None
+
+
 def test_app_error_handled_by_adapter(tmp_path: Path) -> None:
     deps_app, _ = _mk_service(tmp_path)
 
