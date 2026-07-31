@@ -24,6 +24,7 @@ from rw_bot.policy.doctrine import (
     DEFAULT_DOCTRINE,
     DERIVE_RESERVE,
     Doctrine,
+    DoctrineError,
     parse_doctrine_lines,
 )
 from rw_bot.policy.expand import expand
@@ -59,6 +60,8 @@ OPENING_SETTLE_SAMPLES = 40
 EXIT_OK = 0
 EXIT_INCOMPLETE = 1
 EXIT_BAD_USAGE = 2
+
+_UNKNOWN_HEAVY = "RW-DOCTRINE-011"
 
 
 def load_catalogue(path: Path) -> dict[str, UnitStats]:
@@ -172,6 +175,50 @@ def reinforcements(
         Unit type names to keep making, repeats meaningful as a ratio.
     """
     return tuple(name for name in goals if catalogue[name]["speed"] > 0.0)
+
+
+def heavy_reinforcements(
+    heavies: Sequence[str],
+    catalogue: Mapping[str, UnitStats],
+) -> tuple[str, ...]:
+    """Validate the doctrine's extra composition entries.
+
+    The channel the unlocked roster joins the mix through. Unlike the goals,
+    these never pass through plan expansion -- the build tree would insert
+    the experimental factory as a prerequisite rather than wait for the
+    unlock -- so nothing else ever reads them, and the checks the plan would
+    have made are made here: the type must be priced, and it must be a unit
+    a queue can produce rather than a structure needing a site
+    ([[mechanics-build-actions]]).
+
+    Inert until the tier opens, by construction: production orders only what
+    the engine's option stream offers as available, so an entry whose
+    factory is still tier one is never chosen ([[policy-production]]).
+
+    Args:
+        heavies: Type names from the doctrine, repeats a ratio.
+        catalogue: Unit stats by type name.
+
+    Returns:
+        The same names, verified.
+
+    Raises:
+        DoctrineError: ``RW-DOCTRINE-011`` when an entry is unknown to the
+            catalogue or names a structure.
+    """
+    for name in heavies:
+        stats = catalogue.get(name)
+        if stats is None:
+            raise DoctrineError(
+                _UNKNOWN_HEAVY,
+                f"heavies entry {name!r} is not in the catalogue",
+            )
+        if stats["speed"] <= 0.0:
+            raise DoctrineError(
+                _UNKNOWN_HEAVY,
+                f"heavies entry {name!r} is a structure; no producer's queue can make it",
+            )
+    return tuple(heavies)
 
 
 def expansion_reserve(
@@ -316,7 +363,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     total = sum(catalogue[name]["price"] for name in plan)
     sys.stdout.write(f"plan total: {total} credits, holding {opening['credits']}\n")
 
-    reinforce = reinforcements(goals, catalogue)
+    # Heavies join the composition after the goals: the ratio counts them
+    # from the start, and production leaves them alone until the unlock
+    # makes the engine offer them.
+    reinforce = (
+        *reinforcements(goals, catalogue),
+        *heavy_reinforcements(doctrine["heavies"], catalogue),
+    )
     # The derive-or-fix choice the reserve override existed for, now carried by
     # the doctrine: a fixed figure keeps a composition A/B from silently also
     # being a reserve A/B ([[policy-economy]]).

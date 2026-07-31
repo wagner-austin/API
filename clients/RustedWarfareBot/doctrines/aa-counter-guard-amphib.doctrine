@@ -9,6 +9,7 @@
 
 name aa-counter-guard-amphib
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,hoverTank,amphibiousJet
+heavies none
 max_workers 8
 mass 25
 reserve -1

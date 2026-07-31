@@ -29,6 +29,7 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
     return Doctrine(
         name=name,
         goals=("extractorT1", "c_tank", "c_tank"),
+        heavies=(),
         max_workers=6,
         mass=25,
         reserve=450,
@@ -157,6 +158,27 @@ def test_a_blank_goal_entry_is_refused() -> None:
     with pytest.raises(DoctrineError) as caught:
         decode_doctrine(payload)
     assert caught.value.code == "RW-DOCTRINE-006"
+
+
+def test_heavies_round_trip_and_none_means_empty() -> None:
+    """The extra-composition channel: a list, or the word ``none``.
+
+    A word rather than a blank, because a doctrine line cannot carry an
+    empty value and a missing field is an error by design.
+    """
+    armed = _doctrine()
+    armed["heavies"] = ("heavyTank", "heavyTank")
+    assert parse_doctrine_lines(format_doctrine(armed)) == armed
+    assert encode_doctrine(_doctrine())["heavies"] == "none"
+    assert decode_doctrine(encode_doctrine(_doctrine()))["heavies"] == ()
+
+
+def test_a_blank_heavies_entry_is_refused() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["heavies"] = "heavyTank,,heavyTank"
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-010"
 
 
 def test_a_reserve_below_the_sentinel_is_refused() -> None:

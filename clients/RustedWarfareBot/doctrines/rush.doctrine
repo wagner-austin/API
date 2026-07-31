@@ -14,6 +14,7 @@
 
 name rush
 goals extractorT1,c_tank,c_tank,c_tank
+heavies none
 max_workers 2
 mass 3
 reserve 0

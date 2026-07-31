@@ -7,6 +7,7 @@
 
 name aa-counter-guard-arty-mass40
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+heavies none
 max_workers 8
 mass 40
 reserve -1

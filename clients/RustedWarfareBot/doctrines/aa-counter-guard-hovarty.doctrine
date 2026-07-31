@@ -10,6 +10,7 @@
 
 name aa-counter-guard-hovarty
 goals extractorT1,extractorT1,extractorT1,hoverTank,hoverTank,hoverTank,c_tank,c_artillery
+heavies none
 max_workers 8
 mass 25
 reserve -1

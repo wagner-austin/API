@@ -17,12 +17,13 @@ from scripts.play import (
     EXIT_INCOMPLETE,
     EXIT_OK,
     expansion_reserve,
+    heavy_reinforcements,
     load_catalogue,
     load_placements,
     main,
 )
 
-from rw_bot.policy.doctrine import Doctrine, format_doctrine
+from rw_bot.policy.doctrine import Doctrine, DoctrineError, format_doctrine
 from tests.wire_fixtures import ScriptedPeer, StubbedConnect
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -393,6 +394,7 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                 Doctrine(
                     name="tanks",
                     goals=("c_tank", "c_tank"),
+                    heavies=(),
                     max_workers=4,
                     mass=7,
                     reserve=-1,
@@ -464,6 +466,28 @@ def test_the_reserve_covers_the_dearest_thing_the_bot_keeps_making() -> None:
 def test_nothing_to_reinforce_reserves_nothing() -> None:
     """No army to protect means every spare credit belongs to the economy."""
     assert expansion_reserve((), load_catalogue(_CATALOGUE_PATH)) == 0
+
+
+def test_heavies_are_verified_against_the_real_catalogue() -> None:
+    """The extra-composition channel skips plan expansion, so its checks
+    live here: priced, and producible by a queue rather than placed.
+
+    ``heavyTank`` is the entry the channel was built for -- behind the land
+    factory's tier-two unlock, so it must reach the composition without
+    ever becoming a plan goal ([[mechanics-build-actions]]).
+    """
+    catalogue = load_catalogue(_CATALOGUE_PATH)
+    assert heavy_reinforcements(("heavyTank", "heavyTank"), catalogue) == (
+        "heavyTank",
+        "heavyTank",
+    )
+    with pytest.raises(DoctrineError) as unknown:
+        heavy_reinforcements(("heavyTankTypo",), catalogue)
+    assert unknown.value.code == "RW-DOCTRINE-011"
+    with pytest.raises(DoctrineError) as structure:
+        heavy_reinforcements(("landFactory",), catalogue)
+    assert structure.value.code == "RW-DOCTRINE-011"
+    assert "structure" in structure.value.message
 
 
 def test_the_opening_settles_by_content_not_by_clock(

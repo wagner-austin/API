@@ -4,6 +4,7 @@
 
 name default
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
+heavies none
 max_workers 4
 
 # The shipped AI's sustained wave size ([[engine-ai-triggers]]).

@@ -11,6 +11,7 @@
 
 name punch
 goals extractorT1,extractorT1,c_tank,c_tank,c_tank,c_artillery
+heavies none
 max_workers 3
 mass 25
 reserve 0

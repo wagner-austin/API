@@ -3,6 +3,7 @@
 
 name no-expand
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,c_tank
+heavies none
 max_workers 4
 mass 7
 reserve -1

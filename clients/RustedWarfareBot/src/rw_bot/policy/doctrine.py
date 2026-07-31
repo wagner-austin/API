@@ -74,7 +74,7 @@ _FLAG_FIELDS: Final = (
 )
 
 #: Fields carried as text in a doctrine file.
-_STR_FIELDS: Final = ("name", "goals")
+_STR_FIELDS: Final = ("name", "goals", "heavies")
 
 #: Every field a doctrine file must carry, in the order presets write them.
 DOCTRINE_FIELDS: Final = (*_STR_FIELDS, *_INT_FIELDS, *_FLAG_FIELDS)
@@ -167,10 +167,19 @@ class Doctrine(TypedDict):
             2,000-credit upgrade flips a flag on the same building and opens
             the heavy roster -- reachable only through the ability verb,
             because it converts into no type ([[mechanics-build-actions]]).
+        heavies: Composition entries outside the plan, repeats a ratio like
+            the goals. The channel the unlocked roster joins the army mix
+            through: production orders only what the engine offers, so an
+            entry here is inert until its factory's tier opens -- and it
+            must NOT be a goal, because the plan derives prerequisites from
+            the static build tree, which would insert the experimental
+            factory rather than wait for the unlock
+            ([[mechanics-build-actions]], [[policy-production]]).
     """
 
     name: str
     goals: tuple[str, ...]
+    heavies: tuple[str, ...]
     max_workers: int
     mass: int
     reserve: int
@@ -207,6 +216,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
         "c_tank",
         "c_tank",
     ),
+    heavies=(),
     max_workers=DEFAULT_MAX_WORKERS,
     mass=WAVE_SIZES[-1],
     reserve=DERIVE_RESERVE,
@@ -247,6 +257,15 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             _BLANK_GOAL,
             f"the goals carry a blank entry: {payload['goals']!r}",
         )
+    heavies_raw = require_non_empty_str(payload, "heavies")
+    heavies = (
+        () if heavies_raw == NO_HEAVIES else tuple(part.strip() for part in heavies_raw.split(","))
+    )
+    if any(heavy == "" for heavy in heavies):
+        raise DoctrineError(
+            _BLANK_HEAVY,
+            f"the heavies carry a blank entry: {payload['heavies']!r}",
+        )
     reserve = require_int(payload, "reserve")
     if reserve < DERIVE_RESERVE:
         raise DoctrineError(
@@ -268,6 +287,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
     return Doctrine(
         name=require_non_empty_str(payload, "name"),
         goals=goals,
+        heavies=heavies,
         max_workers=require_positive_int(payload, "max_workers"),
         mass=require_positive_int(payload, "mass"),
         reserve=reserve,
@@ -301,6 +321,7 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
     return {
         "name": doctrine["name"],
         "goals": ",".join(doctrine["goals"]),
+        "heavies": ",".join(doctrine["heavies"]) if doctrine["heavies"] else NO_HEAVIES,
         "max_workers": doctrine["max_workers"],
         "mass": doctrine["mass"],
         "reserve": doctrine["reserve"],
@@ -397,6 +418,7 @@ __all__ = [
     "DEFAULT_DOCTRINE",
     "DERIVE_RESERVE",
     "DOCTRINE_FIELDS",
+    "NO_HEAVIES",
     "Doctrine",
     "DoctrineError",
     "decode_doctrine",

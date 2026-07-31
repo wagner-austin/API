@@ -10,6 +10,7 @@
 
 name creeper
 goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,hoverTank,c_artillery
+heavies none
 max_workers 6
 mass 25
 reserve -1
