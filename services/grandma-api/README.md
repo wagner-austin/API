@@ -49,6 +49,12 @@ poetry run hypercorn 'grandma_api.asgi:app' --bind 0.0.0.0:8080
 curl http://localhost:8080/healthz
 ```
 
+> **Ports.** This service binds **8080** inside the container, unlike the rest
+> of the platform (which binds 8000). Started through `make up-grandma`, the
+> compose file publishes it on host port **8008** — so use
+> `http://localhost:8008` for a containerized run and `:8080` for a bare-metal
+> one.
+
 ### Run with Docker
 
 ```bash
@@ -68,6 +74,7 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/healthz` | GET | Liveness probe |
+| `/readyz` | GET | Readiness probe. Always ready while serving: no queue or database, and the credentials it needs are required at startup |
 | `/translate` | POST | Translate audio (any supported language) to English |
 
 ### Translation Example
