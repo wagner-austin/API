@@ -1580,6 +1580,18 @@ def _superior_equipment_candidate(
         candidate["y"],
     ):
         return None
+    # Closer is only superior when it is EXECUTABLE NOW, by the same
+    # predicate execution uses. Session-12 ferry livelock (2026-07-30,
+    # ~70 laps, user broke it by closing the browser): landing at the
+    # ferry boarding tile for the locked (100,8), the steal test's
+    # reachability said the closer (106,14) was walkable, its lock ran
+    # ONE disembark leg, went "not executable - holding plan", and the
+    # cascade hopped back to (100,8)'s boarding tile -- A steals B,
+    # B stalls, B hops back toward A, forever, every action
+    # succeeding so no disproof could fire. A candidate that cannot
+    # produce a command this tick never steals a viable plan.
+    if walk_or_teleport(ctx, candidate["x"], candidate["y"], pickup_kind="equipment") is None:
+        return None
     return candidate
 
 
@@ -1599,6 +1611,11 @@ def _superior_fuel_candidate(
         return None
     deficit = fuel_capacity(ctx.self_state["rank"]) - ctx.fuel
     if not is_fuel_lock_release_warranted(ctx.self_state, locked_target, candidate, deficit):
+        return None
+    # Same executability bar as the equipment steal (session-12 ferry
+    # livelock): a candidate that cannot produce a command this tick
+    # never steals a viable plan.
+    if walk_or_teleport(ctx, candidate["x"], candidate["y"], pickup_kind="fuel") is None:
         return None
     return candidate
 

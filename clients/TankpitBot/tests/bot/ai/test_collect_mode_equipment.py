@@ -988,3 +988,79 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
     assert decision["command"]["target_x"] == 148
     assert decision["command"]["target_y"] == 101
     assert decision["behavior"]["reason_kind"] == "equipment_hop"
+
+
+def test_lock_steal_requires_an_executable_candidate() -> None:
+    """Closer-but-unexecutable equipment never steals a viable lock.
+
+    Session-12 ferry livelock (2026-07-30, ~70 laps): the steal test's
+    reachability said the closer container was walkable, its stolen
+    lock stalled "not executable" after one disembark leg, and the
+    cascade hopped back toward the original target forever -- every
+    action succeeding, so no disproof could fire. Superiority now
+    demands a command THIS TICK, the same bar execution applies.
+    """
+    from tankpit_bot.bot.ai.collect_mode import _superior_equipment_candidate
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "103,100": make_container_state(
+            x=103,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=900, containers=containers)
+    reset_world_state()
+    mark_move_target_failed(103, 100, 99000)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+
+    try:
+        result = _superior_equipment_candidate(ctx, containers["130,100"])
+    finally:
+        reset_world_state()
+
+    assert result is None
+
+
+def test_lock_steal_allows_an_executable_closer_candidate() -> None:
+    """A genuinely executable markedly-closer candidate still steals."""
+    from tankpit_bot.bot.ai.collect_mode import _superior_equipment_candidate
+
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "103,100": make_container_state(
+            x=103,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=900, containers=containers)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+
+    result = _superior_equipment_candidate(ctx, containers["130,100"])
+
+    if result is None:
+        raise AssertionError("an executable closer candidate must steal")
+    assert (result["x"], result["y"]) == (103, 100)

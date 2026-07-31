@@ -984,3 +984,39 @@ def test_low_volume_candidates_stay_out_of_the_ranked_list() -> None:
     )
 
     assert find_fuel_candidates(world, self_state, None, minimum_volume=100) == []
+
+
+def test_fuel_lock_steal_requires_an_executable_candidate() -> None:
+    """The fuel steal applies the same executability bar (session-12)."""
+    from tankpit_bot.bot.ai.collect_mode import _superior_fuel_candidate
+    from tankpit_bot.sniffer.world_state import mark_move_target_failed, reset_world_state
+
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=True,
+            volume=90,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "103,100": make_container_state(
+            x=103,
+            y=100,
+            is_fuel=True,
+            volume=900,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=300, containers=containers)
+    reset_world_state()
+    mark_move_target_failed(103, 100, 99000)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), make_inventory(), 100000, None, "")
+
+    try:
+        result = _superior_fuel_candidate(ctx, containers["130,100"])
+    finally:
+        reset_world_state()
+
+    assert result is None
