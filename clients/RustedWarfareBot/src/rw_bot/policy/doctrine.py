@@ -56,7 +56,7 @@ NO_HEAVIES: Final = "none"
 DERIVE_RESERVE: Final = -1
 
 #: Fields carried as whole numbers in a doctrine file.
-_INT_FIELDS: Final = ("max_workers", "mass", "reserve", "guard_cap", "raid")
+_INT_FIELDS: Final = ("max_workers", "mass", "reserve", "guard_cap", "raid", "tech")
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
 _FLAG_FIELDS: Final = (
@@ -70,7 +70,6 @@ _FLAG_FIELDS: Final = (
     "rush",
     "creep",
     "riposte",
-    "tech",
 )
 
 #: Fields carried as text in a doctrine file.
@@ -195,7 +194,7 @@ class Doctrine(TypedDict):
     rush: bool
     creep: bool
     riposte: bool
-    tech: bool
+    tech: int
 
 
 #: The style everything so far was measured under, exactly.
@@ -232,7 +231,7 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     rush=False,
     creep=False,
     riposte=False,
-    tech=False,
+    tech=0,
 )
 
 
@@ -303,7 +302,7 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         rush=require_bool(payload, "rush"),
         creep=require_bool(payload, "creep"),
         riposte=require_bool(payload, "riposte"),
-        tech=require_bool(payload, "tech"),
+        tech=tech,
     )
 
 
