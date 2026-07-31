@@ -101,10 +101,14 @@ pub(crate) fn build_histogram_ordered_trusted(request: HistogramRequest<'_>) -> 
     // on modern out-of-order cores. Chunks not a multiple of 8 fall to
     // the scalar tail.
     //
-    // Grad/hess reads are f32; the accumulator is f64. `f64::from(f32)` is
-    // an exact widening (no rounding); the double-precision accumulator
-    // preserves 15-digit precision across billions of adds. LightGBM's
-    // `hist_t += score_t` shape (see wiki page `lightgbm-score-t-float`).
+    // Grad/hess and the accumulator are both f64 — no widening at the write
+    // site. LightGBM's asymmetric `hist_t += score_t` shape (f32 in, f64
+    // accumulator) was implemented here and then reverted: narrowing the two
+    // input streams measured slower on this workload, because at the node
+    // sizes reached here both widths already fit in L2, so there is no
+    // bandwidth to save and each element pays a widening conversion before
+    // its accumulate. See the wiki page
+    // `cleargbm-f32-score-narrowing-reverted`.
     // ------------------------------------------------------------
     let chunks = sample_indices.chunks_exact(8_usize);
     let remainder = chunks.remainder();

@@ -7,6 +7,7 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/split/mod.rs
   - libs/cleargbm_rs/src/tree/builder.rs
+  - libs/cleargbm_rs/src/tree/histograms.rs
   - libs/cleargbm_rs/src/losses/derivatives.rs
   - libs/cleargbm_rs/src/losses/sigmoid_arr.rs
   - libs/cleargbm/src/cleargbm/_rust.py
@@ -30,7 +31,7 @@ Rust's `find_best_split_from_histogram` scans `n_regular_bins - 1` bins with pre
 
 ## Sibling subtraction
 
-For each node split, ClearGBM builds a histogram only for the smaller child; the larger child's histogram is derived by subtraction from the parent (`libs/cleargbm_rs/src/tree/builder.rs::compute_child_histograms` in Rust; `libs/cleargbm_rs/src/histogram/mod.rs::subtract_histogram` for the primitive). This is the standard LightGBM 2× histogram-building speedup [^4]. Numerically verified to floating-point precision (max_abs_diff ~ 1e-15 per bin on gradient sums, hessian sums, and counts) in the pre-refactor Python-fallback path [^5]; the Rust code is exercised by cargo tests + the covenant_ml integration tests.
+For each node split, ClearGBM builds a histogram only for the smaller child; the larger child's histogram is derived by subtraction from the parent (`libs/cleargbm_rs/src/tree/histograms.rs:199::compute_child_histograms` in Rust — moved out of `builder.rs` by the `0fdb63f7` builder/nodes/histograms split; `libs/cleargbm_rs/src/histogram/mod.rs::subtract_histogram` for the primitive). This is the standard LightGBM 2× histogram-building speedup [^4]. Numerically verified to floating-point precision (max_abs_diff ~ 1e-15 per bin on gradient sums, hessian sums, and counts) in the pre-refactor Python-fallback path [^5]; the Rust code is exercised by cargo tests + the covenant_ml integration tests.
 
 ## Loss function
 

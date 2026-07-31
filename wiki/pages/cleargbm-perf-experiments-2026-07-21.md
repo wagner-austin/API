@@ -159,7 +159,9 @@ Gap closed from 2.2× to **1.47×**. AUC-PR now slightly higher than LightGBM (0
 
 ## Phase G additions (2026-07-21 later)
 
-### Experiment 6: f32 gradient/hessian narrowing (SHIPPED — the LightGBM asymmetric-precision shape)
+### Experiment 6: f32 gradient/hessian narrowing (SHIPPED 2026-07-21, **REVERTED 2026-07-25** — see [[cleargbm-f32-score-narrowing-reverted]])
+
+**SUPERSEDED.** This experiment no longer describes the code. `score_narrow` was deleted and gradients/hessians are `f64` end to end again; the revert's stated reason is that narrowing measured 8% slower once the leaf-cache and ordered-arrays changes had landed. The "+15% faster" result below is also not cleanly attributable to f32 — the commit series bundled f32 with `u32` indices, ordered arrays, and the leaf cache. Read [[cleargbm-f32-score-narrowing-reverted]] for the reconciliation; the record below is retained as the historical account of what was tried.
 
 **Hypothesis.** Per `~/PROJECTS/tech-wiki/pages/lightgbm-score-t-float.md`, LightGBM defaults `score_t = float` (f32) for gradients + hessians while keeping the histogram accumulator `hist_t = double` (f64). Narrow inputs, wide accumulator — halves cache-line pressure on the two hottest streams the histogram loop reads sequentially, while preserving 15-digit precision in the sums via `f64 += f32` implicit widening (LightGBM's C++ pattern).
 
