@@ -1,0 +1,12 @@
+# The siege tech arm at Very Hard (log 2026-07-31): heavyArtillery in the
+# heavies beside the sweep-winning techprobe arm. Queued behind screen-imp4;
+# control is techprobe's own 3/3 (screen-vh9q).
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9r.txt SWEEP_NAME=screen-vh9r \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+tech-siege|12345|doctrines/tech-siege.doctrine|4000
+tech-siege|777|doctrines/tech-siege.doctrine|4000
+tech-siege|4242|doctrines/tech-siege.doctrine|4000

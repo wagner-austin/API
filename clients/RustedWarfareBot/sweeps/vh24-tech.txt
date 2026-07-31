@@ -1,0 +1,35 @@
+# The tech arm's confirmation batch (log 2026-07-31): the lean unlock swept
+# its screen 3/3 at Very Hard -- the first sweep of any screen this
+# campaign -- so it faces the full 24 seeds. Control is the champion's
+# banked vh24-arc figure (1/24); the arm differs from it by tech 1 and
+# heavies heavyTank,heavyTank.
+#
+#   make sweep SWEEP_JOBS=sweeps/vh24-tech.txt SWEEP_NAME=vh24-tech \
+#     SWEEP_WORKERS=10 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+techprobe|12345|doctrines/techprobe.doctrine|4000
+techprobe|777|doctrines/techprobe.doctrine|4000
+techprobe|4242|doctrines/techprobe.doctrine|4000
+techprobe|31337|doctrines/techprobe.doctrine|4000
+techprobe|8675309|doctrines/techprobe.doctrine|4000
+techprobe|90210|doctrines/techprobe.doctrine|4000
+techprobe|555|doctrines/techprobe.doctrine|4000
+techprobe|1337|doctrines/techprobe.doctrine|4000
+techprobe|24601|doctrines/techprobe.doctrine|4000
+techprobe|8128|doctrines/techprobe.doctrine|4000
+techprobe|60613|doctrines/techprobe.doctrine|4000
+techprobe|99991|doctrines/techprobe.doctrine|4000
+techprobe|2718|doctrines/techprobe.doctrine|4000
+techprobe|31415|doctrines/techprobe.doctrine|4000
+techprobe|16180|doctrines/techprobe.doctrine|4000
+techprobe|6674|doctrines/techprobe.doctrine|4000
+techprobe|42424|doctrines/techprobe.doctrine|4000
+techprobe|271828|doctrines/techprobe.doctrine|4000
+techprobe|141421|doctrines/techprobe.doctrine|4000
+techprobe|173205|doctrines/techprobe.doctrine|4000
+techprobe|223606|doctrines/techprobe.doctrine|4000
+techprobe|244948|doctrines/techprobe.doctrine|4000
+techprobe|264575|doctrines/techprobe.doctrine|4000
+techprobe|282842|doctrines/techprobe.doctrine|4000
