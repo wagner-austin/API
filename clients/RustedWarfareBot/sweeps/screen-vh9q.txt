@@ -1,0 +1,14 @@
+# The lean tech arm at Very Hard (log 2026-07-31): champion (arty+raid)
+# plus ONE land factory unlock (tech 1) and heavyTank x2 in the mix. The
+# all-factories sibling screened as screen-vh9p under the pre-count code;
+# probe 7 at Hard showed the lean arm fielding a 60% larger army for the
+# 6,000 credits the extra unlocks had eaten.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9q.txt SWEEP_NAME=screen-vh9q \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+techprobe|12345|doctrines/techprobe.doctrine|4000
+techprobe|777|doctrines/techprobe.doctrine|4000
+techprobe|4242|doctrines/techprobe.doctrine|4000
