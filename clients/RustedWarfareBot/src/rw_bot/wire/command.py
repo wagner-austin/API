@@ -5,10 +5,12 @@ one line, in exactly the shape ``rwbot.agent.CommandRecord`` accepts — the
 agent rejects anything else loudly rather than skipping it, so this encoder
 exists to make malformed lines unrepresentable rather than merely unlikely.
 
-Three verbs are defined, matching the three the agent can dispatch: move a unit
-to a world position, have a builder place a structure there, and have a
-building produce a unit. All address a unit by its engine identity, never by
-roster position — position renumbers whenever anything is built or dies.
+Six verbs are defined, matching the six the agent can dispatch: move a unit to a
+world position, attack-move it there so it engages what it meets, attack a named
+target, have a builder place a structure, have a building produce a unit, and
+fire a unit's own action by selector. All address a unit by its engine identity,
+never by roster position — position renumbers whenever anything is built or
+dies.
 
 Placing and producing are separate verbs because the engine keeps them
 separate. A structure goes where the planner chooses and travels there as a
@@ -26,6 +28,7 @@ from rw_bot import RwBotError
 _BLANK_TYPE = "RW-CMD-001"
 _NOT_FINITE = "RW-CMD-002"
 _SELF_TARGET = "RW-CMD-003"
+_BAD_ACTION = "RW-CMD-004"
 
 
 class CommandError(RwBotError):
@@ -48,6 +51,27 @@ class MoveOrder(TypedDict):
     """
 
     kind: Literal["move"]
+    unit_id: int
+    x: float
+    y: float
+
+
+class AttackMoveOrder(TypedDict):
+    """Send one unit to a world position, engaging whatever it meets en route.
+
+    The verb every raid and forward rally needs: a plain move walks a unit
+    *past* enemies to its point, and an attack names one target and nothing
+    else. The engine's own double-right-click encodes this as a move command
+    with one flag set ([[community-play-strategies]]).
+
+    Attributes:
+        kind: Discriminator, always ``"attack_move"``.
+        unit_id: Engine identity of the unit to order.
+        x: Destination world x.
+        y: Destination world y.
+    """
+
+    kind: Literal["attack_move"]
     unit_id: int
     x: float
     y: float
@@ -103,6 +127,27 @@ class AttackOrder(TypedDict):
     target_id: int
 
 
+class AbilityOrder(TypedDict):
+    """Have one unit use an action that concerns no type.
+
+    The verb the tech tree was waiting for. The land factory's tier-two
+    upgrade converts into nothing -- it flips a flag on the same building
+    and unlocks the heavy roster -- so it cannot be named by ``produce``'s
+    type or placed by ``build``'s position. It arrives on the option stream
+    as ``produces:""`` with the engine's own selector index, and this order
+    fires that index back ([[mechanics-build-actions]]).
+
+    Attributes:
+        kind: Discriminator, always ``"ability"``.
+        unit_id: Engine identity of the unit whose action it is.
+        action: The engine's selector index, exactly as the option carried it.
+    """
+
+    kind: Literal["ability"]
+    unit_id: int
+    action: int
+
+
 def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
     """Build a validated attack order.
 
@@ -127,6 +172,40 @@ def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
             f"unit {unit_id} cannot be ordered to attack itself",
         )
     return AttackOrder(kind="attack", unit_id=unit_id, target_id=target_id)
+
+
+def ability_order(*, unit_id: int, action: int) -> AbilityOrder:
+    """Build a validated ability order.
+
+    Args:
+        unit_id: Engine identity of the unit whose action it is.
+        action: The engine's selector index, from the option stream.
+
+    Returns:
+        The order.
+
+    Raises:
+        CommandError: ``RW-CMD-004`` when the selector is negative, which no
+            option stream ever carries and the agent would refuse.
+    """
+    if action < 0:
+        raise CommandError(
+            _BAD_ACTION,
+            f"an ability order needs the option stream's selector index, got {action}",
+        )
+    return AbilityOrder(kind="ability", unit_id=unit_id, action=action)
+
+
+def encode_ability(order: AbilityOrder) -> str:
+    """Render an ability order as one wire line.
+
+    Args:
+        order: The order to encode.
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return f'{{"kind":"ability","unit_id":{order["unit_id"]},"action":{order["action"]}}}'
 
 
 def encode_ack() -> str:
@@ -172,6 +251,40 @@ def move_order(*, unit_id: int, x: float, y: float) -> MoveOrder:
     _require_finite(x, "x")
     _require_finite(y, "y")
     return MoveOrder(kind="move", unit_id=unit_id, x=x, y=y)
+
+
+def attack_move_order(*, unit_id: int, x: float, y: float) -> AttackMoveOrder:
+    """Build a validated attack-move order.
+
+    Args:
+        unit_id: Engine identity of the unit to order.
+        x: Destination world x.
+        y: Destination world y.
+
+    Returns:
+        The order.
+
+    Raises:
+        CommandError: ``RW-CMD-002`` when a coordinate is not finite.
+    """
+    _require_finite(x, "x")
+    _require_finite(y, "y")
+    return AttackMoveOrder(kind="attack_move", unit_id=unit_id, x=x, y=y)
+
+
+def encode_attack_move(order: AttackMoveOrder) -> str:
+    """Render an attack-move order as one wire line.
+
+    Args:
+        order: The order to encode.
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return (
+        f'{{"kind":"attack_move","unit_id":{order["unit_id"]},'
+        f'"x":{order["x"]!r},"y":{order["y"]!r}}}'
+    )
 
 
 def build_order(*, unit_id: int, type_name: str, x: float, y: float) -> BuildOrder:
@@ -298,15 +411,21 @@ def _require_finite(value: float, field: str) -> None:
 
 
 __all__ = [
+    "AbilityOrder",
+    "AttackMoveOrder",
     "AttackOrder",
     "BuildOrder",
     "CommandError",
     "MoveOrder",
     "ProduceOrder",
+    "ability_order",
+    "attack_move_order",
     "attack_order",
     "build_order",
+    "encode_ability",
     "encode_ack",
     "encode_attack",
+    "encode_attack_move",
     "encode_build",
     "encode_move",
     "encode_produce",

@@ -19,7 +19,14 @@ from rw_bot.control.channel import (
     open_channel,
 )
 from rw_bot.wire.codec import WireError
-from rw_bot.wire.command import attack_order, build_order, move_order, produce_order
+from rw_bot.wire.command import (
+    ability_order,
+    attack_move_order,
+    attack_order,
+    build_order,
+    move_order,
+    produce_order,
+)
 
 _FRAME_3 = (
     '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,"players":0,'
@@ -224,6 +231,12 @@ def test_an_attack_order_leaves_in_the_agent_format() -> None:
     assert peer.sent == ['{"kind":"attack","unit_id":276,"target_id":216}']
 
 
+def test_an_ability_order_leaves_in_the_agent_format() -> None:
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_ability(ability_order(unit_id=213, action=1))
+    assert peer.sent == ['{"kind":"ability","unit_id":213,"action":1}']
+
+
 def test_an_ack_leaves_in_the_agent_format() -> None:
     """Sent unconditionally, so the planner need not know the agent's mode."""
     peer = _ScriptedPeer([])
@@ -251,3 +264,9 @@ def test_open_channel_honours_an_explicit_host_and_timeout() -> None:
     with _StubbedConnect(peer) as stub:
         open_channel(9999, host="10.0.0.5", timeout_s=1.5)
     assert stub.calls == [("10.0.0.5", 9999, 1.5)]
+
+
+def test_an_attack_move_order_leaves_in_the_agent_format() -> None:
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_attack_move(attack_move_order(unit_id=7, x=990.0, y=2010.0))
+    assert peer.sent == ['{"kind":"attack_move","unit_id":7,"x":990.0,"y":2010.0}']

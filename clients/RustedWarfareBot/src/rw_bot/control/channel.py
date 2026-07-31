@@ -18,12 +18,16 @@ from rw_bot import RwBotError
 from rw_bot.control import _test_hooks
 from rw_bot.wire.codec import declared_children, decode_samples
 from rw_bot.wire.command import (
+    AbilityOrder,
+    AttackMoveOrder,
     AttackOrder,
     BuildOrder,
     MoveOrder,
     ProduceOrder,
+    encode_ability,
     encode_ack,
     encode_attack,
+    encode_attack_move,
     encode_build,
     encode_move,
     encode_produce,
@@ -131,6 +135,28 @@ class AgentChannel:
             OSError: When the write fails.
         """
         self._connection.send_line(encode_attack(order))
+
+    def send_attack_move(self, order: AttackMoveOrder) -> None:
+        """Send one attack-move order.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_attack_move(order))
+
+    def send_ability(self, order: AbilityOrder) -> None:
+        """Send one ability order.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_ability(order))
 
     def send_ack(self) -> None:
         """Tell the agent this sample is finished with.

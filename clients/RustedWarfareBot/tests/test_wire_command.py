@@ -11,10 +11,14 @@ import pytest
 
 from rw_bot.wire.command import (
     CommandError,
+    ability_order,
+    attack_move_order,
     attack_order,
     build_order,
+    encode_ability,
     encode_ack,
     encode_attack,
+    encode_attack_move,
     encode_build,
     encode_move,
     encode_produce,
@@ -54,6 +58,21 @@ def test_a_blank_produce_type_is_rejected() -> None:
     with pytest.raises(CommandError) as caught:
         produce_order(unit_id=213, type_name="  ")
     assert caught.value.code == "RW-CMD-001"
+
+
+def test_ability_encodes_to_the_exact_agent_format() -> None:
+    """The tech verb: a unit and the engine's own selector index, nothing
+    else -- the land factory's tier-two upgrade converts into no type, so
+    neither produce nor build can name it ([[mechanics-build-actions]])."""
+    line = encode_ability(ability_order(unit_id=213, action=1))
+    assert line == '{"kind":"ability","unit_id":213,"action":1}'
+
+
+def test_a_negative_ability_selector_is_rejected() -> None:
+    """No option stream ever carries one, and the agent would refuse it."""
+    with pytest.raises(CommandError) as caught:
+        ability_order(unit_id=213, action=-1)
+    assert caught.value.code == "RW-CMD-004"
 
 
 @pytest.mark.parametrize("hostile", ['sc"out', "sc\\out", "sc\nout", "sc\rout"])
@@ -143,3 +162,17 @@ def test_a_type_name_the_flat_format_cannot_carry_is_rejected(hostile: str) -> N
     with pytest.raises(CommandError) as caught:
         encode_build(build_order(unit_id=1, type_name=hostile, x=0.0, y=0.0))
     assert caught.value.code == "RW-CMD-001"
+
+
+def test_attack_move_encodes_to_the_exact_agent_format() -> None:
+    order = attack_move_order(unit_id=214, x=4550.0, y=2610.0)
+    assert encode_attack_move(order) == '{"kind":"attack_move","unit_id":214,"x":4550.0,"y":2610.0}'
+
+
+def test_an_attack_move_coordinate_must_be_finite() -> None:
+    """The engine reads the point straight into a waypoint; NaN would walk
+    nowhere and report nothing.
+    """
+    with pytest.raises(CommandError) as caught:
+        attack_move_order(unit_id=214, x=float("nan"), y=0.0)
+    assert caught.value.code == "RW-CMD-002"
