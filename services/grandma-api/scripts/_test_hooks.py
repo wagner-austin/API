@@ -37,6 +37,48 @@ def _real_serve_forever(server: http.server.HTTPServer) -> None:
 serve_forever: ServeForeverProtocol = _real_serve_forever
 
 
+class ServerFactoryProtocol(Protocol):
+    """Protocol for constructing the HTTP server."""
+
+    def __call__(
+        self,
+        address: tuple[str, int],
+        handler: type[http.server.BaseHTTPRequestHandler],
+    ) -> http.server.HTTPServer:
+        """Construct a server bound to an address.
+
+        Args:
+            address: Host and port to bind.
+            handler: Request handler class.
+
+        Returns:
+            A bound HTTP server.
+        """
+        ...
+
+
+def _real_server_factory(
+    address: tuple[str, int],
+    handler: type[http.server.BaseHTTPRequestHandler],
+) -> http.server.HTTPServer:
+    """Real implementation binding the requested address.
+
+    Args:
+        address: Host and port to bind.
+        handler: Request handler class.
+
+    Returns:
+        A bound HTTP server.
+    """
+    return http.server.HTTPServer(address, handler)
+
+
+# Construction is the seam because HTTPServer binds its socket in __init__:
+# without it, any test that reaches main() has to bind the real default port,
+# which fails outright on hosts where that port is reserved.
+server_factory: ServerFactoryProtocol = _real_server_factory
+
+
 class IsDirProtocol(Protocol):
     """Protocol for checking if a path is a directory."""
 
@@ -69,17 +111,21 @@ is_dir: IsDirProtocol = _real_is_dir
 
 def reset_hooks() -> None:
     """Reset all hooks to their default implementations."""
-    global serve_forever, is_dir
+    global serve_forever, is_dir, server_factory
     serve_forever = _real_serve_forever
     is_dir = _real_is_dir
+    server_factory = _real_server_factory
 
 
 __all__ = [
     "IsDirProtocol",
     "ServeForeverProtocol",
+    "ServerFactoryProtocol",
     "_real_is_dir",
     "_real_serve_forever",
+    "_real_server_factory",
     "is_dir",
     "reset_hooks",
     "serve_forever",
+    "server_factory",
 ]

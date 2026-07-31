@@ -38,7 +38,7 @@ def create_https_server(
         FileNotFoundError: If cert or key files are not found.
         ssl.SSLError: If SSL configuration fails.
     """
-    server = http.server.HTTPServer(
+    server = _test_hooks.server_factory(
         ("0.0.0.0", port),
         http.server.SimpleHTTPRequestHandler,
     )
