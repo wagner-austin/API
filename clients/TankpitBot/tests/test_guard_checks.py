@@ -282,3 +282,46 @@ def test_guard_detects_violations(tmp_path: Path) -> None:
     )
     rc = main(["--root", str(root)])
     assert rc != 0
+
+
+def _write_bad_wiki(project_root: Path) -> None:
+    """Plant a wiki page that violates the structure rule.
+
+    The page carries no frontmatter at all, which ``wiki/SCHEMA.md``
+    requires on every content page.
+
+    Args:
+        project_root: Fake project root to receive the wiki page.
+    """
+    pages_dir = project_root / "wiki" / "pages"
+    pages_dir.mkdir(parents=True, exist_ok=True)
+    (pages_dir / "bare.md").write_text("# Bare page\n\nNo frontmatter.\n", encoding="utf-8")
+
+
+def test_main_fails_on_wiki_structure_violation(tmp_path: Path) -> None:
+    """Wiki-structure violations flip a passing guard run to rc=1."""
+    _install_fake_guard_hooks(tmp_path)
+    _write_bad_wiki(tmp_path)
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 1
+
+
+def test_main_keeps_orchestrator_rc_over_wiki_rc(tmp_path: Path) -> None:
+    """A nonzero orchestrator rc is not overwritten by wiki violations."""
+
+    class _FakeFindRoot:
+        def __call__(self, start: Path) -> Path:
+            return tmp_path
+
+    class _FakeLoader:
+        def __call__(self, monorepo_root: Path) -> _hooks_guard.RunForProjectProto:
+            def _run_for_project(*, monorepo_root: Path, project_root: Path) -> int:
+                return 5
+
+            return _run_for_project
+
+    _hooks_guard.guard_find_monorepo_root = _FakeFindRoot()
+    _hooks_guard.guard_load_orchestrator = _FakeLoader()
+    _write_bad_wiki(tmp_path)
+    rc = main(["--root", str(tmp_path)])
+    assert rc == 5

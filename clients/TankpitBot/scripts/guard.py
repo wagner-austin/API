@@ -12,6 +12,7 @@ from typing import Protocol
 
 from scripts.contract_rules import run_contract_rules
 from scripts.physics_claims import run_physics_claim_rules
+from scripts.wiki_rules import run_wiki_rules
 from tankpit_bot import _hooks_guard
 
 
@@ -117,11 +118,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     target_root = root_override if root_override is not None else project_root
     rc = run_for_project(monorepo_root=monorepo_root, project_root=target_root)
-    contract_violations = run_contract_rules(target_root)
-    if contract_violations > 0 and rc == 0:
-        rc = 1
-    physics_violations = run_physics_claim_rules(target_root)
-    if physics_violations > 0 and rc == 0:
+    # Every local rule runs unconditionally (each reports its own
+    # violations); a nonzero orchestrator rc is preserved rather than
+    # flattened to 1, so the caller keeps the orchestrator's signal.
+    local_violations = (
+        run_contract_rules(target_root)
+        + run_physics_claim_rules(target_root)
+        + run_wiki_rules(target_root)
+    )
+    if local_violations > 0 and rc == 0:
         rc = 1
     if verbose:
         sys.stdout.write(f"guard_exit_code code={rc}\n")
