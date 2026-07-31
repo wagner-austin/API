@@ -1468,3 +1468,93 @@ class TestCombatCorridorMineGuard:
         if result is None:
             raise AssertionError("expected teleport decision")
         assert result["command"]["cmd_type"] == "teleport"
+
+
+class TestBeyondRefuelReachRelay:
+    """A chase no refuel can fund takes the relay, not a top-off."""
+
+    def test_beyond_reach_target_relays_via_dots(self) -> None:
+        """Flag s10-2: at fuel 1097/1100 a 504-cost chase 'refueled' a
+        3-point deficit with a 121-fuel dot teleport. Cost above
+        cap-minus-reserve is a DISTANCE problem: the decision must be
+        a dot_relay leg with the lock held.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=1,
+                y=193,
+                team=2,
+                rank=1,
+                name="red-50",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1195, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ((60, 150),),
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
+
+        if result is None:
+            raise AssertionError("expected a relay decision")
+        assert result["behavior"]["reason_kind"] == "dot_relay"
+        assert result["command"]["cmd_type"] == "teleport"
+        assert result["command"]["target_x"] == 60
+        assert result["command"]["target_y"] == 150
+        assert result["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_beyond_reach_with_no_usable_dot_falls_back_to_refuel(self) -> None:
+        """When no relay leg exists the beyond-reach chase still refuels.
+
+        The only atlas dot is the bot's own tile (own_tile rejection)
+        and the map was just opened, so the hop declines outright.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=1,
+                y=193,
+                team=2,
+                rank=1,
+                name="red-50",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1195, tanks=tanks)
+        ai_state = AIStateDict(
+            **{
+                **make_scanned_ai_state(),
+                "last_map_open_ms": 99500,
+            }
+        )
+        ctx = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ((100, 100),),
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
+
+        if result is None:
+            raise AssertionError("expected a fallback decision")
+        assert result["behavior"]["reason_kind"] != "dot_relay"

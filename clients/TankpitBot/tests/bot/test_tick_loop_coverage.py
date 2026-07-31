@@ -1542,3 +1542,42 @@ class TestDrainReceipt:
 
         assert result is False
         assert ws.container_desync_ms == 0
+
+
+class TestTeleportPreconditionReceipt:
+    """Code 0 on a teleport blames the map state, never the tile."""
+
+    def setup_method(self) -> None:
+        """Reset world state before each test."""
+        reset_world_state()
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_code0_teleport_rejection_leaves_tile_unmarked(self, fake_env: FakeEnv) -> None:
+        """Flag s10-1: the map closed server-side while the snapshot
+        still read open; the rejected larder landing was innocent and
+        must stay teleportable for the deferred retry."""
+        from tankpit_bot.bot.base import Bot
+        from tankpit_bot.bot.tick_loop_actions import _wait_for_movement_action
+        from tankpit_bot.sniffer.world_state import get_world_service, is_move_target_failed
+
+        update_world_state_from_position(100, 100)
+        ws = get_world_service()
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._state_data = bot._state_data.copy()
+        bot._state_data["state"] = "TELEPORTING"
+        action = InFlightActionDict(
+            kind="teleport",
+            target_x=221,
+            target_y=209,
+            started_ms=get_current_time_ms(),
+            outcome="pending",
+        )
+        ws.last_command_error = 0
+
+        result = _wait_for_movement_action(bot, action)
+
+        assert result is False
+        assert is_move_target_failed(221, 209, get_current_time_ms()) is False

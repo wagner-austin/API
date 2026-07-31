@@ -157,6 +157,34 @@ def has_in_flight_action(bot: Bot) -> bool:
     return False
 
 
+def _mark_movement_failure(kind: ActionKind, error_code: int, tx: int, ty: int) -> None:
+    """Record a rejected movement's failed-target mark, when deserved.
+
+    Code 0 on a teleport is a PRECONDITION receipt, not a verdict on
+    the tile (flag s10-1: the map had closed server-side while the
+    client snapshot still read open, and a perfectly good larder
+    landing got a failed-target mark). The replan defers for a fresh
+    map open and the same tile succeeds. Every other rejection marks
+    the tile so the re-derivation avoids it for the TTL.
+
+    Args:
+        kind: The rejected action's kind.
+        error_code: The 0x52 code the server answered with.
+        tx: Target X.
+        ty: Target Y.
+    """
+    if kind == "teleport" and error_code == _COMMAND_ERROR_CANT_DO_THIS:
+        emit_sync(
+            "teleport to (%d,%d) refused code=0 (map closed server-side) "
+            "- tile not marked, replanning with a fresh map open",
+            tx,
+            ty,
+        )
+        return
+    mark_move_target_failed(tx, ty, get_current_time_ms())
+    emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)
+
+
 def _wait_for_movement_action(bot: Bot, action: InFlightActionDict) -> bool:
     """Return True while a move/collect/teleport action is still resolving."""
     kind = action["kind"]
@@ -386,8 +414,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             increment_container_failed_pickups(get_world_service(), tx, ty)
             emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):
-        mark_move_target_failed(tx, ty, get_current_time_ms())
-        emit_sync("marked (%d,%d) as failed %s target", tx, ty, kind)
+        _mark_movement_failure(kind, error_code, tx, ty)
     if error_code == _COMMAND_ERROR_CANT_GO_THERE and kind in ("move", "collect", "teleport"):
         # The shared fact behind a cant_go on ANY movement-bearing
         # command is "the tank tried to move and the server said no"

@@ -22,6 +22,7 @@ from tankpit_bot.bot.ai.context import (
     teleport_fuel_cost_to,
 )
 from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
+from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
@@ -37,6 +38,7 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.line_of_sight import is_shot_line_clear
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
@@ -637,6 +639,34 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
         landing_y,
         reserve_fuel=engagement_reserve,
     ):
+        cost = teleport_fuel_cost_to(ctx, landing_x, landing_y)
+        max_affordable = fuel_capacity(ctx.self_state["rank"]) - engagement_reserve
+        if cost > max_affordable:
+            # Beyond refuel reach (flag s10-2, 2026-07-30): a 504-cost
+            # chase at fuel 1097/1100 hit this branch and "refueled"
+            # a 3-point deficit with a 121-fuel dot teleport -- no
+            # amount of fuel makes a cost above cap-minus-reserve
+            # affordable. Distance problems take the relay: a dot leg
+            # toward the target (the loot-run/hunt bias steers the
+            # ranking at the nearest enemy) that refuels itself on
+            # landing, with the lock held for the next re-derivation.
+            emit_ai(
+                "chase to %s costs %d > max affordable %d - relaying via dots "
+                "(fuel=%d, refuel cannot fix distance)",
+                target["name"],
+                cost,
+                max_affordable,
+                ctx.fuel,
+            )
+            relay = make_resource_search_hop(
+                ctx,
+                mode="HUNT",
+                score=800,
+                reason="dot_relay",
+                ai_state=_set_combat_target(ctx.base, target),
+            )
+            if relay is not None:
+                return relay
         emit_ai(
             "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)"
             " - refueling before hunt",
@@ -644,7 +674,7 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             landing_x,
             landing_y,
             ctx.fuel,
-            teleport_fuel_cost_to(ctx, landing_x, landing_y),
+            cost,
             engagement_reserve,
         )
         return refuel_for_hunt(ctx, target)
