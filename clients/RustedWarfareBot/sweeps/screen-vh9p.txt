@@ -1,0 +1,13 @@
+# The tech arm at Very Hard (log 2026-07-31): the arty+raid champion plus
+# tech 1 (land factory T2 via the ability verb, saving toward the unlock)
+# and heavies heavyTank,heavyTank joining the mix once the tier opens.
+# Champion control figures are vh24-arc. Three seeds; promote at >=2/3.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-vh9p.txt SWEEP_NAME=screen-vh9p \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 2" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+techprobe|12345|doctrines/techprobe.doctrine|4000
+techprobe|777|doctrines/techprobe.doctrine|4000
+techprobe|4242|doctrines/techprobe.doctrine|4000
