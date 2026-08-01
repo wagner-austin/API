@@ -1010,18 +1010,24 @@ class TorchCudaResetPeakMemoryStatsProto(Protocol):
 def _default_torch_cuda_max_memory_allocated() -> int:
     """Production torch.cuda.max_memory_allocated - used as default hook.
 
+    A thin adapter over torch. Whether CUDA is present is the caller's
+    question, and `_default_gpu_max_memory_allocated` already asks it through
+    the `cuda_is_available` hook before delegating here; repeating the check
+    added a branch that no caller can reach and that no machine with a GPU can
+    execute.
+
     Returns:
-        Peak GPU memory allocated in bytes, or 0 if CUDA unavailable.
+        Peak GPU memory allocated in bytes.
     """
-    if not torch.cuda.is_available():
-        return 0
     return torch.cuda.max_memory_allocated()
 
 
 def _default_torch_cuda_reset_peak_memory_stats() -> None:
-    """Production torch.cuda.reset_peak_memory_stats - used as default hook."""
-    if not torch.cuda.is_available():
-        return
+    """Production torch.cuda.reset_peak_memory_stats - used as default hook.
+
+    A thin adapter over torch; `_default_gpu_reset_peak_memory_stats` owns the
+    availability check.
+    """
     torch.cuda.reset_peak_memory_stats()
 
 

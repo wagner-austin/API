@@ -1055,3 +1055,28 @@ def test_default_torch_cuda_reset_peak_memory_stats_direct() -> None:
     from model_trainer.core._test_hooks import _default_torch_cuda_reset_peak_memory_stats
 
     _default_torch_cuda_reset_peak_memory_stats()
+
+
+def test_default_torch_cuda_memory_hooks_run_against_real_torch() -> None:
+    """Test the lowest-level torch.cuda adapters against the installed torch.
+
+    Every other GPU test fakes `torch_cuda_max_memory_allocated`, so these two
+    adapters -- the ones that actually reach torch -- were never executed. They
+    assume CUDA is present, because their only caller checks that first through
+    the `cuda_is_available` hook.
+    """
+    import torch
+
+    from model_trainer.core._test_hooks import (
+        _default_torch_cuda_max_memory_allocated,
+        _default_torch_cuda_reset_peak_memory_stats,
+    )
+
+    # Asserted rather than skipped: this service pins torch to the cu128 index
+    # and trains on GPU, so a machine without CUDA cannot run its suite
+    # meaningfully. Say that outright instead of quietly passing.
+    assert torch.cuda.is_available()
+
+    _default_torch_cuda_reset_peak_memory_stats()
+
+    assert _default_torch_cuda_max_memory_allocated() >= 0
