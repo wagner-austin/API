@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 import platform_workers.rq_harness as rh
 from platform_workers.testing import (
     FakeRedisBytesClient,
@@ -41,3 +43,32 @@ def test_public_rq_queue_factory() -> None:
 
     # Verify the inner queue is our fake
     assert type(q_adapter._inner) is _FakeRQQueueInternal
+
+
+def test_installed_rq_job_exposes_id_property() -> None:
+    """Test the real rq Job still provides what the harness reads off it.
+
+    Every other test in this suite drives `_FakeRQJob`, so the harness can
+    diverge from rq without a single failure -- which is exactly what happened
+    when rq dropped `Job.get_id()`: the fakes kept implementing it and the
+    enqueue path raised AttributeError only in a running container. This test
+    reads the installed library instead of a stand-in.
+    """
+    from redis import Redis
+    from rq.job import Job
+
+    class _JobIdReader(Protocol):
+        """The single attribute the harness reads off an rq Job."""
+
+        @property
+        def id(self) -> str: ...
+
+    # Redis() opens no socket until a command is issued, and rq only stores the
+    # connection at construction, so nothing here touches a server.
+    # `get_id()` is deliberately not asserted absent: it still exists in rq
+    # 2.6.1 (this venv) and is gone in rq 2.10.0 (the container images), which
+    # is exactly how the harness kept passing here while raising
+    # AttributeError in production.
+    real_job: _JobIdReader = Job(id="contract-job-id", connection=Redis())
+
+    assert real_job.id == "contract-job-id"

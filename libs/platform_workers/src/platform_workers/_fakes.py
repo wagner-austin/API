@@ -787,12 +787,23 @@ class _FakeCurrentJob:
 
 
 class _FakeRQJob:
-    """Internal fake RQ job for testing."""
+    """Internal fake RQ job for testing.
+
+    Mirrors rq's own Job, which exposes `id` as a property. This fake used to
+    provide `get_id()` instead; because the harness called that, every test
+    passed while the real rq raised AttributeError in production.
+    """
 
     def __init__(self, job_id: str = "fake-job-id") -> None:
         self._id = job_id
 
-    def get_id(self) -> str:
+    @property
+    def id(self) -> str:
+        """Job identifier.
+
+        Returns:
+            The job id, as rq's Job.id does.
+        """
         return self._id
 
 

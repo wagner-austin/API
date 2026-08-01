@@ -36,9 +36,17 @@ class _RQWorkerLike(Protocol):
 
 
 class _RQJobInternal(Protocol):
-    """Protocol for internal RQ Job object."""
+    """Protocol for internal RQ Job object.
 
-    def get_id(self) -> str: ...
+    RQ exposes the identifier as an `id` property. It also had a `get_id()`
+    method historically, which this protocol used to declare -- but RQ has
+    since removed it, so calling it raised AttributeError against any modern
+    rq while the test fakes (which implement the protocol as written) kept
+    passing. The protocol now mirrors what rq actually provides.
+    """
+
+    @property
+    def id(self) -> str: ...
 
 
 class _RQQueueInternal(Protocol):
@@ -170,7 +178,7 @@ class _RQQueueAdapter(_RQQueueLike, RQClientQueue):
                 self._inner = inner
 
             def get_id(self) -> str:
-                return str(self._inner.get_id())
+                return str(self._inner.id)
 
         return _Job(job)
 
