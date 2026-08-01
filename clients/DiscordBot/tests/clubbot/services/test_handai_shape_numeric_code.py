@@ -32,6 +32,15 @@ class _FakeResponse:
             raise ValueError("No JSON body")
         return self._json
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 def test_shape_api_error_numeric_code_ignored() -> None:
     # JSON has a non-string code; code should remain None, message should be taken

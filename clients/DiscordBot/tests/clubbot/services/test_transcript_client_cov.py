@@ -23,6 +23,15 @@ class _FakeResp:
     def json(self) -> JSONValue:
         return load_json_str(self.text)
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class _FakeClient:
     def __init__(self, resp: HttpxResponse) -> None:
@@ -42,6 +51,26 @@ class _FakeClient:
 
     def close(self) -> None:
         return None
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        params: Mapping[str, str | int] | None = None,
+    ) -> HttpxResponse:
+        """Return the canned response, as the post path does.
+
+        Args:
+            url: Requested URL.
+            headers: Request headers.
+            params: Query parameters.
+
+        Returns:
+            The canned response.
+        """
+        _ = (url, headers, params)
+        return self._resp
 
 
 def _cfg() -> DiscordbotSettings:

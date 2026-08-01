@@ -23,6 +23,15 @@ class _FakeResp:
     def json(self) -> JSONValue:
         return load_json_str(self.text)
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class _FakeClient:
     """Fake client satisfying HttpxClient Protocol."""
@@ -43,6 +52,26 @@ class _FakeClient:
         json: JSONValue | None = None,
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
     ) -> HttpxResponse:
+        return _FakeResp(self._status, self._content, self._text)
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        params: Mapping[str, str | int] | None = None,
+    ) -> HttpxResponse:
+        """Return the same canned response the post path builds.
+
+        Args:
+            url: Requested URL.
+            headers: Request headers.
+            params: Query parameters.
+
+        Returns:
+            The canned response.
+        """
+        _ = (url, headers, params)
         return _FakeResp(self._status, self._content, self._text)
 
 

@@ -62,6 +62,15 @@ class _Resp(HttpxResponse):
             raise ValueError("no json")
         return self._json
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 def test_shape_api_error_extracts_fields_from_json() -> None:
     payload: JSONValue = {"code": "INVALID_INPUT", "message": "bad", "request_id": "rid"}

@@ -34,6 +34,15 @@ class _FakeResponse:
             raise ValueError("No JSON body")
         return self._json
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class RequestError(Exception):
     """Request error for testing retries."""
@@ -210,6 +219,15 @@ def test_shape_api_error_object_text_non_dict_body() -> None:
 
         def json(self) -> JSONValue:
             return self._body
+
+        def raise_for_status(self) -> None:
+            """Mirror httpx: an error status raises rather than passing silently.
+
+            Raises:
+                RuntimeError: If the status code is 400 or above.
+            """
+            if self.status_code >= 400:
+                raise RuntimeError(f"HTTP {self.status_code}")
 
     list_body: JSONValue = ["x"]
     fake = _ListResponse(text="{ still_not_real_json }", body=list_body, status=502)

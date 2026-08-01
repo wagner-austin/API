@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 def _project_root() -> Path:
     # tests/ -> DiscordBot/
@@ -143,3 +145,41 @@ def test_guard_import_does_not_run_main() -> None:
 
     # Verify main function exists by accessing it
     assert callable(guard_mod.main)
+
+
+def test_default_guard_load_orchestrator_returns_real_runner() -> None:
+    """Test the production orchestrator loader against the real monorepo.
+
+    Every other guard test injects a fake loader, so this production path --
+    which puts `libs/` on sys.path and imports monorepo_guards.orchestrator --
+    was never executed.
+    """
+    from pathlib import Path
+
+    from clubbot._test_hooks import (
+        _default_guard_find_monorepo_root,
+        _default_guard_load_orchestrator,
+    )
+
+    monorepo_root = _default_guard_find_monorepo_root(Path(__file__).resolve())
+    assert (monorepo_root / "libs").is_dir()
+
+    run_for_project = _default_guard_load_orchestrator(monorepo_root)
+
+    assert callable(run_for_project)
+
+
+def test_guard_find_monorepo_root_raises_without_libs_directory() -> None:
+    """Test the climb ends in an error when no libs directory is ever found.
+
+    Saved and restored in one scope so the injection reads as hook-based DI.
+    """
+    from scripts import guard
+
+    original_is_dir = guard._is_dir
+    try:
+        guard._is_dir = lambda p: False
+        with pytest.raises(RuntimeError, match="monorepo root with 'libs' directory not found"):
+            guard._find_monorepo_root(Path(__file__).resolve())
+    finally:
+        guard._is_dir = original_is_dir

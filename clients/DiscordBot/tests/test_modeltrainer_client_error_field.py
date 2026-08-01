@@ -23,6 +23,15 @@ class _FakeResponse:
     def json(self) -> JSONValue:
         return self._json
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class _FakeClient:
     """Protocol-compliant fake async HTTP client for testing."""

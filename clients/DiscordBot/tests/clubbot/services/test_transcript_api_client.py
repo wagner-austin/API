@@ -26,6 +26,15 @@ class _FakeResp:
             raise ValueError("no json")
         return self._payload
 
+    def raise_for_status(self) -> None:
+        """Mirror httpx: an error status raises rather than passing silently.
+
+        Raises:
+            RuntimeError: If the status code is 400 or above.
+        """
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
 
 class _FakeClient:
     """Fake client that satisfies HttpxClient Protocol."""
@@ -43,6 +52,26 @@ class _FakeClient:
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
     ) -> HttpxResponse:
         _ = (url, headers, json, files)
+        return _FakeResp(self._status, self._payload)
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        params: Mapping[str, str | int] | None = None,
+    ) -> HttpxResponse:
+        """Return the same canned response the post path builds.
+
+        Args:
+            url: Requested URL.
+            headers: Request headers.
+            params: Query parameters.
+
+        Returns:
+            The canned response.
+        """
+        _ = (url, headers, params)
         return _FakeResp(self._status, self._payload)
 
     def close(self) -> None:
@@ -122,6 +151,26 @@ def test_captions_200_non_dict_payload() -> None:
             files: Mapping[str, tuple[str, bytes, str]] | None = None,
         ) -> HttpxResponse:
             _ = (url, headers, json, files)
+            return _RespList(200, None)
+
+        def get(
+            self,
+            url: str,
+            *,
+            headers: Mapping[str, str] | None = None,
+            params: Mapping[str, str | int] | None = None,
+        ) -> HttpxResponse:
+            """Return the same canned response the post path builds.
+
+            Args:
+                url: Requested URL.
+                headers: Request headers.
+                params: Query parameters.
+
+            Returns:
+                The canned response.
+            """
+            _ = (url, headers, params)
             return _RespList(200, None)
 
         def close(self) -> None:
