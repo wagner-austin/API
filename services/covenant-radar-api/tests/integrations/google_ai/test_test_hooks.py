@@ -281,7 +281,7 @@ class TestRealGeminiClientEmptyResponse:
         client._client = FakeInnerClient()
 
         with pytest.raises(GeminiError, match="Gemini returned empty response"):
-            client.generate_content("gemini-2.0-flash", "test")
+            client.generate_content("gemini-2.5-flash", "test")
 
 
 class TestRealGeminiClientGenerateContentWithFake:
@@ -318,7 +318,7 @@ class TestRealGeminiClientGenerateContentWithFake:
         client = RealGeminiClient("dummy-api-key-for-test")
         client._client = FakeInnerClient()
 
-        result = client.generate_content("gemini-2.0-flash", "test prompt")
+        result = client.generate_content("gemini-2.5-flash", "test prompt")
         assert result == "generated text"
 
 
@@ -356,7 +356,7 @@ class TestRealGeminiClientCountTokensWithFake:
         client = RealGeminiClient("dummy-api-key-for-test")
         client._client = FakeInnerClient()
 
-        result = client.count_tokens("gemini-2.0-flash", "test content")
+        result = client.count_tokens("gemini-2.5-flash", "test content")
 
         assert result == (42, 0)
         assert result[0] == 42  # Input tokens
@@ -397,7 +397,7 @@ class TestRealGeminiClient:
 
         api_key = _get_gemini_api_key()
         client = RealGeminiClient(api_key)
-        result = client.generate_content("gemini-2.0-flash", "Say hello")
+        result = client.generate_content("gemini-2.5-flash", "Say hello")
         assert result  # Non-empty response
 
     def test_count_tokens_returns_tuple(self) -> None:
@@ -409,7 +409,7 @@ class TestRealGeminiClient:
 
         api_key = _get_gemini_api_key()
         client = RealGeminiClient(api_key)
-        result = client.count_tokens("gemini-2.0-flash", "Hello world")
+        result = client.count_tokens("gemini-2.5-flash", "Hello world")
         assert result[0] > 0  # Input tokens
         assert result[1] == 0  # Output tokens always 0
 

@@ -142,7 +142,9 @@ def build_dependencies() -> GenericWorkerDeps:
     poll_timeout = _parse_float("STREAMING__POLL_TIMEOUT_SECONDS", 1.0)
 
     gemini_api_key = _require_env_str("GEMINI_API_KEY")
-    gemini_model = _parse_str("GEMINI_MODEL", "gemini-2.0-flash")
+    # gemini-2.0-flash was retired by Google and now answers 404 NOT_FOUND, so
+    # every alert summary failed with the old default.
+    gemini_model = _parse_str("GEMINI_MODEL", "gemini-2.5-flash")
 
     return {
         "domain": domain,

@@ -180,7 +180,7 @@ class TestRealTextGeneratorFactory:
         """
         use_fake_gemini()
         try:
-            generator = _real_text_generator_factory("test-key", "gemini-2.0-flash")
+            generator = _real_text_generator_factory("test-key", "gemini-2.5-flash")
 
             assert generator.generate_text("summarise this") != ""
         finally:

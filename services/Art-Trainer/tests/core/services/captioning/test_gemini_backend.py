@@ -128,21 +128,21 @@ def reset_gemini_hooks() -> None:
 def test_gemini_captioner_requires_api_key() -> None:
     """Test GeminiCaptioner raises ValueError for empty API key."""
     with pytest.raises(ValueError) as exc_info:
-        GeminiCaptioner(model_name="gemini-2.0-flash", api_key="")
+        GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="")
 
     assert "API key is required" in str(exc_info.value)
 
 
 def test_gemini_captioner_backend_type() -> None:
     """Test GeminiCaptioner backend_type property."""
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
 
     assert captioner.backend_type == "gemini"
 
 
 def test_gemini_captioner_caption_file_not_found(tmp_path: Path) -> None:
     """Test GeminiCaptioner raises FileNotFoundError for missing file."""
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
     nonexistent = tmp_path / "nonexistent.png"
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -153,7 +153,7 @@ def test_gemini_captioner_caption_file_not_found(tmp_path: Path) -> None:
 
 def test_gemini_captioner_caption_unsupported_format(tmp_path: Path) -> None:
     """Test GeminiCaptioner raises error for unsupported format."""
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
     unsupported = tmp_path / "image.bmp"
     unsupported.write_bytes(b"fake bmp content")
 
@@ -226,7 +226,7 @@ def _create_test_image(tmp_path: Path) -> Path:
 
 def test_gemini_captioner_client_not_initialized() -> None:
     """Test client is None before first use."""
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
 
     assert captioner._client is None
 
@@ -237,7 +237,7 @@ def test_gemini_captioner_caption_with_hook(tmp_path: Path) -> None:
     _test_hooks.Hooks.gemini_client_factory = FakeGeminiClientFactory("A gray square image")
     _test_hooks.Hooks.gemini_part_factory = FakeGeminiPartFactory()
 
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
     image_path = _create_test_image(tmp_path)
 
     caption = captioner.caption(image_path, "test_trigger")
@@ -250,7 +250,7 @@ def test_gemini_captioner_ensures_client_once(tmp_path: Path) -> None:
     _test_hooks.Hooks.gemini_client_factory = FakeGeminiClientFactory("Description")
     _test_hooks.Hooks.gemini_part_factory = FakeGeminiPartFactory()
 
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
     image_path = _create_test_image(tmp_path)
 
     # First call creates client
@@ -269,7 +269,7 @@ def test_gemini_captioner_caption_strips_whitespace(tmp_path: Path) -> None:
     _test_hooks.Hooks.gemini_client_factory = FakeGeminiClientFactory("  response with spaces  ")
     _test_hooks.Hooks.gemini_part_factory = FakeGeminiPartFactory()
 
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
     image_path = _create_test_image(tmp_path)
 
     caption = captioner.caption(image_path, "trigger")
@@ -282,7 +282,7 @@ def test_gemini_captioner_caption_jpg_image(tmp_path: Path) -> None:
     _test_hooks.Hooks.gemini_client_factory = FakeGeminiClientFactory("JPG image")
     _test_hooks.Hooks.gemini_part_factory = FakeGeminiPartFactory()
 
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
 
     image_path = tmp_path / "test_image.jpg"
     img = Image.new("RGB", (32, 32), color=(128, 128, 128))
@@ -298,7 +298,7 @@ def test_gemini_captioner_caption_webp_image(tmp_path: Path) -> None:
     _test_hooks.Hooks.gemini_client_factory = FakeGeminiClientFactory("WebP image")
     _test_hooks.Hooks.gemini_part_factory = FakeGeminiPartFactory()
 
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="test-key")
 
     image_path = tmp_path / "test_image.webp"
     img = Image.new("RGB", (32, 32), color=(128, 128, 128))
@@ -317,7 +317,7 @@ def test_gemini_captioner_real_imports_client(tmp_path: Path) -> None:
     The google-genai library raises an error for invalid API keys.
     """
     # No hooks set - uses real imports
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key="invalid-test-key")
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key="invalid-test-key")
 
     # Create test image
     image_path = _create_test_image(tmp_path)
@@ -347,7 +347,7 @@ def test_gemini_captioner_integration_real_api(tmp_path: Path) -> None:
         pytest.skip("GEMINI_API_KEY not set in settings")
 
     # No hooks set - uses real API
-    captioner = GeminiCaptioner(model_name="gemini-2.0-flash", api_key=api_key)
+    captioner = GeminiCaptioner(model_name=DEFAULT_MODEL, api_key=api_key)
 
     # Create test image
     image_path = tmp_path / "test_real.png"

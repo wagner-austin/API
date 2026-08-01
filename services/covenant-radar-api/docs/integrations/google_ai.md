@@ -210,7 +210,11 @@ The `model` field in GeminiConfig controls which Gemini model is used:
 |-------|-------------|
 | `gemini-2.5-flash` | Fast, low-cost generation (default) |
 | `gemini-2.5-pro` | Higher quality, slower generation |
-| `gemini-2.0-flash` | Previous generation flash model |
+
+`gemini-2.0-flash` is no longer usable — Google retired it, and requests now
+return `404 NOT_FOUND`. It was this service's default until 2026-07-31, which
+meant every alert summary failed. Model names are worth re-checking against
+`client.models.list()` rather than assumed stable.
 
 ---
 

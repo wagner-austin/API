@@ -83,7 +83,7 @@ worker exits non-zero unless `STREAMING__ENABLED` is true.
 | `MODEL_PATH` | string | - | Path to the saved model file (required) |
 | `MODEL_VERSION` | string | `v1.0.0` | Version string reported on every prediction event |
 | `GEMINI_API_KEY` | string | - | Required — alert summary generation |
-| `GEMINI_MODEL` | string | `gemini-2.0-flash` | Gemini model used for alert summaries |
+| `GEMINI_MODEL` | string | `gemini-2.5-flash` | Gemini model used for alert summaries |
 | `WEATHER__STATE_PATH` | string | - | Fitted temporal feature state, JSON (required for `weather`) |
 | `WEATHER__STATION_MAP_PATH` | string | - | station_id to location index, JSON (required for `weather`) |
 | `WEATHER__ALERT_THRESHOLD` | float | `0.80` | Probability at or above which a weather alert fires |
