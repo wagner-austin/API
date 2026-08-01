@@ -382,6 +382,15 @@ class Hooks:
     # generate.py / score.py hooks
     read_text_file: ReadTextFileFn | None = None
 
+    @classmethod
+    def reset(cls) -> None:
+        """Restore every hook to its default.
+
+        The restoration `reset_hooks()` performs, exposed as a classmethod so
+        an autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
 
 def reset_hooks() -> None:
     """Reset all hooks to None for test cleanup."""

@@ -345,6 +345,22 @@ class HooksContainer:
     cli_set_env: CliSetEnvHook
     cli_get_now: CliGetNowHook
 
+    # Guard-script hooks. None means "use the production behaviour". These
+    # live on the container, not as module globals, so the same per-test
+    # reset that protects every other hook protects them too.
+    guard_find_monorepo_root: FindMonorepoRootProto | None
+    guard_load_orchestrator: LoadOrchestratorProto | None
+
+    def reset(self) -> None:
+        """Restore every hook to its production implementation.
+
+        The same restoration `reset_hooks()` performs, exposed as a method so
+        an autouse fixture can express the per-test isolation as
+        `hooks.reset()`. That form states which container is protected, which
+        a bare module-level call cannot.
+        """
+        reset_hooks()
+
 
 hooks = HooksContainer()
 
@@ -738,6 +754,8 @@ def _init_production_hooks() -> None:
     hooks.cli_get_env = _prod_cli_get_env
     hooks.cli_set_env = _prod_cli_set_env
     hooks.cli_get_now = _prod_cli_get_now
+    hooks.guard_find_monorepo_root = None
+    hooks.guard_load_orchestrator = None
 
 
 # Initialize on module load
@@ -746,11 +764,9 @@ _init_production_hooks()
 
 def reset_hooks() -> None:
     """Reset all hooks to production implementations (for test teardown)."""
-    global _cli_env_loaded, _cli_env_cache, guard_find_monorepo_root, guard_load_orchestrator
+    global _cli_env_loaded, _cli_env_cache
     _cli_env_loaded = False
     _cli_env_cache = {}
-    guard_find_monorepo_root = None
-    guard_load_orchestrator = None
     _init_production_hooks()
 
 
@@ -805,9 +821,7 @@ class LoadOrchestratorProto(Protocol):
         ...
 
 
-# Guard hooks - None means use default behavior (production implementation)
-guard_find_monorepo_root: FindMonorepoRootProto | None = None
-guard_load_orchestrator: LoadOrchestratorProto | None = None
+# The guard hooks now live on HooksContainer; see the class definition.
 
 
 # =============================================================================

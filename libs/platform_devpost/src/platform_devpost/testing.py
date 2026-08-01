@@ -66,6 +66,14 @@ class HooksContainer:
     devpost_client: DevpostClientHook
     profile_scanner: ProfileScannerHook
 
+    def reset(self) -> None:
+        """Restore every hook to its production implementation.
+
+        The restoration `reset_hooks()` performs, exposed as a method so an
+        autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
 
 hooks = HooksContainer()
 

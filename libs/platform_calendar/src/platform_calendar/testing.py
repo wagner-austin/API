@@ -255,6 +255,19 @@ class HooksContainer:
     cli_confirm_ask: CliConfirmAskHook
     cli_get_console: CliGetConsoleHook
 
+    # Guard-script hooks. None means "use the production behaviour". Kept on
+    # the container so the per-test reset covers them like every other hook.
+    guard_find_monorepo_root: FindMonorepoRootProto | None
+    guard_load_orchestrator: LoadOrchestratorProto | None
+
+    def reset(self) -> None:
+        """Restore every hook to its production implementation.
+
+        The restoration `reset_hooks()` performs, exposed as a method so an
+        autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
 
 hooks = HooksContainer()
 
@@ -752,6 +765,8 @@ def _prod_cli_get_console() -> Console:
 
 def _init_production_hooks() -> None:
     """Initialize hooks with production implementations."""
+    hooks.guard_find_monorepo_root = None
+    hooks.guard_load_orchestrator = None
     hooks.http_get = _prod_http_get
     hooks.http_post = _prod_http_post
     hooks.http_patch = _prod_http_patch
@@ -785,12 +800,9 @@ _init_production_hooks()
 def reset_hooks() -> None:
     """Reset all hooks to production implementations (for test teardown)."""
     global _cli_env_loaded, _cli_env_cache, _cli_default_console
-    global guard_find_monorepo_root, guard_load_orchestrator
     _cli_env_loaded = False
     _cli_env_cache = {}
     _cli_default_console = None
-    guard_find_monorepo_root = None
-    guard_load_orchestrator = None
     _init_production_hooks()
 
 
@@ -846,8 +858,7 @@ class LoadOrchestratorProto(Protocol):
 
 
 # Guard hooks - None means use default behavior (production implementation)
-guard_find_monorepo_root: FindMonorepoRootProto | None = None
-guard_load_orchestrator: LoadOrchestratorProto | None = None
+# The guard hooks live on HooksContainer; see the class definition.
 
 
 # =============================================================================

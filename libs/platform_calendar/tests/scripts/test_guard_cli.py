@@ -10,8 +10,7 @@ from _pytest.capture import CaptureFixture
 from scripts.guard import _find_monorepo_root_impl
 from scripts.guard import main as guard_main
 
-from platform_calendar import testing
-from platform_calendar.testing import RunForProjectProto, reset_hooks
+from platform_calendar.testing import RunForProjectProto, hooks, reset_hooks
 
 
 @pytest.fixture(autouse=True)
@@ -35,8 +34,8 @@ def test_guard_main_with_root(capsys: CaptureFixture[str], tmp_path: Path) -> No
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     code = guard_main(["--root", str(tmp_path)])
     _ = capsys.readouterr()
@@ -57,8 +56,8 @@ def test_guard_main_unrecognized_arg(tmp_path: Path) -> None:
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     code = guard_main(["--root", str(tmp_path), "--unknown-flag"])
     assert code == 0
@@ -78,8 +77,8 @@ def test_guard_run_as_main(tmp_path: Path) -> None:
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     code = guard_main(["--root", str(tmp_path)])
     assert code == 0
@@ -111,8 +110,8 @@ def test_guard_verbose_prints_exit_code(capsys: CaptureFixture[str], tmp_path: P
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     rc = guard_main(["--root", str(tmp_path), "--verbose"])
     out = capsys.readouterr().out
@@ -149,7 +148,7 @@ def test_find_monorepo_root_uses_impl_when_hook_is_none() -> None:
     """Test _find_monorepo_root uses impl when hook is None."""
     from scripts.guard import _find_monorepo_root
 
-    testing.guard_find_monorepo_root = None
+    hooks.guard_find_monorepo_root = None
 
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[2]
@@ -162,7 +161,7 @@ def test_load_orchestrator_uses_impl_when_hook_is_none() -> None:
     """Test _load_orchestrator uses impl when hook is None."""
     from scripts.guard import _load_orchestrator
 
-    testing.guard_load_orchestrator = None
+    hooks.guard_load_orchestrator = None
 
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[2]
@@ -188,8 +187,8 @@ def test_guard_main_entry_via_runpy(tmp_path: Path) -> None:
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     orig_argv = sys.argv
     sys.argv = ["guard", "--root", str(tmp_path)]
@@ -219,8 +218,8 @@ def test_guard_short_verbose_flag(capsys: CaptureFixture[str], tmp_path: Path) -
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     rc = guard_main(["--root", str(tmp_path), "-v"])
     out = capsys.readouterr().out
@@ -243,8 +242,8 @@ def test_guard_main_no_argv_uses_sys_argv(tmp_path: Path) -> None:
 
             return _run_for_project
 
-    testing.guard_find_monorepo_root = _FakeFindRoot()
-    testing.guard_load_orchestrator = _FakeLoader()
+    hooks.guard_find_monorepo_root = _FakeFindRoot()
+    hooks.guard_load_orchestrator = _FakeLoader()
 
     orig_argv = sys.argv
     sys.argv = ["guard", "--root", str(tmp_path)]

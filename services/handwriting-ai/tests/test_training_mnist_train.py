@@ -212,11 +212,16 @@ def test_train_calls_evaluate_in_epoch(tmp_path: Path, write_mnist_raw: MnistRaw
         called["n"] += 1
         return _orig(model, loader, device)
 
-    mt._evaluate = _spy  # patch
-    write_mnist_raw(cfg["data_root"], n=8)
-    result = train_with_config(cfg, (train_base, test_base))
-    assert result["state_dict"]  # has state dict
-    assert called["n"] >= 1
+    mt._evaluate = _spy
+    try:
+        write_mnist_raw(cfg["data_root"], n=8)
+        result = train_with_config(cfg, (train_base, test_base))
+        assert result["state_dict"]  # has state dict
+        assert called["n"] >= 1
+    finally:
+        # Previously never restored, so the spy leaked into every later test
+        # sharing this worker.
+        mt._evaluate = _orig
 
 
 def test_train_interrupt_saves_artifact(tmp_path: Path, write_mnist_raw: MnistRawWriter) -> None:

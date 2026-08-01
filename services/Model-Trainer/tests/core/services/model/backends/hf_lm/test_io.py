@@ -461,7 +461,7 @@ class TestLoadPreparedHFLMFromHandle:
     def test_loads_prepared_model_successfully(self) -> None:
         """Test successful loading of prepared model."""
         from model_trainer.core.services.finetuning.strategies._test_hooks import (
-            Hooks as FTStrategyHooks,
+            Hooks as FtHooks,
         )
 
         class _FakeTokHandle(TokenizerHandle):
@@ -480,7 +480,7 @@ class TestLoadPreparedHFLMFromHandle:
         Hooks.load_hf_model = _FakeModelLoader()
         Hooks.load_hf_tokenizer = _FakeTokenizerLoader()
         # Also set the full strategy's load hook
-        FTStrategyHooks.load_full_model = _FakeFullModelLoader(name_prefix="loaded-")
+        FtHooks.load_full_model = _FakeFullModelLoader(name_prefix="loaded-")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             metadata: JSONObject = {

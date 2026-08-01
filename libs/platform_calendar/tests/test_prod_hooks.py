@@ -647,7 +647,7 @@ class TestProdCliGetEnv:
 
         # Save original state
         original_env_loaded = testing._cli_env_loaded
-        original_env_cache = testing._cli_env_cache.copy()
+        original_env_cache = testing._cli_env_cache
 
         # Create a temporary .env file
         env_file = tmp_path / ".env"
@@ -682,7 +682,8 @@ class TestProdCliSetEnv:
         from platform_calendar import testing
 
         # Save original state
-        original_cache = testing._cli_env_cache.copy()
+        original_cache = testing._cli_env_cache
+        testing._cli_env_cache = dict(original_cache)
 
         # Set a value
         _prod_cli_set_env("TEST_SET_KEY", "test_set_value")

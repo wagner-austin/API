@@ -6,12 +6,12 @@ from collections.abc import Generator
 
 import pytest
 
-from platform_devpost.testing import reset_hooks
+from platform_devpost.testing import hooks
 
 
 @pytest.fixture(autouse=True)
 def _reset_hooks_fixture() -> Generator[None, None, None]:
     """Reset all hooks before and after each test."""
-    reset_hooks()
+    hooks.reset()
     yield
-    reset_hooks()
+    hooks.reset()

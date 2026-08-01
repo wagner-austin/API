@@ -56,8 +56,8 @@ def _find_monorepo_root(start: Path) -> Path:
     Returns:
         Path to monorepo root.
     """
-    if testing.guard_find_monorepo_root is not None:
-        return testing.guard_find_monorepo_root(start)
+    if testing.hooks.guard_find_monorepo_root is not None:
+        return testing.hooks.guard_find_monorepo_root(start)
     return _find_monorepo_root_impl(start)
 
 
@@ -88,8 +88,8 @@ def _load_orchestrator(monorepo_root: Path) -> _RunForProject:
     Returns:
         The run_for_project function.
     """
-    if testing.guard_load_orchestrator is not None:
-        return testing.guard_load_orchestrator(monorepo_root)
+    if testing.hooks.guard_load_orchestrator is not None:
+        return testing.hooks.guard_load_orchestrator(monorepo_root)
     return _load_orchestrator_impl(monorepo_root)
 
 

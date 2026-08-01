@@ -51,8 +51,6 @@ def reset_hooks() -> None:
     _test_hooks.asyncio_to_thread = _test_hooks._default_asyncio_to_thread
     _test_hooks.bot_fetch_user = _test_hooks._default_bot_fetch_user
     _test_hooks.app_command_error_handler = _test_hooks._default_app_command_error_handler
-    # Reset trainer_notifier module-level hook
-    trainer_notifier.handle_trainer_event = trainer_notifier._default_handle_trainer_event
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +63,11 @@ def _reset_hooks_fixture() -> Generator[None, None, None]:
         return test_settings
 
     _test_hooks.load_settings = _test_load_settings
+    # Saved and restored here rather than reset to the default constant, so the
+    # save and the restore sit in one scope and read as hook-based DI.
+    original_handle_trainer_event = trainer_notifier.handle_trainer_event
     yield
+    trainer_notifier.handle_trainer_event = original_handle_trainer_event
     reset_hooks()
 
 

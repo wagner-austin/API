@@ -19,6 +19,9 @@ from platform_workers.testing import (
 
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings, load_settings
+from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks
+from model_trainer.core.services.finetuning.strategies._test_hooks import Hooks as FtHooks
+from model_trainer.core.services.model.backends.hf_lm._test_hooks import Hooks as HfLmHooks
 
 # Use the import to cache sentencepiece in sys.modules with SWIG warnings suppressed
 _ = _spm_init
@@ -264,3 +267,20 @@ def _make_settings_with_paths(tmp_path: Path, settings_factory: SettingsFactory)
 
 
 settings_with_paths = pytest.fixture(_make_settings_with_paths)
+
+
+@pytest.fixture(autouse=True)
+def _reset_hook_containers() -> Generator[None, None, None]:
+    """Restore the class-level hook containers around every test.
+
+    Named on the containers rather than as bare reset_hooks() calls so the
+    isolation is attributable: tests below this conftest may assign
+    `Hooks.<attr>` knowing each attribute is restored per test.
+    """
+    Hooks.reset()
+    FtHooks.reset()
+    HfLmHooks.reset()
+    yield
+    Hooks.reset()
+    FtHooks.reset()
+    HfLmHooks.reset()

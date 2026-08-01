@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Generator
 from io import StringIO
 from pathlib import Path
 
@@ -32,13 +33,17 @@ class TestDefaultIsDir:
 class TestFindMonorepoRoot:
     """Tests for _find_monorepo_root function."""
 
-    def setup_method(self) -> None:
-        """Store original _is_dir for restoration."""
-        self._original_is_dir = guard._is_dir
+    @pytest.fixture(autouse=True)
+    def _restore_is_dir(self) -> Generator[None, None, None]:
+        """Save and restore guard._is_dir around each test in this class.
 
-    def teardown_method(self) -> None:
-        """Restore original _is_dir."""
-        guard._is_dir = self._original_is_dir
+        Written as one fixture rather than a setup/teardown pair so the save
+        and the restore live in a single scope, which is what makes the
+        injection legible as hook-based DI instead of ad-hoc patching.
+        """
+        original_is_dir = guard._is_dir
+        yield
+        guard._is_dir = original_is_dir
 
     def test_finds_root_with_libs_directory(self, tmp_path: Path) -> None:
         """Find root when libs directory exists."""

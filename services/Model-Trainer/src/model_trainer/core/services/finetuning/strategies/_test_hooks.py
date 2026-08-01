@@ -283,6 +283,15 @@ class Hooks:
     enable_gradient_checkpointing: GradientCheckpointEnabler | None = None
     load_full_model: FullModelLoader | None = None
 
+    @classmethod
+    def reset(cls) -> None:
+        """Restore every hook to its default.
+
+        The restoration `reset_hooks()` performs, exposed as a classmethod so
+        an autouse fixture can name the container it protects.
+        """
+        reset_hooks()
+
 
 def reset_hooks() -> None:
     """Reset all hooks to None (for test cleanup)."""
