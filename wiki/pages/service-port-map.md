@@ -6,8 +6,10 @@ related:
 source_paths:
   - README.md
   - docker-compose.yml
-  - services/doc-extract-api/docker-compose.yml
-fact_checked: "2026-07-20"
+  - services/data-bank-api/README.md
+  - services/data-bank-api/docker-compose.yml
+  - services/covenant-radar-api/docs/configuration.md
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [services]
 ---
@@ -16,7 +18,7 @@ hubs: [services]
 
 Every FastAPI service in the api monorepo binds to a fixed port. Ports are assigned once in the README's Services table (or, for services that layer their own compose on top of the root, in that service's own `docker-compose.yml`) and are stable across dev / staging / prod. New services claim the next free port in the 80xx range.[^1]
 
-## Assigned ports (14 services)
+## Assigned ports (13 services)
 
 | Port | Service | Purpose |
 |---|---|---|
@@ -32,12 +34,11 @@ Every FastAPI service in the api monorepo binds to a fixed port. Ports are assig
 | 8009 | `github-stats-api` | GitHub stats SVG card generation |
 | 8010 | `opportunity-radar-api` | Hackathon and competition discovery |
 | 8011 | `Art-Trainer` | Image generation model training (SD 1.5, SDXL, FLUX LoRAs via Kohya-ss) |
-| 8012 | `doc-extract-api` | PDF text extraction (pdfplumber + docTR OCR); layered `docker-compose.yml` in the service dir, not the root compose[^2] |
 | — | `procart-api` | Procedural art rendering orchestration (port not yet fixed) |
 
 ## Port binding convention
 
-Per data-bank's README: "The server port is configured via hypercorn's `--bind` flag (e.g., `--bind [::]:${PORT:-8000}`), not as an application environment variable." Every service follows this — port lives in the hypercorn / uvicorn invocation, not in the application config. This means:
+Per data-bank's README: "The server port is configured via hypercorn's `--bind` flag (e.g., `--bind [::]:${PORT:-8000}`), not as an application environment variable."[^2] The port lives in the hypercorn / uvicorn invocation rather than in the application config, so:
 
 - Local dev overrides port via `--bind` without touching config
 - Docker maps container port → host port in `docker-compose.yml`
@@ -45,24 +46,29 @@ Per data-bank's README: "The server port is configured via hypercorn's `--bind` 
 
 ## Traefik and cross-service routing
 
-In deployed environments, Traefik fronts the service fleet. Each service exposes standard endpoints:
+Traefik (`traefik:v3`, the root compose's `gateway` service) fronts the fleet on entrypoint `:80` with `--providers.docker.exposedbydefault=false`, so a container joins the mesh only by opting in with labels.[^3] Each service exposes the standard health endpoints:[^4]
 
 - `/healthz` — liveness (does the process respond?)
 - `/readyz` — readiness (are dependencies — Redis, disk, downstream services — reachable?)
 
-Traefik routes by hostname / path prefix, not by port directly. Ports matter for local dev and for the docker-compose network; deployed clients hit `service-name.internal` (or the Traefik-fronted URL), not `:80xx`.
+Routing is by **path prefix only**: all twelve routers in the repo declare a `PathPrefix` rule and there is no `Host(...)` rule anywhere, so Traefik does not route by hostname.[^5] Each router pairs a `stripprefix` middleware with `loadbalancer.server.port=8000`, which targets the *container* port — the 80xx numbers above are host-side mappings for local dev and `curl`, not inputs to Traefik's dispatch.[^6] Deployed cross-service URLs use the hosting platform's private DNS rather than a host port, e.g. `DATA_BANK_API_URL=http://data-bank-api.railway.internal:8080`.[^7]
 
 ## Adding a new service
 
-1. Claim the next port in the 80xx range (currently 8013 is free).
+1. Claim the next port in the 80xx range (8012 and 8013 are both free; 8012 was doc-extract-api's until it was removed).
 2. Add the row to the README's Services table.
-3. Add the service block to `docker-compose.yml` with `expose: [<port>]` and the standard Traefik labels — or, if the service needs its own compose overlay (e.g. GPU services with extra volumes, like doc-extract-api), add a `services/<name>/docker-compose.yml` that layers on top of the root compose.
+3. Add a `services/<name>/docker-compose.yml` overlay carrying the service block, its `ports: "<host>:8000"` mapping, and its five Traefik labels. The root `docker-compose.yml` is infrastructure only — `redis`, `kafka`, `postgres`, and `gateway` — and declares no application service and no `expose:` key at all.[^3]
 4. Wire `/healthz` + `/readyz` per the [[platform-workers-rq-pattern]] readyz helpers if the service depends on Redis.
 5. Follow [[monorepo-discipline]] — strict mypy, 100% coverage, `monorepo_guards`.
 
 ## Why fixed ports
 
-Consistency across dev / staging / prod: the same service is always on the same port. Runbooks, log queries, and troubleshooting scripts can hardcode the tuple `(service, port)` without a lookup. When Traefik or the docker network fails, you can still `curl localhost:8003/healthz` and get a useful signal.
+Each overlay hardcodes its own host-port mapping and the README table fixes the assignment,[^1][^6] so the same service answers on the same port in every environment. Runbooks, log queries, and troubleshooting scripts can hardcode the tuple `(service, port)` without a lookup, and when Traefik or the docker network is down `curl localhost:8003/healthz` still reaches the container directly.[^4]
 
-[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim (rows for 8000-8012 + procart-api). doc-extract-api's 8012 is listed there and independently confirmed by [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml), which is where it was authoritative before the root README row was added.
-[^2]: [`services/doc-extract-api/docker-compose.yml`](../../services/doc-extract-api/docker-compose.yml) — `ports: "8012:8000"` maps host 8012 → container 8000. The compose file declares "Requires root docker-compose to be running first (provides platform-redis + network)."
+[^1]: [`README.md`](../../README.md) — Services table with the port assignments verbatim (rows for 8000-8011 + procart-api).
+[^2]: [`services/data-bank-api/README.md`](../../services/data-bank-api/README.md):78 — verbatim: "> **Note:** The server port is configured via hypercorn's `--bind` flag (e.g., `--bind [::]:${PORT:-8000}`), not as an application environment variable." Verified 2026-07-31.
+[^3]: [`docker-compose.yml`](../../docker-compose.yml):101-113 — the `gateway` service is `image: traefik:v3` with `--providers.docker.exposedbydefault=false` and `--entrypoints.web.address=:80`. The file's only top-level service keys are `redis`, `kafka`, `postgres`, `gateway`; a repo-wide grep of the file returns zero `expose:` occurrences. Verified 2026-07-31.
+[^4]: [`README.md`](../../README.md):142 — verbatim: "- Health endpoints (`/healthz`, `/readyz`)".
+[^5]: Repo-wide sweep of `traefik.http.routers.*.rule=` across every `*.yml` (2026-07-31) returns twelve rules — `/art-trainer`, `/covenant`, `/data-bank`, `/github-stats`, `/grandma`, `/handwriting`, `/music`, `/opportunity`, `/qr`, `/trainer`, `/transcript`, `/turkic` — every one a `PathPrefix`, and no `Host(` rule in the repo. Corrects this page's pre-2026-07-31 claim that Traefik routed "by hostname / path prefix".
+[^6]: [`services/data-bank-api/docker-compose.yml`](../../services/data-bank-api/docker-compose.yml):20-28 — `ports: - "8001:8000"` followed by the five labels: `traefik.enable=true`, `routers.databank.rule=PathPrefix(\`/data-bank\`)`, `routers.databank.middlewares=databank-strip`, `middlewares.databank-strip.stripprefix.prefixes=/data-bank`, `services.databank.loadbalancer.server.port=8000`, plus `traefik.docker.network=platform-network`.
+[^7]: [`services/covenant-radar-api/docs/configuration.md`](../../services/covenant-radar-api/docs/configuration.md):118 — `DATA_BANK_API_URL=http://data-bank-api.railway.internal:8080`. Corrects this page's pre-2026-07-31 claim that deployed clients hit `service-name.internal`.

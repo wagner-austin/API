@@ -28,7 +28,6 @@ Skip: hobby services (`grandma-api`, `github-stats-api`, `procart-api`) unless c
 | [grandma-api](services/grandma-api) | 8008 | Multi-language audio-to-English translation (Whisper STT + language detection, GPT-4o-mini translation) |
 | [github-stats-api](services/github-stats-api) | 8009 | GitHub stats SVG card generation |
 | [opportunity-radar-api](services/opportunity-radar-api) | 8010 | Hackathon and competition discovery |
-| [doc-extract-api](services/doc-extract-api) | 8012 | PDF text extraction with pdfplumber + docTR OCR fallback |
 | [procart-api](services/procart-api) | - | Procedural art rendering orchestration |
 
 ## Clients

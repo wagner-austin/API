@@ -139,3 +139,15 @@ Audited all 14 service READMEs against their code (routes registered, env vars r
 Also corrected in `transcript-api/src/transcript_api/api/routes/__init__.py:6`: its docstring had documented `GET /readyz — Readiness probe (checks Redis + workers)` for a route that was never registered. The docstring is now true rather than deleted.
 
 Root cause worth recording: the health contract lived only in prose — the root README, this wiki, and each service's own README asserted it, but nothing enforced it. Four services drifted out of it without any check failing. A `monorepo_guards` rule asserting that every FastAPI service registers both routes would make the claim self-enforcing; not written this session.
+
+---
+## [2026-07-31] correct | doc-extract-api removed from the api monorepo
+Pages written: none
+Pages updated: pages/service-port-map.md (8012 row dropped, count 14 -> 13, Traefik router count thirteen -> twelve, footnotes renumbered), pages/platform-workers-rq-pattern.md (dropped from the platform_workers consumer list), hubs/services.md, index.md
+Root docs updated: README.md services table
+
+`services/doc-extract-api/` is gone. It was a superseded fork: the live implementation is `~/PROJECTS/MCPs/doc-extract-api`, which runs as the `mcp-doc-extract-api` container on 127.0.0.1:8018, carries 26 source modules to the api copy's 15, and tracks the corvis schema (`tenant_memberships`, `content_hash` dedup via `ON CONFLICT (tenant_id, content_hash)`, a `startup.py` that asserts expected migrations). Nothing in the api monorepo imported `doc_extract_api`, and the MCPs copy has the same pdfplumber + docTR extraction modules, so nothing was lost.
+
+How the drift stayed invisible: the api copy's only link to corvis was through its *tests*, which walked up to `../MCPs/.env` for `DATABASE_TEST_URL` and wrote into `corvis_test`. Its production code was a snapshot of a schema corvis had moved past three times — `users` replaced by `accounts` + `tenant_memberships`, `content_hash` added NOT NULL, and `documents.category` promoted to a foreign key into the `document_categories` taxonomy (`irvine.council.agenda`-style slugs) while the service still validated against a flat 15-value list matching nothing. Those failures never surfaced because `make check` stops at the guard step, and this project's guards were red, so its tests had not run.
+
+Rule this suggests: a service in this monorepo should not reach into another repo's `.env` for a database. That coupling is what let a dead fork keep "passing" while diverging from the schema it depended on.
