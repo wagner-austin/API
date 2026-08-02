@@ -21,6 +21,7 @@ def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
     """Process ALL message types from a session."""
     session_text = _test_hooks.read_text(session_path)
     from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
     session_json = narrow_json_to_dict(load_json_str(session_text))
     session = decode_capture_session(session_json)
 
@@ -50,13 +51,15 @@ def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
 
             # Supervisor tunneled inside 0x2E
             if decoded[0] == 0x52 and len(decoded) >= 4:
-                results["supervisor"].append({
-                    "timestamp_ms": ts,
-                    "status": decoded[1],
-                    "reserved": decoded[2],
-                    "data": decoded[3],
-                    "bytes": list(decoded),
-                })
+                results["supervisor"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "status": decoded[1],
+                        "reserved": decoded[2],
+                        "data": decoded[3],
+                        "bytes": list(decoded),
+                    }
+                )
                 continue
 
             # FuelGain tunneled (0x44)
@@ -64,50 +67,59 @@ def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
                 fuel_total = decoded[1] | (decoded[2] << 8)
                 if len(decoded) >= 4:
                     fuel_total = decoded[1] | (decoded[2] << 8) | (decoded[3] << 16)
-                results["fuel_gain"].append({
-                    "timestamp_ms": ts,
-                    "fuel_total": fuel_total,
-                    "bytes": list(decoded),
-                })
+                results["fuel_gain"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "fuel_total": fuel_total,
+                        "bytes": list(decoded),
+                    }
+                )
                 continue
 
             # ActionDone tunneled (0x54)
             if decoded[0] == 0x54:
-                results["action_done"].append({
-                    "timestamp_ms": ts,
-                    "bytes": list(decoded),
-                    "length": len(decoded),
-                })
+                results["action_done"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "bytes": list(decoded),
+                        "length": len(decoded),
+                    }
+                )
                 continue
 
             # 0x3d and 0x2e self (already analyzed)
             if decoded[0] == 0x3D and len(decoded) == 13:
                 b = list(decoded)
                 tid = b[2] | (b[3] << 8)
-                results["0x3d"].append({
-                    "timestamp_ms": ts,
-                    "tank_id": tid,
-                    "x": b[4], "y": b[5],
-                    "direction": b[6],
-                    "damage_state": b[7],
-                    "rank": b[8],
-                    "lb_high": b[10],
-                    "rank_points": b[11],
-                })
+                results["0x3d"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "tank_id": tid,
+                        "x": b[4],
+                        "y": b[5],
+                        "direction": b[6],
+                        "damage_state": b[7],
+                        "rank": b[8],
+                        "lb_high": b[10],
+                        "rank_points": b[11],
+                    }
+                )
                 continue
 
             if decoded[0] == 0x2E and len(decoded) == 13:
                 b = list(decoded)
                 tid = b[2] | (b[3] << 8)
-                results["0x2e_self"].append({
-                    "timestamp_ms": ts,
-                    "tank_id": tid,
-                    "damage_state": b[4],
-                    "byte7": b[7],
-                    "byte8": b[8],
-                    "byte11": b[11],
-                    "byte12": b[12],
-                })
+                results["0x2e_self"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "tank_id": tid,
+                        "damage_state": b[4],
+                        "byte7": b[7],
+                        "byte8": b[8],
+                        "byte11": b[11],
+                        "byte12": b[12],
+                    }
+                )
                 continue
 
         else:
@@ -116,18 +128,21 @@ def process_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
             if len(decoded) >= 3 and decoded[0] == 0x44:
                 fuel_total = decoded[1] | (decoded[2] << 8)
                 if len(decoded) >= 4:
-                    fuel_total |= (decoded[3] << 16)
-                results["fuel_gain"].append({
-                    "timestamp_ms": ts,
-                    "fuel_total": fuel_total,
-                    "bytes": list(decoded),
-                })
+                    fuel_total |= decoded[3] << 16
+                results["fuel_gain"].append(
+                    {
+                        "timestamp_ms": ts,
+                        "fuel_total": fuel_total,
+                        "bytes": list(decoded),
+                    }
+                )
 
     return dict(results)
 
 
 def main() -> None:
     from platform_core.logging import setup_rich_logging
+
     setup_rich_logging(level="WARNING")
 
     bot_dir = Path("runs/bot")
@@ -167,14 +182,17 @@ def main() -> None:
     kill_timestamps: list[tuple[int, int]] = []
     for tid, msgs in u3d_by_tank.items():
         for i in range(1, len(msgs)):
-            prev_dmg = msgs[i-1]["damage_state"]
+            prev_dmg = msgs[i - 1]["damage_state"]
             curr_dmg = msgs[i]["damage_state"]
             if curr_dmg == 0 and prev_dmg == 1:
-                gap = msgs[i]["timestamp_ms"] - msgs[i-1]["timestamp_ms"]
+                gap = msgs[i]["timestamp_ms"] - msgs[i - 1]["timestamp_ms"]
                 if gap > 5000:
-                    kill_timestamps.append((msgs[i-1]["timestamp_ms"], tid))
+                    kill_timestamps.append((msgs[i - 1]["timestamp_ms"], tid))
             if curr_dmg == 1 and prev_dmg == 2:
-                if i == len(msgs) - 1 or msgs[i+1]["timestamp_ms"] - msgs[i]["timestamp_ms"] > 10000:
+                if (
+                    i == len(msgs) - 1
+                    or msgs[i + 1]["timestamp_ms"] - msgs[i]["timestamp_ms"] > 10000
+                ):
                     kill_timestamps.append((msgs[i]["timestamp_ms"], tid))
 
     kill_timestamps.sort()
@@ -196,7 +214,9 @@ def main() -> None:
         if best_delta < 5000:
             matched_kills += 1
             assert best_kill is not None
-            print(f"  MATCH: supervisor ts={sv_ts} kill ts={best_kill[0]} tank={best_kill[1]} delta={best_delta}ms")
+            print(
+                f"  MATCH: supervisor ts={sv_ts} kill ts={best_kill[0]} tank={best_kill[1]} delta={best_delta}ms"
+            )
         else:
             unmatched_supervisors += 1
             print(f"  UNMATCHED: supervisor ts={sv_ts} (nearest kill {best_delta}ms away)")
@@ -270,13 +290,15 @@ def main() -> None:
                 if match_low:
                     match_count += 1
                 if total_checked <= 20:
-                    print(f"    FuelGain={fg_fuel} (low=0x{fuel_low:02x} high=0x{fuel_high:02x}) "
-                          f"byte11=0x{b11:02x} byte8=0x{b8:02x} "
-                          f"low_match={match_low} high_match={match_high} delta={closest_delta}ms")
+                    print(
+                        f"    FuelGain={fg_fuel} (low=0x{fuel_low:02x} high=0x{fuel_high:02x}) "
+                        f"byte11=0x{b11:02x} byte8=0x{b8:02x} "
+                        f"low_match={match_low} high_match={match_high} delta={closest_delta}ms"
+                    )
 
         print(f"\n  byte11 == fuel & 0xFF: {match_count}/{total_checked}")
         if total_checked > 0:
-            print(f"  Match rate: {100*match_count/total_checked:.1f}%")
+            print(f"  Match rate: {100 * match_count / total_checked:.1f}%")
 
     # ================================================================
     # 4. Combat_data viewport offset verification
@@ -296,7 +318,12 @@ def main() -> None:
         cd = ch.get("combat_data_bytes", [])
         aid = ch.get("attacker_id")
         ts = ch.get("timestamp_ms")
-        if not isinstance(cd, list) or len(cd) < 6 or not isinstance(aid, int) or not isinstance(ts, int):
+        if (
+            not isinstance(cd, list)
+            or len(cd) < 6
+            or not isinstance(aid, int)
+            or not isinstance(ts, int)
+        ):
             continue
 
         # cd[0:2] = attacker map position (proven)

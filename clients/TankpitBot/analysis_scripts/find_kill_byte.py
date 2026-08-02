@@ -59,24 +59,27 @@ def main() -> None:
 
     for tid, msgs in u3d_by_tank.items():
         for i in range(1, len(msgs)):
-            prev_dmg = msgs[i-1]["raw_bytes"][7]
+            prev_dmg = msgs[i - 1]["raw_bytes"][7]
             curr_dmg = msgs[i]["raw_bytes"][7]
 
             # Damage went from 2 -> 1 (medium -> critical) or 1 -> ???
             # Check if the stream STOPS after reaching critical damage
             if curr_dmg == 1 and prev_dmg == 2:
                 # Is this the last message, or is there a long gap after?
-                if i == len(msgs) - 1 or msgs[i+1]["timestamp_ms"] - msgs[i]["timestamp_ms"] > 10000:
+                if (
+                    i == len(msgs) - 1
+                    or msgs[i + 1]["timestamp_ms"] - msgs[i]["timestamp_ms"] > 10000
+                ):
                     kill_timestamps.append((msgs[i]["timestamp_ms"], tid))
 
             # Also check: damage went from 1 -> 0 (critical -> full = healed/respawned)
             # after a gap. The transition TO damage_state 0 after being at 1 with a gap
             # indicates death + respawn
             if curr_dmg == 0 and prev_dmg == 1:
-                gap = msgs[i]["timestamp_ms"] - msgs[i-1]["timestamp_ms"]
+                gap = msgs[i]["timestamp_ms"] - msgs[i - 1]["timestamp_ms"]
                 if gap > 5000:
                     # The kill happened at the LAST dmg=1 message
-                    kill_timestamps.append((msgs[i-1]["timestamp_ms"], tid))
+                    kill_timestamps.append((msgs[i - 1]["timestamp_ms"], tid))
 
     kill_timestamps.sort()
     print(f"  Inferred kill events: {len(kill_timestamps)}")
@@ -103,7 +106,9 @@ def main() -> None:
                 print("    (no 0x2e messages nearby)")
                 continue
 
-            print(f"    {'ts':>16} {'b4':>4} {'b5':>4} {'b6':>4} {'b7':>4} {'b8':>4} {'b9':>4} {'b10':>4} {'b11':>4} {'b12':>4} {'delta':>6}")
+            print(
+                f"    {'ts':>16} {'b4':>4} {'b5':>4} {'b6':>4} {'b7':>4} {'b8':>4} {'b9':>4} {'b10':>4} {'b11':>4} {'b12':>4} {'delta':>6}"
+            )
             prev_bytes = None
             for u in nearby:
                 b = u["raw_bytes"]
@@ -118,7 +123,9 @@ def main() -> None:
                     if changed_indices:
                         changes = f" changed={changed_indices}"
 
-                print(f"    {ts:>16} {b[4]:>4} {b[5]:>4} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[9]:>4} {b[10]:>4} {b[11]:>4} {b[12]:>4} {delta:>+6}{marker}{changes}")
+                print(
+                    f"    {ts:>16} {b[4]:>4} {b[5]:>4} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[9]:>4} {b[10]:>4} {b[11]:>4} {b[12]:>4} {delta:>+6}{marker}{changes}"
+                )
                 prev_bytes = list(b)
 
     # ================================================================
@@ -160,7 +167,7 @@ def main() -> None:
         inc_count = 0
         dec_count = 0
         for i in range(1, len(u2e)):
-            prev = u2e[i-1]["raw_bytes"][byte_idx]
+            prev = u2e[i - 1]["raw_bytes"][byte_idx]
             curr = u2e[i]["raw_bytes"][byte_idx]
             if curr > prev:
                 inc_count += 1
@@ -190,13 +197,17 @@ def main() -> None:
                 continue
 
             print(f"\n  KILL: tank={kill_tid} at ts={kill_ts}")
-            print(f"    {'ts':>16} {'x':>4} {'y':>4} {'dir':>4} {'dmg':>4} {'rank':>4} {'lb':>4} {'rp':>4} {'delta':>6}")
+            print(
+                f"    {'ts':>16} {'x':>4} {'y':>4} {'dir':>4} {'dmg':>4} {'rank':>4} {'lb':>4} {'rp':>4} {'delta':>6}"
+            )
             for u in nearby_3d:
                 b = u["raw_bytes"]
                 ts = u["timestamp_ms"]
                 delta = ts - kill_ts
                 marker = " <-- KILL" if abs(delta) < 100 else ""
-                print(f"    {ts:>16} {b[4]:>4} {b[5]:>4} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[10]:>4} {b[11]:>4} {delta:>+6}{marker}")
+                print(
+                    f"    {ts:>16} {b[4]:>4} {b[5]:>4} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[10]:>4} {b[11]:>4} {delta:>+6}{marker}"
+                )
 
     # ================================================================
     # Step 7: TSS extra_byte (rank_points) — does it jump on kills?
@@ -209,14 +220,18 @@ def main() -> None:
 
         for kill_ts, kill_tid in kill_timestamps[:10]:
             # Find TSS for the killed tank around kill time
-            nearby_tss = [t for t in tss_list
-                          if t["tank_id"] == kill_tid
-                          and abs(t["timestamp_ms"] - kill_ts) < 5000]
+            nearby_tss = [
+                t
+                for t in tss_list
+                if t["tank_id"] == kill_tid and abs(t["timestamp_ms"] - kill_ts) < 5000
+            ]
             if nearby_tss:
                 print(f"\n  KILL: tank={kill_tid} at ts={kill_ts}")
                 for t in sorted(nearby_tss, key=lambda x: x["timestamp_ms"]):
                     delta = t["timestamp_ms"] - kill_ts
-                    print(f"    ts={t['timestamp_ms']} dmg={t['damage_state']} rank={t['rank']} rp={t.get('extra_byte')} delta={delta:>+6}")
+                    print(
+                        f"    ts={t['timestamp_ms']} dmg={t['damage_state']} rank={t['rank']} rp={t.get('extra_byte')} delta={delta:>+6}"
+                    )
 
 
 if __name__ == "__main__":

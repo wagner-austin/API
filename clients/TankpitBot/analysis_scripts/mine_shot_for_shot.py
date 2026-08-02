@@ -1,4 +1,5 @@
 """Archive test of the shot-for-shot contract: hits taken vs returns fired, and stop->stop gaps."""
+
 import json
 import re
 from collections import Counter
@@ -14,6 +15,7 @@ stop_gap_buckets = Counter()
 total_hits_on_bots = 0
 total_bot_returns = 0
 
+
 def split_frames(payload):
     data = decode_base64_safe(payload)
     if not data:
@@ -26,6 +28,7 @@ def split_frames(payload):
             break
         yield data[off : off + ln]
         off += ln
+
 
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     try:
@@ -83,9 +86,12 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
             gap_s = (last_shot_by[tid] - last_hit_on[tid]) / 1000
             stop_gap_buckets[max(min(round(gap_s), 10), -10)] += 1
 
-print(f"total hits on bots: {total_hits_on_bots}, total bot shots: {total_bot_returns}, "
-      f"global ratio {total_bot_returns / max(total_hits_on_bots, 1):.2f}")
-print("per-bot fired/taken ratio (engagements with >=3 hits):",
-      dict(sorted(ratio_buckets.items())))
-print("last-bot-shot minus last-hit-taken, seconds (clamped +/-10):",
-      dict(sorted(stop_gap_buckets.items())))
+print(
+    f"total hits on bots: {total_hits_on_bots}, total bot shots: {total_bot_returns}, "
+    f"global ratio {total_bot_returns / max(total_hits_on_bots, 1):.2f}"
+)
+print("per-bot fired/taken ratio (engagements with >=3 hits):", dict(sorted(ratio_buckets.items())))
+print(
+    "last-bot-shot minus last-hit-taken, seconds (clamped +/-10):",
+    dict(sorted(stop_gap_buckets.items())),
+)

@@ -92,25 +92,33 @@ def main() -> None:
             if b12 == d_3d:
                 match_count += 1
             elif b12 != b4:
-                print(f"    ts={ts} byte4(self_dmg)={b4} byte12={b12} 0x3d_dmg={d_3d} delta_ms={closest_delta}")
+                print(
+                    f"    ts={ts} byte4(self_dmg)={b4} byte12={b12} 0x3d_dmg={d_3d} delta_ms={closest_delta}"
+                )
 
     print(f"\n  byte12 == 0x3d[7]: {match_count}/{total}")
     if total > 0:
-        print(f"  Match rate: {100*match_count/total:.1f}%")
+        print(f"  Match rate: {100 * match_count / total:.1f}%")
 
     # Check: is byte12 just byte4 from the PREVIOUS tick?
     print()
     print("  byte12 == previous_byte4 (1-message lag)?")
-    lag1 = sum(1 for i in range(1, len(u2e)) if u2e[i]["raw_bytes"][12] == u2e[i-1]["raw_bytes"][4])
-    print(f"    {lag1}/{len(u2e)-1} ({100*lag1/(len(u2e)-1):.1f}%)")
+    lag1 = sum(
+        1 for i in range(1, len(u2e)) if u2e[i]["raw_bytes"][12] == u2e[i - 1]["raw_bytes"][4]
+    )
+    print(f"    {lag1}/{len(u2e) - 1} ({100 * lag1 / (len(u2e) - 1):.1f}%)")
 
     # Check: is byte12 == byte4 from 2 messages ago?
-    lag2 = sum(1 for i in range(2, len(u2e)) if u2e[i]["raw_bytes"][12] == u2e[i-2]["raw_bytes"][4])
-    print(f"  byte12 == byte4[t-2]: {lag2}/{len(u2e)-2} ({100*lag2/(len(u2e)-2):.1f}%)")
+    lag2 = sum(
+        1 for i in range(2, len(u2e)) if u2e[i]["raw_bytes"][12] == u2e[i - 2]["raw_bytes"][4]
+    )
+    print(f"  byte12 == byte4[t-2]: {lag2}/{len(u2e) - 2} ({100 * lag2 / (len(u2e) - 2):.1f}%)")
 
     # Check: is byte12 the NEXT byte4 (lookahead)?
-    look1 = sum(1 for i in range(len(u2e)-1) if u2e[i]["raw_bytes"][12] == u2e[i+1]["raw_bytes"][4])
-    print(f"  byte12 == byte4[t+1]: {look1}/{len(u2e)-1} ({100*look1/(len(u2e)-1):.1f}%)")
+    look1 = sum(
+        1 for i in range(len(u2e) - 1) if u2e[i]["raw_bytes"][12] == u2e[i + 1]["raw_bytes"][4]
+    )
+    print(f"  byte12 == byte4[t+1]: {look1}/{len(u2e) - 1} ({100 * look1 / (len(u2e) - 1):.1f}%)")
 
     # ================================================================
     # DIRECTION: use movement byte[5] vs last waypoint direction
@@ -140,7 +148,7 @@ def main() -> None:
         counts = dict(sorted(dir_to_b5[d_char].items(), key=lambda x: -x[1]))
         total_dir = sum(counts.values())
         top3 = list(counts.items())[:3]
-        top3_str = ", ".join(f"{v}({c}/{total_dir}={100*c/total_dir:.0f}%)" for v, c in top3)
+        top3_str = ", ".join(f"{v}({c}/{total_dir}={100 * c / total_dir:.0f}%)" for v, c in top3)
         print(f"    last='{d_char}': top values: {top3_str}")
 
     print()
@@ -149,7 +157,7 @@ def main() -> None:
         counts = dict(sorted(dir_to_b5_first[d_char].items(), key=lambda x: -x[1]))
         total_dir = sum(counts.values())
         top3 = list(counts.items())[:3]
-        top3_str = ", ".join(f"{v}({c}/{total_dir}={100*c/total_dir:.0f}%)" for v, c in top3)
+        top3_str = ", ".join(f"{v}({c}/{total_dir}={100 * c / total_dir:.0f}%)" for v, c in top3)
         print(f"    first='{d_char}': top values: {top3_str}")
 
     # Check if byte[5] is the direction BEFORE the movement (heading at start)
@@ -169,7 +177,7 @@ def main() -> None:
     for pid, moves in by_player.items():
         moves.sort(key=lambda x: x["timestamp_ms"])
         for i in range(1, len(moves)):
-            prev_wp = moves[i-1].get("waypoints", "")
+            prev_wp = moves[i - 1].get("waypoints", "")
             curr_raw = moves[i].get("raw_bytes", [])
             if not prev_wp or not isinstance(curr_raw, list) or len(curr_raw) < 6:
                 continue
@@ -181,7 +189,7 @@ def main() -> None:
         counts = dict(sorted(prev_last_to_b5[d_char].items(), key=lambda x: -x[1]))
         total_dir = sum(counts.values())
         top3 = list(counts.items())[:3]
-        top3_str = ", ".join(f"{v}({c}/{total_dir}={100*c/total_dir:.0f}%)" for v, c in top3)
+        top3_str = ", ".join(f"{v}({c}/{total_dir}={100 * c / total_dir:.0f}%)" for v, c in top3)
         print(f"    prev_last='{d_char}': next byte[5] top values: {top3_str}")
 
     # ================================================================
@@ -204,13 +212,13 @@ def main() -> None:
             continue
         ex, ey = m_sx, m_sy
         for c in wp:
-            if c == 'n':
+            if c == "n":
                 ey -= 1
-            elif c == 's':
+            elif c == "s":
                 ey += 1
-            elif c == 'e':
+            elif c == "e":
                 ex += 1
-            elif c == 'w':
+            elif c == "w":
                 ex -= 1
 
         # Find 0x3d at end position within 500ms
@@ -221,7 +229,9 @@ def main() -> None:
                 continue
             u_x, u_y = b[4], b[5]
             if abs(u_x - ex) <= 1 and abs(u_y - ey) <= 1:
-                print(f"    last_wp='{last_dir}' end=({ex},{ey}) 0x3d pos=({u_x},{u_y}) 0x3d[6]={b[6]}")
+                print(
+                    f"    last_wp='{last_dir}' end=({ex},{ey}) 0x3d pos=({u_x},{u_y}) 0x3d[6]={b[6]}"
+                )
                 break
 
 

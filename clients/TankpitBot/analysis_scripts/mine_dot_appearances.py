@@ -55,9 +55,7 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
             elif dm["msg_type"] == 0x4F:
                 for c in dm["containers"]:
                     if c["volume"] > 0:
-                        events.append(
-                            (m["timestamp_ms"], "reveal", (c["x"], c["y"], c["volume"]))
-                        )
+                        events.append((m["timestamp_ms"], "reveal", (c["x"], c["y"], c["volume"])))
             elif dm["msg_type"] == 0x5A:
                 left, top = dm["viewport_left"], dm["viewport_top"]
                 for e in dm["entities"]:

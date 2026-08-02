@@ -97,6 +97,7 @@ def scan_session(path: Path, agg: dict) -> None:
                 }
             )
             del death_watch[tid]
+
     last_tier: dict[int, tuple[int, int]] = {}  # id -> (ts, tier)
     max_rank: dict[int, int] = {}
     session_bot_shots = 0
@@ -243,7 +244,9 @@ def scan_session(path: Path, agg: dict) -> None:
                 if is_bot(sid):
                     session_bot_shots += 1
                     agg["bot_shot_weapons"][m["weapon"]] += 1
-                    rng = max(abs(m["target_x"] - m["source_x"]), abs(m["target_y"] - m["source_y"]))
+                    rng = max(
+                        abs(m["target_x"] - m["source_x"]), abs(m["target_y"] - m["source_y"])
+                    )
                     agg["bot_shot_range"][min(rng, 20)] += 1
                     atk = last_attacker.get(sid)
                     if atk is not None and atk in last_pos:

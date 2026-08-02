@@ -1,4 +1,5 @@
 """Archive check: radar low-fuel no-debit floor + initial extras stock."""
+
 import json
 from collections import Counter
 from pathlib import Path
@@ -10,7 +11,7 @@ from tankpit_bot.validate.wire_timeline import extract_wire_timeline
 from tankpit_bot.protocol.commands import CMD_RADAR
 
 first_inventory = Counter()
-floor_deltas = Counter()      # fuel-level bucket -> delta counter for isolated radar windows
+floor_deltas = Counter()  # fuel-level bucket -> delta counter for isolated radar windows
 low_fuel_examples = []
 
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
@@ -26,12 +27,8 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     if tl["inventory_snapshots"]:
         first_inventory[tl["inventory_snapshots"][0]["counts"][4]] += 1
     readings = tl["fuel_readings"]
-    radar_times = sorted(
-        a["timestamp_ms"] for a in tl["sent_actions"] if a["command"] == CMD_RADAR
-    )
-    other_times = sorted(
-        a["timestamp_ms"] for a in tl["sent_actions"] if a["command"] != CMD_RADAR
-    )
+    radar_times = sorted(a["timestamp_ms"] for a in tl["sent_actions"] if a["command"] == CMD_RADAR)
+    other_times = sorted(a["timestamp_ms"] for a in tl["sent_actions"] if a["command"] != CMD_RADAR)
     contamination = sorted(
         [s["timestamp_ms"] for s in tl["own_shots"]]
         + [s["timestamp_ms"] for s in tl["enemy_shots"]]
@@ -40,6 +37,7 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
         + [r["timestamp_ms"] for r in readings if r["from_event"]]
     )
     from bisect import bisect_right
+
     for i in range(1, len(readings)):
         a, b = readings[i - 1], readings[i]
         ta, tb = a["timestamp_ms"], b["timestamp_ms"]
@@ -49,7 +47,15 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
         if radars != 1 or others or dirty:
             continue
         delta = b["fuel"] - a["fuel"]
-        bucket = "0-49" if a["fuel"] < 50 else "50-99" if a["fuel"] < 100 else "100-199" if a["fuel"] < 200 else "200+"
+        bucket = (
+            "0-49"
+            if a["fuel"] < 50
+            else "50-99"
+            if a["fuel"] < 100
+            else "100-199"
+            if a["fuel"] < 200
+            else "200+"
+        )
         floor_deltas[(bucket, delta)] += 1
         if a["fuel"] < 100 and len(low_fuel_examples) < 10:
             low_fuel_examples.append((path.name[:28], a["fuel"], delta))

@@ -92,12 +92,14 @@ def _analyze_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
         try:
             decoded_msg = decode_container_message(decoded_bytes)
         except Exception as e:
-            results["DECODE_ERROR"].append({
-                "timestamp_ms": msg["timestamp_ms"],
-                "error": str(e),
-                "raw_hex": decoded_bytes.hex(),
-                "length": len(decoded_bytes),
-            })
+            results["DECODE_ERROR"].append(
+                {
+                    "timestamp_ms": msg["timestamp_ms"],
+                    "error": str(e),
+                    "raw_hex": decoded_bytes.hex(),
+                    "length": len(decoded_bytes),
+                }
+            )
             continue
 
         entry: dict[str, object] = {
@@ -110,155 +112,245 @@ def _analyze_session(session_path: Path) -> dict[str, list[dict[str, object]]]:
 
         # Extract ALL fields from every message type — nothing skipped
         match decoded_msg:
-            case {"msg_type": "combat_hit", "direction": d, "attacker_id": aid, "combat_data": cd, "is_outgoing": out}:
+            case {
+                "msg_type": "combat_hit",
+                "direction": d,
+                "attacker_id": aid,
+                "combat_data": cd,
+                "is_outgoing": out,
+            }:
                 weapon_byte = cd[-1] if len(cd) > 0 else -1
-                entry.update({
-                    "direction_byte": d,
-                    "attacker_id": aid,
-                    "is_outgoing": out,
-                    "weapon_byte": weapon_byte,
-                    "combat_data_hex": cd.hex(),
-                    "combat_data_bytes": list(cd),
-                    "cd_byte0": cd[0] if len(cd) > 0 else None,
-                    "cd_byte1": cd[1] if len(cd) > 1 else None,
-                    "cd_byte2": cd[2] if len(cd) > 2 else None,
-                    "cd_byte3": cd[3] if len(cd) > 3 else None,
-                    "cd_byte4": cd[4] if len(cd) > 4 else None,
-                    "cd_byte5": cd[5] if len(cd) > 5 else None,
-                    "cd_byte6": cd[6] if len(cd) > 6 else None,
-                })
+                entry.update(
+                    {
+                        "direction_byte": d,
+                        "attacker_id": aid,
+                        "is_outgoing": out,
+                        "weapon_byte": weapon_byte,
+                        "combat_data_hex": cd.hex(),
+                        "combat_data_bytes": list(cd),
+                        "cd_byte0": cd[0] if len(cd) > 0 else None,
+                        "cd_byte1": cd[1] if len(cd) > 1 else None,
+                        "cd_byte2": cd[2] if len(cd) > 2 else None,
+                        "cd_byte3": cd[3] if len(cd) > 3 else None,
+                        "cd_byte4": cd[4] if len(cd) > 4 else None,
+                        "cd_byte5": cd[5] if len(cd) > 5 else None,
+                        "cd_byte6": cd[6] if len(cd) > 6 else None,
+                    }
+                )
 
-            case {"msg_type": "tank_update_compact" | "tank_update_extended" | "tank_update_full" as mt, "flags": f, "tank_id": tid, "status_data": sd}:
-                entry.update({
-                    "sub_type": mt,
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "flags_bits": f"{f:08b}",
-                    "tank_id": tid,
-                    "status_data_hex": sd.hex(),
-                    "status_data_bytes": list(sd),
-                })
+            case {
+                "msg_type": "tank_update_compact"
+                | "tank_update_extended"
+                | "tank_update_full" as mt,
+                "flags": f,
+                "tank_id": tid,
+                "status_data": sd,
+            }:
+                entry.update(
+                    {
+                        "sub_type": mt,
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "flags_bits": f"{f:08b}",
+                        "tank_id": tid,
+                        "status_data_hex": sd.hex(),
+                        "status_data_bytes": list(sd),
+                    }
+                )
                 for i, b in enumerate(sd):
                     entry[f"sd_byte{i}"] = b
 
-            case {"msg_type": "tank_status_short", "flags": f, "tank_id": tid, "damage_state": dmg, "rank": rank, "leaderboard_position": lb}:
-                entry.update({
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "flags_bits": f"{f:08b}",
-                    "tank_id": tid,
-                    "damage_state": dmg,
-                    "rank": rank,
-                    "leaderboard_position": lb,
-                    "extra_byte": decoded_bytes[8] if len(decoded_bytes) > 8 else None,
-                })
+            case {
+                "msg_type": "tank_status_short",
+                "flags": f,
+                "tank_id": tid,
+                "damage_state": dmg,
+                "rank": rank,
+                "leaderboard_position": lb,
+            }:
+                entry.update(
+                    {
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "flags_bits": f"{f:08b}",
+                        "tank_id": tid,
+                        "damage_state": dmg,
+                        "rank": rank,
+                        "leaderboard_position": lb,
+                        "extra_byte": decoded_bytes[8] if len(decoded_bytes) > 8 else None,
+                    }
+                )
 
-            case {"msg_type": "position_update", "flags": f, "tank_id": tid, "x": x, "y": y, "extra_data": ed}:
-                entry.update({
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "flags_bits": f"{f:08b}",
-                    "tank_id": tid,
-                    "x": x,
-                    "y": y,
-                    "extra_data_hex": ed.hex(),
-                    "extra_data_bytes": list(ed),
-                })
+            case {
+                "msg_type": "position_update",
+                "flags": f,
+                "tank_id": tid,
+                "x": x,
+                "y": y,
+                "extra_data": ed,
+            }:
+                entry.update(
+                    {
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "flags_bits": f"{f:08b}",
+                        "tank_id": tid,
+                        "x": x,
+                        "y": y,
+                        "extra_data_hex": ed.hex(),
+                        "extra_data_bytes": list(ed),
+                    }
+                )
                 for i, b in enumerate(ed):
                     entry[f"ed_byte{i}"] = b
 
             case {"msg_type": "deactivation_kill", "victim_id": vid, "killer_id": kid}:
-                entry.update({
-                    "victim_id": vid,
-                    "killer_id": kid,
-                })
+                entry.update(
+                    {
+                        "victim_id": vid,
+                        "killer_id": kid,
+                    }
+                )
 
             case {"msg_type": "deactivation_death", "flags": f, "killer_id": kid, "extra_data": ed}:
-                entry.update({
-                    "flags": f,
-                    "killer_id": kid,
-                    "extra_data_hex": ed.hex(),
-                    "extra_data_bytes": list(ed),
-                })
+                entry.update(
+                    {
+                        "flags": f,
+                        "killer_id": kid,
+                        "extra_data_hex": ed.hex(),
+                        "extra_data_bytes": list(ed),
+                    }
+                )
 
-            case {"msg_type": "tank_registry", "flags": f, "tank_id": tid, "info_bytes": ib, "team": team, "tank_name": name, "military_rank": mr, "is_bot": bot, "is_container": ic}:
-                entry.update({
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "flags_bits": f"{f:08b}",
-                    "tank_id": tid,
-                    "info_bytes_hex": ib.hex(),
-                    "info_bytes_list": list(ib),
-                    "team": team,
-                    "tank_name": name,
-                    "military_rank": mr,
-                    "is_bot": bot,
-                    "is_container": ic,
-                })
+            case {
+                "msg_type": "tank_registry",
+                "flags": f,
+                "tank_id": tid,
+                "info_bytes": ib,
+                "team": team,
+                "tank_name": name,
+                "military_rank": mr,
+                "is_bot": bot,
+                "is_container": ic,
+            }:
+                entry.update(
+                    {
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "flags_bits": f"{f:08b}",
+                        "tank_id": tid,
+                        "info_bytes_hex": ib.hex(),
+                        "info_bytes_list": list(ib),
+                        "team": team,
+                        "tank_name": name,
+                        "military_rank": mr,
+                        "is_bot": bot,
+                        "is_container": ic,
+                    }
+                )
                 for i, b in enumerate(ib):
                     entry[f"ib_byte{i}"] = b
 
-            case {"msg_type": "movement", "flags": f, "start_x": sx, "start_y": sy, "player_id": pid, "tank_id": tid, "waypoints": wp, "is_self": is_self}:
-                entry.update({
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "flags_bits": f"{f:08b}",
-                    "start_x": sx,
-                    "start_y": sy,
-                    "player_id": pid,
-                    "tank_id": tid,
-                    "waypoints": wp,
-                    "waypoint_count": len(wp),
-                    "is_self": is_self,
-                })
+            case {
+                "msg_type": "movement",
+                "flags": f,
+                "start_x": sx,
+                "start_y": sy,
+                "player_id": pid,
+                "tank_id": tid,
+                "waypoints": wp,
+                "is_self": is_self,
+            }:
+                entry.update(
+                    {
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "flags_bits": f"{f:08b}",
+                        "start_x": sx,
+                        "start_y": sy,
+                        "player_id": pid,
+                        "tank_id": tid,
+                        "waypoints": wp,
+                        "waypoint_count": len(wp),
+                        "is_self": is_self,
+                    }
+                )
 
             case {"msg_type": "tank_leave", "tank_id": tid, "flags": f, "extra_data": ed}:
-                entry.update({
-                    "flags": f,
-                    "flags_hex": f"0x{f:02x}",
-                    "tank_id": tid,
-                    "extra_data_hex": ed.hex(),
-                    "extra_data_bytes": list(ed),
-                })
+                entry.update(
+                    {
+                        "flags": f,
+                        "flags_hex": f"0x{f:02x}",
+                        "tank_id": tid,
+                        "extra_data_hex": ed.hex(),
+                        "extra_data_bytes": list(ed),
+                    }
+                )
 
             case {"msg_type": "tank_status_sync", "sync_data": sd}:
-                entry.update({
-                    "sync_data_hex": sd.hex(),
-                    "sync_data_bytes": list(sd),
-                })
+                entry.update(
+                    {
+                        "sync_data_hex": sd.hex(),
+                        "sync_data_bytes": list(sd),
+                    }
+                )
 
             case {"msg_type": "teleport_landed", "subtype": st}:
                 entry.update({"subtype": st})
 
-            case {"msg_type": "container_pickup", "x": x, "y": y, "volume": vol, "is_fuel": is_fuel}:
-                entry.update({
-                    "x": x,
-                    "y": y,
-                    "volume": vol,
-                    "is_fuel": is_fuel,
-                })
+            case {
+                "msg_type": "container_pickup",
+                "x": x,
+                "y": y,
+                "volume": vol,
+                "is_fuel": is_fuel,
+            }:
+                entry.update(
+                    {
+                        "x": x,
+                        "y": y,
+                        "volume": vol,
+                        "is_fuel": is_fuel,
+                    }
+                )
 
-            case {"msg_type": "radar_response", "container_count": cc, "containers": containers, "mines": mines}:
-                entry.update({
-                    "container_count": cc,
-                    "num_containers": len(containers),
-                    "num_mines": len(mines),
-                })
+            case {
+                "msg_type": "radar_response",
+                "container_count": cc,
+                "containers": containers,
+                "mines": mines,
+            }:
+                entry.update(
+                    {
+                        "container_count": cc,
+                        "num_containers": len(containers),
+                        "num_mines": len(mines),
+                    }
+                )
 
-            case {"msg_type": "tip_notification", "subtype": st, "length": ln, "notification_data": nd}:
-                entry.update({
-                    "subtype": st,
-                    "data_length": ln,
-                    "notification_hex": nd.hex(),
-                })
+            case {
+                "msg_type": "tip_notification",
+                "subtype": st,
+                "length": ln,
+                "notification_data": nd,
+            }:
+                entry.update(
+                    {
+                        "subtype": st,
+                        "data_length": ln,
+                        "notification_hex": nd.hex(),
+                    }
+                )
 
             case {"msg_type": "unknown_container", "subtype": st, "length": ln, "data": d}:
-                entry.update({
-                    "subtype": st,
-                    "data_length": ln,
-                    "data_hex": d.hex(),
-                    "data_bytes": list(d),
-                })
+                entry.update(
+                    {
+                        "subtype": st,
+                        "data_length": ln,
+                        "data_hex": d.hex(),
+                        "data_bytes": list(d),
+                    }
+                )
 
             case _:
                 entry["decoded_type"] = str(type(decoded_msg).__name__)
@@ -464,7 +556,9 @@ def _print_tank_status_short_analysis(statuses: list[dict[str, object]]) -> None
 
     # Extra byte analysis
     print()
-    extra_values = sorted(set(s.get("extra_byte") for s in statuses if s.get("extra_byte") is not None))
+    extra_values = sorted(
+        set(s.get("extra_byte") for s in statuses if s.get("extra_byte") is not None)
+    )
     print(f"Extra byte (offset 8) unique values: {extra_values}")
 
     print()
@@ -479,10 +573,16 @@ def _print_tank_status_short_analysis(statuses: list[dict[str, object]]) -> None
             flags = s.get("flags_hex")
             extra = s.get("extra_byte")
             lb = s.get("leaderboard_position")
-            print(f"    ts={ts} damage={dmg} rank={rank} flags={flags} extra=0x{extra:02x} lb={lb}" if isinstance(extra, int) else f"    ts={ts} damage={dmg} rank={rank} flags={flags} extra={extra} lb={lb}")
+            print(
+                f"    ts={ts} damage={dmg} rank={rank} flags={flags} extra=0x{extra:02x} lb={lb}"
+                if isinstance(extra, int)
+                else f"    ts={ts} damage={dmg} rank={rank} flags={flags} extra={extra} lb={lb}"
+            )
 
 
-def _print_deactivation_analysis(kills: list[dict[str, object]], deaths: list[dict[str, object]]) -> None:
+def _print_deactivation_analysis(
+    kills: list[dict[str, object]], deaths: list[dict[str, object]]
+) -> None:
     """Print deactivation message analysis."""
     print(f"\n{'=' * 80}")
     print("DEACTIVATION — kill and death events")
@@ -509,7 +609,11 @@ def _print_deactivation_analysis(kills: list[dict[str, object]], deaths: list[di
             flags = d.get("flags")
             ed = d.get("extra_data_hex")
             raw = d.get("raw_hex")
-            print(f"  ts={ts} killer={kid} flags=0x{flags:02x} extra={ed} raw={raw}" if isinstance(flags, int) else f"  ts={ts} killer={kid} flags={flags} extra={ed} raw={raw}")
+            print(
+                f"  ts={ts} killer={kid} flags=0x{flags:02x} extra={ed} raw={raw}"
+                if isinstance(flags, int)
+                else f"  ts={ts} killer={kid} flags={flags} extra={ed} raw={raw}"
+            )
 
 
 def _print_movement_analysis(movements: list[dict[str, object]]) -> None:
@@ -558,7 +662,11 @@ def _print_tank_registry_analysis(registries: list[dict[str, object]]) -> None:
 
     # Per-byte analysis of info_bytes for tanks
     if tanks:
-        max_ib_len = max(len(r.get("info_bytes_list", [])) for r in tanks if isinstance(r.get("info_bytes_list"), list))
+        max_ib_len = max(
+            len(r.get("info_bytes_list", []))
+            for r in tanks
+            if isinstance(r.get("info_bytes_list"), list)
+        )
         print()
         print("Per-byte value ranges across tank registry info_bytes:")
         for byte_idx in range(max_ib_len):
@@ -577,7 +685,9 @@ def _print_tank_registry_analysis(registries: list[dict[str, object]]) -> None:
         flags = r.get("flags_hex")
         ib = r.get("info_bytes_hex")
         ib_list = r.get("info_bytes_list")
-        print(f"  ts={ts} id={tid} name={name} team={team} rank={rank} flags={flags} info={ib} bytes={ib_list}")
+        print(
+            f"  ts={ts} id={tid} name={name} team={team} rank={rank} flags={flags} info={ib} bytes={ib_list}"
+        )
 
 
 def _print_unknown_analysis(unknowns: list[dict[str, object]]) -> None:
@@ -636,7 +746,11 @@ def main() -> None:
             print(f"Error processing {path.name}: {e}")
             continue
 
-        has_combat = bool(results.get("COMBAT_HIT") or results.get("DEACTIVATION_KILL") or results.get("DEACTIVATION_DEATH"))
+        has_combat = bool(
+            results.get("COMBAT_HIT")
+            or results.get("DEACTIVATION_KILL")
+            or results.get("DEACTIVATION_DEATH")
+        )
 
         if len(sys.argv) <= 1 and not has_combat:
             continue

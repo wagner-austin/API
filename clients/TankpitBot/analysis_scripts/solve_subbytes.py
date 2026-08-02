@@ -71,19 +71,19 @@ def main() -> None:
                 p = cd_pairs[0]
                 dx = abs(p[0] - attacker_pos[0])
                 dy = abs(p[1] - attacker_pos[1])
-                print(f"    cd[0:2] vs attacker: delta=({dx},{dy}) match={dx<=1 and dy<=1}")
+                print(f"    cd[0:2] vs attacker: delta=({dx},{dy}) match={dx <= 1 and dy <= 1}")
         if self_pos:
             print(f"    self 0x3d pos:     {self_pos}")
             if len(cd_pairs) >= 2:
                 p = cd_pairs[1]
                 dx = abs(p[0] - self_pos[0])
                 dy = abs(p[1] - self_pos[1])
-                print(f"    cd[2:4] vs self:    delta=({dx},{dy}) match={dx<=1 and dy<=1}")
+                print(f"    cd[2:4] vs self:    delta=({dx},{dy}) match={dx <= 1 and dy <= 1}")
             if len(cd_pairs) >= 3:
                 p = cd_pairs[2]
                 dx = abs(p[0] - self_pos[0])
                 dy = abs(p[1] - self_pos[1])
-                print(f"    cd[4:6] vs self:    delta=({dx},{dy}) match={dx<=1 and dy<=1}")
+                print(f"    cd[4:6] vs self:    delta=({dx},{dy}) match={dx <= 1 and dy <= 1}")
 
     # ================================================================
     # 0x3d[1] FLAGS: bit-by-bit analysis beyond team

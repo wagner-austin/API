@@ -46,7 +46,9 @@ def main() -> None:
         u3d_b10s = sorted(set(u["raw_bytes"][10] for u in u3d_by_tank[tid]))
         match = tss_lb_highs == u3d_b10s
         tss_lbs = sorted(set(t["leaderboard_position"] for t in tss_by_tank[tid]))
-        print(f"  Tank {tid}: TSS.lb={tss_lbs} lb>>8={tss_lb_highs} 0x3d[10]={u3d_b10s} match={match}")
+        print(
+            f"  Tank {tid}: TSS.lb={tss_lbs} lb>>8={tss_lb_highs} 0x3d[10]={u3d_b10s} match={match}"
+        )
 
     # ================================================================
     # HYPOTHESIS: 0x3d[11] == TSS.extra_byte (rank_points)?
@@ -79,11 +81,13 @@ def main() -> None:
                 if b11 == tss_extra:
                     match_count += 1
                 else:
-                    print(f"  MISMATCH tank={tid} ts_delta={closest_delta}ms: 0x3d[11]={b11} TSS.extra={tss_extra} diff={abs(b11 - tss_extra)}")
+                    print(
+                        f"  MISMATCH tank={tid} ts_delta={closest_delta}ms: 0x3d[11]={b11} TSS.extra={tss_extra} diff={abs(b11 - tss_extra)}"
+                    )
 
     print(f"\n  Result: {match_count}/{total_count} exact matches")
     if total_count > 0:
-        print(f"  Match rate: {100*match_count/total_count:.1f}%")
+        print(f"  Match rate: {100 * match_count / total_count:.1f}%")
 
     # ================================================================
     # Wider window: 0x3d[11] vs TSS.extra_byte within 2 seconds
@@ -243,7 +247,9 @@ def main() -> None:
             predict_total += 1
             if b_next[4] == b_now[12]:
                 predict_count += 1
-    print(f"    When byte4 != byte12: byte12 predicts next byte4 in {predict_count}/{predict_total}")
+    print(
+        f"    When byte4 != byte12: byte12 predicts next byte4 in {predict_count}/{predict_total}"
+    )
 
 
 if __name__ == "__main__":

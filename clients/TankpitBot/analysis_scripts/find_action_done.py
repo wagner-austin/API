@@ -18,6 +18,7 @@ def scan_session(session_path: Path) -> list[dict[str, object]]:
     """Scan for ActionDone and other response messages."""
     session_text = _test_hooks.read_text(session_path)
     from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
     session_json = narrow_json_to_dict(load_json_str(session_text))
     session = decode_capture_session(session_json)
 
@@ -47,30 +48,35 @@ def scan_session(session_path: Path) -> list[dict[str, object]]:
 
             # Check for tunneled ActionDone (0x54)
             if decoded[0] == 0x54:
-                results.append({
-                    "type": "action_done_tunneled",
-                    "timestamp_ms": msg["timestamp_ms"],
-                    "decoded_hex": decoded.hex(),
-                    "decoded_bytes": list(decoded),
-                    "length": len(decoded),
-                })
+                results.append(
+                    {
+                        "type": "action_done_tunneled",
+                        "timestamp_ms": msg["timestamp_ms"],
+                        "decoded_hex": decoded.hex(),
+                        "decoded_bytes": list(decoded),
+                        "length": len(decoded),
+                    }
+                )
         else:
             decoded = xor_decode(body)
             # Standalone ActionDone
             if len(decoded) >= 1 and decoded[0] == 0x54:
-                results.append({
-                    "type": "action_done_standalone",
-                    "timestamp_ms": msg["timestamp_ms"],
-                    "decoded_hex": decoded.hex(),
-                    "decoded_bytes": list(decoded),
-                    "length": len(decoded),
-                })
+                results.append(
+                    {
+                        "type": "action_done_standalone",
+                        "timestamp_ms": msg["timestamp_ms"],
+                        "decoded_hex": decoded.hex(),
+                        "decoded_bytes": list(decoded),
+                        "length": len(decoded),
+                    }
+                )
 
     return results
 
 
 def main() -> None:
     from platform_core.logging import setup_rich_logging
+
     setup_rich_logging(level="WARNING")
 
     bot_dir = Path("runs/bot")

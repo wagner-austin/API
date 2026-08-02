@@ -71,7 +71,9 @@ def main() -> None:
     print(f"  Total direction-b6 correlations: {len(direction_correlations)}")
     for d_char in sorted(dir_to_b6.keys()):
         b6_counts = dict(sorted(dir_to_b6[d_char].items(), key=lambda x: -x[1]))
-        print(f"  Last waypoint '{d_char}' ({dir_map.get(d_char, '?')}): b6 distribution = {b6_counts}")
+        print(
+            f"  Last waypoint '{d_char}' ({dir_map.get(d_char, '?')}): b6 distribution = {b6_counts}"
+        )
 
     # Also check: does b6 change WHEN position changes?
     print()
@@ -90,8 +92,8 @@ def main() -> None:
             b = m["raw_bytes"]
             x, y, b6 = b[4], b[5], b[6]
             if prev_x is not None and prev_b6 is not None:
-                pos_changed = (x != prev_x or y != prev_y)
-                b6_changed = (b6 != prev_b6)
+                pos_changed = x != prev_x or y != prev_y
+                b6_changed = b6 != prev_b6
                 if b6_changed and pos_changed:
                     b6_with_pos_change += 1
                 elif b6_changed and not pos_changed:
@@ -117,7 +119,9 @@ def main() -> None:
         increases = sum(1 for i in range(1, len(u16s)) if u16s[i] > u16s[i - 1])
         decreases = sum(1 for i in range(1, len(u16s)) if u16s[i] < u16s[i - 1])
         same = sum(1 for i in range(1, len(u16s)) if u16s[i] == u16s[i - 1])
-        print(f"  Tank {tid}: {len(u16s)} values, decreases={decreases} increases={increases} same={same}")
+        print(
+            f"  Tank {tid}: {len(u16s)} values, decreases={decreases} increases={increases} same={same}"
+        )
         if len(u16s) <= 30:
             print(f"    values: {u16s}")
         else:
@@ -184,7 +188,9 @@ def main() -> None:
         b = u["raw_bytes"]
         b8 = b[8]
         if prev_b8 is not None and b8 != prev_b8:
-            print(f"  TRANSITION ts={u['timestamp_ms']}: byte8 {prev_b8} (0x{prev_b8:02x}) -> {b8} (0x{b8:02x})")
+            print(
+                f"  TRANSITION ts={u['timestamp_ms']}: byte8 {prev_b8} (0x{prev_b8:02x}) -> {b8} (0x{b8:02x})"
+            )
             # What else changed at this time?
             prev_b8 = b8
         elif prev_b8 is None:
@@ -218,7 +224,7 @@ def main() -> None:
             ts = u2e[i]["timestamp_ms"]
             jump_count += 1
             if jump_count <= 10:
-                print(f"    ts={ts} {b11_vals[i-1]}->{b11_vals[i]} delta=+{delta}")
+                print(f"    ts={ts} {b11_vals[i - 1]}->{b11_vals[i]} delta=+{delta}")
     if jump_count > 10:
         print(f"    ... and {jump_count - 10} more jumps")
 
@@ -233,14 +239,16 @@ def main() -> None:
     # Check if byte12 == byte4 (redundant damage)
     match_count = sum(1 for u in u2e if u["raw_bytes"][12] == u["raw_bytes"][4])
     total = len(u2e)
-    print(f"  byte12 == byte4: {match_count}/{total} ({100*match_count/total:.1f}%)")
+    print(f"  byte12 == byte4: {match_count}/{total} ({100 * match_count / total:.1f}%)")
 
     # Check if byte12 tracks byte4 with a lag
     lag_match = 0
     for i in range(1, len(u2e)):
         if u2e[i]["raw_bytes"][12] == u2e[i - 1]["raw_bytes"][4]:
             lag_match += 1
-    print(f"  byte12[t] == byte4[t-1] (lagged): {lag_match}/{total-1} ({100*lag_match/(total-1):.1f}%)")
+    print(
+        f"  byte12[t] == byte4[t-1] (lagged): {lag_match}/{total - 1} ({100 * lag_match / (total - 1):.1f}%)"
+    )
 
     # Cross-tab
     b12_vs_b4: dict[tuple[int, int], int] = defaultdict(int)

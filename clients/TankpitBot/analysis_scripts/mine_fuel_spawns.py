@@ -1,4 +1,5 @@
 """Archive sweep: fuel-container spawn/despawn dynamics from 0x4C fuel-dot atlas diffs."""
+
 import json
 from collections import Counter
 from pathlib import Path
@@ -8,13 +9,14 @@ from tankpit_bot.protocol import decode_message
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
 agg = Counter()
-gap_appear_rate = Counter()   # appearances bucketed by inter-snapshot gap
+gap_appear_rate = Counter()  # appearances bucketed by inter-snapshot gap
 quadrant_appear = Counter()
 dot_counts = []
 appear_events = 0
 disappear_events = 0
 observed_map_minutes = 0.0
 back_to_back_diffs = Counter()
+
 
 def split_frames(payload):
     data = decode_base64_safe(payload)
@@ -28,6 +30,7 @@ def split_frames(payload):
             break
         yield data[off : off + ln]
         off += ln
+
 
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     try:
@@ -74,14 +77,20 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
 
 dot_counts.sort()
 n = len(dot_counts)
-print(f"snapshots: {agg['snapshots']}  dot-count median {dot_counts[n//2] if n else 0} "
-      f"p10 {dot_counts[n//10] if n else 0} p90 {dot_counts[9*n//10] if n else 0}")
+print(
+    f"snapshots: {agg['snapshots']}  dot-count median {dot_counts[n // 2] if n else 0} "
+    f"p10 {dot_counts[n // 10] if n else 0} p90 {dot_counts[9 * n // 10] if n else 0}"
+)
 print(f"back-to-back (<=5 s) diffs: {dict(sorted(back_to_back_diffs.items()))}")
-print(f"appearances: {appear_events}  disappearances: {disappear_events} "
-      f"over {observed_map_minutes:.0f} map-open-gap minutes")
+print(
+    f"appearances: {appear_events}  disappearances: {disappear_events} "
+    f"over {observed_map_minutes:.0f} map-open-gap minutes"
+)
 if observed_map_minutes:
-    print(f"MAP-WIDE spawn rate: {appear_events / observed_map_minutes:.2f} dots/min "
-          f"(65,536 tiles -> {appear_events / observed_map_minutes / 65536 * 1e6:.1f} spawns per million tile-min)")
+    print(
+        f"MAP-WIDE spawn rate: {appear_events / observed_map_minutes:.2f} dots/min "
+        f"(65,536 tiles -> {appear_events / observed_map_minutes / 65536 * 1e6:.1f} spawns per million tile-min)"
+    )
 print("appearances by inter-open gap bucket (s):", dict(sorted(gap_appear_rate.items())))
 qa = Counter()
 for (qx, qy), c in quadrant_appear.items():

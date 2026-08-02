@@ -411,9 +411,7 @@ def main(argv: list[str]) -> int:
 
     print("\nSubtype byte distribution per TankUpdate length:")
     for target_len in (10, 14, 15):
-        sub: Counter[int] = Counter(
-            u.full_body[0] for u in all_updates if u.body_len == target_len
-        )
+        sub: Counter[int] = Counter(u.full_body[0] for u in all_updates if u.body_len == target_len)
         if not sub:
             print(f"  body_len={target_len}: (no samples)")
             continue

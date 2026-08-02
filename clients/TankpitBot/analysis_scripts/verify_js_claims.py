@@ -20,6 +20,7 @@ def process_all_sessions() -> dict[str, list[dict[str, object]]]:
         try:
             session_text = _test_hooks.read_text(path)
             from platform_core.json_utils import load_json_str, narrow_json_to_dict
+
             session_json = narrow_json_to_dict(load_json_str(session_text))
             session = decode_capture_session(session_json)
             magic = session["magic"]
@@ -42,24 +43,40 @@ def process_all_sessions() -> dict[str, list[dict[str, object]]]:
                     if len(decoded) == 13 and decoded[0] == 0x3D:
                         b = list(decoded)
                         tid = b[2] | (b[3] << 8)
-                        all_data["0x3d"].append({
-                            "ts": ts, "tid": tid,
-                            "x": b[4], "y": b[5], "dir": b[6],
-                            "dmg": b[7], "rank": b[8],
-                            "lb_h": b[9], "lb_m": b[10], "lb_l": b[11],
-                            "b12": b[12],
-                        })
+                        all_data["0x3d"].append(
+                            {
+                                "ts": ts,
+                                "tid": tid,
+                                "x": b[4],
+                                "y": b[5],
+                                "dir": b[6],
+                                "dmg": b[7],
+                                "rank": b[8],
+                                "lb_h": b[9],
+                                "lb_m": b[10],
+                                "lb_l": b[11],
+                                "b12": b[12],
+                            }
+                        )
                     elif len(decoded) == 13 and decoded[0] == 0x2E:
                         b = list(decoded)
                         tid = b[2] | (b[3] << 8)
-                        all_data["0x2e"].append({
-                            "ts": ts, "tid": tid,
-                            "dmg": b[4], "rank_byte": b[5],
-                            "lb_h": b[6], "lb_m": b[7], "lb_l": b[8],
-                            "promo": b[9], "has_fuel": b[10],
-                            "fuel_lo": b[11], "fuel_hi": b[12],
-                            "fuel_value": b[11] + b[12] * 256,
-                        })
+                        all_data["0x2e"].append(
+                            {
+                                "ts": ts,
+                                "tid": tid,
+                                "dmg": b[4],
+                                "rank_byte": b[5],
+                                "lb_h": b[6],
+                                "lb_m": b[7],
+                                "lb_l": b[8],
+                                "promo": b[9],
+                                "has_fuel": b[10],
+                                "fuel_lo": b[11],
+                                "fuel_hi": b[12],
+                                "fuel_value": b[11] + b[12] * 256,
+                            }
+                        )
                     elif len(decoded) >= 3 and decoded[0] == 0x44:
                         fuel = decoded[1] | (decoded[2] << 8)
                         if len(decoded) >= 4:
@@ -73,6 +90,7 @@ def process_all_sessions() -> dict[str, list[dict[str, object]]]:
 
 def main() -> None:
     from platform_core.logging import setup_rich_logging
+
     setup_rich_logging(level="WARNING")
 
     d = process_all_sessions()
@@ -118,10 +136,12 @@ def main() -> None:
             print(f"    Tank {tid}: {len(corpse_msgs)} corpse messages out of {len(msgs)}")
             # Show transition into corpse
             for i, m in enumerate(msgs):
-                if m["dir"] >= 32 and (i == 0 or msgs[i-1]["dir"] < 32):
-                    prev = msgs[i-1] if i > 0 else None
+                if m["dir"] >= 32 and (i == 0 or msgs[i - 1]["dir"] < 32):
+                    prev = msgs[i - 1] if i > 0 else None
                     prev_info = f" prev: dir={prev['dir']} dmg={prev['dmg']}" if prev else ""
-                    print(f"      TRANSITION: ts={m['ts']} dir={m['dir']} dmg={m['dmg']} rank={m['rank']}{prev_info}")
+                    print(
+                        f"      TRANSITION: ts={m['ts']} dir={m['dir']} dmg={m['dmg']} rank={m['rank']}{prev_info}"
+                    )
 
     # ================================================================
     # VERIFY 2: 0x2e fuel = byte[11] + byte[12]*256 vs FuelGain
@@ -160,12 +180,14 @@ def main() -> None:
                 match_close += 1
             if total_checked <= 30:
                 mark = "EXACT" if diff == 0 else f"diff={diff}"
-                print(f"    FuelGain={fg_fuel} 0x2e fuel={fuel_calc} ({mark}) delta_ms={closest_delta}")
+                print(
+                    f"    FuelGain={fg_fuel} 0x2e fuel={fuel_calc} ({mark}) delta_ms={closest_delta}"
+                )
 
     print(f"\n  Exact match: {match_exact}/{total_checked}")
     print(f"  Within 10: {match_exact + match_close}/{total_checked}")
     if total_checked > 0:
-        print(f"  Exact rate: {100*match_exact/total_checked:.1f}%")
+        print(f"  Exact rate: {100 * match_exact / total_checked:.1f}%")
 
     # ================================================================
     # VERIFY 3: lb_score 24-bit BE in 0x3d matches TSS
@@ -250,7 +272,9 @@ def main() -> None:
             fuel_before = prev_fuel_lo + prev_fuel_hi * 256
             fuel_after = flo + fhi * 256
             if transition_count <= 20:
-                print(f"    fuel_hi change: {prev_fuel_hi}->{fhi} fuel: {fuel_before}->{fuel_after} (delta={fuel_after-fuel_before})")
+                print(
+                    f"    fuel_hi change: {prev_fuel_hi}->{fhi} fuel: {fuel_before}->{fuel_after} (delta={fuel_after - fuel_before})"
+                )
         prev_fuel_hi = fhi
         prev_fuel_lo = flo
 

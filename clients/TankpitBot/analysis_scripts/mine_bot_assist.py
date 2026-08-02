@@ -1,4 +1,5 @@
 """Archive sweep: do bots shoot at other bots' tiles, and when?"""
+
 import json
 import re
 from collections import Counter
@@ -12,6 +13,7 @@ BOT_NAME = re.compile(r"^(red|purple|blue|orange)-\d+$")
 agg = Counter()
 examples = []
 
+
 def split_frames(payload):
     data = decode_base64_safe(payload)
     if not data:
@@ -24,6 +26,7 @@ def split_frames(payload):
             break
         yield data[off : off + ln]
         off += ln
+
 
 paths = sorted(Path("runs").glob("*/*.capture_session.json"))
 for path in paths:
@@ -81,8 +84,13 @@ for path in paths:
                     agg["  within_10s_of_player_shot"] += 1 if recent else 0
                     if len(examples) < 8:
                         examples.append(
-                            (path.name, round(ts / 1000), sname,
-                             [names.get(t) for t in hit_bots], "recent" if recent else "cold")
+                            (
+                                path.name,
+                                round(ts / 1000),
+                                sname,
+                                [names.get(t) for t in hit_bots],
+                                "recent" if recent else "cold",
+                            )
                         )
                 else:
                     agg["bot_shot_at_empty_or_unknown"] += 1

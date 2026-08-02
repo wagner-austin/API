@@ -58,9 +58,11 @@ def main() -> None:
                 if agree:
                     matches_agree += 1
                 mark = "OK" if agree else "MISMATCH"
-                print(f"  [{mark}] tid={tid} ts_delta={u_ts-ts}ms")
+                print(f"  [{mark}] tid={tid} ts_delta={u_ts - ts}ms")
                 print(f"    tank_status_short: dmg={dmg} rank={rank}")
-                print(f"    0x3d:              b7={b[7]} b4=0x{b[4]:02x} b5=0x{b[5]:02x} b6=0x{b[6]:02x}")
+                print(
+                    f"    0x3d:              b7={b[7]} b4=0x{b[4]:02x} b5=0x{b[5]:02x} b6=0x{b[6]:02x}"
+                )
 
     print(f"\nResult: {matches_agree}/{matches_found} matches agree on damage_state")
     print()
@@ -86,8 +88,12 @@ def main() -> None:
             u_ts = u["timestamp_ms"]
             if abs(u_ts - mov_ts) <= 100:
                 pos_matches += 1
-                print(f"  movement: ts={mov_ts} player_id={mov_tid_raw} pos=({sx},{sy}) waypoints={mov.get('waypoints','')[:10]}")
-                print(f"  0x3d:     ts={u_ts} tid={u_tid} b4=0x{b[4]:02x}={b[4]} b5=0x{b[5]:02x}={b[5]}")
+                print(
+                    f"  movement: ts={mov_ts} player_id={mov_tid_raw} pos=({sx},{sy}) waypoints={mov.get('waypoints', '')[:10]}"
+                )
+                print(
+                    f"  0x3d:     ts={u_ts} tid={u_tid} b4=0x{b[4]:02x}={b[4]} b5=0x{b[5]:02x}={b[5]}"
+                )
                 if b[4] == sx or b[5] == sy:
                     pos_agree += 1
                     print("    ^^ POSITION MATCH")
@@ -117,7 +123,9 @@ def main() -> None:
         # Check if combat_hit happened near this timestamp
         for ch in combat_list:
             if abs(ch["timestamp_ms"] - ts) <= 5:
-                print(f"    ^^ combat_hit at ts={ch['timestamp_ms']} weapon={ch.get('weapon_byte')} attacker={ch.get('attacker_id')}")
+                print(
+                    f"    ^^ combat_hit at ts={ch['timestamp_ms']} weapon={ch.get('weapon_byte')} attacker={ch.get('attacker_id')}"
+                )
 
     # ================================================================
     # CORRELATION 4: 0x3d byte structure - all fields dump per tank
@@ -136,11 +144,15 @@ def main() -> None:
     for tid in sorted(by_tank.keys()):
         msgs = by_tank[tid]
         print(f"\n  Tank {tid} ({len(msgs)} messages):")
-        print(f"    {'ts':>16} {'b1':>4} {'b4':>6} {'b5':>6} {'b6':>4} {'b7':>4} {'b8':>4} {'b9':>4} {'u16':>6} {'b12':>4}")
+        print(
+            f"    {'ts':>16} {'b1':>4} {'b4':>6} {'b5':>6} {'b6':>4} {'b7':>4} {'b8':>4} {'b9':>4} {'u16':>6} {'b12':>4}"
+        )
         for u in msgs:
             b = u["raw_bytes"]
             u16 = b[10] | (b[11] << 8)
-            print(f"    {u['timestamp_ms']:>16} 0x{b[1]:02x} 0x{b[4]:02x}={b[4]:>3} 0x{b[5]:02x}={b[5]:>3} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[9]:>4} {u16:>6} {b[12]:>4}")
+            print(
+                f"    {u['timestamp_ms']:>16} 0x{b[1]:02x} 0x{b[4]:02x}={b[4]:>3} 0x{b[5]:02x}={b[5]:>3} {b[6]:>4} {b[7]:>4} {b[8]:>4} {b[9]:>4} {u16:>6} {b[12]:>4}"
+            )
 
     # ================================================================
     # CORRELATION 5: 0x2e self-messages - byte8 vs known rank_points
@@ -151,7 +163,7 @@ def main() -> None:
     print("=" * 80)
     b8_vals = sorted(set(u["raw_bytes"][8] for u in u2e))
     print(f"  byte8 unique values: {b8_vals} = {[hex(x) for x in b8_vals]}")
-    u16_vals = sorted(set(u["raw_bytes"][10]|(u["raw_bytes"][11]<<8) for u in u2e))
+    u16_vals = sorted(set(u["raw_bytes"][10] | (u["raw_bytes"][11] << 8) for u in u2e))
     print(f"  u16[10:12] range: {min(u16_vals)} to {max(u16_vals)}")
     print(f"  u16 values (first 20): {u16_vals[:20]}")
 

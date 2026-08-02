@@ -43,9 +43,13 @@ def main() -> None:
                 best_delta = delta
                 b = entry["raw_bytes"]
                 best = {
-                    "x": b[4], "y": b[5], "direction": b[6],
-                    "damage_state": b[7], "rank": b[8],
-                    "lb_high": b[10], "rank_points": b[11],
+                    "x": b[4],
+                    "y": b[5],
+                    "direction": b[6],
+                    "damage_state": b[7],
+                    "rank": b[8],
+                    "lb_high": b[10],
+                    "rank_points": b[11],
                 }
         return best
 
@@ -69,7 +73,12 @@ def main() -> None:
             ts = u.get("timestamp_ms")
             sd = u.get("status_data_bytes", [])
             flags = u.get("flags")
-            assert isinstance(tid, int) and isinstance(ts, int) and isinstance(sd, list) and isinstance(flags, int)
+            assert (
+                isinstance(tid, int)
+                and isinstance(ts, int)
+                and isinstance(sd, list)
+                and isinstance(flags, int)
+            )
 
             ref = find_0x3d(tid, ts)
             if ref is None:
@@ -78,7 +87,9 @@ def main() -> None:
             print(f"  tank={tid} ts={ts} flags=0x{flags:02x} ({flags:08b})")
             print(f"    status_data bytes: {sd}")
             print(f"    status_data hex:   {bytes(sd).hex()}")
-            print(f"    0x3d ref: x={ref['x']} y={ref['y']} dir={ref['direction']} dmg={ref['damage_state']} rank={ref['rank']}")
+            print(
+                f"    0x3d ref: x={ref['x']} y={ref['y']} dir={ref['direction']} dmg={ref['damage_state']} rank={ref['rank']}"
+            )
             # Check byte-by-byte
             for i, val in enumerate(sd):
                 matches_field = []
@@ -162,9 +173,13 @@ def main() -> None:
     b11_when_7is0 = [u["raw_bytes"][11] for u in b7_zero]
     b11_when_7is1 = [u["raw_bytes"][11] for u in b7_one]
     if b11_when_7is0:
-        print(f"  byte11 when byte7=0: min={min(b11_when_7is0)} max={max(b11_when_7is0)} mean={sum(b11_when_7is0)/len(b11_when_7is0):.1f}")
+        print(
+            f"  byte11 when byte7=0: min={min(b11_when_7is0)} max={max(b11_when_7is0)} mean={sum(b11_when_7is0) / len(b11_when_7is0):.1f}"
+        )
     if b11_when_7is1:
-        print(f"  byte11 when byte7=1: min={min(b11_when_7is1)} max={max(b11_when_7is1)} mean={sum(b11_when_7is1)/len(b11_when_7is1):.1f}")
+        print(
+            f"  byte11 when byte7=1: min={min(b11_when_7is1)} max={max(b11_when_7is1)} mean={sum(b11_when_7is1) / len(b11_when_7is1):.1f}"
+        )
 
     # Check if byte7 flips at session boundaries
     print()
@@ -177,7 +192,7 @@ def main() -> None:
         ts = u["timestamp_ms"]
         gap = ""
         if prev_ts is not None and ts - prev_ts > 10000:
-            gap = f" [GAP {(ts-prev_ts)/1000:.0f}s]"
+            gap = f" [GAP {(ts - prev_ts) / 1000:.0f}s]"
         if b7 != prev_b7:
             transition_count += 1
             if transition_count <= 30:
@@ -185,7 +200,9 @@ def main() -> None:
                 b8 = u["raw_bytes"][8]
                 b11 = u["raw_bytes"][11]
                 b12 = u["raw_bytes"][12]
-                print(f"    ts={ts} byte7: {prev_b7}->{b7} dmg={b4} rp={b8} b11={b11} b12={b12}{gap}")
+                print(
+                    f"    ts={ts} byte7: {prev_b7}->{b7} dmg={b4} rp={b8} b11={b11} b12={b12}{gap}"
+                )
         prev_b7 = b7
         prev_ts = ts
     print(f"  Total transitions: {transition_count}")
@@ -215,7 +232,7 @@ def main() -> None:
     print("  byte11 delta analysis:")
     deltas_11: dict[int, int] = defaultdict(int)
     for i in range(1, len(u2e)):
-        d_val = u2e[i]["raw_bytes"][11] - u2e[i-1]["raw_bytes"][11]
+        d_val = u2e[i]["raw_bytes"][11] - u2e[i - 1]["raw_bytes"][11]
         # Detect wrapping
         if d_val > 128:
             d_val -= 256
@@ -253,7 +270,7 @@ def main() -> None:
         b = u["raw_bytes"]
         if b[12] > b[4]:
             # Find next message where byte4 changes
-            for j in range(i+1, min(i+10, len(u2e))):
+            for j in range(i + 1, min(i + 10, len(u2e))):
                 bn = u2e[j]["raw_bytes"]
                 if bn[4] != b[4]:
                     diverge_events.append((b[4], b[12], bn[4], bn[12]))
@@ -263,7 +280,9 @@ def main() -> None:
     pair_counts: dict[tuple[int, int, int, int], int] = defaultdict(int)
     for ev in diverge_events:
         pair_counts[ev] += 1
-    for (b4, b12, next_b4, next_b12), count in sorted(pair_counts.items(), key=lambda x: -x[1])[:15]:
+    for (b4, b12, next_b4, next_b12), count in sorted(pair_counts.items(), key=lambda x: -x[1])[
+        :15
+    ]:
         print(f"    dmg={b4} b12={b12} -> next_dmg={next_b4} next_b12={next_b12}: {count}")
 
     # ================================================================
@@ -278,12 +297,32 @@ def main() -> None:
         for m in movement_list[:10]:
             b = m.get("raw_bytes", [])
             if isinstance(b, list) and len(b) >= 12:
-                print(f"  bytes[5:8] = [{b[5]}, {b[6]}, {b[7]}] = 0x{b[5]:02x} 0x{b[6]:02x} 0x{b[7]:02x}")
+                print(
+                    f"  bytes[5:8] = [{b[5]}, {b[6]}, {b[7]}] = 0x{b[5]:02x} 0x{b[6]:02x} 0x{b[7]:02x}"
+                )
 
         # Aggregate
-        b5_vals = sorted(set(m["raw_bytes"][5] for m in movement_list if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 5))
-        b6_vals = sorted(set(m["raw_bytes"][6] for m in movement_list if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 6))
-        b7_vals = sorted(set(m["raw_bytes"][7] for m in movement_list if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 7))
+        b5_vals = sorted(
+            set(
+                m["raw_bytes"][5]
+                for m in movement_list
+                if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 5
+            )
+        )
+        b6_vals = sorted(
+            set(
+                m["raw_bytes"][6]
+                for m in movement_list
+                if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 6
+            )
+        )
+        b7_vals = sorted(
+            set(
+                m["raw_bytes"][7]
+                for m in movement_list
+                if isinstance(m.get("raw_bytes"), list) and len(m["raw_bytes"]) > 7
+            )
+        )
         print(f"\n  byte[5] unique: {b5_vals}")
         print(f"  byte[6] unique: {b6_vals}")
         print(f"  byte[7] unique: {b7_vals}")
@@ -342,7 +381,9 @@ def main() -> None:
                 ref_info = ""
                 if ref:
                     ref_info = f" 0x3d: dmg={ref['damage_state']} rank={ref['rank']} dir={ref['direction']}"
-                print(f"  tank={tid} flags=0x{flags:02x} ({flags:08b}) upper=0x{upper:02x} dmg={dmg} rank={rank}{ref_info}")
+                print(
+                    f"  tank={tid} flags=0x{flags:02x} ({flags:08b}) upper=0x{upper:02x} dmg={dmg} rank={rank}{ref_info}"
+                )
 
     # ================================================================
     # 10. WORLD_STATE blob — what's in the large messages?
@@ -401,8 +442,8 @@ def main() -> None:
                 print(f"  len={len(raw)} bytes[0:40]={raw[:40]}")
                 # Check if it contains embedded coordinate pairs or tank data
                 # Look for known tank IDs in the data
-                for i in range(0, len(raw)-1):
-                    tid_check = raw[i] | (raw[i+1] << 8)
+                for i in range(0, len(raw) - 1):
+                    tid_check = raw[i] | (raw[i + 1] << 8)
                     if 500 <= tid_check <= 535 or tid_check == 1301:
                         print(f"    possible tank_id {tid_check} at offset {i}")
 

@@ -95,7 +95,9 @@ def main() -> None:
 
     for tid in sorted(set(tss_by_tank.keys()) & set(u3d_by_tank.keys())):
         tss_lbs = sorted(set(t["leaderboard_position"] for t in tss_by_tank[tid]))
-        u3d_u16s = sorted(set(u["raw_bytes"][10] | (u["raw_bytes"][11] << 8) for u in u3d_by_tank[tid]))
+        u3d_u16s = sorted(
+            set(u["raw_bytes"][10] | (u["raw_bytes"][11] << 8) for u in u3d_by_tank[tid])
+        )
         match = tss_lbs == u3d_u16s
         print(f"  Tank {tid}: TSS.lb={tss_lbs} 0x3d[10:12]={u3d_u16s} match={match}")
 
@@ -161,7 +163,9 @@ def main() -> None:
     for tid in sorted(set(tss_by_tank.keys()) & set(u3d_by_tank.keys())):
         tss_flags = sorted(set(t["flags"] for t in tss_by_tank[tid]))
         u3d_flags = sorted(set(u["raw_bytes"][1] for u in u3d_by_tank[tid]))
-        print(f"  Tank {tid}: TSS.flags={[hex(f) for f in tss_flags]} 0x3d[1]={[hex(f) for f in u3d_flags]}")
+        print(
+            f"  Tank {tid}: TSS.flags={[hex(f) for f in tss_flags]} 0x3d[1]={[hex(f) for f in u3d_flags]}"
+        )
 
     # Check if lower 2 bits = team
     print()
@@ -177,7 +181,9 @@ def main() -> None:
                 reg_team = r.get("team")
                 break
         team_names = {0: "red", 1: "purple", 2: "blue", 3: "orange"}
-        print(f"    Tank {tid}: flags=0x{flags:02x} team_bits={team_bits}={team_names.get(team_bits,'?')} registry_team={reg_team}")
+        print(
+            f"    Tank {tid}: flags=0x{flags:02x} team_bits={team_bits}={team_names.get(team_bits, '?')} registry_team={reg_team}"
+        )
 
     # ================================================================
     # 0x3d[8] vs tank_registry military_rank

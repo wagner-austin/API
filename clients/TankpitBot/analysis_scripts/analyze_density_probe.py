@@ -62,9 +62,7 @@ for m in sorted(session["messages"], key=lambda x: x["timestamp_ms"]):
             fuel = [c for c in dm["containers"] if c["volume"] >= 0]
             equip = sum(1 for c in dm["containers"] if c["volume"] == -1)
             hidden_volumes.extend(c["volume"] for c in fuel if c["volume"] > 0)
-            large_on_dot = sum(
-                1 for c in fuel if c["volume"] >= 500 and (c["x"], c["y"]) in atlas
-            )
+            large_on_dot = sum(1 for c in fuel if c["volume"] >= 500 and (c["x"], c["y"]) in atlas)
             scans.append(
                 {
                     "at": position,

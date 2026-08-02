@@ -1,4 +1,5 @@
 """Archive sweep: return fire vs gang-up (teammate-aggro) vs assist, with distances."""
+
 import json
 import re
 from collections import Counter
@@ -14,6 +15,7 @@ agg = Counter()
 assist_dist = Counter()
 gang_dist = Counter()
 
+
 def split_frames(payload):
     data = decode_base64_safe(payload)
     if not data:
@@ -26,6 +28,7 @@ def split_frames(payload):
             break
         yield data[off : off + ln]
         off += ln
+
 
 for path in sorted(Path("runs").glob("*/*.capture_session.json")):
     try:
@@ -73,11 +76,12 @@ for path in sorted(Path("runs").glob("*/*.capture_session.json")):
                 # bot shot: classify
                 hit_players = [t for t in victims if names.get(t) and not BOT_NAME.match(names[t])]
                 hit_bots = [t for t in victims if BOT_NAME.match(names.get(t, ""))]
-                shooter_hit_recently = ts - last_hit_ms.get(sid, -10**12) <= WINDOW_MS
+                shooter_hit_recently = ts - last_hit_ms.get(sid, -(10**12)) <= WINDOW_MS
                 teammate_hit_recently = any(
-                    ts - last_hit_ms.get(t, -10**12) <= WINDOW_MS
+                    ts - last_hit_ms.get(t, -(10**12)) <= WINDOW_MS
                     for t in last_hit_ms
-                    if t != sid and teams.get(t) == teams.get(sid)
+                    if t != sid
+                    and teams.get(t) == teams.get(sid)
                     and BOT_NAME.match(names.get(t, ""))
                 )
                 sp = pos.get(sid)
