@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.humans import is_human_name
 from tankpit_bot.bot.ai.types import EnemyThreatDict
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import DUAL_SHOT_COST
@@ -112,6 +113,18 @@ def assess_engagement_break(
 ) -> EngagementBreakDict:
     """Project the cost of finishing the kill against the escape fund.
 
+    Human-fight break band (user ruling 2026-07-31: "the bot seems to
+    run too much when fighting a human... it kinda just does damage
+    then leaves"): against a human-classified target the projection is
+    SUPPRESSED while fuel is at or above half the rank capacity. Human
+    fights are attrition -- both sides refuel, sustain wins (2026-07-30
+    ruling) -- and the one-kill projection vs a full-health human
+    (hits_to_kill ~13) breaks near 900 fuel, which read as constant
+    fleeing. The escape floor sits well below half capacity at every
+    measured human damage rate (max 72/tick), so holding to the band
+    never strands the escape. The ``sustained`` requirement is shared,
+    so a quiet human fight still never breaks here.
+
     Args:
         ctx: Decision context.
         target: The engaged enemy.
@@ -132,8 +145,11 @@ def assess_engagement_break(
         + ctx.config["hunt_min_fuel"]
         + _ESCAPE_LATENCY_TICKS * rate_per_tick
     )
+    human_band_holds = (
+        is_human_name(target["name"]) and ctx.fuel >= fuel_capacity(ctx.self_state["rank"]) // 2
+    )
     return EngagementBreakDict(
-        break_engagement=sustained and projected < escape_floor,
+        break_engagement=sustained and projected < escape_floor and not human_band_holds,
         hits_in_window=hits_in_window,
         incoming_fuel_in_window=incoming_fuel_in_window,
         incoming_rate_per_tick=rate_per_tick,

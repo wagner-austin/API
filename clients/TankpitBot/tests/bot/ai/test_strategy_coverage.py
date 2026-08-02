@@ -302,7 +302,7 @@ class TestLockedFuelTarget:
         continuation yields the tick but the plan survives for a
         later ferry or approach.
         """
-        from tankpit_bot.bot.ai.collect_mode import _continue_or_release_fuel_lock
+        from tankpit_bot.bot.ai.collect_locks import continue_or_release_fuel_lock
         from tankpit_bot.bot.ai.context import DecideCtx
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -334,7 +334,7 @@ class TestLockedFuelTarget:
             "",
         )
 
-        decision, state = _continue_or_release_fuel_lock(
+        decision, state = continue_or_release_fuel_lock(
             ctx, ctx.base, ctx.filtered["containers"]["105,105"]
         )
 
@@ -343,7 +343,7 @@ class TestLockedFuelTarget:
 
     def test_move_failed_fuel_target_releases_plan(self) -> None:
         """The move-failed mark structurally releases the fuel plan."""
-        from tankpit_bot.bot.ai.collect_mode import _continue_or_release_fuel_lock
+        from tankpit_bot.bot.ai.collect_locks import continue_or_release_fuel_lock
         from tankpit_bot.bot.ai.context import DecideCtx
         from tankpit_bot.sniffer.world_state import mark_move_target_failed
         from tests.in_memory_terrain_map import InMemoryTerrainMap
@@ -377,7 +377,7 @@ class TestLockedFuelTarget:
             "",
         )
 
-        decision, state = _continue_or_release_fuel_lock(
+        decision, state = continue_or_release_fuel_lock(
             ctx, ctx.base, ctx.filtered["containers"]["105,105"]
         )
 

@@ -250,6 +250,37 @@ def make_chat_command(message_id: int, target_x: int, target_y: int) -> ChatComm
     )
 
 
+class ScopeShiftCommandDict(TypedDict):
+    """Scope-extend command: shift the stored viewport window.
+
+    The wire ``Rb`` frame ``[3,'Z',direction]`` — free (no fuel, no
+    queue slot), answered by a fresh ``0x5A`` whose origin follows the
+    measured ANCHOR law: the tank pins to the window edge trailing the
+    requested compass direction ([[viewport-shift-protocol]],
+    wire-measured 2026-08-01 from the 2026-07-10 human capture).
+
+    Attributes:
+        cmd_type: Command type identifier.
+        direction: Compass byte, clockwise from north (``SCOPE_*``
+            constants in ``protocol.commands``: 0=N .. 7=NW).
+    """
+
+    cmd_type: Literal["scope_shift"]
+    direction: int
+
+
+def make_scope_shift_command(direction: int) -> ScopeShiftCommandDict:
+    """Create a scope-shift command.
+
+    Args:
+        direction: Compass byte (0=N clockwise through 7=NW).
+
+    Returns:
+        ScopeShiftCommandDict for the requested shift.
+    """
+    return ScopeShiftCommandDict(cmd_type="scope_shift", direction=direction)
+
+
 class HoldCommandDict(TypedDict):
     """No-op command: the tick executes but dispatches nothing.
 
@@ -286,6 +317,7 @@ BotCommand = (
     | MapOpenCommandDict
     | TeleportCommandDict
     | ChatCommandDict
+    | ScopeShiftCommandDict
     | HoldCommandDict
 )
 
@@ -299,6 +331,7 @@ __all__ = [
     "PickupEquipmentCommandDict",
     "PickupFuelCommandDict",
     "RadarCommandDict",
+    "ScopeShiftCommandDict",
     "ShootCommandDict",
     "TeleportCommandDict",
     "make_chat_command",
@@ -308,6 +341,7 @@ __all__ = [
     "make_pickup_equipment_command",
     "make_pickup_fuel_command",
     "make_radar_command",
+    "make_scope_shift_command",
     "make_shoot_command",
     "make_teleport_command",
 ]

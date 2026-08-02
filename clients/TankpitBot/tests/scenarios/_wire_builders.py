@@ -15,6 +15,7 @@ and the wire-protocol surface stays small and inspectable.
 from __future__ import annotations
 
 from tankpit_bot.protocol import (
+    ChatMessageDict,
     DeactivationDict,
     EnemyDetectionDict,
     InventoryDict,
@@ -24,6 +25,9 @@ from tankpit_bot.protocol import (
     TankExitDict,
     TankInfoDict,
     TankRemoveDict,
+    TankStatusSyncDict,
+    ViewportEntityDict,
+    ViewportUpdateDict,
 )
 
 #: Default weapon byte for ``shot()`` helper -- dual shot, the bot's
@@ -286,6 +290,110 @@ def inventory_sync(
     )
 
 
+def viewport_update(
+    viewport_left: int,
+    viewport_top: int,
+    entities: list[ViewportEntityDict] | None = None,
+) -> ViewportUpdateDict:
+    """Build a 0x5A ``ViewportUpdate`` establishing the viewport origin.
+
+    Every real session receives one on join and on every teleport
+    landing — it is the authoritative viewport record consumers like
+    the aim clamp and the greeting encounter gate read. An empty
+    ``entities`` list is a legal "nothing visible" patch (the
+    reset-then-apply sweep clears visible-layer beliefs inside the
+    bounds).
+
+    Args:
+        viewport_left: Viewport left edge (self x - 8 centers the
+            bot, matching the live client).
+        viewport_top: Viewport top edge.
+        entities: Visible-layer entity entries; ``None`` for an empty
+            patch.
+
+    Returns:
+        A :class:`ViewportUpdateDict` ready for ingestion.
+    """
+    return ViewportUpdateDict(
+        msg_type=0x5A,
+        viewport_left=viewport_left,
+        viewport_top=viewport_top,
+        entities=entities if entities is not None else [],
+    )
+
+
+def chat_message(
+    sender_id: int,
+    message_id: int = 41,
+    x: int | None = None,
+    y: int | None = None,
+) -> ChatMessageDict:
+    """Build an inbound 0x4D ``ChatMessage`` broadcast.
+
+    A non-self sender lands in ``chat_seen_tank_ids`` — the
+    human-consent contract's chat signal (2026-07-30). The default
+    ``message_id`` 41 is the HELLO preset the bot itself greets with.
+
+    Args:
+        sender_id: Chatting tank's id.
+        message_id: Preset chat message ID (E[] table index).
+        x: Sender-reported X tile, or ``None`` for a coordinate-less
+            frame.
+        y: Sender-reported Y tile, or ``None``.
+
+    Returns:
+        A :class:`ChatMessageDict` ready for ingestion.
+    """
+    return ChatMessageDict(
+        msg_type=0x4D,
+        sender_id=sender_id,
+        message_type=message_id,
+        x=x,
+        y=y,
+    )
+
+
+def self_status_sync(
+    fuel: int,
+    tank_id: int,
+    team: int = 2,
+    rank: int = 1,
+    damage_state: int = 0,
+    lb_score: int = 0,
+    promo_state: int = 0,
+) -> TankStatusSyncDict:
+    """Build a fuel-bearing 0x2E ``TankStatusSync`` for the self tank.
+
+    The long (fuel-carrying) form is per-recipient — always the self
+    tank — and is the wire path that CONFIRMS incoming damage: the
+    dispatcher folds the fuel delta into the damage book
+    (``confirm_incoming_damage``), which is what feeds the
+    engagement-break's measured incoming rate.
+
+    Args:
+        fuel: New absolute fuel level.
+        tank_id: The self tank's id.
+        team: Team id (the wire subtype byte).
+        rank: Military rank.
+        damage_state: Damage tier (0-3).
+        lb_score: Leaderboard score.
+        promo_state: Promotion-progress counter.
+
+    Returns:
+        A :class:`TankStatusSyncDict` ready for ingestion.
+    """
+    return TankStatusSyncDict(
+        msg_type=0x2E,
+        subtype=team,
+        tank_id=tank_id,
+        damage_state=damage_state,
+        rank=rank,
+        lb_score=lb_score,
+        promo_state=promo_state,
+        fuel=fuel,
+    )
+
+
 def radar_result(found: bool, detection_type: int = 0) -> RadarResultDict:
     """Build an 0x46 ``RadarResult`` (the boolean detect-found ack).
 
@@ -336,13 +444,16 @@ def enemy_detection(
 __all__ = [
     "DEFAULT_ENEMY_TEAM",
     "DEFAULT_WEAPON_DUAL",
+    "chat_message",
     "deactivation",
     "enemy_detection",
     "inventory_sync",
     "movement_response",
     "radar_result",
+    "self_status_sync",
     "shoot_event",
     "tank_exit",
     "tank_info",
     "tank_remove",
+    "viewport_update",
 ]

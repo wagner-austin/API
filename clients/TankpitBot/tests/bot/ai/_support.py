@@ -13,8 +13,135 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     make_container_state,
     make_self_state,
+    make_tank_state,
     make_viewport_state,
 )
+
+
+def consent_human(tank_id: int) -> None:
+    """Mark a human as combat-consented for pursuit scenarios.
+
+    The human-consent contract (2026-07-30) requires a chat response
+    or a first strike before any human is targeted; pursuit tests use
+    this to model a human who has already responded.
+    """
+    get_world_service().chat_seen_tank_ids.add(tank_id)
+
+
+def make_enemy_tank(
+    *,
+    tank_id: int = 50,
+    x: int = 120,
+    y: int = 100,
+    name: str = "red-40",
+) -> TankStateDict:
+    """Create a visible enemy tank for HUNT tests.
+
+    The tank is wire-present at the HUNT tests' tick clock (100000):
+    ``last_wire_seen_ms`` is set equal to ``timestamp_ms`` so it passes
+    the kill-shot wire-presence gate, modelling an enemy genuinely in
+    view rather than a map-only afterimage.
+
+    Args:
+        tank_id: Enemy tank id.
+        x: Enemy x coordinate.
+        y: Enemy y coordinate.
+        name: Enemy display name.
+
+    Returns:
+        Visible enemy tank state.
+    """
+    return make_tank_state(
+        tank_id=tank_id,
+        x=x,
+        y=y,
+        team=2,
+        rank=1,
+        name=name,
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        last_viewport_observation_ms=100000,
+    )
+
+
+def make_pursuit_target(
+    *,
+    tank_id: int = 50,
+    x: int = 120,
+    y: int = 100,
+    name: str = "red-9",
+) -> TankStateDict:
+    """Create an off-viewport but wire-fresh locked target.
+
+    Models the case where a locked enemy teleported out of view:
+    ``last_viewport_observation_ms`` is stale (so analyze_threats
+    filters them out of the firing list) but ``timestamp_ms`` and
+    ``last_wire_seen_ms`` are fresh (the global 0x2E broadcast or
+    a recent map snapshot still vouches for them). HUNT must
+    pursue this target via the world-registry path rather than
+    enter CONFIRM_KILL.
+    """
+    return make_tank_state(
+        tank_id=tank_id,
+        x=x,
+        y=y,
+        team=2,
+        rank=1,
+        name=name,
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        # Left the viewport 8 s ago -- inside the ~12 s homing trace
+        # ([[shoot-event-format]]#reroute-ttl-ms), so pursuit fire is
+        # still live; the trace-expired behavior has its own pin.
+        last_viewport_observation_ms=92000,
+    )
+
+
+def make_map_known_enemy(
+    *,
+    tank_id: int = 60,
+    x: int = 240,
+    y: int = 100,
+    name: str = "red-50",
+    timestamp_ms: int = 99800,
+) -> TankStateDict:
+    """Create a map-known enemy with no viewport confirmation.
+
+    The tank carries a fresh map ``timestamp_ms`` (within the map-open
+    cooldown) but no viewport observation, so it is invisible to
+    ``analyze_threats`` and reachable only through the acquisition /
+    relay paths.
+
+    Args:
+        tank_id: Enemy tank id.
+        x: Enemy x coordinate.
+        y: Enemy y coordinate.
+        name: Enemy display name.
+        timestamp_ms: Map snapshot observation timestamp.
+
+    Returns:
+        Map-known enemy tank state.
+    """
+    return make_tank_state(
+        tank_id=tank_id,
+        x=x,
+        y=y,
+        team=2,
+        rank=1,
+        name=name,
+        is_self=False,
+        is_bot=False,
+        damage_state=0,
+        timestamp_ms=timestamp_ms,
+    )
 
 
 def seed_confirmed_incoming(count: int, weapon: int = 1, damage: int = -90) -> None:

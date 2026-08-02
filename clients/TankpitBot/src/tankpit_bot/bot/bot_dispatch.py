@@ -262,6 +262,32 @@ class DispatchMixin(CompletionsMixin):
         )
         return True
 
+    def scope_shift(self, direction: int) -> bool:
+        """Send the scope-extend command: shift the stored viewport window.
+
+        Free on every axis (no fuel, no queue slot) — the server
+        answers with a fresh 0x5A whose origin follows the anchor law
+        (the tank pins to the trailing window edge,
+        [[viewport-shift-protocol]]). Fire-and-forget like chat: the
+        sniffer's 0x5A ingestion updates the world's viewport origin
+        when the confirmation lands, so no HFSM transition is taken.
+
+        Args:
+            direction: Compass byte, clockwise from north (0=N..7=NW).
+
+        Returns:
+            True if command was sent, False if CDP unavailable.
+        """
+        from tankpit_bot.protocol.commands import build_scope_command
+
+        if not self._send_bytes(build_scope_command(direction), f"scope({direction})"):
+            return False
+        emit_diagnostic(
+            diagnostic_kind="scope_shift_sent",
+            direction=direction,
+        )
+        return True
+
     def request_inventory(self) -> bool:
         """Send CMD_INVENTORY to request the inventory snapshot.
 

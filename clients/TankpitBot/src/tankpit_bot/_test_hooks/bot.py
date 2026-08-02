@@ -125,6 +125,17 @@ class BotProtocol(Protocol):
         """
         ...
 
+    def scope_shift(self, direction: int) -> bool:
+        """Send the scope-extend command (shift the stored viewport).
+
+        Args:
+            direction: Compass byte, clockwise from north (0=N..7=NW).
+
+        Returns:
+            True if command was sent.
+        """
+        ...
+
     def open_map(self) -> bool:
         """Send map open command to reveal global enemy positions.
 

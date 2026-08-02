@@ -86,10 +86,19 @@ class PendingIncomingDict(TypedDict):
 
 
 class ConfirmedIncomingDict(TypedDict):
-    """One fuel-confirmed incoming hit, timestamped for rate windows."""
+    """One fuel-confirmed incoming hit, timestamped for rate windows.
+
+    ``shooter_id`` carries the attribution from the pending queue so
+    the rate window can be scoped to attackers who still exist — the
+    2026-07-31 arena soak proved the attacker-agnostic window wrong:
+    a freshly killed enemy's hits kept projecting forward for the
+    whole 10 s window and the bot blocked three healthy targets as
+    "unwinnable" on a dead tank's damage.
+    """
 
     timestamp_ms: int
     cost: int
+    shooter_id: int
 
 
 class DamageBookDict(TypedDict):
@@ -336,7 +345,11 @@ def confirm_incoming_damage(book: DamageBookDict, fuel_delta: int, now_ms: int) 
             key = str(pending["shooter_id"])
             book["taken"][key]["fuel"] += pending["cost"]
             book["confirmed_incoming"].append(
-                ConfirmedIncomingDict(timestamp_ms=now_ms, cost=pending["cost"])
+                ConfirmedIncomingDict(
+                    timestamp_ms=now_ms,
+                    cost=pending["cost"],
+                    shooter_id=pending["shooter_id"],
+                )
             )
         else:
             remaining.append(pending)
@@ -347,6 +360,7 @@ def incoming_damage_window(
     book: DamageBookDict,
     now_ms: int,
     window_ms: int,
+    dead_shooter_ids: frozenset[int],
 ) -> tuple[int, int]:
     """Return confirmed incoming (hits, fuel) inside the trailing window.
 
@@ -355,20 +369,37 @@ def incoming_damage_window(
     inflates the rate), and the log is pruned to the window on every
     read so it cannot grow unbounded.
 
+    Hits from shooters in ``dead_shooter_ids`` are excluded — a dead
+    attacker cannot keep firing, so their damage must not project
+    into the next engagement (2026-07-31 arena soak: the
+    attacker-agnostic window carried a freshly killed enemy's 81/tick
+    for the whole 10 s window and three healthy follow-up targets
+    were blocked as "unwinnable at any fuel"). The exclusion is
+    KNOWN-dead only: a shooter the registry cannot vouch for still
+    counts, so a registry gap can never under-report live danger.
+    Dead shooters' entries stay in the log until the window prunes
+    them — liveness can flip back within the window on a respawn.
+
     Args:
         book: The damage book.
         now_ms: Current wall-clock ms.
         window_ms: Trailing window length in ms.
+        dead_shooter_ids: Tank ids the registry currently lists as
+            deactivated.
 
     Returns:
-        ``(hits, fuel)`` confirmed within ``[now_ms - window_ms, now_ms]``.
+        ``(hits, fuel)`` confirmed within ``[now_ms - window_ms, now_ms]``
+        from shooters not known to be dead.
     """
     floor = now_ms - window_ms
     book["confirmed_incoming"] = [
         hit for hit in book["confirmed_incoming"] if hit["timestamp_ms"] >= floor
     ]
-    hits = len(book["confirmed_incoming"])
-    fuel = sum(hit["cost"] for hit in book["confirmed_incoming"])
+    counted = [
+        hit for hit in book["confirmed_incoming"] if hit["shooter_id"] not in dead_shooter_ids
+    ]
+    hits = len(counted)
+    fuel = sum(hit["cost"] for hit in counted)
     return hits, fuel
 
 

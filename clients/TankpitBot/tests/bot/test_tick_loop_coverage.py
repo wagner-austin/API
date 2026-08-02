@@ -263,6 +263,28 @@ class TestInterruptedExitReason:
         row = decode_row(data_lines[0])
         assert row["exit_reason"] == "interrupted"
         assert row["ticks"] == 1
+        # The interrupted run also leaves the human-readable scorecard
+        # ([[bot-behavior-contract]] §1.3: summary carries the exit
+        # reason) — pinned byte-for-byte at the tick-1 empty-session
+        # shape so a format drift is caught here, not in a live run.
+        summary = fake_fs.get_written_files()["runs\\bot\\latest.summary.txt"]
+        assert summary == (
+            "TANKPIT SESSION SUMMARY\n"
+            "========================================\n"
+            "Ticks:    1\n"
+            "Exit:     interrupted\n"
+            "Kills:    0\n"
+            "Shots:    0 (0 hits, 0 misses, 0 rejected)\n"
+            "Hit rate: n/a\n"
+            "Blocked:  0\n"
+            "========================================\n"
+            "Fuel:     0\n"
+            "Duals:    0\n"
+            "Homings:  0\n"
+            "Radars:   0\n"
+            "========================================\n"
+            "Mode:     UNSET/\n"
+        )
 
 
 class TestAppendIndexRowEndToEnd:

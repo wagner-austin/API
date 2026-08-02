@@ -141,6 +141,13 @@ def _is_walk_territory(
     equally walk territory (a tank at its viewport edge two tiles
     from off-frame stock). The larder is cross-viewport machinery.
 
+    A container FLOATING ON WATER is never walk territory from land
+    (F5 completion, 2026-08-01): the walk step's surface routing
+    cannot reach it at any distance, so ceding it to the walk
+    economics stranded in-viewport water fuel with nobody serving it
+    -- the larder keeps it and its landing resolution falls through
+    to the ferry boarding tile.
+
     Args:
         ctx: Decision context (viewport bounds).
         container: Candidate fuel container.
@@ -150,6 +157,9 @@ def _is_walk_territory(
     Returns:
         True when the walk step owns this container.
     """
+    terrain = ctx.terrain
+    if terrain is not None and not terrain.is_passable(container["x"], container["y"]):
+        return False
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     if left <= container["x"] <= right and top <= container["y"] <= bottom:
         return True

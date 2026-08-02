@@ -402,6 +402,40 @@ def pursuit_trace_is_live(
     return now_ms - tank["last_viewport_observation_ms"] <= PURSUIT_TRACE_TTL_MS
 
 
+def pursuit_homing_budget_spent(
+    world: WorldStateDict,
+    locked_target_id: int,
+    pursuit_shot_target_id: int,
+    pursuit_shot_ms: int,
+) -> bool:
+    """Return True when this departure window's pursuit shot is spent.
+
+    The human homing cap (user ruling 2026-07-31: firing all ~7
+    reroute-tracked homings the 12 s wall allows "is cheating"): one
+    pursuit shot per departure. The departure window is delimited by
+    the registry's ``last_viewport_observation_ms`` — a pursuit shot
+    stamped at or after the target's last in-viewport observation
+    means the budget for THIS departure is used, and the target
+    re-entering the viewport re-arms it with no explicit reset.
+
+    Args:
+        world: Filtered world state.
+        locked_target_id: The locked target's tank id.
+        pursuit_shot_target_id: ``ai_state["pursuit_shot_target_id"]``.
+        pursuit_shot_ms: ``ai_state["pursuit_shot_ms"]``.
+
+    Returns:
+        True when a pursuit shot at this target was already dispatched
+        since it was last seen in the viewport.
+    """
+    if pursuit_shot_target_id != locked_target_id:
+        return False
+    tank = world["tanks"].get(str(locked_target_id))
+    if tank is None:
+        return True
+    return pursuit_shot_ms >= tank["last_viewport_observation_ms"]
+
+
 def find_locked_target_pursuit(
     world: WorldStateDict,
     self_state: SelfStateDict,

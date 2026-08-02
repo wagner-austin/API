@@ -195,6 +195,65 @@ class TestRadarSpendEconomics:
         assert radar_spend_worthwhile(stocked) is False
         assert radar_spend_worthwhile(broke) is True
 
+    def test_last_extra_is_not_dribbled_on_a_partial_reveal(self) -> None:
+        """Radar reserve (user ruling 2026-07-31): the final extra holds.
+
+        42 uncovered tiles clear the stocked 32-tile floor but not the
+        last-extra 128-tile bar — running dry mid-session left the bot
+        "dead in the water" restocking through the built-in radius-2
+        scan, so the final paid sweep waits for a near-full reveal.
+        """
+        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+
+        world, self_state = make_world(scanned=True)
+        left = world["viewport"]["left"]
+        top = world["viewport"]["top"]
+        for dy in range(2, 5):
+            for dx in range(2, 16):
+                del world["scanned_tiles"][f"{left + dx},{top + dy}"]
+        ai_state = make_scanned_ai_state()
+
+        two_left = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(default_count=2),
+            100000,
+            None,
+            "",
+        )
+        last_extra = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(default_count=1),
+            100000,
+            None,
+            "",
+        )
+
+        assert radar_spend_worthwhile(two_left) is True
+        assert radar_spend_worthwhile(last_extra) is False
+
+    def test_last_extra_spends_on_a_near_full_reveal(self) -> None:
+        """A fully uncovered viewport is worth the final extra radar."""
+        from tankpit_bot.bot.ai.context import radar_spend_worthwhile
+
+        world, self_state = make_world(scanned=False)
+        ai_state = make_scanned_ai_state()
+
+        last_extra = DecideCtx(
+            world,
+            self_state,
+            ai_state,
+            make_inventory(default_count=1),
+            100000,
+            None,
+            "",
+        )
+
+        assert radar_spend_worthwhile(last_extra) is True
+
 
 class TestDisplacedLandingScanEconomics:
     """The displaced-harvest radar obeys the spend economics."""

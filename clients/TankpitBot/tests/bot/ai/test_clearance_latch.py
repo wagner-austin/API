@@ -8,10 +8,8 @@ consumer branch and the cascade's clearance step had no pins.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.collect_mode import (
-    _mine_clearance_decision,
-    decide_collect_mode,
-)
+from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
+from tankpit_bot.bot.ai.collect_pickups import mine_clearance_decision
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import make_container_state, make_mine_state
@@ -77,7 +75,7 @@ def test_same_tile_reaim_inside_the_effect_window_is_refused() -> None:
     state = _collect_state(mine_clearance_aim_key="104,100", mine_clearance_shot_ms=98000)
     ctx = _ctx_with_covered_container(state)
 
-    assert _mine_clearance_decision(ctx, ctx.base) is None
+    assert mine_clearance_decision(ctx, ctx.base) is None
 
 
 def test_stale_latch_allows_the_reclear() -> None:
@@ -89,7 +87,7 @@ def test_stale_latch_allows_the_reclear() -> None:
     state = _collect_state(mine_clearance_aim_key="104,100", mine_clearance_shot_ms=90000)
     ctx = _ctx_with_covered_container(state)
 
-    decision = _mine_clearance_decision(ctx, ctx.base)
+    decision = mine_clearance_decision(ctx, ctx.base)
 
     if decision is None:
         raise AssertionError("expected a clearance shot after the window")

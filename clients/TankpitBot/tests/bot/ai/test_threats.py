@@ -713,3 +713,23 @@ def test_pursuit_trace_dead_when_target_missing_from_registry() -> None:
     world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
 
     assert pursuit_trace_is_live(world, 999, 100000) is False
+
+
+def test_pursuit_homing_budget_spent_for_a_vanished_target() -> None:
+    """A stamped target missing from the registry stays spent, never re-fired."""
+    from tankpit_bot.bot.ai.threats import pursuit_homing_budget_spent
+    from tests.bot.ai._support import make_world
+
+    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
+
+    assert pursuit_homing_budget_spent(world, 999, 999, 95000) is True
+
+
+def test_pursuit_homing_budget_fresh_for_a_different_target() -> None:
+    """The stamp binds to one target id; another lock has a fresh budget."""
+    from tankpit_bot.bot.ai.threats import pursuit_homing_budget_spent
+    from tests.bot.ai._support import make_world
+
+    world, _self_state = make_world(self_x=100, self_y=100, fuel=800)
+
+    assert pursuit_homing_budget_spent(world, 999, 42, 95000) is False

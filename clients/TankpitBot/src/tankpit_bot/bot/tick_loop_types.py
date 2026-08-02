@@ -51,6 +51,38 @@ def _require_int_list(data: JSONObject, key: str) -> list[int]:
     return result
 
 
+def _decode_untargeted_command(data: JSONObject, cmd_type: str) -> BotCommand | None:
+    """Decode the command kinds that carry no target coordinates.
+
+    Args:
+        data: JSON object being decoded.
+        cmd_type: The already-extracted command type string.
+
+    Returns:
+        The decoded command, or ``None`` when the kind is targeted
+        and the caller must read the coordinates.
+    """
+    if cmd_type == "radar":
+        from tankpit_bot.bot.types import RadarCommandDict
+
+        return RadarCommandDict(cmd_type="radar")
+    if cmd_type == "map_open":
+        from tankpit_bot.bot.types import MapOpenCommandDict
+
+        return MapOpenCommandDict(cmd_type="map_open")
+    if cmd_type == "hold":
+        from tankpit_bot.bot.types import HoldCommandDict
+
+        return HoldCommandDict(cmd_type="hold")
+    if cmd_type == "scope_shift":
+        from tankpit_bot.bot.types import ScopeShiftCommandDict
+
+        return ScopeShiftCommandDict(
+            cmd_type="scope_shift", direction=require_int(data, "direction")
+        )
+    return None
+
+
 def _decode_bot_command(data: JSONObject) -> BotCommand:
     """Decode a BotCommand from JSON with validation.
 
@@ -64,18 +96,9 @@ def _decode_bot_command(data: JSONObject) -> BotCommand:
         ValueError: If cmd_type is not recognized.
     """
     cmd_type = require_str(data, "cmd_type")
-    if cmd_type == "radar":
-        from tankpit_bot.bot.types import RadarCommandDict
-
-        return RadarCommandDict(cmd_type="radar")
-    if cmd_type == "map_open":
-        from tankpit_bot.bot.types import MapOpenCommandDict
-
-        return MapOpenCommandDict(cmd_type="map_open")
-    if cmd_type == "hold":
-        from tankpit_bot.bot.types import HoldCommandDict
-
-        return HoldCommandDict(cmd_type="hold")
+    untargeted = _decode_untargeted_command(data, cmd_type)
+    if untargeted is not None:
+        return untargeted
     target_x = require_int(data, "target_x")
     target_y = require_int(data, "target_y")
     if cmd_type == "move":
@@ -136,6 +159,8 @@ def _encode_bot_command(command: BotCommand) -> JSONObject:
         return {"cmd_type": "map_open"}
     if command["cmd_type"] == "hold":
         return {"cmd_type": "hold"}
+    if command["cmd_type"] == "scope_shift":
+        return {"cmd_type": "scope_shift", "direction": command["direction"]}
     result: JSONObject = {
         "cmd_type": command["cmd_type"],
         "target_x": command["target_x"],

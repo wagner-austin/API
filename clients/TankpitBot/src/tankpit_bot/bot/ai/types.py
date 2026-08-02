@@ -52,6 +52,7 @@ ReasonKind = Literal[
     "search_collect_local",
     "walk_for_fuel",
     "map_for_dots",
+    "ferry_scope_scout",
     # HUNT
     "find_target",
     "find_enemies",
@@ -89,6 +90,7 @@ REASON_KINDS: tuple[ReasonKind, ...] = (
     "search_collect_local",
     "walk_for_fuel",
     "map_for_dots",
+    "ferry_scope_scout",
     "find_target",
     "find_enemies",
     "teleport_target",
@@ -536,12 +538,40 @@ class AIStateDict(TypedDict):
             yet -- the live double-shot at (162,94), 01:59:57/:59,
             run bot-20260730-015x.
         mine_clearance_shot_ms: Dispatch timestamp of that shot.
-        greeted_target_id: Tank ID of the last human target greeted
-            with the HELLO chat (-1 before the first). The greeting
-            attaches once per human lock acquisition; the latch stops
-            re-greets while the same lock is re-derived tick after
-            tick — the server's chat flood mute silently swallows
-            spam for the rest of the session ([[chat-messages]]).
+        greeted_tank_ids: Tank IDs already given the one-shot HELLO,
+            {str(tank_id): greeting timestamp_ms}. A PER-ID map, not
+            a last-id scalar: the 2026-07-31 two-human arena soak
+            showed the scalar latch ping-ponging between two humans —
+            12 HELLOs in one session, past the server's 8-send flood
+            mute that silences chat for the rest of the session
+            ([[chat-messages]]).
+        pursuit_shot_target_id: Tank ID of the last pursuit-fire
+            target (-1 before the first). Paired with
+            ``pursuit_shot_ms`` to cap pursuit homings at ONE per
+            departure window against humans (user ruling 2026-07-31:
+            milking the ~12 s reroute wall for up to 7 tracked hits
+            is cheating). The window needs no explicit reset: the
+            budget is spent while the stamp is newer than the
+            target's ``last_viewport_observation_ms``, so the target
+            re-entering the viewport re-arms it naturally.
+        pursuit_shot_ms: Dispatch timestamp of that pursuit shot.
+        visited_tank_ids: Tank IDs already given the stand-off GREET
+            VISIT, {str(tank_id): visit timestamp_ms}. Decoupled from
+            ``greeted_tank_ids`` (user ruling 2026-07-31: "hello can
+            run anytime... as long as the other player is on the map
+            logged in. you dont have to be near them") — the HELLO
+            may fire long before the visit, and sharing one latch
+            made an early long-range HELLO cancel the visit entirely
+            (first human-opponent sim soak). Per-id like the greeting
+            map so multiple unconsenting humans each get exactly one
+            courtesy trip; consent (their chat or first strike) is
+            what admits them to acquisition.
+        last_scope_scout_ms: Timestamp of the last ferry scope-scout
+            (the free Rb viewport pan toward a water-locked goal,
+            [[viewport-shift-protocol]]). Cooldown latch: a pan that
+            reveals no ferry leaves no negative belief behind, so
+            without it the scout would re-fire every tick the larder
+            declines the same water-locked container.
     """
 
     config: AIConfigDict
@@ -575,7 +605,11 @@ class AIStateDict(TypedDict):
     live_teleports: int
     mine_clearance_aim_key: str
     mine_clearance_shot_ms: int
-    greeted_target_id: int
+    greeted_tank_ids: dict[str, int]
+    pursuit_shot_target_id: int
+    pursuit_shot_ms: int
+    visited_tank_ids: dict[str, int]
+    last_scope_scout_ms: int
 
 
 def make_initial_ai_state(
@@ -621,7 +655,11 @@ def make_initial_ai_state(
         live_teleports=0,
         mine_clearance_aim_key="",
         mine_clearance_shot_ms=0,
-        greeted_target_id=-1,
+        greeted_tank_ids={},
+        pursuit_shot_target_id=-1,
+        pursuit_shot_ms=0,
+        visited_tank_ids={},
+        last_scope_scout_ms=0,
     )
 
 

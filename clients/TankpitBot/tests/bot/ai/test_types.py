@@ -535,25 +535,31 @@ class TestAIState:
         assert decoded["live_radars_used"] == 17
         assert decoded["live_teleports"] == 42
 
-    def test_encode_decode_roundtrip_with_greeted_target(self) -> None:
-        """Encode/decode preserves the HELLO greet latch."""
+    def test_encode_decode_roundtrip_with_greet_and_visit_maps(self) -> None:
+        """Encode/decode preserves the per-id HELLO and visit maps."""
         from tankpit_bot.bot.ai.types import AIStateDict
 
         original = make_initial_ai_state()
-        assert original["greeted_target_id"] == -1
-        state = AIStateDict(**{**original, "greeted_target_id": 1229})
+        assert original["greeted_tank_ids"] == {}
+        assert original["visited_tank_ids"] == {}
+        state = AIStateDict(
+            **{
+                **original,
+                "greeted_tank_ids": {"1229": 100000, "31": 105000},
+                "visited_tank_ids": {"1229": 101000},
+            }
+        )
         encoded = encode_ai_state(state)
         decoded = decode_ai_state(encoded)
-        assert decoded["greeted_target_id"] == 1229
+        assert decoded["greeted_tank_ids"] == {"1229": 100000, "31": 105000}
+        assert decoded["visited_tank_ids"] == {"1229": 101000}
 
-    def test_decode_missing_greeted_target_id_raises(self) -> None:
-        """Missing ``greeted_target_id`` raises — no back-compat default."""
-        from platform_core.json_utils import JSONTypeError
-
+    def test_decode_missing_greeted_tank_ids_raises(self) -> None:
+        """Missing ``greeted_tank_ids`` raises — no back-compat default."""
         original = make_initial_ai_state()
         encoded = encode_ai_state(original)
-        del encoded["greeted_target_id"]
-        with pytest.raises(JSONTypeError):
+        del encoded["greeted_tank_ids"]
+        with pytest.raises(ValueError, match="greeted_tank_ids"):
             decode_ai_state(encoded)
 
     def test_decode_missing_manual_mode_raises(self) -> None:

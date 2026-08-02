@@ -10,7 +10,7 @@ from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import BotCommand
+from tankpit_bot.bot.types import BotCommand, TeleportCommandDict
 from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
@@ -143,7 +143,17 @@ def dispatch_command(
         # and the flood-mute contract forbids retry-on-silence
         # ([[chat-messages]]) — so nothing downstream should wait on it.
         return bot.send_chat(command["message_id"], command["target_x"], command["target_y"])
-    if command["cmd_type"] in ("move", "pickup_fuel", "pickup_equipment"):
+    if command["cmd_type"] == "scope_shift":
+        # Free viewport pan (no fuel, no queue slot). Like chat there
+        # is no ledger entry: the outcome is the 0x5A confirmation the
+        # sniffer ingests as the new viewport origin, and nothing
+        # downstream correlates an attempt against it.
+        return bot.scope_shift(command["direction"])
+    if (
+        command["cmd_type"] == "move"
+        or command["cmd_type"] == "pickup_fuel"
+        or command["cmd_type"] == "pickup_equipment"
+    ):
         return _dispatch_tracked_target_command(bot, command)
     if command["cmd_type"] == "shoot":
         # Record the combat target so the 0x53 dispatcher can attribute
@@ -175,14 +185,32 @@ def dispatch_command(
         # ``map_data_processed`` in ~2 s including those issued while
         # ``map_visible`` was ``True``. There is nothing to guard.
         return bot.open_map()
-    # Teleport: an OPEN map is a server-side precondition. A teleport
-    # dispatched in the same tick as the wire map_open races the
-    # server's open processing and is silently dropped: run
-    # 20260610-024x lost 4 of 15 same-tick attempts to 10s stall
-    # timeouts while all 21 attempts against an already-open map
-    # landed. So the open and the teleport never share a tick: this
-    # tick opens the map, and the next tick's decision re-dispatches
-    # the teleport against a confirmed-open map.
+    return _dispatch_teleport_command(bot, command, snapshot)
+
+
+def _dispatch_teleport_command(
+    bot: BotProtocol,
+    command: TeleportCommandDict,
+    snapshot: PageClientSnapshotDict,
+) -> bool:
+    """Dispatch a teleport against a confirmed-open map, else open it.
+
+    An OPEN map is a server-side precondition. A teleport dispatched
+    in the same tick as the wire map_open races the server's open
+    processing and is silently dropped: run 20260610-024x lost 4 of
+    15 same-tick attempts to 10s stall timeouts while all 21 attempts
+    against an already-open map landed. So the open and the teleport
+    never share a tick: this tick opens the map, and the next tick's
+    decision re-dispatches the teleport against a confirmed-open map.
+
+    Args:
+        bot: Bot instance for sending commands.
+        command: The teleport command.
+        snapshot: Live page-client state captured at tick start.
+
+    Returns:
+        True if the map open or the teleport was dispatched.
+    """
     if snapshot["map_visible"] is not True:
         emit_ai(
             "deferring teleport to (%d,%d): opening map first",

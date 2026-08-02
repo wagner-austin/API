@@ -47,6 +47,7 @@ from tankpit_bot.protocol import (
     InventoryDict,
     MovementResponseDict,
     TankInfoDict,
+    ViewportUpdateDict,
 )
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state import (
@@ -336,6 +337,21 @@ class BotScenario:
             )
         )
         self.ingest(FuelGainDict(msg_type=0x44, fuel_total=fuel, is_free=False, flag=1))
+        # The join 0x5A: every real session's first viewport patch
+        # establishes the authoritative viewport record centered on
+        # the tank (left/top = pos - 8, the live client's anchor).
+        # Consumers like the aim clamp and the greeting encounter
+        # gate refuse to act on an unestablished record, so a
+        # scenario without this models a pre-join limbo no decision
+        # tick ever runs in.
+        self.ingest(
+            ViewportUpdateDict(
+                msg_type=0x5A,
+                viewport_left=x - 8,
+                viewport_top=y - 8,
+                entities=[],
+            )
+        )
         self.ingest(
             InventoryDict(
                 msg_type=0x49,

@@ -394,3 +394,32 @@ def test_far_ferry_is_not_a_boarding_target() -> None:
     assert selection["container"] is None
     assert selection["no_landing"] == 1
     assert selection["ferry_served"] == 0
+
+
+def test_in_viewport_water_container_is_still_larder_business() -> None:
+    """A floating container in view is never ceded to the walk step.
+
+    F5 completion (2026-08-01): the walk-territory gate handed every
+    in-viewport container to the walk economics, but a water container
+    is walk-unreachable from land at ANY distance — ceding it stranded
+    in-view water fuel with nobody serving it. On water the larder
+    keeps the candidate and its landing resolves to the ferry
+    boarding tile.
+    """
+    containers = {
+        "105,100": make_container(105, 100, 800, is_fuel=True),
+    }
+    terrain_data = {(x, y): "W" for x in range(103, 112) for y in range(96, 105)}
+    ctx = _ctx(
+        fuel=_fuel_at_deficit(600),
+        containers=containers,
+        terrain=InMemoryTerrainMap(terrain_data=terrain_data),
+    )
+    ctx.world["terrain"]["108,100"] = _ferry_tile(108, 100, observed_ms=100000)
+
+    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+
+    assert selection["too_close"] == 0
+    assert selection["container"] == containers["105,100"]
+    assert (selection["landing_x"], selection["landing_y"]) == (108, 100)
+    assert selection["ferry_served"] == 1

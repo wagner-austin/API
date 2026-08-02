@@ -198,18 +198,30 @@ def get_incoming_damage_window(now_ms: int, window_ms: int) -> tuple[int, int]:
     """Return fuel-confirmed incoming (hits, fuel) in the trailing window.
 
     The damage-aware engagement break's rate instrument -- reads the
-    session damage book ([[bot-behavior-contract]] §3.3).
+    session damage book ([[bot-behavior-contract]] §3.3), excluding
+    shooters the registry lists as DEACTIVATED: a dead attacker
+    cannot keep firing, so their hits must not project into the next
+    engagement (2026-07-31 arena soak -- a freshly killed enemy's
+    rate blocked three healthy follow-up targets as "unwinnable").
+    Unknown shooters still count -- a registry gap can never
+    under-report live danger.
 
     Args:
         now_ms: Current wall-clock ms.
         window_ms: Trailing window length in ms.
 
     Returns:
-        ``(hits, fuel)`` confirmed within the window.
+        ``(hits, fuel)`` confirmed within the window from shooters
+        not known to be dead.
     """
     from tankpit_bot.ledger.damage_book import incoming_damage_window
 
-    return incoming_damage_window(_service.damage_book, now_ms, window_ms)
+    dead_shooter_ids = frozenset(
+        tank["tank_id"]
+        for tank in _service.world_state["tanks"].values()
+        if tank["liveness"] == "deactivated"
+    )
+    return incoming_damage_window(_service.damage_book, now_ms, window_ms, dead_shooter_ids)
 
 
 def mark_scan_viewport_failed(viewport_left: int, viewport_top: int, timestamp_ms: int) -> None:

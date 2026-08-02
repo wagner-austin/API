@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tankpit_bot.bot.ai.collect_mode import (
+from tankpit_bot.bot.ai.collect_pickups import (
     select_equipment_target as _select_equipment_target_command,
 )
 from tankpit_bot.bot.ai.context import (

@@ -377,6 +377,23 @@ built-in radar (extras=0) stays gated only on "any uncovered tile"
 because it costs nothing but the tick.
 """
 
+RADAR_RESERVE_EXTRAS = 1
+"""Extra-radar count treated as the reserve (user ruling 2026-07-31:
+"if the bot runs out of radar ever ... its like dead in the water cuz
+it takes so long to restock via free radar"). At or below this count
+the spend bar escalates to :data:`RADAR_RESERVE_REVEAL_FLOOR_TILES`.
+This is spend-gating inside the existing economics rule, NOT the
+extras-toggle rationing rejected 2026-06-12 ([[radar-mechanics]]) --
+the extras slot stays enabled and any scan that does fire uses the
+extra."""
+
+RADAR_RESERVE_REVEAL_FLOOR_TILES = 128
+"""Uncovered-tile bar for spending the LAST extra radar: half the
+256-tile viewport. The final paid sweep goes only to a near-full-value
+reveal, never dribbles away on a sliver -- once it is gone, discovery
+collapses to the built-in radius-2 scan and restock stalls
+([[radar-mechanics]] "Death spiral at 0 extras")."""
+
 
 def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
     """Return True when a radar dispatch is worth its cost right now.
@@ -385,10 +402,12 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         ctx: Decision context (coverage map + inventory).
 
     Returns:
-        With extra radars stocked: True when the current viewport has
-        at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
-        tiles. Without extras: True when any tile is uncovered (the
-        built-in radar is free).
+        With extras above the reserve: True when the current viewport
+        has at least :data:`RADAR_SPEND_REVEAL_FLOOR_TILES` uncovered
+        tiles. At the reserve (the last extra): True only from
+        :data:`RADAR_RESERVE_REVEAL_FLOOR_TILES` uncovered tiles.
+        Without extras: True when any tile is uncovered (the built-in
+        radar is free).
     """
     left, top, right, bottom = viewport_visible_bounds(ctx.world["viewport"])
     uncovered = viewport_uncovered_count(
@@ -399,8 +418,11 @@ def radar_spend_worthwhile(ctx: DecideCtx) -> bool:
         bottom,
         ctx.timestamp_ms,
     )
-    if ctx.inventory["extra_radars"]["count"] > 0:
+    extras = ctx.inventory["extra_radars"]["count"]
+    if extras > RADAR_RESERVE_EXTRAS:
         return uncovered >= RADAR_SPEND_REVEAL_FLOOR_TILES
+    if extras > 0:
+        return uncovered >= RADAR_RESERVE_REVEAL_FLOOR_TILES
     return uncovered > 0
 
 

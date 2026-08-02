@@ -222,6 +222,8 @@ def _extract_command_target(command: BotCommand) -> tuple[int, int]:
         return (0, 0)
     if command["cmd_type"] == "hold":
         return (0, 0)
+    if command["cmd_type"] == "scope_shift":
+        return (0, 0)
     # All remaining command types have target_x and target_y.
     # Narrow to a concrete type to satisfy mypy's strict union checking.
     targeted: (

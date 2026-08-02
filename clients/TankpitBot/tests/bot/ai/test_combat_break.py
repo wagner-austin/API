@@ -21,7 +21,10 @@ from tests.bot.ai._support import (
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 
-def _threat(*, damage_state: int, rank: int = 1) -> EnemyThreatDict:
+def _threat(*, damage_state: int, rank: int = 1, name: str = "red-7") -> EnemyThreatDict:
+    # A practice-bot name: the human-fight break band (2026-07-31)
+    # keys on the name-shape classifier, so the plain projection pins
+    # must use a bot-shaped target.
     return make_enemy_threat(
         tank_id=50,
         x=120,
@@ -30,7 +33,7 @@ def _threat(*, damage_state: int, rank: int = 1) -> EnemyThreatDict:
         damage_state=damage_state,
         rank=rank,
         team=2,
-        name="Runner",
+        name=name,
         is_bot=True,
     )
 
@@ -91,6 +94,36 @@ def test_a_two_hit_spike_is_not_sustained_fire() -> None:
     assessment = assess_engagement_break(_ctx(fuel=500), _threat(damage_state=3), 2, 180)
     assert assessment["incoming_rate_per_tick"] == 0
     assert assessment["break_engagement"] is False
+
+
+def test_human_fight_holds_above_half_capacity() -> None:
+    """The human break band (user ruling 2026-07-31) suppresses the break.
+
+    The same fire that breaks a practice-bot fight
+    (:func:`test_full_health_target_under_sustained_fire_breaks`)
+    holds against a human while fuel is at or above half the rank
+    capacity (rank-2 self: 600 of 1200) -- human fights are attrition
+    and "does damage then leaves" was the complaint.
+    """
+    assessment = assess_engagement_break(
+        _ctx(fuel=600),
+        _threat(damage_state=3, name="Yuppler"),
+        5,
+        500,
+    )
+    assert assessment["projected_fuel_at_kill"] == 600 - 13 * 120
+    assert assessment["break_engagement"] is False
+
+
+def test_human_fight_breaks_below_half_capacity() -> None:
+    """Below half capacity the normal projection governs humans too."""
+    assessment = assess_engagement_break(
+        _ctx(fuel=599),
+        _threat(damage_state=3, name="Yuppler"),
+        5,
+        500,
+    )
+    assert assessment["break_engagement"] is True
 
 
 def _pursuit_target(*, damage_state: int) -> TankStateDict:
@@ -400,6 +433,24 @@ def test_close_phase_fight_under_fire_breaks_at_entry() -> None:
     assert decision["updated_ai_state"]["break_escape_until_fuel"] > 500
 
 
+def _human_pursuit_tank() -> TankStateDict:
+    return make_tank_state(
+        tank_id=50,
+        x=150,
+        y=150,
+        team=2,
+        rank=1,
+        name="Yuppler",
+        is_self=False,
+        is_bot=False,
+        damage_state=3,
+        timestamp_ms=100000,
+        last_wire_seen_ms=100000,
+        last_position_update_ms=100000,
+        last_viewport_observation_ms=80000,
+    )
+
+
 def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
     """A human fight is never blocked as unwinnable — refuel and resume.
 
@@ -408,36 +459,48 @@ def test_unwinnable_human_fight_refuels_and_keeps_the_lock() -> None:
     kept fighting and collected as necessary"): the one-kill
     projection that condemns a practice-bot fight does not apply to
     attrition fights against humans. Past-capacity projections latch
-    at capacity and escape to fuel with the lock held.
+    the RESUME floor (2026-07-31: refuel just enough to fund re-entry,
+    never a full-tank restock trip) and escape to fuel with the lock
+    held. Fuel 500 sits below the rank-2 half-capacity band (600), so
+    the break is live.
     """
     reset_world_state()
     seed_confirmed_incoming(5)
     try:
-        base_ctx = _engage_ctx(fuel=800)
-        base_ctx.world["tanks"]["50"] = make_tank_state(
-            tank_id=50,
-            x=150,
-            y=150,
-            team=2,
-            rank=1,
-            name="Yuppler",
-            is_self=False,
-            is_bot=False,
-            damage_state=3,
-            timestamp_ms=100000,
-            last_wire_seen_ms=100000,
-            last_position_update_ms=100000,
-            last_viewport_observation_ms=80000,
-        )
+        base_ctx = _engage_ctx(fuel=500)
+        base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
         decision = decide_hunt_mode(base_ctx)
     finally:
         reset_world_state()
 
     assert decision["behavior"]["mode"] == "COLLECT"
     assert decision["updated_ai_state"]["combat_target_id"] == 50
-    # Latched at capacity: the fixture's self tank is rank 2, so full
-    # is 1200 — refuel to the brim, then resume the human fight.
-    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 1200
+    # The resume floor at defaults: max(200 + 100 + 450, 1200 // 2 +
+    # 100) = 750 — one good container away, then back in the fight.
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 750
+
+
+def test_human_fight_above_half_capacity_keeps_fighting() -> None:
+    """The break band holds a human fight in HUNT at healthy fuel.
+
+    Same fire and target as the latch test, but at fuel 800 (above
+    the rank-2 band of 600): no break fires, no COLLECT delegation --
+    the tick stays a HUNT decision on the held lock (user ruling
+    2026-07-31: "it dont really hunt to kill, it kinda just does
+    damage then leaves").
+    """
+    reset_world_state()
+    seed_confirmed_incoming(5)
+    try:
+        base_ctx = _engage_ctx(fuel=800)
+        base_ctx.world["tanks"]["50"] = _human_pursuit_tank()
+        decision = decide_hunt_mode(base_ctx)
+    finally:
+        reset_world_state()
+
+    assert decision["behavior"]["mode"] == "HUNT"
+    assert decision["updated_ai_state"]["combat_target_id"] == 50
+    assert decision["updated_ai_state"]["break_escape_until_fuel"] == 0
 
 
 def test_close_phase_unwinnable_fight_blocks_at_entry() -> None:

@@ -10,7 +10,7 @@ ping-pong, and the lock-continuation integration in collect mode.
 
 from __future__ import annotations
 
-from tankpit_bot.bot.ai.collect_mode import _continue_or_release_fuel_lock
+from tankpit_bot.bot.ai.collect_locks import continue_or_release_fuel_lock
 from tankpit_bot.bot.ai.context import DecideCtx
 from tankpit_bot.bot.ai.equipment import (
     fuel_deliverable_score,
@@ -143,7 +143,7 @@ class TestLockContinuationIntegration:
     """The collect-mode lock path applies the value rule."""
 
     def test_dreg_lock_releases_when_high_volume_fuel_is_visible(self) -> None:
-        """The flag-13 shape clears the lock in _continue_or_release_fuel_lock."""
+        """The flag-13 shape clears the lock in continue_or_release_fuel_lock."""
         world, self_state = make_world(
             self_x=242,
             self_y=16,
@@ -156,7 +156,7 @@ class TestLockContinuationIntegration:
         ai_state = make_scanned_ai_state()
         ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
 
-        decision, updated = _continue_or_release_fuel_lock(
+        decision, updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(249, 18, 84)
         )
 
@@ -177,7 +177,7 @@ class TestLockContinuationIntegration:
         ai_state = make_scanned_ai_state()
         ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
 
-        decision, _updated = _continue_or_release_fuel_lock(
+        decision, _updated = continue_or_release_fuel_lock(
             ctx, ctx.base, _fuel_container(105, 105, 300)
         )
 

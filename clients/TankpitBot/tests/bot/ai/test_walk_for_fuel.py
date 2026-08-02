@@ -132,8 +132,8 @@ def test_marooned_exit_ignores_blacklisted_containers() -> None:
 
 def test_marooned_exit_ignores_session_blacklisted_containers() -> None:
     """A session-blacklisted container never anchors the walk."""
-    from tankpit_bot.bot.ai.collect_mode import (
-        _blacklist_container,
+    from tankpit_bot.bot.ai.collect_common import (
+        blacklist_container,
         reset_container_blacklist,
     )
 
@@ -166,7 +166,7 @@ def test_marooned_exit_ignores_session_blacklisted_containers() -> None:
         "",
     )
     reset_container_blacklist()
-    _blacklist_container(130, 100)
+    blacklist_container(130, 100)
     try:
         with pytest.raises(SessionExitError, match="out_of_fuel"):
             decide_collect_mode(ctx)

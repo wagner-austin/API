@@ -76,20 +76,31 @@ CMD_TOP10 = 49  # 0x31 - 't/r/p/b/o' keys - Leaderboard (extra byte: ff=all, 00-
 # Leaderboard response: rank(1) + mystery(1) + score(2) + team(1) + 0x08 + namelen(1) + name
 
 CMD_SCOPE = 90  # 0x5a - Arrow/Page keys - Pan camera view
-# Extra byte: 00=N, 02=E, 03=SE, 05=SW, 06=W, 07=NW
-# Response: Z + viewport data with entity positions
+# Direction byte is compass CLOCKWISE FROM NORTH: 0=N 1=NE 2=E 3=SE
+# 4=S 5=SW 6=W 7=NW. Wire-measured 2026-08-01 against the 2026-07-10
+# human capture (sniff-20260710-202821): all 8 sent Rb frames decode
+# as [3,'Z',dir] with 0=N, 1=NE, 2=E, 3=SE, 6=W paired to the game
+# log's "Extend view {dir}" lines; 5=SW and 7=NW corroborated by the
+# JS key handlers (End/Home). Response: 0x5A with the shifted window
+# — the ANCHOR law, not a fixed stride ([[viewport-shift-protocol]]).
 
 CMD_TOGGLE_EQUIPMENT = 114  # 0x72 - '1-5' keys - Toggle equipment
 # Extra byte: 0x31='1'=armor, 0x32='2'=dual, 0x33='3'=missile, 0x34='4'=homing, 0x35='5'=radar
 # Response: t(1) + armor(1) + dual(1) + missile(1) + homing(1) + radar(1) - each 0=off, 1=on
 
-# Scope direction codes (extra byte for CMD_SCOPE)
-SCOPE_NORTH = 0x00  # ArrowUp
-SCOPE_EAST = 0x02  # ArrowRight
-SCOPE_SOUTHEAST = 0x03  # PageDown
+# Scope direction codes (extra byte for CMD_SCOPE) — the full
+# clockwise-from-north compass, wire-measured (see CMD_SCOPE above).
+SCOPE_NORTH = 0x00  # ArrowUp; measured (Extend view N -> window top = tank_y-15)
+SCOPE_NORTHEAST = 0x01  # measured (Extend view NE -> window = (tank_x, tank_y-15))
+SCOPE_EAST = 0x02  # ArrowRight; measured x3 (window left = tank_x)
+SCOPE_SOUTHEAST = 0x03  # PageDown; measured x2 (window = tank tile exactly)
+SCOPE_SOUTH = 0x04  # clockwise-table completion (unobserved on the wire)
 SCOPE_SOUTHWEST = 0x05  # End
-SCOPE_WEST = 0x06  # ArrowLeft
+SCOPE_WEST = 0x06  # ArrowLeft; measured (window left = tank_x-15)
 SCOPE_NORTHWEST = 0x07  # Home
+SCOPE_CENTER = 0x08  # recenter on the tank (user-confirmed option 2026-08-01;
+# byte inferred — the measured compass occupies 0-7, center is the one
+# remaining value of the client's 0-8 direction range)
 
 # Plain commands (no XOR encoding, just length header + body)
 PLAIN_QUIT = b"-"  # 'q' key - Quit game and return to lobby
@@ -545,9 +556,12 @@ __all__ = [
     "PLAIN_QUIT",
     "PLAIN_SOUND_OFF",
     "PLAIN_SOUND_ON",
+    "SCOPE_CENTER",
     "SCOPE_EAST",
     "SCOPE_NORTH",
+    "SCOPE_NORTHEAST",
     "SCOPE_NORTHWEST",
+    "SCOPE_SOUTH",
     "SCOPE_SOUTHEAST",
     "SCOPE_SOUTHWEST",
     "SCOPE_WEST",

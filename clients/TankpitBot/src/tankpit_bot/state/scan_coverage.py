@@ -25,10 +25,12 @@ reads it to:
 * Pick a walking destination -- the viewport tile whose next free
   radar would reveal the most uncovered ground.
 
-Game-config note: viewport shifting is OFF in this session, so once
-the bot teleports the viewport is fixed until the next teleport.
-Tiles outside the current viewport remain in the map until the TTL
-expires; they never become reachable by walking.
+Game-config note: autoscroll is OFF in this session, so walking
+never moves the window — it moves on teleport landings and on the
+bot's own Rb scope pans ([[viewport-shift-protocol]], 2026-08-01),
+both of which arrive as 0x5A and update the origin this module
+reads. Tiles outside the current viewport remain in the map until
+the TTL expires; they never become reachable by walking.
 """
 
 from __future__ import annotations

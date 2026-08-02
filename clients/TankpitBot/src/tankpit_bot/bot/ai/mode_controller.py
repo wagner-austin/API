@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.humans import is_human_name
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
@@ -278,15 +279,35 @@ def should_enter_collect(ctx: DecideCtx) -> bool:
     """
     if ctx.fuel <= ctx.config["fuel_low_threshold"]:
         return True
-    if (
-        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
-        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
-        or ctx.inventory["extra_radars"]["count"] < ctx.config["radar_break_threshold"]
-    ):
+    if weapon_reserves_below_break(ctx):
         return True
     if ctx.ai_state["combat_target_id"] != -1:
         return False
     return ctx.fuel < hunt_fuel_floor(ctx) or not hunt_entry_permitted(ctx)
+
+
+def weapon_reserves_below_break(ctx: DecideCtx) -> bool:
+    """Return True when any weapon or radar reserve is below its break bar.
+
+    The genuine emergency bar (dual / homing below
+    ``dual_break_threshold``, extra radars below
+    ``radar_break_threshold``) -- as opposed to the hunt-ENTRY bar of
+    exact rank caps. The entry-vs-held distinction (F21,
+    [[flag-triage-20260729]]): entry bars govern starting a fight
+    fully stocked; a HELD fight tops up only at this break bar, never
+    the entry cap.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when any reserve is below its break threshold.
+    """
+    return (
+        ctx.inventory["dual_shots"]["count"] < ctx.config["dual_break_threshold"]
+        or ctx.inventory["homing_shots"]["count"] < ctx.config["dual_break_threshold"]
+        or ctx.inventory["extra_radars"]["count"] < ctx.config["radar_break_threshold"]
+    )
 
 
 def hunt_fuel_floor(ctx: DecideCtx) -> int:
@@ -319,15 +340,98 @@ def should_exit_collect(ctx: DecideCtx) -> bool:
     rebuilds a full stock instead of leaving the moment it scrapes
     together one radar.
 
+    Mid-HUMAN-fight exception (user ruling 2026-07-31: "its not
+    necessary to full restock but to do partial restocks so the bot
+    can keep fighting the human"): while a human combat lock is held,
+    the exit bar drops to the combat-resume bar
+    (:func:`human_fight_resume_permitted`) so the restock detour stays
+    short and the fight resumes aggressively. Wind-down keeps the full
+    bar -- the session-complete exit must leave a fully stocked tank.
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when fuel and inventory are fully restored.
+        True when the applicable restock bar is met.
     """
+    if held_human_combat_lock(ctx) and not ctx.ai_state["wind_down"]:
+        return human_fight_resume_permitted(ctx)
     if ctx.fuel < hunt_fuel_floor(ctx):
         return False
     return hunt_entry_permitted(ctx)
+
+
+def held_human_combat_lock(ctx: DecideCtx) -> bool:
+    """Return True when the held combat lock is on a human-classified target.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when ``combat_target_id`` names a registry tank whose
+        name shape classifies as human. A vanished target (left the
+        game) reads False -- the full restock bar applies and the
+        resume machinery releases the lock on its own.
+    """
+    target_id = ctx.ai_state["combat_target_id"]
+    if target_id == -1:
+        return False
+    tank = ctx.filtered["tanks"].get(str(target_id))
+    return tank is not None and is_human_name(tank["name"])
+
+
+def human_fight_resume_fuel_floor(ctx: DecideCtx) -> int:
+    """Return the fuel level at which a broken human fight resumes.
+
+    Shared by the engagement-break latch and the mid-fight restock bar
+    (user ruling 2026-07-31): enough to fund the re-entry -- usually
+    one good container -- never a full-tank rebuild. Sits above the
+    half-capacity break band so the hysteresis never inverts.
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        ``min(capacity, max(fuel_low + hunt_min + engagement_budget,
+        capacity // 2 + hunt_min))`` -- 750 at defaults for a private.
+    """
+    capacity = fuel_capacity(ctx.self_state["rank"])
+    return min(
+        capacity,
+        max(
+            ctx.config["fuel_low_threshold"]
+            + ctx.config["hunt_min_fuel"]
+            + ctx.config["engagement_fuel_budget"],
+            capacity // 2 + ctx.config["hunt_min_fuel"],
+        ),
+    )
+
+
+def human_fight_resume_permitted(ctx: DecideCtx) -> bool:
+    """Return True when a partial restock can resume a held human fight.
+
+    The combat-resume bar (user ruling 2026-07-31, [[bot-behavior-contract]]
+    §3.1): fuel at the resume floor, duals AND homings at half the rank
+    cap (break fires below ``dual_break_threshold``, so half-cap keeps
+    a wide hysteresis band), and extra radars at twice the radar break
+    (the bare break bar would be a zero-width band -- the design law
+    every re-derived gate follows).
+
+    Args:
+        ctx: Decision context.
+
+    Returns:
+        True when fuel, weapons, and radars clear the resume bar.
+    """
+    rank = ctx.self_state["rank"]
+    weapon_floor = inventory_capacity(rank) // 2
+    radar_floor = min(combat_radar_min(rank), 2 * ctx.config["radar_break_threshold"])
+    return (
+        ctx.fuel >= human_fight_resume_fuel_floor(ctx)
+        and ctx.inventory["dual_shots"]["count"] >= weapon_floor
+        and ctx.inventory["homing_shots"]["count"] >= weapon_floor
+        and ctx.inventory["extra_radars"]["count"] >= radar_floor
+    )
 
 
 def should_enter_hunt(ctx: DecideCtx) -> bool:
@@ -339,14 +443,24 @@ def should_enter_hunt(ctx: DecideCtx) -> bool:
     Starting a fight below full stock leads to abandoned kills when
     the break threshold pulls the bot away mid-fight.
 
+    Mid-HUMAN-fight exception (user ruling 2026-07-31): a held human
+    lock re-enters HUNT at the combat-resume bar
+    (:func:`human_fight_resume_permitted`) -- without this override
+    the partial COLLECT exit and the full entry bar deadlock the
+    arbitration and the fight never resumes. The full bar still
+    governs STARTING fights (no held lock).
+
     Args:
         ctx: Decision context.
 
     Returns:
-        True when fully stocked and COLLECT has no entry condition.
+        True when stocked to the applicable bar and COLLECT has no
+        entry condition.
     """
     if should_enter_collect(ctx):
         return False
+    if held_human_combat_lock(ctx) and human_fight_resume_permitted(ctx):
+        return True
     return ctx.fuel >= hunt_fuel_floor(ctx) and hunt_entry_permitted(ctx)
 
 
@@ -480,7 +594,10 @@ def derive_collect_mode_state(decision: TickDecisionDict) -> AIModeState:
     command_type = decision["command"]["cmd_type"]
     if reason in ("forage_radar", "forage_sweep", "scan_on_landing", "desync_rescan"):
         return "SENSE"
-    if reason == "search_collect_local":
+    if reason in ("search_collect_local", "ferry_scope_scout"):
+        # The free viewport pan is a SEARCH beat: the tick looks at
+        # water it cannot yet believe in, exactly like a local search
+        # looks at ground ([[viewport-shift-protocol]] scope scout).
         return "SEARCH"
     if command_type in ("pickup_fuel", "pickup_equipment"):
         return "PICKUP"
@@ -495,6 +612,9 @@ __all__ = [
     "combat_radar_min",
     "derive_collect_mode_state",
     "derive_hunt_mode_state",
+    "held_human_combat_lock",
+    "human_fight_resume_fuel_floor",
+    "human_fight_resume_permitted",
     "hunt_entry_permitted",
     "hunt_fuel_floor",
     "make_hold_decision",

@@ -20,21 +20,28 @@ def _tank(
     tank_id: int,
     name: str,
     *,
-    viewport_seen_ms: int = 100000,
+    x: int = 105,
+    y: int = 100,
+    timestamp_ms: int = 100000,
 ) -> TankStateDict:
-    """A registry tank the greeting can classify by name."""
+    """A registry tank the greeting can classify by name.
+
+    ``timestamp_ms`` is the map-freshness stamp the hello-anytime
+    rule reads (user ruling 2026-07-31): fresh means "on the map
+    logged in"; position and viewport presence never gate the HELLO.
+    """
     return make_tank_state(
         tank_id=tank_id,
-        x=120,
-        y=100,
+        x=x,
+        y=y,
         team=2,
         rank=4,
         name=name,
         is_self=False,
         is_bot=False,
         damage_state=0,
-        timestamp_ms=100000,
-        last_viewport_observation_ms=viewport_seen_ms,
+        timestamp_ms=timestamp_ms,
+        last_viewport_observation_ms=timestamp_ms,
     )
 
 
@@ -55,7 +62,7 @@ def _ctx(tanks: dict[str, TankStateDict]) -> DecideCtx:
 def _decision(
     *,
     combat_target_id: int,
-    greeted_target_id: int = -1,
+    greeted_tank_ids: dict[str, int] | None = None,
     with_secondary: bool = False,
 ) -> TickDecisionDict:
     """A HUNT-owner decision with the given lock and greet latch."""
@@ -63,7 +70,7 @@ def _decision(
         **{
             **make_initial_ai_state(),
             "combat_target_id": combat_target_id,
-            "greeted_target_id": greeted_target_id,
+            "greeted_tank_ids": greeted_tank_ids if greeted_tank_ids is not None else {},
         }
     )
     secondary = make_radar_command() if with_secondary else None
@@ -86,7 +93,7 @@ def test_greets_new_human_lock_with_hello_secondary() -> None:
     assert result["secondary_command"] == make_chat_command(
         CHAT_HELLO, ctx.self_state["x"], ctx.self_state["y"]
     )
-    assert result["updated_ai_state"]["greeted_target_id"] == 50
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
     assert result["command"] == decision["command"]
     assert result["behavior"] == decision["behavior"]
     assert result["desired_equipment"] == decision["desired_equipment"]
@@ -107,17 +114,18 @@ def test_greets_viewport_human_without_a_lock() -> None:
     assert result["secondary_command"] == make_chat_command(
         CHAT_HELLO, ctx.self_state["x"], ctx.self_state["y"]
     )
-    assert result["updated_ai_state"]["greeted_target_id"] == 50
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
 
 
-def test_stale_viewport_human_is_not_greeted() -> None:
-    """A human without live viewport presence is not greeted.
+def test_map_stale_human_is_not_greeted() -> None:
+    """A human whose registry stamp went map-stale gets no HELLO.
 
-    The greeting is a face-to-face gesture: a registry entry seen
-    only on the map (or long ago) gets its HELLO when the greeting
-    approach actually brings the bot into their viewport.
+    Map freshness is the "on the map logged in" proxy (user ruling
+    2026-07-31): 0x4C map opens and the global 0x2E sync refresh the
+    stamp for everyone actually in the game, so a stale stamp means
+    nobody has vouched for them recently — wait for the next map.
     """
-    ctx = _ctx({"50": _tank(50, "Yuppler", viewport_seen_ms=10)})
+    ctx = _ctx({"50": _tank(50, "Yuppler", timestamp_ms=10)})
     decision = _decision(combat_target_id=-1)
 
     result = attach_human_greeting(ctx, decision)
@@ -133,7 +141,7 @@ def test_no_regreeting_of_the_same_target() -> None:
     toward the mute that silences the bot for the whole session.
     """
     ctx = _ctx({"50": _tank(50, "Yuppler")})
-    decision = _decision(combat_target_id=50, greeted_target_id=50)
+    decision = _decision(combat_target_id=50, greeted_tank_ids={"50": 90000})
 
     result = attach_human_greeting(ctx, decision)
 
@@ -148,7 +156,7 @@ def test_practice_bot_lock_is_never_greeted() -> None:
     result = attach_human_greeting(ctx, decision)
 
     assert result is decision
-    assert result["updated_ai_state"]["greeted_target_id"] == -1
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {}
 
 
 def test_unknown_target_id_is_not_greeted() -> None:
@@ -169,7 +177,7 @@ def test_existing_secondary_command_is_never_displaced() -> None:
     result = attach_human_greeting(ctx, decision)
 
     assert result is decision
-    assert result["updated_ai_state"]["greeted_target_id"] == -1
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {}
 
 
 class TestGreetingThroughDecide:
@@ -222,7 +230,7 @@ class TestGreetingThroughDecide:
         assert decision["secondary_command"] == make_chat_command(
             CHAT_HELLO, self_state["x"], self_state["y"]
         )
-        assert decision["updated_ai_state"]["greeted_target_id"] == 50
+        assert decision["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
 
     def test_decide_locks_a_consented_human(self) -> None:
         """A chat response consents the human into a normal lock."""
@@ -253,7 +261,7 @@ class TestGreetingThroughDecide:
 
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["updated_ai_state"]["combat_target_id"] == 50
-        assert decision["updated_ai_state"]["greeted_target_id"] == 50
+        assert decision["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
 
     def test_decide_stays_silent_when_locking_a_practice_bot(self) -> None:
         """The same acquisition against a practice bot attaches nothing."""
@@ -283,16 +291,48 @@ class TestGreetingThroughDecide:
         assert decision["behavior"]["mode"] == "HUNT"
         assert decision["updated_ai_state"]["combat_target_id"] == 51
         assert decision["secondary_command"] is None
-        assert decision["updated_ai_state"]["greeted_target_id"] == -1
+        assert decision["updated_ai_state"]["greeted_tank_ids"] == {}
 
 
 def test_greets_the_nearest_of_two_viewport_humans() -> None:
     """With two ungreeted humans in view the nearest gets the HELLO."""
-    far = _tank(60, "guest")
-    far["x"] = 130
-    ctx = _ctx({"50": _tank(50, "Yuppler"), "60": far})
+    ctx = _ctx({"50": _tank(50, "Yuppler"), "60": _tank(60, "guest", x=107)})
     decision = _decision(combat_target_id=-1)
 
     result = attach_human_greeting(ctx, decision)
 
-    assert result["updated_ai_state"]["greeted_target_id"] == 50
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
+
+
+def test_far_off_viewport_human_is_greeted_anyway() -> None:
+    """Chat is global: a map-fresh human across the field gets the HELLO.
+
+    User ruling 2026-07-31, verbatim: "hello can run anytime... as
+    long as the other player is on the map logged in. you dont have
+    to be near them." The stand-off VISIT keeps its own latch and
+    proximity machinery; the hello never waits for it.
+    """
+    ctx = _ctx({"50": _tank(50, "Yuppler", x=240, y=30)})
+    decision = _decision(combat_target_id=-1)
+
+    result = attach_human_greeting(ctx, decision)
+
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}
+    assert result["secondary_command"] == make_chat_command(
+        CHAT_HELLO, ctx.self_state["x"], ctx.self_state["y"]
+    )
+
+
+def test_position_unsynced_human_is_greeted_anyway() -> None:
+    """A logged-in human whose position has not synced still gets the HELLO.
+
+    The (0,0) sentinel gates targeting and the stand-off visit (both
+    need real coordinates), never the chat — they are in the game the
+    moment their identity broadcast lands.
+    """
+    ctx = _ctx({"50": _tank(50, "Yuppler", x=0, y=0)})
+    decision = _decision(combat_target_id=-1)
+
+    result = attach_human_greeting(ctx, decision)
+
+    assert result["updated_ai_state"]["greeted_tank_ids"] == {"50": 100000}

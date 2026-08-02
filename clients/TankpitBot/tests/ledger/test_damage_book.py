@@ -133,8 +133,8 @@ def test_confirmed_hits_are_timestamped_for_the_rate_window() -> None:
     record_incoming_shot(book, 2627, "guest", 3, 1000)
     confirm_incoming_damage(book, -(DUAL_HIT_VICTIM_COST + HOMING_HIT_VICTIM_COST), 2000)
     assert book["confirmed_incoming"] == [
-        {"timestamp_ms": 2000, "cost": DUAL_HIT_VICTIM_COST},
-        {"timestamp_ms": 2000, "cost": HOMING_HIT_VICTIM_COST},
+        {"timestamp_ms": 2000, "cost": DUAL_HIT_VICTIM_COST, "shooter_id": 2627},
+        {"timestamp_ms": 2000, "cost": HOMING_HIT_VICTIM_COST, "shooter_id": 2627},
     ]
 
 
@@ -144,10 +144,10 @@ def test_incoming_damage_window_counts_and_prunes() -> None:
     for confirm_ms in (1000, 5000, 12000):
         record_incoming_shot(book, 2627, "guest", 3, confirm_ms - 500)
         confirm_incoming_damage(book, -HOMING_HIT_VICTIM_COST, confirm_ms)
-    hits, fuel = incoming_damage_window(book, 13000, 10000)
+    hits, fuel = incoming_damage_window(book, 13000, 10000, frozenset())
     assert (hits, fuel) == (2, 2 * HOMING_HIT_VICTIM_COST)
     assert len(book["confirmed_incoming"]) == 2
-    hits, fuel = incoming_damage_window(book, 30000, 10000)
+    hits, fuel = incoming_damage_window(book, 30000, 10000, frozenset())
     assert (hits, fuel) == (0, 0)
     assert book["confirmed_incoming"] == []
 
@@ -157,7 +157,34 @@ def test_unconfirmed_shots_never_enter_the_rate_window() -> None:
     book = make_damage_book()
     record_incoming_shot(book, 2627, "guest", 1, 1000)
     confirm_incoming_damage(book, 900, 2000)
-    assert incoming_damage_window(book, 2000, 10000) == (0, 0)
+    assert incoming_damage_window(book, 2000, 10000, frozenset()) == (0, 0)
+
+
+def test_dead_shooters_hits_leave_the_rate_window() -> None:
+    """A known-dead attacker's damage never projects into the next fight.
+
+    The 2026-07-31 arena soak: after killing the attacker, its 5-hit
+    window rate persisted and three healthy follow-up targets were
+    blocked as "unwinnable at any fuel". Known-dead shooters are
+    excluded; an UNKNOWN shooter still counts (a registry gap can
+    never under-report live danger); and the entries stay in the log,
+    so a respawned shooter's liveness flip restores them.
+    """
+    book = make_damage_book()
+    record_incoming_shot(book, 2627, "guest", 1, 1000)
+    confirm_incoming_damage(book, -DUAL_HIT_VICTIM_COST, 2000)
+    record_incoming_shot(book, 3000, "stranger", 3, 2500)
+    confirm_incoming_damage(book, -HOMING_HIT_VICTIM_COST, 3000)
+
+    both = incoming_damage_window(book, 4000, 10000, frozenset())
+    assert both == (2, DUAL_HIT_VICTIM_COST + HOMING_HIT_VICTIM_COST)
+
+    guest_dead = incoming_damage_window(book, 4000, 10000, frozenset({2627}))
+    assert guest_dead == (1, HOMING_HIT_VICTIM_COST)
+    assert len(book["confirmed_incoming"]) == 2
+
+    guest_respawned = incoming_damage_window(book, 4000, 10000, frozenset())
+    assert guest_respawned == (2, DUAL_HIT_VICTIM_COST + HOMING_HIT_VICTIM_COST)
 
 
 def test_summarize_side_renders_rows_and_empty() -> None:

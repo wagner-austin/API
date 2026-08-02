@@ -129,6 +129,20 @@ class TestEncodeDecodeRoundTrip:
         decoded = decode_tick_decision(encoded)
         assert decoded == original
 
+    def test_roundtrip_scope_shift(self) -> None:
+        """A scope-shift decision round-trips with its direction byte."""
+        from tankpit_bot.bot.types import make_scope_shift_command
+        from tankpit_bot.protocol.commands import SCOPE_SOUTHEAST
+
+        cmd = make_scope_shift_command(SCOPE_SOUTHEAST)
+        behavior = make_behavior_score("COLLECT", 925, 112, 112, "ferry_scope_scout")
+        ai_state = make_initial_ai_state()
+        original = make_tick_decision(cmd, behavior, ai_state, [5])
+        encoded = encode_tick_decision(original)
+        assert encoded["command"] == {"cmd_type": "scope_shift", "direction": SCOPE_SOUTHEAST}
+        decoded = decode_tick_decision(encoded)
+        assert decoded == original
+
     def test_roundtrip_chat_secondary(self) -> None:
         """A chat secondary command round-trips with its message_id."""
         from tankpit_bot.bot.types import make_chat_command, make_teleport_command

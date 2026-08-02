@@ -181,16 +181,9 @@ def run_tick_loop(
                 "Kill target reached (%d): winding down for a clean exit",
                 session_kills,
             )
-        try:
-            _tick_once(bot)
-            _sync_live_view_demand(bot)
-        except TargetClosedError:
-            log.info("Browser closed during tick, ending run gracefully")
-            _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
-            return
-        except SessionExitError as exit_request:
-            log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
-            _emit_session_scorecard(bot, ticks_done, exit_reason=exit_request.reason)
+        exit_reason = _tick_with_exit_boundary(bot, ticks_done)
+        if exit_reason is not None:
+            _emit_session_scorecard(bot, ticks_done, exit_reason=exit_reason)
             return
         _publish_session_status(bot)
         ticks_done += 1
@@ -528,6 +521,47 @@ def _publish_session_status(bot: Bot) -> None:
     bot._status_bus.publish(status)
 
 
+def _tick_with_exit_boundary(bot: Bot, ticks_done: int) -> str | None:
+    """Run one guarded tick and translate its endings into exit reasons.
+
+    The session's single exception boundary ([[bot-behavior-contract]]
+    §1.2/§1.3): a closed browser and a self-directed
+    :class:`SessionExitError` become graceful exit reasons the caller
+    finalizes; any OTHER unhandled exception finalizes the artifacts
+    HERE — scorecard, ``latest.summary.txt``, and the ``_index.tsv``
+    row as ``exit_reason="crashed"`` — and then RE-RAISES so the
+    process still fails loudly. Before 2026-07-31 the contract
+    promised "crashed" with no writer anywhere: a crashed session
+    simply vanished from the runs index, which is exactly the "which
+    runs died?" blindness the index exists to prevent.
+
+    Args:
+        bot: Bot instance.
+        ticks_done: Completed tick count (for the crash scorecard).
+
+    Returns:
+        A graceful exit reason for the caller to finalize, or ``None``
+        to continue the loop.
+    """
+    try:
+        _tick_once(bot)
+        _sync_live_view_demand(bot)
+    except TargetClosedError:
+        log.info("Browser closed during tick, ending run gracefully")
+        return "browser_closed"
+    except SessionExitError as exit_request:
+        log.info("Session exit: %s -- %s", exit_request.reason, exit_request.detail)
+        return exit_request.reason
+    except Exception:
+        log.exception(
+            "Unhandled exception in tick %d - finalizing artifacts as crashed",
+            ticks_done + 1,
+        )
+        _emit_session_scorecard(bot, ticks_done, exit_reason="crashed")
+        raise
+    return None
+
+
 def _sync_live_view_demand(bot: Bot) -> None:
     """Keep the in-page caster matched to viewer demand.
 
@@ -621,7 +655,10 @@ def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
     fresh = make_initial_ai_state(bot._ai_state["config"])
     fresh["session_kill_count"] = bot._ai_state["session_kill_count"]
     fresh["wind_down"] = bot._ai_state["wind_down"]
-    fresh["greeted_target_id"] = bot._ai_state["greeted_target_id"]
+    fresh["greeted_tank_ids"] = bot._ai_state["greeted_tank_ids"]
+    # The stand-off visit map is session-scoped like the greeting:
+    # dying to a human must not schedule a fresh courtesy visit.
+    fresh["visited_tank_ids"] = bot._ai_state["visited_tank_ids"]
     bot._ai_state = fresh
     bot._state_data = make_initial_state_data()
     service.world_state["self_state"] = None

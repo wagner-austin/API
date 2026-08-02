@@ -513,3 +513,42 @@ class TestMovementDeadEscape:
             raise AssertionError("expected a decision from the under-fire branch")
         assert decision["command"]["cmd_type"] == "pickup_fuel"
         assert decision["behavior"]["reason_kind"] == "fuel_collect"
+
+
+def test_under_fire_with_nothing_available_falls_to_the_exhausted_outcome() -> None:
+    """Sustained fire with nothing to do yields the tick to hunt.
+
+    Fully stocked (hunt-entry permitted), fuel at capacity, no larder,
+    and the only fuel dot's landing viewport overlaps live coverage —
+    every escape verb declines, the trapped fallback has nothing to
+    fall back to, and the under-fire branch resolves through the
+    exhausted outcome: ``None``, handing the tick to the hunt owner.
+    """
+    from tankpit_bot.bot.ai.collect_mode import decide_collect_mode
+    from tankpit_bot.bot.ai.context import DecideCtx
+    from tankpit_bot.sniffer.world_state import reset_world_state
+    from tests.bot.ai._support import (
+        make_inventory,
+        make_scanned_ai_state,
+        make_world,
+        seed_confirmed_incoming,
+    )
+
+    reset_world_state()
+    try:
+        seed_confirmed_incoming(3)
+        world, self_state = make_world(fuel=1200)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(dual_count=30, default_count=30),
+            100000,
+            None,
+            "",
+            map_fuel_dots=((101, 101),),
+        )
+
+        assert decide_collect_mode(ctx) is None
+    finally:
+        reset_world_state()

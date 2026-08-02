@@ -61,6 +61,11 @@ class _DispatchFailBot:
         _ = (message_id, x, y)
         return False
 
+    def scope_shift(self, direction: int) -> bool:
+        """Unused stub."""
+        _ = direction
+        return False
+
     def open_map(self) -> bool:
         """Unused stub."""
         return False

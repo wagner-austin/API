@@ -212,7 +212,7 @@ def _isolate_protocol_singletons() -> Generator[None, None, None]:
     lives in -- no duplicated per-file fixtures, no missed resets.
     """
     from tankpit_bot.action_lab.client_structure import reset_client_structure_survey
-    from tankpit_bot.bot.ai.collect_mode import reset_container_blacklist
+    from tankpit_bot.bot.ai.collect_common import reset_container_blacklist
     from tankpit_bot.ledger.decision import reset_decision_records
     from tankpit_bot.ledger.events import reset_event_ids
     from tankpit_bot.ledger.mode_transition import reset_mode_transitions
