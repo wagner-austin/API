@@ -33,70 +33,72 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
+from tankpit_bot.sim.atlas_seed import seed_atlas_population
+from tankpit_bot.sim.commands import ClientCommandDict
+from tankpit_bot.sim.ghost import (
+    GhostSpecDict,
+    GhostTracker,
+    ghost_events_for_tick,
+    seed_ghost_world_population,
+)
 from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
 from tankpit_bot.sim.practice_room import PracticeRoomDriver
-from tankpit_bot.sim.server import SimServer
-from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
-from tankpit_bot.sim.world import (
-    SimContainerDict,
-    SimEquipmentDict,
-    SimWorldDict,
-    encode_sim_world,
-    make_sim_tank,
-    make_sim_world,
+from tankpit_bot.sim.scenarios import (
+    _FERRY_CLIENT_FUEL,
+    _SIM_DIR,
+    SIM_CLIENT_ID,
+    SIM_ENEMY_ID,
+    SIM_FIELD,
+    SIM_MAGIC,
+    _parse_cli,
+    _require_seeds_passable,
+    _resolve_session_mode,
+    make_default_sim_world,
+    make_ferry_sim_world,
 )
+from tankpit_bot.sim.server import TICK_MS, SimServer
+from tankpit_bot.sim.session import SimCDPSession, build_capture_session, deliver_batch
+from tankpit_bot.sim.spawn import find_open_tile_near
+from tankpit_bot.sim.world import SimWorldDict, encode_sim_world, make_sim_tank
 from tankpit_bot.sim.world_seed import (
     seed_field_population,
     seed_practice_client,
     select_practice_layout,
 )
-from tankpit_bot.sniffer.world_state import reset_world_state
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.xor import build_global_xor_table, get_global_xor_table, reset_xor_state
 from tankpit_bot.types import encode_capture_session
 
 log = get_logger(__name__)
 
-SIM_MAGIC = "simmagic"
-SIM_CLIENT_ID = 9
-SIM_ENEMY_ID = 11
-SIM_FIELD = "field01_r.gif"
-_SIM_DIR = Path("runs") / "sim"
-_DEFAULT_ROUNDS = 150
 
-# The default arena is the most open ground on field01: a fully
-# passable 21x21 clearing centered on (216, 108) (verified against
-# the real GIF — the naive (100, 100) region is coastal, and six of
-# its would-be container tiles sit in water).
-_ARENA_X = 216
-_ARENA_Y = 108
-_DEFAULT_FUEL_CONTAINERS: tuple[tuple[int, int, int], ...] = (
-    (219, 108, 300),
-    (213, 112, 400),
-    (222, 103, 400),
-    (210, 105, 400),
-    (225, 112, 400),
-    (216, 116, 400),
-    (208, 111, 300),
-    (221, 100, 300),
-)
-# Enough equipment that the bot can actually rebuild its radar
-# buffer: collect hops burn extras on scan-on-landing roughly as fast
-# as one container's radar stack refills them, so a sparse seeding
-# strands the session below the hunt threshold (first clearing run:
-# exit no_productive_collect at round 39 with all three containers
-# drained).
-_DEFAULT_EQUIPMENT: tuple[tuple[int, int], ...] = (
-    (219, 111),
-    (214, 106),
-    (210, 114),
-    (224, 105),
-    (212, 100),
-    (218, 115),
-    (208, 104),
-    (223, 113),
-)
+class TickPacedClock:
+    """The sim session's decision clock: one real tick per round.
+
+    Wall time is the wrong clock for a sim session — an in-process
+    round takes microseconds, so live TTLs (forage coverage 180 s,
+    harvest memory 10 min, belief freshness gates) either never age
+    or age at the mercy of machine load (the 2026-08-01 flake: the
+    same 600-round session exited at round 54 solo and never under
+    xdist). Pacing the decision clock at the measured 2 s server tick
+    makes sessions deterministic AND live-realistic: a 300-round soak
+    now ages exactly like a 10-minute session.
+    """
+
+    def __init__(self, start_ms: int) -> None:
+        """Anchor the clock at the session's real start time."""
+        self._now_ms = start_ms
+
+    def __call__(self) -> int:
+        """Return the paced session time."""
+        return self._now_ms
+
+    def advance(self, delta_ms: int) -> None:
+        """Advance the session by one round's worth of time."""
+        self._now_ms += delta_ms
 
 
 class SimRunResultDict(TypedDict):
@@ -120,73 +122,75 @@ class SimRunResultDict(TypedDict):
     events_path: str
 
 
-def make_default_sim_world() -> SimWorldDict:
-    """Build the default scenario: a sustainable fight-and-collect map.
-
-    The client spawns rank 1 in the field01 clearing combat-ready
-    (the fight runs first; the extras it burns scanning pull the
-    equipment-collection paths in afterwards), the armed rank-8
-    opponent holds ten tiles east, and enough fuel and equipment is
-    on the ground that a long session stays productive. A finite
-    world still drains eventually — container respawns are an
-    uncertified gap — so the production ``no_productive_collect``
-    exit is this scenario's natural old age.
-
-    Returns:
-        The seeded world.
-    """
-    world = make_sim_world(SIM_FIELD)
-    world["tanks"][SIM_CLIENT_ID] = make_sim_tank(SIM_CLIENT_ID, 2, 1, _ARENA_X, _ARENA_Y, 1100)
-    world["tanks"][SIM_CLIENT_ID]["counts"] = [25, 25, 25, 25, 25]
-    # A winnable fight, not an execution. The bot FIGHTS WITH ARMOR
-    # OFF by policy (desired_equipment is dual/homing/radar — the
-    # scenario-harness baseline pins armor disabled), so its
-    # effective HP is its fuel — and an out-of-ammo opponent still
-    # lands unlimited 45-fuel singles, so ammo does not cap damage.
-    # A 500-fuel opponent (six kill-hits needed) lets the client win
-    # the deterministic knife fight while still eating real return
-    # fire; heavier seedings killed the bot by round ~20 every run
-    # (that ``deactivated`` ending is itself covered by the exit
-    # law's tests).
-    world["tanks"][SIM_ENEMY_ID] = make_sim_tank(SIM_ENEMY_ID, 1, 8, _ARENA_X + 10, _ARENA_Y, 500)
-    world["tanks"][SIM_ENEMY_ID]["counts"] = [0, 4, 0, 2, 3]
-    for x, y, volume in _DEFAULT_FUEL_CONTAINERS:
-        world["containers"].append(SimContainerDict(x=x, y=y, volume=volume, dotted=True))
-    for x, y in _DEFAULT_EQUIPMENT:
-        world["equipment"].append(SimEquipmentDict(x=x, y=y))
-    return world
-
-
-def _require_seeds_passable(world: SimWorldDict, terrain: _test_hooks.TerrainMapProtocol) -> None:
-    """Reject a scenario whose seeds sit on rock or water — loudly.
-
-    The first real-terrain run (2026-07-22) seeded the coastal
-    (100, 100) region and drowned six containers: the bot starved
-    among dots it could never reach. Nothing on the real map spawns
-    on impassable ground, so a seed there is a harness bug, not a
-    world.
+def _seed_ghost_world(
+    world: SimWorldDict,
+    terrain: _test_hooks.TerrainMapProtocol,
+    ghost_spec: GhostSpecDict,
+    atlas_path: Path | None,
+) -> None:
+    """Seed a recorded session's world: client, ghosts, containers.
 
     Args:
-        world: The seeded world.
+        world: Simulated world (mutated).
         terrain: The loaded field terrain.
-
-    Raises:
-        RuntimeError: Listing every impassable seed.
+        ghost_spec: The compiled recording.
+        atlas_path: Optional mined-atlas underlay — fills tiles the
+            recording never observed; the capture's own reads stay
+            per-tile authoritative.
     """
-    offenders: list[str] = []
-    for tank_id, tank in sorted(world["tanks"].items()):
-        if not terrain.is_passable(tank["x"], tank["y"]):
-            offenders.append(f"tank {tank_id} at ({tank['x']},{tank['y']})")
-    for container in world["containers"]:
-        if not terrain.is_passable(container["x"], container["y"]):
-            offenders.append(f"fuel container at ({container['x']},{container['y']})")
-    for equipment in world["equipment"]:
-        if not terrain.is_passable(equipment["x"], equipment["y"]):
-            offenders.append(f"equipment at ({equipment['x']},{equipment['y']})")
-    if offenders:
-        raise RuntimeError(
-            "impassable scenario seeds on " + world["field"] + ": " + "; ".join(offenders)
+    client = make_sim_tank(
+        SIM_CLIENT_ID,
+        ghost_spec["client_team"],
+        ghost_spec["client_rank"],
+        ghost_spec["client_x"],
+        ghost_spec["client_y"],
+        ghost_spec["client_fuel"],
+    )
+    client["counts"] = list(ghost_spec["client_counts"])
+    world["tanks"][SIM_CLIENT_ID] = client
+    placed = 0
+    for ghost in ghost_spec["ghosts"]:
+        spawn_x, spawn_y = ghost["x"], ghost["y"]
+        if not terrain.is_passable(spawn_x, spawn_y):
+            spot = find_open_tile_near(
+                world, terrain, spawn_x, spawn_y, world["tick"], min_radius=1, max_radius=4
+            )
+            if spot is None:
+                continue
+            spawn_x, spawn_y = spot
+        world["tanks"][ghost["tank_id"]] = make_sim_tank(
+            ghost["tank_id"],
+            ghost["team"],
+            ghost["rank"],
+            spawn_x,
+            spawn_y,
+            fuel_capacity(ghost["rank"]),
+            name=ghost["name"],
         )
+        placed += 1
+    if atlas_path is not None:
+        atlas_tally = seed_atlas_population(
+            world, terrain, atlas_path, frozenset(ghost_spec["dot_atlas"])
+        )
+        ghost_tiles = {(c["x"], c["y"]) for c in ghost_spec["containers"]}
+        ghost_tiles.update(ghost_spec["equipment"])
+        world["containers"] = [
+            c for c in world["containers"] if (c["x"], c["y"]) not in ghost_tiles
+        ]
+        world["equipment"] = [e for e in world["equipment"] if (e["x"], e["y"]) not in ghost_tiles]
+        log.info("ghost atlas underlay: %s", atlas_tally)
+    skipped = seed_ghost_world_population(
+        world["containers"], world["equipment"], ghost_spec, terrain
+    )
+    log.info(
+        "ghost world: %d ghosts placed (%d identities unsighted), "
+        "%d containers/equipment seeded (%d unseedable), %d ticks of timeline",
+        placed,
+        ghost_spec["unplaced_tanks"],
+        len(world["containers"]) + len(world["equipment"]),
+        skipped,
+        ghost_spec["ticks"],
+    )
 
 
 def _boot(
@@ -194,6 +198,8 @@ def _boot(
     *,
     practice: bool = False,
     stamp: str = "",
+    atlas_path: Path | None = None,
+    ghost_spec: GhostSpecDict | None = None,
 ) -> tuple[Bot, SimServer, SimCDPSession, PracticeRoomDriver | None]:
     """Wire a real Bot to the sim over the CDP seam.
 
@@ -208,8 +214,19 @@ def _boot(
             handshake so the join roster dump includes the bots, and
             hand the server their ids for the corpse-window
             reactivation hook.
-        stamp: The run stamp (practice mode's layout selector; unused
-            otherwise).
+        stamp: The run stamp (the layout selector for practice and
+            atlas spawns; unused otherwise).
+        atlas_path: When set, the mined longitudinal atlas replaces
+            the statistical container field ([[game-economy]]
+            2026-08-01): in practice mode the roster still seeds, but
+            the ground truth is the REAL room; standalone it is a
+            pure-forage world on the real field.
+        ghost_spec: When set, seed a recorded session's world: the
+            client at its recorded spawn state, every sighted
+            opponent as a replayable ghost (at its first PASSABLE
+            sighting; ferry riders and other water sightings spawn at
+            their first dry tile), and the capture's first-observed
+            containers.
 
     Returns:
         The bot, the server, the seam link, and the practice-room
@@ -231,6 +248,19 @@ def _boot(
     if not _test_hooks.path_exists(gif_path):
         raise RuntimeError(f"terrain GIF {gif_path} not found — run `make download-fields` first")
     terrain = _test_hooks.load_terrain_map(gif_path)
+    # The lobby TEXT handshake (ROOM_LIST + SELECT) is outside the
+    # binary seam, but a session always has a selected room — without
+    # it the bot's decision terrain stays None for the whole run ("No
+    # selected room is available for terrain-map loading") and every
+    # terrain-gated behavior (greeting stand-off landings, larder
+    # landing legality, LOS composition) silently self-disables.
+    # First surfaced by the 2026-07-31 human-opponent soak: the greet
+    # approach could never vouch a landing, so the session exited
+    # no_viable_targets two rounds in. Register the sim room exactly
+    # as the lobby decoders would have.
+    service = get_world_service()
+    service.register_room_image("sim", gif_path.name.replace("_r.gif", ".gif"))
+    service.set_selected_room("sim")
     driver: PracticeRoomDriver | None = None
     roster_ids: frozenset[int] = frozenset()
     if practice:
@@ -244,7 +274,23 @@ def _boot(
         seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
         driver = PracticeRoomDriver(world, terrain, SIM_CLIENT_ID, layout["roster"])
         roster_ids = driver.roster_ids()
-        seed_field_population(world, terrain, seed=zlib.crc32(stamp.encode("utf-8")))
+        if atlas_path is not None:
+            tally = seed_atlas_population(world, terrain, atlas_path)
+            log.info("atlas field %s: %s", atlas_path, tally)
+        else:
+            seed_field_population(world, terrain, seed=zlib.crc32(stamp.encode("utf-8")))
+    elif ghost_spec is not None:
+        _seed_ghost_world(world, terrain, ghost_spec, atlas_path)
+    elif atlas_path is not None:
+        layout = select_practice_layout(stamp)
+        seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
+        # A pure-forage world has no targets, so a hunt-ready spawn
+        # would exit ``no_viable_targets`` on tick 2 (first standalone
+        # atlas run did exactly that). Start lean: the session's work
+        # IS the real field's larder economics.
+        world["tanks"][SIM_CLIENT_ID]["fuel"] = _FERRY_CLIENT_FUEL
+        tally = seed_atlas_population(world, terrain, atlas_path)
+        log.info("atlas forage world %s: %s", atlas_path, tally)
     _require_seeds_passable(world, terrain)
     server = SimServer(world, terrain, client_id=SIM_CLIENT_ID, roster_ids=roster_ids)
     bot = Bot("https://sim.tankpit.local/", headless=True)
@@ -256,22 +302,127 @@ def _boot(
     return bot, server, link, driver
 
 
+def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int) -> None:
+    """Feed one round's recorded ghost actions into the server.
+
+    Dead ghosts skip their remaining timeline (the live fight may
+    have killed them earlier than the recording did).
+
+    Args:
+        server: The live sim server.
+        spec: The compiled ghost spec.
+        round_index: The session tick about to be played.
+    """
+    for event in ghost_events_for_tick(spec, round_index):
+        tank = server.world["tanks"].get(event["tank_id"])
+        if tank is None or not tank["alive"]:
+            continue
+        if event["kind"] == "place":
+            server.relocate_tank(event["tank_id"], event["x"], event["y"])
+        elif event["kind"] == "shoot":
+            server.queue_command(
+                event["tank_id"],
+                ClientCommandDict(
+                    kind="shoot",
+                    command=115,
+                    x=event["x"],
+                    y=event["y"],
+                    target_id=0,
+                    slot=0,
+                    message_id=0,
+                    direction=0,
+                ),
+            )
+        else:
+            server.queue_command(
+                event["tank_id"],
+                ClientCommandDict(
+                    kind="chat",
+                    command=109,
+                    x=event["x"],
+                    y=event["y"],
+                    target_id=0,
+                    slot=0,
+                    message_id=event["message_id"],
+                    direction=0,
+                ),
+            )
+
+
+def _queue_round_opponents(
+    server: SimServer,
+    driver: PracticeRoomDriver | None,
+    opponent: bool,
+    ghost_spec: GhostSpecDict | None,
+    enemy_id: int,
+    round_index: int,
+) -> int:
+    """Queue this round's non-client actions for the active mode.
+
+    Args:
+        server: The live sim server.
+        driver: The practice-room driver, when in practice mode.
+        opponent: Whether the scripted opponent plays.
+        ghost_spec: The ghost timeline, when in ghost mode.
+        enemy_id: The scripted opponent's current wire id.
+        round_index: The session tick about to be played.
+
+    Returns:
+        The (possibly revived) scripted opponent id.
+    """
+    if ghost_spec is not None:
+        _queue_ghost_round(server, ghost_spec, round_index)
+    if driver is not None:
+        for bot_id, command in driver.decide_all(server.world, server.terrain):
+            server.queue_command(bot_id, command)
+    elif opponent:
+        enemy_id = maybe_revive_opponent(server, enemy_id, SIM_CLIENT_ID)
+        opponent_command = decide_opponent(server.world, enemy_id, SIM_CLIENT_ID)
+        if opponent_command is not None:
+            server.queue_command(enemy_id, opponent_command)
+    return enemy_id
+
+
 def run_sim_session(
     rounds: int,
     *,
     opponent: bool = True,
     practice: bool = False,
+    ferry: bool = False,
+    atlas: str | None = None,
+    ghost: str | None = None,
     stamp: str | None = None,
+    opponent_name: str = "",
 ) -> SimRunResultDict:
     """Play one production-bot session against the sim and archive it.
 
     Args:
         rounds: Maximum server ticks to play.
         opponent: Whether the scripted opponent returns fire (ignored
-            in practice mode — the certified roster replaces it).
+            in practice and ferry modes).
         practice: Face the certified practice-bot roster
             (``sim/practice_room``) instead of the scripted harness.
+        ferry: Play the ferry forage scenario
+            (:func:`make_ferry_sim_world`) — no opponent, a
+            water-locked larder behind one scope pan. Ignored when
+            ``practice`` is set.
+        atlas: Path to the mined longitudinal atlas
+            (``container_atlas.json``). With ``practice`` it replaces
+            the statistical container field under the roster; alone
+            it is a pure-forage session on the real room. Ignored in
+            ferry mode.
+        ghost: Path to a recorded ``capture_session.json`` to replay
+            as ghosts ([[capture-differ]] stage 4): the production
+            bot plays live against the recording's opponents doing
+            exactly what they did; the ``ghost_summary`` diagnostic
+            reports how long the live run tracked the recorded
+            client. Takes precedence over every other scenario flag.
         stamp: Optional archive stamp override for deterministic tests.
+        opponent_name: Optional wire name for the scripted opponent.
+            A human-shaped name (e.g. ``guest``) runs the session
+            under the human-consent gate and the fair-fight contracts
+            (2026-07-31) — the opponent shoots first, which consents
+            it into acquisition. Ignored in practice mode.
 
     Returns:
         The session summary (also written to the artifacts).
@@ -281,27 +432,41 @@ def run_sim_session(
     """
     run_stamp = stamp if stamp is not None else make_run_stamp()
     artifacts = configure_probe_runtime_logging("sim", run_stamp)
-    world = make_sim_world(SIM_FIELD) if practice else make_default_sim_world()
-    bot, server, link, driver = _boot(world, practice=practice, stamp=run_stamp)
+    world, opponent, practice, ghost_spec, atlas_path, ferry_mode = _resolve_session_mode(
+        opponent=opponent,
+        practice=practice,
+        ferry=ferry,
+        atlas=atlas,
+        ghost=ghost,
+        opponent_name=opponent_name,
+    )
+    bot, server, link, driver = _boot(
+        world, practice=practice, stamp=run_stamp, atlas_path=atlas_path, ghost_spec=ghost_spec
+    )
     exit_reason = "rounds_exhausted"
     exit_detail = ""
     played = 0
     enemy_id = SIM_ENEMY_ID
+    clock = TickPacedClock(_test_hooks.get_current_time_ms())
+    original_clock = _test_hooks.get_current_time_ms
+    _test_hooks.get_current_time_ms = clock
+    tracker = GhostTracker(ghost_spec["recorded_path"]) if ghost_spec is not None else None
+    if ghost_spec is not None:
+        rounds = min(rounds, ghost_spec["ticks"])
     try:
-        for _ in range(rounds):
+        for round_index in range(rounds):
             _tick_once(bot)
-            if driver is not None:
-                for bot_id, command in driver.decide_all(server.world, server.terrain):
-                    server.queue_command(bot_id, command)
-            elif opponent:
-                enemy_id = maybe_revive_opponent(server, enemy_id, SIM_CLIENT_ID)
-                opponent_command = decide_opponent(server.world, enemy_id, SIM_CLIENT_ID)
-                if opponent_command is not None:
-                    server.queue_command(enemy_id, opponent_command)
+            enemy_id = _queue_round_opponents(
+                server, driver, opponent, ghost_spec, enemy_id, round_index
+            )
             batch = server.advance_tick()
             if driver is not None:
                 driver.note_batch(server.world, batch)
             deliver_batch(bot._cdp_message_buffer, batch, link)
+            if tracker is not None:
+                live = server.world["tanks"][SIM_CLIENT_ID]
+                tracker.note_round(round_index, live["x"], live["y"])
+            clock.advance(TICK_MS)
             played += 1
     except SessionExitError as error:
         exit_reason = error.reason
@@ -311,13 +476,25 @@ def run_sim_session(
             error.reason,
             error.detail,
         )
+    finally:
+        _test_hooks.get_current_time_ms = original_clock
+    if tracker is not None:
+        tracker.emit_summary()
+        log.info(
+            "ghost track: %d/%d rounds within reach of the recording; "
+            "first divergence at round %d, final drift %d",
+            tracker.tracked_ticks,
+            tracker.compared_ticks,
+            tracker.first_divergence_tick,
+            tracker.final_drift,
+        )
     capture_path = _SIM_DIR / f"sim-{run_stamp}.capture_session.json"
     world_path = _SIM_DIR / f"sim-{run_stamp}.world.json"
     session = build_capture_session(link, SIM_MAGIC, f"sim-{run_stamp}")
     _test_hooks.write_text(capture_path, dump_json_str(encode_capture_session(session)))
     _test_hooks.write_text(world_path, dump_json_str(encode_sim_world(server.world)))
     client = server.world["tanks"][SIM_CLIENT_ID]
-    if practice:
+    if practice or ferry_mode or atlas_path is not None or ghost_spec is not None:
         enemy_alive = any(
             tank["alive"] and tank["team"] != client["team"]
             for tank_id, tank in server.world["tanks"].items()
@@ -345,36 +522,26 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Args:
         argv: Command-line arguments (``--rounds N``,
-            ``--no-opponent``, ``--stamp S``). Uses ``sys.argv[1:]``
-            when None.
+            ``--no-opponent``, ``--stamp S``, ``--human-opponent
+            NAME``, ``--ferry``, ``--from-atlas [PATH]``). Uses
+            ``sys.argv[1:]`` when None.
 
     Returns:
         Process exit code (0 — a session that ends via the production
         exit path is still a successful sim run).
     """
-    args = list(argv) if argv is not None else list(sys.argv[1:])
-    rounds = _DEFAULT_ROUNDS
-    opponent = True
-    practice = False
-    stamp: str | None = None
-    index = 0
-    while index < len(args):
-        token = args[index]
-        if token == "--rounds" and index + 1 < len(args):
-            rounds = int(args[index + 1])
-            index += 2
-        elif token == "--no-opponent":
-            opponent = False
-            index += 1
-        elif token == "--practice":
-            practice = True
-            index += 1
-        elif token == "--stamp" and index + 1 < len(args):
-            stamp = args[index + 1]
-            index += 2
-        else:
-            index += 1
-    result = run_sim_session(rounds, opponent=opponent, practice=practice, stamp=stamp)
+    parsed = _parse_cli(list(argv) if argv is not None else list(sys.argv[1:]))
+    result = run_sim_session(
+        parsed["rounds"],
+        opponent=parsed["opponent"],
+        practice=parsed["practice"],
+        ferry=parsed["ferry"],
+        atlas=parsed["atlas"],
+        ghost=parsed["ghost"],
+        stamp=parsed["stamp"],
+        opponent_name=parsed["opponent_name"],
+    )
+    rounds = parsed["rounds"]
     sys.stdout.write(
         f"sim session {result['stamp']}: {result['rounds_played']}/{rounds} rounds, "
         f"{result['commands_sent']} commands, exit={result['exit_reason']}\n"
@@ -395,5 +562,6 @@ __all__ = [
     "SimRunResultDict",
     "main",
     "make_default_sim_world",
+    "make_ferry_sim_world",
     "run_sim_session",
 ]
