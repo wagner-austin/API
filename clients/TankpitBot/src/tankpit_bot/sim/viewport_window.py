@@ -89,6 +89,46 @@ class ViewportTracker:
         """
         self.window = self._centered_window()
 
+    def apply_scope_shift(self, direction: int) -> None:
+        """Shift the stored window per the measured Rb anchor law.
+
+        Wire-measured 2026-08-01 (capture sniff-20260710-202821, all 8
+        "Extend view" events fit exactly, zero free parameters): the
+        server does NOT stride the window — it ANCHORS it to the tank
+        so the full 16x16 extends in the requested compass direction.
+        An eastward component pins ``left = tank_x`` (tank on the west
+        edge), a westward one ``left = tank_x - 15``; south/north pin
+        ``top`` the same way; an axis the direction does not name
+        keeps its current origin (E kept top three times; N kept
+        left). Map-clamped like every window origin.
+
+        Direction 8 is Scope Center (user-confirmed 2026-08-01):
+        recenter on the tank, the same window a teleport landing
+        produces.
+
+        Args:
+            direction: Compass byte, clockwise from north (0=N..7=NW),
+                or 8 for center. Unknown bytes shift nothing but still
+                confirm with the 0x5A the server always answers.
+        """
+        if direction == 8:
+            self.window = self._centered_window()
+            return
+        client = self._world["tanks"][self._client_id]
+        left, top = self.window
+        if direction in (1, 2, 3):  # NE, E, SE
+            left = client["x"]
+        elif direction in (5, 6, 7):  # SW, W, NW
+            left = client["x"] - (VIEWPORT_SPAN - 1)
+        if direction in (3, 4, 5):  # SE, S, SW
+            top = client["y"]
+        elif direction in (7, 0, 1):  # NW, N, NE
+            top = client["y"] - (VIEWPORT_SPAN - 1)
+        self.window = (
+            min(max(left, 0), _MAP_SPAN - VIEWPORT_SPAN),
+            min(max(top, 0), _MAP_SPAN - VIEWPORT_SPAN),
+        )
+
     def in_window(self, x: int, y: int) -> bool:
         """Report whether a tile lies inside the client's current window."""
         left, top = self.window
@@ -164,6 +204,12 @@ class ViewportTracker:
             if in_patch(x, y) and self._patched_dynamic_tiles.get((x, y)) != value:
                 entities.append(entity(x, y, value))
                 self._patched_dynamic_tiles[(x, y)] = value
+        # The 0x5A skip-RLE cursor only walks FORWARD: entities must
+        # be in ascending patch-linear order or the encoder's delta
+        # goes negative. A ferry riding WEST surfaces this — its
+        # revert (the vacated tile) sits later in the walk than its
+        # fresh patch one tile earlier.
+        entities.sort(key=lambda item: (item["row"], item["col"]))
         return ViewportUpdateDict(
             msg_type=0x5A, viewport_left=left, viewport_top=top, entities=entities
         )

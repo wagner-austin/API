@@ -153,7 +153,7 @@ def test_server_emits_0x42_0x4a_and_refreshed_viewport() -> None:
     world["tanks"][9]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     press = ClientCommandDict(
-        kind="block", command=98, x=10, y=11, target_id=0, slot=0, message_id=0
+        kind="block", command=98, x=10, y=11, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(9, press)
     messages = server.advance_tick()
@@ -183,7 +183,9 @@ def test_out_of_reach_press_answers_code_1_for_the_client_only() -> None:
     world = _world()
     world["tanks"][11] = make_sim_tank(11, 1, 1, 20, 20, 500)
     server = SimServer(world, _map_with_pond(), client_id=9)
-    far = ClientCommandDict(kind="block", command=98, x=30, y=30, target_id=0, slot=0, message_id=0)
+    far = ClientCommandDict(
+        kind="block", command=98, x=30, y=30, target_id=0, slot=0, message_id=0, direction=0
+    )
     server.queue_command(9, far)
     own = server.advance_tick()
     assert [m["error_code"] for m in own if m["msg_type"] == 0x52] == [1]
@@ -198,7 +200,7 @@ def test_towing_refuses_teleport_with_code_0() -> None:
     world["tanks"][9]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     hop = ClientCommandDict(
-        kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0
+        kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(9, hop)
     messages = server.advance_tick()
@@ -222,13 +224,13 @@ def test_enemy_block_actions_stay_per_recipient() -> None:
     world["tanks"][11]["carrying"] = True
     server = SimServer(world, _map_with_pond(), client_id=9)
     hop = ClientCommandDict(
-        kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0
+        kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(11, hop)
     towed = server.advance_tick()
     assert [m for m in towed if m["msg_type"] == 0x52] == []
     drop = ClientCommandDict(
-        kind="block", command=98, x=20, y=21, target_id=0, slot=0, message_id=0
+        kind="block", command=98, x=20, y=21, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(11, drop)
     dropped = server.advance_tick()

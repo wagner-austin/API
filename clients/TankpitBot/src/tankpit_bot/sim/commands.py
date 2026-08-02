@@ -20,6 +20,7 @@ from tankpit_bot.protocol.commands import (
     CMD_PICKUP_EQUIPMENT,
     CMD_PICKUP_FUEL,
     CMD_RADAR,
+    CMD_SCOPE,
     CMD_SHOOT,
     CMD_TOGGLE_EQUIPMENT,
 )
@@ -37,6 +38,7 @@ ClientCommandKind = Literal[
     "toggle_equipment",
     "block",
     "chat",
+    "scope",
     "other",
 ]
 
@@ -61,8 +63,10 @@ class ClientCommandDict(TypedDict):
     is the shoot command's optional entity id (0 = positional shot);
     ``slot`` is the equipment-toggle slot (1-5, 0 for every other
     kind); ``message_id`` is the chat command's preset message id
-    (0 for every other kind). ``command`` preserves the raw command
-    byte for ``other`` kinds.
+    (0 for every other kind); ``direction`` is the scope command's
+    compass byte (0=N clockwise through 7=NW, 0 for every other
+    kind). ``command`` preserves the raw command byte for ``other``
+    kinds.
     """
 
     kind: ClientCommandKind
@@ -72,6 +76,7 @@ class ClientCommandDict(TypedDict):
     target_id: int
     slot: int
     message_id: int
+    direction: int
 
 
 def decode_client_command(payload: bytes) -> ClientCommandDict:
@@ -100,6 +105,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             target_id=0,
             slot=0,
             message_id=0,
+            direction=0,
         )
     if command == CMD_SHOOT:
         require_min_length(payload, 4, "ClientCommand.shoot")
@@ -112,6 +118,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             target_id=target_id,
             slot=0,
             message_id=0,
+            direction=0,
         )
     if command == CMD_TOGGLE_EQUIPMENT:
         require_min_length(payload, 3, "ClientCommand.toggle")
@@ -123,6 +130,7 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             target_id=0,
             slot=payload[2] - ord("0"),
             message_id=0,
+            direction=0,
         )
     if command == CMD_CHAT:
         # [type][0x6D][message_id][x][y][flag] — the 6-byte Hb frame
@@ -136,6 +144,21 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             target_id=0,
             slot=0,
             message_id=payload[2],
+            direction=0,
+        )
+    if command == CMD_SCOPE:
+        # [type]['Z'][direction] — the 3-byte Rb scope-extend frame
+        # (wire-measured 2026-08-01, [[viewport-shift-protocol]]).
+        require_min_length(payload, 3, "ClientCommand.scope")
+        return ClientCommandDict(
+            kind="scope",
+            command=command,
+            x=0,
+            y=0,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=payload[2],
         )
     if command in _BARE_KINDS:
         return ClientCommandDict(
@@ -146,9 +169,10 @@ def decode_client_command(payload: bytes) -> ClientCommandDict:
             target_id=0,
             slot=0,
             message_id=0,
+            direction=0,
         )
     return ClientCommandDict(
-        kind="other", command=command, x=0, y=0, target_id=0, slot=0, message_id=0
+        kind="other", command=command, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
     )
 
 

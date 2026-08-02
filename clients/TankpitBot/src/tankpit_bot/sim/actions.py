@@ -20,7 +20,7 @@ from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
 from tankpit_bot.sim.blocks import blocks_at
 from tankpit_bot.sim.combat import SLOT_RADAR
-from tankpit_bot.sim.movement import PickupRecordDict, resolve_pickup
+from tankpit_bot.sim.movement import PickupRecordDict, ferry_at, resolve_pickup
 from tankpit_bot.sim.world import SimMineDict, SimWorldDict
 
 # Ring-1 displacement preference when the teleport target is blocked
@@ -75,7 +75,12 @@ def _tile_blocked_for_landing(
     Rock/water, any OTHER living tank (self-occupancy of the target
     tile counts as blocked only for other tanks — the mover vacates
     its own tile), and enemy mines all block; own-color mines do not
-    (wiki [[teleport-mechanics]]).
+    (wiki [[teleport-mechanics]]). A FERRY tile is a legal landing
+    even though its water is not: boarding by teleport is the F5
+    doctrine's core move (user, [[ferry-mechanics]]: "you generally
+    will need to teleport to the ferry since many times it will be on
+    its own area in the water") and what ``ferry_landing.py``'s
+    boarding-tile hops dispatch.
 
     Args:
         world: Simulated world.
@@ -88,7 +93,7 @@ def _tile_blocked_for_landing(
     Returns:
         True when the tile cannot be landed on.
     """
-    if not terrain.is_passable(x, y):
+    if not terrain.is_passable(x, y) and ferry_at(world, x, y) is None:
         return True
     if blocks_at(world, x, y) > 0:
         return True

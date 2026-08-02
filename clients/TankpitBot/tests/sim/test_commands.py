@@ -79,10 +79,15 @@ def test_chat_decodes_message_id_and_sender_tile() -> None:
 
 
 def test_unknown_command_preserves_raw_byte() -> None:
-    """Unmapped commands decode as ``other`` with the byte kept."""
-    decoded = decode_client_command(bytes([2, 90]))
+    """Unmapped commands decode as ``other`` with the byte kept.
+
+    91 (``[``) is outside every mapped command byte — 90 (``Z``) was
+    the old example until the scope-extend decode claimed it
+    (2026-08-01, [[viewport-shift-protocol]]).
+    """
+    decoded = decode_client_command(bytes([2, 91]))
     assert decoded["kind"] == "other"
-    assert decoded["command"] == 90
+    assert decoded["command"] == 91
 
 
 def test_short_payloads_raise() -> None:

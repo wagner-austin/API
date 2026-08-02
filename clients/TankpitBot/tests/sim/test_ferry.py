@@ -124,7 +124,9 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
     world["ferries"][0] = SimFerryDict(x=13, y=12)
     server.queue_command(
         9,
-        ClientCommandDict(kind="move", command=112, x=11, y=10, target_id=0, slot=0, message_id=0),
+        ClientCommandDict(
+            kind="move", command=112, x=11, y=10, target_id=0, slot=0, message_id=0, direction=0
+        ),
     )
     batch = server.advance_tick()
     patch = next(m for m in batch if m["msg_type"] == 0x5A)
@@ -166,7 +168,7 @@ def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="teleport", command=116, x=40, y=10, target_id=0, slot=0, message_id=0
+            kind="teleport", command=116, x=40, y=10, target_id=0, slot=0, message_id=0, direction=0
         ),
     )
     batch = server.advance_tick()
@@ -184,3 +186,44 @@ def test_production_world_learns_the_ferry_over_the_seam() -> None:
     if tile is None:
         raise AssertionError("the seam never delivered the ferry tile")
     assert tile["terrain_type"] == 5
+
+
+def test_teleport_lands_on_a_ferry_tile() -> None:
+    """Boarding by teleport is legal — the F5 doctrine's core move.
+
+    The ferry floats on water the static map calls impassable; the
+    landing law reads the live ferry over the map (user,
+    [[ferry-mechanics]]: "you generally will need to teleport to the
+    ferry since many times it will be on its own area in the water").
+    """
+    from tankpit_bot.sim.actions import process_teleport
+
+    world = _world(10, 10)
+    outcome = process_teleport(world, _channel_map(), 9, 13, 10)
+    tank = world["tanks"][9]
+    assert outcome["kind"] == "landed"
+    assert (tank["x"], tank["y"]) == (13, 10)
+    assert ferry_at(world, 13, 10) == world["ferries"][0]
+
+
+def test_riding_west_emits_an_ascending_viewport_patch() -> None:
+    """The 0x5A skip-RLE cursor only walks forward.
+
+    A ferry carrying its rider one tile west produces BOTH a fresh
+    patch (the new tile, earlier in the walk) and a revert (the
+    vacated tile, later) — the tracker must order them ascending or
+    the wire encoder's delta goes negative (found by the first
+    ferry-scenario soak, 2026-08-01).
+    """
+    from tankpit_bot.sim.viewport_window import ViewportTracker
+
+    world = _world(13, 10)  # client standing ON the ferry at (13, 10)
+    terrain = _channel_map()
+    tracker = ViewportTracker(world, terrain, client_id=9)
+    first = tracker.build_update()
+    assert [(e["col"], e["row"], e["terrain_type"]) for e in first["entities"]] == [(9, 9, 5)]
+    world["ferries"][0]["x"] = 12
+    world["tanks"][9]["x"] = 12
+    second = tracker.build_update()
+    coded = [(e["col"], e["row"], e["terrain_type"]) for e in second["entities"]]
+    assert coded == [(8, 9, 5), (9, 9, 0)]

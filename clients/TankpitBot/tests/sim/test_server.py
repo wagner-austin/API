@@ -31,12 +31,16 @@ from tests.in_memory_terrain_map import InMemoryTerrainMap
 
 def _move(x: int, y: int) -> ClientCommandDict:
     """A decoded move command to (x, y)."""
-    return ClientCommandDict(kind="move", command=112, x=x, y=y, target_id=0, slot=0, message_id=0)
+    return ClientCommandDict(
+        kind="move", command=112, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+    )
 
 
 def _shoot(x: int, y: int) -> ClientCommandDict:
     """A decoded shoot command at (x, y)."""
-    return ClientCommandDict(kind="shoot", command=115, x=x, y=y, target_id=0, slot=0, message_id=0)
+    return ClientCommandDict(
+        kind="shoot", command=115, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
+    )
 
 
 def _server() -> SimServer:
@@ -92,7 +96,7 @@ def test_unsupported_kind_and_unknown_tank_raise() -> None:
     """Out-of-scope kinds and unknown/dead tanks fail loudly at queue time."""
     server = _server()
     unknown = ClientCommandDict(
-        kind="other", command=90, x=0, y=0, target_id=0, slot=0, message_id=0
+        kind="other", command=90, x=0, y=0, target_id=0, slot=0, message_id=0, direction=0
     )
     with pytest.raises(SimError):
         server.queue_command(9, unknown)
@@ -150,15 +154,22 @@ def test_rejected_moves_emit_supervisor_errors() -> None:
 
 
 def test_arrival_pickup_and_mine_walk_emit_container_messages() -> None:
-    """Pickups and destination mines ride the same tick's batch."""
+    """Pickups and destination mines ride the same tick's batch.
+
+    Arrival auto-picks DOUBLE their container record — the measured
+    duplicate-record law (2026-08-01: 129 move and 2,200+ teleport
+    windows all read ``...pickup+pickup``).
+    """
     server = _server()
     server.world["containers"].append(SimContainerDict(x=11, y=10, volume=50, dotted=True))
     server.world["mines"].append(SimMineDict(x=11, y=10, team=1))
     server.queue_command(9, _move(11, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, 0x45, "container_pickup", 0x2E, 0x2E]
+    assert _kinds(messages) == [0x47, 0x45, "container_pickup", "container_pickup", 0x2E, 0x2E]
+    assert messages[2] == messages[3]
     pickup = messages[2]
-    assert pickup["msg_type"] == "container_pickup"
+    if pickup["msg_type"] != "container_pickup":
+        raise AssertionError("expected the arrival's container_pickup record")
     assert pickup["pickups"][0]["remaining_volume"] == 0
 
 
@@ -174,8 +185,14 @@ def test_shot_bills_the_shooter_on_the_next_tick() -> None:
     assert [(sync["tank_id"], sync["fuel"]) for sync in _syncs(second)] == [(9, 994), (11, None)]
 
 
-def test_hit_victim_syncs_and_client_ammo_snapshot() -> None:
-    """A dual hit syncs the victim's fuel and snapshots client ammo."""
+def test_hit_victim_syncs_and_no_shot_snapshot() -> None:
+    """A dual hit syncs the victim's fuel and sends NO 0x49.
+
+    The archive's 11,051 live shot windows are 92.4% a bare 0x53
+    echo (response-shape differ 2026-08-01): the real server never
+    snapshots inventory for firing costs — counts re-sync on the
+    next 0x49-bearing event. The count still decrements server-side.
+    """
     server = _server()
     server.world["tanks"][9]["counts"][SLOT_DUAL] = 3
     server.queue_command(9, _shoot(15, 10))
@@ -184,8 +201,8 @@ def test_hit_victim_syncs_and_client_ammo_snapshot() -> None:
     syncs = _syncs(messages)
     assert [(sync["tank_id"], sync["fuel"]) for sync in syncs] == [(9, 1000), (11, None)]
     assert server.world["tanks"][11]["fuel"] == 410
-    snapshots = _snapshots(messages)
-    assert [snapshot["counts"][SLOT_DUAL] for snapshot in snapshots] == [2]
+    assert _snapshots(messages) == []
+    assert server.world["tanks"][9]["counts"][SLOT_DUAL] == 2
 
 
 def test_same_tick_move_then_shot_selects_homing() -> None:
@@ -286,27 +303,48 @@ def _command(kind_command: tuple[str, int], x: int = 0, y: int = 0) -> ClientCom
     """A decoded client command of the given (kind, byte) pair."""
     kind, command = kind_command
     move_kind: ClientCommandDict = ClientCommandDict(
-        kind="move", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+        kind="move", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
     )
     if kind == "teleport":
         return ClientCommandDict(
-            kind="teleport", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+            kind="teleport",
+            command=command,
+            x=x,
+            y=y,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
         )
     if kind == "radar":
         return ClientCommandDict(
-            kind="radar", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+            kind="radar", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
         )
     if kind == "mine":
         return ClientCommandDict(
-            kind="mine", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+            kind="mine", command=command, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
         )
     if kind == "map_open":
         return ClientCommandDict(
-            kind="map_open", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+            kind="map_open",
+            command=command,
+            x=x,
+            y=y,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
         )
     if kind == "pickup_fuel":
         return ClientCommandDict(
-            kind="pickup_fuel", command=command, x=x, y=y, target_id=0, slot=0, message_id=0
+            kind="pickup_fuel",
+            command=command,
+            x=x,
+            y=y,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
         )
     return move_kind
 
@@ -322,11 +360,18 @@ def test_teleport_tick_emits_landing_position_and_sync() -> None:
     server.world["containers"].append(SimContainerDict(x=30, y=30, volume=40, dotted=True))
     server.queue_command(9, _command(("teleport", 116), 30, 30))
     messages = server.advance_tick()
+    # Wire order law (archive-measured 2026-08-01, 7,176 live
+    # teleports): the recentered 0x5A LEADS the landing batch, then
+    # the position statement, then the landed confirm, then the
+    # pickup — ``5A -> 3D -> landed -> pickup``. The 0x3D still
+    # precedes the confirm (the displacement receipt reads position
+    # at confirm time).
     assert _kinds(messages) == [
-        "teleport_landed",
-        0x3D,
-        "container_pickup",
         0x5A,
+        0x3D,
+        "teleport_landed",
+        "container_pickup",
+        "container_pickup",
         0x58,
         0x2E,
         0x2E,
@@ -365,13 +410,17 @@ def test_teleport_onto_sealed_tile_is_cant_go() -> None:
     assert [r["error_code"] for r in rejected] == [SUPERVISOR_ERROR_CANT_GO]
 
 
-def test_radar_tick_emits_scan_ack_sync_and_snapshot() -> None:
-    """A scan with an extra: 0x4F, 0x46, fuel sync, ammo snapshot."""
+def test_radar_tick_emits_snapshot_then_scan_and_sync() -> None:
+    """A scan with an extra: 0x49 FIRST, then 0x4F, 0x46, fuel syncs.
+
+    Live radar windows are 84% ``49+4F+46`` (response-shape differ
+    2026-08-01) — the extra-consumption snapshot LEADS the results.
+    """
     server = _server()
     server.world["tanks"][9]["counts"][4] = 3
     server.queue_command(9, _command(("radar", 102)))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x4F, 0x46, 0x2E, 0x2E, 0x49]
+    assert _kinds(messages) == [0x49, 0x4F, 0x46, 0x2E, 0x2E]
     assert server.world["tanks"][9]["fuel"] == 990
     assert server.world["tanks"][9]["counts"][4] == 2
 
@@ -390,7 +439,7 @@ def test_teleport_to_empty_ground_has_no_pickup_message() -> None:
     """A landing on bare ground emits no container message."""
     server = _server()
     server.queue_command(9, _command(("teleport", 116), 30, 30))
-    assert _kinds(server.advance_tick()) == ["teleport_landed", 0x3D, 0x5A, 0x58, 0x2E, 0x2E]
+    assert _kinds(server.advance_tick()) == [0x5A, 0x3D, "teleport_landed", 0x58, 0x2E, 0x2E]
 
 
 def test_radar_without_extras_has_no_snapshot() -> None:
@@ -417,7 +466,14 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
     """A toggle press flips the slot server-side and reports all five."""
     server = _server()
     toggle = ClientCommandDict(
-        kind="toggle_equipment", command=114, x=0, y=0, target_id=0, slot=2, message_id=0
+        kind="toggle_equipment",
+        command=114,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=2,
+        message_id=0,
+        direction=0,
     )
     server.queue_command(9, toggle)
     messages = server.advance_tick()
@@ -427,7 +483,14 @@ def test_equipment_toggle_flips_the_slot_and_answers_0x74() -> None:
     assert toggled["enabled"] == [True, False, True, True, True]
     assert server.world["tanks"][9]["enabled"][1] is False
     out_of_range = ClientCommandDict(
-        kind="toggle_equipment", command=114, x=0, y=0, target_id=0, slot=9, message_id=0
+        kind="toggle_equipment",
+        command=114,
+        x=0,
+        y=0,
+        target_id=0,
+        slot=9,
+        message_id=0,
+        direction=0,
     )
     server.queue_command(9, out_of_range)
     ignored = server.advance_tick()
@@ -445,12 +508,20 @@ def test_map_open_tick_emits_map_data() -> None:
 
 
 def test_pickup_click_routes_through_the_move_law() -> None:
-    """A pickup-fuel click walks to the container and drains it."""
+    """A pickup-fuel click walks, drains, and closes with the code-4 shape.
+
+    The byte-mined drain choreography (2026-08-01): the walk echo,
+    the DUPLICATE remaining-0 records, then the 0x52 code-4 close
+    with ``reset_action=1`` — the walked-drain close the archive
+    shows in 274+ windows.
+    """
     server = _server()
     server.world["containers"].append(SimContainerDict(x=12, y=10, volume=30, dotted=True))
     server.queue_command(9, _command(("pickup_fuel", 100), 12, 10))
     messages = server.advance_tick()
-    assert _kinds(messages) == [0x47, "container_pickup", 0x2E, 0x2E]
+    assert _kinds(messages) == [0x47, "container_pickup", "container_pickup", 0x52, 0x2E, 0x2E]
+    assert messages[1] == messages[2]
+    assert [(c["error_code"], c["reset_action"]) for c in _supervisors(messages)] == [(4, 1)]
 
 
 def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
@@ -463,7 +534,7 @@ def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
     """
     server = _server()
     chat = ClientCommandDict(
-        kind="chat", command=0x6D, x=10, y=10, target_id=0, slot=0, message_id=41
+        kind="chat", command=0x6D, x=10, y=10, target_id=0, slot=0, message_id=41, direction=0
     )
     server.queue_command(9, chat)
     messages = server.advance_tick()
@@ -474,3 +545,46 @@ def test_chat_tick_echoes_the_0x4d_broadcast() -> None:
     assert echo["message_type"] == 41
     assert echo["x"] == 10
     assert echo["y"] == 10
+
+
+def test_drained_pickup_answers_empty_container_only_to_the_client() -> None:
+    """A pickup click on a drained container: 0x52 code 4, client-only.
+
+    The real server validates the destination before any movement
+    (the belief-removal signal the production code=4 handler
+    consumes); another tank's identical click stays silent on our
+    wire — rejections are per-connection.
+    """
+    from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_EMPTY_CONTAINER
+
+    server = _server()
+    server.world["containers"].append(SimContainerDict(x=12, y=10, volume=0, dotted=True))
+    server.queue_command(
+        9,
+        ClientCommandDict(
+            kind="pickup_fuel",
+            command=100,
+            x=12,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+        ),
+    )
+    own = _supervisors(server.advance_tick())
+    assert [record["error_code"] for record in own] == [SUPERVISOR_ERROR_EMPTY_CONTAINER]
+    server.queue_command(
+        11,
+        ClientCommandDict(
+            kind="pickup_fuel",
+            command=100,
+            x=12,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
+        ),
+    )
+    assert _supervisors(server.advance_tick()) == []

@@ -72,7 +72,9 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
 
     server.queue_command(
         11,
-        ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0),
+        ClientCommandDict(
+            kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0, direction=0
+        ),
     )
     blocked = server.advance_tick()
     assert [m for m in blocked if m["msg_type"] == 0x52] == []
@@ -80,21 +82,30 @@ def test_enemy_rejections_never_leak_into_the_client_stream() -> None:
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0
+            kind="teleport", command=116, x=40, y=40, target_id=0, slot=0, message_id=0, direction=0
         ),
     )
     poor = server.advance_tick()
     assert [m for m in poor if m["msg_type"] == 0x52] == []
     server.queue_command(
         11,
-        ClientCommandDict(kind="move", command=112, x=20, y=14, target_id=0, slot=0, message_id=0),
+        ClientCommandDict(
+            kind="move", command=112, x=20, y=14, target_id=0, slot=0, message_id=0, direction=0
+        ),
     )
     broke = server.advance_tick()
     assert [m for m in broke if m["msg_type"] == 0x52] == []
     server.queue_command(
         11,
         ClientCommandDict(
-            kind="pickup_fuel", command=100, x=20, y=10, target_id=0, slot=0, message_id=0
+            kind="pickup_fuel",
+            command=100,
+            x=20,
+            y=10,
+            target_id=0,
+            slot=0,
+            message_id=0,
+            direction=0,
         ),
     )
     ghost = server.advance_tick()
@@ -126,6 +137,39 @@ def test_revival_activates_a_new_tank_near_the_client() -> None:
     assert announcement["tank_id"] == 12
 
 
+def test_revival_derives_a_fresh_practice_name_for_the_new_id() -> None:
+    """A red-named opponent respawns as red-<new id>, not a stale alias."""
+    world = _arena()
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    world["tanks"][11]["alive"] = False
+    world["tick"] = 2
+
+    new_id = maybe_revive_opponent(server, 11, 9)
+
+    assert new_id == 12
+    assert world["tanks"][12]["name"] == "red-12"
+
+
+def test_revival_keeps_a_human_persona_across_respawns() -> None:
+    """A human-named sparring opponent stays itself when it respawns.
+
+    The human-fight contracts (2026-07-31) key per-human state —
+    greeting latch, consent, pursuit-shot window — to the persona; a
+    respawn that silently reverted to the practice shape would drop
+    the session out of the human-fight paths mid-soak.
+    """
+    world = _arena()
+    world["tanks"][11]["name"] = "guest"
+    server = SimServer(world, InMemoryTerrainMap(), client_id=9)
+    world["tanks"][11]["alive"] = False
+    world["tick"] = 2
+
+    new_id = maybe_revive_opponent(server, 11, 9)
+
+    assert new_id == 12
+    assert world["tanks"][12]["name"] == "guest"
+
+
 def test_revival_holds_while_alive_off_beat_or_sealed() -> None:
     """No revival for the living, off the beat, or on a closed map."""
     world = _arena()
@@ -153,7 +197,9 @@ def test_enemy_equipment_grant_resolves_silently() -> None:
     server = SimServer(world, InMemoryTerrainMap(), client_id=9)
     server.queue_command(
         11,
-        ClientCommandDict(kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0),
+        ClientCommandDict(
+            kind="move", command=112, x=16, y=10, target_id=0, slot=0, message_id=0, direction=0
+        ),
     )
     messages = server.advance_tick()
     assert [m for m in messages if m["msg_type"] in (0x67, 0x49)] == []

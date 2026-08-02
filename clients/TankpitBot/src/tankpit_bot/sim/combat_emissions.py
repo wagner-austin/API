@@ -108,8 +108,11 @@ class CombatLedger:
             )
         )
         self._pending_debits.append((tank_id, outcome["shooter_debit"]))
-        if outcome["ammo_slot"] is not None:
-            ammo_changed.add(tank_id)
+        # Firing-cost ammo consumption does NOT snapshot: the archive's
+        # 11,051 shot windows are 92.4% a bare 0x53 echo — the real
+        # server never answers a shot with 0x49 (response-shape differ
+        # 2026-08-01). Counts re-sync on the next 0x49-bearing event
+        # (radar extra, equipment gain), exactly as live.
         if outcome["shields_consumed"] > 0 and outcome["victim_id"] is not None:
             ammo_changed.add(outcome["victim_id"])
         for packet in outcome["mine_cascade"]:

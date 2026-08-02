@@ -42,6 +42,7 @@ from tankpit_bot.sim.emissions import (
     emit_chat,
     emit_equipment_pickup,
     emit_equipment_toggle,
+    emit_fuel_pickup_close,
     emit_mine_press,
     emit_move,
     emit_radar,
@@ -70,6 +71,7 @@ _SUPPORTED_KINDS = frozenset(
         "toggle_equipment",
         "block",
         "chat",
+        "scope",
     }
 )
 _MOVE_KINDS = frozenset({"move", "pickup_fuel", "pickup_equipment"})
@@ -164,6 +166,44 @@ class SimServer:
         """
         self._pending_announcements.append(identity_statement(self.world, tank_id))
 
+    def relocate_tank(self, tank_id: int, x: int, y: int) -> None:
+        """Place a tank at a tile by recorded authority (ghost replay).
+
+        Ghost positions come from a capture's wire record, not from
+        the sim's movement law — the recording IS the routing. When
+        the tank sits inside the client's stored window after the
+        placement, a 0x3D position statement rides the next batch head
+        (positions are viewport-scoped on the real wire); out-of-view
+        placements stay silent and the end-of-tick membership diff
+        announces any enter/exit exactly as live.
+
+        Args:
+            tank_id: The tank to place (must exist and be alive).
+            x: Destination tile X.
+            y: Destination tile Y.
+
+        Raises:
+            SimError: For unknown or dead tanks — a ghost timeline
+                referencing a corpse is skipped by the caller, so a
+                reach here is a harness bug.
+        """
+        tank = self.world["tanks"].get(tank_id)
+        if tank is None or not tank["alive"]:
+            raise SimError(f"no living tank {tank_id} to relocate")
+        tank["x"] = x
+        tank["y"] = y
+        if (
+            tank_id != self.client_id
+            and tank_id in self._viewport.visible
+            and self._viewport.in_window(x, y)
+        ):
+            # In-window movement of an ALREADY-visible tank re-states
+            # its position (0x3D, viewport-scoped like live); a tank
+            # ENTERING the window gets its 0x3D from the end-of-tick
+            # membership diff instead — appending here too would
+            # double the statement.
+            self._pending_announcements.append(position_statement(self.world, tank_id))
+
     def queue_command(self, tank_id: int, command: ClientCommandDict) -> None:
         """Queue one command for the next tick.
 
@@ -243,18 +283,67 @@ class SimServer:
             emit_equipment_toggle(self.world, tank_id, command["slot"], messages)
             return
         if kind == "block":
-            if (
-                emit_block_action(
-                    self.world, self.terrain, self.client_id, tank_id, command, messages
-                )
-                and tank_id == self.client_id
-            ):
-                messages.append(self._viewport.build_update())
+            self._process_block_command(tank_id, command, messages)
             return
         if kind == "chat":
             emit_chat(tank_id, command, messages)
             return
+        if kind == "scope":
+            self._process_scope_command(tank_id, command, messages)
+            return
         messages.append(build_map_data(self.world))
+
+    def _process_block_command(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+    ) -> None:
+        """Route one block pick-up/drop press through the block law.
+
+        A landed CLIENT block action repaints the dynamic layer, so
+        the stored window's patch refresh rides the same batch (the
+        2026-07-20 block captures show 0x5A after block operations).
+
+        Args:
+            tank_id: The commanding tank.
+            command: The queued block command.
+            messages: This tick's outgoing batch (appended).
+        """
+        landed = emit_block_action(
+            self.world, self.terrain, self.client_id, tank_id, command, messages
+        )
+        if landed and tank_id == self.client_id:
+            messages.append(self._viewport.build_update())
+
+    def _process_scope_command(
+        self,
+        tank_id: int,
+        command: ClientCommandDict,
+        messages: list[BinaryMessage],
+    ) -> None:
+        """Route one scope-extend command (the Rb viewport pan).
+
+        Scope-extend shifts only the CLIENT's stored window (the
+        server keeps one per connection; other tanks' scopes are
+        invisible to this client). The confirming 0x5A always comes —
+        measured lag 50 ms-1.5 s, every Rb answered
+        ([[viewport-shift-protocol]]) — and it is PAIRED with a self
+        0x3D position statement (the corpus's 22:22 1:1 pairing; the
+        archive's 27 scope commands all answered ``5A+3Dself`` —
+        response-shape differ 2026-08-01). The end-of-tick membership
+        diff announces any tanks the pan revealed.
+
+        Args:
+            tank_id: The commanding tank.
+            command: The queued scope command.
+            messages: This tick's outgoing batch (appended).
+        """
+        if tank_id != self.client_id:
+            return
+        self._viewport.apply_scope_shift(command["direction"])
+        messages.append(self._viewport.build_update())
+        messages.append(position_statement(self.world, tank_id))
 
     def _process_move_command(
         self,
@@ -272,10 +361,16 @@ class SimServer:
         0x52 code 0, at exactly the boundary column (measured
         2026-07-25, [[viewport-shift-protocol]]); the check precedes
         the container validation because the server never answers for
-        a coordinate it does not consider actionable. Pickup clicks
-        then validate their destination (empty-container rejection).
-        A successful walk does NOT re-emit 0x5A: with autoscroll OFF
-        the window is static between teleports.
+        a coordinate it does not consider actionable. A fuel-pickup
+        click at a KNOWN container executes its walk and answers with
+        the measured pickup choreography even when the container is
+        drained (archive windows 2026-08-01: the walk echo, the
+        duplicate remaining-0 records, then the code-4 close — the
+        old pre-move refusal was a sim invention; only a click at a
+        tile with NO container record short-circuits). Equipment
+        clicks keep the presence pre-check. A successful walk does
+        NOT re-emit 0x5A: with autoscroll OFF the window is static
+        between teleports.
 
         Args:
             tank_id: The commanding tank.
@@ -306,10 +401,29 @@ class SimServer:
                     )
                 )
             return
+        fuel_before = _fuel_container_volume(self.world, command["x"], command["y"])
         outcome = process_move(self.world, self.terrain, tank_id, command["x"], command["y"])
         if outcome["kind"] == "moved":
             moved.add(tank_id)
-        emit_move(self.world, self.client_id, outcome, messages)
+        choreographed = kind == "pickup_fuel" and outcome["kind"] == "moved"
+        emit_move(
+            self.world,
+            self.client_id,
+            outcome,
+            messages,
+            include_pickups=not choreographed,
+        )
+        if choreographed:
+            emit_fuel_pickup_close(
+                self.world,
+                self.client_id,
+                tank_id,
+                command["x"],
+                command["y"],
+                volume_before=fuel_before,
+                walked=outcome["path"] != "",
+                messages=messages,
+            )
         if outcome["kind"] == "moved":
             emit_equipment_pickup(self.world, self.client_id, tank_id, kind, messages, ammo_changed)
 
@@ -327,7 +441,12 @@ class SimServer:
         0x52 code 0 ("You can't do this") — three-for-three in the
         2026-07-20 capture. A landed client hop is the ONE window
         recenter under autoscroll OFF ([[viewport-shift-protocol]])
-        and resolves equipment on arrival.
+        and resolves equipment on arrival. Wire order of a landed
+        client hop (archive-measured 2026-08-01, 38%+31% of 7,176
+        live teleports fit ``5A -> 3D -> landed [-> pickup]``): the
+        RECENTERED 0x5A leads the batch, then the position statement,
+        then the landed confirm — the response-shape differ caught
+        the sim emitting the 0x5A last.
 
         Args:
             tank_id: The hopping tank.
@@ -347,23 +466,29 @@ class SimServer:
                     )
                 )
             return
-        if emit_teleport(self.world, self.terrain, self.client_id, tank_id, command, messages):
+        landing: list[BinaryMessage] = []
+        if emit_teleport(self.world, self.terrain, self.client_id, tank_id, command, landing):
             moved.add(tank_id)
             if tank_id == self.client_id:
                 self._viewport.recenter()
                 messages.append(self._viewport.build_update())
+            messages.extend(landing)
             emit_equipment_pickup(
                 self.world, self.client_id, tank_id, "teleport", messages, ammo_changed
             )
+        else:
+            messages.extend(landing)
 
     def _pickup_target_stocked(self, kind: str, x: int, y: int) -> bool:
         """Validate a pickup click's destination before any movement.
 
-        The real server answers a pickup at a consumed/absent
-        container with 0x52 error 4 ("empty container") and no
-        movement — the client removes its stale belief on that signal
-        (``tick_loop_actions``: code=4 -> belief removed). Plain moves
-        are never validated this way.
+        A fuel click needs a container RECORD at the tile — even a
+        drained one: the archive shows the walk executing and the
+        remaining-0 choreography answering for empty-but-known
+        containers (2026-08-01); only a click at bare ground draws
+        the moveless code-4 refusal the production belief-removal
+        consumes. Equipment clicks keep the presence check. Plain
+        moves are never validated this way.
 
         Args:
             kind: The command kind.
@@ -374,9 +499,7 @@ class SimServer:
             True when the command may proceed to the move law.
         """
         if kind == "pickup_fuel":
-            return any(
-                (c["x"], c["y"]) == (x, y) and c["volume"] > 0 for c in self.world["containers"]
-            )
+            return any((c["x"], c["y"]) == (x, y) for c in self.world["containers"])
         if kind == "pickup_equipment":
             return any((e["x"], e["y"]) == (x, y) for e in self.world["equipment"])
         return True
@@ -451,6 +574,14 @@ class SimServer:
                 )
             )
         return messages
+
+
+def _fuel_container_volume(world: SimWorldDict, x: int, y: int) -> int:
+    """The fuel volume recorded at a tile before a command resolves."""
+    for container in world["containers"]:
+        if (container["x"], container["y"]) == (x, y):
+            return container["volume"]
+    return 0
 
 
 TICK_MS = TICK_RATE_MS

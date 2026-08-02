@@ -31,9 +31,19 @@ def test_make_sim_tank_clamps_fuel_to_rank_capacity() -> None:
     assert under["counts"] == [0, 0, 0, 0, 0]
 
 
+def test_make_sim_tank_names_default_to_the_practice_shape() -> None:
+    """An unnamed tank gets the farmable ``red-<id>`` wire name."""
+    assert make_sim_tank(7, 1, 1, 5, 5, 500)["name"] == "red-7"
+
+
+def test_make_sim_tank_accepts_a_human_persona() -> None:
+    """A seeded human name survives construction — the consent-gate seam."""
+    assert make_sim_tank(7, 1, 1, 5, 5, 500, name="guest")["name"] == "guest"
+
+
 def test_tank_codec_round_trip() -> None:
     """encode/decode of one tank is lossless."""
-    tank = make_sim_tank(1301, 2, 3, 42, 161, 900)
+    tank = make_sim_tank(1301, 2, 3, 42, 161, 900, name="guest")
     tank["counts"] = [5, 10, 0, 3, 2]
     tank["enabled"] = [True, False, True, True, True]
     assert decode_sim_tank(encode_sim_tank(tank)) == tank

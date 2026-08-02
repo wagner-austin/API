@@ -16,6 +16,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     require_bool,
     require_int,
+    require_str,
 )
 
 from tankpit_bot.physics.capacity import fuel_capacity
@@ -32,11 +33,20 @@ class SimTankDict(TypedDict):
     not stored state but the fuel quartile, derived at emission via
     ``physics.damage_tier`` (corpus-fitted 2026-07-23,
     [[deactivation-format]]).
+
+    ``name`` is the wire display name the 0x21 identity broadcast
+    carries. The bot classifies humans by NAME SHAPE
+    (``bot/ai/humans.py``): the practice shape ``red-<id>`` (the
+    :func:`make_sim_tank` default) keeps a tank on the farmable
+    practice-bot tier, while any other non-empty name puts it behind
+    the human-consent gate and the fair-fight contracts (2026-07-31)
+    — seed one to exercise the human-fight paths in sim.
     """
 
     tank_id: int
     team: int
     rank: int
+    name: str
     x: int
     y: int
     fuel: int
@@ -133,6 +143,7 @@ def make_sim_tank(
     x: int,
     y: int,
     fuel: int,
+    name: str = "",
 ) -> SimTankDict:
     """Build a live tank with empty equipment slots.
 
@@ -143,6 +154,10 @@ def make_sim_tank(
         x: Tile X.
         y: Tile Y.
         fuel: Starting fuel (clamped to capacity).
+        name: Wire display name. Empty resolves to the practice-bot
+            shape ``red-<id>``; a human-shaped name (e.g. ``guest``)
+            puts the tank behind the human-consent gate and the
+            fair-fight contracts.
 
     Returns:
         A live tank.
@@ -151,6 +166,7 @@ def make_sim_tank(
         tank_id=tank_id,
         team=team,
         rank=rank,
+        name=name if name else f"red-{tank_id}",
         x=x,
         y=y,
         fuel=min(fuel, fuel_capacity(rank)),
@@ -196,6 +212,7 @@ def encode_sim_tank(tank: SimTankDict) -> JSONObject:
         "tank_id": tank["tank_id"],
         "team": tank["team"],
         "rank": tank["rank"],
+        "name": tank["name"],
         "x": tank["x"],
         "y": tank["y"],
         "fuel": tank["fuel"],
@@ -274,6 +291,7 @@ def decode_sim_tank(data: JSONObject) -> SimTankDict:
         tank_id=require_int(data, "tank_id"),
         team=require_int(data, "team"),
         rank=require_int(data, "rank"),
+        name=require_str(data, "name"),
         x=require_int(data, "x"),
         y=require_int(data, "y"),
         fuel=require_int(data, "fuel"),

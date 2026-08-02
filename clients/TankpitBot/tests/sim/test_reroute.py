@@ -43,14 +43,14 @@ def _server(world: SimWorldDict) -> SimServer:
 def _teleport(x: int, y: int) -> ClientCommandDict:
     """A decoded teleport command to (x, y)."""
     return ClientCommandDict(
-        kind="teleport", command=116, x=x, y=y, target_id=0, slot=0, message_id=0
+        kind="teleport", command=116, x=x, y=y, target_id=0, slot=0, message_id=0, direction=0
     )
 
 
 def _id_shot(x: int, y: int, target_id: int) -> ClientCommandDict:
     """A decoded id-targeted shoot command clicked at (x, y)."""
     return ClientCommandDict(
-        kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0, message_id=0
+        kind="shoot", command=115, x=x, y=y, target_id=target_id, slot=0, message_id=0, direction=0
     )
 
 
@@ -112,7 +112,7 @@ def test_id_shot_reroutes_to_a_moved_targets_current_tile() -> None:
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
     server = _server(world)
     enemy_move = ClientCommandDict(
-        kind="move", command=112, x=15, y=12, target_id=0, slot=0, message_id=0
+        kind="move", command=112, x=15, y=12, target_id=0, slot=0, message_id=0, direction=0
     )
     server.queue_command(7, enemy_move)
     server.queue_command(9, _id_shot(15, 10, 7))
@@ -197,8 +197,9 @@ def test_server_ticks_price_the_departure_age_for_the_shot() -> None:
     """The server converts ticks-since-0x58 into the reroute age.
 
     Departure at tick 1, shot processed at tick 2: age 2 000 ms —
-    inside the TTL, so the wire shows a weapon-3 echo and the ammo
-    snapshot debits a homing round.
+    inside the TTL, so the wire shows a weapon-3 echo and the homing
+    round debits server-side. No 0x49 rides the shot (the live law:
+    firing costs never snapshot — response-shape differ 2026-08-01).
     """
     world = _arena()
     world["tanks"][9]["counts"][SLOT_HOMING] = 2
@@ -210,6 +211,6 @@ def test_server_ticks_price_the_departure_age_for_the_shot() -> None:
     messages = server.advance_tick()
     shots = [m for m in messages if m["msg_type"] == 0x53]
     assert [s["weapon"] for s in shots] == [WEAPON_HOMING]
-    snapshots = [m for m in messages if m["msg_type"] == 0x49]
-    assert [s["counts"][SLOT_HOMING] for s in snapshots] == [1]
+    assert [m for m in messages if m["msg_type"] == 0x49] == []
+    assert world["tanks"][9]["counts"][SLOT_HOMING] == 1
     assert world["tanks"][11]["fuel"] == 455

@@ -148,7 +148,14 @@ def test_roster_bot_reactivates_when_its_corpse_clears() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=BOT_ID, slot=0, message_id=0
+            kind="shoot",
+            command=CMD_SHOOT,
+            x=101,
+            y=100,
+            target_id=BOT_ID,
+            slot=0,
+            message_id=0,
+            direction=0,
         ),
     )
     first = server.advance_tick()
@@ -273,13 +280,27 @@ def test_round_resolution_orders_by_ascending_tank_id() -> None:
     server.queue_command(
         9,
         ClientCommandDict(
-            kind="shoot", command=CMD_SHOOT, x=101, y=100, target_id=510, slot=0, message_id=0
+            kind="shoot",
+            command=CMD_SHOOT,
+            x=101,
+            y=100,
+            target_id=510,
+            slot=0,
+            message_id=0,
+            direction=0,
         ),
     )
     server.queue_command(
         510,
         ClientCommandDict(
-            kind="shoot", command=CMD_SHOOT, x=100, y=100, target_id=9, slot=0, message_id=0
+            kind="shoot",
+            command=CMD_SHOOT,
+            x=100,
+            y=100,
+            target_id=9,
+            slot=0,
+            message_id=0,
+            direction=0,
         ),
     )
     batch = server.advance_tick()

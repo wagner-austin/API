@@ -76,6 +76,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
             target_id=0,
             slot=0,
             message_id=0,
+            direction=0,
         )
     if beat == 2:
         return None
@@ -87,6 +88,7 @@ def decide_opponent(world: SimWorldDict, enemy_id: int, client_id: int) -> Clien
         target_id=0,
         slot=0,
         message_id=0,
+        direction=0,
     )
 
 
@@ -129,8 +131,17 @@ def maybe_revive_opponent(server: SimServer, enemy_id: int, client_id: int) -> i
     if position is None:
         return enemy_id
     new_id = max(world["tanks"]) + 1
+    # A human-named opponent keeps its persona across respawns (the
+    # practice default derives a fresh red-<id> from the new id).
+    respawn_name = "" if enemy["name"] == f"red-{enemy_id}" else enemy["name"]
     replacement = make_sim_tank(
-        new_id, enemy["team"], enemy["rank"], position[0], position[1], _REVIVE_FUEL
+        new_id,
+        enemy["team"],
+        enemy["rank"],
+        position[0],
+        position[1],
+        _REVIVE_FUEL,
+        name=respawn_name,
     )
     replacement["counts"] = list(_REVIVE_COUNTS)
     world["tanks"][new_id] = replacement

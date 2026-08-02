@@ -20,8 +20,10 @@ from tankpit_bot.container.types import (
 )
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_EMPTY_CONTAINER,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     SUPERVISOR_ERROR_INVENTORY_FULL,
+    SUPERVISOR_ERROR_TANK_FULL,
 )
 from tankpit_bot.protocol.types import (
     BinaryMessage,
@@ -29,6 +31,8 @@ from tankpit_bot.protocol.types import (
     ChatMessageDict,
     EquipmentGainDict,
     EquipmentToggleDict,
+    FuelGainDict,
+    InventoryDict,
     RadarResultDict,
     RadarScanResultDict,
     SupervisorDict,
@@ -98,14 +102,24 @@ def emit_move(
     client_id: int,
     outcome: MoveOutcomeDict,
     messages: list[BinaryMessage],
+    *,
+    include_pickups: bool = True,
 ) -> None:
     """Emit the wire consequences of one processed move.
+
+    Arrival auto-picks emit their container record TWICE — the
+    measured duplicate-record law (2026-08-01 archive: 129 move and
+    2,200+ teleport windows all read ``...pickup+pickup``; the real
+    server always doubles the record).
 
     Args:
         world: Simulated world (post-move).
         client_id: The connected client's tank id.
         outcome: The move's outcome.
         messages: This tick's outgoing batch (appended).
+        include_pickups: False when an explicit fuel-pickup command's
+            choreography (:func:`emit_fuel_pickup_close`) owns the
+            records instead.
     """
     if outcome["kind"] == "cant_go":
         if outcome["tank_id"] == client_id:
@@ -121,7 +135,8 @@ def emit_move(
     messages.append(movement_echo(world, outcome))
     for x, y in outcome["mine_positions"]:
         messages.append(MineDetonationDict(msg_type=0x45, positions=[(x, y)]))
-    if outcome["pickups"]:
+    if include_pickups and outcome["pickups"]:
+        messages.append(_pickup_message(list(outcome["pickups"])))
         messages.append(_pickup_message(list(outcome["pickups"])))
 
 
@@ -158,13 +173,113 @@ def emit_teleport(
                 SupervisorDict(msg_type=0x52, reset_action=1, close_map=1, error_code=code)
             )
         return False
+    # Wire order law: the SelfMovement position update PRECEDES the
+    # landed confirm on the real wire — the displacement receipt
+    # (`_emit_teleport_displacement`) reads the self position AT
+    # confirm time as the landed tile. The pre-2026-08-01 sim sent
+    # the confirm first, so every exact landing compared the OLD
+    # position against the request, read as a displacement, and
+    # spuriously consumed ferry beliefs (`_expire_disproven_ferry_
+    # belief`) the landing had just proven TRUE.
+    messages.append(position_statement(world, tank_id))
     messages.append(
         TeleportLandedDict(msg_type="teleport_landed", subtype=_TELEPORT_LANDED_SUBTYPE)
     )
-    messages.append(position_statement(world, tank_id))
     if outcome["pickups"]:
+        # The duplicate-record law: landing auto-picks double their
+        # container record (31% of 7,176 live teleports read
+        # ``...landed+pickup+pickup``).
+        messages.append(_pickup_message(list(outcome["pickups"])))
         messages.append(_pickup_message(list(outcome["pickups"])))
     return True
+
+
+def emit_fuel_pickup_close(
+    world: SimWorldDict,
+    client_id: int,
+    tank_id: int,
+    x: int,
+    y: int,
+    *,
+    volume_before: int,
+    walked: bool,
+    messages: list[BinaryMessage],
+) -> None:
+    """Answer an explicit fuel-pickup command with the measured choreography.
+
+    Byte-mined 2026-08-01 from ~1,600 archive windows ([[fuel-system]],
+    [[capture-differ]]) — four branches, all closing with a 0x52 the
+    production ledger types (code 5 = clamped SUCCESS, code 4 = empty):
+
+    * **transfer + clamp** (tank filled, container keeps a remainder):
+      record x2, 0x44 absolute fuel (``is_free=True, flag=0``),
+      record x1, code 5 ``reset_action=0``.
+    * **transfer + drain** (container empties): record x2 at
+      remaining 0, code 4 — ``reset_action=1`` after a walk.
+    * **no transfer, walked** (arrived to find it empty, or a
+      full-tank walk-up): record x2, close by stockedness.
+    * **no transfer, no walk** (own-tile/adjacent click): 0x44 in its
+      no-gain form (``is_free=False, flag=43`` — the measured bytes),
+      record x1, close by stockedness, ``reset_action=0``.
+
+    Records broadcast (observers track consumption through them); the
+    0x44 and the 0x52 close are per-connection.
+
+    Args:
+        world: Simulated world (post-move).
+        client_id: The connected client's tank id.
+        tank_id: The picking tank.
+        x: The clicked container tile X.
+        y: The clicked container tile Y.
+        volume_before: The container's volume before the command.
+        walked: Whether the command's walk covered any tiles.
+        messages: This tick's outgoing batch (appended).
+    """
+    remaining = 0
+    for container in world["containers"]:
+        if (container["x"], container["y"]) == (x, y):
+            remaining = container["volume"]
+            break
+    transfer = volume_before - remaining
+    is_client = tank_id == client_id
+    record = _pickup_message([PickupRecordDict(x=x, y=y, remaining_volume=remaining)])
+    tank = world["tanks"][tank_id]
+    close_code = SUPERVISOR_ERROR_TANK_FULL if remaining > 0 else SUPERVISOR_ERROR_EMPTY_CONTAINER
+    if transfer > 0 and remaining > 0:
+        messages.append(record)
+        messages.append(record)
+        if is_client:
+            messages.append(
+                FuelGainDict(msg_type=0x44, fuel_total=tank["fuel"], is_free=True, flag=0)
+            )
+        messages.append(record)
+        if is_client:
+            messages.append(
+                SupervisorDict(msg_type=0x52, reset_action=0, close_map=0, error_code=close_code)
+            )
+        return
+    if walked or transfer > 0:
+        messages.append(record)
+        messages.append(record)
+        if is_client:
+            messages.append(
+                SupervisorDict(
+                    msg_type=0x52,
+                    reset_action=1 if walked else 0,
+                    close_map=0,
+                    error_code=close_code,
+                )
+            )
+        return
+    if is_client:
+        messages.append(
+            FuelGainDict(msg_type=0x44, fuel_total=tank["fuel"], is_free=False, flag=43)
+        )
+    messages.append(record)
+    if is_client:
+        messages.append(
+            SupervisorDict(msg_type=0x52, reset_action=0, close_map=0, error_code=close_code)
+        )
 
 
 def emit_radar(
@@ -189,8 +304,21 @@ def emit_radar(
     outcome = process_radar(world, tank_id, window if tank_id == client_id else None)
     tank = world["tanks"][tank_id]
     tank["fuel"] = max(0, tank["fuel"] - RADAR_FUEL_COST)
-    if outcome["consumed_extra"]:
-        ammo_changed.add(tank_id)
+    del ammo_changed
+    if outcome["consumed_extra"] and tank_id == client_id:
+        # The extra-consumption snapshot LEADS the scan results —
+        # live radar windows are 84% ``49+4F+46`` (response-shape
+        # differ 2026-08-01); the sim's end-of-tick snapshot had it
+        # trailing.
+        messages.append(
+            InventoryDict(
+                msg_type=0x49,
+                show=False,
+                alternate=False,
+                counts=list(tank["counts"]),
+                enabled=list(tank["enabled"]),
+            )
+        )
     messages.append(
         RadarScanResultDict(
             msg_type=0x4F,
@@ -264,10 +392,27 @@ def emit_equipment_pickup(
         return
     if grant["kind"] == "granted":
         if tank_id == client_id:
+            # Live order (2,170 archive windows): the 0x67 gain, its
+            # 0x49 snapshot, then the container-pickup record closing
+            # the drained container (remaining 0) — the sim had no
+            # pickup record at all (response-shape differ 2026-08-01).
+            tank = world["tanks"][tank_id]
             messages.append(
                 EquipmentGainDict(msg_type=0x67, show_message=True, gained=grant["gained"])
             )
-        ammo_changed.add(tank_id)
+            messages.append(
+                InventoryDict(
+                    msg_type=0x49,
+                    show=False,
+                    alternate=False,
+                    counts=list(tank["counts"]),
+                    enabled=list(tank["enabled"]),
+                )
+            )
+            messages.append(
+                _pickup_message([PickupRecordDict(x=tank["x"], y=tank["y"], remaining_volume=0)])
+            )
+        del ammo_changed
         return
     if kind == "pickup_equipment" and tank_id == client_id:
         messages.append(
