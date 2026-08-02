@@ -11,7 +11,7 @@ source_paths:
   - "runs/bot/bot-20260620-191622.capture_session.json"
   - "src/tankpit_bot/state"
 source_git_blobs:
-  "src/tankpit_bot/state": "c7709222fffa03aaca07d68e87e2a0a648772d81"
+  "src/tankpit_bot/state": "01f57c7928f05025a5ca0c14ab82ec4ff320031b"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
@@ -228,10 +228,11 @@ The combat-side regression tests for the kill-shot gate live in
 target stickiness across the wire TTL is pinned by
 `tests/scenarios/test_target_stickiness.py`. Removing or weakening any
 of these tests is a deliberate contract change and must come with a
-docstring and an update to this page.
+docstring and an update to this page[^9].
 
 [^1]: code truth: `state/mutations.py` (`apply_tank_observation`) + `state/types/tank_observation.py` + `bot/ai/threats.py` gates + `sniffer/world_state_tanks.py` dispatcher (`src/tankpit_bot/state` blob-pinned in frontmatter); invariants locked by `tests/world_state/test_tank_observation.py` and `tests/bot/ai/test_combat_strategy.py`
 [^2]: runs/bot/bot-20260619-050303.capture_session.json (frontmatter-pinned) — the 25-miss stale-registry loop; three-timestamp fix landed 2026-06-19/20
 [^3]: `make shadow` sync-cadence law (`src/tankpit_bot/validate/shadow_laws.py`), calibration sweep 2026-07-22 over 245 archive sessions
 [^8]: decisive watch capture `bot_watch_probe.capture_session.json` (2026-07-24): 617 s adjacent to purple-2; received t>60 s = 188 self 0x2E, 0 other-tank 0x2E; see [[server-push-gating]] for the seven-run proof
 [^4]: live capture 2026-06-22 — one-homing lock-drop incident that motivated the 0x58 no-op change
+[^9]: Verified present 2026-07-31: `tests/bot/ai/test_combat_strategy.py` (with `class TestKillShotWireGate` at `:984`), `tests/integration/test_combat_gates.py` (which imports `POSITION_FRESHNESS_TTL_MS` and `WIRE_PRESENCE_TTL_MS` at `:26-27` and describes the gate at `:10`), and `tests/scenarios/test_target_stickiness.py`.

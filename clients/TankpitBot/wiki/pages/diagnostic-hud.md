@@ -69,7 +69,7 @@ composites canvases only) — the phone stream shows the clean game.[^1]
 ## Tracing a flag (triage recipe)
 
 Every `human_flag` event auto-carries `tick_n`, `bot_state`, and the
-runtime timestamp alongside its own fields, so a flag pins an exact
+runtime timestamp alongside its own fields[^4], so a flag pins an exact
 spot in the event stream:
 
 1. `grep '"human_flag"' runs/bot/<run>.events.jsonl` → note the
@@ -91,3 +91,4 @@ spot in the event stream:
 [^3]: `src/tankpit_bot/browser/flag_capture.py`
     (`FlagCaptureService`, ring size 8); binding-vs-fetch rationale
     measured 2026-07-29 in `browser/live_view.py` module docs.
+[^4]: `src/tankpit_bot/runtime_logging.py:45` — `RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})`, the context stamped onto every emitted diagnostic (field docs at `:57-67`). The flag's own fields come from `src/tankpit_bot/browser/flag_capture.py:100-105`: `emit_diagnostic(diagnostic_kind="human_flag", flag_seq=..., clicked_at_ms=..., recent_ticks=...)`.

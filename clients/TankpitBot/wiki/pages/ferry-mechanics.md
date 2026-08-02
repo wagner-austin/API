@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/sim/movement.py"
 source_git_blobs:
   "src/tankpit_bot/sim/movement.py": "e397b3de7b692128e94fe27badb6e5284c7252ad"
-fact_checked: "2026-06-12"
+fact_checked: "2026-08-01"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -73,6 +73,43 @@ following its rider; `SimServer` patches ferries as 0x5A wire terrain
 with explicit reverts) and is proven against the production ingestion
 over real wire bytes — see the ferries as-built in
 [[physics-module-roadmap]].
+
+## Ferry scenario in the sim (2026-08-01)
+
+The first ferry-SEEDED sim world: `tankpit-sim-run --ferry`
+(`sim/run.py::make_ferry_sim_world`) builds the real field01 lake at
+(112,112) — client on the west shore at (106,112) with 400 fuel, a
+700-volume container floating water-locked 6 east (inside the join
+window, so the landing radar believes it), the ferry idling at
+(118,112) on its own water (min land distance 3 — the doctrine's
+"own area in the water" shape) OUTSIDE the join window, land stock
+deliberately too lean to reach hunt readiness. The proven chain, all
+through the production bot: land forage -> radar belief -> larder
+`no_landing` -> **scope-scout east pan** ([[viewport-shift-protocol]])
+-> ferry arrives as a terrain-5 patch -> larder hop `ferry_served`
+teleports ONTO the ferry -> the held fuel lock rides 6 tiles of open
+water to the container -> auto-pickup -> full tank at 1100. Pinned by
+`tests/sim/test_run.py::test_ferry_session_scouts_boards_and_drains_the_water_larder`.
+
+Sim law completed for it: a live ferry tile is a LEGAL teleport
+landing even though its water is not
+(`sim/actions.py::_tile_blocked_for_landing` — boarding by teleport
+is the doctrine's core move). Production law completed for it (F5
+completion): a container floating on water is NEVER walk territory —
+the larder keeps in-viewport water containers instead of ceding them
+to the walk step that can't reach them (`larder._is_walk_territory`).
+
+## Autoscroll riding doctrine (user ruling 2026-08-01, OPEN)
+
+User, verbatim: "tbh when i use ferries i use auto scroll on so i
+can ride it across multiple viewports. also when i forage with no
+extra radars, i use auto scroll on." The sim scenario's ride fits
+one window; a REAL long harvest ride crosses several, which needs
+autoscroll ON (edge-arrival recenter, one tick per recenter) for the
+duration of the ride — with it OFF the ride's move legs die at the
+stored window edge. Dynamic `Ia` toggling (ON when boarding for a
+beyond-window ride or foraging radar-broke, OFF otherwise) is the
+queued next build; details in [[viewport-shift-protocol]].
 
 ## Forage platform doctrine (2026-07-29)
 

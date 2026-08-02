@@ -7,8 +7,8 @@ source_paths:
   - "src/tankpit_bot"
   - "tests"
 source_git_blobs:
-  "src/tankpit_bot": "eade4f75f4a72733d539a9faeb6991857c41ed3e"
-  "tests": "34568813e5020215afec118c8ecb413eddea01cb"
+  "src/tankpit_bot": "744443e972df97d609f4c2530ef056e25c877db5"
+  "tests": "2170c901aac496262dd7b981773e87d97f54a0b6"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
@@ -40,7 +40,7 @@ hubs: [architecture]
 - No `try/except` for flow control — only at system boundaries[^1]
 - Google-style docstrings[^1]
 - TypedDict with encode/decode and `require_*` validation[^1]
-- Files under 400 lines where possible (Phase 4 god-file splits)[^1]
+- **File size 400-600 lines max, src AND tests** (user ruling 2026-07-31, verbatim: "we need modular, clear sepraration of concerns, no monolithic files. 400 - 600 lines, including test files too" — supersedes the earlier "under 400 where possible"). Split any over-bar file you touch into cohesive modules; never grow a file already past 600. No re-export shims when splitting (the wrapper ban above applies) — move call-site imports properly. Backlog at ruling time: 45 files over 600, listed in the 2026-07-31 log entry.[^1]
 
 ## Git discipline
 
@@ -49,5 +49,5 @@ hubs: [architecture]
 - Create new commits rather than amending[^3]
 
 [^1]: user (Austin), enforced across all sessions — "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias, no duplicate code"
-[^2]: MonkeyPatchBanRule in monorepo-guards; _test_hooks pattern verified across 5,603 tests at 100% coverage. `poetry run python -m scripts.guard` 2026-07-31: 0 violations across every rule group, `mock-ban` and `monkey-patch-ban` included
+[^2]: MonkeyPatchBanRule in monorepo-guards; _test_hooks pattern verified across 5,631 tests at 100% coverage. `poetry run python -m scripts.guard` 2026-07-31: 0 violations across every rule group, `mock-ban` and `monkey-patch-ban` included
 [^3]: user (Austin), 2026-06-13 — incident destroyed uncommitted work; absolute rule since

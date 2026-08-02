@@ -12,8 +12,8 @@ source_paths:
   - "src/tankpit_bot/state"
   - "src/tankpit_bot/bot/ai"
 source_git_blobs:
-  "src/tankpit_bot/state": "c7709222fffa03aaca07d68e87e2a0a648772d81"
-  "src/tankpit_bot/bot/ai": "15e99c69d071cba99f5214df9f14de712355dba3"
+  "src/tankpit_bot/state": "01f57c7928f05025a5ca0c14ab82ec4ff320031b"
+  "src/tankpit_bot/bot/ai": "0a51db229264f0bc93945d41f007c54f5ead8b0d"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
@@ -71,7 +71,7 @@ fixed-container errands** — the score picks, not a queue.[^1]
    larder is empty or unprofitable; radar is spent only when
    knowledge is exhausted.[^4]
 
-HUNT is untouched: locks, chases, break thresholds unchanged.
+HUNT is untouched: locks, chases, break thresholds unchanged[^7].
 
 The under-fire teleport-refuel (PvP doctrine, [[bot-behavior-contract]])
 has since LANDED as the predicted second client of the same query:
@@ -160,3 +160,4 @@ gets harvested instead of rediscovered.[^2]
 [^4]: Cascade order: `bot/ai/collect_mode.py` (in-viewport pickup steps precede hop steps); hunt-gate/lock independence per [[bot-behavior-contract]] §resume and never-drop rows; under-fire refuel doctrine from the 2026-07-27 guest post-mortem (wiki/log.md).
 [^6]: Code: `src/tankpit_bot/bot/ai/larder.py` (scorer + FuelLarderSelectionDict), `collect_mode.py` (`_larder_harvest`, `_hop_toward_fuel_larder`, suppress-aware `_scan_on_landing_decision`), `types.py` `suppress_landing_scan` field; run artifacts `runs/bot/bot-20260727-234645.*`; forage-economy output recorded in wiki/log.md (2026-07-27 larder implementation entry) against baselines bot-20260726-145124 (3.10) and bot-20260726-094309 (7.70).
 [^5]: Probe artifacts on disk: `runs/probe/larder-20260727-224933.json` (water-sitting candidates, 0 trials), `-225643.json` (own-tile 0/2 + adjacent control 1, all-capped inventory, code-7 receipts in the paired `.log`), `-230858.json` (own-tile 3/3, no errors) with matching `.capture_session.json` wire evidence; historical own-tile sample capture 2026-06-21 16:54:26 ([[combat-chase-bug]] footnote 6) superseded by the deliberate trials; long-press decode tpclient.js `bb` handler ([[client-commands]] Long-press pickup gesture); code-7 string table [[decode-coverage]] §Supervisor error codes.
+[^7]: [synthesis] — the larder plan is a cascade priority inside COLLECT, so it edits the `collect_*` modules only. The HUNT family (`src/tankpit_bot/bot/ai/hunt_mode.py`, `hunt_acquire.py`, `hunt_lock.py`, `hunt_relay.py`) carries lock, chase, and break-threshold logic and is not in this change's scope. Verified 2026-07-31 that all four modules exist and own that behaviour; this footnote records scope, not a measured no-op.

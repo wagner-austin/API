@@ -132,7 +132,7 @@ unchanged.[^3]
 
 To restore always-on, recreate
 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\tankpit-bot-service.cmd`
-with:
+with[^4]:
 
 ```bat
 @echo off
@@ -142,7 +142,7 @@ start "TankpitBotService" /min cmd /c "make service"
 ```
 
 It runs `make service` minimized at logon with the idle self-exit disabled;
-`make service`'s own respawn loop covers crashes.
+`make service`'s own respawn loop covers crashes[^4].
 
 No input path exists anywhere in this surface — the buttons are HTTP
 POSTs to the bot service; nothing can touch the host mouse, in the
@@ -277,3 +277,4 @@ See also: [[coding-standards]] (the strictness rules Phases A / B / C were writt
 [^1]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/service/` (`mode_bridge.py`, `status_bus.py`, `session_runner.py`, `http_server.py`, `service_main.py`, `probe.py`, `types.py`/`types_codecs.py`, `_test_hooks.py`) and `src/tankpit_bot/bot/config.py` — file inventory re-verified 2026-07-23; `make service` target at `Makefile:209`; landed via the 2026-07-12 Phase A commits in git history.
 [^2]: cross-repo truth in `~/PROJECTS/MCPs`: `fiesta/src/tankbot/` and `fiesta/nginx.conf`; Phase B/C landing commit `6c78deff` ("fiesta: bot-controls SPA panel + /api/tankbot proxy"), later reworked by `88fc8ae5` ("bot-controls view replaced by overlay viewmodel") — see the staleness note; file inventory re-verified against that repo 2026-07-23.
 [^3]: code truth on disk, frontmatter-pinned: `src/tankpit_bot/browser/screencast.py`, `src/tankpit_bot/service/frame_bus.py`, `service/watch_page.py`, `service/http_server.py` (`_add_watch_routes`, `_drain_frame_bus_to_response`, `_latest_frame_snapshot`), `bot/tick_loop.py` (`_sync_screencast_demand`), `service/session_runner.py` (per-session `configure_bot_runtime_logging`). Live proof 2026-07-28: run `runs/bot/bot-20260728-230140.*` (first line `Session artifacts:`, `Screencast started (viewer connected)` / `stopped (no viewers)` bracketing a 3 s `/frame` subscription, `_index.tsv` row) versus the artifactless 22:31 service session (10/10 kills, only `latest.summary.txt` on disk); MJPEG rate measurements 6 vs 28 parts per 10 s (idle vs AUTO). Mouse-stealing diagnosis from the fiesta wiki (`~/PROJECTS/fiesta/wiki`): `arch-virtual-display-headless.md` (SendInput `abs_mouse` path + unfixed offset bug, task #16; isolated virtual display parked non-adjacent) and `hist-2026-07-01-desktop-takeover-incident.md`; nginx prefix-strip proxy `MCPs/fiesta/nginx.conf` `location /api/tankbot/` (forwards all subpaths, `proxy_buffering off`). SPA-port + always-on truth (2026-07-29): MCPs commit `95f27215` (`fiesta/src/profiles/types.ts` `botVideoUrl`, `fiesta/src/tankbot/overlay-viewmodel.ts::computeBotVideoView`, `fiesta/src/boot/bot-overlay.ts` video glue, `fiesta/profiles/tankpit.json` stream-less rewrite; 782 SPA tests, 100% coverage) and this repo commit `59201238` (`bot/config.py::resolve_idle_exit_seconds`, `exit_when_idle` disabled branch, startup launcher `tankpit-bot-service.cmd` in shell:startup); deploy curl-verified on port 8091 (SPA at tankpit root, profile serving `stream: null` + `botVideoUrl`, compiled bundle carrying the `bot-video` glue).
+[^4]: `Makefile:265-268` — the `service` target (`service: install`) starts the "long-running SPA-driven HTTP + SSE server", listening on `0.0.0.0:27100`. The Startup-folder `.cmd` described here is machine state on the operator's workstation, not a repo artifact, so it is not verifiable from this checkout; only the `make service` entry point it invokes is.

@@ -80,6 +80,8 @@ Each scan with extras available auto-consumes one (count decrements by 1). The b
 
 Never ration extras via the toggle. The viewport sweep is always worth one extra. Keep stock UP through reliable equipment collection. A proposed "radar floor" (disable extras when low) was explicitly rejected.[^4]
 
+**2026-07-31 refinement — spend-gating, not toggle rationing:** after the 100-kill run twice drained extras to 0 (desync-rescan burn, ferry-orbit landing scans) the user ruled the death spiral itself unacceptable ("if the bot runs out of radar ever ... its like dead in the water cuz it takes so long to restock via free radar"). The shared economics rule (`radar_spend_worthwhile`, [[bot-behavior-contract]] §3.4) now escalates the reveal bar as stock falls: extras ≥ 2 → 32 uncovered tiles; the LAST extra → 128 tiles (half the viewport — the final paid sweep buys only a near-full reveal, never a sliver); extras 0 → any tile. The toggle stays enabled and every fired scan still auto-consumes the extra, so the 2026-06-12 rejection stands untouched — this gates *whether a discretionary scan fires*, not *which radar answers it*.
+
 ## Death spiral at 0 extras
 
 At 0 extras: 25-tile reveal vs 324-tile. Equipment discovery collapses, refill stalls. Three consecutive runs at 0 gained duals/homings but zero radars.[^5]

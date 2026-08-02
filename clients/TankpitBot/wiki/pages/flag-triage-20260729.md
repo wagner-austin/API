@@ -1,5 +1,5 @@
 ---
-title: Flag Triage — bot-20260729-232252 (10 human flags)
+title: Flag Triage — bot-20260729-232252 (13 human flags)
 tags: [bug, forage, hunt, mines, observability]
 related:
   - "[[diagnostic-hud]]"
@@ -10,18 +10,42 @@ source_paths:
   - "runs/bot/bot-20260729-232252.events.jsonl"
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
-fact_checked: "2026-07-30"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture, combat]
 ---
 
 # Flag Triage — bot-20260729-232252
 
-First live use of the flag channel: 10 flags, all captured with 8-tick
+First live use of the flag channel: 13 flags[^2], all captured with 8-tick
 lead-up rings. Locate any flag: `grep '"human_flag"' <events.jsonl>` →
 its `tick_n`/`flag_seq`, then filter the stream by `tick_n` (see
 [[diagnostic-hud]] § Tracing a flag). Four root causes; fix status
 table at the bottom.
+
+> **PROVENANCE AUDIT 2026-07-31.** This page's evidence base is the per-run
+> `runs/bot/*.events.jsonl` streams, and `runs/` is **gitignored**[^1] — nothing
+> preserves a run once it is deleted, and the `git-blob-hash-pin` rule exempts these
+> paths for exactly that reason. Three findings from re-checking every cited run
+> against disk:
+>
+> - **The flag count in this page's title is wrong.** The primary run
+>   `bot-20260729-232252` carries **13** `human_flag` events (`flag_seq` 1–13),
+>   not 10[^2]. The body already discusses "old-session flags 12–13", so the title
+>   and opening line were simply never updated.
+> - **Three cited run IDs do not exist; each resolves to a run seconds away**[^1]:
+>   `bot-20260730-000030` → `bot-20260730-000038`, `bot-20260730-004114` →
+>   `bot-20260730-004144`, `bot-20260730-025337` → `bot-20260730-025333`. In each
+>   case the surviving run's flag timestamps match this page's narration to within
+>   a few seconds, so these are transcription slips rather than lost runs.
+> - **The two session-3 sections describe the same run.** `bot-20260730-004114`
+>   does not exist, and every flag it narrates (00:43:28, 00:44:19→22, 00:49:02–07,
+>   00:51:37→40, 00:57:08, 00:59:05) appears in `bot-20260730-004144`[^3]. This is
+>   the duplication the page's own hygiene note describes, and it means the "two
+>   sessions" were triaging one stream, not two.
+>
+> Flag narrations below are marked [^1]: they are read off a run that may no longer
+> exist, and none of them is reproducible from this checkout.
 
 ## F1 — Pre-hunt top-off hop is direction-blind (flags 1, 2, 6)
 
@@ -62,13 +86,13 @@ flag-10 window).[^2] Two conspiring causes:
 2. **The hop score measures fuel-dot density, not expected yield.** At
    full fuel (most SEARCH hops run at 1100/1100) a landing dot drinks
    nothing; the hop's real value is undiscovered equipment, which the
-   score does not model.
+   score does not model.[^4]
 
 Direction: split radar-coverage TTL (what's worth re-scanning) from
 harvest memory (what we picked clean, belief-driven, much longer
 lived), and score hops by expected yield: unknown ground + known
 unharvested containers, with dots contributing only the fuel headroom
-they can actually fill.
+they can actually fill.[^4]
 
 ## F3 — Mine-covered equipment is unpickable; mine-shot clearance missing (flags 4, 8)
 
@@ -109,7 +133,7 @@ nearest the target (tie-broken toward self) when the target's own
 tile is impassable, since the server refuses water landings. Water
 never blocks shots ([[weapon-selection]]), so the shore tile is a
 firing position; a target with NO ground inside the 8-diamond
-(mid-ocean ferry) still rejects, now as `no_standoff_landing`.
+(mid-ocean ferry) still rejects, now as `no_standoff_landing`.[^1]
 
 **Static receipt for the landed gate** (independent verification,
 2026-07-30): the field01 terrain map puts **86 passable tiles inside
@@ -120,7 +144,7 @@ pursuit fire. Run-order note: the run's rejections read
 `no_passable_adjacent` because the stand-off gate landed in the tree
 at 23:49–23:51, AFTER the run ended at 23:47 — the run executed the
 old strictly-adjacent gate, so the fix is untested live but not
-contradicted by this run.
+contradicted by this run.[^1]
 
 **Chat/HELLO trail** (the user's companion report "never said
 hello"): the run has ZERO `chat_greeting`/`chat_sent`/`chat_received`
@@ -128,7 +152,7 @@ events — correct behavior given no lock ever formed. The greeting is
 downstream of acquisition (`greeted_target_id` latch untouched all
 run), so F4's fix is the HELLO fix too: first human lock → HELLO
 rides the acquisition tick; delivery receipt is the `chat_received`
-self-echo ([[chat-messages]]).
+self-echo ([[chat-messages]]).[^1]
 
 ## F5 — Ferry as forage platform (flag 11)
 
@@ -141,7 +165,7 @@ good to use." Feature, not a bug: the forage planner never considers
 teleporting TO a ferry to harvest water-locked containers (the larder
 scorer counts them as `no_landing`). Mechanics prerequisites already
 proven in [[ferry-mechanics]] (free water movement, surface-gated
-routing, water-container pickup while riding).
+routing, water-container pickup while riding).[^1]
 
 ## Session-2 flags (bot-20260730-000030, first build with the F4 fix) + old-session flags 12–13
 
@@ -154,7 +178,7 @@ the server refused with `error_code=1` twice ((191,41) then
 (190,37)), burning two actions and two failed-pickup marks. Same
 lesson as the 2026-07-20 mine-veto loop recorded in `ferry.py`:
 every dynamic blocker must compose into the ONE passability answer —
-tanks and movable land blocks are still missing.
+tanks and movable land blocks are still missing.[^1]
 
 **F7 — Fuel locks are never re-validated (old flag 13, 23:59:24).**
 After the red-4 kill at fuel 893, "continue locked fuel target at
@@ -162,7 +186,7 @@ After the red-4 kill at fuel 893, "continue locked fuel target at
 partial pickup (+84 → 965, not full), then paid a map-open plus a
 teleport for the 462-volume container it had just skipped. A lock
 that survives combat should be re-scored against the current deficit
-and alternatives, not blindly continued.
+and alternatives, not blindly continued.[^1]
 
 **F8 — Acquire paid a teleport onto a 2-tile-distant enemy (new flag
 1, 00:01:03).** purple-4 stood at (179,138) inside the freshly
@@ -171,7 +195,7 @@ teleported onto him before engaging — only `_combat_close` (which
 requires an existing lock) asked the shot-range question. FIXED same
 night: `_combat_teleport` now short-circuits to the shot when the
 target is in-view within `SHOT_RANGE_TILES`, covering fresh, map,
-and resume acquires.
+and resume acquires.[^1]
 
 **F9 — Escape/hop/shoot interleave under fire; deferred teleports
 pre-empted every tick (new flag 7, 00:11:18–29).** The orange
@@ -186,7 +210,7 @@ re-deferred the identical hop. Four cycles, 11 seconds, fuel 572→462
 under fire before the teleport finally went out at 00:11:29. Same
 family as the map-fire loop and the non-hysteretic-gate anti-pattern:
 a decision that defers for a map open must RETAIN priority on the
-following tick instead of re-entering open arbitration.
+following tick instead of re-entering open arbitration.[^1]
 
 CORRECTION (cross-check 2026-07-30): the landing-vs-request receipt
 **already existed** — the completions-side `teleport_displacement`
@@ -205,7 +229,7 @@ removed, and completions keeps only the consumer:
 enemy-bump tolerance. Historical analyzers reading the old `dist`
 field must switch to `displacement` for runs after 2026-07-30.
 Still open within F9's consumer story: displacement feeds only the
-single-tile veto, not the mine belief or an area veto.
+single-tile veto, not the mine belief or an area veto.[^1]
 
 **F10 — Walk-blocked equipment gets no teleport service (new flag 4,
 00:05:01).** The collect selector saw the equipment at (187,168) but
@@ -221,7 +245,7 @@ blocked_walk" — all three of the user's containers were KNOWN, the
 tank sat at 1087/1100 fuel needing only radars (17 vs floor 20), and
 the planner still chose a blind fuel-dot hop to (204,162) over the
 known cluster; the later return that claimed them proves they were
-harvestable.
+harvestable.[^1]
 
 **Flag-by-flag map for session 2:** flag 1 → F8 (fixed; live receipt
 next cycle). Flag 2 → healthy engage (user: "flag 2 is fine"). Flags
@@ -237,7 +261,7 @@ F3's LOS module + close-range movement, still open. Flag 6 → F3
 (mine shooting not yet implemented). Flag 7 → F9. Flag 10 → F2
 again (post-orange-1-kill restock: ~12 dry "Zoom in" hops for ~15
 pieces, user: "one of the worst ever viewport hops"). Flag 11 → F5
-again (ferry at (56,20) in view, unused).
+again (ferry at (56,20) in view, unused).[^1]
 
 **Why known containers sometimes get a direct teleport and sometimes
 a come-back-later** (user question at flag 10): a container is
@@ -252,7 +276,7 @@ identified equipment that can't be walked to is teleport fair game
 (one hop, then walk the cluster). F2's belief-driven hop scoring
 closes the remaining inconsistency (dry search hops outranking known
 containers). Flag s2-12 is the healthy contrast receipt: one radar,
-four equipment containers, all collected in place.
+four equipment containers, all collected in place.[^1]
 
 ## Session-3 flags (bot-20260730-004114, first build with F1/F2/F7/F8-tightened/F9/F10)
 
@@ -268,12 +292,12 @@ the map on every shot, so the first teleport after any fight always
 pays one visible map open. s3-1's ring also shows the F9 entry gate
 working live: latch holding, zero shots interleaved with the escape
 hop. s3-3's "then walked" was the locked fuel pickup at (229,146)
-completing before the acquire teleport went out.
+completing before the acquire teleport went out.[^5]
 
 **s3-2 (00:43:28) — orange minefield over equipment ignored again** —
 F3's third live receipt (after s2-flags 4/8). F3 is the last unbuilt
 counterplay: shoot the equipment tile (private+ clears the 3×3),
-teleport, collect.
+teleport, collect.[^1]
 
 **F12 — Wasted map opens: the hop's own lock pre-empts the deferred
 teleport (s3 flags 4/6, plus the "shoot" case; user: "there's a bug
@@ -301,7 +325,7 @@ tick boundary. Fix direction: the lock-continuation branch must
 re-issue the deferred teleport when the lock it is continuing was
 created BY that hop and the landing is beyond walk-worthiness — or
 the hop must not latch the lock until its teleport actually
-dispatches.
+dispatches.[^1]
 
 Flag s3-9 (00:51:37→39) is the cleanest receipt and adds a second
 sub-defect: the larder hop chose a cost-16 TELEPORT to a container
@@ -312,7 +336,7 @@ teleport+map_open pairs, and the lock-continuation flip then
 "corrects" it at the price of the wasted map open. The larder step
 needs the same walk-vs-teleport economics the pickup step has
 (teleport ~4 s vs walk ~2 s, user timing law): inside walking range,
-walk; the hop is for genuinely far remainders.
+walk; the hop is for genuinely far remainders.[^5]
 
 **F1 residual (s3 flag 7, 00:49:02–07; user: "we have that extra
 teleport still… hit the equipment quota, teleport to one last
@@ -325,7 +349,7 @@ candidates carry no hunt bias (`hop_selected` for fuel_larder has no
 the leg. Residual fix: extend the hunt-ready direction bias to
 larder candidate selection, and settle the walk-heuristic vs
 exact-capacity disagreement (accept clamped gains that COMPLETE hunt
-readiness).
+readiness).[^5]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
@@ -333,7 +357,7 @@ readiness).
 | F2 | Zero-yield hop churn (TTL-as-harvest-memory, yield-blind score) | 3, 5, 7, 9, 10 | FIX LANDED (2026-07-30: harvest-memory veto — a landing viewport whose believed containers are all drained within `HARVEST_MEMORY_TTL_MS` (10 min, unbracketed respawn assumption) is skipped with a `known_empty` tally even when the 180 s scan TTL reads clean; live receipt bot-20260730-004144: 36% zero-yield (8/22) vs 63-64% in sessions 1-2 — nearly halved, further gain expected as beliefs populate) |
 | F3 | Shot-clearance system + mine-covered pickup counterplay | 4, 8, s2-6, s3-2, s3-14 | FIX LANDED + LIVE RECEIPT (s5-2: clearance shot → pickup → clearance shot → fuel hop onto the exposed container, 02:00:04) |
 | F4 | Ferry-rider/mine-ring cloak at acquisition + stale-refresh rule not firing | Yuppler report | FIX LANDED + LIVE RECEIPT (s5-5, 02:04:17: lock on Yuppler + HELLO self-echo + lock-held fuel-chain approach; stale-refresh path still to verify) |
-| F5 | Ferry-as-forage-platform: teleport to ferries, harvest water-locked containers | 11, s2-3, s2-8, s2-11, s3-15? | FIX LANDED for the fuel larder (2026-07-30: `ferry_landing.py` — a water-locked container with a fresh believed ferry within 12 tiles boards it as the landing, `ferry_served` tally; ride+pickup rides the existing lock machinery per the riding-pickup law; ferry beliefs gated at 60 s. Equipment-hop ferry service + exploration ferry hops remain OPEN) |
+| F5 | Ferry-as-forage-platform: teleport to ferries, harvest water-locked containers | 11, s2-3, s2-8, s2-11, s3-15? | FIX LANDED + SIM RECEIPT (2026-07-30: `ferry_landing.py` fuel-larder boarding; 2026-07-31: equipment hops share the ferry landing; 2026-08-01: the scope scout pans at ferry-less water before discovery ([[viewport-shift-protocol]]), in-viewport water containers stay larder business (`_is_walk_territory` water fix), and the full chain — scout pan → ferry_served hop → teleport-board → ride → pickup — is sim-soaked end to end (`--ferry` scenario, [[ferry-mechanics]]). REMAINING OPEN: multi-viewport rides need the 2026-08-01 autoscroll-ON riding doctrine; exploration ferry hops) |
 | F6 | Collect reachability ignores tanks/land blocks (server code=1 refusals) | 12 | OPEN |
 | F7 | Fuel-lock continuation ignores dwindled volume | 13 | FIX LANDED (2026-07-30: `is_fuel_lock_release_warranted` — deliverable-score release path (min(volume, deficit) − distance, 2× hysteresis) alongside the distance rule; flag-13 shape pinned in `test_fuel_lock_value.py`; live receipt pending) |
 | F8 | Acquire teleported onto an in-view enemy | s2-1, s2-5, s2-13 | FIX LANDED and tightened (`89459dd7` in-view shot short-circuit; `78b1483e` drops the 8-tile bound per flag s2-13 — in-view alone is the firing criterion at any range, which also covers the s2-13 dist-9 shape without a walk step and folds the mine-ring/ferry stand-off into the same rule; live receipt pending next cycle) |
@@ -345,7 +369,7 @@ readiness).
 | F15 | Quota met but free in-viewport equipment left behind at hunt handoff (user ruling s3-13) | s3-13 | OPEN (arbitration-order fix: drain walk-worthy in-viewport pickups before yielding to HUNT) |
 
 Update this table as fixes land; close a row only with a live-run or
-sim receipt cited next to it.
+sim receipt cited next to it.[^1]
 
 [^1]: flag rings in `bot-20260729-232252.events.jsonl`: flag 1 tick
     49 (hop (14,81)→(7,93), acquire red-9 →(3,105)); flag 2 tick 106
@@ -376,7 +400,7 @@ existed in the user's law ("as long as theyre on the viewport…"), so
 `_combat_teleport` now shoots any viewport-visible target at any
 range — no walk step needed for in-view targets. The
 walk-to-a-clear-shot move stays relevant only for F11's LOS case
-(terrain in the shot line), not for range.
+(terrain in the shot line), not for range.[^1]
 
 **Flag s2-14 (00:33:22) → F3's LOS module + a NEW weapon-economy rule
 (user narration):** after the mid-fight equipment pickup the bot spent
@@ -388,7 +412,7 @@ first and shoot the cheap weapon. Needs the same lifted LOS test as
 F3's mine clearance (terrain + land movables per shot line), plus a
 reposition step in ENGAGE when LOS is dirty. The mid-fight
 restock/refuel interleave itself (fuel 624→1090 on a 481 drink
-between shots) drew no user objection — only the weapon choice did.
+between shots) drew no user objection — only the weapon choice did.[^1]
 
 **Flag s2-15 (00:35:15) → explained, working as designed** (user:
 "the bot going to the random map location after it had collected
@@ -401,7 +425,7 @@ refuels on the landing — then the affordable CLOSE teleport engaged.
 Not a defect; a legibility gap. The HUD shows `dot_relay` as the
 reason but a watcher tracking the map can't tell a relay leg from a
 wasted hop — candidate HUD tweak: render relay legs as
-"RELAY→red-9 (leg 1)" instead of the bare reason string.
+"RELAY→red-9 (leg 1)" instead of the bare reason string.[^1]
 
 ## Session-3 flags (bot-20260730-004144, first build with ALL fixes live)
 
@@ -413,7 +437,7 @@ this is the walk-vs-teleport family (F8/s2-13) in its larder form:
 `_hop_toward_fuel_larder`'s `too_close` gate evidently permits dist-3
 hops; the walk-vs-teleport economics (2 s/walk-tile vs ~4 s + 6/tile
 fuel per teleport) belong in ONE shared movement-choice rule rather
-than per-caller gates.
+than per-caller gates.[^1]
 
 **Flag s3-2 (00:43:xx, tick 44), pending user narration + session-3
 health readout (ticks 28-46):** the F10 equipment hop is live and
@@ -425,7 +449,7 @@ ZERO a drained container or only assert present ones — if empties are
 wire-invisible, in-viewport beliefs can only be corrected by the
 failed pickup itself (which worked: neither tile was retried). Flag 2
 clicked at a dot hop to (250,11) right after draining (235,3) to 4
-remaining — awaiting the user's read.
+remaining — awaiting the user's read.[^1]
 
 **Flag s3-3 (00:44:22, tick 70), pending user narration:** ring shows
 the s3-1 shape again — a ~5-tile `fuel_hop` teleport ((231,150)→
@@ -434,7 +458,7 @@ purple-4. Short-range larder teleports where walks would do are now
 the recurring session-3 theme (s3-1, s3-3): the walk-vs-teleport
 economics belong in one shared movement-choice rule (2 s/walk-tile vs
 ~4 s + 6 fuel/tile teleport, break-even ~2 tiles) applied by larder
-hops, fuel hops, AND combat closes alike.
+hops, fuel hops, AND combat closes alike.[^5]
 
 **Flag s3-6 (tick 168) + the session-3 empty_container cluster → F14
 candidate.** Six `empty_container` rejections in 168 ticks (t33, 41,
@@ -447,7 +471,7 @@ equipment beliefs rot in ~30 s. The failed-pickup blacklist self-heals
 at one wasted tick each (no tile was retried). Fix direction: a
 belief-age gate on pickup dispatch — beliefs older than ~30 s require
 a cheap re-verify (the landing scan already in flight, or ordering by
-freshness) before walking/teleporting to them; do NOT add retries.
+freshness) before walking/teleporting to them; do NOT add retries.[^1]
 
 **Flags s3-4, s3-5, s3-7 (pending user narration), ring shapes:**
 s3-4 (00:46:01) — engagement break from purple-3 at fuel 869, then a
@@ -460,7 +484,7 @@ the user's objection; s3-7 (00:49:06) — the s2-15 relay shape again
 (top-off → `dot_relay` (212,178)→(144,166) → CLOSE onto red-1 at
 (114,186), ~100-tile pursuit): if the flag is "why that far a
 target," the acquisition_candidates record at tick ~206 needs reading
-against nearer roster options.
+against nearer roster options.[^1]
 
 **Flag s3-8 (00:50:14, tick 241), pending user narration:** adjacent
 duel with red-1 ends, then HUNT/REFRESH opens the MAP before
@@ -469,7 +493,7 @@ tick-246 `empty_container` suggests one drop expired or was taken in
 that gap). If the flag is "why the map mid-fight": REFRESH re-locates
 the target roster after a kill, but its ordering ahead of
 drop-collection costs the freshest pickups — candidate rule: drops
-first, map second.
+first, map second.[^3]
 
 **Flag s3-9 (00:51:40, tick 283), pending user narration:** the
 clearest dreg-chain receipt — 2-tile teleport to a 35-volume dreg
@@ -477,7 +501,7 @@ clearest dreg-chain receipt — 2-tile teleport to a 35-volume dreg
 then another 2-tile hop to a 276. `min(vol, deficit)/cost` favors
 close dregs structurally; F13's fix needs BOTH the walk-vs-teleport
 rule and a net-gain floor on larder hops (deliverable must clear the
-teleport cost by a real margin, not merely divide well by it).
+teleport cost by a real margin, not merely divide well by it).[^1]
 
 **Flag s3-13 (00:59:05, tick 499) → NEW RULING, F15 candidate (user
 verbatim): "we could have picked up two other containers and gotten
@@ -493,7 +517,7 @@ containers left behind. Fix direction: the yield-to-hunt gesture
 in-viewport walk-worthy pickups — the walk economics already exist;
 only the arbitration order changes. Complements F1's residual
 (exact-capacity fuel floor) — both are "quota met, but free value in
-reach" shapes.
+reach" shapes.[^1]
 
 **F13 — Hunt entry leaves easy in-viewport pickups behind (s3 flag
 13, 00:59:05).** Radars reached exactly the cap−5 floor (20/25) with
@@ -506,19 +530,19 @@ is a hard threshold with no look at what one more WALK would buy.
 Fix shape: when hunt-readiness first flips true, drain the current
 viewport's actionable walk-reachable equipment before the acquire
 tick — walk-only (zero teleports, so F1's extra-hop problem cannot
-return), bounded to the viewport. Task #40.
+return), bounded to the viewport. Task #40.[^5]
 
 **Flag s3-12 (00:57:08) — "stuck with extra map opens":** F12
 compounding under fire — fuel bled 1064→653 across 00:56 while hop
 decisions kept re-deriving across map-open tick boundaries,
 including a cost-18 hop to a 52-volume container it had just refused
 to walk 4 tiles for. Strongest receipt yet that F12 plus the shared
-walk-vs-teleport movement rule is the top open economy fix.
+walk-vs-teleport movement rule is the top open economy fix.[^1]
 
 **Page hygiene note:** two concurrent AI sessions triaged session 3
 in parallel — the two "Session-3 flags" sections above overlap on
 flags s3-1/3/9 (same walk-vs-teleport family read) and should be
-merged into one section on the next quiet pass.
+merged into one section on the next quiet pass.[^1]
 
 **Flag s3-15 — the F1-residual leg, caught mid-waste:** quota met →
 COLLECT search hop teleports out → HUNT preempts BEFORE the landing
@@ -528,7 +552,7 @@ the proof that the hop's only value was the landing auto-pickup
 buying the last fuel points to exact capacity — the leg exists
 because of the exact-capacity floor and dies unused the moment it
 has served it. Task #39's settlement (accept clamped gains that
-complete hunt readiness / direction-aware final leg) closes it.
+complete hunt readiness / direction-aware final leg) closes it.[^1]
 
 ## F16 — The lethal-pressure dead zone: Artax died standing still (01:06:55)
 
@@ -544,7 +568,7 @@ tiles), desperation locked until fuel ≤ 200, walk-for-fuel likewise —
 so the bot had no legal move and tanked four more hits to death at
 (168,94). Companion defect: the final shots fired "toward last wire
 position" (167,95) with over-terrain homings at half damage while
-Yuppler stood adjacent.
+Yuppler stood adjacent.[^1]
 
 USER RULING (2026-07-30, superseding the first fix direction): "the
 bot can fight against a human and win... it should have collected
@@ -567,7 +591,7 @@ while the lock holds. Flight/quit-to-lobby remains ONLY for the true
 lethal case: death projected before any refuel pickup can land (no
 reachable fuel inside the survival horizon) — and there the reserve
 is void, since a dead tank holds no reserve.
-Receipts: bot-20260730-004144 lines 17577–17607.
+Receipts: bot-20260730-004144 lines 17577–17607.[^5]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
@@ -581,7 +605,7 @@ container (→ 1100), teleport back onto orange-7, point-blank duals.
 If the flag is the 6-tile teleport back after the refuel, that is the
 walk-vs-teleport boundary case (beyond the 2-tile walk-dominant
 range; a 6-tile walk costs 6 ticks vs the teleport's 2 + 36 fuel —
-teleport arguably correct mid-fight where ticks are damage windows).
+teleport arguably correct mid-fight where ticks are damage windows).[^1]
 
 **Flag s4-2 (01:26:45, tick 146), pending user narration:** equipment-hop
 chain through the orange minefield zone ((217,19)→(226,17)→(220,9)),
@@ -591,7 +615,7 @@ SAME field that shoved session 2 four times. The
 (F9 remainder): nothing feeds the shove into mine beliefs or the
 landing chooser, so the bot re-aims into the field. Same ground is
 F3's target zone — mine-shot clearance (in build) + the displacement
-consumer together retire this shape.
+consumer together retire this shape.[^3]
 
 **Flag s4-3 (01:28:54, tick 211) → F6/F9 convergence, fix specified.**
 Three consecutive `cant_go` walk rejections (ticks 208-210, targets
@@ -610,7 +634,7 @@ harvest landing standing >1 tile from its lock fires the landing
 radar with the LOCK KEPT, and the landing-scan gate moved ahead of
 lock continuation in the cascade (the 2026-07-03 "radar before any
 pickup" policy, which the old order violated for held locks — s4-3's
-blind walks came from exactly that). 737 bot-ai tests green.
+blind walks came from exactly that). 737 bot-ai tests green.[^5]
 
 **Flags s4-4 (01:31:41) and s4-5 (01:35:06) → narrated: the terminal
 guaranteed miss.** User: "we did 7 homing shots, and 1 missed shot...
@@ -621,7 +645,7 @@ guaranteed miss + wasted tick per pursuit. FIX LANDED (parallel
 session): `pursuit_trace_is_live` (PURSUIT_TRACE_TTL_MS = 12 s on
 last_viewport_observation_ms) gates the pursuit shot — past the wall
 it skips straight to the map chase the miss would have triggered
-anyway.
+anyway.[^5]
 
 **Flag s4-3 user narration (received after the fix landed):** "we hit
 mines that hadnt been detected. we were walking and ran into mines...
@@ -631,7 +655,7 @@ not been revealed" — the user independently named the fix's mechanism
 each) are the same blind-ground failure as the traced cant_go
 rejections; the displaced-landing radar covers the landing case, and
 the user also re-confirmed F12's law: "we should really only ever
-have map open when we are teleporting."
+have map open when we are teleporting."[^1]
 
 **Flags s4-6 (01:36:34) and s4-7 (01:37:00), pending user narration:**
 s4-6 — chained `dot_relay` legs at FULL fuel ((252,125)→(223,176)→
@@ -640,14 +664,14 @@ the map to a distant target; if flagged, it is the s2-15 legibility
 gap again (relay legs read as random hops) or the between-leg map
 churn. s4-7 — mid-pursuit refuel loop working (scan → 339-volume
 fuel_hop, 724→1051 → CLOSE onto orange-2), with an `empty_container`
-one tick earlier (F14's ninth+ occurrence this night).
+one tick earlier (F14's ninth+ occurrence this night).[^1]
 
 **NUMBERING NOTE (audit, 2026-07-30 01:45):** F14 on this page =
 shared-room container belief rot (s3-6 cluster). The parallel
 session's "walks crossing unscanned ground should spend an available
 radar first" finding (s4-3's three walk-over mine hits) is hereby
 **F17** — it was announced as "F14" in that session's chat before
-reaching this page. One number, one finding.
+reaching this page. One number, one finding.[^1]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
@@ -676,7 +700,7 @@ where shoot-wall-then-walk exits into the enemy's kill zone at
 walking speed. No in-viewport fuel → nearest affordable fuel dot
 beyond it. **With no pressure, shoot the mine wall** (free shot) and
 walk — saves the teleport fuel. One rule, keyed on incoming fire /
-enemy adjacency; landing preference: in-viewport fuel first.
+enemy adjacency; landing preference: in-viewport fuel first.[^1]
 
 **Flag s4-12 (01:50:50, tick 849) → narrated: FRIENDLY FIRE → new
 F18.** User: "flag 12 was a friendly fire shot. how did this occur
@@ -689,7 +713,7 @@ re-aim, no diagnostic beyond the command_error). Fix direction: the
 aim selector vetoes ally-occupied aim tiles (registry has team data
 in-viewport), and a friendly_fire rejection must mark the aim stale
 and force a re-acquire tick, mirroring the cant_go → failed-move
-marking.
+marking.[^1]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
@@ -697,17 +721,17 @@ marking.
 
 **Flag s4-13 (tick 930), pending narration:** clicked one tick after
 an `empty_container` rejection mid-COLLECT — presumed F14 (belief
-rot) receipt; the count this session alone is ~12.
+rot) receipt; the count this session alone is ~12.[^1]
 
 ## Session-5 (first build with mine clearance + all fixes live)
 
 **Milestone:** first `mine_clearance_shot` dispatched at tick 24 —
-F3 executing live, three sessions after the first ask.
+F3 executing live, three sessions after the first ask.[^1]
 
 **Flag s5-1 (01:58:37, tick 72), pending narration:** ring shows the
 new restock chain working — fuel lock drink to 1100, equipment
 pickup, 21-tile equipment hop, landing pickup under the held lock.
-Awaiting the user's objection if any.
+Awaiting the user's objection if any.[^1]
 
 **Flag s5-2 (02:00:04, tick 115) → F3's LIVE RECEIPT.** The ring is
 the user's doctrine executing verbatim in the SAME mined tiles that
@@ -715,19 +739,19 @@ ate six cant_go rejections in session 4 ((158-162, 94-98)):
 `mine_clearance_shot` at (160,98) → equipment collected at (162,97) →
 second clearance shot at (162,94) → `fuel_hop` onto the newly exposed
 453-volume container. Shoot the cover, collect the goods. F3's
-fix-status row can take the live receipt pending the user's read.
+fix-status row can take the live receipt pending the user's read.[^1]
 
 **Flag s5-3 (02:01:45, tick 165) → the ORANGE FIELD receipt.** The
 specific minefield flagged since s1-8 ("huge swathe of orange mines")
 is being harvested: clearance shot at (225,17) → equipment collected
 under it → fuel hop onto the exposed 1048-volume container at
 (221,20) → full tank → straight into a HUNT acquisition. Four
-sessions from first flag to farmland.
+sessions from first flag to farmland.[^1]
 
 **Flag s5-4 (02:02:38, tick 192), pending narration:** another clean
 chain — landing radar, equipment pickup, 14-tile fuel hop onto an
 808-volume container, full tank, hunt close on orange-8. Nothing
-anomalous in the ring; awaiting the user's read.
+anomalous in the ring; awaiting the user's read.[^1]
 
 **Flag s5-5 (02:05:03, tick 266) → F4's LIVE PURSUIT RECEIPT + first
 HELLO.** The ring holds lock `#1229` (Yuppler) throughout: acquisition
@@ -736,7 +760,7 @@ tick (`chat(41)` → `chat_received` self-echo — the delivery receipt),
 and the approach is fuel-chaining with the lock held (156 drink →
 249 hop → 813 hop, fight-refuel-refight). The acquisition that
 rejected Yuppler 11/11 times in session 1 now locks, greets, and
-closes. F4's row takes the live receipt.
+closes. F4's row takes the live receipt.[^1]
 
 **Flag s5-6 (02:05:47, tick 288) → F16's LIVE COMBAT RECEIPT.** The
 Artax-death scenario replayed against the same human and SURVIVED:
@@ -746,26 +770,26 @@ fire with the lock held — 400-vol hop → 543 → 898 → 302-vol hop →
 1055, still hunting #1229 throughout. Fight-refuel-refight under real
 human pressure, exactly as ruled after the death. F16's collect half
 takes the live receipt; the hunt-side verdict rewire (delete
-arithmetic blocking) remains the open half.
+arithmetic blocking) remains the open half.[^1]
 
 **Flag s5-7 (02:06:36, tick 312), pending narration:** between-fights
 restock with the Yuppler lock HELD (#1229 threaded through every
 tick) — equipment hops + pickups + a 567-volume drink to full, then
 more equipment, rebuilding weapons for the re-engage. The
 "finish the kill then the human is the next target" contract shape,
-now in its restock phase.
+now in its restock phase.[^1]
 
 **Flag s5-8 (02:10:50, tick 439), pending narration:** a 12-tile
 mine-clearance shot into the purple field at (147,93) — the user's
 own mines from the fight — then equipment hop, lock pickup, forage
-radar. F3 clearing hostile player mines at range, as specified.
+radar. F3 clearing hostile player mines at range, as specified.[^1]
 
 **Flag s5-9 (02:12:18, tick 483), pending narration:** mid-fight vs
 orange-9 — a 189-volume refuel hop between shots (825→1010) then
 resumed fire from range 5. If the objection is the non-adjacent
 shooting economy (homings at range vs closing for duals), that is
 F11/F8's open remainder; the refuel interleave itself is the ruled
-doctrine.
+doctrine.[^1]
 
 **Session-5 narration batch (flags 4-9):**
 - **s5-4 → answered from the ring:** all stocks 25/25 throughout; the
@@ -797,7 +821,7 @@ doctrine.
   fuel only above a floor (share `_LARDER_MIN_GAIN`'s bar). Candidate
   for whoever holds mine_clearance.py (parallel session, hot).
 - **s5-9 → F12 receipt #7** (map open then walked to fuel on the same
-  viewport).
+  viewport).[^1]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
@@ -819,7 +843,7 @@ collecting"), and duals are the kill resource — Artax at ~5 duals
 "is in a bad spot... no kill potential without duals" (duals-floor
 task opened). Flag 8 FIXED same hour (`76f34832`): clearance shots
 now require a deliverable (fuel ≥ 100 volume; equipment always).
-Flag 9: another F12 map-open-then-walk receipt.
+Flag 9: another F12 map-open-then-walk receipt.[^1]
 
 ## Session-6
 
@@ -829,13 +853,13 @@ harvest chain — equipment hop, lock pickup, clearance shot at
 CORRECT here: equipment hops fire only after walk-pickup declines, so
 a 2-tile hop means the 2-tile walk was mine-blocked — teleporting
 over the wall is the right move (unlike F13's fuel dregs, where the
-walk was open).
+walk was open).[^1]
 
 **Flags s6-2 (02:18:39) and s6-3 (02:19:05), pending narration:**
 s6-2 — chase cycle vs orange-6: ranged shot, map refresh, 16-tile
 close, landing radar, adjacent dual; reads as the intended pursuit
 with the new walk-close law only applying at short range.
-s6-3 ring to follow in the record.
+s6-3 ring to follow in the record.[^1]
 
 **Session-6 flags 1–6 (bot-20260730-021x).** Flag 1: a clearance
 shot the LOS module called clear was visibly blocked by terrain —
@@ -853,7 +877,7 @@ but after a teleport the user judges unnecessary from (124,19) —
 hypothesis: the post-landing viewport record lags, suppressing the
 in-view short-circuit; folded into the calibration task. Flag 3
 ring banked pending narration. Flag 6: third ferry-boarding-walk
-receipt for F5 (ferry adjacent to land, equipment beyond).
+receipt for F5 (ferry adjacent to land, equipment beyond).[^1]
 
 **s6 narration batch (flags 1-6) + homing-range hypothesis:** s6-1 —
 clearance shot blocked by terrain (user: "audit and review our clear
@@ -870,14 +894,14 @@ pursuit shots exceeded — and should pursuit fire stop after the FIRST
 miss instead of repeating the dead aim (5x at (220,117)). s6-4 — "could hit red 2 from (124,19), why teleport
 back": the walk-close/in-view boundary again (F8/F11 family). s6-6 —
 ferry adjacent to LAND, equipment on water: F5's WALK-boarding case
-(no teleport needed), second receipt after s5-1.
+(no teleport needed), second receipt after s5-1.[^1]
 
 **Flag s6-8 (tick 243) + live cluster:** five `cant_go` rejections in
 HUNT/ACQUIRE (ticks 236-245) — F6's shape again on the newest build
 (the displaced-landing radar covers harvest landings only;
 between-kills restock walks still dispatch blind into
 tank/unobserved-mine blocks). F6's tank-composition build is now the
-single most receipt-heavy open item; every session adds a cluster.
+single most receipt-heavy open item; every session adds a cluster.[^1]
 
 **AUDIT FINDING F20 (2026-07-30 02:27, cross-session handoff): the
 walk-close candidates NEVER CONSULT TERRAIN.**
@@ -894,7 +918,7 @@ same hole flags s6-8/9's mine walks fell through); the teleport path
 keeps the unfiltered list. Test spec ready: 3x3 rock box minus target
 → expect fall-through to the landing teleport, plus a mined-cardinal
 variant expecting the same. Directly relevant to the parallel
-session's live flags-8/9 investigation.
+session's live flags-8/9 investigation.[^1]
 
 **Flag s6-10 (tick 286) → dropped-tick receipt for the early-wake
 work:** the t285 teleport resolved in **3961 ms** (vs ~1850-2120 ms
@@ -902,7 +926,7 @@ for every neighbor) — a full extra server window burned right before
 the dual pickup, exactly the phase drift the early-wake sleep
 targets. Either the wake missed the landing confirm or the confirm
 itself arrived late; the events carry the pair for the parallel
-session's calibration.
+session's calibration.[^1]
 
 ## Session-7
 
@@ -912,7 +936,7 @@ restock destinations without executing — equipment_hop (46 tiles!) →
 fuel_hop → pickup → different fuel_hop, position unchanged for three
 of five ticks. Smells like the F12 defer-flip re-arbitrating each
 tick under combat pressure; the parallel session's F12 fix remains
-the named cure.
+the named cure.[^1]
 
 **Flags s7-2 (02:34:33) and s7-3 (02:34:40), pending narration:** the
 second Yuppler fight of the night — the bot holds the fight-refuel
@@ -920,7 +944,7 @@ loop (900→1010 off a locked 808 mid-exchange) and map-refreshes to
 re-find the kiting human; the shots land at Yuppler's VACATED tiles
 ((87,163) then (83,152)) — the aim-staleness-vs-movers defect the
 parallel session just receipted, now against the human it matters
-most for.
+most for.[^1]
 
 **Flags s7-3/4 (02:34:41-52) → F21 candidate: the mid-fight weapon
 top-up detour.** With Yuppler locked and DUALS AT 22/25, the
@@ -931,24 +955,24 @@ re-applied during a HELD pursuit. The entry-vs-held distinction
 already exists for fuel (`should_exit_hunt` deliberately does not
 re-check the entry bar); the equipment-restock path needs the same:
 during a held human lock, top up only at a genuine weapon BREAK (the
-resume floor), never the entry cap, and prefer near stock.
+resume floor), never the entry cap, and prefer near stock.[^1]
 
 | # | Finding | Flags | Status |
 |---|---|---|---|
-| F21 | Entry-cap weapon floor re-applied mid-pursuit: 85-tile round trip at 22/25 duals during the Yuppler fight | s7-3, s7-4 | OPEN |
+| F21 | Entry-cap weapon floor re-applied mid-pursuit: 85-tile round trip at 22/25 duals during the Yuppler fight | s7-3, s7-4 | FIX LANDED (2026-07-31: `_equipment_hop_barred` in `collect_hops.py` — during a held combat lock the equipment hop declines unless a reserve is below its BREAK threshold (`weapon_reserves_below_break`); in-viewport walk pickups stay unconditional. Pinned in `test_collect_equipment_hops.py::test_hop_toward_equipment_declines_during_a_held_lock_above_break` / `_fires_during_a_held_lock_at_weapon_break`; live receipt pending) |
 
 **F14 combat escalation (s7, ticks 134/138/139):** three empty-container
 pickups inside the Yuppler fight — the human drains the fuel the
 bot's beliefs point at, and each phantom pickup is a wasted tick
 under fire. F14's cost concentrates exactly where ticks are most
 expensive; the pending ruling (belief-age gate vs two-clocks) is now
-a combat-effectiveness question, not just forage economy.
+a combat-effectiveness question, not just forage economy.[^1]
 
 **Flag s7-5 (02:38:06) → F21 receipt #2:** the same mid-pursuit
 top-up detour — duals 20/25 with Yuppler locked, a 50-tile
 equipment hop out of the pursuit lane, then fuel hops. The entry-cap
 floor is dominating the pursuit phase; F21 is now the top open item
-for the human fights alongside aim-staleness.
+for the human fights alongside aim-staleness.[^1]
 
 **Flag s7-6 (02:38:41), pending narration:** pursuit-phase fuel churn
 under fire — drank a 176, then LOCKED an 86-volume dreg via the
@@ -957,13 +981,13 @@ pickups), then a fuel hop, all while eating hits (916→826) with
 Yuppler locked and duals at 20. Together with F21's detours, the
 pursuit phase is spending its windows on grazing instead of closing;
 the walk-pickup path may need the same deficit-aware value bar the
-larder got (F7/F13's economics, applied to walk pickups mid-pursuit).
+larder got (F7/F13's economics, applied to walk pickups mid-pursuit).[^1]
 
 **Flag s7-7 (02:42:56), pending narration:** productive range-5 duel
 with red-6 (duals consuming on hits 25→22) with one mid-fight
 REFRESH map_open at fuel 989 — if flagged, the question is the map
 window spent while the target was engaged; otherwise the exchange
-reads healthy.
+reads healthy.[^1]
 
 ## Session-8 (bot-20260730-025337, first build with engagement-break projection + break latch + corridor guard live)
 
@@ -978,7 +1002,7 @@ receipt for the full break→escape→refuel→re-engage loop. One
 cosmetic residue: the deferral tick's plan said `equipment_hop
 (138,54)` but the jump tick executed `fuel_hop (138,57)` — plan
 re-derivation between the two escape ticks (benign here; same map
-open served both, but it is the plan-continuity gap in miniature).
+open served both, but it is the plan-continuity gap in miniature).[^1]
 
 **Flag s8-2 (03:00:01, tick 188) — wasted tick at the escape landing:**
 same break vs purple-5 (projected 277 < 354 at fuel 747), two-tick
@@ -989,7 +1013,7 @@ while self was at (141,85) — burning a map_open tick before the
 next tick's pickup (duals 21→25, then an 889 fuel drink). A plan
 that survived the landing would have gone straight to the pickup.
 Receipt for the committed-intent gap: post-landing re-derivation
-does not know the hop's purpose was already served by arriving.
+does not know the hop's purpose was already served by arriving.[^1]
 
 **Flag s8-3 (03:00:19, tick 197) — re-acquire overhead + mid-duel
 map_open:** the return to purple-5 worked ("returning to locked
@@ -997,20 +1021,20 @@ target — refreshing stale position via map" → re-teleport →
 re-engage), with mid-combat fuel pickups keeping the tank at cap
 during the duel (nice). Residue: at 03:00:13, one `find_target`
 map_open fired BETWEEN shots at an engaged, in-view target — an
-F12-family lost tick mid-duel.
+F12-family lost tick mid-duel.[^1]
 
 **Flag s8-4 (03:01:14, tick 224) — the clean specimen:** break vs
 purple-3 (projected 169 < 354 at fuel 639) → map_open → teleport
 (185,33) onto a 419 container WITH pickup on landing → latch
 released at 995 → re-engaged purple-3 the same second. Two ticks
 under fire, zero wasted ticks at the landing. This is the contract
-behavior end-to-end.
+behavior end-to-end.[^1]
 
 Session-8 residues to track: (a) s8-2's landing-tick self-teleport
 re-derivation — new finding, needs a landing-serves-the-plan guard
 or the intent layer; (b) s8-3's mid-duel find_target map_open (F12
 family). The engagement-break projection numbers were consistent
-across all three breaks (27/tick over 3 observed hits, floor 354).
+across all three breaks (27/tick over 3 observed hits, floor 354).[^1]
 
 **s8-2 FIXED (2026-07-30, committed-intent phase 1,
 [[committed-intent]]):** the root fix is structural, not a point
@@ -1034,7 +1058,7 @@ hop; far lock does NOT hijack the walk law), own-ground gate tests.
 Gate: 5,481 tests, 100.00% statements+branches. Phase 2 (hunt +
 clearance plans, supersede visibility) specified on
 [[committed-intent]] — the s8-3 mid-duel map_open (F12) belongs to
-the hunt-plan phase.
+the hunt-plan phase.[^1]
 
 **F22 (found AND fixed same hour by the plan_released channel):**
 the new events stream exposed three `not_executable` releases (run
@@ -1049,12 +1073,12 @@ move-failed mark (`is_move_target_failed`). Water-boxed plans now
 survive for a later ferry/approach; the genuine release gates
 (superior candidate, validity, at-capacity, move-failed) are
 unchanged. Repinned: water-locked hold ×3, move-failed release ×2.
-Gate: 5,484 tests, 100.00%.
+Gate: 5,484 tests, 100.00%.[^1]
 
 **Same-run F14 quantification (ticks 360-448):** five phantom
 pickups on distinct drained beliefs, each exactly one wasted tick
 followed by a clean `target_gone` release — the feedback loop is
-correct; the cost is purely the pending belief-age ruling.
+correct; the cost is purely the pending belief-age ruling.[^1]
 
 **F23 (found by monitor cluster-trace, FIXED same hour): the
 movement-dead escape loop.** Run bot-20260730-110x ticks 95-107:
@@ -1080,7 +1104,7 @@ to the hop (a teleport needs no walk path and lands
 displacement-safe). Pins: service record/count/prune, cant_go-on-
 collect records + code-0 does NOT, movement-dead skips the walkable
 in-viewport fuel for the larder hop, single rejection keeps the walk
-law. Gate: 5,491 tests, 100.00%.
+law. Gate: 5,491 tests, 100.00%.[^1]
 
 **F20 FIXED (2026-07-30, forced by a live 110-tick livelock):** run
 bot-20260730-110x ticks 904-1017+: HUNT/CLOSE walked to (240,46)
@@ -1098,4 +1122,9 @@ replans. Pins: terrain-blocked candidate skipped, marked candidate
 skipped, signature updated at all call sites. Gate: 5,493 tests,
 100.00%. The stuck session was cycled via the stop file so the
 relaunch runs the fix; the withheld red-test spec published earlier
-under F20 is superseded by these landed pins.
+under F20 is superseded by these landed pins.[^1]
+[^1]: **Run-derived observation.** The source is a per-run `runs/bot/<id>.events.jsonl` stream. `runs/` is gitignored (`clients/TankpitBot/.gitignore:1`), so these artifacts are never committed and are not recoverable once deleted — the `git-blob-hash-pin` rule exempts such paths as "unpinnable by nature". Re-checked 2026-07-31: of the six run IDs this page cites, `bot-20260729-232252` (13,566 lines), `bot-20260730-004144` (8,954) and `bot-20260730-012133` (11,326) survive on disk; `bot-20260730-000030`, `bot-20260730-004114` and `bot-20260730-025337` do **not**. Each missing ID resolves to a run seconds away whose `human_flag` timestamps match this page's narration — `000030`→`bot-20260730-000038` (flags at 00:01:04, 00:05:09 vs the page's 00:01:03, 00:05:01), `004114`→`bot-20260730-004144`, `025337`→`bot-20260730-025333` (flags at 03:00:01, 03:00:19, 03:01:14, matching s8-2/s8-3/s8-4 exactly). Individual tick numbers, fuel readings and ring contents quoted below were read during triage and are not re-derivable here.
+[^2]: `runs/bot/bot-20260729-232252.events.jsonl` — `grep -c '"human_flag"'` returns **13**, and the distinct `flag_seq` values are exactly 1–13 (verified 2026-07-31). This page's title and opening line said 10; the body's own references to "old-session flags 12–13" are consistent with 13.
+[^3]: `runs/bot/bot-20260730-004144.events.jsonl` — its 16 `human_flag` events sit at 00:42:27, 00:43:28, 00:44:22, 00:46:01, 00:46:39, 00:47:44, 00:49:06, 00:50:14, 00:51:40, 00:52:06, 00:53:03, 00:57:08, 00:59:05, 01:00:56, 01:03:58, 01:05:41. Every flag narrated under the non-existent `bot-20260730-004114` heading matches one of these to within ~5 s, so both session-3 sections cover this single run. Verified 2026-07-31.
+[^4]: Code paths for the fixes and directions proposed on this page: `src/tankpit_bot/bot/ai/resource_search.py` and `src/tankpit_bot/state/scan_coverage.py` (both declared in this page's `source_paths`), plus `src/tankpit_bot/bot/ai/intent.py` for the plan-release channel described in [[committed-intent]]. Present as of 2026-07-31; the *proposals* here are directions, not landed code, except where a paragraph says FIXED.
+[^5]: **User ruling, quoted verbatim from the live session.** Austin's narration during or immediately after the run being triaged. There is no artifact outside this page — the rulings were given in chat and are recorded here because they are the authority for the behaviour change, not because they were independently logged.

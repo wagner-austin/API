@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/bot"
   - "runs/bot"
 source_git_blobs:
-  "src/tankpit_bot/bot": "b43c4b757f188792926ee32e42f3a2eb5e877994"
+  "src/tankpit_bot/bot": "ea3b92488d8a2eee1865c993bf524ba088fe55dd"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [architecture]
@@ -83,7 +83,7 @@ cut, item 4).
 
 Formerly: `find_teleport_landing_tile` accepted a `blocked_mines`
 parameter and deleted it unread, dead code across five callers, so
-container-teleport landing never consulted mines.
+container-teleport landing never consulted mines[^8].
 
 `blocked_mines` no longer exists anywhere in the tree — the end-to-end
 deletion described under the 2026-07-20 resolution above took it out
@@ -144,3 +144,4 @@ the frozen position → server reroutes → hits confirm → first
 genuine miss at TTL expiry trips the stationary-miss classifier →
 release). Soaks 2026-07-21 show 4–12 pursuit shots per run. The
 veto was dead code either way — the deletion stands unchanged.
+[^8]: `src/tankpit_bot/bot/ai/equipment_search.py:33-37` — the current signature is `find_teleport_landing_tile(terrain: TerrainMapProtocol, goal_x: int, goal_y: int) -> tuple[int, int] | None`, with no `blocked_mines` parameter. A grep for `blocked_mines` across `src/` returns **zero** matches, confirming the parameter and its dead plumbing were removed rather than merely bypassed. Verified 2026-07-31.

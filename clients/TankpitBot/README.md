@@ -1,12 +1,23 @@
 # TankpitBot
 
-Automated bot client for the Tankpit.com browser game. Playwright + Chrome DevTools
-Protocol drive a real browser session; the game's WebSocket is captured and decoded
-through a fully reverse-engineered XOR wire protocol, and a durable HFSM plans and
-executes tank actions autonomously.
+**System identification against an undocumented network protocol.** Tankpit.com
+publishes no wire spec and no mechanics documentation, so this package infers both
+and then proves the inferred model is right.
 
-The project also ships a server twin (`sim/`), a machine-checked physics layer bound
-to the wiki, an archive-priced law validator, and a phone-driven HTTP + SSE service.
+Playwright + Chrome DevTools Protocol capture the live WebSocket; a fully
+reverse-engineered XOR wire protocol decodes it; controlled probes measure the
+game's laws; and every derived claim is bound to a wiki page that re-derives from
+the runs archive on every `make check`. A durable HFSM plays the game — which is
+the end-to-end proof that the model holds.
+
+The instrument is the larger half of the project. `action_lab/` runs isolated live
+experiments, `facts/` carries provenance and confidence on every observed entity,
+`validate/` prices the model against the capture archive, `contracts/` fails at the
+offending state transition rather than N observations later, and `sim/` is a server
+twin that replays the whole model with no browser and no live server.
+
+Also ships a machine-checked physics layer bound to the wiki and a phone-driven
+HTTP + SSE service.
 
 ## Wiki first
 

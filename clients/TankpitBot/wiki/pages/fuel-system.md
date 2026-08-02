@@ -10,7 +10,7 @@ source_paths:
   - "src/tankpit_bot/physics"
 source_git_blobs:
   "src/tankpit_bot/physics": "130c17d4a20d81886055bc97dc20140c9656f1c6"
-fact_checked: "2026-07-25"
+fact_checked: "2026-08-01"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -80,6 +80,38 @@ yielded the correct 633 fuel in the worldstate log but the bot's
 `ctx.fuel` reported 1071 (633 + 438) for the next decision tick. The
 local fuel-delta branch was removed 2026-06-23; the wire is the
 single source of truth.[^6]
+
+## The fuel-pickup wire choreography (byte-mined 2026-08-01)
+
+Every explicit ``pickup_fuel`` command answers with one of four
+measured shapes (~1,600 archive windows, [[capture-differ]]; all
+messages land in one server tick, and the self 0x2E sync carrying the
+new absolute fuel LEADS the batch):
+
+| Case | Shape |
+|---|---|
+| transfer, tank FILLS (clamp) | ``[0x47] + record x2 + 0x44 (gain form: is_free=True, flag=0, absolute fuel) + record x1 + 0x52 code 5, reset_action=0`` |
+| transfer, container EMPTIES (drain) | ``[0x47] + record x2 (remaining 0) + 0x52 code 4, reset_action=1`` — no 0x44 |
+| no transfer, walked (arrived to find it empty / full-tank walk-up) | ``0x47 + record x2 + close by stockedness`` |
+| no transfer, no walk (own-tile / adjacent click) | ``0x44 (no-gain form: is_free=False, flag=43, unchanged fuel) + record x1 + close, reset_action=0`` |
+
+Key laws inside it: the container records come in IDENTICAL
+duplicates (twice, three times in the clamp case with the 0x44
+between records 2 and 3) — not progressive drain steps; the same
+duplicate-record law governs plain move and teleport-landing
+auto-picks (``...pickup+pickup``, 129 move + 2,200+ teleport
+windows), which carry NO 0x44 and NO 0x52 close. The 0x44 has two
+byte-distinct forms (gain vs no-gain). **The walk executes even for
+a KNOWN-drained container** — receipt bot-20260730-224244
+@1785476734979: fuel 783 -> 783 across a 4-tile walk, then the
+remaining-0 records and the code-4 close (``reset_action=1`` after a
+walk; 0 without) — the sim's old walk-free pre-refusal was an
+invention; only a click at a tile with NO container record at all
+draws the moveless code-4 refusal. Code 5 remains the SUCCESS close
+of a clamped transfer, code 4 the empty close — exactly the typed
+0x52 vocabulary the production ledger already consumes. The whole
+choreography is executable in the sim (`emit_fuel_pickup_close`,
+pinned by `tests/sim/test_fuel_choreography.py`).
 
 ## Fuel recovery cascade
 

@@ -7,7 +7,7 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "eade4f75f4a72733d539a9faeb6991857c41ed3e"
+  "src/tankpit_bot": "744443e972df97d609f4c2530ef056e25c877db5"
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [codebase]
@@ -22,7 +22,7 @@ All source lives under `src/tankpit_bot/`. Tests mirror the structure under `tes
 | Package | Purpose | Key files |
 |---------|---------|-----------|
 | `bot/` | The game-playing bot — HFSM states, command dispatch, tick loop | `base.py` (Bot class), `ai/` (all decision logic), `tick_loop.py` (orchestrator), `executor.py` (dispatch + ledger recording), `config.py` (env-resolved launch settings) |
-| `bot/ai/` | The two durable mode owners and every planner they delegate to | `mode_controller.py` (entry/exit rules), `hunt_mode.py`, `collect_mode.py`, `ferry.py` (`compose_decision_terrain` — the single walkability owner, see [[terrain-composition]]), `intent.py` (see [[committed-intent]]) |
+| `bot/ai/` | The two durable mode owners and every planner they delegate to | `mode_controller.py` (entry/exit rules); the HUNT family — `hunt_mode.py` (owner + phases), `hunt_acquire.py` (search/greet/acquire), `hunt_lock.py` (pursuit fire + break escape), `hunt_relay.py` (dot-relay travel); the COLLECT family — `collect_mode.py` (owner + sense/safety gates), `collect_pickups.py`, `collect_locks.py`, `collect_hops.py` (larder + marooned ladder), `collect_common.py` (score/blacklist); `ferry.py` (`compose_decision_terrain` — the single walkability owner, see [[terrain-composition]]), `intent.py` (see [[committed-intent]]). Split 2026-07-31 under the 400-600-line file rule ([[coding-standards]]) |
 | `browser/` | Browser automation — Playwright, CDP, login, room join | `session_base.py` (shared composition), `lifecycle.py` (standalone functions), `login.py` + `room_join.py` |
 | `state/` | World state types and mutations — tanks, containers, viewport | `types/` (TypedDicts), `mutations.py`, `viewport_geometry.py` |
 | `protocol/` | Wire protocol — framing, encoding, decoding, command constants | `commands.py` (CMD_* constants), `codec.py` (XOR encode/decode), `decoders/` + `encoders/` (mirrored; byte-identity proven by `make roundtrip`) |
@@ -79,7 +79,7 @@ validate/    ──→ sim/ + physics/     (offline, reads the runs archive)
 diagnostics/ ──→ ledger/ + state/    (offline, reads events.jsonl)
 ```
 
-`physics/`, `facts/`, `ledger/`, and `contracts/` are leaf layers — anything above may import them; they import nothing from the bot.
+`physics/`, `facts/`, `ledger/`, and `contracts/` are leaf layers — anything above may import them; they import nothing from the bot[^3].
 
 All three consumers (Bot, ProbeBase, BrowserSession) inherit from `SessionBase` in `browser/session_base.py`. See [[services]] for how the DI wires together.[^1]
 
@@ -89,3 +89,4 @@ Standalone CLI tools, each with a `main()` entry point registered in `pyproject.
 
 [^1]: architecture phases A-F, 52 commits on combat-rework; see [[inheritance-chain]]
 [^2]: pyproject.toml [tool.poetry.scripts] section — all CLI entry points
+[^3]: Verified 2026-07-31 — a grep for `from tankpit_bot.bot` / `import tankpit_bot.bot` under `src/tankpit_bot/physics/`, `facts/`, `ledger/`, and `contracts/` returns **zero** matches in all four packages, so the leaf-layer direction holds by construction rather than by convention.

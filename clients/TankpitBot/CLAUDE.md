@@ -25,4 +25,4 @@ See `wiki/pages/coding-standards.md` for the full list. Summary:
 - No mocks, no monkey-patching — use `_test_hooks` DI
 - No back-compat shims, no wrappers, no fallbacks, no legacy code
 - 100% test coverage, no weak assertions
-- Files under 400 lines where possible
+- File size 400-600 lines max, including test files — no monolithic files

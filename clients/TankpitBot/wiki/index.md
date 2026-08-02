@@ -1,11 +1,11 @@
 # TankpitBot Wiki
 
-**Read this first.** 6 topic hubs, 67 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
+**Read this first.** 6 topic hubs, 68 content pages. Follow the hub link for your topic; each hub lists its pages with one-line descriptions.
 
 ## Hubs
 
 [Game Mechanics](hubs/game-mechanics.md) -- how the game works: viewport, teleport, radar, fuel, ferries, map, equipment, official rules, movable blocks, walk mechanics (10 pages)
-[Protocol](hubs/protocol.md) -- wire format: combat hits, deactivation, MAP_DATA, viewport entities, tank registry, weapon selection, decode coverage, viewport shift, server push gating (9 pages)
+[Protocol](hubs/protocol.md) -- wire format: combat hits, deactivation, MAP_DATA, viewport entities, tank registry, weapon selection, decode coverage, viewport shift, server push gating, the capture differ (10 pages)
 [Combat](hubs/combat.md) -- fighting strategy: shot range, enemy behavior, weapon selection, gameplay loop, equipment refill, mine mechanics, movable blocks, game economy, tournament strategy (12 pages)
 [JS Client](hubs/js-client.md) -- reverse-engineered tpclient.js: source map, commands, V table, constants, state machine, XOR, terrain, chat, connection, more (21 pages)
 [Architecture](hubs/architecture.md) -- codebase decisions: inheritance chain, DI, test hooks, coding standards, tank freshness model, bot behavior contract, self-observing architecture, bot service, executor rejection loops, terrain composition, physics roadmap, committed intent, diagnostic HUD + flag channel, flag triage, larder plan (13 pages)

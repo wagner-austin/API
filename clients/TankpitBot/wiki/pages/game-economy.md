@@ -14,7 +14,7 @@ source_paths:
   - "tpclient.js"
 source_git_blobs:
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
-fact_checked: "2026-07-24"
+fact_checked: "2026-08-01"
 confidence: high
 verified: 2026-07-06 (capacity formula cross-checked client gauge math vs user deposits at ranks 1/3/6/7)
 hubs: [combat]
@@ -204,10 +204,89 @@ pinning it precisely needs multi-hour watches, now cheap (walking
 and scanning are both free at fuel 0, and the 1.5 s cadence holds
 the connection open indefinitely — [[server-push-gating]]).[^8]
 
+## The longitudinal container atlas (archive-mined 2026-08-01)
+
+First full-archive sweep: 318 real-wire captures (bot + sniff +
+probe, 120.1 days, all room 1 / field01) replayed through the
+production decoders, every per-tile container statement extracted —
+**197,030 observations over 10,930 distinct tiles**, cross-session
+ordered by absolute epoch timestamps. Miner:
+`analysis_scripts/mine_container_atlas.py` (+ the persistence pass in
+`analyze_container_atlas.py`); artifacts in
+`runs/analysis/container_atlas.json` / `container_observations.jsonl`.
+Layer discipline matters: a visible-layer 0 (0x5A/0x43 cache byte)
+says "no VISIBLE container", never "tile empty" — only radar zeros
+and pickup remaining=0 are true empty statements; increases from a
+visible-layer 0 are the exposure law, not refills.
+
+**1. The field is highly persistent — the atlas snapshot is real.**
+Cross-session volume agreement at the same tile: **98.8% within 1 h
+(n=8,268), 98.1% within a day (n=12,873), 96.8% at 3-7 d, 94.9% at
+7-30 d, 81.4% beyond 30 d**. A week-fresh snapshot of the mined atlas
+is ~97% truthful — good enough to seed the sim with the REAL field
+instead of the statistical model.
+
+**2. Containers GAIN fuel — discrete deposits, NOT regeneration.**
+169 genuine refill events in 120 days: 120 cross-session plus **49
+within-session radar-to-radar increases** (e.g. 993→1823 inside one
+session). Method note: the first pass counted 172 within-session
+events — 123 were a same-tick ordering artifact (a pickup's
+remaining-volume record and the pre-pickup 0x5A read share one
+timestamp; sorting by value instead of wire order manufactures an
+"increase" — the miner now carries an intra-payload sequence
+number). Three discriminators close the mechanism:
+
+* **corr(Δv, Δt) = −0.13 over all 169 events** — refill size is
+  INDEPENDENT of elapsed time (dt median 53 h, max 2,809 h). An
+  accumulating server regen is refuted; so is continuous top-up
+  (same-tile agreement is 99.1% within the hour).
+* **Δv is chunky and fixed-scale**: mean +792 ± 251, median +805 —
+  the max-deposit band of a rank-0/1 tank (capacity − 100 ≈
+  900-1,000); the occasional +1,586 fits two deposits inside a
+  multi-day gap. Post-refill volumes spread 100-2,071 with no
+  landing band (not a reset-to-spawn-volume law).
+* **Zero 0x64 FuelDeposit frames in all 318 captures** — consistent,
+  not contradictory: 0x64 goes only to the DEPOSITING player, so
+  third-party deposits are wire-invisible except as the volume bump
+  the next radar reads. Adjacency attribution of the 49
+  within-session events (34 nobody-visible / 14 self-adjacent / 1
+  practice-bot-adjacent) is dominated by viewport-scoping — the
+  depositor is usually off-screen.
+
+**Leading hypothesis: PRACTICE BOTS (and players) deposit excess
+fuel; the server never adds any.** Most refill-bearing sessions are
+bot-only, and the Δv band matches a near-full roster bot banking.
+Definitive proof queued as a live probe: stationary free-radar watch
+on a stocked container until a bot walks up and the volume jumps.
+The 2026-07-25 static-population law stands refined: static
+placement, consumption-dominated, deposit-topped —
+`analysis_scripts/mine_deposit_attribution.py` +
+`runs/analysis/container_refills.json`.
+
+**3. The stocked population is far larger than the sim's model.**
+Median 62 distinct stocked tiles observed per session; **5,457
+distinct tiles held verified stock within the last 7 days** (6,034 in
+30 days; 7,763 ever). Even granting the dot-biased sampling (the bot
+forages where dots are), slow churn (97% weekly agreement) means most
+of those coexisted — an instantaneous stocked population of roughly
+**5,000+**, versus the sim seed model's ~670 stocked (the
+density-probe extrapolation). The probe's fresh-ground HIDDEN density
+may still be right; the gap says the visited-area/dotted layer is
+much richer than the 641-dot live census suggested. Sim reseeding
+from the mined atlas (a `--from-atlas` world) is the queued fix.
+
+**4. Placement churns only over months.** 175 fuel↔equipment
+type-flip tiles across 120 days; 10,930 cumulative tiles vs ~5-6k
+instantaneous — re-placement happens on the weeks-to-months scale,
+matching the >30 d agreement drop to 81%.
+
 ## What's still open
 
 Equipment-container respawn dynamics and spawn volumes (the 0x4C
-atlas carries neither). Every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).[^5]
+atlas carries neither). Whether the atlas refill events are ALL
+deposits (attributable by pairing them with observed tank positions
+at the refill timestamp — a follow-up mining pass) or a slow server
+top-up also exists. Every player-action fuel cost is closed: walk=1/tile, single=6 (free ammo), dual/missile/homing=10 (+1 round per landed shot), radar=10, mine press=10 flat, teleport=floor(6×euclid to actual landing), deposit=free (clamped to fuel−100). Dual/homing/single came from the 204-capture archive; missile (sniff-20260720-213208) and mine press (sniff-20260720-214329) from dedicated manual captures the same day. The former mystery "paired −45/−10 per combat firing tick" decomposes as −10 = our firing cost + −45 = the incoming enemy single hit landing the same tick. The action-cost design is now visible: everything is 10 except walking (1/tile) and the free single (6).[^5]
 
 ## Machine-checked claims
 

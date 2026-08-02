@@ -1175,9 +1175,9 @@ sections still describe the behaviour correctly, just not its address:[^2]
   queries. This is the model the law-4 as-built above introduced;
   it now has its own home rather than living inside the server.
 
-`server.py` keeps routing and orchestration. No law changed in the
+`server.py` keeps routing and orchestration[^3]. No law changed in the
 split — the fidelity statement and every shadow verdict above stand as
-written.
+written[^3].
 
 ### Damage tier solved (2026-07-23): no healing exists — the tier is the fuel quartile
 
@@ -1233,3 +1233,4 @@ follow the 2026-07-20 commit style (`6d2afdbe`, `3bd031f9`).[^2]
 
 [^1]: Design conversation 2026-07-20: user framing "wiki as the source of truth... with 3 consumers" (code, archived wire evidence, live wire) and "no handwaving, no half assing it at all. the full complete process verified. quality." Phase ordering user-approved; Phase 1 explicitly agreed as the starting point.
 [^2]: receipts for every design and as-built claim above, three-fold: (1) CODE — the blob-pinned trees in frontmatter (`src/tankpit_bot/physics`, `src/tankpit_bot/sim`, `src/tankpit_bot/validate`) plus `protocol/encoders/`, `ledger/fuel_book.py`/`ammo_book.py`, `scripts/physics_claims.py`, and the named `tests/sim/*` files — every symbol, constant, and law named above is greppable on disk, and design paragraphs describe the plan those trees implement (deviations recorded inline); (2) INSTRUMENTS — `make check` (gate/coverage), `make audit` (per-claim sample counts), `make roundtrip` (72,916-message corpus), `make shadow` (law table), `make sim-run` re-derive every number quoted above on demand; (3) HISTORY — the dated 2026-07-20/21/22 commits in git history and their wiki-log entries, plus soak artifacts under `runs/`.
+[^3]: `src/tankpit_bot/sim/server.py` and `src/tankpit_bot/sim/wire_statements.py` both exist as of 2026-07-31, matching the split this phase describes. The "no law changed" claim is a statement of intent for the split, not a measurement — the shadow verdicts it refers to are the ones recorded earlier on this page.
