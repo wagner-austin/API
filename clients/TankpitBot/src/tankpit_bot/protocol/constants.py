@@ -151,6 +151,23 @@ SUPERVISOR_ERROR_INSUFFICIENT_FUEL = 8
 SUPERVISOR_ERROR_NO_ENEMIES = 9
 SUPERVISOR_ERROR_CONGRATULATIONS = 10
 
+# Canonical human-readable names for the 0x52 codes ([[client-commands]]).
+# Codes 4/5/7 are resolutions, not failures — code 5 in particular is the
+# clamp receipt riding with a completed fuel transfer ([[fuel-system]]).
+SUPERVISOR_ERROR_NAMES: dict[int, str] = {
+    SUPERVISOR_ERROR_CANT_DO: "cant_do",
+    SUPERVISOR_ERROR_CANT_GO: "cant_go",
+    SUPERVISOR_ERROR_UNCONTROLLABLE: "uncontrollable",
+    SUPERVISOR_ERROR_FRIENDLY_FIRE: "friendly_fire",
+    SUPERVISOR_ERROR_EMPTY_CONTAINER: "empty_container",
+    SUPERVISOR_ERROR_TANK_FULL: "tank_full_clamp_receipt",
+    SUPERVISOR_ERROR_ALREADY_THERE: "already_there",
+    SUPERVISOR_ERROR_INVENTORY_FULL: "inventory_full",
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL: "insufficient_fuel",
+    SUPERVISOR_ERROR_NO_ENEMIES: "no_enemies",
+    SUPERVISOR_ERROR_CONGRATULATIONS: "congratulations",
+}
+
 # Text message types that don't use XOR encoding
 TEXT_MSG_TYPES = frozenset(
     {
@@ -233,6 +250,7 @@ __all__ = [
     "SUPERVISOR_ERROR_FRIENDLY_FIRE",
     "SUPERVISOR_ERROR_INSUFFICIENT_FUEL",
     "SUPERVISOR_ERROR_INVENTORY_FULL",
+    "SUPERVISOR_ERROR_NAMES",
     "SUPERVISOR_ERROR_NO_ENEMIES",
     "SUPERVISOR_ERROR_TANK_FULL",
     "SUPERVISOR_ERROR_UNCONTROLLABLE",
