@@ -24,6 +24,7 @@ from rw_bot.wire.command import (
     BuildOrder,
     MoveOrder,
     ProduceOrder,
+    TargetedAbilityOrder,
     encode_ability,
     encode_ack,
     encode_attack,
@@ -31,8 +32,10 @@ from rw_bot.wire.command import (
     encode_build,
     encode_move,
     encode_produce,
+    encode_targeted_ability,
 )
 from rw_bot.wire.ndjson import parse_object
+from rw_bot.wire.posture import PostureOrder, encode_posture
 from rw_bot.wire.state import Sample
 
 DEFAULT_HOST = "127.0.0.1"
@@ -157,6 +160,28 @@ class AgentChannel:
             OSError: When the write fails.
         """
         self._connection.send_line(encode_ability(order))
+
+    def send_targeted_ability(self, order: TargetedAbilityOrder) -> None:
+        """Send one targeted ability order.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_targeted_ability(order))
+
+    def send_posture(self, order: PostureOrder) -> None:
+        """Send one posture row.
+
+        Args:
+            order: The order to send.
+
+        Raises:
+            OSError: When the write fails.
+        """
+        self._connection.send_line(encode_posture(order))
 
     def send_ack(self) -> None:
         """Tell the agent this sample is finished with.
