@@ -21,6 +21,8 @@ the service tree keeps the import graph acyclic.
 from __future__ import annotations
 
 import asyncio
+import subprocess
+import sys
 from typing import Protocol
 
 from aiohttp import web
@@ -96,6 +98,20 @@ class ServeProtocol(Protocol):
 
     def __call__(self) -> None:
         """Run the bot service to completion or fail loudly."""
+        ...
+
+
+class RunWebAppProtocol(Protocol):
+    """Blocking web-app runner the fleet entry point delegates to."""
+
+    def __call__(self, app: web.Application, *, host: str, port: int) -> None:
+        """Serve the application until the process is interrupted.
+
+        Args:
+            app: Routed application to serve.
+            host: Bind host.
+            port: TCP port to bind.
+        """
         ...
 
 
@@ -237,6 +253,17 @@ def _real_serve() -> None:
     asyncio.run(_async_main())
 
 
+def _real_run_web_app(app: web.Application, *, host: str, port: int) -> None:
+    """Production runner — :func:`aiohttp.web.run_app` until interrupted.
+
+    Args:
+        app: Routed application to serve.
+        host: Bind host.
+        port: TCP port to bind.
+    """
+    web.run_app(app, host=host, port=port)
+
+
 def _real_build_bot_factory(
     target_url: str, *, headless: bool, prefer_account: bool
 ) -> BotFactoryProtocol:
@@ -304,12 +331,93 @@ serve: ServeProtocol = _real_serve
 build_bot_factory: BotFactoryBuilderProtocol = _real_build_bot_factory
 
 
+class SpawnedProcessProtocol(Protocol):
+    """The child-process surface the fleet manager consumes."""
+
+    @property
+    def pid(self) -> int:
+        """The child's process id."""
+        ...
+
+    def poll(self) -> int | None:
+        """Return the exit code, or None while the child runs."""
+        ...
+
+
+class SpawnBotProcessProtocol(Protocol):
+    """Spawns one bot child process for the fleet manager."""
+
+    def __call__(self, env_overrides: dict[str, str]) -> SpawnedProcessProtocol:
+        """Start a bot child with the given environment overrides.
+
+        Args:
+            env_overrides: Variables set in the child's environment.
+
+        Returns:
+            The spawned process handle.
+        """
+        ...
+
+
+#: Bootstrap the fleet child runs: apply ``KEY=VALUE`` argv pairs to
+#: its OWN environment, then hand off to the bot entry point. The
+#: manager never reads the parent environment — the child inherits it
+#: whole (``env=None``) and the per-instance overrides ride in as
+#: arguments, applied on the far side of the process boundary where
+#: the ``get_env`` seam does not exist yet.
+_CHILD_BOOTSTRAP = (
+    "import os, sys\n"
+    "for pair in sys.argv[1:]:\n"
+    "    key, _, value = pair.partition('=')\n"
+    "    os.environ[key] = value\n"
+    "from tankpit_bot.bot.entry import main\n"
+    "main()\n"
+)
+
+
+def _real_spawn_bot_process(env_overrides: dict[str, str]) -> subprocess.Popen[bytes]:
+    """Spawn one ``tankpit-bot`` child with instance environment.
+
+    The child runs the existing bot entry point in its own process;
+    the per-instance isolation (artifact namespace, stop sentinel,
+    account selection) all lands through the environment.
+
+    Args:
+        env_overrides: Variables set in the child's environment
+            (``TANKPIT_BOT_INSTANCE`` and friends), layered over the
+            inherited parent environment by the child's bootstrap.
+
+    Returns:
+        The spawned process handle.
+    """
+    pairs = [f"{key}={value}" for key, value in env_overrides.items()]
+    return subprocess.Popen([sys.executable, "-c", _CHILD_BOOTSTRAP, *pairs])
+
+
+#: Fleet-manager spawn seam. Tests inject a fake that records env and
+#: returns a controllable process double; production spawns the real
+#: ``tankpit-bot`` child.
+spawn_bot_process: SpawnBotProcessProtocol = _real_spawn_bot_process
+
+#: Fleet-manager serve seam — production blocks in
+#: :func:`aiohttp.web.run_app`; tests inject a recorder so
+#: ``fleet.main`` is exercised without opening a socket.
+run_web_app: RunWebAppProtocol = _real_run_web_app
+
+
 __all__ = [
+    "RunWebAppProtocol",
     "SiteFactoryProtocol",
     "SiteRunnerProtocol",
+    "SpawnBotProcessProtocol",
+    "SpawnedProcessProtocol",
+    "_real_run_web_app",
+    "_real_spawn_bot_process",
     "build_bot_factory",
     "build_site",
     "load_dotenv",
     "probe_existing_instance",
+    "run_web_app",
     "serve",
+    "spawn_bot_process",
 ]

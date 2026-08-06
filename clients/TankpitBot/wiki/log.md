@@ -2862,3 +2862,28 @@ User: "we have unlimited time, tokens and context. lift, dont fork" + "no back c
 - Earlier same night: `POST /start` gained the `{"seconds", "kills"}` bounds body (commit 5c94e66c) — service sessions had been running fully unbounded.
 
 Account selection already existed (`TANKPIT_ACCOUNT` + accounts.json). Same-team pairs share radar exposure server-side ([[game-economy]] team-scope); opposite teams is bot-vs-bot sparring under the fair-fight stack. Gate: 5,890 tests at 100.00% (run with the parallel session's in-flight `analysis/` dirs excluded — see tree note), commit 49eb754b.
+
+---
+## [2026-08-06] lift | The dead terminal's analysis package, finished — direction-tagged frames, typed unframed skip, two miners migrated with exact reproduction
+
+A parallel session built `tankpit_bot.analysis` (one typed owner for the load/XOR/frame-walk pipeline forty scripts each forked privately, commit cb49da1f) and died mid-arc; this session adopted and finished it.
+
+- **Direction extension**: `DecodedFrameDict` gains `direction` (`FrameDirection = "received" | "sent"`); `decode_session_frames` decodes BOTH sides of the wire with the same session cipher, so command-correlating miners (displacement semantics, cost pairing) stop re-implementing the sent walk. Measured archive-wide: 62,095 sent payloads split cleanly with exactly 2 framing errors, both in the one pre-framing capture `bot-20260331-230406`; 217,678 received, zero.
+- **Typed skip, not a crash**: `scan_session` classifies a `FramingError` as `SkippedSessionDict(reason="unframed_payload")` — the vocabulary is closed (`no_magic`, `unframed_payload`), so tallies stay comparable and any NEW corruption stays loud. Fixed the package's docstring lie about frame shape (the body is the whole frame through the cipher, type-byte position included — exactly what `decode_message`/`decode_client_command` take).
+- **Dead code deleted, not covered**: the direction filter inside `decode_session_frames` could never fire — `decode_capture_session` already validates `MessageDirection` to the same closed vocabulary. The check and the `RECEIVED_DIRECTION`/`SENT_DIRECTION` constants are gone; the capture's own literal flows through.
+- **Two miners migrated onto `scan_session`** (`mine_displacement_semantics.py`, `mine_map_position_delta.py` — the newest two, both mined this week's laws): private pipelines deleted, reproduction verified EXACT against the committed verdicts (displacement: 3,418 displaced pairs, 1,227 enemy / 2 friendly, 20/88 friendly-exact/stale-clear; delta: 2,851 pairs, 0 swapped, 0 scaled). The remaining 38 scripts are mechanical follow-ups.
+
+Gate: guard 0 violations, 100.00% coverage, shadow all laws PASS.
+
+---
+## [2026-08-06] lift | The fleet manager — the AI spins up, sees, and stops the bots
+
+User rulings: "so we can run two bots at once? also can you finish the other ai work?" then "not one single server with the option to spin up bots?" then "the goal is the ai can spin up and maintain and see the bots, not the spa method." The SPA service stays what it is; the new `tankpit-fleet` (`make fleet`, port 27300, `TANKPIT_FLEET_PORT`) is the AI's control plane.
+
+- **One user-owned manager process, N bot children.** In-process multi-bot is impossible (world service is a module singleton); harness background tasks die at ~46 min (the 41-kill session's killer). Each bot is a `Popen` child running the ordinary bot entry; isolation is entirely the instance-namespace lift (`runs/bot/<instance>/`, instance STOP sentinel, `TANKPIT_ACCOUNT`).
+- **The manager never reads `os.environ`**: the child inherits the parent environment whole (`env=None`) and a 4-line bootstrap applies `KEY=VALUE` argv overrides to its OWN environment before importing the entry — env writing happens on the far side of the process boundary, where the `get_env` seam does not exist yet.
+- **HTTP**: `GET /bots` (pid/alive/returncode/bounds per instance), `POST /bots` `{"instance", "account?", "kills?", "seconds?"}` (400 malformed, 409 duplicate-live or invalid name — validated against the same `_INSTANCE_NAME` pattern as `resolve_bot_instance`, so a bad name is rejected here and not by a crashed child), `POST /bots/{instance}/stop` (graceful sentinel; scorecard + capture + archive all happen), `DELETE /bots/{instance}` (409 while alive — the fleet never silently kills).
+- **Telemetry stays on disk**: the AI reads `runs/bot/<instance>/latest.log` and runs `tankpit-run-digest`; the fleet owns lifecycle only.
+- New seams `service_hooks.spawn_bot_process` + `run_web_app`, both with real-implementation tests (the spawn test kills the child inside interpreter startup, long before the entry point could open a browser).
+
+Gate: **5,938 tests at 100.00%**, guard 0 violations, `make shadow` all laws PASS.

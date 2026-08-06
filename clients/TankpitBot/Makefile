@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service fleet analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -47,6 +47,7 @@ help:
 	@Write-Host "  make bot                         live HFSM bot"
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
+	@Write-Host "  make fleet                       AI-operated fleet manager (spawn/list/stop bots over HTTP)"
 	@Write-Host "  make analyze                     issue report + run audit + cross-session stats"
 	@Write-Host "  make digest                      compact per-run truth table (works on crashed runs)"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
@@ -268,6 +269,18 @@ service: install
 	@Write-Host "==> service (long-running SPA-driven HTTP + SSE server)" -ForegroundColor Cyan
 	@Write-Host "  Listens on 0.0.0.0:27100; Ctrl+C to stop." -ForegroundColor DarkGray
 	$$crashCount = 0; while ($$true) { Write-Host ""; Write-Host "[service] Starting at $$(Get-Date -Format 'HH:mm:ss')" -ForegroundColor Cyan; poetry run tankpit-bot-service; if ($$LASTEXITCODE -eq 0) { Write-Host "[service] Exited cleanly; done." -ForegroundColor Green; break }; $$crashCount = $$crashCount + 1; if ($$crashCount -ge 3) { Write-Host "[service] 3 consecutive crashes; giving up." -ForegroundColor Red; exit 1 }; Write-Host "[service] Crashed (exit=$$LASTEXITCODE); restarting in 5s ($$crashCount/3)" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
+
+# The fleet manager is the AI-operated control plane: it spawns
+# tankpit-bot child processes (one per instance namespace) and exposes
+# spawn/list/stop/remove over plain HTTP so an AI session can drive a
+# multi-bot fleet without owning any bot's terminal. Runs in a
+# user-owned terminal for the same reason as `make service` — harness
+# background tasks are killed after ~46 minutes.
+fleet: install
+	@Write-Host ""
+	@Write-Host "==> fleet (AI-operated fleet manager)" -ForegroundColor Cyan
+	@Write-Host "  Listens on 0.0.0.0:27300 (TANKPIT_FLEET_PORT overrides); Ctrl+C to stop." -ForegroundColor DarkGray
+	poetry run tankpit-fleet
 
 run: install
 	@Write-Host ""
