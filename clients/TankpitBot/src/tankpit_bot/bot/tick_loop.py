@@ -23,7 +23,11 @@ from tankpit_bot.action_lab.page_client_snapshot import (
 )
 from tankpit_bot.bot import ai_strategy, executor, world_sync
 from tankpit_bot.bot.ai.combat_strategy import clear_combat_target
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_reason
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_respawn_ai_state,
+    render_reason,
+)
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
 from tankpit_bot.bot.session_exit import SessionExitError
@@ -51,6 +55,11 @@ from tankpit_bot.ledger.outcome.shoot import (
 from tankpit_bot.ledger.ring import outcome_counts
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
 from tankpit_bot.protocol.commands import TICK_RATE_MS
+from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
+    SUPERVISOR_ERROR_FRIENDLY_FIRE,
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
+)
 from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
@@ -91,17 +100,11 @@ from tankpit_bot.state import SelfStateDict
 # window before an identical redispatch).
 _SHOT_REJECTING_COMMAND_ERRORS = frozenset(
     {
-        0,  # "You can't do this" -- aim outside the viewport
-        3,  # "Friendly fire!"
-        8,  # "Insufficient fuel"
+        SUPERVISOR_ERROR_CANT_DO,  # aim outside the viewport
+        SUPERVISOR_ERROR_FRIENDLY_FIRE,
+        SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     }
 )
-
-# The err=3 member of the set above, named because it carries target
-# semantics the other two do not: a friendly-fire rejection on an
-# id-targeted shot disproves the TARGET (departed player, team truth),
-# not the aim geometry or the fuel state.
-_COMMAND_ERROR_FRIENDLY_FIRE = 3
 
 log = get_logger(__name__)
 
@@ -652,14 +655,7 @@ def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
         self_state["x"],
         self_state["y"],
     )
-    fresh = make_initial_ai_state(bot._ai_state["config"])
-    fresh["session_kill_count"] = bot._ai_state["session_kill_count"]
-    fresh["wind_down"] = bot._ai_state["wind_down"]
-    fresh["greeted_tank_ids"] = bot._ai_state["greeted_tank_ids"]
-    # The stand-off visit map is session-scoped like the greeting:
-    # dying to a human must not schedule a fresh courtesy visit.
-    fresh["visited_tank_ids"] = bot._ai_state["visited_tank_ids"]
-    bot._ai_state = fresh
+    bot._ai_state = make_respawn_ai_state(bot._ai_state)
     bot._state_data = make_initial_state_data()
     service.world_state["self_state"] = None
     bot._respawn_deadline_ms = get_current_time_ms() + _RESPAWN_WAIT_MS
@@ -1165,7 +1161,7 @@ def _get_combat_feedback(bot: Bot) -> CombatFeedback:
                 "session_reject_count": bot._ai_state["session_reject_count"] + 1,
             }
         )
-        if error_code == _COMMAND_ERROR_FRIENDLY_FIRE:
+        if error_code == SUPERVISOR_ERROR_FRIENDLY_FIRE:
             _disprove_target_by_friendly_fire(bot, target_id, target_name)
         return "rejected"
     return ""

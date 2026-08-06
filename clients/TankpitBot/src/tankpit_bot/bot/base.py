@@ -520,6 +520,7 @@ class Bot(DispatchMixin):
             finally:
                 self._send_graceful_quit()
                 self._save_capture_session()
+                self._detach_cdp_session()
                 self._cdp = None
                 self._page = None
                 cleanup_browser(browser)
@@ -544,6 +545,29 @@ class Bot(DispatchMixin):
             self._commands.quit_game()
         except TargetClosedError:
             log.info("Graceful quit skipped: browser already closed (socket drop = lobby exit)")
+
+    def _detach_cdp_session(self) -> None:
+        """Detach the CDP session so no events race the browser close.
+
+        The session's frame listeners stay registered until an explicit
+        detach; after ``quit_game`` drops the game socket, late CDP
+        events dispatched during ``browser.close()`` hit Playwright's
+        sync bridge on a closing connection and log an ERROR-level
+        callback traceback (seen at the end of the 20-kill soak
+        bot-20260802-205105, zero bot frames in the stack). Detaching
+        first unsubscribes the session; a target that is ALREADY gone
+        makes the detach pointless, so its close-race error is
+        absorbed with a log line — the same discipline as
+        :meth:`_send_graceful_quit`.
+        """
+        from playwright._impl._errors import Error as PlaywrightError
+
+        if self._cdp is None:
+            return
+        try:
+            self._cdp.detach()
+        except PlaywrightError as exc:
+            log.info("CDP detach skipped: session already gone (%s)", exc)
 
     def _save_capture_session(self) -> None:
         """Save accumulated messages as a replayable capture session.

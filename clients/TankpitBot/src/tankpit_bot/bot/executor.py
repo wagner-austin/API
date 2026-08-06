@@ -10,7 +10,13 @@ from tankpit_bot._test_hooks import BotProtocol
 from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
 from tankpit_bot.bot.ai.types import render_reason
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
-from tankpit_bot.bot.types import BotCommand, TeleportCommandDict
+from tankpit_bot.bot.types import (
+    BotCommand,
+    PickupEquipmentCommandDict,
+    PickupFuelCommandDict,
+    TeleportCommandDict,
+)
+from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.ledger.ammo_book import record_ammo_scan
 from tankpit_bot.ledger.decision import record_decision
 from tankpit_bot.ledger.events import ActionKind as LedgerActionKind
@@ -20,8 +26,15 @@ from tankpit_bot.ledger.outcome.teleport import (
     record_teleport_dispatch,
 )
 from tankpit_bot.physics.costs import RADAR_COST, teleport_cost
+from tankpit_bot.physics.supervisor import (
+    TELEPORT_RING1_COST_SLACK,
+    equipment_pickup_refusal,
+    fuel_pickup_refusal,
+    teleport_refusal,
+)
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_world_service
+from tankpit_bot.state.types.coord import coord_key
 
 # Combat equipment slots that get toggled based on behavior mode.
 # Slot 5 (radar) is handled separately — always enabled when desired + stocked.
@@ -85,6 +98,71 @@ def apply_equipment(bot: BotProtocol, desired: list[int]) -> None:
             bot.disable_equipment(slot)
 
 
+def _predicted_pickup_refusal(
+    command: PickupEquipmentCommandDict | PickupFuelCommandDict,
+) -> int | None:
+    """Predict the server's 0x52 answer to a pickup, when belief proves it.
+
+    The ``physics/supervisor.py`` refusal laws applied to the live
+    belief: a fuel pickup at rank fuel capacity, or an equipment
+    pickup with every slot at the rank inventory cap, transfers
+    nothing — the 20-kill soak bot-20260802-205105 sent 48 such
+    pickups and the server refused every one. A target tile without a
+    believed container record proves nothing (drained containers are
+    REMOVED from belief, and drained-by-another-tank races are
+    invisible) — those dispatch optimistically, which is correct.
+
+    Args:
+        command: A ``pickup_fuel`` or ``pickup_equipment`` command.
+
+    Returns:
+        The predicted 0x52 error code, or None to dispatch.
+    """
+    ws = get_world_service()
+    self_state = ws.world_state["self_state"]
+    if self_state is None:
+        return None
+    if command["cmd_type"] == "pickup_fuel":
+        container = ws.world_state["containers"].get(
+            coord_key(command["target_x"], command["target_y"])
+        )
+        if container is None or not container["is_fuel"]:
+            return None
+        return fuel_pickup_refusal(self_state["fuel"], self_state["rank"], container["volume"])
+    return equipment_pickup_refusal(inventory_counts(ws.inventory_state), self_state["rank"])
+
+
+def _suppress_dispatch(
+    command: PickupEquipmentCommandDict | PickupFuelCommandDict | TeleportCommandDict,
+    predicted_code: int,
+) -> bool:
+    """Log a belief-refuted command instead of sending it.
+
+    Args:
+        command: The refuted command.
+        predicted_code: The 0x52 code the server would answer.
+
+    Returns:
+        False — nothing was dispatched; the next tick replans.
+    """
+    emit_ai(
+        "suppressed %s to (%d,%d): belief predicts 0x52 code %d",
+        command["cmd_type"],
+        command["target_x"],
+        command["target_y"],
+        predicted_code,
+    )
+    emit_diagnostic(
+        diagnostic_kind="dispatch_suppressed",
+        origin="executor.dispatch_command.refusal_prediction",
+        command_name=command["cmd_type"],
+        target_x=command["target_x"],
+        target_y=command["target_y"],
+        predicted_error_code=predicted_code,
+    )
+    return False
+
+
 def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> bool:
     """Send a move or pickup command to its target tile.
 
@@ -106,8 +184,14 @@ def _dispatch_tracked_target_command(bot: BotProtocol, command: BotCommand) -> b
     if command["cmd_type"] == "move":
         return bot.move_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_fuel":
+        predicted = _predicted_pickup_refusal(command)
+        if predicted is not None:
+            return _suppress_dispatch(command, predicted)
         return bot.pickup_fuel_to(command["target_x"], command["target_y"])
     if command["cmd_type"] == "pickup_equipment":
+        predicted = _predicted_pickup_refusal(command)
+        if predicted is not None:
+            return _suppress_dispatch(command, predicted)
         return bot.pickup_equipment_to(command["target_x"], command["target_y"])
     raise ValueError(f"Not a tracked-target command: {command['cmd_type']}")
 
@@ -235,6 +319,17 @@ def _dispatch_teleport_command(
         teleport_target_x=command["target_x"],
         teleport_target_y=command["target_y"],
     )
+    self_state = get_world_service().world_state["self_state"]
+    if self_state is not None:
+        floor_cost = (
+            teleport_cost(
+                self_state["x"], self_state["y"], command["target_x"], command["target_y"]
+            )
+            - TELEPORT_RING1_COST_SLACK
+        )
+        predicted = teleport_refusal(self_state["fuel"], floor_cost)
+        if predicted is not None:
+            return _suppress_dispatch(command, predicted)
     message_index = bot.captured_message_count()
     dispatched = bot.teleport_to(command["target_x"], command["target_y"])
     if dispatched:

@@ -47,6 +47,15 @@ from tankpit_bot.ledger.outcome.teleport import (
     emit_teleport_command_rejected,
     emit_teleport_stall_timeout,
 )
+from tankpit_bot.protocol.constants import (
+    SUPERVISOR_ERROR_CANT_DO,
+    SUPERVISOR_ERROR_CANT_GO,
+    SUPERVISOR_ERROR_EMPTY_CONTAINER,
+    SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
+    SUPERVISOR_ERROR_INVENTORY_FULL,
+    SUPERVISOR_ERROR_NAMES,
+    SUPERVISOR_ERROR_TANK_FULL,
+)
 from tankpit_bot.runtime_logging import emit_diagnostic, emit_sync
 from tankpit_bot.sniffer.world_state import (
     get_terrain_map,
@@ -65,18 +74,11 @@ from tankpit_bot.sniffer.world_state_containers import (
 from tankpit_bot.sniffer.world_state_dispatch import was_recent_pickup_at
 from tankpit_bot.sniffer.world_state_inventory import update_inventory_from_full_signal
 
-# Supervisor (0x52) error codes from tpclient.js ``Gb[]``. The bot
-# reacts to the codes that prove the in-flight action will never
-# resolve. The remaining codes are server-side messages that don't
-# correspond to an in-flight action the bot can clear.
-_COMMAND_ERROR_CANT_DO_THIS = 0  # "You can't do this"
-_COMMAND_ERROR_CANT_GO_THERE = 1  # "You can't go there!"
-_COMMAND_ERROR_EMPTY_CONTAINER = 4  # "Empty container"
-_COMMAND_ERROR_TANK_FULL = 5  # "Tank full"
-_COMMAND_ERROR_INVENTORY_FULL = 7  # "Inventory full"
-_COMMAND_ERROR_INSUFFICIENT_FUEL = 8  # "Insufficient fuel"
-
-
+# The 0x52 codes themselves are the canonical ``SUPERVISOR_ERROR_*``
+# constants in ``protocol/constants.py`` (tpclient.js ``Gb[]``); the
+# bot reacts to the codes that prove the in-flight action will never
+# resolve.
+#
 # Per-``ActionKind`` whitelist of the 0x52 codes that action can legitimately
 # draw. A 0x52 whose code is NOT in the current action's whitelist belongs
 # to a prior action (typically one that already completed via a different
@@ -100,26 +102,26 @@ _COMMAND_ERROR_INSUFFICIENT_FUEL = 8  # "Insufficient fuel"
 _COMMAND_ERROR_APPLICABILITY: dict[ActionKind, frozenset[int]] = {
     "move": frozenset(
         {
-            _COMMAND_ERROR_CANT_DO_THIS,
-            _COMMAND_ERROR_CANT_GO_THERE,
-            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+            SUPERVISOR_ERROR_CANT_DO,
+            SUPERVISOR_ERROR_CANT_GO,
+            SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
     "teleport": frozenset(
         {
-            _COMMAND_ERROR_CANT_DO_THIS,
-            _COMMAND_ERROR_CANT_GO_THERE,
-            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+            SUPERVISOR_ERROR_CANT_DO,
+            SUPERVISOR_ERROR_CANT_GO,
+            SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
     "collect": frozenset(
         {
-            _COMMAND_ERROR_CANT_DO_THIS,
-            _COMMAND_ERROR_CANT_GO_THERE,
-            _COMMAND_ERROR_EMPTY_CONTAINER,
-            _COMMAND_ERROR_TANK_FULL,
-            _COMMAND_ERROR_INVENTORY_FULL,
-            _COMMAND_ERROR_INSUFFICIENT_FUEL,
+            SUPERVISOR_ERROR_CANT_DO,
+            SUPERVISOR_ERROR_CANT_GO,
+            SUPERVISOR_ERROR_EMPTY_CONTAINER,
+            SUPERVISOR_ERROR_TANK_FULL,
+            SUPERVISOR_ERROR_INVENTORY_FULL,
+            SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
         }
     ),
     "scan": frozenset(),
@@ -173,7 +175,7 @@ def _mark_movement_failure(kind: ActionKind, error_code: int, tx: int, ty: int) 
         tx: Target X.
         ty: Target Y.
     """
-    if kind == "teleport" and error_code == _COMMAND_ERROR_CANT_DO_THIS:
+    if kind == "teleport" and error_code == SUPERVISOR_ERROR_CANT_DO:
         emit_sync(
             "teleport to (%d,%d) refused code=0 (map closed server-side) "
             "- tile not marked, replanning with a fresh map open",
@@ -285,6 +287,47 @@ def _drain_orphan_command_error(action: InFlightActionDict) -> None:
     _emit_orphan_command_error(action["kind"], error_code)
 
 
+def _emit_command_error_sync(kind: ActionKind, tx: int, ty: int, error_code: int) -> None:
+    """Log one applicable 0x52 with truthful receipt/rejection wording.
+
+    A collect's 0x52 close is a RECEIPT, not a rejection: code 5 is
+    the clamp SUCCESS close (the transfer landed in the same batch),
+    code 4 the drained close, code 7 the inventory statement — the
+    measured choreography ([[fuel-system]]). Logging them all as
+    "rejected" hid the 2026-08-03 nope-fight autopsy's ground truth
+    (32 "rejections" that were successful drinks) from three read
+    passes. Genuine rejections keep the word.
+
+    Args:
+        kind: The in-flight action's kind.
+        tx: The action's target X.
+        ty: The action's target Y.
+        error_code: The 0x52 code the server answered.
+    """
+    if kind == "collect" and error_code in (
+        SUPERVISOR_ERROR_TANK_FULL,
+        SUPERVISOR_ERROR_EMPTY_CONTAINER,
+        SUPERVISOR_ERROR_INVENTORY_FULL,
+    ):
+        emit_sync(
+            "%s to (%d,%d) closed by server receipt %s (code=%d)",
+            kind,
+            tx,
+            ty,
+            SUPERVISOR_ERROR_NAMES[error_code],
+            error_code,
+        )
+        return
+    emit_sync(
+        "%s to (%d,%d) rejected by server %s (code=%d), replanning",
+        kind,
+        tx,
+        ty,
+        SUPERVISOR_ERROR_NAMES[error_code],
+        error_code,
+    )
+
+
 def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     """Clear an in-flight movement action when the server emitted a 0x52 rejection.
 
@@ -326,13 +369,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
     tx, ty = action["target_x"], action["target_y"]
     started_ms = action["started_ms"]
     elapsed_ms = get_current_time_ms() - started_ms if started_ms > 0 else -1
-    emit_sync(
-        "%s to (%d,%d) rejected by server (error_code=%d), replanning",
-        kind,
-        tx,
-        ty,
-        error_code,
-    )
+    _emit_command_error_sync(kind, tx, ty, error_code)
     _emit_command_rejected_outcome(bot, kind, tx, ty, elapsed_ms, error_code)
     if kind == "collect":
         # Semantic split (Bug 0.3, 2026-07-06): "failed pickup" and
@@ -367,14 +404,14 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
         # failed_pickups, so the 22:37 fuel-loop's four consecutive
         # partial-transfer + code=5 events blacklisted four still-full
         # fuel containers.
-        if error_code == _COMMAND_ERROR_TANK_FULL:
+        if error_code == SUPERVISOR_ERROR_TANK_FULL:
             emit_sync(
                 "container at (%d,%d) rejected code=5 (tank full) -- "
                 "not blacklisting, container is not empty",
                 tx,
                 ty,
             )
-        elif error_code == _COMMAND_ERROR_INVENTORY_FULL:
+        elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
             update_inventory_from_full_signal(get_world_service())
             emit_sync(
                 "container at (%d,%d) rejected code=7 (inventory full) -- "
@@ -382,7 +419,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
                 tx,
                 ty,
             )
-        elif error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
+        elif error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
             remove_container_at(get_world_service(), tx, ty)
             if was_recent_pickup_at(get_world_service(), tx, ty, get_current_time_ms()):
                 # Drain receipt (flag s9-4): the code=4 rode our own
@@ -415,7 +452,7 @@ def _clear_command_error(bot: Bot, action: InFlightActionDict) -> bool:
             emit_sync("marked container at (%d,%d) as failed pickup", tx, ty)
     if kind in ("move", "teleport"):
         _mark_movement_failure(kind, error_code, tx, ty)
-    if error_code == _COMMAND_ERROR_CANT_GO_THERE and kind in ("move", "collect", "teleport"):
+    if error_code == SUPERVISOR_ERROR_CANT_GO and kind in ("move", "collect", "teleport"):
         # The shared fact behind a cant_go on ANY movement-bearing
         # command is "the tank tried to move and the server said no"
         # -- a walk-pickup's leg is a move even though its kind is
@@ -533,11 +570,11 @@ def _emit_command_rejected_outcome(
         # these), or the inventory is authoritatively full. Only the
         # genuine refusals (code 0 geometry, code 1 can't-go) stay
         # ``command_rejected``.
-        if error_code == _COMMAND_ERROR_EMPTY_CONTAINER:
+        if error_code == SUPERVISOR_ERROR_EMPTY_CONTAINER:
             emit_collect_pickup_empty(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
-        elif error_code == _COMMAND_ERROR_TANK_FULL:
+        elif error_code == SUPERVISOR_ERROR_TANK_FULL:
             emit_collect_clamped_transfer(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
-        elif error_code == _COMMAND_ERROR_INVENTORY_FULL:
+        elif error_code == SUPERVISOR_ERROR_INVENTORY_FULL:
             emit_collect_inventory_full(duration_ms=elapsed_ms, target_x=tx, target_y=ty)
         else:
             emit_collect_command_rejected(
@@ -658,7 +695,11 @@ def _clear_blocked_walk(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
-    terrain = compose_decision_terrain(world, get_terrain_map())
+    terrain = compose_decision_terrain(
+        world,
+        get_terrain_map(),
+        get_current_time_ms(),
+    )
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
@@ -691,7 +732,11 @@ def _clear_blocked_collection(
     """
     world = bot.get_world_state()
     self_state = world["self_state"]
-    terrain = compose_decision_terrain(world, get_terrain_map())
+    terrain = compose_decision_terrain(
+        world,
+        get_terrain_map(),
+        get_current_time_ms(),
+    )
     if self_state is None or terrain is None:
         return False
     tx, ty = action["target_x"], action["target_y"]
