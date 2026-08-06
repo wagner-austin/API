@@ -2789,3 +2789,17 @@ The chain post-mortem above cited a law [[game-economy]] itself falsified on 202
 - Defects opened: landing selector is mine-blind; no displacement-failure/no-progress detector on collect hops; gate resource spent by the gate-satisfying loop. [[enemy-bot-behavior]] corollary rewritten with this diagnosis.
 
 **The century closed anyway:** the chain runner fired session 5 (bot latest, 18:14-18:35) before the stop landed — bounded 18 kills, delivered **18/18 kills, 209/209 shots (100%), 0 deaths, exit session_complete**, first live session with liveness rule 4 in the binary. Chain total: 32 + 26 + 24 + 0 + 18 = **100/100**.
+
+---
+## [2026-08-05] lift | Landing attainability + the general clearance trigger — the session-4 trap class deleted, no escape hatches
+
+User ruling: "generalize the clearance trigger and fix the landing servability" — and "no escape hatches": no displacement counters, no blocklists; the planner must KNOW, not retry-and-learn. The lift, all plan-time knowledge the bot already held at tick 4:
+
+- **`find_attainable_landing_tile` (`bot/ai/reachability.py`)** — the teleport twin of walkability: legality (server accepts the aim) vs attainability (the tank will STAND there). Scans the pickup service set (goal + cardinals) for a terrain-legal AND mine-free tile; every known mine displaces regardless of team (user law 2026-06-16 verbatim, mine-landing probe 3/3 2026-07-28). Consumers: equipment hop, fuel larder, desperation fuel hop, `_teleport_fallback_command` (locked-approach). `find_teleport_landing_tile` stays as the TRANSPORT answer (combat aims, scouting, mine-flip) with its docstring scoped — "displacement is not a reason to re-aim" was a legality truth silently promoted to an attainability lie.
+- **General clearance trigger (`mine_clearance.py`)** — the free unlock single now fires on the general condition (a known hostile mine denies a worthwhile in-view container's service access, and the blast provably reopens it) instead of the two special cases (mined container tile / mined walk corridor) that both missed the session-4 pocket. New single-target arm `find_service_clearance_aim` feeds the lock verdict. Aims scored by containers reopened, tie to nearest, fully deterministic.
+- **Lock verdict** — `_locked_target_is_unservable`: servable = attainable landing OR shootable service mine (HOLD; the clearance step runs before the hop lanes) OR pond ferry. Unshootable mine-denial releases `unservable`, same closed vocabulary.
+- In the session-4 geometry the new tick-4: clearance shot at the flank mine (3×3 blast clears the pocket) → tick 5 hop lands exactly → pickup. One shot, zero loops.
+
+Pins: verbatim `_session4_pocket` fixture (water-locked equipment, mined flanks, bot at (60,94)) across `test_mine_clearance.py` / `test_reachability.py` / loop-killer hop test / hold-vs-release lock tests. Behavior shift pinned: covered-container aim may now be the closer service-tile mine (same blast, one tile nearer).
+
+Gate: guard 0 violations, ruff+mypy clean, **5,835 tests at 100.00%**, `make shadow` all 7 laws PASS. Open follow-up (parked): what a displacement receipt implies when the obstruction was NOT already known — mine it from the 534 session-4 receipts + the 2,861-pair corpus before writing any inference law.

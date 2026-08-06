@@ -325,9 +325,29 @@ from the session's own events, is a client-side geometry trap:
   room normally — room state was irrelevant; session 4 merely spawned
   two tiles from the trap.
 
-Open defects exposed: (1) the teleport landing selector does not
-avoid known-mine tiles even when displacement is certain; (2) no
-displacement-failure counter or no-progress detector exists on
-collect hops, so a geometrically unreachable target is retried
-forever; (3) the gate resource (radars) is spent by the very loop
-that is trying to satisfy the gate.
+Defects exposed and FIXED the same day (no escape hatches — plan-time
+knowledge, not retry counters):
+
+1. **Landing attainability** (`find_attainable_landing_tile`,
+   `bot/ai/reachability.py`): every pickup-serving teleport selector
+   (equipment hop, fuel larder, desperation hop, locked-approach
+   fallback) now requires the landing tile to be terrain-legal AND
+   mine-free — a landing the tank will actually stand on. Legality
+   alone remains the transport answer (combat aims, scouting,
+   mine-flip escapes, where arriving near is fine).
+2. **General clearance trigger** (`mine_clearance.py`): the free
+   unlock shot fires on the general condition — a known hostile mine
+   denies a worthwhile container's service access (covered tile OR no
+   attainable landing) and the blast provably reopens it — replacing
+   the two special cases (mined container tile; mined walk corridor)
+   that both missed this pocket. In session 4's geometry the shot at
+   the flank mine resolves the whole trap at tick 4.
+3. **Lock verdict** (`_locked_target_is_unservable`): servable now
+   means attainable landing OR shootable service mine OR pond ferry;
+   a shootable denial HOLDS (the clearance step precedes the hops),
+   an unshootable one releases `unservable`.
+
+The radar burn (gate resource spent by the gate-satisfying loop) is
+mooted by the fix — the loop no longer exists to burn it. Pinned by
+the verbatim session-4 pocket in `tests/bot/ai/test_mine_clearance.py`
+(`_session4_pocket`) and the loop-killer hop test.
