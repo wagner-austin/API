@@ -41,6 +41,8 @@ CheckName = Literal[
     "unknown_container_subtypes",
     "deactivation_channel_diff",
     "supervisor_channel_diff",
+    "human_episode",
+    "turret_exchange",
     "dom_witness_diff",
 ]
 """Closed set of audit checks; every finding names the check that produced it."""

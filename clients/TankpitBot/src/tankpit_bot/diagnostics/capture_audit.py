@@ -35,6 +35,8 @@ from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.runtime_logging import RuntimeEventRecordDict
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.types import CaptureSession
+from tankpit_bot.validate.fight_timeline import extract_human_episodes
+from tankpit_bot.validate.shadow_timeline import extract_shadow_timeline
 
 log = get_logger(__name__)
 
@@ -287,6 +289,67 @@ def _dom_witness_findings(
     return findings
 
 
+_TURRET_STREAK_THRESHOLD = 4
+"""Consecutive own shots from ONE tile, while the human is firing,
+that flag the turret behavior. The 2026-08-03 nope fight measured a
+streak of 6 with a hit taken every tick; 4 keeps two-shot trades and
+repositioning duels out of the warning."""
+
+
+def _human_episode_findings(capture: CaptureSession) -> list[FindingDict]:
+    """Surface every human engagement as first-class findings.
+
+    The nope fight hid inside a rejection stream for three read
+    passes because no audit layer named the humans. One INFO finding
+    per engaged human; a WARNING when the episode shows the turret
+    exchange (a stationary own-shot streak at or past
+    ``_TURRET_STREAK_THRESHOLD`` against an actively firing human).
+
+    Args:
+        capture: Decoded capture session for the run.
+
+    Returns:
+        Episode findings, first-shot order.
+    """
+    episodes = extract_human_episodes(extract_shadow_timeline(capture))
+    findings: list[FindingDict] = []
+    for episode in episodes:
+        findings.append(
+            make_finding(
+                "human_episode",
+                "info",
+                (
+                    f"human {episode['name']}: {episode['shots_by_human']} shots taken, "
+                    f"{episode['our_shots_in_window']} returned, "
+                    f"{episode['kills_of_human']} kill(s) of them, "
+                    f"{episode['deaths_to_human']} death(s) to them"
+                ),
+                tank_id=episode["tank_id"],
+                first_shot_ms=episode["first_shot_ms"],
+                last_shot_ms=episode["last_shot_ms"],
+                max_stationary_streak=episode["max_stationary_streak"],
+            )
+        )
+        if (
+            episode["max_stationary_streak"] >= _TURRET_STREAK_THRESHOLD
+            and episode["shots_by_human"] >= _TURRET_STREAK_THRESHOLD
+        ):
+            findings.append(
+                make_finding(
+                    "turret_exchange",
+                    "warning",
+                    (
+                        f"stood on one tile for {episode['max_stationary_streak']} "
+                        f"consecutive shots while {episode['name']} was firing -- "
+                        "stationary trading gives a human 100% uptime"
+                    ),
+                    tank_id=episode["tank_id"],
+                    max_stationary_streak=episode["max_stationary_streak"],
+                )
+            )
+    return findings
+
+
 def audit_capture(
     capture: CaptureSession,
     records: list[RuntimeEventRecordDict],
@@ -372,6 +435,7 @@ def audit_capture(
     own_id = _own_tank_id(records)
     own_deactivations = sum(1 for _, killer_id in deactivations if killer_id == own_id)
     findings.extend(_dom_witness_findings(capture, own_deactivations, supervisor_codes))
+    findings.extend(_human_episode_findings(capture))
     return findings
 
 
