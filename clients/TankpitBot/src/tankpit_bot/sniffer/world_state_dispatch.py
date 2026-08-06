@@ -22,6 +22,7 @@ from tankpit_bot.physics.costs import (
     SINGLE_SHOT_COST,
 )
 from tankpit_bot.physics.damage import DUAL_HIT_VICTIM_COST, MINE_DETONATION_COST
+from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_NAMES
 from tankpit_bot.runtime_logging import emit_diagnostic, emit_world
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.sniffer.world_state_combat import (
@@ -66,24 +67,6 @@ from tankpit_bot.state import (
 from tankpit_bot.state.types.constants import TERRAIN_FERRY
 
 log = get_logger(__name__)
-
-# Human-readable names for the 0x52 Supervisor codes
-# ([[client-commands]]). Codes 4/5/7 are resolutions, not failures —
-# code 5 in particular is the clamp receipt riding with a completed
-# fuel transfer.
-_SUPERVISOR_ERROR_NAMES: dict[int, str] = {
-    0: "cant_do",
-    1: "cant_go",
-    2: "uncontrollable",
-    3: "friendly_fire",
-    4: "empty_container",
-    5: "tank_full_clamp_receipt",
-    6: "already_there",
-    7: "inventory_full",
-    8: "insufficient_fuel",
-    9: "no_enemies",
-    10: "congratulations",
-}
 
 
 def _update_tank_from_position_status(
@@ -1264,7 +1247,7 @@ def dispatch_world_state_update(ws: WorldService, decoded: protocol.BinaryMessag
             emit_diagnostic(
                 diagnostic_kind="command_error",
                 error_code=error_code,
-                error_name=_SUPERVISOR_ERROR_NAMES.get(error_code, "unknown"),
+                error_name=SUPERVISOR_ERROR_NAMES.get(error_code, "unknown"),
             )
             return
         case {
