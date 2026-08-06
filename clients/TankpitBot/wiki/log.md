@@ -2803,3 +2803,8 @@ User ruling: "generalize the clearance trigger and fix the landing servability" 
 Pins: verbatim `_session4_pocket` fixture (water-locked equipment, mined flanks, bot at (60,94)) across `test_mine_clearance.py` / `test_reachability.py` / loop-killer hop test / hold-vs-release lock tests. Behavior shift pinned: covered-container aim may now be the closer service-tile mine (same blast, one tile nearer).
 
 Gate: guard 0 violations, ruff+mypy clean, **5,835 tests at 100.00%**, `make shadow` all 7 laws PASS. Open follow-up (parked): what a displacement receipt implies when the obstruction was NOT already known — mine it from the 534 session-4 receipts + the 2,861-pair corpus before writing any inference law.
+
+---
+## [2026-08-05] lift | Ferry memory goes positional — the 60s TTL retired by the no-drift law
+
+User ruling ("do the positional invalidation for the ferry memory"). The TTL's premise — "ferries drift freely" — was falsified by our own movement mining (136/148 wire movements rider-attributed, zero spontaneous; bots never ride). Three channels already retire a wrong belief positionally: 0x4A atomic move pairs overwrite both tiles, viewport re-observation rewrites the tile's truth, and a boarding teleport displaced off a believed ferry deletes it on contact (`_expire_disproven_ferry_belief`). The clock on top only FORGOT true ferries — rediscovery pans and the chain's release→re-lock churn. `find_ferry_boarding_tile` drops the freshness gate; stale-belief tests flip to pin the new law. Residual risk (a human rides it away unseen) costs one displaced hop and self-heals via channel 3 — the same accepted economics as stale container hops. Gate: 5,835 tests at 100.00%, shadow green. Commit 8614316a.
