@@ -1,8 +1,22 @@
 # RustedWarfareBot
 
-Headless Rusted Warfare client. A Java agent inside the game's JVM dispatches orders and serialises simulation state; this Python package plans and evaluates. The standing goal is a 100% win rate against the built-in AI at Impossible and every rung below, measured, with any champion match watchable live.
+**System identification against an obfuscated binary.** Rusted Warfare ships as a
+compiled Java program with no published internals and class names that change
+silently between releases, so this project infers the engine's rules from the inside
+and pins every claim to the build it was measured on.
+
+A Java agent injected into the game's own JVM dispatches orders and serialises
+simulation state; this Python package plans, evaluates, and verifies. The standing
+goal is a 100% win rate against the built-in AI at Impossible and every rung below,
+measured, with any champion match watchable live.
 
 The game is a plain Java program and boots fully headless via `-nodisplay`, so there is no virtual framebuffer, no screen scraping, and no input synthesis.
+
+Verification is structural rather than incidental: `mechanics/` holds the extracted
+game facts, doctrines make each experiment differ from its control by exactly one
+field, seeded matches are bit-identical per seed with a world digest that proves it,
+and `make agent-selftest` patches the real jar so a moved obfuscated class fails at
+the build gate instead of inside a live engine.
 
 ## Wiki
 
