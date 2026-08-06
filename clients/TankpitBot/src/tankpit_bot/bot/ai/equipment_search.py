@@ -44,9 +44,15 @@ def find_teleport_landing_tile(
 
     Asks ``is_landing_legal``, never ``is_passable``: the server
     displaces a landing off mines and off occupied tiles rather than
-    refusing it, so neither is a reason to re-aim. Using the walk
-    question here would forbid aiming at any enemy at all, since an
-    enemy always occupies its own tile.
+    refusing it. That makes this the TRANSPORT answer — arriving NEAR
+    the aim is acceptable (combat aims, scouting, mine-flip escapes;
+    using the walk question would forbid aiming at any enemy at all,
+    since an enemy always occupies its own tile). It is NOT the pickup
+    answer: a transfer needs the tank ON or cardinally adjacent to the
+    container, and a mined landing displaces outside that reach every
+    time — pickup selectors must use ``find_attainable_landing_tile``
+    (session bot-20260805-173034: 534 displaced teleports re-aimed at
+    one known mine, zero pickups, 43 minutes).
 
     Args:
         terrain: Terrain view answering landing legality.

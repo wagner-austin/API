@@ -21,6 +21,7 @@ from tankpit_bot.bot.ai.ferry import (
     is_riding_ferry,
 )
 from tankpit_bot.bot.ai.reachability import (
+    find_attainable_landing_tile,
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
 )
@@ -654,12 +655,18 @@ def _teleport_fallback_command(
 ) -> BotCommand | None:
     """Return a teleport command for a terrain-blocked target when possible.
 
-    The server handles displacement when the landing tile is occupied or
-    impassable, so ``find_teleport_landing_tile`` always returns the goal
-    for in-bounds targets. The only rejection is when the teleport is
-    unaffordable.
+    This fallback serves a PICKUP approach, so the landing must be
+    attainable, not merely legal: a known mine on the tile displaces
+    the landing outside the transfer's on-or-cardinal reach every time
+    ([[mine-mechanics]]; session bot-20260805-173034 re-aimed 534
+    displaced teleports at one mined tile). A mine-denied target
+    returns ``None`` — the lock holds, and the clearance step or the
+    ``unservable`` release resolves it. The transport-flavored
+    teleports (``_mine_flip_teleport``, combat aims) deliberately keep
+    plain legality: they only need to arrive NEAR, and displacement is
+    acceptable there.
     """
-    landing = find_teleport_landing_tile(terrain, tx, ty)
+    landing = find_attainable_landing_tile(terrain, ctx.world["mines"], tx, ty)
     if landing is None:
         return None
     lx, ly = landing

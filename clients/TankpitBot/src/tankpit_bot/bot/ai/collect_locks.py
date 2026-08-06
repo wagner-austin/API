@@ -23,11 +23,12 @@ from tankpit_bot.bot.ai.equipment import (
 from tankpit_bot.bot.ai.equipment_search import (
     find_best_fuel,
     find_nearest_equipment,
-    find_teleport_landing_tile,
 )
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import release_collect_plan
+from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
 from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.physics.capacity import fuel_capacity
@@ -40,16 +41,27 @@ def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -
     """Return whether NO lane can ever serve the locked container.
 
     Completes the enumerated release law with the verdict the hop
-    selectors already compute: a container with no legal teleport
-    landing (it and every cardinal neighbor terrain-illegal) AND no
-    fresh ferry floating on its own water body cannot be walked to,
-    hopped to, or ridden to — nothing in the cascade can resolve the
-    lock, and no move-failed mark will ever arrive because nothing is
-    ever dispatched. Run bot-20260804-234008 (2026-08-05 00:04) held
+    selectors already compute. Three lanes are checked, in the order
+    the cascade would use them: an ATTAINABLE teleport landing (a
+    service tile that is terrain-legal and mine-free — legality alone
+    is not service, the displacement law bounces mined landings
+    outside pickup reach, session bot-20260805-173034), a clearance
+    shot that provably reopens such a landing (the free-single step
+    runs before the hop lanes, so a shootable denial HOLDS), and a
+    fresh ferry floating on the target's own water body. When all
+    three are absent nothing in the cascade can resolve the lock, and
+    no move-failed mark will ever arrive because nothing is ever
+    dispatched. Run bot-20260804-234008 (2026-08-05 00:04) held
     exactly such a lock for 11 minutes. Affordability and viewport
     misalignment are deliberately NOT part of this verdict — those
     change with fuel and movement, and holding through them is the
-    committed-intent law working.
+    committed-intent law working. So is shot-line geometry: a denied
+    target whose clearance mine has no LOS from HERE may gain it after
+    the next movement, but the verdict must be structural, so only the
+    mine set and terrain decide — ``find_service_clearance_aim`` is
+    consulted with the bot's current position exactly because the
+    clearance step itself is; a released target is re-lockable the
+    tick geometry improves.
 
     Args:
         ctx: Decision context.
@@ -62,7 +74,15 @@ def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -
     """
     if ctx.terrain is None:
         return False
-    if find_teleport_landing_tile(ctx.terrain, target_x, target_y) is not None:
+    if (
+        find_attainable_landing_tile(ctx.terrain, ctx.world["mines"], target_x, target_y)
+        is not None
+    ):
+        return False
+    if (
+        find_service_clearance_aim(ctx.filtered, ctx.self_state, ctx.terrain, target_x, target_y)
+        is not None
+    ):
         return False
     return (
         find_ferry_boarding_tile(ctx.world, ctx.terrain, target_x, target_y, ctx.timestamp_ms)

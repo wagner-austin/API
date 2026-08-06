@@ -15,15 +15,13 @@ from tankpit_bot.bot.ai.collect_common import (
     is_container_blacklisted,
 )
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision, set_resource_target
-from tankpit_bot.bot.ai.equipment_search import (
-    find_all_tracked_equipment,
-    find_teleport_landing_tile,
-)
+from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import release_collect_plan
 from tankpit_bot.bot.ai.larder import select_fuel_larder_hop
 from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted, weapon_reserves_below_break
 from tankpit_bot.bot.ai.movement import walk_or_teleport
+from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_teleport_command
@@ -41,6 +39,13 @@ def _equipment_hop_landing(
 ) -> tuple[int, int] | None:
     """Resolve an equipment hop's landing: own ground, else a ferry.
 
+    The ground landing must be ATTAINABLE, not merely legal: a known
+    mine on the tile displaces the landing (session
+    bot-20260805-173034: 1,068 hops re-aimed at one mined service
+    tile, 534 displaced teleports, zero pickups). Mine-denied access
+    is the clearance shot's job, which runs earlier in the cascade;
+    this selector only aims where the tank will actually stand.
+
     Water-locked equipment gets the ferry boarding-tile fallback
     exactly as the fuel larder does ([[flag-triage-20260729]] F5).
     Radar-situation receipt (2026-07-30 session 7): ALL 8 tracked
@@ -57,7 +62,9 @@ def _equipment_hop_landing(
         Landing coordinates, or ``None`` when neither ground nor a
         fresh believed ferry serves the container.
     """
-    landing = find_teleport_landing_tile(terrain, container["x"], container["y"])
+    landing = find_attainable_landing_tile(
+        terrain, ctx.world["mines"], container["x"], container["y"]
+    )
     if landing is not None:
         return landing
     return find_ferry_boarding_tile(
@@ -367,8 +374,9 @@ def desperation_fuel_hop(
     auto-pick law ([[fuel-system]]) credits a teleport landing ON or
     CARDINALLY ADJACENT to a fuel container, so a 2-tile hop to a
     shore landing tile refuels where no walk can. Gates here are
-    physics only: a legal landing (`find_teleport_landing_tile`, the
-    shore-aware helper) and cost within the remaining tank. The hop
+    physics only: an attainable landing (`find_attainable_landing_tile`,
+    the shore-aware, displacement-proof helper) and cost within the
+    remaining tank. The hop
     holds a fuel lock and suppresses the landing radar (larder
     semantics, [[larder-plan]]).
 
@@ -396,7 +404,9 @@ def desperation_fuel_hop(
             continue
         if is_container_blacklisted(container["x"], container["y"]):
             continue
-        landing = find_teleport_landing_tile(terrain, container["x"], container["y"])
+        landing = find_attainable_landing_tile(
+            terrain, ctx.world["mines"], container["x"], container["y"]
+        )
         if landing is None:
             continue
         landing_x, landing_y = landing

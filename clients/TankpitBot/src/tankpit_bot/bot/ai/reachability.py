@@ -1,17 +1,24 @@
-"""Viewport-bounded reachability helpers for movement and collection.
+"""Reachability helpers for movement and collection.
 
-These helpers answer the question the live bot actually needs:
-can the current visible viewport execute this command right now?
-Walkability — including dynamic obstacles like hostile mines — is
-owned entirely by the terrain view (see ``compose_decision_terrain``);
-these helpers only add viewport bounding and pickup adjacency service.
+These helpers answer the questions the live bot actually needs: can
+the current visible viewport execute this command right now, and can
+a teleport actually ARRIVE where the plan needs the tank? Walkability
+— including dynamic obstacles like hostile mines — is owned entirely
+by the terrain view (see ``compose_decision_terrain``); the viewport
+helpers only add bounding and pickup adjacency service. Landing
+ATTAINABILITY is the teleport-side twin: legality says the server will
+accept the aim, attainability says the tank will stand on that tile
+afterwards (the displacement law bounces landings off mines,
+[[teleport-mechanics]] / [[mine-mechanics]]).
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import path_exists
-from tankpit_bot.state.types import WorldStateDict
+from tankpit_bot.state.types import MineStateDict, WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 _ADJACENT_DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -115,6 +122,52 @@ def is_collection_reachable_in_viewport(
     return False
 
 
+def find_attainable_landing_tile(
+    terrain: TerrainMapProtocol,
+    mines: Mapping[str, MineStateDict],
+    goal_x: int,
+    goal_y: int,
+) -> tuple[int, int] | None:
+    """Find a teleport landing the tank will actually END UP on.
+
+    Legality (``is_landing_legal``) only says the server accepts the
+    aim; the displacement law then bounces the landing off any mine on
+    the tile ([[mine-mechanics]] § teleport landings displace, probe
+    3/3 2026-07-28). For a pickup that is fatal: the measured transfer
+    choreography needs the tank ON the container or cardinally
+    adjacent, so a landing that displaces never completes the mission.
+    Session bot-20260805-173034 spent 43 minutes re-aiming at a known
+    mine — 534 displaced teleports, zero pickups — because the
+    selector answered legality when the plan needed attainability.
+
+    Every known mine displaces regardless of team (user law
+    2026-06-16, verbatim: "you get moved off if there are mines") —
+    pass the full ``world["mines"]`` layer, not the hostile filter.
+
+    Args:
+        terrain: Terrain view answering landing legality.
+        mines: Known mines indexed by ``"x,y"`` key (all teams).
+        goal_x: Target container X coordinate.
+        goal_y: Target container Y coordinate.
+
+    Returns:
+        The first service tile (target, then cardinal neighbors) that
+        is terrain-legal AND mine-free, or ``None`` when every service
+        tile would refuse or displace the landing.
+    """
+    if not (_MAP_MIN <= goal_x <= _MAP_MAX and _MAP_MIN <= goal_y <= _MAP_MAX):
+        return None
+    if terrain.is_landing_legal(goal_x, goal_y) and f"{goal_x},{goal_y}" not in mines:
+        return (goal_x, goal_y)
+    for landing_x, landing_y in _collection_landing_tiles(goal_x, goal_y):
+        if not terrain.is_landing_legal(landing_x, landing_y):
+            continue
+        if f"{landing_x},{landing_y}" in mines:
+            continue
+        return (landing_x, landing_y)
+    return None
+
+
 def _collection_landing_tiles(goal_x: int, goal_y: int) -> list[tuple[int, int]]:
     """Return cardinal landing tiles that could service a pickup target.
 
@@ -177,6 +230,7 @@ def _viewport_path_exists(
 
 
 __all__ = [
+    "find_attainable_landing_tile",
     "is_collection_reachable_in_viewport",
     "is_move_reachable_in_viewport",
 ]

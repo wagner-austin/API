@@ -7,10 +7,13 @@ at 25 tiles beats a 300 at 10 when the tank is down 700, and loses
 when it is down 200. The selection is re-run every tick so the plan
 never goes stale (user ruling: no fixed-container errands).
 
-Landing reuses ``find_teleport_landing_tile``: the container tile
-itself when passable, else a cardinal shore neighbor -- both are
-inside the server's fuel auto-pick reach (ON or cardinally adjacent,
-[[fuel-system]]), so the hop needs no pickup command at all.
+Landing reuses ``find_attainable_landing_tile``: the container tile
+itself when landing-legal and mine-free, else a cardinal shore
+neighbor -- both are inside the server's fuel auto-pick reach (ON or
+cardinally adjacent, [[fuel-system]]), so the hop needs no pickup
+command at all. Attainability, not mere legality: a known mine on the
+landing displaces the teleport outside auto-pick reach every time
+([[mine-mechanics]]; session bot-20260805-173034).
 """
 
 from __future__ import annotations
@@ -20,9 +23,9 @@ from collections.abc import Callable
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.equipment_search import find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_controller import hunt_entry_permitted
+from tankpit_bot.bot.ai.reachability import find_attainable_landing_tile
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.costs import teleport_cost
 from tankpit_bot.state.types import ContainerStateDict
@@ -213,7 +216,9 @@ def select_fuel_larder_hop(
         if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1
             continue
-        landing = find_teleport_landing_tile(terrain, container["x"], container["y"])
+        landing = find_attainable_landing_tile(
+            terrain, ctx.world["mines"], container["x"], container["y"]
+        )
         if landing is None:
             # Water-locked container: a fresh believed ferry near it is
             # the boarding-tile landing — teleport to the ferry, then
