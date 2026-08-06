@@ -8,7 +8,11 @@ source_paths:
   - "src/tankpit_bot/service"
   - "src/tankpit_bot/bot/config.py"
   - "src/tankpit_bot/browser/live_view.py"
-fact_checked: "2026-07-29"
+source_git_blobs:
+  "src/tankpit_bot/service": "bfceaca35cfa2cf3b5ae83fc578638c869825709"
+  "src/tankpit_bot/bot/config.py": "a81fafe6dda99fc36d1af0e2af7777b574523bbc"
+  "src/tankpit_bot/browser/live_view.py": "3fa929e9df72efd53f42d3c3405a469067b66f26"
+fact_checked: "2026-08-06"
 confidence: medium
 hubs: [architecture]
 ---

@@ -10,7 +10,10 @@ source_paths:
   - "runs/bot/bot-20260729-232252.events.jsonl"
   - "src/tankpit_bot/bot/ai/resource_search.py"
   - "src/tankpit_bot/state/scan_coverage.py"
-fact_checked: "2026-07-31"
+source_git_blobs:
+  "src/tankpit_bot/bot/ai/resource_search.py": "0ccd69aaad2608585028649ff3da1c3f4f0c86e5"
+  "src/tankpit_bot/state/scan_coverage.py": "06c0ae372146a32a3bc5e5e5a4cd300277ebdac6"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [architecture, combat]
 ---
