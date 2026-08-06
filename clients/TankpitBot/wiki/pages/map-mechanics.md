@@ -40,7 +40,7 @@ Map blob provides positions at the moment it's opened. Enemy positions go stale 
 
 MAP_DATA is server-cached — byte-identical across all map opens in one session even while containers are consumed. Drifts a few dots between sessions. Treat as atlas, not live feed.[^4]
 
-[^1]: discovery probe 2026-06-12 — tested open, close, toggle; CDP keypress is the only close mechanism; commit history documents probe
-[^2]: discovery probe 2026-06-12 — bytes 0x6d, 0x6e, 0x6f sent; no effect on map_visible
+[^1]: Discovery probe of 2026-06-12; captures under `runs/bot/bot-20260612-*.capture_session.json` (9 sessions carry that date, counted 2026-08-06). Tested open, close and toggle; a CDP keypress was the only mechanism that closed the map. The state this drove is `snapshot["map_visible"]`, read by the executor's teleport short-circuit at `src/tankpit_bot/bot/executor.py:298`.
+[^2]: Same 2026-06-12 probe session set. Bytes `0x6d`/`0x6e`/`0x6f` (ASCII `m`/`n`/`o`) were sent and none moved `map_visible`. Note these are NOT the map command: opening the map is `CMD_MAP_OPEN = 108` (`0x6c`), bound in `src/tankpit_bot/protocol/commands.py` and machine-checked by the claim block on [[client-commands]] — the three bytes probed here are the ones immediately after it, which is why they were tried.
 [^3]: user (Austin), 2026-04-20 — "map blob only provides positions at the moment it's opened"
-[^4]: 15 runs 2026-06-11 — MAP_DATA bytes identical across 32 map opens in 240s session
+[^4]: Sessions of 2026-06-11 under `runs/bot/bot-20260611-*.capture_session.json` — MAP_DATA bytes identical across 32 map opens within one 240 s session. **Re-counted 2026-08-06: 22 capture sessions carry that date, not the 15 stated here**; the original subset was not recorded. [[map-data-decode]] [^2] carries the same figure and the same correction.
