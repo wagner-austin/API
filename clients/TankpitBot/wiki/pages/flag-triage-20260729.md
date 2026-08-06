@@ -502,6 +502,23 @@ readiness).[^5]
 Update this table as fixes land; close a row only with a live-run or
 sim receipt cited next to it.[^1]
 
+> **OPEN DEFECT — colliding footnote labels (found 2026-08-06).** This
+> page carries TWO complete footnote blocks, both numbered `[^1]`-`[^5]`:
+> one immediately below (session-1 flag detail) and a second at the end
+> of the page (run provenance, flag counts, code paths, user rulings).
+> Markdown renderers bind a reference to the FIRST matching definition;
+> the wiki-check extractor keeps the LAST. So the same marker resolves
+> to different text depending on the tool, and 94 body references are
+> affected — `[^1]` alone appears 75 times, 19 before this block and 56
+> after, so the two sets are interleaved rather than cleanly split.
+>
+> This is NOT safe to renumber mechanically: which definition a given
+> reference intended cannot be recovered from position, and guessing
+> would silently rebind citations. It needs whoever wrote the second
+> block to say which markers belong to it. Both blocks are individually
+> accurate — every claim in each was checked 2026-08-06 — the defect is
+> purely that they share labels.
+
 [^1]: flag rings in `bot-20260729-232252.events.jsonl`: flag 1 tick
     49 (hop (14,81)→(7,93), acquire red-9 →(3,105)); flag 2 tick 106
     ((49,35)→(70,20)→(48,43)); flag 6 tick 230 ((92,58)→(72,79)→(21,77)).
@@ -1258,4 +1275,4 @@ under F20 is superseded by these landed pins.[^1]
 [^2]: `runs/bot/bot-20260729-232252.events.jsonl` — `grep -c '"human_flag"'` returns **13**, and the distinct `flag_seq` values are exactly 1–13 (verified 2026-07-31). This page's title and opening line said 10; the body's own references to "old-session flags 12–13" are consistent with 13.
 [^3]: `runs/bot/bot-20260730-004144.events.jsonl` — its 16 `human_flag` events sit at 00:42:27, 00:43:28, 00:44:22, 00:46:01, 00:46:39, 00:47:44, 00:49:06, 00:50:14, 00:51:40, 00:52:06, 00:53:03, 00:57:08, 00:59:05, 01:00:56, 01:03:58, 01:05:41. Every flag narrated under the non-existent `bot-20260730-004114` heading matches one of these to within ~5 s, so both session-3 sections cover this single run. Verified 2026-07-31.
 [^4]: Code paths for the fixes and directions proposed on this page: `src/tankpit_bot/bot/ai/resource_search.py` and `src/tankpit_bot/state/scan_coverage.py` (both declared in this page's `source_paths`), plus `src/tankpit_bot/bot/ai/intent.py` for the plan-release channel described in [[committed-intent]]. Present as of 2026-07-31; the *proposals* here are directions, not landed code, except where a paragraph says FIXED.
-[^5]: **User ruling, quoted verbatim from the live session.** Austin's narration during or immediately after the run being triaged. There is no artifact outside this page — the rulings were given in chat and are recorded here because they are the authority for the behaviour change, not because they were independently logged.
+[^5]: **User ruling, quoted verbatim from the live session** — Austin's narration during or immediately after the run being triaged. The rulings themselves were given in chat and have no transcript in the repo; they are recorded here because they are the authority for the behaviour change, not because they were independently logged. What IS on disk is the run each ruling narrates, and every flag a ruling responds to is timestamped in it: `runs/bot/bot-20260729-232252.events.jsonl` (13 `human_flag` events, `flag_seq` 1-13) and `runs/bot/bot-20260730-004144.events.jsonl` (16), both re-counted 2026-08-06. So a ruling's OCCASION is verifiable to the second even though its wording is not.

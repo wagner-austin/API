@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/terrain.py"
   - "tpclient.js"
 source_git_blobs:
-  "src/tankpit_bot/terrain.py": "38871a35766c9d5bb8f491a46786db2526d474fc"
+  "src/tankpit_bot/terrain.py": "ba99f673e65e33e17bb0cd81eacb8165a676d066"
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
 fact_checked: "2026-08-06"
 confidence: high
@@ -70,6 +70,18 @@ question ([[walk-mechanics]], [[flag-triage-20260729]] F6):
 |---|---|---|
 | `is_passable` | Can the tank WALK onto this tile? | terrain, blocks, mines, tank bodies |
 | `is_landing_legal` | May the server PLACE the tank here? | terrain, blocks only |
+| `is_landing_attainable` | Will a teleport aimed here actually STAND here? | terrain, blocks, team-scoped hostile mines |
+
+**Three questions as of 2026-08-06**, not two. `is_landing_attainable`
+(`bot/ai/ferry.py:187`, composed-view override at `:324`) is landing
+legality intersected with the composed view's TEAM-SCOPED hostile-mine
+set — the same set the walk side consumes, built once per tick from the
+self model's team. Own-colour mines never displace a landing and are
+absent from that set by construction ([[mine-mechanics]] § team scope;
+archive 2026-08-06 measured 1,227 enemy against 2 friendly). The
+distinction from `is_landing_legal` is aim versus outcome: a teleport at
+an enemy-mined tile is still *legal* to dispatch and is not refused, but
+it will not leave the tank on that tile.
 
 The split exists because a teleport aimed at a mined or occupied tile
 is **not refused** — the server displaces the landing to an adjacent
