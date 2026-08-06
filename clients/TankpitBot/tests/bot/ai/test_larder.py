@@ -358,6 +358,41 @@ def test_water_locked_fuel_is_ferry_served() -> None:
     assert selection["no_landing"] == 0
 
 
+def test_ferry_on_a_disjoint_pond_stays_no_landing() -> None:
+    """A ferry on a separate water body cannot serve the container.
+
+    Live deadlocks 2026-08-04/05 (runs bot-20260804-234008 and
+    bot-20260805-070006): a ferry docked on a pool one land ridge
+    away from the container's pond was served as the boarding tile
+    purely on distance; the ride could never reach the pickup, and
+    the hop + lock + one-step-disembark contract cycled for minutes.
+    A land column at x=127 splits the lake: ferry on the far side,
+    container on the near side — the ride does not exist, so the
+    candidate is ``no_landing``.
+    """
+    containers = {
+        "125,100": make_container(125, 100, 800, is_fuel=True),
+    }
+    terrain_data: dict[tuple[int, int], str] = {}
+    for x in range(115, 135):
+        for y in range(90, 110):
+            terrain_data[(x, y)] = "W"
+    for y in range(90, 110):
+        terrain_data[(127, y)] = InMemoryTerrainMap.GROUND
+    ctx = _ctx(
+        fuel=_fuel_at_deficit(600),
+        containers=containers,
+        terrain=InMemoryTerrainMap(terrain_data=terrain_data),
+    )
+    ctx.world["terrain"]["129,101"] = _ferry_tile(129, 101, observed_ms=100000)
+
+    selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
+
+    assert selection["container"] is None
+    assert selection["no_landing"] == 1
+    assert selection["ferry_served"] == 0
+
+
 def test_stale_ferry_belief_stays_no_landing() -> None:
     """A ferry sighted beyond the belief TTL is not a boarding target."""
     containers = {

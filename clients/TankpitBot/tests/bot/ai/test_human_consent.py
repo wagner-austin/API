@@ -165,7 +165,7 @@ class TestGreetingLandingTile:
         target = make_enemy_threat_from_tank(world["tanks"]["1229"], 10)
         terrain = InMemoryTerrainMap()
 
-        landing = choose_greeting_landing_tile(world, self_state, target, terrain)
+        landing = choose_greeting_landing_tile(world, self_state, target, terrain, 100000)
 
         if landing is None:
             raise AssertionError("open terrain must yield a greeting landing")
@@ -179,7 +179,7 @@ class TestGreetingLandingTile:
         world, self_state = _human_world()
         target = make_enemy_threat_from_tank(world["tanks"]["1229"], 10)
 
-        assert choose_greeting_landing_tile(world, self_state, target, None) is None
+        assert choose_greeting_landing_tile(world, self_state, target, None, 100000) is None
 
     def test_never_falls_back_inside_the_band(self) -> None:
         """With only near tiles passable the chooser declines entirely."""
@@ -193,7 +193,7 @@ class TestGreetingLandingTile:
         }
         terrain = InMemoryTerrainMap.from_passable_set(near_only)
 
-        assert choose_greeting_landing_tile(world, self_state, target, terrain) is None
+        assert choose_greeting_landing_tile(world, self_state, target, terrain, 100000) is None
 
 
 class TestConsentEdgeCoverage:
@@ -223,7 +223,7 @@ class TestConsentEdgeCoverage:
         target = make_enemy_threat_from_tank(world["tanks"]["1229"], 10)
         terrain = InMemoryTerrainMap()
 
-        landing = choose_greeting_landing_tile(world, self_state, target, terrain)
+        landing = choose_greeting_landing_tile(world, self_state, target, terrain, 100000)
 
         if landing is None:
             raise AssertionError("corner human must still get a greeting landing")
@@ -242,12 +242,15 @@ class TestConsentEdgeCoverage:
             name="red-60",
             is_bot=True,
             is_self=False,
+            # A blocking body must be viewport-fresh under the
+            # occupancy law -- a stale entry no longer vetoes.
+            last_viewport_observation_ms=100000,
         )
         world["tanks"]["60"] = blocker
         target = make_enemy_threat_from_tank(world["tanks"]["1229"], 10)
         terrain = InMemoryTerrainMap()
 
-        landing = choose_greeting_landing_tile(world, self_state, target, terrain)
+        landing = choose_greeting_landing_tile(world, self_state, target, terrain, 100000)
 
         if landing is None:
             raise AssertionError("an occupied band tile must not kill the landing")

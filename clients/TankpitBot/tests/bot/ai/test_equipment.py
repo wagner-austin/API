@@ -99,6 +99,7 @@ class TestIsReachable:
             {},
             riding=False,
             hostile_mine_keys=frozenset(f"12,{y}" for y in range(256)),
+            occupied_tank_keys=frozenset(),
         )
         assert is_reachable(terrain, 10, 10, 15, 10) is False
 

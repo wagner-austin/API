@@ -19,6 +19,8 @@ from tankpit_bot.state.types import (
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
+_NOW_MS = 1_000_000
+
 
 class TestWalkOrTeleport:
     """Tests for public movement planning behavior."""
@@ -143,6 +145,9 @@ class TestWalkOrTeleport:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                # A blocking body must be viewport-fresh under the
+                # occupancy law -- a stale entry no longer vetoes.
+                last_viewport_observation_ms=100000,
             ),
         }
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
@@ -206,6 +211,9 @@ class TestWalkOrTeleport:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                # A blocking body must be viewport-fresh under the
+                # occupancy law -- a stale entry no longer vetoes.
+                last_viewport_observation_ms=100000,
             ),
         }
         terrain = InMemoryTerrainMap()
@@ -245,6 +253,9 @@ class TestWalkOrTeleport:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                # A blocking body must be viewport-fresh under the
+                # occupancy law -- a stale entry no longer vetoes.
+                last_viewport_observation_ms=100000,
             ),
         }
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, None, "")
@@ -359,6 +370,9 @@ class TestWalkOrTeleport:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                # A blocking body must be viewport-fresh under the
+                # occupancy law -- a stale entry no longer vetoes.
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
@@ -410,6 +424,9 @@ class TestWalkOrTeleport:
                 is_bot=False,
                 damage_state=0,
                 timestamp_ms=100000,
+                # A blocking body must be viewport-fresh under the
+                # occupancy law -- a stale entry no longer vetoes.
+                last_viewport_observation_ms=100000,
             ),
         }
         world, self_state = make_world(self_x=100, self_y=100, fuel=150, tanks=tanks)
@@ -629,7 +646,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static)
+        terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
@@ -663,7 +680,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static)
+        terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
@@ -696,7 +713,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static)
+        terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
@@ -728,7 +745,7 @@ class TestPickupSurfaceRouting:
         )
         ai_state = make_scanned_ai_state()
         inventory = make_inventory()
-        terrain = compose_decision_terrain(world, static)
+        terrain = compose_decision_terrain(world, static, _NOW_MS)
         if terrain is None:
             raise AssertionError("composed terrain unexpectedly None")
         ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")

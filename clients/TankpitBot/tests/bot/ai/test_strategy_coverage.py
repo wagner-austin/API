@@ -152,13 +152,19 @@ class TestLockedEquipmentTarget:
         bot-20260730-032x ticks 361/366/371): transient
         inexecutability is not invalidity. The continuation yields
         the tick to the rest of the cascade but KEEPS the plan — a
-        ferry or a better approach can serve it later, and only the
-        server-confirmed move-failed mark releases it.
+        ferry or a better approach can serve it later, and only a
+        structural verdict (the move-failed mark, unservability)
+        releases it. A fresh ferry floats ON the target's pond so the
+        ride lane keeps the target servable and the hold genuinely
+        transient.
         """
+        from tankpit_bot.state.types import make_terrain_tile
+        from tankpit_bot.state.types.constants import TERRAIN_FERRY
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 0, False)}
         world, self_state = _make_world(containers=containers, fuel=800)
+        world["terrain"]["104,105"] = make_terrain_tile(104, 105, TERRAIN_FERRY, observed_ms=100000)
         terrain_data: dict[tuple[int, int], str] = {
             (105, 105): "W",
             (104, 105): "W",
@@ -304,10 +310,13 @@ class TestLockedFuelTarget:
         """
         from tankpit_bot.bot.ai.collect_locks import continue_or_release_fuel_lock
         from tankpit_bot.bot.ai.context import DecideCtx
+        from tankpit_bot.state.types import make_terrain_tile
+        from tankpit_bot.state.types.constants import TERRAIN_FERRY
         from tests.in_memory_terrain_map import InMemoryTerrainMap
 
         containers = {"105,105": _c(105, 105, 700, True)}
         world, self_state = _make_world(fuel=800, containers=containers)
+        world["terrain"]["104,105"] = make_terrain_tile(104, 105, TERRAIN_FERRY, observed_ms=100000)
         terrain_data: dict[tuple[int, int], str] = {
             (105, 105): "W",
             (104, 105): "W",

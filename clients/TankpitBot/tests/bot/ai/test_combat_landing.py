@@ -56,6 +56,9 @@ def test_combat_landing_candidates_orders_by_distance_and_filters_dynamic_tiles(
         name="occupier",
         is_bot=False,
         is_self=False,
+        # A blocking body must be viewport-fresh under the occupancy
+        # law -- a stale entry no longer vetoes a landing candidate.
+        last_viewport_observation_ms=100000,
     )
     world["containers"]["104,101"] = make_container_state(
         x=104,
@@ -115,13 +118,13 @@ def test_choose_combat_landing_tile_returns_target_coords_with_terrain() -> None
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
 
 
 def test_choose_combat_landing_tile_returns_target_coords_without_terrain() -> None:
     world, self_state, target = _world()
 
-    assert choose_combat_landing_tile(world, self_state, target, None) == (104, 100)
+    assert choose_combat_landing_tile(world, self_state, target, None, 100000) == (104, 100)
 
 
 def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() -> None:
@@ -136,7 +139,7 @@ def test_choose_combat_landing_tile_returns_target_when_adjacent_impassable() ->
         }
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
 
 
 def test_choose_combat_landing_tile_standoff_when_target_tile_impassable() -> None:
@@ -151,7 +154,7 @@ def test_choose_combat_landing_tile_standoff_when_target_tile_impassable() -> No
     water = {(x, y): InMemoryTerrainMap.WATER for x in range(102, 108) for y in range(97, 104)}
     terrain = InMemoryTerrainMap(water)
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (101, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (101, 100)
 
 
 def test_choose_combat_landing_tile_standoff_skips_occupied_and_prefers_self() -> None:
@@ -169,9 +172,12 @@ def test_choose_combat_landing_tile_standoff_skips_occupied_and_prefers_self() -
         name="occupier",
         is_bot=False,
         is_self=False,
+        # A blocking body must be viewport-fresh under the occupancy
+        # law -- a stale entry no longer vetoes a landing candidate.
+        last_viewport_observation_ms=100000,
     )
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (100, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (100, 100)
 
 
 def test_choose_combat_landing_tile_returns_target_when_no_standoff_exists() -> None:
@@ -179,7 +185,7 @@ def test_choose_combat_landing_tile_returns_target_when_no_standoff_exists() -> 
     world, self_state, target = _world()
     terrain = InMemoryTerrainMap.from_passable_set(set())
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (104, 100)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (104, 100)
 
 
 def test_choose_combat_landing_tile_standoff_clips_map_bounds() -> None:
@@ -208,7 +214,7 @@ def test_choose_combat_landing_tile_standoff_clips_map_bounds() -> None:
     )
     terrain = InMemoryTerrainMap.from_passable_set({(2, 0)})
 
-    assert choose_combat_landing_tile(world, self_state, target, terrain) == (2, 0)
+    assert choose_combat_landing_tile(world, self_state, target, terrain, 100000) == (2, 0)
 
 
 def test_has_cardinal_enemy_adjacency_matches_exact_distance_one() -> None:

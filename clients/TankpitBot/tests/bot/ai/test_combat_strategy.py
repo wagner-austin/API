@@ -1232,7 +1232,7 @@ class TestFindCombatPickup:
         assert result["cmd_type"] == "pickup_fuel"
 
     def test_finds_adjacent_equipment(self) -> None:
-        """Returns equipment pickup when equipment is adjacent."""
+        """Returns equipment pickup when adjacent and a slot is deficient."""
         from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
         from tankpit_bot.state import make_container_state
 
@@ -1254,7 +1254,7 @@ class TestFindCombatPickup:
             world,
             self_state,
             make_scanned_ai_state(),
-            make_inventory(),
+            make_inventory(default_count=10),
             100000,
             None,
             "",
@@ -1264,6 +1264,76 @@ class TestFindCombatPickup:
         if result is None:
             raise AssertionError("expected a pickup command")
         assert result["cmd_type"] == "pickup_equipment"
+
+    def test_full_tank_skips_adjacent_fuel(self) -> None:
+        """At rank fuel capacity the only adjacent container is fuel:
+        the sip is a predicted code-5 refusal (physics/supervisor.py)
+        and the scanner declines it — the 48-refusal shape of the
+        20-kill soak. One fuel of headroom flips it back to a sip."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+        from tankpit_bot.bot.types import BotCommand
+        from tankpit_bot.physics.capacity import fuel_capacity
+        from tankpit_bot.state import make_container_state
+
+        def scan(fuel: int) -> BotCommand | None:
+            world, self_state = make_world(
+                self_x=100,
+                self_y=100,
+                fuel=fuel,
+                containers={
+                    "101,100": make_container_state(
+                        x=101, y=100, is_fuel=True, volume=508, timestamp_ms=100000
+                    ),
+                },
+            )
+            ctx = DecideCtx(
+                world,
+                self_state,
+                make_scanned_ai_state(),
+                make_inventory(),
+                100000,
+                None,
+                "",
+            )
+            return _find_combat_pickup(ctx)
+
+        _, self_state = make_world()
+        cap = fuel_capacity(self_state["rank"])
+        assert scan(cap) is None
+        headroom = scan(cap - 1)
+        if headroom is None:
+            raise AssertionError("one fuel of headroom must allow the sip")
+        assert headroom["cmd_type"] == "pickup_fuel"
+
+    def test_full_inventory_skips_adjacent_equipment(self) -> None:
+        """All five slots at the rank cap: the grab is a predicted
+        code-7 refusal and the scanner declines it."""
+        from tankpit_bot.bot.ai.combat_strategy import _find_combat_pickup
+        from tankpit_bot.physics.capacity import inventory_capacity
+        from tankpit_bot.state import make_container_state
+
+        world, self_state = make_world(
+            self_x=100,
+            self_y=100,
+            fuel=800,
+            containers={
+                "101,100": make_container_state(
+                    x=101, y=100, is_fuel=False, volume=0, timestamp_ms=100000
+                ),
+            },
+        )
+        cap = inventory_capacity(self_state["rank"])
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(dual_count=cap, default_count=cap),
+            100000,
+            None,
+            "",
+        )
+
+        assert _find_combat_pickup(ctx) is None
 
     def test_returns_none_when_no_adjacent(self) -> None:
         """Returns None when nothing is adjacent."""
@@ -1514,6 +1584,90 @@ class TestBeyondRefuelReachRelay:
         assert result["command"]["target_x"] == 60
         assert result["command"]["target_y"] == 150
         assert result["updated_ai_state"]["combat_target_id"] == 50
+
+    def test_neighbor_dot_never_beats_the_progress_dot(self) -> None:
+        """The live 2026-08-04 ping-pong, pinned.
+
+        Run bot-20260804-230342 23:24-23:29: a locked target 98 tiles
+        out, and the relay branch (then wired to the COLLECT
+        dot-ranker) teleported between two ADJACENT dots at one hop
+        per 2 ticks forever -- the /cost denominator made the dot
+        under the tank's feet unbeatable. The relay lane must pick
+        the strict-progress dot even when a neighbor dot is
+        thousands of times cheaper.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=1,
+                y=193,
+                team=2,
+                rank=1,
+                name="red-50",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1195, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ((101, 100), (60, 150)),
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
+
+        if result is None:
+            raise AssertionError("expected a relay decision")
+        assert result["behavior"]["reason_kind"] == "dot_relay"
+        assert result["command"]["cmd_type"] == "teleport"
+        assert result["command"]["target_x"] == 60
+        assert result["command"]["target_y"] == 150
+
+    def test_no_progress_dot_at_cap_blocks_the_unreachable_target(self) -> None:
+        """With no strict-progress dot and fuel at capacity, the relay
+        cannot help and refueling cannot help: the target is blocked
+        so the next pass finds closer prey instead of treadmilling.
+        """
+        tanks: dict[str, TankStateDict] = {
+            "50": make_tank_state(
+                tank_id=50,
+                x=1,
+                y=193,
+                team=2,
+                rank=1,
+                name="red-50",
+                is_self=False,
+                is_bot=True,
+                damage_state=0,
+                timestamp_ms=100000,
+            ),
+        }
+        world, self_state = make_world(fuel=1195, tanks=tanks)
+        ctx = DecideCtx(
+            world,
+            self_state,
+            make_scanned_ai_state(),
+            make_inventory(),
+            100000,
+            None,
+            "",
+            ((101, 100),),
+        )
+
+        result = teleport_to_target(ctx, _enemy_threat(x=1, y=193, name="red-50", tank_id=50))
+
+        if result is None:
+            raise AssertionError("expected a block-and-replan decision")
+        assert result["behavior"]["reason_kind"] != "dot_relay"
+        assert "50" in result["updated_ai_state"]["blocked_combat_targets"]
 
     def test_beyond_reach_with_no_usable_dot_falls_back_to_refuel(self) -> None:
         """When no relay leg exists the beyond-reach chase still refuels.

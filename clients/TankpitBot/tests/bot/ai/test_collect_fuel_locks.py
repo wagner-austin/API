@@ -124,7 +124,10 @@ def test_locked_fuel_holds_when_water_locked() -> None:
     Committed-intent law ([[committed-intent]]): transient
     inexecutability holds the plan â€” the tick goes to the rest of
     the cascade, and only a genuine release gate (superior
-    candidate, validity, the move-failed mark) drops it.
+    candidate, validity, the move-failed mark, unservability) drops
+    it. The fixture keeps a fresh ferry ON the container's pond so
+    the target stays SERVABLE (the ride lane exists) and the hold is
+    genuinely transient.
     """
     terrain_data: dict[tuple[int, int], str] = {}
     for x in range(92, 108):
@@ -163,6 +166,11 @@ def test_locked_fuel_holds_when_water_locked() -> None:
             "resource_target_y": 100,
         }
     )
+    from tankpit_bot.state.types import make_terrain_tile
+    from tankpit_bot.state.types.constants import TERRAIN_FERRY
+
+    world["terrain"]["121,101"] = make_terrain_tile(121, 101, TERRAIN_FERRY, observed_ms=100000)
+    terrain_data[(121, 101)] = "W"
     inventory = make_inventory()
     inventory["extra_radars"]["count"] = 0
     ctx = DecideCtx(world, self_state, ai_state, inventory, 100000, terrain, "")
@@ -173,6 +181,159 @@ def test_locked_fuel_holds_when_water_locked() -> None:
         raise AssertionError("expected collect decision")
     assert decision["behavior"]["reason_kind"] != "fuel_locked"
     assert decision["updated_ai_state"]["resource_target_kind"] == "fuel"
+
+
+def test_inexecutable_lock_without_terrain_holds() -> None:
+    """No terrain map means no unservability verdict: the lock holds.
+
+    Without the static map the pond and landing questions cannot be
+    answered, so the structural release must not guess — transient
+    hold, per the committed-intent law. The locked target sits
+    outside the visible viewport, so the pickup path yields no
+    command this tick.
+    """
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=400,
+        scanned=True,
+        containers={
+            "130,100": make_container_state(
+                x=130,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "resource_target_kind": "fuel",
+            "resource_target_x": 130,
+            "resource_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, None, "")
+
+    decision, held_state = continue_or_release_fuel_lock(
+        ctx, ai_state, world["containers"]["130,100"]
+    )
+
+    assert decision is None
+    assert held_state["resource_target_kind"] == "fuel"
+
+
+def test_unservable_water_locked_fuel_releases_the_lock() -> None:
+    """No landing, no ferry on the pond: the lock releases as unservable.
+
+    Run bot-20260804-234008 (2026-08-05 00:04) held exactly this lock
+    for 11 minutes: a water-boxed container with the only known ferry
+    floating on a DIFFERENT water body. No lane -- walk, hop, or ride
+    -- could ever serve it, and no move-failed mark could ever arrive
+    because nothing was ever dispatched. The enumerated release law
+    now carries the structural verdict the selectors already compute.
+    """
+    terrain_data: dict[tuple[int, int], str] = {
+        (120, 100): "W",
+        (121, 100): "W",
+        (119, 100): "W",
+        (120, 101): "W",
+        (120, 99): "W",
+    }
+    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=150,
+        scanned=True,
+        containers={
+            "120,100": make_container_state(
+                x=120,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 120,
+            "resource_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+
+    decision, released_state = continue_or_release_fuel_lock(
+        ctx, ai_state, world["containers"]["120,100"]
+    )
+
+    assert decision is None
+    assert released_state["resource_target_kind"] == ""
+
+
+def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:
+    """A lock outside the command window HOLDS -- it must not decide.
+
+    Run bot-20260805-075502 07:57 proved the law by breaking it: an
+    "approach the window edge" leg inserted here returned a decision
+    every tick, short-circuited the cascade, and starved the
+    already-planned equipment-hop teleport into a one-tile-walk
+    treadmill (autoscroll OFF walking can never shift the window,
+    [[viewport-shift-protocol]]). The hold returns no decision so the
+    cascade falls through to the hop lane, whose teleport recenters
+    the window on the target.
+    """
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=400,
+        scanned=True,
+        containers={
+            "130,100": make_container_state(
+                x=130,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 130,
+            "resource_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(
+        world,
+        self_state,
+        ai_state,
+        make_inventory(),
+        100000,
+        InMemoryTerrainMap(),
+        "",
+    )
+
+    decision, held_state = continue_or_release_fuel_lock(
+        ctx, ai_state, world["containers"]["130,100"]
+    )
+
+    assert decision is None
+    assert held_state["resource_target_kind"] == "fuel"
+    assert held_state["resource_target_x"] == 130
 
 
 def test_select_fuel_returns_none_at_rank_derived_capacity() -> None:

@@ -13,12 +13,16 @@ from tankpit_bot.bot.ai.ferry import (
 from tankpit_bot.state.types import (
     TERRAIN_FERRY,
     TERRAIN_GROUND,
+    VIEWPORT_PRESENCE_TTL_MS,
     TerrainTileDict,
     make_mine_state,
+    make_tank_state,
     make_terrain_tile,
 )
 from tests.bot.ai._support import make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+_NOW_MS = 1_000_000
 
 
 def _ferry_tile(x: int, y: int) -> dict[str, TerrainTileDict]:
@@ -47,7 +51,9 @@ class TestFerryAwareTerrain:
         """A live ferry tile renders and passes over static water."""
         base = InMemoryTerrainMap({(100, 100): "W"})
         wire = _ferry_tile(100, 100)
-        terrain = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+        terrain = FerryAwareTerrain(
+            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
 
         assert terrain.get_terrain(100, 100) == "~"
         assert terrain.is_passable(100, 100) is True
@@ -56,8 +62,12 @@ class TestFerryAwareTerrain:
         """Open water flips passable exactly with the riding flag."""
         base = InMemoryTerrainMap({(101, 100): "W"})
 
-        riding = FerryAwareTerrain(base, {}, riding=True, hostile_mine_keys=frozenset())
-        parked = FerryAwareTerrain(base, {}, riding=False, hostile_mine_keys=frozenset())
+        riding = FerryAwareTerrain(
+            base, {}, riding=True, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
+        parked = FerryAwareTerrain(
+            base, {}, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
         assert riding.is_passable(101, 100) is True
         assert parked.is_passable(101, 100) is False
 
@@ -66,7 +76,13 @@ class TestFerryAwareTerrain:
         base = InMemoryTerrainMap({(102, 100): "#"})
 
         for riding in (False, True):
-            terrain = FerryAwareTerrain(base, {}, riding=riding, hostile_mine_keys=frozenset())
+            terrain = FerryAwareTerrain(
+                base,
+                {},
+                riding=riding,
+                hostile_mine_keys=frozenset(),
+                occupied_tank_keys=frozenset(),
+            )
             assert terrain.is_passable(100, 100) is True
             assert terrain.is_passable(102, 100) is False
 
@@ -74,7 +90,11 @@ class TestFerryAwareTerrain:
         """The rendered grid carries the ferry overlay."""
         base = InMemoryTerrainMap({(100, 100): "W"})
         terrain = FerryAwareTerrain(
-            base, _ferry_tile(100, 100), riding=True, hostile_mine_keys=frozenset()
+            base,
+            _ferry_tile(100, 100),
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
 
         grid = terrain.render_viewport(100, 100, width=3, height=3)
@@ -105,7 +125,9 @@ class TestFerryAwareTerrain:
             "102,100": make_terrain_tile(x=102, y=100, terrain_type=TERRAIN_BLOCK_LAND),
             "103,100": make_terrain_tile(x=103, y=100, terrain_type=TERRAIN_BLOCK_STACKED),
         }
-        terrain = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+        terrain = FerryAwareTerrain(
+            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
 
         assert terrain.get_terrain(101, 100) == "."  # bridge = ground class
         assert terrain.is_passable(101, 100) is True  # walkable, not riding
@@ -128,7 +150,9 @@ class TestFerryAwareTerrain:
 
         base = InMemoryTerrainMap({(101, 100): "W"})
         wire = {"101,100": make_terrain_tile(x=101, y=100, terrain_type=TERRAIN_BLOCK_BRIDGE)}
-        view = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+        view = FerryAwareTerrain(
+            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
 
         assert SurfaceRouteTerrain(view, water=False).is_passable(101, 100) is True
 
@@ -143,7 +167,9 @@ class TestFerryAwareTerrain:
         base = InMemoryTerrainMap({(101, 100): "W"})
         mines = frozenset({"100,100", "101,100", "102,100"})
         wire = _ferry_tile(102, 100)
-        terrain = FerryAwareTerrain(base, wire, riding=True, hostile_mine_keys=mines)
+        terrain = FerryAwareTerrain(
+            base, wire, riding=True, hostile_mine_keys=mines, occupied_tank_keys=frozenset()
+        )
 
         assert terrain.is_passable(100, 100) is False  # mined ground
         assert terrain.is_passable(101, 100) is False  # mined water (even riding)
@@ -185,7 +211,7 @@ class TestRidingAndComposition:
         """Without a static map there is nothing to compose."""
         world, _self_state = make_world()
 
-        assert compose_decision_terrain(world, None) is None
+        assert compose_decision_terrain(world, None, _NOW_MS) is None
 
     def test_compose_builds_riding_view(self) -> None:
         """Composition carries the riding flag into water passability."""
@@ -193,7 +219,7 @@ class TestRidingAndComposition:
         world["terrain"].update(_ferry_tile(100, 100))
         base = InMemoryTerrainMap({(101, 100): "W"})
 
-        composed = compose_decision_terrain(world, base)
+        composed = compose_decision_terrain(world, base, _NOW_MS)
         if composed is None:
             pytest.fail("expected composed terrain from ferry + base map")
 
@@ -211,12 +237,118 @@ class TestRidingAndComposition:
         world["mines"]["103,100"] = make_mine_state(103, 100, 0, -1, 3, source="radar")
         world["mines"]["104,100"] = make_mine_state(104, 100, 0, -1, 1, source="radar")
 
-        composed = compose_decision_terrain(world, InMemoryTerrainMap())
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
         if composed is None:
             pytest.fail("expected composed terrain from mines + base map")
 
         assert composed.is_passable(103, 100) is False  # hostile (team 3 vs self 1)
         assert composed.is_passable(104, 100) is True  # friendly (same team)
+
+    def test_compose_folds_tank_bodies_of_every_team(self) -> None:
+        """A tank body blocks its tile whether ally or enemy.
+
+        Regression guard for [[flag-triage-20260729]] F6: the composed
+        view answered "open" for tiles holding another tank, the bot
+        dispatched walks through them, and the server walked the tank
+        to the body, stopped, and returned ``error_code=1`` (ten stops
+        in run bot-20260803-180918).
+        """
+        ally = make_tank_state(
+            tank_id=2,
+            x=103,
+            y=100,
+            team=1,
+            rank=1,
+            damage_state=3,
+            name="purple-2",
+            is_bot=True,
+            is_self=False,
+            last_viewport_observation_ms=_NOW_MS,
+        )
+        enemy = make_tank_state(
+            tank_id=3,
+            x=104,
+            y=100,
+            team=3,
+            rank=1,
+            damage_state=3,
+            name="orange-3",
+            is_bot=True,
+            is_self=False,
+            last_viewport_observation_ms=_NOW_MS,
+        )
+        world, _self_state = make_world(self_x=100, self_y=100, tanks={"2": ally, "3": enemy})
+
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
+        if composed is None:
+            pytest.fail("expected composed terrain from tanks + base map")
+
+        assert composed.is_passable(103, 100) is False
+        assert composed.is_passable(104, 100) is False
+        assert composed.is_passable(105, 100) is True
+
+    def test_landing_legality_ignores_mines_and_bodies(self) -> None:
+        """A teleport may be aimed where a walk may not go.
+
+        The server displaces a landing off mines and off occupied
+        tiles rather than refusing it, so both blockers belong to the
+        walk question alone. Conflating them made every approach
+        teleport at an enemy impossible -- an enemy always occupies
+        its own tile.
+        """
+        terrain = FerryAwareTerrain(
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"100,100"}),
+            occupied_tank_keys=frozenset({"101,100"}),
+        )
+
+        assert terrain.is_passable(100, 100) is False
+        assert terrain.is_landing_legal(100, 100) is True
+        assert terrain.is_passable(101, 100) is False
+        assert terrain.is_landing_legal(101, 100) is True
+
+    def test_landing_legality_still_refuses_illegal_terrain(self) -> None:
+        """Terrain legality is the one thing a landing does respect."""
+        base = InMemoryTerrainMap({(102, 100): "#", (103, 100): "W"})
+        terrain = FerryAwareTerrain(
+            base,
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+        )
+
+        assert terrain.is_landing_legal(102, 100) is False
+        assert terrain.is_landing_legal(103, 100) is False
+
+    def test_compose_ages_stale_tank_bodies_out_of_the_view(self) -> None:
+        """A tank last seen past the presence TTL stops blocking.
+
+        Without the age-out, the registry's global roster (refreshed
+        for every tank on the map by 0x4C MapData) would wall off tiles
+        the bot cannot even see.
+        """
+        stale = make_tank_state(
+            tank_id=4,
+            x=103,
+            y=100,
+            team=3,
+            rank=1,
+            damage_state=3,
+            name="orange-4",
+            is_bot=True,
+            is_self=False,
+            last_viewport_observation_ms=_NOW_MS - VIEWPORT_PRESENCE_TTL_MS - 1,
+        )
+        world, _self_state = make_world(self_x=100, self_y=100, tanks={"4": stale})
+
+        composed = compose_decision_terrain(world, InMemoryTerrainMap(), _NOW_MS)
+        if composed is None:
+            pytest.fail("expected composed terrain from tanks + base map")
+
+        assert composed.is_passable(103, 100) is True
 
 
 class TestSurfaceTransitionClamp:
@@ -227,7 +359,9 @@ class TestSurfaceTransitionClamp:
         world, _self_state = make_world(self_x=100, self_y=100)
         base = InMemoryTerrainMap({(103, 100): "W", (104, 100): "W"})
         wire = _ferry_tile(102, 100)
-        terrain = FerryAwareTerrain(base, wire, riding=False, hostile_mine_keys=frozenset())
+        terrain = FerryAwareTerrain(
+            base, wire, riding=False, hostile_mine_keys=frozenset(), occupied_tank_keys=frozenset()
+        )
 
         clamped = clamp_move_target_at_surface_transition(
             world,
@@ -247,7 +381,11 @@ class TestSurfaceTransitionClamp:
             {(100, 100): "W", (101, 100): "W", (102, 100): "W"},
         )
         terrain = FerryAwareTerrain(
-            base, _ferry_tile(100, 100), riding=True, hostile_mine_keys=frozenset()
+            base,
+            _ferry_tile(100, 100),
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -265,7 +403,11 @@ class TestSurfaceTransitionClamp:
         """A path that never changes surface class is not clamped."""
         world, _self_state = make_world(self_x=100, self_y=100)
         terrain = FerryAwareTerrain(
-            InMemoryTerrainMap(), {}, riding=False, hostile_mine_keys=frozenset()
+            InMemoryTerrainMap(),
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -288,6 +430,7 @@ class TestSurfaceTransitionClamp:
             _ferry_tile(100, 100),
             riding=True,
             hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
 
         clamped = clamp_move_target_at_surface_transition(
@@ -317,7 +460,11 @@ class TestSurfaceRouteTerrain:
 
         base = InMemoryTerrainMap({(101, 100): "W", (102, 100): "#"})
         ferry_view = FerryAwareTerrain(
-            base, _ferry_tile(103, 100), riding=True, hostile_mine_keys=frozenset()
+            base,
+            _ferry_tile(103, 100),
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
         ground_surface = SurfaceRouteTerrain(ferry_view, water=False)
 
@@ -341,7 +488,11 @@ class TestSurfaceRouteTerrain:
 
         base = InMemoryTerrainMap({(101, 100): "W", (102, 100): "#"})
         ferry_view = FerryAwareTerrain(
-            base, _ferry_tile(103, 100), riding=True, hostile_mine_keys=frozenset()
+            base,
+            _ferry_tile(103, 100),
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
         water_surface = SurfaceRouteTerrain(ferry_view, water=True)
 
@@ -364,10 +515,36 @@ class TestSurfaceRouteTerrain:
             {},
             riding=True,
             hostile_mine_keys=frozenset({"100,100", "101,100"}),
+            occupied_tank_keys=frozenset(),
         )
 
         assert SurfaceRouteTerrain(view, water=False).is_passable(100, 100) is False
         assert SurfaceRouteTerrain(view, water=True).is_passable(101, 100) is False
+
+    def test_landing_legality_intersects_surface_with_wrapped_view(self) -> None:
+        """The surface view answers landing without walk-only blockers.
+
+        Three outcomes, one per branch: terrain the wrapped view calls
+        illegal is refused; a legal tile off the routing surface is
+        refused; a legal tile on the surface is accepted even when a
+        mine or body makes it unwalkable.
+        """
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
+
+        base = InMemoryTerrainMap({(102, 100): "#", (101, 100): "W"})
+        view = FerryAwareTerrain(
+            base,
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"100,100"}),
+            occupied_tank_keys=frozenset(),
+        )
+        ground_surface = SurfaceRouteTerrain(view, water=False)
+
+        assert ground_surface.is_landing_legal(102, 100) is False  # rock
+        assert ground_surface.is_landing_legal(101, 100) is False  # off-surface water
+        assert ground_surface.is_landing_legal(100, 100) is True  # mined but landable
+        assert ground_surface.is_passable(100, 100) is False  # and still unwalkable
 
     def test_render_viewport_delegates_to_wrapped_view(self) -> None:
         """The rendering is the wrapped view's rendering, verbatim."""
@@ -375,7 +552,11 @@ class TestSurfaceRouteTerrain:
 
         base = InMemoryTerrainMap({(100, 100): "W"})
         view = FerryAwareTerrain(
-            base, _ferry_tile(100, 100), riding=False, hostile_mine_keys=frozenset()
+            base,
+            _ferry_tile(100, 100),
+            riding=False,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
         )
         assert SurfaceRouteTerrain(view, water=False).render_viewport(
             100, 100, 1, 1

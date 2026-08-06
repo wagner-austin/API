@@ -12,6 +12,7 @@ from tankpit_bot.bot.ai.types import (
     make_enemy_threat,
     make_initial_ai_state,
     make_path_step,
+    make_respawn_ai_state,
 )
 from tankpit_bot.bot.ai.types_codecs import (
     decode_ai_config,
@@ -320,6 +321,33 @@ class TestAIConfig:
 
 class TestAIState:
     """Tests for AIStateDict factory and encode/decode."""
+
+    def test_make_respawn_ai_state_carries_session_scope_only(self) -> None:
+        """Death resets life-scoped state; the seven session-scoped
+        fields survive — run bot-20260803-180918's summary printed 23
+        shots against 223 actual because the old inline carry-list
+        dropped the hit/miss/reject counters."""
+        previous = make_initial_ai_state()
+        previous["session_kill_count"] = 14
+        previous["session_hit_count"] = 200
+        previous["session_miss_count"] = 6
+        previous["session_reject_count"] = 17
+        previous["wind_down"] = True
+        previous["greeted_tank_ids"] = {"2678": 1}
+        previous["visited_tank_ids"] = {"984": 1}
+        previous["mode"] = "HUNT"
+
+        fresh = make_respawn_ai_state(previous)
+
+        assert fresh["session_kill_count"] == 14
+        assert fresh["session_hit_count"] == 200
+        assert fresh["session_miss_count"] == 6
+        assert fresh["session_reject_count"] == 17
+        assert fresh["wind_down"] is True
+        assert fresh["greeted_tank_ids"] == {"2678": 1}
+        assert fresh["visited_tank_ids"] == {"984": 1}
+        assert fresh["mode"] == make_initial_ai_state()["mode"]
+        assert fresh["mode"] != "HUNT"
 
     def test_make_initial_ai_state_defaults(self) -> None:
         """Initial state uses default config and unset durable mode."""
