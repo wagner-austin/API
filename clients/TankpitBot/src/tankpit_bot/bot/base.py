@@ -58,7 +58,7 @@ from tankpit_bot.sniffer.core import (
     _chrome_stream_no_viewport,
     _maximize_via_cdp,
 )
-from tankpit_bot.sniffer.world_state import get_world_state
+from tankpit_bot.sniffer.world_state import get_world_state, record_account_stats
 from tankpit_bot.state import ContainerStateDict, SelfStateDict, WorldStateDict
 from tankpit_bot.types import CapturedMessage, GameLogEntryWithTimestamp
 
@@ -397,7 +397,21 @@ class Bot(DispatchMixin):
             )
         self._page.wait_for_timeout(_ACCOUNT_STATS_PANEL_RENDER_MS)
         page_text = scrape_page_text(self._cdp)
-        emit_account_stats_sample(parse_account_stats(page_text), phase=phase)
+        stats = parse_account_stats(page_text)
+        emit_account_stats_sample(stats, phase=phase)
+        if stats is not None:
+            # Canonical account model (state/types/self_account.py):
+            # runtime features read this instead of re-fishing the
+            # diagnostic stream.
+            record_account_stats(
+                rank_name=stats["rank_name"],
+                rank_number=stats["rank_number"],
+                promotion_points=stats["promotion_points"],
+                destroyed_enemies=stats["destroyed_enemies"],
+                deactivated_total=stats["deactivated"],
+                play_time_s=stats["play_time_s"],
+                timestamp_ms=get_current_time_ms(),
+            )
 
     def maybe_capture_account_stats_once(self) -> None:
         """Capture account stats on the first healthy tick, with bounded retries.

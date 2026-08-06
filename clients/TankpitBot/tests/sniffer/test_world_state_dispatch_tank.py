@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
 from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
+from tankpit_bot.state.types import WorldStateDict
 from tests.conftest import FakeFileSystem
 
 
@@ -968,3 +969,70 @@ class TestDispatchEnemyDetection:
         state = get_world_service().world_state
         assert state["tanks"]["556"]["x"] == 200
         assert state["tanks"]["556"]["y"] == 210
+
+
+class TestSelfIdentityRecording:
+    """The self 0x21 TankInfo fills the canonical account model."""
+
+    def teardown_method(self) -> None:
+        """Reset world state after each test."""
+        reset_world_state()
+
+    def test_self_tank_info_records_identity(self) -> None:
+        """A 0x21 matching the self tank id lands in self_account."""
+        from tankpit_bot.protocol import TankInfoDict
+        from tankpit_bot.state.mutations import update_self_position
+
+        ws = get_world_service()
+        ws.world_state = update_self_position(ws.world_state, 100, 100, 1000)
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("update_self_position must create a self state")
+        ws.world_state = WorldStateDict(
+            self_state={**self_state, "tank_id": 1301},
+            tanks=ws.world_state["tanks"],
+            containers=ws.world_state["containers"],
+            mines=ws.world_state["mines"],
+            terrain=ws.world_state["terrain"],
+            viewport=ws.world_state["viewport"],
+            scanned_tiles=ws.world_state["scanned_tiles"],
+            timestamp_ms=ws.world_state["timestamp_ms"],
+        )
+
+        dispatch_world_state_update(
+            ws,
+            TankInfoDict(
+                msg_type=0x21,
+                tank_id=1301,
+                name="Artax",
+                team=2,
+                decoration_state=b"\x1e\x00\x00\x00",
+                persistent_tank_id=62913,
+            ),
+        )
+
+        account = ws.self_account
+        assert account["name"] == "Artax"
+        assert account["persistent_tank_id"] == 62913
+        assert account["decoration_state_hex"] == "1e000000"
+        assert account["identity_observed_ms"] > 0
+
+    def test_other_tank_info_leaves_the_account_model_alone(self) -> None:
+        """Roster 0x21s for other tanks never touch self_account."""
+        from tankpit_bot.protocol import TankInfoDict
+
+        ws = get_world_service()
+        dispatch_world_state_update(
+            ws,
+            TankInfoDict(
+                msg_type=0x21,
+                tank_id=777,
+                name="stranger",
+                team=3,
+                decoration_state=b"",
+                persistent_tank_id=999,
+            ),
+        )
+
+        assert ws.self_account["name"] == ""
+        assert ws.self_account["persistent_tank_id"] == -1

@@ -34,6 +34,7 @@ from tankpit_bot.state import (
     update_self_rank,
     viewport_scan_key,
 )
+from tankpit_bot.state.types.self_account import SelfAccountDict, make_empty_self_account
 from tankpit_bot.state.viewport_geometry import (
     regular_radar_bounds,
     viewport_radar_bounds,
@@ -145,6 +146,12 @@ class WorldService:
         self.pending_radar_uses_extra: bool = True
         self.failed_move_targets: dict[str, int] = {}
         self.movement_rejections: list[int] = []
+        # The canonical account-identity model ([[tank-registry]] rank
+        # number; state/types/self_account.py) — session-stable "who
+        # am I" facts, filled by the self 0x21 TankInfo and the
+        # startup stats-panel scrape. Runtime features consult this
+        # instead of re-fishing diagnostic streams.
+        self.self_account: SelfAccountDict = make_empty_self_account()
         # Tank ids that have sent any (non-self-echo) chat this
         # session. One half of the human-consent combat contract
         # (user ruling 2026-07-30, session 8 killed over it: "to
@@ -358,6 +365,56 @@ class WorldService:
     # -----------------------------------------------------------------
     # Failed move / scan tracking
     # -----------------------------------------------------------------
+
+    def record_self_identity(
+        self,
+        name: str,
+        persistent_tank_id: int,
+        decoration_state_hex: str,
+        timestamp_ms: int,
+    ) -> None:
+        """Record the self tank's wire identity (0x21 TankInfo).
+
+        Args:
+            name: In-game tank name.
+            persistent_tank_id: Cross-session account id.
+            decoration_state_hex: Cosmetic skin bytes, hex-encoded.
+            timestamp_ms: When the identity arrived.
+        """
+        self.self_account["name"] = name
+        self.self_account["persistent_tank_id"] = persistent_tank_id
+        self.self_account["decoration_state_hex"] = decoration_state_hex
+        self.self_account["identity_observed_ms"] = timestamp_ms
+
+    def record_account_stats(
+        self,
+        *,
+        rank_name: str,
+        rank_number: int,
+        promotion_points: int,
+        destroyed_enemies: int,
+        deactivated_total: int,
+        play_time_s: int,
+        timestamp_ms: int,
+    ) -> None:
+        """Record the startup stats-panel scrape.
+
+        Args:
+            rank_name: Panel rank label.
+            rank_number: The countdown rank number.
+            promotion_points: Lifetime promotion points.
+            destroyed_enemies: Lifetime kills.
+            deactivated_total: Lifetime own-deactivations.
+            play_time_s: Lifetime play seconds.
+            timestamp_ms: When the scrape was taken.
+        """
+        self.self_account["rank_name"] = rank_name
+        self.self_account["rank_number"] = rank_number
+        self.self_account["promotion_points"] = promotion_points
+        self.self_account["destroyed_enemies"] = destroyed_enemies
+        self.self_account["deactivated_total"] = deactivated_total
+        self.self_account["play_time_s"] = play_time_s
+        self.self_account["stats_observed_ms"] = timestamp_ms
 
     def mark_move_target_failed(self, x: int, y: int, timestamp_ms: int) -> None:
         """Record a move destination that stalled and timed out.

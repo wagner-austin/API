@@ -14,6 +14,7 @@ from __future__ import annotations
 from tankpit_bot import _test_hooks
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.state import WorldStateDict
+from tankpit_bot.state.types.self_account import SelfAccountDict
 
 _service = WorldService()
 
@@ -92,6 +93,48 @@ def update_world_state_from_position(x: int, y: int) -> None:
         y: Self Y coordinate.
     """
     _service.update_world_state_from_position(x, y)
+
+
+def record_account_stats(
+    *,
+    rank_name: str,
+    rank_number: int,
+    promotion_points: int,
+    destroyed_enemies: int,
+    deactivated_total: int,
+    play_time_s: int,
+    timestamp_ms: int,
+) -> None:
+    """Record the startup stats-panel scrape on the account model.
+
+    Args:
+        rank_name: Panel rank label.
+        rank_number: The countdown rank number ([[tank-registry]]).
+        promotion_points: Lifetime promotion points.
+        destroyed_enemies: Lifetime kills.
+        deactivated_total: Lifetime own-deactivations.
+        play_time_s: Lifetime play seconds.
+        timestamp_ms: When the scrape was taken.
+    """
+    _service.record_account_stats(
+        rank_name=rank_name,
+        rank_number=rank_number,
+        promotion_points=promotion_points,
+        destroyed_enemies=destroyed_enemies,
+        deactivated_total=deactivated_total,
+        play_time_s=play_time_s,
+        timestamp_ms=timestamp_ms,
+    )
+
+
+def get_self_account() -> SelfAccountDict:
+    """Return the canonical account-identity model of the own tank.
+
+    Returns:
+        The live account state (never None; sentinel fields until the
+        writers fire).
+    """
+    return _service.self_account
 
 
 def mark_move_target_failed(x: int, y: int, timestamp_ms: int) -> None:

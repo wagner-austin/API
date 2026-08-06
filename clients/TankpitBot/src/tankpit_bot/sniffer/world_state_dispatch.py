@@ -496,6 +496,14 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
                 persistent_tank_id=persistent_id,
                 decoration_state_hex=decoration.hex(),
             )
+            self_state = ws.world_state["self_state"]
+            if self_state is not None and self_state["tank_id"] == tid:
+                ws.record_self_identity(
+                    name,
+                    persistent_id,
+                    decoration.hex(),
+                    browser.get_current_time_ms(),
+                )
             return True
         case {
             "msg_type": 0x3E,

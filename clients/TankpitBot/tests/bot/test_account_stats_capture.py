@@ -20,6 +20,7 @@ from tankpit_bot.runtime_logging import (
     RuntimeEventRecordDict,
     configure_bot_runtime_logging,
 )
+from tankpit_bot.sniffer.world_state import get_self_account
 from tests.conftest import FakeCDPSessionSimple, FakeEnv, FakeFileSystem
 
 
@@ -138,6 +139,16 @@ def test_capture_emits_single_c_press_and_scrapes(
     assert records[0]["fields"]["promotion_points"] == 121314
     assert records[0]["fields"]["destroyed_enemies"] == 65
     assert records[0]["fields"]["phase"] == "startup"
+    # The canonical account model is populated by the same capture --
+    # runtime features read THIS, not the diagnostic stream.
+    account = get_self_account()
+    assert account["rank_name"] == "private"
+    assert account["rank_number"] == 160
+    assert account["promotion_points"] == 121314
+    assert account["destroyed_enemies"] == 65
+    assert account["deactivated_total"] == 0
+    assert account["play_time_s"] == 41 * 3600 + 25 * 60 + 23
+    assert account["stats_observed_ms"] > 0
 
 
 def test_capture_emits_absence_when_panel_not_rendered(

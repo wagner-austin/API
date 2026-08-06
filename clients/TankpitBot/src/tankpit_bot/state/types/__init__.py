@@ -69,6 +69,12 @@ from tankpit_bot.state.types.mine import (
     encode_mine_state,
     make_mine_state,
 )
+from tankpit_bot.state.types.self_account import (
+    SelfAccountDict,
+    decode_self_account,
+    encode_self_account,
+    make_empty_self_account,
+)
 from tankpit_bot.state.types.self_state import (
     SelfStateDict,
     decode_self_state,
@@ -143,6 +149,7 @@ __all__ = [
     "ContainerStateDict",
     "EntitySource",
     "MineStateDict",
+    "SelfAccountDict",
     "SelfStateDict",
     "TankObservation",
     "TankStateDict",
@@ -153,6 +160,7 @@ __all__ = [
     "decode_container_refresh_kind",
     "decode_container_state",
     "decode_mine_state",
+    "decode_self_account",
     "decode_self_state",
     "decode_tank_observation",
     "decode_tank_state",
@@ -162,6 +170,7 @@ __all__ = [
     "encode_container_refresh_kind",
     "encode_container_state",
     "encode_mine_state",
+    "encode_self_account",
     "encode_self_state",
     "encode_tank_observation",
     "encode_tank_state",
@@ -171,6 +180,7 @@ __all__ = [
     "has_known_position",
     "has_real_coordinates",
     "make_container_state",
+    "make_empty_self_account",
     "make_empty_world_state",
     "make_mine_state",
     "make_self_state",
