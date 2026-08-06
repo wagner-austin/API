@@ -1,0 +1,41 @@
+# The finisher on the fortress chassis: survive as the fortress does, and
+# END it. Impossible is conclusively survivable behind the wall and
+# conclusively unclosable without a finisher (walls-alone refuted,
+# log 2026-08-02); every link of the nuke chain was validated live
+# (`runs/nuke-probe4.out`, log 2026-08-05). The launcher's 45,000 saves
+# through the withhold ahead of every channel but tech, which is the
+# doctrine's whole bet: the standing wall holds while the finisher funds,
+# then 5,400-damage strikes land on the priciest structure in sight.
+
+name fortress-nuke
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery,repairbay
+heavies none
+max_workers 8
+mass 40
+reserve -1
+expand 1
+counter 1
+cover 1
+intercept 1
+guard_cap 0
+aa_cover 1
+forward 0
+scout 0
+raid 3
+rush 0
+creep 0
+riposte 1
+kite 0
+tech 0
+lurk 0
+allin 0
+strike 0
+medics 0
+decoys 0
+hp_floor 0
+bunkers 0
+flame 0
+close 0
+income_ladder 0
+guns 0
+nukes 1

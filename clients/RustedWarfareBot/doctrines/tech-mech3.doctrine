@@ -1,0 +1,41 @@
+# The funded mobile-turret arm. v1 proved a 4,500 composition entry hijacks
+# the derived reserve (income 0/s, defeated); v2 pinned the reserve and the
+# economy breathed -- best rival dip yet, 3,900 -- but ordinary production
+# still never accumulated 4,500 (asked 1178, got 0), so no turret was ever
+# fielded. v3 funds them through the saving-hire channel the medics and the
+# tech unlock already use: a refused hire withholds its price, one on order
+# at a time, bounded by this headcount ([[policy-budget]],
+# [[community-play-strategies]]).
+
+name tech-mech3
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery,mechFactory
+heavies heavyTank,heavyTank
+max_workers 8
+mass 25
+reserve 900
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 3
+rush 0
+creep 0
+riposte 0
+kite 0
+tech 1
+lurk 0
+allin 0
+strike 0
+medics 0
+decoys 0
+hp_floor 0
+bunkers 2
+flame 0
+close 0
+income_ladder 0
+guns 0
+nukes 0

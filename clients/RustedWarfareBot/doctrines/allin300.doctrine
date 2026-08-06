@@ -1,0 +1,38 @@
+# Impossible probe (log 2026-07-31): release on time, not on size. Every
+# size-released arm met an army that had compounded past answering; this
+# one holds everything to its chosen observation, dumps the whole reserve
+# at the enemy start, and streams reinforcements in behind. The trigger
+# is the open question and this file is one point on it.
+
+name allin300
+goals extractorT1,extractorT1,extractorT1,c_tank,c_tank,c_tank,hoverTank,c_artillery
+heavies heavyTank,heavyTank
+max_workers 8
+mass 40
+reserve -1
+expand 1
+counter 1
+cover 0
+intercept 1
+guard_cap 0
+aa_cover 0
+forward 0
+scout 0
+raid 3
+rush 1
+creep 0
+riposte 0
+kite 0
+tech 1
+lurk 0
+allin 300
+strike 0
+medics 0
+decoys 0
+hp_floor 0
+bunkers 0
+flame 0
+close 0
+income_ladder 0
+guns 0
+nukes 0
