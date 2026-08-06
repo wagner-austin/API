@@ -108,20 +108,25 @@ def _elect_self_id(events: list[tuple[int, str, dict]]) -> int:
     return votes.most_common(1)[0][0] if votes else -1
 
 
-def mine(path: Path, agg: dict) -> None:
+def mine(path: Path, agg: dict, static_terrain) -> None:
     session = json.loads(path.read_text(encoding="utf-8"))
     events = _decode_all(session)
     self_id = _elect_self_id(events)
     if self_id == -1:
         agg["sessions_no_self"] += 1
         return
+    # Wire-terrain statement per tile: last 0x4A terrain_type (blocks,
+    # ferries — the movable obstruction layer the static map lacks).
+    wire_terrain: dict[tuple[int, int], int] = {}
 
     # Per-tile mine statement timeline: list of (t, present, team | -1).
     mine_timeline: dict[tuple[int, int], list[tuple[int, bool, int]]] = defaultdict(list)
     # Self team from 0x21 TankInfo (-1 until seen).
     self_team = -1
-    # Last known position + time per tank.
+    # Last known position + time per tank (0x28/0x3D wire statements).
     tank_pos: dict[int, tuple[int, int, int]] = {}
+    # Last map-listed position per tank (0x4C — sees idle tanks).
+    map_pos: dict[int, tuple[int, int, int]] = {}
     # (t, rx, ry) awaiting landing.
     pending: list[tuple[int, int, int]] = []
     pairs: list[tuple[int, int, int, int, int]] = []  # (t, rx, ry, lx, ly)
@@ -148,6 +153,21 @@ def mine(path: Path, agg: dict) -> None:
         elif mt == 0x21:
             if payload.get("tank_id") == self_id and isinstance(payload.get("team"), int):
                 self_team = payload["team"]
+        elif mt == 0x4A:
+            for x, y, terrain_type in payload.get("updates", []):
+                wire_terrain[(x, y)] = terrain_type
+        elif mt == 0x4C:
+            # The map is a strictly living-tanks list with positions —
+            # it sees IDLE tanks that never broadcast a 0x3D. Kept in
+            # its OWN layer: the first sweep that folded these into
+            # tank_pos collapsed 0x3D body attribution 1053->277,
+            # proving the two channels' coordinates disagree for the
+            # same tank; map entries may only ADD evidence.
+            for entry in payload.get("tanks", []):
+                tid = entry.get("tank_id")
+                x, y = entry.get("x"), entry.get("y")
+                if isinstance(tid, int) and isinstance(x, int) and isinstance(y, int):
+                    map_pos[tid] = (x, y, t)
         elif mt == 0x4F:
             for entry in payload.get("mines", []):
                 mine_timeline[(entry["x"], entry["y"])].append((t, True, entry.get("team", -1)))
@@ -189,6 +209,10 @@ def mine(path: Path, agg: dict) -> None:
             tid != self_id and (px, py) == (rx, ry) and t - pt <= BODY_FRESH_MS
             for tid, (px, py, pt) in tank_pos.items()
         )
+        map_body = any(
+            tid != self_id and (px, py) == (rx, ry) and t - pt <= BODY_FRESH_MS
+            for tid, (px, py, pt) in map_pos.items()
+        )
         if displaced:
             agg["displaced_total"] += 1
             landings_by_request[(rx, ry)].add((lx, ly))
@@ -202,6 +226,16 @@ def mine(path: Path, agg: dict) -> None:
                 agg["displaced_mine_revealed_after"] += 1
             elif body:
                 agg["displaced_body_present"] += 1
+            elif map_body:
+                agg["displaced_idle_body_on_map"] += 1
+            elif static_terrain is not None and not static_terrain.is_landing_legal(rx, ry):
+                # Water/rock aim (user-piloted sniffs, probes, old
+                # binaries): displacement is plain terrain physics.
+                agg["displaced_static_terrain"] += 1
+            elif wire_terrain.get((rx, ry), 0) != 0:
+                # A block/ferry statement stands at the tile — the
+                # movable-obstruction layer, not a mine.
+                agg["displaced_wire_block_or_ferry"] += 1
             else:
                 agg["displaced_no_visible_cause"] += 1
                 distance = max(abs(lx - rx), abs(ly - ry))
@@ -279,6 +313,9 @@ def main() -> int:
         "divergence_samples": [],
         "displaced_mine_revealed_after": 0,
         "displaced_body_present": 0,
+        "displaced_idle_body_on_map": 0,
+        "displaced_static_terrain": 0,
+        "displaced_wire_block_or_ferry": 0,
         "displaced_no_visible_cause": 0,
         "exact_total": 0,
         "exact_on_known_mine": 0,
@@ -290,9 +327,13 @@ def main() -> int:
         "no_cause_samples": [],
         "violation_samples": [],
     }
+    from tankpit_bot.terrain import TerrainMap
+
+    field_gif = Path("field01_r.gif")
+    static_terrain = TerrainMap(field_gif) if field_gif.exists() else None
     for path in paths:
         try:
-            mine(path, agg)
+            mine(path, agg, static_terrain)
             agg["sessions"] += 1
         except Exception as error:  # noqa: BLE001 - archive files vary; report and continue
             print(f"SKIP {path.name}: {error}")
