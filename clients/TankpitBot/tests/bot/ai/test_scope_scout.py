@@ -201,16 +201,19 @@ def test_fresh_ferry_belief_needs_no_scout() -> None:
     assert scope_scout_for_ferry(_ctx(world, terrain), make_scanned_ai_state()) is None
 
 
-def test_stale_ferry_belief_still_draws_the_pan() -> None:
-    """A rotted sighting is exactly what the live look refreshes."""
+def test_old_ferry_belief_still_serves_and_needs_no_pan() -> None:
+    """Ferry memory is positional, not clocked: an old sighting still serves.
+
+    The no-drift law ([[ferry-mechanics]]) plus the three positional
+    invalidation channels (0x4A move pairs, re-observation patches,
+    displacement disproof) replaced the 60 s TTL on 2026-08-05 — a
+    99-second-old sighting is a boarding tile, not a reason to spend
+    a pan rediscovering what nothing has contradicted.
+    """
     world, terrain = _water_locked_world()
     _believe_ferry(world, 112, 100, observed_ms=1000)
 
-    decision = scope_scout_for_ferry(_ctx(world, terrain), make_scanned_ai_state())
-
-    if decision is None:
-        raise AssertionError("expected the scout to pan")
-    assert decision["command"]["cmd_type"] == "scope_shift"
+    assert scope_scout_for_ferry(_ctx(world, terrain), make_scanned_ai_state()) is None
 
 
 def test_ground_served_container_never_draws_a_pan() -> None:

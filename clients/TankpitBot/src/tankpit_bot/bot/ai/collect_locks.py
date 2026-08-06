@@ -84,10 +84,7 @@ def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -
         is not None
     ):
         return False
-    return (
-        find_ferry_boarding_tile(ctx.world, ctx.terrain, target_x, target_y, ctx.timestamp_ms)
-        is None
-    )
+    return find_ferry_boarding_tile(ctx.world, ctx.terrain, target_x, target_y) is None
 
 
 def continue_or_release_lock(

@@ -17,12 +17,28 @@ tile instead — the freshest-known ferry near the goal — so the hop
 becomes teleport-to-ferry + ride-to-container under the existing
 lock-continuation machinery.
 
-Ferries move on their own, so a remembered ferry tile rots like any
-other dynamic belief: candidates are gated on
-:data:`FERRY_BELIEF_TTL_MS` and callers tally stale/absent ferries as
-``no_landing`` still — an honest decline, never a blind teleport onto
-open water (the server refuses water landings, [[flag-triage-20260729]]
-F4 fix notes).
+Ferry memory is POSITIONALLY invalidated, not clocked (user ruling
+2026-08-05). The measured movement law ([[ferry-mechanics]]) says
+ferries NEVER drift — they move only when a rider drives them (136/148
+wire movements rider-attributed, zero spontaneous) — and practice
+bots never ride, so a sighted ferry stays where it was until someone
+visibly moves it. Three channels already keep the belief honest:
+
+1. Wire moves: every 0x4A terrain update overwrites the belief at its
+   tile, and ferry moves arrive as atomic old→water / new→ferry pairs
+   (``update_terrain_tiles``).
+2. Re-observation: viewport patches rewrite the tile's current truth.
+3. Contact disproof: a boarding teleport displaced off a believed
+   ferry deletes the belief on the spot
+   (``_expire_disproven_ferry_belief``, world_state_dispatch).
+
+The residual risk — a human rides it away while unobserved — costs
+one displaced hop, which channel 3 turns into a deletion and a replan
+the same tick: the same accepted stale-belief economics as container
+hops. The old 60 s ``FERRY_BELIEF_TTL_MS`` clock sat on top of this
+and only FORGOT true ferries (its "ferries drift freely" premise was
+falsified by the movement mining); it forced rediscovery pans and the
+release→re-lock churn logged in the 2026-08-05 chain.
 """
 
 from __future__ import annotations
@@ -32,14 +48,6 @@ from collections import deque
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.state.types import WorldStateDict
 from tankpit_bot.state.types.constants import ASCII_FERRY, TERRAIN_FERRY
-
-FERRY_BELIEF_TTL_MS = 60000
-"""How long a believed ferry tile stays a trusted boarding target.
-
-Ferries drift freely on water; a minute-old sighting is a guess, and
-a teleport aimed at vacated water is a refused command. Unbracketed —
-no wire measurement of ferry drift speed yet.
-"""
 
 FERRY_SEARCH_RADIUS = 12
 """Chebyshev radius around the goal container searched for a ferry.
@@ -93,14 +101,13 @@ def find_ferry_boarding_tile(
     terrain: TerrainMapProtocol,
     goal_x: int,
     goal_y: int,
-    now_ms: int,
 ) -> tuple[int, int] | None:
     """Return the best believed ferry tile to board for a water goal.
 
     Candidates are wire-terrain beliefs of type ``TERRAIN_FERRY``
-    observed within :data:`FERRY_BELIEF_TTL_MS`, at most
-    :data:`FERRY_SEARCH_RADIUS` from the goal, AND floating on the
-    goal's own water body — the ride must EXIST. The two live
+    (positionally invalidated — see the module docstring; no clock),
+    at most :data:`FERRY_SEARCH_RADIUS` from the goal, AND floating on
+    the goal's own water body — the ride must EXIST. The two live
     deadlocks of 2026-08-04/05 (runs bot-20260804-234008 and
     bot-20260805-070006) were both this gate's absence: a ferry
     docked on a separate pool one land ridge away from the
@@ -116,10 +123,9 @@ def find_ferry_boarding_tile(
         terrain: Static terrain of the current field (pond gate).
         goal_x: Water-locked container X.
         goal_y: Water-locked container Y.
-        now_ms: Current tick timestamp for the freshness gate.
 
     Returns:
-        ``(x, y)`` of the boarding tile, or ``None`` when no fresh
+        ``(x, y)`` of the boarding tile, or ``None`` when no believed
         ferry floats on the goal's water body nearby.
     """
     pond: set[tuple[int, int]] | None = None
@@ -127,8 +133,6 @@ def find_ferry_boarding_tile(
     best_dist = 0
     for tile in world["terrain"].values():
         if tile["terrain_type"] != TERRAIN_FERRY:
-            continue
-        if now_ms - tile["observed_ms"] > FERRY_BELIEF_TTL_MS:
             continue
         dist = max(abs(tile["x"] - goal_x), abs(tile["y"] - goal_y))
         if dist > FERRY_SEARCH_RADIUS:
@@ -144,7 +148,6 @@ def find_ferry_boarding_tile(
 
 
 __all__ = [
-    "FERRY_BELIEF_TTL_MS",
     "FERRY_SEARCH_RADIUS",
     "find_ferry_boarding_tile",
 ]

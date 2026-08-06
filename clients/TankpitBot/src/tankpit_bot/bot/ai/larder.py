@@ -220,16 +220,15 @@ def select_fuel_larder_hop(
             terrain, ctx.world["mines"], container["x"], container["y"]
         )
         if landing is None:
-            # Water-locked container: a fresh believed ferry near it is
-            # the boarding-tile landing — teleport to the ferry, then
-            # the held lock rides to the pickup ([[flag-triage-20260729]]
+            # Water-locked container: a believed ferry near it is the
+            # boarding-tile landing — teleport to the ferry, then the
+            # held lock rides to the pickup ([[flag-triage-20260729]]
             # F5; riding pickup law in [[ferry-mechanics]]).
             landing = find_ferry_boarding_tile(
                 ctx.world,
                 terrain,
                 container["x"],
                 container["y"],
-                ctx.timestamp_ms,
             )
             if landing is not None:
                 ferry_served += 1

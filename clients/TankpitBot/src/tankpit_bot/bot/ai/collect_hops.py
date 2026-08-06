@@ -72,7 +72,6 @@ def _equipment_hop_landing(
         terrain,
         container["x"],
         container["y"],
-        ctx.timestamp_ms,
     )
 
 

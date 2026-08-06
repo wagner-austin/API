@@ -26,7 +26,7 @@ def test_goal_not_afloat_yields_no_boarding_tile() -> None:
     _ferry_at(world["terrain"], 52, 50)
     terrain = InMemoryTerrainMap(terrain_data={(52, 50): "W", (52, 51): "W"})
 
-    assert find_ferry_boarding_tile(world, terrain, 50, 50, _NOW) is None
+    assert find_ferry_boarding_tile(world, terrain, 50, 50) is None
 
 
 def test_pond_at_the_map_edge_still_serves_the_goal() -> None:
@@ -41,4 +41,4 @@ def test_pond_at_the_map_edge_still_serves_the_goal() -> None:
     water = {(x, y): "W" for x in range(0, 4) for y in range(0, 3)}
     terrain = InMemoryTerrainMap(terrain_data=water)
 
-    assert find_ferry_boarding_tile(world, terrain, 0, 0, _NOW) == (2, 0)
+    assert find_ferry_boarding_tile(world, terrain, 0, 0) == (2, 0)

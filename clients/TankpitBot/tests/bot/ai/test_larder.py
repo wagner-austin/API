@@ -393,8 +393,15 @@ def test_ferry_on_a_disjoint_pond_stays_no_landing() -> None:
     assert selection["ferry_served"] == 0
 
 
-def test_stale_ferry_belief_stays_no_landing() -> None:
-    """A ferry sighted beyond the belief TTL is not a boarding target."""
+def test_old_ferry_belief_still_boards() -> None:
+    """Ferry memory is positional, not clocked (user ruling 2026-08-05).
+
+    A sighting 61 s old was the OLD TTL's rot boundary; under the
+    no-drift law ([[ferry-mechanics]]: 136/148 movements
+    rider-attributed, zero spontaneous) an uncontradicted belief keeps
+    serving — the 0x4A move pairs, re-observation patches, and
+    displacement disproof are what retire it, never a clock.
+    """
     containers = {
         "125,100": make_container(125, 100, 800, is_fuel=True),
     }
@@ -407,9 +414,12 @@ def test_stale_ferry_belief_stays_no_landing() -> None:
 
     selection = select_fuel_larder_hop(ctx, is_blacklisted=_never_blacklisted)
 
-    assert selection["container"] is None
-    assert selection["no_landing"] == 1
-    assert selection["ferry_served"] == 0
+    container = selection["container"]
+    if container is None:
+        raise AssertionError("expected the old ferry belief to board the water pickup")
+    assert (container["x"], container["y"]) == (125, 100)
+    assert selection["ferry_served"] == 1
+    assert (selection["landing_x"], selection["landing_y"]) == (122, 101)
 
 
 def test_far_ferry_is_not_a_boarding_target() -> None:
