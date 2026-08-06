@@ -18,7 +18,7 @@ rule the sweep's job lines follow, for the same reason.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Final, TypedDict
 
 from rw_bot import RwBotError
@@ -31,17 +31,24 @@ from rw_bot.validation import (
     require_positive_int,
 )
 
-_FIELD_SHAPE = "RW-DOCTRINE-001"
-_UNKNOWN_FIELD = "RW-DOCTRINE-002"
-_NOT_A_NUMBER = "RW-DOCTRINE-003"
-_NOT_A_FLAG = "RW-DOCTRINE-004"
-_REPEATED_FIELD = "RW-DOCTRINE-005"
 _BLANK_GOAL = "RW-DOCTRINE-006"
 _BAD_RESERVE = "RW-DOCTRINE-007"
 _BAD_GUARD_CAP = "RW-DOCTRINE-008"
 _BAD_RAID_SIZE = "RW-DOCTRINE-009"
 _BLANK_HEAVY = "RW-DOCTRINE-010"
 _BAD_TECH_CAP = "RW-DOCTRINE-012"
+_BAD_LURK_COUNT = "RW-DOCTRINE-013"
+_BAD_ALLIN_SAMPLE = "RW-DOCTRINE-014"
+_BAD_CREEP_HOLD = "RW-DOCTRINE-015"
+_BAD_DECOY_COUNT = "RW-DOCTRINE-016"
+_BAD_HP_FLOOR = "RW-DOCTRINE-017"
+_BAD_STRIKE_RATIO = "RW-DOCTRINE-018"
+_BAD_MEDIC_COUNT = "RW-DOCTRINE-019"
+_BAD_BUNKER_COUNT = "RW-DOCTRINE-020"
+_BAD_FLAME_COUNT = "RW-DOCTRINE-021"
+_BAD_CLOSE_RATIO = "RW-DOCTRINE-022"
+_BAD_GUN_COUNT = "RW-DOCTRINE-023"
+_BAD_NUKE_COUNT = "RW-DOCTRINE-024"
 
 #: The ``heavies`` value that means "no extra composition entries".
 #:
@@ -57,10 +64,29 @@ NO_HEAVIES: Final = "none"
 DERIVE_RESERVE: Final = -1
 
 #: Fields carried as whole numbers in a doctrine file.
-_INT_FIELDS: Final = ("max_workers", "mass", "reserve", "guard_cap", "raid", "tech")
+INT_FIELDS: Final = (
+    "max_workers",
+    "mass",
+    "reserve",
+    "guard_cap",
+    "raid",
+    "tech",
+    "lurk",
+    "allin",
+    "creep",
+    "decoys",
+    "hp_floor",
+    "strike",
+    "medics",
+    "bunkers",
+    "flame",
+    "close",
+    "guns",
+    "nukes",
+)
 
 #: Fields carried as ``0`` or ``1`` in a doctrine file.
-_FLAG_FIELDS: Final = (
+FLAG_FIELDS: Final = (
     "expand",
     "counter",
     "cover",
@@ -69,15 +95,16 @@ _FLAG_FIELDS: Final = (
     "forward",
     "scout",
     "rush",
-    "creep",
     "riposte",
+    "kite",
+    "income_ladder",
 )
 
 #: Fields carried as text in a doctrine file.
-_STR_FIELDS: Final = ("name", "goals", "heavies")
+STR_FIELDS: Final = ("name", "goals", "heavies")
 
 #: Every field a doctrine file must carry, in the order presets write them.
-DOCTRINE_FIELDS: Final = (*_STR_FIELDS, *_INT_FIELDS, *_FLAG_FIELDS)
+DOCTRINE_FIELDS: Final = (*STR_FIELDS, *INT_FIELDS, *FLAG_FIELDS)
 
 
 class DoctrineError(RwBotError):
@@ -152,12 +179,13 @@ class Doctrine(TypedDict):
             measure left: at the first-wave size the raid is free and wins
             nothing, so whether a heavier party converts is a doctrine arm,
             not a code edit ([[policy-raid]]).
-        creep: Whether the economy walks turrets toward the enemy start, one
-            covered step at a time. The documented human answer to the
-            cheating difficulties: turrets outrange and outlast anything the
-            AI fields inside its thousand-tick opening delay, and ground
-            taken this way is ground its random-target attack groups cannot
-            answer ([[ai-opponent-strategy]], [[community-play-strategies]]).
+        creep: The percent of the anchor-to-enemy line the turret walk
+            holds at, zero for no creep. Walked to one hundred -- the
+            enemy's door -- the line died faster than it stood (164
+            turrets, 82,000 credits, refuted); held at a choke it is the
+            community's whole answer to the cheating difficulties, and
+            every third structure the walk lays is a repair bay
+            ([[ai-opponent-strategy]], [[community-play-strategies]]).
         riposte: Whether the whole reserve releases the moment an intrusion
             ends -- the human counter-punch: let the attack burn itself on
             the defences, then push into the window before the opponent's
@@ -172,6 +200,114 @@ class Doctrine(TypedDict):
             opens production: the flag form bought all four factories'
             unlocks in one probe -- 8,000 credits of saving pauses for a
             roster the first 2,000 had opened ([[policy-budget]]).
+        lurk: Scouts kept alive loitering at the enemy start, zero for
+            none. The AI recalls its attack groups home for 500 ticks
+            whenever an intruder stands in its base zone, and the recall
+            runs before the attack branch -- a lurker re-arms that leash
+            and retreats alive when chased, where a raider pays for each
+            recall with its life ([[ai-opponent-strategy]]).
+        kite: Whether armed mobile units hold the reach band -- the
+            agent's between-samples reflex steps a unit away whenever a
+            shorter-reached threat closes inside its own reach, so a unit
+            that outranges its attacker is never hit by it. The reflex
+            no-ops without a reach advantage, so the flag covers every
+            armed mobile type safely ([[community-play-strategies]]).
+        hp_floor: Percent of health below which armed mobile units flee
+            the threat in reach, zero for never. Value preserved beats
+            value spent, and the engine running the newest waypoint hands
+            the unit back to the planner the moment it is clear.
+        decoys: Scouts kept alive scattered wide on our own half, zero
+            for none. The AI picks every attack target uniformly at random
+            over ALL our units with no fog term, so our placement IS the
+            distribution of its attacks -- each decoy is an extra ticket in
+            its lottery, and a wave that draws one walks to an empty flank
+            and chases a unit that flees it ([[ai-opponent-strategy]]).
+        medics: Combat engineers to keep alive in the army, zero for
+            none. The healer the community meta is built on, offered by
+            the tier-two land factory and priced out of every tick under
+            pressure -- so a refused hire saves toward itself, the tech
+            unlock's gated pattern, one hire outstanding at a time
+            ([[policy-budget]], [[community-play-strategies]]).
+        bunkers: Mobile turrets to keep alive in the army, zero for none.
+            The community's named counter to massed tier-one waves --
+            4,500 credits of area damage behind a deploy shield -- and a
+            price ordinary production never once accumulated: measured at
+            Impossible, ``produce:mechBunker asked 1178 got 0`` with the
+            economy healthy (log 2026-08-01). Funded exactly like the
+            medics: a refused hire withholds its price, one outstanding
+            at a time ([[policy-budget]], [[community-play-strategies]]).
+        flame: Flame turrets to hold by converting ground turrets up the
+            tier-two fork, zero for none. The ground turret's upgrade is a
+            four-way fork the extractor walk deliberately skips, and the
+            flame branch is the community's named anti-horde static: 1,600
+            hit points, self-repair, wide-area fire that scales with how
+            crowded the rush is -- a 1,000-credit conversion off the
+            500-credit turret cover already builds. Funded like the medics:
+            a refused conversion withholds, ordered once per structure
+            because converting never fills the queue
+            ([[policy-budget]], [[community-play-strategies]]).
+        close: Our army as a multiple of the strongest rival's that ends
+            the holding game, zero for never. Dominance decays: nineteen
+            Very Hard matches stood dominant at the 4,000-sample cap and
+            eleven of them LOST at 10,000 -- the AI compounds too, and a
+            decided match is won by ending it while it is decided. Open,
+            the window releases every wave and forces the march at the
+            enemy start through contact -- and the commitment LATCHES on
+            SUSTAINED dominance, both halves measured. Re-reading the
+            window every tick closed piecemeal: three lost matches show 9,
+            3 and 6 marches dying in dribbles as it flickered. Latching on
+            one open sample went 9 won / 13 lost: early-game ratio noise
+            became lifelong premature all-ins and wiped four former wins.
+            So the window must hold :data:`~rw_bot.policy.situation.CLOSE_HOLD`
+            samples running before the latch commits
+            ([[policy-situation]], log 2026-08-01).
+        guns: Top-tier gun turrets to hold by walking the turret chain
+            (T1 -> T2 gun -> T3 gun), zero for none. The community's
+            fortified-zone teeth: the tier three "solos most ground
+            units", the AI's attack-move stands its army at a turret wall
+            until one of them dies, and every written account of beating
+            Impossible names this unit (steam-impossible-playbook.txt,
+            [[community-play-strategies]]). Each chain step is funded
+            through the withhold, one order a tick, pipeline bounded by
+            the top's shortfall so the base cover is never consumed
+            wholesale ([[policy-budget]]).
+        nukes: Nuke launchers to stand and keep firing, zero for none.
+            The finisher: Impossible is survivable behind walls and
+            unclosable without one, and every link of this chain was
+            validated live -- launcher by the ordinary builder, 11,000
+            warhead by the priced action, launch by the targeted ability,
+            an extractor erased where the planner pointed
+            (`runs/nuke-probe4.out`, log 2026-08-05). The 45,000 saves
+            through the withhold because the plain afford-wait provably
+            never accumulates it, and every launch is refired until the
+            world answers because the launch flag does not carry the ammo
+            gate. Doctrine-gated hard: the big-ticket law (four measured
+            refutations) says saving this deep during contested Very Hard
+            play loses; this knob is for the fortress context where
+            survival is already solved ([[policy-budget]]).
+        income_ladder: Whether a refused extractor conversion saves toward
+            itself. Off is the Impossible measurement: unconditional saving
+            doubled income and lost, because the army pauses let the enemy's
+            economy live untouched. On is the Very Hard counter-measurement:
+            our worth ceilinged at ~30-35k on every seed while the T3
+            conversion asked thousands of times and funded never -- the
+            matches where the opponent's compounding passed that ceiling
+            were unwinnable regardless of trigger design
+            ([[policy-budget]], `runs/traces/vh-debounce`, log 2026-08-02).
+        strike: Credits the strongest rival's army value must sit below
+            its recent peak for the release window to open, zero for off.
+            The engine broadcasts every army value unfogged; a wave dying
+            on our line reads as a fall of its own worth, and the horde
+            releases into that gap rather than on a clock or a ladder
+            rung. A ratio was tried first and refuted in one probe: at
+            Impossible their army is always a multiple of ours, so an
+            absolute comparison never opens ([[policy-situation]]).
+        allin: The observation the whole reserve releases from, zero for
+            never. Releasing on size met an Impossible army that had
+            compounded past answering in forty-seven straight matches;
+            this releases on time -- hold everything to the chosen moment,
+            dump it, and stream every later unit in behind
+            ([[policy-combat]]).
         heavies: Composition entries outside the plan, repeats a ratio like
             the goals. The channel the unlocked roster joins the army mix
             through: production orders only what the engine offers, so an
@@ -198,9 +334,22 @@ class Doctrine(TypedDict):
     scout: bool
     raid: int
     rush: bool
-    creep: bool
+    creep: int
     riposte: bool
     tech: int
+    lurk: int
+    allin: int
+    decoys: int
+    kite: bool
+    income_ladder: bool
+    hp_floor: int
+    strike: int
+    medics: int
+    bunkers: int
+    flame: int
+    close: int
+    guns: int
+    nukes: int
 
 
 #: The style everything so far was measured under, exactly.
@@ -235,10 +384,53 @@ DEFAULT_DOCTRINE: Final[Doctrine] = Doctrine(
     scout=False,
     raid=0,
     rush=False,
-    creep=False,
+    creep=0,
     riposte=False,
     tech=0,
+    lurk=0,
+    allin=0,
+    decoys=0,
+    kite=False,
+    income_ladder=False,
+    hp_floor=0,
+    strike=0,
+    medics=0,
+    bunkers=0,
+    flame=0,
+    close=0,
+    guns=0,
+    nukes=0,
 )
+
+
+def _count(
+    payload: Mapping[str, str | int | float | bool],
+    field: str,
+    code: str,
+    meaning: str,
+) -> int:
+    """Read one non-negative count field, or refuse it with its own code.
+
+    Every count shares the shape -- zero is a meaningful off-state, below
+    zero is a typo -- and each keeps its own error code so a refusal names
+    the field's semantics rather than a generic bound.
+
+    Args:
+        payload: Field values by name.
+        field: The count's name.
+        code: The DoctrineError code a refusal carries.
+        meaning: The field's semantics, for the message.
+
+    Returns:
+        The validated count.
+
+    Raises:
+        DoctrineError: When the value is negative.
+    """
+    value = require_int(payload, field)
+    if value < 0:
+        raise DoctrineError(code, f"field {field!r} must be >= 0, {meaning}, got {value}")
+    return value
 
 
 def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine:
@@ -277,23 +469,30 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
             _BAD_RESERVE,
             f"field 'reserve' must be >= 0, or {DERIVE_RESERVE} to derive it, got {reserve}",
         )
-    guard_cap = require_int(payload, "guard_cap")
-    if guard_cap < 0:
+    guard_cap = _count(payload, "guard_cap", _BAD_GUARD_CAP, "with 0 meaning the whole reserve")
+    raid = _count(payload, "raid", _BAD_RAID_SIZE, "a party size with 0 meaning no raiding")
+    tech = _count(payload, "tech", _BAD_TECH_CAP, "factories to unlock with 0 meaning none")
+    lurk = _count(payload, "lurk", _BAD_LURK_COUNT, "lurkers to keep alive with 0 meaning none")
+    decoys = _count(payload, "decoys", _BAD_DECOY_COUNT, "scatter scouts with 0 for none")
+    allin = _count(payload, "allin", _BAD_ALLIN_SAMPLE, "a release observation with 0 for never")
+    strike = _count(payload, "strike", _BAD_STRIKE_RATIO, "a rival army-value drop with 0 for off")
+    medics = _count(payload, "medics", _BAD_MEDIC_COUNT, "combat engineers to keep alive, 0 none")
+    bunkers = _count(payload, "bunkers", _BAD_BUNKER_COUNT, "mobile turrets to keep alive, 0 none")
+    flame = _count(payload, "flame", _BAD_FLAME_COUNT, "flame turrets to hold, 0 none")
+    close = _count(payload, "close", _BAD_CLOSE_RATIO, "a dominance multiple with 0 for never")
+    guns = _count(payload, "guns", _BAD_GUN_COUNT, "top-tier gun turrets to hold, 0 none")
+    nukes = _count(payload, "nukes", _BAD_NUKE_COUNT, "nuke launchers to stand, 0 none")
+    hp_floor = require_int(payload, "hp_floor")
+    if hp_floor < 0 or hp_floor > 100:
         raise DoctrineError(
-            _BAD_GUARD_CAP,
-            f"field 'guard_cap' must be >= 0, with 0 meaning the whole reserve, got {guard_cap}",
+            _BAD_HP_FLOOR,
+            f"field 'hp_floor' is a percent of health, 0-100 with 0 for never, got {hp_floor}",
         )
-    raid = require_int(payload, "raid")
-    if raid < 0:
+    creep = require_int(payload, "creep")
+    if creep < 0 or creep > 100:
         raise DoctrineError(
-            _BAD_RAID_SIZE,
-            f"field 'raid' must be >= 0, a party size with 0 meaning no raiding, got {raid}",
-        )
-    tech = require_int(payload, "tech")
-    if tech < 0:
-        raise DoctrineError(
-            _BAD_TECH_CAP,
-            f"field 'tech' must be >= 0, factories to unlock with 0 meaning none, got {tech}",
+            _BAD_CREEP_HOLD,
+            f"field 'creep' must be 0-100, the percent of the way to hold at, got {creep}",
         )
     return Doctrine(
         name=require_non_empty_str(payload, "name"),
@@ -312,9 +511,22 @@ def decode_doctrine(payload: Mapping[str, str | int | float | bool]) -> Doctrine
         scout=require_bool(payload, "scout"),
         raid=raid,
         rush=require_bool(payload, "rush"),
-        creep=require_bool(payload, "creep"),
+        creep=creep,
         riposte=require_bool(payload, "riposte"),
         tech=tech,
+        lurk=lurk,
+        allin=allin,
+        decoys=decoys,
+        kite=require_bool(payload, "kite"),
+        income_ladder=require_bool(payload, "income_ladder"),
+        hp_floor=hp_floor,
+        strike=strike,
+        medics=medics,
+        bunkers=bunkers,
+        flame=flame,
+        close=close,
+        guns=guns,
+        nukes=nukes,
     )
 
 
@@ -349,91 +561,32 @@ def encode_doctrine(doctrine: Doctrine) -> dict[str, str | int | bool]:
         "creep": doctrine["creep"],
         "riposte": doctrine["riposte"],
         "tech": doctrine["tech"],
+        "lurk": doctrine["lurk"],
+        "allin": doctrine["allin"],
+        "decoys": doctrine["decoys"],
+        "kite": doctrine["kite"],
+        "income_ladder": doctrine["income_ladder"],
+        "hp_floor": doctrine["hp_floor"],
+        "strike": doctrine["strike"],
+        "medics": doctrine["medics"],
+        "bunkers": doctrine["bunkers"],
+        "flame": doctrine["flame"],
+        "close": doctrine["close"],
+        "guns": doctrine["guns"],
+        "nukes": doctrine["nukes"],
     }
-
-
-def parse_doctrine_lines(lines: Sequence[str]) -> Doctrine:
-    """Read a doctrine file: one ``field value`` pair per line.
-
-    Blank lines and ``#`` comments are skipped, so a preset can record why its
-    values are what they are beside the values themselves. Fields may appear in
-    any order; each exactly once.
-
-    Args:
-        lines: The file's lines, without newlines.
-
-    Returns:
-        The doctrine it describes.
-
-    Raises:
-        DoctrineError: When a line is malformed, names an unknown field,
-            repeats one, or carries a value of the wrong shape.
-        DecodeError: When a field is absent or out of range.
-    """
-    payload: dict[str, str | int | float | bool] = {}
-    for line in lines:
-        bare = line.strip()
-        if not bare or bare.startswith("#"):
-            continue
-        field, _, raw = bare.partition(" ")
-        raw = raw.strip()
-        if not raw:
-            raise DoctrineError(_FIELD_SHAPE, f"a doctrine line is 'field value', got {line!r}")
-        if field in payload:
-            raise DoctrineError(_REPEATED_FIELD, f"field {field!r} appears twice")
-        if field in _STR_FIELDS:
-            payload[field] = raw
-        elif field in _INT_FIELDS:
-            try:
-                payload[field] = int(raw)
-            except ValueError as error:
-                raise DoctrineError(
-                    _NOT_A_NUMBER, f"field {field!r} must be a whole number, got {raw!r}"
-                ) from error
-        elif field in _FLAG_FIELDS:
-            if raw not in ("0", "1"):
-                raise DoctrineError(_NOT_A_FLAG, f"field {field!r} must be 0 or 1, got {raw!r}")
-            payload[field] = raw == "1"
-        else:
-            raise DoctrineError(
-                _UNKNOWN_FIELD,
-                f"field {field!r} is not one of {', '.join(DOCTRINE_FIELDS)}",
-            )
-    return decode_doctrine(payload)
-
-
-def format_doctrine(doctrine: Doctrine) -> tuple[str, ...]:
-    """Render a doctrine as the lines :func:`parse_doctrine_lines` reads.
-
-    What a probe or a test writes when it needs a preset on disk, so the two
-    formats cannot drift.
-
-    Args:
-        doctrine: The doctrine to render.
-
-    Returns:
-        One line per field, in :data:`DOCTRINE_FIELDS` order.
-    """
-    flat = encode_doctrine(doctrine)
-    rendered: list[str] = []
-    for field in DOCTRINE_FIELDS:
-        value = flat[field]
-        if isinstance(value, bool):
-            rendered.append(f"{field} {int(value)}")
-        else:
-            rendered.append(f"{field} {value}")
-    return tuple(rendered)
 
 
 __all__ = [
     "DEFAULT_DOCTRINE",
     "DERIVE_RESERVE",
     "DOCTRINE_FIELDS",
+    "FLAG_FIELDS",
+    "INT_FIELDS",
     "NO_HEAVIES",
+    "STR_FIELDS",
     "Doctrine",
     "DoctrineError",
     "decode_doctrine",
     "encode_doctrine",
-    "format_doctrine",
-    "parse_doctrine_lines",
 ]

@@ -162,6 +162,25 @@ class Workforce:
         """
         return tuple(site for _, site in self._job.values())
 
+    def underway(self, type_name: str) -> int:
+        """Count workers currently under orders to build one type.
+
+        **What this answers is "how many of these are already coming".** A
+        headcount read off standing structures alone is blind to the walk:
+        the nuke channel counted zero launchers while its first builder was
+        in transit and assigned a fresh builder to the same job every tick
+        -- eight granted claims, 360,000 credits, one structure
+        (`runs/sweeps/vh-nuke`, log 2026-08-05). The same disease
+        :meth:`claims` exists for, asked by type instead of by site.
+
+        Args:
+            type_name: The structure type to count.
+
+        Returns:
+            Workers with an outstanding order for that type.
+        """
+        return sum(1 for job_type, _ in self._job.values() if job_type == type_name)
+
     def _is_free(self, sample: Sample, worker: Entity) -> bool:
         """Judge one worker against what it was last sent to do.
 

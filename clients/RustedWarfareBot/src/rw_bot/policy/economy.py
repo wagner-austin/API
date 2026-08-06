@@ -101,6 +101,16 @@ class Expansion(TypedDict):
         owned: Finished extractors the player holds.
         occupied: Pools with something already standing on them.
         exposed: Pools reachable only through hostile fire.
+        visible: Pools the sample carries in total. Zero means no survey ran
+            on this answer -- a refusal before the survey, or a decision that
+            never asked about pools at all -- and a zero is how the caller
+            tells "the map was measured empty" from "the map was not
+            measured", two states a shared default would fuse.
+        unreachable: Pools the builder cannot walk to at all. With
+            ``visible`` this is the map's own answer to how large an economy
+            it can ever fund, which is what the expander's protection floor
+            is derived from rather than a number measured on one map and
+            carried to every other ([[policy-holding-ground]]).
     """
 
     build: bool
@@ -113,6 +123,8 @@ class Expansion(TypedDict):
     owned: int
     occupied: int
     exposed: int
+    visible: int
+    unreachable: int
 
 
 def count_extractors(sample: Sample, type_name: str = EXTRACTOR_TYPE) -> int:
@@ -175,6 +187,8 @@ def waiting(reason: str, sample: Sample, type_name: str, *, priced_out: bool = F
         owned=count_extractors(sample, type_name),
         occupied=0,
         exposed=0,
+        visible=0,
+        unreachable=0,
     )
 
 
@@ -306,6 +320,8 @@ def expand_economy(
             owned=owned,
             occupied=survey["occupied"],
             exposed=survey["exposed"],
+            visible=survey["visible"],
+            unreachable=survey["unreachable"],
         )
 
     pool = survey["pool"]
@@ -320,6 +336,8 @@ def expand_economy(
         owned=owned,
         occupied=survey["occupied"],
         exposed=survey["exposed"],
+        visible=survey["visible"],
+        unreachable=survey["unreachable"],
     )
 
 
@@ -390,6 +408,8 @@ def expand_production(
         owned=count_extractors(sample),
         occupied=0,
         exposed=0,
+        visible=0,
+        unreachable=0,
     )
 
 

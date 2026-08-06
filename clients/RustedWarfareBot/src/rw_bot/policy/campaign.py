@@ -1,21 +1,10 @@
 """Play a whole match in one tick: perceive, arbitrate, dispatch, acknowledge.
 
-There used to be two loops. The build loop ran the opening plan to completion
-and handed over to a fight loop, and the seam between them was the bot's largest
-structural defect rather than a tidy separation of concerns:
-
-* while building there was no army and no economy, so the opening was played
-  defenceless and every credit above the plan's cost sat in the bank;
-* once fighting there was no build policy at all, so ``extractorT1`` was the
-  only structure that could ever be placed again and the factory count was
-  frozen for the rest of the match — which is the arithmetic behind a run that
-  banked 7,013 credits behind a single Land Factory ([[policy-production]]);
-* and a plan that stalled meant a match that never fought, because the handover
-  was conditional on the plan finishing.
-
-So there is one loop, and everything runs on every observation. The plan keeps
-building, the factories keep producing, the economy keeps expanding and the army
-keeps fighting, for as long as the match lasts.
+There used to be two loops -- build, then fight -- and the seam between them
+was the bot's largest structural defect: defenceless while building, unable to
+build once fighting, and a stalled plan meant a match that never fought
+([[policy-production]]). So there is one loop, and everything runs on every
+observation for as long as the match lasts.
 
 **Spending is arbitrated, not raced.** Every decision that costs credits claims
 against one :class:`~rw_bot.policy.budget.Budget` per observation, in priority
@@ -26,8 +15,11 @@ and committed the same credit twice ([[policy-budget]]).
 
 This module is orchestration only. What to build is
 :mod:`rw_bot.policy.build_order`, what to attack is
-:mod:`rw_bot.policy.combat`, what to claim is :mod:`rw_bot.policy.economy`, and
-all of them are pure -- the channel is touched here and nowhere else.
+:mod:`rw_bot.policy.combat`, what to claim is :mod:`rw_bot.policy.economy`,
+and all of them are pure. Orders leave through the loop's sending arm,
+:mod:`rw_bot.policy.dispatching` -- the pair is the loop, and the
+architecture guard names exactly the two of them so a third sender can
+never grow unnoticed.
 """
 
 from __future__ import annotations
@@ -39,15 +31,35 @@ from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.catalogue import UnitStats
 from rw_bot.mechanics.combat_profile import CombatProfile
 from rw_bot.mechanics.placement import TypePlacement
+from rw_bot.policy.assess import AirWatch
 from rw_bot.policy.budget import Budget
 from rw_bot.policy.combat import WAVE_SIZES, find_army, find_targets
+from rw_bot.policy.convert import Converter, TurretLadder
 from rw_bot.policy.counter import counter_composition, mobile_threats
 from rw_bot.policy.creep import Creeper
+from rw_bot.policy.decoy import Decoys, scout_shortfall
 from rw_bot.policy.dispatch import WaveController
+from rw_bot.policy.dispatching import (
+    advance_creep,
+    draft_raid,
+    march_rush,
+    send_attacks,
+    send_builds,
+    send_moves,
+    send_nukes,
+    send_plan_step,
+    send_postures,
+    send_produces,
+    send_recon,
+    send_tech,
+)
 from rw_bot.policy.expander import Expander
 from rw_bot.policy.intel import Intel
 from rw_bot.policy.ledger import Outlays
+from rw_bot.policy.lurk import Lurker
 from rw_bot.policy.match_report import MatchReport
+from rw_bot.policy.medic import BUNKER_TYPE, Medic
+from rw_bot.policy.nuker import Nuker
 from rw_bot.policy.production import wanted_producers
 from rw_bot.policy.raid import Raider
 from rw_bot.policy.recorder import Recorder
@@ -55,102 +67,15 @@ from rw_bot.policy.runner import AFFORD_STALL_SAMPLES, DEFAULT_STALL_SAMPLES, Or
 from rw_bot.policy.rush import Rusher
 from rw_bot.policy.scorekeeper import Scorekeeper
 from rw_bot.policy.scouting import SCOUT_TYPE, ScoutRunner
+from rw_bot.policy.situation import Closer, Momentum, strike_window
 from rw_bot.policy.spending import (
-    PlanStep,
     build_plan,
     replace_losses,
-    unlock_tech,
     upgrade_income,
     worker_need,
 )
 from rw_bot.policy.verdict import GRADE_SURVIVED
 from rw_bot.policy.workforce import DEFAULT_MAX_WORKERS, EXPAND_RETRY_SAMPLES, Workforce
-from rw_bot.wire.command import AttackOrder, BuildOrder, MoveOrder, ProduceOrder
-from rw_bot.wire.state import Entity, Sample
-
-
-def _send_plan_step(channel: AgentChannel, step: PlanStep) -> None:
-    """Send whatever the opening plan decided on, if anything.
-
-    Args:
-        channel: An open connection to the agent.
-        step: What the plan decided this observation.
-
-    Raises:
-        OSError: When the connection fails.
-    """
-    if step["produce"] is not None:
-        channel.send_produce(step["produce"])
-    if step["build"] is not None:
-        channel.send_build(step["build"])
-
-
-def _send_moves(channel: AgentChannel, moves: Sequence[MoveOrder]) -> int:
-    """Send every move order and report how many.
-
-    Args:
-        channel: An open connection to the agent.
-        moves: The orders to send.
-
-    Returns:
-        How many were sent.
-
-    Raises:
-        OSError: When the connection fails.
-    """
-    for move in moves:
-        channel.send_move(move)
-    return len(moves)
-
-
-def _send_attacks(channel: AgentChannel, attacks: Sequence[AttackOrder]) -> int:
-    """Send every attack order and report how many.
-
-    Args:
-        channel: An open connection to the agent.
-        attacks: The orders to send.
-
-    Returns:
-        How many were sent.
-
-    Raises:
-        OSError: When the connection fails.
-    """
-    for attack in attacks:
-        channel.send_attack(attack)
-    return len(attacks)
-
-
-def _send_produces(channel: AgentChannel, orders: Sequence[ProduceOrder]) -> int:
-    """Send every produce order and report how many.
-
-    Args:
-        channel: An open connection to the agent.
-        orders: The orders to send.
-
-    Returns:
-        How many were sent.
-
-    Raises:
-        OSError: When the connection fails.
-    """
-    for order in orders:
-        channel.send_produce(order)
-    return len(orders)
-
-
-def _send_builds(channel: AgentChannel, orders: Sequence[BuildOrder]) -> None:
-    """Send every build order.
-
-    Args:
-        channel: An open connection to the agent.
-        orders: The orders to send.
-
-    Raises:
-        OSError: When the connection fails.
-    """
-    for order in orders:
-        channel.send_build(order)
 
 
 def play(
@@ -174,9 +99,22 @@ def play(
     scout: bool = False,
     raid: int = 0,
     rush: bool = False,
-    creep: bool = False,
+    creep: int = 0,
     riposte: bool = False,
     tech: int = 0,
+    lurk: int = 0,
+    decoys: int = 0,
+    kite: bool = False,
+    hp_floor: int = 0,
+    allin: int = 0,
+    strike: int = 0,
+    medics: int = 0,
+    bunkers: int = 0,
+    flame: int = 0,
+    close: int = 0,
+    guns: int = 0,
+    nukes: int = 0,
+    income_ladder: bool = False,
     stop_when_plan_done: bool = False,
     stall_samples: int = DEFAULT_STALL_SAMPLES,
     afford_samples: int = AFFORD_STALL_SAMPLES,
@@ -229,6 +167,23 @@ def play(
         creep: Walk turrets toward the enemy start, one covered step each.
         riposte: Release the whole reserve the moment an intrusion ends.
         tech: Factories to unlock a tier on, zero for none. See Doctrine.
+        lurk: Scouts kept alive at the enemy start, zero for none. See Doctrine.
+        decoys: Scatter scouts kept alive on our half, zero for none. See Doctrine.
+        kite: Reflex: armed mobile units hold the reach band. See Doctrine.
+        hp_floor: Reflex: flee below this percent of health. See Doctrine.
+        allin: Observation the whole reserve releases from, zero never. See Doctrine.
+        strike: Rival army-value drop that opens the release window. See Doctrine.
+        medics: Combat engineers kept alive via saving hires. See Doctrine.
+        bunkers: Mobile turrets kept alive the same way. See Doctrine.
+        flame: Flame turrets held by converting ground turrets. See Doctrine.
+        close: Dominance multiple that releases and marches everything. See
+            Doctrine.
+        guns: Top-tier gun turrets held by walking the turret chain. See
+            Doctrine.
+        nukes: Nuke launchers stood and kept firing at the priciest hostile
+            structure in sight. See Doctrine.
+        income_ladder: Refused extractor conversions save toward themselves.
+            See Doctrine.
 
         Each of these is one doctrine field; the reasoning and the
         measurements behind every flag live on
@@ -264,15 +219,30 @@ def play(
     recorder = Recorder(trace)
     scores = Scorekeeper(catalogue, profiles)
     waves = WaveController(
-        ladder, intercept=intercept, guard_cap=guard_cap, forward=forward, riposte=riposte
+        ladder,
+        intercept=intercept,
+        guard_cap=guard_cap,
+        forward=forward,
+        riposte=riposte,
+        allin_at=allin,
     )
     intel = Intel()
     scouts = ScoutRunner()
+    lurkers = Lurker()
+    scatter = Decoys()
+    momentum = Momentum()
+    medic = Medic()
+    bunker = Medic(BUNKER_TYPE)
+    flamer = Converter()
+    gunner = TurretLadder()
+    closer = Closer(close)
     # Sized by the doctrine; at zero the raid gate below never fires and the
     # raider is never consulted, so the size is safe to construct with.
     raiders = Raider(size=raid) if raid else Raider()
     rusher = Rusher()
     creeper = Creeper()
+    nuker = Nuker()
+    airwatch = AirWatch()
 
     produced = 0
     refused = 0
@@ -289,6 +259,7 @@ def play(
     build_reason = "no sample seen yet"
     outcome = "sample_limit"
 
+    send_postures(channel, kite, hp_floor, catalogue, profiles)
     while scores.samples_seen < max_samples:
         sample = channel.next_sample()
 
@@ -297,14 +268,26 @@ def play(
         # ([[policy-determinism]]).
         try:
             army = find_army(sample, catalogue, profiles)
-            if scout:
-                # The scout is eyes, not a soldier: left in the army it would
-                # be counted toward a wave and marched into the fight the
-                # moment enough of it gathers.
+            if scout or lurk or decoys:
+                # The scout is eyes, the lurker a leash, the decoy a ticket
+                # in the enemy's target lottery -- none of them soldiers:
+                # left in the army they would be counted toward a wave and
+                # marched into the fight the moment enough of it gathers.
                 army = tuple(unit for unit in army if unit["type_name"] != SCOUT_TYPE)
             targets = find_targets(sample)
             if scout or raid:
                 intel.observe(sample)
+            momentum.observe(sample)
+            airwatch.observe(sample)
+            # The closer: dominance decays, so a decided match is ended
+            # while it is decided -- eleven of nineteen dominant Very Hard
+            # positions lost when the game ran long. Latched by the Closer
+            # on SUSTAINED dominance only: the un-debounced latch turned
+            # early-game ratio noise into lifelong premature all-ins
+            # ([[policy-situation]]). Observed at the top of the tick since
+            # the finisher funds from it: the commitment IS the surplus
+            # signal at this rung (`runs/sweeps/vh-nuke`, log 2026-08-05).
+            committed_close = closer.observe(sample)
             scores.observe(sample, army, targets, workforce.size(sample))
             completed = tracker.completed(sample)
 
@@ -329,7 +312,7 @@ def play(
             build_outcome = plan_step["outcome"]
             build_reason = plan_step["reason"]
             plan_holds_worker = plan_step["holds_worker"]
-            _send_plan_step(channel, plan_step)
+            send_plan_step(channel, plan_step)
             # Production runs before the army check, so a wave that has just
             # been wiped still queues its replacements on the sample that
             # notices.
@@ -348,7 +331,10 @@ def play(
             # match on one builder ([[policy-production]]).
             composition_now: tuple[str, ...] = (
                 *need,
-                *(scouts.need(sample, workforce.size(sample)) if scout else ()),
+                # One shortfall for all three scout verbs together: each
+                # counting the roster against its own figure would leave
+                # every one satisfied by the others' scouts.
+                *scout_shortfall(sample, int(scout) + lurk + decoys),
                 *reinforce,
             )
             if counter:
@@ -360,55 +346,51 @@ def play(
                 for entity in sample["entities"]
                 if entity["unit_id"] in set(capable) and entity["queued"] == 0
             )
-            # **Upgrading claims before production, and this is the third
-            # ordering this pair has held.** Production-first left the tier
-            # three conversion asked eighteen hundred times a match and
-            # granted never -- `upgrade:extractorT3 asked 1816 got 0` -- while
-            # produce drained every credit above the reserve into units that
-            # traded even against a 1.8x income and equilibrated
-            # ([[policy-economy]], log 2026-07-31). A 4,000-credit conversion
-            # returns +8 a second on ground already held: ~500 in-game seconds
-            # to pay back inside matches that run ~900. The reserve still
-            # protects the replacement of a loss -- upgrades claim past it --
-            # so production is deferred, not starved.
+            # Upgrading claims before production: production-first left the
+            # T3 conversion asked 1,816 times and granted never while produce
+            # drained every credit into units that traded even and
+            # equilibrated. The reserve still protects replacing a loss, so
+            # production is deferred, not starved ([[policy-economy]]).
             # Tech claims before income conversions. The unlock saves toward
             # itself when refused, and the T2 extractor conversion funds at a
             # 2,300 balance where the unlock needs 2,900 -- ordered the other
             # way round, every accrual is sniped just short of the goal and
             # the tech arm never reaches the roster it exists for.
-            _send_tech(channel, tech, sample, budget, teched)
-            _send_produces(channel, upgrade_income(sample, catalogue, budget, upgraded))
-            _advance_creep(
+            send_tech(channel, tech, sample, budget, teched)
+            # The finisher claims right after tech: its 45,000 withhold is
+            # the doctrine's stated intent -- the fortress survives on what
+            # already stands while the launcher funds -- and an end-of-chain
+            # save would be drained by every channel below, exactly as the
+            # probe measured cover doing (`runs/nuke-probe.out`).
+            send_nukes(
+                channel,
+                nuker.advance(sample, catalogue, budget, free, workforce, nukes, committed_close),
+            )
+            send_produces(channel, medic.hire(sample, budget, medics))
+            send_produces(channel, bunker.hire(sample, budget, bunkers))
+            send_produces(channel, flamer.convert(sample, budget, flame))
+            send_produces(channel, gunner.convert(sample, budget, guns))
+            # Defence saves toward the turret it was refused last tick, early
+            # enough to bind the spenders below -- withheld here rather than
+            # where defence claims (last), because a fresh budget every tick
+            # means an end-of-tick withhold binds nobody
+            # ([[policy-budget]], log 2026-08-01).
+            expander.fund_cover(budget)
+            send_produces(
+                channel,
+                upgrade_income(sample, catalogue, budget, upgraded, ladder=income_ladder),
+            )
+            advance_creep(
                 channel, creep, sample, catalogue, profiles, budget, free, workforce, creeper
             )
             produce_orders = replace_losses(sample, catalogue, budget, composition_now)
-            ordered_now = _send_produces(channel, produce_orders)
+            ordered_now = send_produces(channel, produce_orders)
             produced += ordered_now
-            # **Upgrading also claims before expanding, and the arithmetic
-            # says the opposite.** A new extractor is 700 for +8 credits a
-            # second; converting one is 1,400 for +4 and then 4,000 for +8, so
-            # pools are six times better per credit and [[policy-economy]]
-            # states the rule outright -- "take every free pool before
-            # upgrading anything".
-            #
-            # **It was reordered on that arithmetic and measured worse.** Twelve
-            # seeds at Very Hard: 7 won with upgrades first, 5 with expansion
-            # first, same two losses, routs 3 -> 2, median win 2,207 -> 2,362.
-            # Inside the noise floor, so not a refutation -- but it is certainly
-            # not the improvement the per-credit figure promised.
-            #
-            # The mechanism the arithmetic omits is **risk**, and it is the one
-            # thing every rung of this ladder turns on. Matches are decided by
-            # how many extractors are LOST -- winners drop nought to four, the
-            # rest six or more ([[policy-holding-ground]]). A new extractor is
-            # income that can be destroyed; a conversion is income on ground
-            # already held, needing no builder and crossing no contested map.
-            # Six times the price for income that cannot be taken away is a
-            # different trade from six times the price for nothing.
-            #
-            # So the order stands, and the reasoning is recorded because the
-            # arithmetic against it is correct and still lost.
-            _send_builds(
+            # Upgrading also claims before expanding, although pools are
+            # cheaper per credit: the arithmetic omits risk, and matches are
+            # decided by extractors LOST ([[policy-economy]],
+            # [[policy-holding-ground]]).
+            send_builds(
                 channel,
                 expander.step(
                     sample,
@@ -418,6 +400,7 @@ def play(
                     composition_now,
                     workforce,
                     plan_step["wants_worker"],
+                    air_seen=airwatch.seen(),
                 ),
             )
             refused_now = sum(1 for claim in budget.ledger() if not claim["granted"])
@@ -466,16 +449,33 @@ def play(
             # their memory live on the controller; what the loop owns is only
             # that attacking runs last and costs nothing, which is why it is
             # not arbitrated at all ([[policy-combat]]).
-            if scout:
-                _send_moves(channel, scouts.patrol(sample, catalogue))
+            send_recon(channel, scout, lurk, decoys, scouts, lurkers, scatter, sample, catalogue)
             fighting = army
+            if waves.committed():
+                # The strike force is withheld from the engagement like the
+                # raid party, or first contact re-tasks the whole dump onto
+                # the replaceable army and the income is never reached.
+                struck = rusher.ordered()
+                fighting = tuple(u for u in fighting if u["unit_id"] not in struck)
             if raid:
-                fighting = _draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
-            moves, attacks = waves.command(sample, catalogue, profiles, fighting)
-            _send_moves(channel, moves)
-            _send_attacks(channel, attacks)
-            if rush:
-                _march_rush(channel, sample, catalogue, waves, rusher, fighting, targets)
+                fighting = draft_raid(channel, sample, catalogue, intel, army, waves, raiders)
+            moves, attacks = waves.command(
+                sample,
+                catalogue,
+                profiles,
+                fighting,
+                strike=strike_window(momentum, strike) or committed_close,
+            )
+            send_moves(channel, moves)
+            send_attacks(channel, attacks)
+            # Gated on the LATCHED commitment, not the knob: before the first
+            # open window a close doctrine holds exactly as it would without
+            # one -- gating on the knob made every ladder release march at
+            # the mirror, which is the rush verb wearing the closer's name.
+            if rush or allin or committed_close:
+                march_rush(
+                    channel, sample, catalogue, waves, rusher, fighting, targets, committed_close
+                )
         finally:
             channel.send_ack()
 
@@ -505,95 +505,3 @@ def play(
 
 
 __all__ = ["play"]
-
-
-def _draft_raid(
-    channel: AgentChannel,
-    sample: Sample,
-    catalogue: Mapping[str, UnitStats],
-    intel: Intel,
-    army: tuple[Entity, ...],
-    waves: WaveController,
-    raiders: Raider,
-) -> tuple[Entity, ...]:
-    """Advance the raid and return the units the waves may still command.
-
-    Whether the army can SPARE a party is decided here, against the wave
-    controller's own figure, because nothing asked it in v1 and that cost
-    every seat in the batch: the party came out of the wave gate and the
-    guard, and the raid was refuted 0/12 for it (log: 2026-07-29). The gate
-    arbitrates drafting only -- a party already out is managed to its end
-    regardless. A unit cannot serve two commanders: whatever the raid drafted
-    is withheld from the waves, and returns the moment the raid has nothing
-    left to assault.
-    """
-    spare = len(army) >= waves.need() + raiders.size
-    for order in raiders.strike(sample, intel, army, catalogue, spare):
-        channel.send_attack_move(order)
-    drafted = raiders.party()
-    return tuple(u for u in army if u["unit_id"] not in drafted)
-
-
-def _send_tech(
-    channel: AgentChannel,
-    tech: int,
-    sample: Sample,
-    budget: Budget,
-    teched: set[int],
-) -> None:
-    """Fire the factories' tier unlocks, up to the doctrine's count.
-
-    The gate is judged here rather than in the loop so the loop stays under
-    its complexity bound; an arm without the verb costs one call and no
-    claim ([[mechanics-build-actions]]).
-    """
-    if len(teched) >= tech:
-        return
-    for unlock in unlock_tech(sample, budget, teched, limit=tech):
-        channel.send_ability(unlock)
-
-
-def _advance_creep(
-    channel: AgentChannel,
-    creep: bool,
-    sample: Sample,
-    catalogue: Mapping[str, UnitStats],
-    profiles: Mapping[str, CombatProfile],
-    budget: Budget,
-    free: Sequence[Entity],
-    workforce: Workforce,
-    creeper: Creeper,
-) -> None:
-    """Advance the turret line one covered step, when the doctrine plays it.
-
-    Claimed before the army on purpose: for a creep style the turret line IS
-    the army, and a claim placed after production would starve on the same
-    every-tick drain the tier-three conversion did ([[policy-creep]]). The
-    flag is judged here rather than in the loop so the loop stays under its
-    complexity bound; an arm without the verb costs one call and no claim.
-    """
-    if not creep:
-        return
-    _send_builds(channel, creeper.advance(sample, catalogue, profiles, budget, free, workforce))
-
-
-def _march_rush(
-    channel: AgentChannel,
-    sample: Sample,
-    catalogue: Mapping[str, UnitStats],
-    waves: WaveController,
-    rusher: Rusher,
-    fighting: tuple[Entity, ...],
-    targets: Sequence[Entity],
-) -> None:
-    """March this tick's released units at the enemy start until contact.
-
-    After the waves, so the released set is this tick's. While nothing is
-    visible the released units march at the mirror of our base; on contact
-    the engagement policy re-tasks them, the engine running the newest
-    waypoint ([[policy-combat]]).
-    """
-    cleared = waves.released()
-    marching = tuple(u for u in fighting if u["unit_id"] in cleared)
-    for order in rusher.march(sample, catalogue, marching, bool(targets)):
-        channel.send_attack_move(order)

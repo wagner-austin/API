@@ -185,6 +185,7 @@ class WaveController:
         guard_cap: int = 0,
         forward: bool = False,
         riposte: bool = False,
+        allin_at: int = 0,
     ) -> None:
         """Open a controller.
 
@@ -211,12 +212,26 @@ class WaveController:
                 ([[ai-opponent-strategy]]). False is the behaviour every
                 measurement so far was taken under: waves release on size
                 alone, at a moment that means nothing.
+            allin_at: The observation from which the whole reserve releases
+                every tick, or zero never. The all-in verb: forty-seven
+                Impossible matches released on size and met an army that had
+                compounded past answering, so this releases on TIME -- hold
+                everything to the chosen moment, dump it, and stream every
+                later unit straight in. The anti-trickle floor still holds:
+                a release below the first wave's size is a trickle whatever
+                the clock says ([[policy-combat]]).
         """
         self._ladder = tuple(ladder)
         self._intercept = intercept
         self._guard_cap = guard_cap
         self._forward = forward
         self._riposte = riposte
+        self._allin_at = allin_at
+        # Observations seen, counted here rather than passed in: the trigger
+        # is about this controller's own timeline, and every caller already
+        # calls command() exactly once per observation.
+        self._observed = 0
+        self._committed = False
         # The riposte's memory: whether an intruder stood on our ground last
         # observation, and whether its departure has armed a counter-punch
         # that muster has not yet consumed.
@@ -235,6 +250,19 @@ class WaveController:
         self._guarding: set[int] = set()
         self._ordered: dict[int, int] = {}
         self._attacked: set[int] = set()
+
+    def committed(self) -> bool:
+        """Return whether the all-in moment has arrived.
+
+        The rusher's override: past the trigger the march ignores contact,
+        because the all-in IS the march -- the first probe released on time
+        and then stood at home fighting whatever was visible, and the dump
+        never crossed the map (``marches 0``, log 2026-07-31).
+
+        Returns:
+            True from the all-in observation onward.
+        """
+        return self._committed
 
     def released(self) -> frozenset[int]:
         """Return the ids currently cleared to attack.
@@ -266,6 +294,7 @@ class WaveController:
         catalogue: Mapping[str, UnitStats],
         profiles: Mapping[str, CombatProfile],
         army: Sequence[Entity],
+        strike: bool = False,
     ) -> tuple[tuple[MoveOrder, ...], tuple[AttackOrder, ...]]:
         """Decide this observation's moves and attacks.
 
@@ -286,7 +315,19 @@ class WaveController:
         Returns:
             The move orders and the attack orders to send, in that order.
         """
-        wave = muster(army, self._released, self._waves, self._ladder, force=self._avenging)
+        self._observed += 1
+        self._committed = self._allin_at > 0 and self._observed >= self._allin_at
+        # Three ways the whole reserve releases, in the order they were
+        # built: the riposte's intrusion edge, the all-in's clock, and the
+        # strike window's army-value ratio -- the signal the first two were
+        # approximating ([[policy-situation]]).
+        wave = muster(
+            army,
+            self._released,
+            self._waves,
+            self._ladder,
+            force=self._avenging or self._committed or strike,
+        )
         # Consumed whether or not it released: a riposte with too few units
         # to punch is a riposte missed, not one banked for an arbitrary
         # later moment that has lost the window.

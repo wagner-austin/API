@@ -171,6 +171,37 @@ class Budget:
             )
         self._withheld += amount
 
+    def release(self, amount: int) -> None:
+        """Hand a withholding back to the claimants that run after this call.
+
+        The withhold-then-release pair is how a LATE claimant saves. The tech
+        unlock claims first each tick, so claim-then-withhold suffices there;
+        defence claims last, and a withholding it placed early in the tick
+        would bind its own claim too -- ``spendable`` subtracts what is
+        withheld with no notion of whose saving it is. So the deficit is
+        withheld early (binding produce, upgrades and creep), and released
+        here at the point the expander runs -- where income and defence, the
+        two claimants the measurements ordered, arbitrate it in that order
+        ([[policy-economy]], log 2026-08-01).
+
+        Never released below zero: a release larger than what stands withheld
+        frees only what was actually held, so a caller cannot mint credits by
+        over-releasing.
+
+        Args:
+            amount: Credits to hand back. Negative is refused for the same
+                reason a negative withholding is.
+
+        Raises:
+            BudgetError: ``RW-BUDGET-003`` when the amount is negative.
+        """
+        if amount < 0:
+            raise BudgetError(
+                _NEGATIVE_CLAIM,
+                f"a release of {amount} would withhold credits rather than free them",
+            )
+        self._withheld = max(0, self._withheld - amount)
+
     def ledger(self) -> tuple[Claim, ...]:
         """Return every claim made this tick, granted or not, in order.
 

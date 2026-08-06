@@ -222,13 +222,23 @@ def expand_defence(
     stats = catalogue.get(turret_type)
     if stats is None:
         return waiting(f"the catalogue does not price {turret_type}", sample, turret_type)
-    if available < stats["price"]:
-        return waiting(
-            f"{turret_type} wanted {stats['price']} of {available} available", sample, turret_type
-        )
+    # Demand before price, so a priced-out wait is a fact worth saving toward:
+    # it now means "a bare structure exists and this balance cannot cover it",
+    # never "we are broke and everything is covered anyway". The expander's
+    # cross-tick withhold keys on exactly that flag -- the validated champion's
+    # own ledger showed defence reached 954 times and acting twice, with the
+    # last refusal reading `wanted 500 of 0 available` while the two turrets it
+    # DID land were setting the survival and dip records (log 2026-08-01).
     target = undefended(sample, catalogue, profiles, turret_type)
     if target is None:
         return waiting("every structure already has cover", sample, turret_type)
+    if available < stats["price"]:
+        return waiting(
+            f"{turret_type} wanted {stats['price']} of {available} available",
+            sample,
+            turret_type,
+            priced_out=True,
+        )
     builder = placer(sample, turret_type, free)
     if builder is None:
         return waiting(f"no free worker can place {turret_type}", sample, turret_type)
@@ -251,6 +261,8 @@ def expand_defence(
         owned=count_extractors(sample),
         occupied=0,
         exposed=0,
+        visible=0,
+        unreachable=0,
     )
 
 

@@ -46,6 +46,8 @@ def upgrade_income(
     catalogue: Mapping[str, UnitStats],
     budget: Budget,
     ordered: set[tuple[int, str]],
+    *,
+    ladder: bool = False,
 ) -> tuple[ProduceOrder, ...]:
     """Order every extractor that offers to upgrade itself and can be afforded.
 
@@ -110,7 +112,17 @@ def upgrade_income(
         ordered: Structures already told to upgrade, extended in place. A
             structure leaves this set only by leaving the roster, which is what
             makes a converted one stop being asked.
-        upgrade_type: What an owned structure converts into.
+        ladder: Whether a refused TIER-THREE conversion saves toward itself
+            (lower tiers fund organically and never save). Off is the
+            Impossible measurement (see the refusal comment below); on is the
+            Very Hard counter-measurement: our worth ceilinged at ~30-35k on
+            every seed while ``upgrade:extractorT3 asked 1,559-2,788 got 0``
+            in every ledger -- the T3 tier never once funded, income
+            flatlined at T2, and the matches where the opponent's compounding
+            passed the ceiling were unwinnable regardless of tactics
+            (`runs/traces/vh-debounce`, log 2026-08-02). Behind a wall that
+            holds, the tier the refusal protects against buying is the
+            ceiling itself.
 
     Returns:
         The produce orders to send, in roster order.
@@ -126,17 +138,27 @@ def upgrade_income(
             continue
         claim = budget.claim(f"upgrade:{step['produces']}", holder["upgrade_prices"][0])
         if not claim["granted"]:
-            # A refused conversion does NOT save toward itself, and this is a
-            # measured refutation, not an omission. Withholding the price
-            # (:meth:`~rw_bot.policy.budget.Budget.withhold`) bought six T2
-            # and six T3 conversions a match and doubled income to 98/s --
-            # and the army pauses it forced let the enemy's economy live
-            # untouched, rival scores rising to the worst of the whole
-            # screening arc while drops fell. Income that displaces early
-            # pressure is income for a longer strangle ([[policy-budget]],
-            # log 2026-07-31). The gated use the mechanism was kept for is
-            # :func:`unlock_tech` -- one bounded purchase per factory, not
-            # an unbounded ladder of them. Unconditionally, saving lost.
+            # A refused conversion does NOT save toward itself by default,
+            # and this is a measured refutation, not an omission. Withholding
+            # the price (:meth:`~rw_bot.policy.budget.Budget.withhold`)
+            # bought six T2 and six T3 conversions a match and doubled income
+            # to 98/s -- and the army pauses it forced let the enemy's
+            # economy live untouched, rival scores rising to the worst of the
+            # whole screening arc while drops fell. Income that displaces
+            # early pressure is income for a longer strangle
+            # ([[policy-budget]], log 2026-07-31). Unconditionally, saving
+            # lost -- at Impossible. The ``ladder`` gate is the Very Hard
+            # counter-case (see the docstring), and it saves toward the T3
+            # tier ONLY: the raw ladder went 2 won / 12 lost, and the deaths
+            # were the early T2-phase withholds starving the wall and army
+            # in the window survival is decided -- while T2 conversions fund
+            # organically in every match without saving. The two wins broke
+            # the worth ceiling (83k at 138/s; a never-won seed at 68k), so
+            # the tier that never funds keeps the saving and the tier that
+            # always funds keeps its timing (`runs/sweeps/vh-t3`,
+            # log 2026-08-02).
+            if ladder and step["produces"] == "extractorT3":
+                budget.withhold(holder["upgrade_prices"][0])
             break
         ordered.add(key)
         orders.append(produce_order(unit_id=step["unit_id"], type_name=step["produces"]))

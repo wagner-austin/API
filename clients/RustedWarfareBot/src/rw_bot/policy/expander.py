@@ -46,19 +46,56 @@ from rw_bot.wire.state import Entity, Sample
 #: placed, and that arm wiped three matches of six ([[policy-production]]).
 _SPARE_WORKER_FLOOR = 2
 
-#: Extractors below which expansion outranks replacing a loss.
+#: Pools the rival lands before the expansion race is decided.
 #:
-#: **Measured, not chosen.** Across 46 duels, final income at or above 50
-#: credits a second won 36 matches of 36; at or below 38 it failed 6 of 7. Base
-#: income is 18 and an extractor pays 8, so 50/s is exactly four extractors
+#: **Measured, not chosen.** Every winning duel_lake solo trace ends the race
+#: with the survey reading 8-9 of the map's 9 pools occupied and the bot
+#: holding 6-7 of them: the Very Hard opponent claims two, sometimes three,
+#: and the race is won by taking everything else
+#: (`runs/traces/vh-solo24`, log 2026-08-03; census strings in
+#: `runs/sweeps/vh-solo24`).
+RIVAL_POOL_SHARE = 2
+
+#: The floor no map can lower: the first extractor is always protected.
+#:
+#: Across 46 duels, matches without an economy at all lost outright -- final
+#: income at or below 38/s failed 6 of 7 -- so however few pools a map offers,
+#: claiming the first is never outranked by replacing a loss
 #: ([[policy-holding-ground]]).
-#:
-#: Below that the player does not have an economy, and an army bought without
-#: one is bought once: at Very Hard the bot spent roughly 65,000 credits of
-#: which **2,800 reached the economy**, produced 129 units, and ended with two
-#: alive and 26 credits a second. Above it the army resumes its priority,
-#: because by then there is an income to defend.
-ECONOMY_FLOOR = 4
+FLOOR_MINIMUM = 1
+
+
+def economy_floor(visible: int, unreachable: int) -> int:
+    """Derive the extractor count below which expansion outranks a loss.
+
+    **The number used to be a literal seven, and seven was one map's answer.**
+    The definitive solo run's traces split cleanly on it and nothing else in
+    the first 1,500 samples: the duel_lake opening is a bloodless expansion
+    race, every win reached 6-7 extractors by s1500 and every loss stalled at
+    4-5, so the floor was raised from four to seven and Very Hard went from
+    0/24 to 14/24 (`runs/traces/vh-solo24`, log 2026-08-03).
+
+    Carried to four other maps, the same seven lost every match it did not
+    stalemate -- 0W/5L/3S -- because their extractor peaks were 2-4: a floor
+    the map cannot fund is never crossed, so expansion stayed protected
+    forever and the army channels starved on maps where the race was already
+    over (`runs/sweeps/xmap-*`, log 2026-08-05). The number was never the
+    policy; the map's own pool count was.
+
+    So the floor is what duel_lake's seven actually measured: **everything
+    the builder can reach, minus the share the rival takes.** On duel_lake's
+    9 reachable pools that is exactly the seven the traces demanded; on a
+    map offering four it is two, and protection ends where the map's race
+    does instead of where duel_lake's did.
+
+    Args:
+        visible: Pools the sample carries in total.
+        unreachable: Pools the builder cannot walk to at all.
+
+    Returns:
+        The derived floor, never below :data:`FLOOR_MINIMUM`.
+    """
+    return max(FLOOR_MINIMUM, visible - unreachable - RIVAL_POOL_SHARE)
 
 
 class Expander:
@@ -122,10 +159,19 @@ class Expander:
         self.reaches = Reaches()
         self._catalogue = catalogue
         self._profiles = profiles
-        # Latched, not sampled: aircraft leave the viewport and come back, and
-        # AA that stands down between sorties is AA that is never finished
-        # when the sortie arrives.
-        self._air_seen = False
+        # The turret price the last cover decision was too late to afford, or
+        # zero. Carried across ticks because a fresh Budget is built every
+        # observation: a withhold placed where defence claims -- last -- binds
+        # nobody, so the deficit is withheld EARLY next tick instead
+        # (:meth:`fund_cover`), the same cross-tick saving that funds the tech
+        # unlock ([[policy-budget]]).
+        self._cover_need = 0
+        # The last floor the map's own census derived, kept because not every
+        # commit carries one: a factory or turret decision never surveyed the
+        # pools, and judging its protection by a zero census would read every
+        # map as empty. Pool counts are fixed per map, so the latch converges
+        # on the first economy survey and stays there (:func:`economy_floor`).
+        self._floor = FLOOR_MINIMUM
 
     def step(
         self,
@@ -136,6 +182,7 @@ class Expander:
         wanted: Sequence[str],
         workforce: Workforce,
         plan_wants_worker: bool = False,
+        air_seen: bool = False,
     ) -> tuple[BuildOrder, ...]:
         """Ask the economy what to do about this sample.
 
@@ -160,7 +207,11 @@ class Expander:
         Args:
             sample: One observation of the world.
             budget: The tick's credits, already claimed against by the plan and
-                by production.
+                by production. Any cover deficit :meth:`fund_cover` withheld
+                is released back here, first thing: the spenders it was meant
+                to bind have all run by now, and income and defence -- the
+                two claimants the measurements ordered -- arbitrate the saved
+                credits below in exactly that order.
             free: Workers not already carrying out an order, minus any the plan
                 has taken this observation. Availability has one owner now, so
                 this class no longer decides it ([[policy-loop]]).
@@ -183,6 +234,10 @@ class Expander:
                 is the plan's rather than the economy's ([[policy-loop]]).
             workforce: Told what each worker was sent to build, so the next
                 observation can see it working.
+            air_seen: Whether the opponent has ever shown aircraft, latched
+                by the campaign's :class:`~rw_bot.policy.assess.AirWatch` --
+                a fact about the match rather than about this channel, which
+                used to keep a private copy of it.
 
         Returns:
             The build order to send, or nothing when the economy declined to
@@ -192,6 +247,12 @@ class Expander:
         if not self.enabled:
             self.reaches.reached("disabled", False, "expansion disabled")
             return ()
+        # The cover deficit did its binding: everything between fund_cover and
+        # here saw the balance short by the turret's price. From this point
+        # the saved credits belong to the expander's own priority order --
+        # income first, then cover -- so they are handed back before either
+        # claims (:meth:`~rw_bot.policy.budget.Budget.release`).
+        budget.release(self._cover_need)
         if plan_wants_worker:
             # The plan's worker priority, matching the credit priority it has
             # always had. Every capable worker is busy and the plan is waiting
@@ -210,7 +271,6 @@ class Expander:
             )
             self.reason = "the plan is waiting for the next free worker"
             return ()
-        self._note_air(sample)
         # The plan's worker, and only the plan's worker. Filtering rather than
         # returning is the whole of the fix: the two spenders still never order
         # the same unit, and the other five workers stay available.
@@ -352,7 +412,7 @@ class Expander:
             self.reason = income_reason
             return (*capacity, *self._commit(growth, budget, workforce))
         if not growth["build"]:
-            growth = self._cover(sample, budget, free)
+            growth = self._cover(sample, budget, free, air_seen)
         if not growth["build"]:
             growth = expand_production(
                 sample,
@@ -365,19 +425,9 @@ class Expander:
         self.reason = growth["reason"] if growth["build"] else income_reason
         return (*capacity, *self._commit(growth, budget, workforce))
 
-    def _note_air(self, sample: Sample) -> None:
-        """Latch the sighting that arms anti-air cover.
-
-        Latched, not sampled: aircraft leave the viewport and come back, and
-        AA that stands down between sorties is never finished when the
-        sortie arrives.
-        """
-        if self.aa_cover and not self._air_seen:
-            self._air_seen = any(
-                entity["hostile"] and entity["flying"] for entity in sample["entities"]
-            )
-
-    def _cover(self, sample: Sample, budget: Budget, free: Sequence[Entity]) -> Expansion:
+    def _cover(
+        self, sample: Sample, budget: Budget, free: Sequence[Entity], air_seen: bool
+    ) -> Expansion:
         """Cover a bare structure: anti-air first once aircraft have been shown.
 
         Skipped entirely when the doctrine turns cover off -- the arm that
@@ -409,7 +459,7 @@ class Expander:
         Returns:
             The first cover decision that builds, or the last that declined.
         """
-        if self.aa_cover and self._air_seen:
+        if self.aa_cover and air_seen:
             growth = expand_defence(
                 sample,
                 self._catalogue,
@@ -433,7 +483,45 @@ class Expander:
             free=free,
         )
         self.reaches.reached("defence", growth["build"], growth["reason"])
+        # A priced-out cover wait means a bare structure exists and the
+        # balance could not reach the turret -- record the deficit so the
+        # next tick's :meth:`fund_cover` saves toward it. Any other outcome
+        # clears it: built, everything covered, no worker, no site.
+        self._cover_need = (
+            self._catalogue[TURRET_TYPE]["price"]
+            if not growth["build"] and growth["priced_out"]
+            else 0
+        )
         return growth
+
+    def fund_cover(self, budget: Budget) -> None:
+        """Withhold the turret the last cover decision could not afford.
+
+        The validated champion's ledger is the whole argument: defence was
+        reached 954 times and acted twice, its last refusal reading
+        ``c_turret_t1 wanted 500 of 0 available`` -- because defence claims
+        LAST, after every other spender has drained the tick, and a fresh
+        budget is built every observation so nothing accrues on its own.
+        Meanwhile the two turrets that did land set the survival and rival-dip
+        records at Impossible (log 2026-08-01).
+
+        Withheld early rather than reordered, and the distinction is a
+        measured one: defence *spending ahead of income* bought 29 turrets
+        against 4 extractors at Hard and was refuted ([[policy-holding-ground]]).
+        A withhold never buys anything out of turn -- the turret is still only
+        purchased inside :meth:`step`, after income has had its claim on the
+        same tick -- it only stops the LOWER-priority spenders from draining
+        the balance to zero first, exactly as the tech unlock saves
+        ([[policy-budget]]). Anti-air is deliberately not funded here yet: its
+        starvation is real (``aa-cover reached 403 acted 0``) but unmeasured
+        as a deficit, and one saving channel per measurement.
+
+        Args:
+            budget: The tick's credits, before the spenders below the plan
+                run.
+        """
+        if self._cover_need:
+            budget.withhold(self._cover_need)
 
     def _commit(
         self, growth: Expansion, budget: Budget, workforce: Workforce
@@ -448,6 +536,11 @@ class Expander:
         the economy out of roughly 65,000 spent**, 129 units produced and two
         alive, income ending at 26/s ([[policy-holding-ground]]).
 
+        How many is "the first few" is the map's answer rather than a
+        constant: :func:`economy_floor` derives it from the survey each
+        economy decision carries, and the latch keeps the last derivation for
+        the decisions that never surveyed.
+
         Args:
             growth: What the economy decided. Nothing is ordered when it
                 declined to build.
@@ -461,11 +554,15 @@ class Expander:
         """
         if not growth["build"]:
             return ()
+        # A decision that surveyed the pools re-derives the floor; one that
+        # never asked (a factory, a turret) is judged by the last map answer.
+        if growth["visible"]:
+            self._floor = economy_floor(growth["visible"], growth["unreachable"])
         stats = self._catalogue[growth["type_name"]]
         claim = budget.claim(
             f"expand:{growth['type_name']}",
             stats["price"],
-            protected=growth["owned"] < ECONOMY_FLOOR,
+            protected=growth["owned"] < self._floor,
         )
         if not claim["granted"]:
             self.reason = claim["reason"]
@@ -485,4 +582,4 @@ class Expander:
         )
 
 
-__all__ = ["Expander"]
+__all__ = ["FLOOR_MINIMUM", "RIVAL_POOL_SHARE", "Expander", "economy_floor"]
