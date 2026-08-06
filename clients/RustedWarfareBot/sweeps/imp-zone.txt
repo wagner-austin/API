@@ -1,0 +1,7 @@
+# The full fortified zone at Impossible: champion chassis + laser shields
+# + repair bay in goals + the gun ladder (guns 2 -> two T3 turrets via
+# funded chain steps). The teeth the shield-only probe lacked (0/3).
+# label | seed | doctrine | samples
+zone|12345|doctrines/zone.doctrine|4000
+zone|777|doctrines/zone.doctrine|4000
+zone|424242|doctrines/zone.doctrine|4000

@@ -1,0 +1,6 @@
+# The finisher at the rung with surplus: the failed-close seed + two
+# baseline-win regression seeds (does carrying a launcher cost a win?).
+# label | seed | doctrine | samples
+flame-nuke|24601|doctrines/flame-nuke.doctrine|10000
+flame-nuke|90210|doctrines/flame-nuke.doctrine|10000
+flame-nuke|4242|doctrines/flame-nuke.doctrine|10000

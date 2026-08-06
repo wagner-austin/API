@@ -1,0 +1,31 @@
+# The DEBOUNCED closer's verdict sweep -- the fifth point on the line:
+# no closer 7W/11L/1S (vh-close), flicker 9W/10L/5S (vh-closer, dribble
+# deaths), raw latch 9W/13L (vh-latch, premature all-ins wiped four
+# former wins). The Closer now commits only after CLOSE_HOLD=25
+# consecutive open samples (code, log 2026-08-01); same doctrine file.
+#
+# label | seed | doctrine | samples
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|1337|doctrines/flame-close.doctrine|10000
+flame-close|141421|doctrines/flame-close.doctrine|10000
+flame-close|16180|doctrines/flame-close.doctrine|10000
+flame-close|173205|doctrines/flame-close.doctrine|10000
+flame-close|223606|doctrines/flame-close.doctrine|10000
+flame-close|244948|doctrines/flame-close.doctrine|10000
+flame-close|24601|doctrines/flame-close.doctrine|10000
+flame-close|264575|doctrines/flame-close.doctrine|10000
+flame-close|2718|doctrines/flame-close.doctrine|10000
+flame-close|271828|doctrines/flame-close.doctrine|10000
+flame-close|282842|doctrines/flame-close.doctrine|10000
+flame-close|31337|doctrines/flame-close.doctrine|10000
+flame-close|31415|doctrines/flame-close.doctrine|10000
+flame-close|4242|doctrines/flame-close.doctrine|10000
+flame-close|42424|doctrines/flame-close.doctrine|10000
+flame-close|555|doctrines/flame-close.doctrine|10000
+flame-close|60613|doctrines/flame-close.doctrine|10000
+flame-close|6674|doctrines/flame-close.doctrine|10000
+flame-close|777|doctrines/flame-close.doctrine|10000
+flame-close|8128|doctrines/flame-close.doctrine|10000
+flame-close|8675309|doctrines/flame-close.doctrine|10000
+flame-close|90210|doctrines/flame-close.doctrine|10000
+flame-close|99991|doctrines/flame-close.doctrine|10000

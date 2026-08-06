@@ -1,0 +1,6 @@
+# The finisher's first screen: fortress chassis + one nuke launcher at
+# Impossible, where survival is solved and closing is the open problem.
+# label | seed | doctrine | samples
+fortress-nuke|12345|doctrines/fortress-nuke.doctrine|10000
+fortress-nuke|777|doctrines/fortress-nuke.doctrine|10000
+fortress-nuke|4242|doctrines/fortress-nuke.doctrine|10000

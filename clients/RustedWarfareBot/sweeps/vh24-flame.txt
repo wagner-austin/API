@@ -1,0 +1,30 @@
+# The ladder goal is 100% per rung, watchably. The banked Very Hard figure
+# is the pre-stack champion's 13/24 (vh24-tech); the flame chassis --
+# funded defence, flame conversions, pinned reserve -- has never been
+# measured below Impossible. Same 24 seeds, same map, difficulty 2.
+#
+# label | seed | doctrine | samples
+tech-flame|12345|doctrines/tech-flame.doctrine|4000
+tech-flame|1337|doctrines/tech-flame.doctrine|4000
+tech-flame|141421|doctrines/tech-flame.doctrine|4000
+tech-flame|16180|doctrines/tech-flame.doctrine|4000
+tech-flame|173205|doctrines/tech-flame.doctrine|4000
+tech-flame|223606|doctrines/tech-flame.doctrine|4000
+tech-flame|244948|doctrines/tech-flame.doctrine|4000
+tech-flame|24601|doctrines/tech-flame.doctrine|4000
+tech-flame|264575|doctrines/tech-flame.doctrine|4000
+tech-flame|2718|doctrines/tech-flame.doctrine|4000
+tech-flame|271828|doctrines/tech-flame.doctrine|4000
+tech-flame|282842|doctrines/tech-flame.doctrine|4000
+tech-flame|31337|doctrines/tech-flame.doctrine|4000
+tech-flame|31415|doctrines/tech-flame.doctrine|4000
+tech-flame|4242|doctrines/tech-flame.doctrine|4000
+tech-flame|42424|doctrines/tech-flame.doctrine|4000
+tech-flame|555|doctrines/tech-flame.doctrine|4000
+tech-flame|60613|doctrines/tech-flame.doctrine|4000
+tech-flame|6674|doctrines/tech-flame.doctrine|4000
+tech-flame|777|doctrines/tech-flame.doctrine|4000
+tech-flame|8128|doctrines/tech-flame.doctrine|4000
+tech-flame|8675309|doctrines/tech-flame.doctrine|4000
+tech-flame|90210|doctrines/tech-flame.doctrine|4000
+tech-flame|99991|doctrines/tech-flame.doctrine|4000

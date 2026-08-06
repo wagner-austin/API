@@ -1,0 +1,15 @@
+# The walking wall, screened on the six seeds NOTHING has ever won:
+# 777, 31415, 60613, 173205, 223606, 264575. The ratio autopsy: on
+# these the AI grows uncontested and never bleeds on our line -- no
+# closer threshold can reach them. flame-wall forces the engagement:
+# covered turrets walking 60% of the way, repair bays, flame
+# conversions on the advance. Creep was refuted at IMPOSSIBLE income,
+# never measured at VH parity.
+#
+# label | seed | doctrine | samples
+flame-wall|777|doctrines/flame-wall.doctrine|10000
+flame-wall|31415|doctrines/flame-wall.doctrine|10000
+flame-wall|60613|doctrines/flame-wall.doctrine|10000
+flame-wall|173205|doctrines/flame-wall.doctrine|10000
+flame-wall|223606|doctrines/flame-wall.doctrine|10000
+flame-wall|264575|doctrines/flame-wall.doctrine|10000

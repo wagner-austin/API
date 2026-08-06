@@ -1,0 +1,17 @@
+# flame-raid6 promoted from the imp-screen2 screen (3/3 ending with live
+# income -- the only arm in the record to do so -- tightest dip cluster,
+# lowest unengageable). Full twelve against the banked imp-flame rows.
+#
+# label | seed | doctrine | samples
+flame-raid6|12345|doctrines/flame-raid6.doctrine|4000
+flame-raid6|777|doctrines/flame-raid6.doctrine|4000
+flame-raid6|4242|doctrines/flame-raid6.doctrine|4000
+flame-raid6|31337|doctrines/flame-raid6.doctrine|4000
+flame-raid6|8675309|doctrines/flame-raid6.doctrine|4000
+flame-raid6|90210|doctrines/flame-raid6.doctrine|4000
+flame-raid6|555|doctrines/flame-raid6.doctrine|4000
+flame-raid6|1337|doctrines/flame-raid6.doctrine|4000
+flame-raid6|24601|doctrines/flame-raid6.doctrine|4000
+flame-raid6|8128|doctrines/flame-raid6.doctrine|4000
+flame-raid6|60613|doctrines/flame-raid6.doctrine|4000
+flame-raid6|99991|doctrines/flame-raid6.doctrine|4000

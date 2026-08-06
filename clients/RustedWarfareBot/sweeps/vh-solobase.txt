@@ -1,0 +1,16 @@
+# Overnight solo baseline: true deployment win rates for the two top
+# configs, matched 6-seed panels (mixed prior outcomes), workers=1.
+#
+# label | seed | doctrine | samples
+flame-t3|555|doctrines/flame-t3.doctrine|10000
+flame-t3|1337|doctrines/flame-t3.doctrine|10000
+flame-t3|12345|doctrines/flame-t3.doctrine|10000
+flame-t3|24601|doctrines/flame-t3.doctrine|10000
+flame-t3|90210|doctrines/flame-t3.doctrine|10000
+flame-t3|8675309|doctrines/flame-t3.doctrine|10000
+flame-close|555|doctrines/flame-close.doctrine|10000
+flame-close|1337|doctrines/flame-close.doctrine|10000
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|24601|doctrines/flame-close.doctrine|10000
+flame-close|90210|doctrines/flame-close.doctrine|10000
+flame-close|8675309|doctrines/flame-close.doctrine|10000

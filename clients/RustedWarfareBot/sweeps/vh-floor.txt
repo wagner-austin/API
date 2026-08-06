@@ -1,0 +1,12 @@
+# The floor screen: ECONOMY_FLOOR raised 4 -> 7 (re-measured, expander.py
+# docstring). The race is decided by s1500 with zero combat, so 2,500
+# samples suffice -- read extractors@s1500 from the traces, not verdicts.
+# Seeds: the six that stalled at 4-5 extractors in the definitive run.
+#
+# label | seed | doctrine | samples
+flame-close|555|doctrines/flame-close.doctrine|2500
+flame-close|1337|doctrines/flame-close.doctrine|2500
+flame-close|12345|doctrines/flame-close.doctrine|2500
+flame-close|24601|doctrines/flame-close.doctrine|2500
+flame-close|244948|doctrines/flame-close.doctrine|2500
+flame-close|141421|doctrines/flame-close.doctrine|2500

@@ -1,0 +1,12 @@
+# The community playbook's fortified zone, first probe at Impossible:
+# champion chassis + laser shields and a repair bay in the opening
+# (steam-impossible-playbook.txt: 'T3 guns, T2 AA, T2 arty, four repair
+# bays and some laser shields in each zone' + the attack-move pin:
+# 'once they see a wall of turrets they just stand there until they or
+# the wall dies'). Turret tiers and the mech push follow if the zone
+# holds. Screen: 3 seeds, 4,000 samples, parallel.
+#
+# label | seed | doctrine | samples
+playbook|12345|doctrines/playbook.doctrine|4000
+playbook|777|doctrines/playbook.doctrine|4000
+playbook|424242|doctrines/playbook.doctrine|4000

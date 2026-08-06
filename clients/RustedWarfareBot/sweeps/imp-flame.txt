@@ -1,0 +1,35 @@
+# The stack's distribution at Impossible (log 2026-08-01): single runs are
+# inside a ~1,100-sample noise band under varying concurrency, so the
+# champion claim is settled here -- tech-flame (cover + funded defence +
+# flame 2) against techprobe, the pre-stack champion, 12 seeds each,
+# identical worker conditions for every match.
+#
+#   make sweep SWEEP_JOBS=sweeps/imp-flame.txt SWEEP_NAME=imp-flame \
+#     SWEEP_WORKERS=8 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+tech-flame|12345|doctrines/tech-flame.doctrine|4000
+tech-flame|777|doctrines/tech-flame.doctrine|4000
+tech-flame|4242|doctrines/tech-flame.doctrine|4000
+tech-flame|31337|doctrines/tech-flame.doctrine|4000
+tech-flame|8675309|doctrines/tech-flame.doctrine|4000
+tech-flame|90210|doctrines/tech-flame.doctrine|4000
+tech-flame|555|doctrines/tech-flame.doctrine|4000
+tech-flame|1337|doctrines/tech-flame.doctrine|4000
+tech-flame|24601|doctrines/tech-flame.doctrine|4000
+tech-flame|8128|doctrines/tech-flame.doctrine|4000
+tech-flame|60613|doctrines/tech-flame.doctrine|4000
+tech-flame|99991|doctrines/tech-flame.doctrine|4000
+techprobe|12345|doctrines/techprobe.doctrine|4000
+techprobe|777|doctrines/techprobe.doctrine|4000
+techprobe|4242|doctrines/techprobe.doctrine|4000
+techprobe|31337|doctrines/techprobe.doctrine|4000
+techprobe|8675309|doctrines/techprobe.doctrine|4000
+techprobe|90210|doctrines/techprobe.doctrine|4000
+techprobe|555|doctrines/techprobe.doctrine|4000
+techprobe|1337|doctrines/techprobe.doctrine|4000
+techprobe|24601|doctrines/techprobe.doctrine|4000
+techprobe|8128|doctrines/techprobe.doctrine|4000
+techprobe|60613|doctrines/techprobe.doctrine|4000
+techprobe|99991|doctrines/techprobe.doctrine|4000

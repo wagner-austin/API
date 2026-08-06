@@ -1,0 +1,25 @@
+# The conversion sweep: 19 of 24 VH matches ended 'survived' at the
+# 4,000-sample cap with the bot dominant (vh24-flame: 5 won, 0 lost).
+# Same seeds, 10,000 samples -- how many wins complete given clock,
+# and which seeds are true stalemates needing a closer.
+#
+# label | seed | doctrine | samples
+tech-flame|777|doctrines/tech-flame.doctrine|10000
+tech-flame|1337|doctrines/tech-flame.doctrine|10000
+tech-flame|2718|doctrines/tech-flame.doctrine|10000
+tech-flame|4242|doctrines/tech-flame.doctrine|10000
+tech-flame|8128|doctrines/tech-flame.doctrine|10000
+tech-flame|12345|doctrines/tech-flame.doctrine|10000
+tech-flame|16180|doctrines/tech-flame.doctrine|10000
+tech-flame|24601|doctrines/tech-flame.doctrine|10000
+tech-flame|31337|doctrines/tech-flame.doctrine|10000
+tech-flame|31415|doctrines/tech-flame.doctrine|10000
+tech-flame|42424|doctrines/tech-flame.doctrine|10000
+tech-flame|60613|doctrines/tech-flame.doctrine|10000
+tech-flame|99991|doctrines/tech-flame.doctrine|10000
+tech-flame|141421|doctrines/tech-flame.doctrine|10000
+tech-flame|173205|doctrines/tech-flame.doctrine|10000
+tech-flame|223606|doctrines/tech-flame.doctrine|10000
+tech-flame|264575|doctrines/tech-flame.doctrine|10000
+tech-flame|271828|doctrines/tech-flame.doctrine|10000
+tech-flame|8675309|doctrines/tech-flame.doctrine|10000

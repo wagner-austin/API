@@ -1,0 +1,25 @@
+# Screening the unexplored axes on the flame chassis (log 2026-08-01,
+# post-imp-flame): raiding the rebuild engine harder (raid 6, the
+# anti-economy verb never measured at Impossible), the random-targeting
+# exploit (decoys 3 -- each decoy an equal ticket in the AI's target
+# lottery), and the healing arc completed (medics 2 + hp_floor 30:
+# flee-heal-rejoin). Controls are the banked imp-flame rows at these
+# same seeds. Three seeds screen; survivors face the full twelve.
+#
+#   make sweep SWEEP_JOBS=sweeps/imp-screen2.txt SWEEP_NAME=imp-screen2 \
+#     SWEEP_WORKERS=8 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+flame-raid6|555|doctrines/flame-raid6.doctrine|4000
+flame-raid6|24601|doctrines/flame-raid6.doctrine|4000
+flame-raid6|60613|doctrines/flame-raid6.doctrine|4000
+flame-decoys|555|doctrines/flame-decoys.doctrine|4000
+flame-decoys|24601|doctrines/flame-decoys.doctrine|4000
+flame-decoys|60613|doctrines/flame-decoys.doctrine|4000
+flame-med|555|doctrines/flame-med.doctrine|4000
+flame-med|24601|doctrines/flame-med.doctrine|4000
+flame-med|60613|doctrines/flame-med.doctrine|4000
+tech-raid6|555|doctrines/tech-raid6.doctrine|4000
+tech-raid6|24601|doctrines/tech-raid6.doctrine|4000
+tech-raid6|60613|doctrines/tech-raid6.doctrine|4000

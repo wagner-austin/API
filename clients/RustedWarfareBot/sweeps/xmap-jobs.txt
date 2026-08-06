@@ -1,0 +1,4 @@
+# Cross-map job list: the champion, two seeds per map.
+# label | seed | doctrine | samples
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|777|doctrines/flame-close.doctrine|10000

@@ -1,0 +1,12 @@
+# The merge screen: retimed ladder took 777/60613/173205/264575, the
+# wall took 777/31415 -- between them 5 of the never-won six. Does
+# creep 60 + income_ladder 1 compose (warden says winners can
+# cannibalize)? Screened on the six, incl. the last holdout 223606.
+#
+# label | seed | doctrine | samples
+flame-siege|777|doctrines/flame-siege.doctrine|10000
+flame-siege|31415|doctrines/flame-siege.doctrine|10000
+flame-siege|60613|doctrines/flame-siege.doctrine|10000
+flame-siege|173205|doctrines/flame-siege.doctrine|10000
+flame-siege|223606|doctrines/flame-siege.doctrine|10000
+flame-siege|264575|doctrines/flame-siege.doctrine|10000

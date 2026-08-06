@@ -1,0 +1,31 @@
+# The closer's verdict sweep: nineteen dominant Very Hard positions at
+# the 4,000 cap became eleven LOSSES at 10,000 (vh-close) -- dominance
+# decays. flame-close (champion + close 3) on the same 24 seeds at the
+# same 10,000-sample horizon: does ending the match while it is decided
+# convert the window into kills before the long game flips?
+#
+# label | seed | doctrine | samples
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|1337|doctrines/flame-close.doctrine|10000
+flame-close|141421|doctrines/flame-close.doctrine|10000
+flame-close|16180|doctrines/flame-close.doctrine|10000
+flame-close|173205|doctrines/flame-close.doctrine|10000
+flame-close|223606|doctrines/flame-close.doctrine|10000
+flame-close|244948|doctrines/flame-close.doctrine|10000
+flame-close|24601|doctrines/flame-close.doctrine|10000
+flame-close|264575|doctrines/flame-close.doctrine|10000
+flame-close|2718|doctrines/flame-close.doctrine|10000
+flame-close|271828|doctrines/flame-close.doctrine|10000
+flame-close|282842|doctrines/flame-close.doctrine|10000
+flame-close|31337|doctrines/flame-close.doctrine|10000
+flame-close|31415|doctrines/flame-close.doctrine|10000
+flame-close|4242|doctrines/flame-close.doctrine|10000
+flame-close|42424|doctrines/flame-close.doctrine|10000
+flame-close|555|doctrines/flame-close.doctrine|10000
+flame-close|60613|doctrines/flame-close.doctrine|10000
+flame-close|6674|doctrines/flame-close.doctrine|10000
+flame-close|777|doctrines/flame-close.doctrine|10000
+flame-close|8128|doctrines/flame-close.doctrine|10000
+flame-close|8675309|doctrines/flame-close.doctrine|10000
+flame-close|90210|doctrines/flame-close.doctrine|10000
+flame-close|99991|doctrines/flame-close.doctrine|10000

@@ -1,0 +1,16 @@
+# The siege tech arm at Impossible (log 2026-07-31): heavyArtillery (3,100
+# credits, reach 310) beside the heavyTanks. The lean tech arm swept Very
+# Hard but its first Impossible verdict was a rout -- rival peak 126,250,
+# our dip in them nil. The Impossible autopsies say non-wins die against
+# turret walls that out-range everything we field; heavyArtillery
+# out-ranges them back, and the roster probe proved it sits behind the
+# same single 2,000-credit T2 unlock ([[ai-opponent-strategy]]).
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-imp5.txt SWEEP_NAME=screen-imp5 \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+tech-siege|12345|doctrines/tech-siege.doctrine|4000
+tech-siege|777|doctrines/tech-siege.doctrine|4000
+tech-siege|4242|doctrines/tech-siege.doctrine|4000

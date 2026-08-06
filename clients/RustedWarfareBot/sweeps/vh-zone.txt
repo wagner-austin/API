@@ -1,0 +1,12 @@
+# The gun ladder at Very Hard, on the perimeter-erosion loss class: all
+# 8 vh-final losses built 6-7 extractors then lost every one under
+# sustained raiding (intercepts 1,900-2,800). Two T3 guns are the
+# community's answer to exactly that. 10k horizon; the erosion shows
+# at s4,800-9,300.
+# label | seed | doctrine | samples
+zone|555|doctrines/zone.doctrine|10000
+zone|1337|doctrines/zone.doctrine|10000
+zone|2718|doctrines/zone.doctrine|10000
+zone|173205|doctrines/zone.doctrine|10000
+zone|223606|doctrines/zone.doctrine|10000
+zone|264575|doctrines/zone.doctrine|10000

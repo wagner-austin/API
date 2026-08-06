@@ -1,0 +1,15 @@
+# Impossible triage (log 2026-07-31): three one-knob variants of the tech
+# champion, one seed each, against the champion's banked s12345 baseline
+# (defeated, worth 2,100, rival 126,250). The question is which posture
+# buys survival long enough for the heavy economy to matter: a defensive
+# kernel (cover+aa), a bigger horde (mass 40), or a heavier group-recall
+# leash (raid 6).
+#
+#   make sweep SWEEP_JOBS=sweeps/imp-triage.txt SWEEP_NAME=imp-triage \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+tech-cover|12345|doctrines/tech-cover.doctrine|4000
+tech-mass40|12345|doctrines/tech-mass40.doctrine|4000
+tech-raid6|12345|doctrines/tech-raid6.doctrine|4000

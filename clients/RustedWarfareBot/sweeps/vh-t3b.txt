@@ -1,0 +1,13 @@
+# The RETIMED ladder on the six never-won seeds: withhold only for the
+# T3 conversion (code, log 2026-08-02) -- the raw ladder's early
+# T2-phase pauses killed 12 matches while its two wins broke the worth
+# ceiling (83k @ 138/s; never-won 282842 at 68k). Same doctrine file;
+# the timing is structural now.
+#
+# label | seed | doctrine | samples
+flame-t3|777|doctrines/flame-t3.doctrine|10000
+flame-t3|31415|doctrines/flame-t3.doctrine|10000
+flame-t3|60613|doctrines/flame-t3.doctrine|10000
+flame-t3|173205|doctrines/flame-t3.doctrine|10000
+flame-t3|223606|doctrines/flame-t3.doctrine|10000
+flame-t3|264575|doctrines/flame-t3.doctrine|10000

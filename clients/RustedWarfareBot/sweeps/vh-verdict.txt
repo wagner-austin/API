@@ -1,0 +1,32 @@
+# The retimed ladder's verdict sweep -- the 100% candidate. On the
+# never-won six it took 4 (777/60613/173205/264575, zero drops); its
+# early game is byte-identical to flame-close until a T3 offers, so the
+# champion family's seeds should hold. The merge with the wall was
+# refuted 0/6 (cannibalization); known gaps: 31415 (wall-only) and
+# 223606 (never won by anything).
+#
+# label | seed | doctrine | samples
+flame-t3|12345|doctrines/flame-t3.doctrine|10000
+flame-t3|1337|doctrines/flame-t3.doctrine|10000
+flame-t3|141421|doctrines/flame-t3.doctrine|10000
+flame-t3|16180|doctrines/flame-t3.doctrine|10000
+flame-t3|173205|doctrines/flame-t3.doctrine|10000
+flame-t3|223606|doctrines/flame-t3.doctrine|10000
+flame-t3|244948|doctrines/flame-t3.doctrine|10000
+flame-t3|24601|doctrines/flame-t3.doctrine|10000
+flame-t3|264575|doctrines/flame-t3.doctrine|10000
+flame-t3|2718|doctrines/flame-t3.doctrine|10000
+flame-t3|271828|doctrines/flame-t3.doctrine|10000
+flame-t3|282842|doctrines/flame-t3.doctrine|10000
+flame-t3|31337|doctrines/flame-t3.doctrine|10000
+flame-t3|31415|doctrines/flame-t3.doctrine|10000
+flame-t3|4242|doctrines/flame-t3.doctrine|10000
+flame-t3|42424|doctrines/flame-t3.doctrine|10000
+flame-t3|555|doctrines/flame-t3.doctrine|10000
+flame-t3|60613|doctrines/flame-t3.doctrine|10000
+flame-t3|6674|doctrines/flame-t3.doctrine|10000
+flame-t3|777|doctrines/flame-t3.doctrine|10000
+flame-t3|8128|doctrines/flame-t3.doctrine|10000
+flame-t3|8675309|doctrines/flame-t3.doctrine|10000
+flame-t3|90210|doctrines/flame-t3.doctrine|10000
+flame-t3|99991|doctrines/flame-t3.doctrine|10000

@@ -1,0 +1,14 @@
+# Does the retimed T3 ladder compose with the race floor? Every prior
+# ladder measurement predates ECONOMY_FLOOR 7 -- the fatal early pauses
+# collided with unprotected expansion, a collision the floor removed.
+# Screened on the six sag-class losses of vh-final (ratio decaying
+# 0.9 -> 0.3-0.7 from s2000: the VH multiplier out-compounding a full
+# race). Read via autopsy ratios at s2000-3400, 4,000 samples.
+#
+# label | seed | doctrine | samples
+flame-t3|555|doctrines/flame-t3.doctrine|4000
+flame-t3|1337|doctrines/flame-t3.doctrine|4000
+flame-t3|2718|doctrines/flame-t3.doctrine|4000
+flame-t3|173205|doctrines/flame-t3.doctrine|4000
+flame-t3|223606|doctrines/flame-t3.doctrine|4000
+flame-t3|264575|doctrines/flame-t3.doctrine|4000

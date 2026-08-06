@@ -1,0 +1,32 @@
+# THE definitive measurement: the debounced closer under deployment
+# conditions -- solo, sequential, all 24 seeds, 10k horizon. The
+# overnight baseline: flame-close 4W/1L/1-near-win solo vs flame-t3's
+# 2/6 -- the ladder is refuted under deployment conditions and the
+# closer stands at ~70-80%. This run is the honest 100%-question
+# answer (log 2026-08-03).
+#
+# label | seed | doctrine | samples
+flame-close|12345|doctrines/flame-close.doctrine|10000
+flame-close|1337|doctrines/flame-close.doctrine|10000
+flame-close|141421|doctrines/flame-close.doctrine|10000
+flame-close|16180|doctrines/flame-close.doctrine|10000
+flame-close|173205|doctrines/flame-close.doctrine|10000
+flame-close|223606|doctrines/flame-close.doctrine|10000
+flame-close|244948|doctrines/flame-close.doctrine|10000
+flame-close|24601|doctrines/flame-close.doctrine|10000
+flame-close|264575|doctrines/flame-close.doctrine|10000
+flame-close|2718|doctrines/flame-close.doctrine|10000
+flame-close|271828|doctrines/flame-close.doctrine|10000
+flame-close|282842|doctrines/flame-close.doctrine|10000
+flame-close|31337|doctrines/flame-close.doctrine|10000
+flame-close|31415|doctrines/flame-close.doctrine|10000
+flame-close|4242|doctrines/flame-close.doctrine|10000
+flame-close|42424|doctrines/flame-close.doctrine|10000
+flame-close|555|doctrines/flame-close.doctrine|10000
+flame-close|60613|doctrines/flame-close.doctrine|10000
+flame-close|6674|doctrines/flame-close.doctrine|10000
+flame-close|777|doctrines/flame-close.doctrine|10000
+flame-close|8128|doctrines/flame-close.doctrine|10000
+flame-close|8675309|doctrines/flame-close.doctrine|10000
+flame-close|90210|doctrines/flame-close.doctrine|10000
+flame-close|99991|doctrines/flame-close.doctrine|10000

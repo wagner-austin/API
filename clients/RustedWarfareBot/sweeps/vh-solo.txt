@@ -1,0 +1,13 @@
+# Solo-conditions screen: the deployment measurement. 8-worker sweeps
+# perturb the engine (60613/264575 won at 6 workers, lost at 8, same
+# config). Six ladder-won seeds, workers=1, sequential -- if wins
+# reproduce solo, sweep noise is the artifact and the candidate's real
+# rate is what a watched match gets.
+#
+# label | seed | doctrine | samples
+flame-t3|555|doctrines/flame-t3.doctrine|10000
+flame-t3|777|doctrines/flame-t3.doctrine|10000
+flame-t3|173205|doctrines/flame-t3.doctrine|10000
+flame-t3|264575|doctrines/flame-t3.doctrine|10000
+flame-t3|282842|doctrines/flame-t3.doctrine|10000
+flame-t3|60613|doctrines/flame-t3.doctrine|10000

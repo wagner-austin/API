@@ -1,0 +1,6 @@
+# duel_lake regression pair for the map-derived floor: two baseline WINS from
+# vh-solo24, so a regression shows as a flip. The derivation must recover the
+# literal seven here (9 pools, 0 unreachable, rival share 2).
+# label | seed | doctrine | samples
+flame-close|16180|doctrines/flame-close.doctrine|10000
+flame-close|90210|doctrines/flame-close.doctrine|10000

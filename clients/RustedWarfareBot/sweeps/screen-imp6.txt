@@ -1,0 +1,13 @@
+# tech-mass40 at Impossible (log 2026-07-31): the one triage arm that
+# survived the rung (s12345: full 4,000 samples, army 13,350 standing,
+# dip 8,300 -- every other arm died by 3,332). Three seeds decide whether
+# the 40-horde holds everywhere.
+#
+#   make sweep SWEEP_JOBS=sweeps/screen-imp6.txt SWEEP_NAME=screen-imp6 \
+#     SWEEP_WORKERS=3 SWEEP_MATCH="maps/skirmish/[p2]duel_lake.tmx 3" \
+#     SWEEP_PINDELTA=3
+#
+# label | seed | doctrine | samples
+tech-mass40|12345|doctrines/tech-mass40.doctrine|4000
+tech-mass40|777|doctrines/tech-mass40.doctrine|4000
+tech-mass40|4242|doctrines/tech-mass40.doctrine|4000

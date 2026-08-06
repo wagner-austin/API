@@ -1,0 +1,13 @@
+# zone2: the zone with its base turrets in the PLAN -- the four-probe
+# investigation showed cover's turret orders mostly never stand (the
+# builder walk eats them silently), starving the conversion channels of
+# their raw material. Plan-built turrets fund protected, place on the
+# base ring, and probe4 proved the whole ladder fires live with them
+# (first T2 gun built, both flames converted). Same six seeds.
+# label | seed | doctrine | samples
+zone2|555|doctrines/zone2.doctrine|10000
+zone2|1337|doctrines/zone2.doctrine|10000
+zone2|2718|doctrines/zone2.doctrine|10000
+zone2|173205|doctrines/zone2.doctrine|10000
+zone2|223606|doctrines/zone2.doctrine|10000
+zone2|264575|doctrines/zone2.doctrine|10000
