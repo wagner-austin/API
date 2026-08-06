@@ -328,3 +328,56 @@ def test_hop_toward_equipment_boards_a_ferry_for_water_locked_drop() -> None:
     assert decision["command"]["target_x"] == 148
     assert decision["command"]["target_y"] == 101
     assert decision["behavior"]["reason_kind"] == "equipment_hop"
+
+
+def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
+    """The bot-20260805-173034 loop-killer: mined access is not a landing.
+
+    The nearer container's only legal service tile carries a known
+    hostile mine -- a teleport there displaces every time, so the hop
+    must not aim at it. The selector skips it (no_landing) and takes
+    the farther clean candidate instead of re-aiming forever.
+    """
+    from tankpit_bot.state.types import make_mine_state
+
+    containers = {
+        "130,100": make_container_state(
+            x=130,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+        "150,100": make_container_state(
+            x=150,
+            y=100,
+            is_fuel=False,
+            volume=0,
+            timestamp_ms=100000,
+            failed_pickups=0,
+        ),
+    }
+    world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
+    # (130,100) sits on water; three cardinals are water, the sole
+    # ground neighbor (131,100) carries a hostile mine.
+    world["mines"]["131,100"] = make_mine_state(x=131, y=100, mine_type=0, tank_id=-1, team=1)
+    terrain = InMemoryTerrainMap(
+        {
+            (130, 100): InMemoryTerrainMap.WATER,
+            (129, 100): InMemoryTerrainMap.WATER,
+            (130, 99): InMemoryTerrainMap.WATER,
+            (130, 101): InMemoryTerrainMap.WATER,
+        }
+    )
+    inventory = make_inventory(default_count=15)
+    ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")
+
+    decision = hop_toward_equipment(ctx, ctx.base)
+
+    if decision is None:
+        raise AssertionError("expected the clean farther candidate to win the hop")
+    command = decision["command"]
+    assert command["cmd_type"] == "teleport"
+    assert command["target_x"] == 150
+    assert command["target_y"] == 100

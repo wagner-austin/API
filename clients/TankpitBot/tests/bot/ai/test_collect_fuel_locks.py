@@ -8,8 +8,9 @@ from tankpit_bot.bot.ai.collect_pickups import (
     select_and_pickup_fuel,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
-from tankpit_bot.state.types import SelfStateDict, make_container_state
+from tankpit_bot.state.types import SelfStateDict, make_container_state, make_mine_state
 from tests.bot.ai._support import (
     make_inventory,
     make_scanned_ai_state,
@@ -277,6 +278,119 @@ def test_unservable_water_locked_fuel_releases_the_lock() -> None:
 
     assert decision is None
     assert released_state["resource_target_kind"] == ""
+
+
+def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
+    """Mined-only service tiles with no shootable mine: unservable.
+
+    The bot-20260805-173034 class with the clearance arm closed: the
+    sole ground service tile carries a hostile mine (teleports
+    displace, walks refuse), but the mine sits outside the visible
+    viewport so no clearance shot can be aimed, and no ferry floats
+    on the pond. Nothing in the cascade can ever serve it — release.
+    """
+    terrain_data: dict[tuple[int, int], str] = {
+        (130, 100): "W",
+        (129, 100): "W",
+        (130, 101): "W",
+        (130, 99): "W",
+    }
+    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=150,
+        scanned=True,
+        containers={
+            "130,100": make_container_state(
+                x=130,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    world["mines"]["131,100"] = make_mine_state(x=131, y=100, mine_type=0, tank_id=-1, team=2)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 130,
+            "resource_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+
+    decision, released_state = continue_or_release_fuel_lock(
+        ctx, ai_state, world["containers"]["130,100"]
+    )
+
+    assert decision is None
+    assert released_state["resource_target_kind"] == ""
+
+
+def test_mine_denied_locked_fuel_holds_while_the_clearance_shot_exists() -> None:
+    """A shootable service mine keeps the lock alive: servable via the free single.
+
+    Same pocket but inside the viewport with a clear shot line: the
+    clearance step runs before the hop lanes, so the verdict must
+    HOLD — the shot reopens the landing next tick and the lock then
+    serves normally. Releasing here would re-create the session-4
+    churn one layer up.
+    """
+    terrain_data: dict[tuple[int, int], str] = {
+        (104, 100): "W",
+        (103, 100): "W",
+        (104, 101): "W",
+        (104, 99): "W",
+    }
+    terrain = FerryAwareTerrain(
+        InMemoryTerrainMap(terrain_data=terrain_data),
+        {},
+        riding=False,
+        hostile_mine_keys=frozenset({"105,100"}),
+        occupied_tank_keys=frozenset(),
+    )
+    world, self_state = make_world(
+        self_x=100,
+        self_y=100,
+        fuel=150,
+        scanned=True,
+        containers={
+            "104,100": make_container_state(
+                x=104,
+                y=100,
+                is_fuel=True,
+                volume=500,
+                timestamp_ms=100000,
+            )
+        },
+    )
+    world["mines"]["105,100"] = make_mine_state(x=105, y=100, mine_type=0, tank_id=-1, team=2)
+    ai_state = AIStateDict(
+        **{
+            **make_scanned_ai_state(),
+            "mode": "COLLECT",
+            "mode_state": "",
+            "mode_started_ms": 90000,
+            "resource_target_kind": "fuel",
+            "resource_target_x": 104,
+            "resource_target_y": 100,
+        }
+    )
+    ctx = DecideCtx(world, self_state, ai_state, make_inventory(), 100000, terrain, "")
+
+    _decision, held_state = continue_or_release_fuel_lock(
+        ctx, ai_state, world["containers"]["104,100"]
+    )
+
+    assert held_state["resource_target_kind"] == "fuel"
+    assert held_state["resource_target_x"] == 104
+    assert held_state["resource_target_y"] == 100
 
 
 def test_out_of_window_locked_fuel_holds_so_the_hop_can_fire() -> None:

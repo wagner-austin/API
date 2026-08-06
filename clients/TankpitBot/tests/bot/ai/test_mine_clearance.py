@@ -100,13 +100,18 @@ def test_rock_in_the_shot_line_disqualifies_the_aim() -> None:
 
 
 def test_intermediate_mines_do_not_occlude_the_shot() -> None:
-    """ "We can shoot over other mines of course" — a mined lane stays clear."""
+    """ "We can shoot over other mines of course" — a mined lane stays clear.
+
+    The winning aim is (103,100) — the mined service tile nearest the
+    bot whose blast still covers the container — and its shot line
+    crosses the mine at (102,100), which never occludes.
+    """
     world, self_state = _world_with_self()
     _add_covered_container(world, 104, 100)
     world["mines"]["102,100"] = make_mine_state(x=102, y=100, mine_type=0, tank_id=-1, team=1)
     world["mines"]["103,100"] = make_mine_state(x=103, y=100, mine_type=0, tank_id=-1, team=1)
 
-    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (103, 100)
 
 
 def test_out_of_viewport_covered_container_is_skipped() -> None:
@@ -183,6 +188,233 @@ def test_blast_clips_at_the_map_edge() -> None:
     _add_covered_container(world, 0, 0)
 
     assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (0, 0)
+
+
+def _session4_pocket() -> tuple[WorldStateDict, SelfStateDict, InMemoryTerrainMap]:
+    """Rebuild the bot-20260805-173034 geometry trap, verbatim.
+
+    Equipment at (58,95) sits ON water; its west and south service
+    tiles are water, its north (58,94) and east (59,95) service tiles
+    are ground carrying hostile mines. The bot stands at (60,94). The
+    live session re-aimed 1,068 hops / 534 displaced teleports at
+    (59,95) over 43 minutes because no planner connected the mine to
+    the free clearance single.
+    """
+    world = make_empty_world_state()
+    world["viewport"] = make_viewport_state(left=52, top=86, width=16, height=16)
+    self_state = make_self_state(
+        tank_id=1,
+        x=60,
+        y=94,
+        team=2,
+        rank=1,
+        fuel=900,
+        leaderboard_position=1,
+    )
+    world["self_state"] = self_state
+    world["containers"]["58,95"] = make_container_state(x=58, y=95, is_fuel=False, volume=0)
+    for mine_x, mine_y in ((58, 94), (59, 95)):
+        world["mines"][f"{mine_x},{mine_y}"] = make_mine_state(
+            x=mine_x,
+            y=mine_y,
+            mine_type=0,
+            tank_id=-1,
+            team=1,
+        )
+    terrain = InMemoryTerrainMap(
+        {
+            (58, 95): InMemoryTerrainMap.WATER,
+            (57, 95): InMemoryTerrainMap.WATER,
+            (58, 96): InMemoryTerrainMap.WATER,
+        }
+    )
+    return world, self_state, terrain
+
+
+def test_water_locked_equipment_with_mined_flanks_draws_the_unlock_shot() -> None:
+    """The session-4 trap resolves to one free shot, not 1,068 hops.
+
+    Neither old trigger fired live: the container tile carries no mine
+    (it is water) and no walk was ever planned. The general trigger —
+    a hostile mine denies every attainable landing — aims at (58,94),
+    whose 3x3 blast destroys both flank mines and reopens the landing.
+    """
+    world, self_state, terrain = _session4_pocket()
+
+    assert find_mine_clearance_shot(world, self_state, terrain) == (58, 94)
+
+
+def test_pure_water_lock_without_mines_draws_no_shot() -> None:
+    """A blocked container with mine-free service tiles is ferry business."""
+    world, self_state, _terrain = _session4_pocket()
+    world["mines"].clear()
+    terrain_all_water = InMemoryTerrainMap(
+        {
+            (58, 95): InMemoryTerrainMap.WATER,
+            (57, 95): InMemoryTerrainMap.WATER,
+            (58, 96): InMemoryTerrainMap.WATER,
+            (58, 94): InMemoryTerrainMap.WATER,
+            (59, 95): InMemoryTerrainMap.WATER,
+        }
+    )
+
+    assert find_mine_clearance_shot(world, self_state, terrain_all_water) is None
+
+
+def test_blocked_arm_needs_terrain() -> None:
+    """Without terrain, attainability is unanswerable — no blocked aim."""
+    world, self_state, _ = _session4_pocket()
+
+    assert find_mine_clearance_shot(world, self_state, None) is None
+
+
+def test_los_blocked_flank_mines_defer_the_unlock_shot() -> None:
+    """Rock between the bot and every service mine defers the clearance."""
+    world, self_state, _ = _session4_pocket()
+    self_state["x"], self_state["y"] = 63, 95
+    terrain = InMemoryTerrainMap(
+        {
+            (58, 95): InMemoryTerrainMap.WATER,
+            (57, 95): InMemoryTerrainMap.WATER,
+            (58, 96): InMemoryTerrainMap.WATER,
+            (61, 93): InMemoryTerrainMap.ROCK,
+            (61, 94): InMemoryTerrainMap.ROCK,
+            (61, 95): InMemoryTerrainMap.ROCK,
+            (61, 96): InMemoryTerrainMap.ROCK,
+        }
+    )
+
+    assert find_mine_clearance_shot(world, self_state, terrain) is None
+
+
+def test_recruit_single_tile_blast_still_opens_the_aim_tile() -> None:
+    """A recruit's 1-tile blast opens the very tile it clears."""
+    world, self_state, terrain = _session4_pocket()
+    self_state["rank"] = 0
+
+    aim = find_mine_clearance_shot(world, self_state, terrain)
+
+    assert aim in {(58, 94), (59, 95)}
+
+
+def test_recruit_covered_flank_aim_opens_nothing_and_is_skipped() -> None:
+    """An aim whose blast reopens no denied container never wins.
+
+    Recruit blast is one tile: shooting the flank mine at (105,100)
+    neither exposes the covered container tile (104,100) nor opens a
+    landing that is missing (the clean west cardinal already serves
+    it), so that aim scores zero and the container tile itself wins.
+    """
+    world, self_state = _world_with_self(rank=0)
+    _add_covered_container(world, 104, 100)
+    world["mines"]["105,100"] = make_mine_state(x=105, y=100, mine_type=0, tank_id=-1, team=1)
+
+    assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (104, 100)
+
+
+def test_edge_of_viewport_container_with_out_of_view_mine_waits() -> None:
+    """A denied container whose only service mine sits off-view has no aim."""
+    world, self_state, _ = _session4_pocket()
+    world["containers"].clear()
+    world["mines"].clear()
+    world["containers"]["67,94"] = make_container_state(x=67, y=94, is_fuel=False, volume=0)
+    world["mines"]["68,94"] = make_mine_state(x=68, y=94, mine_type=0, tank_id=-1, team=1)
+    terrain = InMemoryTerrainMap(
+        {
+            (67, 94): InMemoryTerrainMap.WATER,
+            (66, 94): InMemoryTerrainMap.WATER,
+            (67, 93): InMemoryTerrainMap.WATER,
+            (67, 95): InMemoryTerrainMap.WATER,
+        }
+    )
+
+    assert find_mine_clearance_shot(world, self_state, terrain) is None
+
+
+class TestServiceClearanceAim:
+    """Tests for the single-target unlock aim used by the lock verdict."""
+
+    def test_mined_flanks_name_the_nearest_service_mine(self) -> None:
+        """The session-4 locked target holds because this aim exists."""
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, terrain = _session4_pocket()
+
+        assert find_service_clearance_aim(world, self_state, terrain, 58, 95) == (59, 95)
+
+    def test_open_access_needs_no_aim(self) -> None:
+        """A target with an attainable landing already never draws a shot."""
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, _ = _session4_pocket()
+        open_terrain = InMemoryTerrainMap()
+
+        assert find_service_clearance_aim(world, self_state, open_terrain, 58, 95) is None
+
+    def test_terrain_none_proposes_no_aim(self) -> None:
+        """Attainability is unanswerable without terrain — no aim."""
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, _ = _session4_pocket()
+
+        assert find_service_clearance_aim(world, self_state, None, 58, 95) is None
+
+    def test_los_blocked_service_mine_yields_no_aim(self) -> None:
+        """A rock wall between the bot and every service mine defers the aim."""
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, _ = _session4_pocket()
+        self_state["x"], self_state["y"] = 63, 95
+        terrain = InMemoryTerrainMap(
+            {
+                (58, 95): InMemoryTerrainMap.WATER,
+                (57, 95): InMemoryTerrainMap.WATER,
+                (58, 96): InMemoryTerrainMap.WATER,
+                (61, 93): InMemoryTerrainMap.ROCK,
+                (61, 94): InMemoryTerrainMap.ROCK,
+                (61, 95): InMemoryTerrainMap.ROCK,
+                (61, 96): InMemoryTerrainMap.ROCK,
+            }
+        )
+
+        assert find_service_clearance_aim(world, self_state, terrain, 58, 95) is None
+
+    def test_recruit_shot_at_a_water_mine_opens_nothing_and_is_skipped(self) -> None:
+        """A mined WATER service tile is a dead aim at recruit blast.
+
+        The goal tile itself carries a hostile mine but sits on water:
+        a recruit's 1-tile blast clears that mine yet water can never
+        be landed on, and the east ground tile stays mined — so the
+        water aim is skipped and the ground mine is the aim instead.
+        """
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, _terrain = _session4_pocket()
+        self_state["rank"] = 0
+        world["mines"]["58,95"] = make_mine_state(x=58, y=95, mine_type=0, tank_id=-1, team=1)
+        del world["mines"]["58,94"]
+        terrain_water_north = InMemoryTerrainMap(
+            {
+                (58, 95): InMemoryTerrainMap.WATER,
+                (57, 95): InMemoryTerrainMap.WATER,
+                (58, 96): InMemoryTerrainMap.WATER,
+                (58, 94): InMemoryTerrainMap.WATER,
+            }
+        )
+
+        assert find_service_clearance_aim(world, self_state, terrain_water_north, 58, 95) == (
+            59,
+            95,
+        )
+
+    def test_out_of_viewport_service_mine_cannot_be_aimed_at(self) -> None:
+        """The server rejects off-view aims; the verdict must not hold on one."""
+        from tankpit_bot.bot.ai.mine_clearance import find_service_clearance_aim
+
+        world, self_state, terrain = _session4_pocket()
+        world["viewport"] = make_viewport_state(left=70, top=86, width=16, height=16)
+
+        assert find_service_clearance_aim(world, self_state, terrain, 58, 95) is None
 
 
 class TestCorridorClearance:
