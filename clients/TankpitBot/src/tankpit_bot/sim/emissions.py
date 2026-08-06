@@ -18,12 +18,11 @@ from tankpit_bot.container.types import (
     MinePlacementDict,
     TeleportLandedDict,
 )
+from tankpit_bot.physics.supervisor import fuel_pickup_close_code
 from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_CANT_GO,
-    SUPERVISOR_ERROR_EMPTY_CONTAINER,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
     SUPERVISOR_ERROR_INVENTORY_FULL,
-    SUPERVISOR_ERROR_TANK_FULL,
 )
 from tankpit_bot.protocol.types import (
     BinaryMessage,
@@ -112,6 +111,23 @@ def emit_move(
     2,200+ teleport windows all read ``...pickup+pickup``; the real
     server always doubles the record).
 
+    A ``cant_go`` is a partial-walk receipt, not a bare rejection
+    (exact-window measure 2026-08-04, 12 live code-1s): when the
+    server walked a non-empty prefix before stopping, the 0x47 echo
+    for the walked tiles precedes the 0x52 close in the same batch
+    (live pairs landed within ±100 ms). The zero-tile pure refusal
+    (1 of the 12) emits the bare 0x52 — no echo, nothing moved.
+
+    A surface-transition stop SHORT of the click gets the same code-1
+    close even though the walk itself is lawful: the 2026-08-03 run's
+    cluster-A collects (bot riding the ferry afloat on (59,28) water,
+    land targets inland) each echoed the one-step disembark and then
+    the 0x52 — the receipt says "your command did not finish", not
+    "your walk was refused". A transition stop that IS the click
+    (boarding the clicked ferry tile) closes silently, and a mine
+    walk-over arrest closes silently too (18 archive detonations,
+    zero paired code-1s).
+
     Args:
         world: Simulated world (post-move).
         client_id: The connected client's tank id.
@@ -121,23 +137,23 @@ def emit_move(
             choreography (:func:`emit_fuel_pickup_close`) owns the
             records instead.
     """
-    if outcome["kind"] == "cant_go":
-        if outcome["tank_id"] == client_id:
-            messages.append(
-                SupervisorDict(
-                    msg_type=0x52,
-                    reset_action=1,
-                    close_map=0,
-                    error_code=SUPERVISOR_ERROR_CANT_GO,
-                )
+    if outcome["kind"] == "moved" or outcome["path"]:
+        messages.append(movement_echo(world, outcome))
+        for x, y in outcome["mine_positions"]:
+            messages.append(MineDetonationDict(msg_type=0x45, positions=[(x, y)]))
+        if include_pickups and outcome["pickups"]:
+            messages.append(_pickup_message(list(outcome["pickups"])))
+            messages.append(_pickup_message(list(outcome["pickups"])))
+    unfinished_transition = outcome["stop_reason"] == "transition" and not outcome["dest_reached"]
+    if (outcome["kind"] == "cant_go" or unfinished_transition) and outcome["tank_id"] == client_id:
+        messages.append(
+            SupervisorDict(
+                msg_type=0x52,
+                reset_action=1,
+                close_map=0,
+                error_code=SUPERVISOR_ERROR_CANT_GO,
             )
-        return
-    messages.append(movement_echo(world, outcome))
-    for x, y in outcome["mine_positions"]:
-        messages.append(MineDetonationDict(msg_type=0x45, positions=[(x, y)]))
-    if include_pickups and outcome["pickups"]:
-        messages.append(_pickup_message(list(outcome["pickups"])))
-        messages.append(_pickup_message(list(outcome["pickups"])))
+        )
 
 
 def emit_teleport(
@@ -244,7 +260,7 @@ def emit_fuel_pickup_close(
     is_client = tank_id == client_id
     record = _pickup_message([PickupRecordDict(x=x, y=y, remaining_volume=remaining)])
     tank = world["tanks"][tank_id]
-    close_code = SUPERVISOR_ERROR_TANK_FULL if remaining > 0 else SUPERVISOR_ERROR_EMPTY_CONTAINER
+    close_code = fuel_pickup_close_code(remaining)
     if transfer > 0 and remaining > 0:
         messages.append(record)
         messages.append(record)

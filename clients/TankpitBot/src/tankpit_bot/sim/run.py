@@ -34,6 +34,7 @@ from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop import _tick_once
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.protocol.naming import is_practice_bot_name
 from tankpit_bot.runtime_artifacts import make_run_stamp
 from tankpit_bot.runtime_logging import configure_probe_runtime_logging
 from tankpit_bot.sim.atlas_seed import seed_atlas_population
@@ -45,7 +46,7 @@ from tankpit_bot.sim.ghost import (
     seed_ghost_world_population,
 )
 from tankpit_bot.sim.opponent import decide_opponent, maybe_revive_opponent
-from tankpit_bot.sim.practice_room import PracticeRoomDriver
+from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_roster
 from tankpit_bot.sim.scenarios import (
     _FERRY_CLIENT_FUEL,
     _SIM_DIR,
@@ -272,8 +273,8 @@ def _boot(
             len(layout["roster"]),
         )
         seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
-        driver = PracticeRoomDriver(world, terrain, SIM_CLIENT_ID, layout["roster"])
-        roster_ids = driver.roster_ids()
+        roster_ids = seed_practice_roster(world, terrain, layout["roster"])
+        driver = PracticeRoomDriver(roster_ids)
         if atlas_path is not None:
             tally = seed_atlas_population(world, terrain, atlas_path)
             log.info("atlas field %s: %s", atlas_path, tally)
@@ -281,6 +282,19 @@ def _boot(
             seed_field_population(world, terrain, seed=zlib.crc32(stamp.encode("utf-8")))
     elif ghost_spec is not None:
         _seed_ghost_world(world, terrain, ghost_spec, atlas_path)
+        # Reactive ghosts (2026-08-03): bot-named ghosts carry the
+        # certified roster policy UNDER their recorded timeline — the
+        # live bot's shots draw the mined shot-for-shot return fire
+        # and team aggro even where the recording has no answer, and
+        # a killed bot ghost reactivates by the corpse-window law.
+        # Human-named ghosts stay pure recordings.
+        roster_ids = frozenset(
+            ghost["tank_id"]
+            for ghost in ghost_spec["ghosts"]
+            if is_practice_bot_name(ghost["name"]) and ghost["tank_id"] in world["tanks"]
+        )
+        if roster_ids:
+            driver = PracticeRoomDriver(roster_ids)
     elif atlas_path is not None:
         layout = select_practice_layout(stamp)
         seed_practice_client(world, terrain, layout, SIM_CLIENT_ID)
@@ -302,7 +316,7 @@ def _boot(
     return bot, server, link, driver
 
 
-def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int) -> None:
+def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int) -> frozenset[int]:
     """Feed one round's recorded ghost actions into the server.
 
     Dead ghosts skip their remaining timeline (the live fight may
@@ -312,11 +326,17 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
         server: The live sim server.
         spec: The compiled ghost spec.
         round_index: The session tick about to be played.
+
+    Returns:
+        Ids of ghosts that acted from the recording this tick — the
+        reactive-policy layer yields to them (recorded authority).
     """
+    acted: set[int] = set()
     for event in ghost_events_for_tick(spec, round_index):
         tank = server.world["tanks"].get(event["tank_id"])
         if tank is None or not tank["alive"]:
             continue
+        acted.add(event["tank_id"])
         if event["kind"] == "place":
             server.relocate_tank(event["tank_id"], event["x"], event["y"])
         elif event["kind"] == "shoot":
@@ -347,6 +367,7 @@ def _queue_ghost_round(server: SimServer, spec: GhostSpecDict, round_index: int)
                     direction=0,
                 ),
             )
+    return frozenset(acted)
 
 
 def _queue_round_opponents(
@@ -361,7 +382,8 @@ def _queue_round_opponents(
 
     Args:
         server: The live sim server.
-        driver: The practice-room driver, when in practice mode.
+        driver: The roster-policy driver — practice mode's seeded
+            roster, or ghost mode's reactive bot-named ghosts.
         opponent: Whether the scripted opponent plays.
         ghost_spec: The ghost timeline, when in ghost mode.
         enemy_id: The scripted opponent's current wire id.
@@ -370,10 +392,12 @@ def _queue_round_opponents(
     Returns:
         The (possibly revived) scripted opponent id.
     """
+    recorded_actors: frozenset[int] = frozenset()
     if ghost_spec is not None:
-        _queue_ghost_round(server, ghost_spec, round_index)
+        recorded_actors = _queue_ghost_round(server, ghost_spec, round_index)
     if driver is not None:
-        for bot_id, command in driver.decide_all(server.world, server.terrain):
+        decisions = driver.decide_all(server.world, server.terrain, hold_ids=recorded_actors)
+        for bot_id, command in decisions:
             server.queue_command(bot_id, command)
     elif opponent:
         enemy_id = maybe_revive_opponent(server, enemy_id, SIM_CLIENT_ID)

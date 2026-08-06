@@ -124,6 +124,18 @@ class SimWorldDict(TypedDict):
 
     ``field`` names the terrain GIF the router loads
     (e.g. ``field01_r.gif``); ``tick`` counts processed server ticks.
+
+    ``revealed_mine_keys_by_team`` holds, per team (string key for
+    JSON round-tripping), the "x,y" keys of mines that team has been
+    SHOWN. Mine visibility is TEAM-scoped (user contract 2026-08-04):
+    any teammate's scan reveals for the whole color, a fresh plant is
+    invisible even to a tank sharing the planter's viewport until
+    someone on its team radars, and own-team mines are always visible
+    (and walkable, so they never enter routing). The server routes a
+    walk around VISIBLE enemy mines only ([[walk-mechanics]]); a
+    hidden one is walked into and detonates. Detonated mines need no
+    key cleanup — routing intersects these keys with the live mine
+    list.
     """
 
     field: str
@@ -134,6 +146,7 @@ class SimWorldDict(TypedDict):
     equipment: list[SimEquipmentDict]
     ferries: list[SimFerryDict]
     blocks: list[SimBlockDict]
+    revealed_mine_keys_by_team: dict[str, list[str]]
 
 
 def make_sim_tank(
@@ -196,6 +209,7 @@ def make_sim_world(field: str) -> SimWorldDict:
         equipment=[],
         ferries=[],
         blocks=[],
+        revealed_mine_keys_by_team={},
     )
 
 
@@ -320,6 +334,9 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
     equipment: list[JSONValue] = [{"x": e["x"], "y": e["y"]} for e in world["equipment"]]
     ferries: list[JSONValue] = [{"x": f["x"], "y": f["y"]} for f in world["ferries"]]
     blocks: list[JSONValue] = [{"x": b["x"], "y": b["y"]} for b in world["blocks"]]
+    revealed: JSONValue = {
+        team: list(keys) for team, keys in world["revealed_mine_keys_by_team"].items()
+    }
     return {
         "field": world["field"],
         "tick": world["tick"],
@@ -329,6 +346,7 @@ def encode_sim_world(world: SimWorldDict) -> JSONObject:
         "equipment": equipment,
         "ferries": ferries,
         "blocks": blocks,
+        "revealed_mine_keys_by_team": revealed,
     }
 
 
@@ -411,6 +429,19 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
         )
         for record in _require_record_list(data, "mines")
     ]
+    raw_revealed = data.get("revealed_mine_keys_by_team")
+    if not isinstance(raw_revealed, dict):
+        raise ValueError("SimWorld.revealed_mine_keys_by_team: expected an object")
+    revealed: dict[str, list[str]] = {}
+    for team_key, raw_keys in raw_revealed.items():
+        if not isinstance(raw_keys, list):
+            raise ValueError("SimWorld.revealed_mine_keys_by_team: entries must be lists")
+        keys: list[str] = []
+        for raw_key in raw_keys:
+            if not isinstance(raw_key, str):
+                raise ValueError("SimWorld.revealed_mine_keys_by_team: keys must be strings")
+            keys.append(raw_key)
+        revealed[team_key] = keys
     return SimWorldDict(
         field=field,
         tick=require_int(data, "tick"),
@@ -420,6 +451,7 @@ def decode_sim_world(data: JSONObject) -> SimWorldDict:
         equipment=[SimEquipmentDict(x=x, y=y) for x, y in _decode_xy_list(data, "equipment")],
         ferries=[SimFerryDict(x=x, y=y) for x, y in _decode_xy_list(data, "ferries")],
         blocks=[SimBlockDict(x=x, y=y) for x, y in _decode_xy_list(data, "blocks")],
+        revealed_mine_keys_by_team=revealed,
     )
 
 

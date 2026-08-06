@@ -34,63 +34,71 @@ from tankpit_bot.sim.spawn import find_open_tile_near
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank
 
 
+def seed_practice_roster(
+    world: SimWorldDict,
+    terrain: TerrainMapProtocol,
+    roster: tuple[tuple[int, int, int, int, int], ...],
+) -> frozenset[int]:
+    """Seed the mined roster layout into the world.
+
+    Each bot lands on the nearest open tile to its mined ``(x, y)``
+    position. Mined positions are NOT always passable ground: an
+    archive snapshot can catch a bot afloat on a ferry (layout
+    bot-20260706-223721 holds tank 511 at (38,1), open sea, nearest
+    land 11 tiles away) — the sim seeds no ferry there, so the bot
+    lands on the nearest coast instead. Bots boot at their rank's
+    full fuel — the reactivation law's full-tank state, the only fuel
+    level the archive pins for a bot at a known moment.
+
+    Args:
+        world: Simulated world (roster tanks added).
+        terrain: Static terrain for the placement search.
+        roster: ``(tank_id, team, rank, x, y)`` rows, absolute map
+            positions (see ``sim.world_seed.PRACTICE_LAYOUTS``).
+
+    Returns:
+        The seeded tank ids.
+
+    Raises:
+        RuntimeError: If no open tile exists within the search radius
+            of a mined position — a layout that far at sea is bad
+            data, not a placement problem.
+    """
+    seeded: set[int] = set()
+    for tank_id, team, rank, seed_x, seed_y in roster:
+        landing = find_open_tile_near(
+            world, terrain, seed_x, seed_y, world["tick"], min_radius=0, max_radius=16
+        )
+        if landing is None:
+            raise RuntimeError(
+                f"practice roster tank {tank_id} at ({seed_x},{seed_y}) has no "
+                "open tile within 16 — bad layout data"
+            )
+        world["tanks"][tank_id] = make_sim_tank(
+            tank_id, team, rank, landing[0], landing[1], fuel_capacity(rank)
+        )
+        seeded.add(tank_id)
+    return frozenset(seeded)
+
+
 class PracticeRoomDriver:
-    """Owns roster policy states and drives them each tick."""
+    """Owns roster policy states over EXISTING tanks and drives them.
 
-    def __init__(
-        self,
-        world: SimWorldDict,
-        terrain: TerrainMapProtocol,
-        client_id: int,
-        roster: tuple[tuple[int, int, int, int, int], ...],
-    ) -> None:
-        """Seed the roster into the world and initialize states.
+    The tanks come from either seeding source — the mined practice
+    layouts (``seed_practice_roster``) or a ghost replay's bot-named
+    ghosts (reactive ghosts, 2026-08-03): the certified policy
+    reacts identically in both, because it IS the same policy.
+    """
 
-        Each bot lands on the nearest open tile to its mined
-        ``(x, y)`` position. Mined positions are NOT always passable
-        ground: an archive snapshot can catch a bot afloat on a ferry
-        (layout bot-20260706-223721 holds tank 511 at (38,1), open
-        sea, nearest land 11 tiles away) — the sim seeds no ferry
-        there, so the bot lands on the nearest coast instead. Bots
-        boot at their rank's full fuel — the reactivation law's
-        full-tank state, the only fuel level the archive pins for a
-        bot at a known moment.
+    def __init__(self, bot_ids: frozenset[int]) -> None:
+        """Initialize policy states for tanks already in the world.
 
         Args:
-            world: Simulated world (roster tanks added).
-            terrain: Static terrain for the placement search.
-            client_id: The connected client's tank id (never seeded).
-            roster: ``(tank_id, team, rank, x, y)`` rows, absolute
-                map positions (see ``sim.world_seed.PRACTICE_LAYOUTS``).
-
-        Raises:
-            RuntimeError: If no open tile exists within the search
-                radius of a mined position — a layout that far at sea
-                is bad data, not a placement problem.
+            bot_ids: Ids of the world tanks this driver reacts for.
         """
-        del client_id
-        self.states: dict[int, PracticeBotStateDict] = {}
-        for tank_id, team, rank, seed_x, seed_y in roster:
-            landing = find_open_tile_near(
-                world, terrain, seed_x, seed_y, world["tick"], min_radius=0, max_radius=16
-            )
-            if landing is None:
-                raise RuntimeError(
-                    f"practice roster tank {tank_id} at ({seed_x},{seed_y}) has no "
-                    "open tile within 16 — bad layout data"
-                )
-            world["tanks"][tank_id] = make_sim_tank(
-                tank_id, team, rank, landing[0], landing[1], fuel_capacity(rank)
-            )
-            self.states[tank_id] = make_practice_bot_state()
-
-    def roster_ids(self) -> frozenset[int]:
-        """Return the roster's tank ids (for the server's corpse hook).
-
-        Returns:
-            The ids seeded by this driver.
-        """
-        return frozenset(self.states)
+        self.states: dict[int, PracticeBotStateDict] = {
+            tank_id: make_practice_bot_state() for tank_id in sorted(bot_ids)
+        }
 
     def note_batch(self, world: SimWorldDict, batch: list[BinaryMessage]) -> None:
         """Note every hit the tick's emissions reveal.
@@ -125,18 +133,26 @@ class PracticeRoomDriver:
         self,
         world: SimWorldDict,
         terrain: TerrainMapProtocol,
+        hold_ids: frozenset[int] = frozenset(),
     ) -> list[tuple[int, ClientCommandDict]]:
         """Collect every roster bot's command for the coming tick.
 
         Args:
             world: Simulated world.
             terrain: Terrain for escape-tile searches.
+            hold_ids: Bots NOT decided this tick — their pending
+                policy state stays queued untouched. Ghost mode holds
+                the bots whose RECORDED timeline acted this tick
+                (recorded authority wins the tick; the withheld
+                return still fires on the next quiet one).
 
         Returns:
             ``(bot_id, command)`` pairs, holds omitted.
         """
         decisions: list[tuple[int, ClientCommandDict]] = []
         for bot_id, state in self.states.items():
+            if bot_id in hold_ids:
+                continue
             command = decide_practice_bot(state, world, terrain, bot_id)
             if command is not None:
                 decisions.append((bot_id, command))
@@ -145,4 +161,5 @@ class PracticeRoomDriver:
 
 __all__ = [
     "PracticeRoomDriver",
+    "seed_practice_roster",
 ]

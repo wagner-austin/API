@@ -2,14 +2,18 @@
 
 Archive-mined law (2026-07-22, 1,149 exact-pre ``0x67 -> next 0x49``
 pairs across 246 sessions): every successful pickup grants EXACTLY
-ONE slot; counts hard-cap at 25 (zero past-25 in the corpus); the
-uncapped stack rolls are 5-9 for the weapon slots and 2-4 for radar
-(radar really is the smallest stack); slot choice is RANDOM among
-deficient slots (128 homing-over-needier-dual, 37 the reverse, 89
-radar-while-a-weapon-short — the wiki's "deterministic most-behind"
-claim is falsified). All slots at cap -> the server rejects the
-pickup with 0x52 error 7 (``SUPERVISOR_ERROR_INVENTORY_FULL``) and
-the container stays.
+ONE slot; counts hard-cap at the rank inventory capacity — the
+all-private corpus capped at 25, i.e. ``inventory_capacity(1)``, and
+the rank-derived law (``20 + 5 * rank``) is the better-attested form
+(official rules table; recruit cap 20 confirmed by the
+bot-20260725-211120 promotion crossing). The uncapped stack rolls are
+5-9 for the weapon slots and 2-4 for radar (radar really is the
+smallest stack); slot choice is RANDOM among deficient slots (128
+homing-over-needier-dual, 37 the reverse, 89 radar-while-a-weapon-
+short — the wiki's "deterministic most-behind" claim is falsified).
+All slots at cap -> the server rejects the pickup with 0x52 error 7,
+the ``equipment_pickup_refusal`` law in ``physics/supervisor.py``,
+and the container stays.
 
 Sim assumption (documented, [[physics-module-roadmap]]): the sim is
 deterministic, so it grants the MOST-DEFICIENT slot (lowest slot
@@ -22,10 +26,9 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+from tankpit_bot.physics.capacity import inventory_capacity
+from tankpit_bot.physics.supervisor import equipment_pickup_refusal
 from tankpit_bot.sim.world import EQUIPMENT_SLOTS, SimTankDict, SimWorldDict
-
-EQUIPMENT_CAP = 25
-"""Hard per-slot cap — 0/1,149 corpus grants pushed a count past it."""
 
 RADAR_SLOT = 4
 """Index of the extra-radar slot in the five-slot counts array."""
@@ -97,9 +100,9 @@ def resolve_equipment_pickup(world: SimWorldDict, tank_id: int) -> EquipmentGran
     containers = [e for e in world["equipment"] if (e["x"], e["y"]) == (tank["x"], tank["y"])]
     if not containers:
         return None
+    if equipment_pickup_refusal(list(tank["counts"]), tank["rank"]) is not None:
+        return EquipmentGrantDict(kind="inventory_full", gained=[0] * EQUIPMENT_SLOTS)
     gained = _grant(tank)
-    if not any(gained):
-        return EquipmentGrantDict(kind="inventory_full", gained=gained)
     world["equipment"].remove(containers[0])
     return EquipmentGrantDict(kind="granted", gained=gained)
 
@@ -107,20 +110,22 @@ def resolve_equipment_pickup(world: SimWorldDict, tank_id: int) -> EquipmentGran
 def _grant(tank: SimTankDict) -> list[int]:
     """Apply the deterministic grant to the neediest slot.
 
+    The caller has already ruled out the all-at-cap refusal via
+    ``equipment_pickup_refusal``, so at least one slot is deficient.
+
     Args:
-        tank: The collecting tank (mutated on a grant).
+        tank: The collecting tank (mutated).
 
     Returns:
-        The five-slot gained array (all zeros at full inventory).
+        The five-slot gained array (exactly one nonzero entry).
     """
     gained = [0] * EQUIPMENT_SLOTS
-    deficits = [EQUIPMENT_CAP - count for count in tank["counts"]]
+    cap = inventory_capacity(tank["rank"])
+    deficits = [cap - count for count in tank["counts"]]
     best = 0
     for slot in range(1, EQUIPMENT_SLOTS):
         if deficits[slot] > deficits[best]:
             best = slot
-    if deficits[best] <= 0:
-        return gained
     amount = min(_SLOT_STACKS[best], deficits[best])
     tank["counts"][best] += amount
     gained[best] = amount
@@ -128,7 +133,6 @@ def _grant(tank: SimTankDict) -> list[int]:
 
 
 __all__ = [
-    "EQUIPMENT_CAP",
     "MERCY_BUNDLE",
     "MERCY_BUNDLE_ROLLS",
     "RADAR_SLOT",

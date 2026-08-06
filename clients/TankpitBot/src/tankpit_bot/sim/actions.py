@@ -17,6 +17,7 @@ from tankpit_bot._test_hooks.terrain import TerrainMapProtocol
 from tankpit_bot.physics.capacity import damage_tier, free_radar_radius
 from tankpit_bot.physics.costs import MINE_PRESS_COST, RADAR_COST, teleport_cost
 from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
+from tankpit_bot.physics.supervisor import teleport_refusal
 from tankpit_bot.protocol.types import MapDataDict, MapTankEntry, RadarContainerDict, RadarMineDict
 from tankpit_bot.sim.blocks import blocks_at
 from tankpit_bot.sim.combat import SLOT_RADAR
@@ -138,7 +139,7 @@ def process_teleport(
         if _tile_blocked_for_landing(world, terrain, tank_id, tank["team"], x, y):
             continue
         cost = teleport_cost(tank["x"], tank["y"], x, y)
-        if cost > tank["fuel"]:
+        if teleport_refusal(tank["fuel"], cost) is not None:
             outcome["kind"] = "insufficient_fuel"
             return outcome
         tank["x"] = x
@@ -221,6 +222,16 @@ def process_radar(
         for m in world["mines"]
         if inside(m["x"], m["y"])
     ]
+    # A scan is the REVEAL event, and reveals are TEAM-scoped (user
+    # contract 2026-08-04): any teammate's scan makes the mines
+    # visible to the whole color, while a fresh plant stays hidden
+    # from enemies — even ones sharing the planter's viewport — until
+    # someone on their team radars. The movement law consults this to
+    # route around VISIBLE enemy mines only ([[walk-mechanics]]).
+    team_key = str(tank["team"])
+    revealed = set(world["revealed_mine_keys_by_team"].get(team_key, []))
+    revealed.update(f"{m['x']},{m['y']}" for m in mines)
+    world["revealed_mine_keys_by_team"][team_key] = sorted(revealed)
     enemy_found = any(
         other["alive"] and other["team"] != tank["team"] and inside(other["x"], other["y"])
         for other in world["tanks"].values()
