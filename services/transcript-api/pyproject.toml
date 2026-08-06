@@ -24,7 +24,7 @@ platform-workers = { path = "../../libs/platform_workers", develop = true }
 redis = "^7.1"
 rq = "^2.3"
 openai = "^2.8.0"
-youtube-transcript-api = { version = "^0.6.3", python = ">=3.11,<3.14" }
+youtube-transcript-api = { version = "^1.2.4", python = ">=3.11,<3.14" }
 yt-dlp = "^2025.11.12"
 
 [tool.poetry.scripts]

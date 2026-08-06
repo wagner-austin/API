@@ -15,7 +15,6 @@ from platform_workers.rq_harness import WorkerConfig
 from .types import (
     AudioChunk,
     OpenAIClientProto,
-    RawTranscriptItem,
     SubtitleResultTD,
     TranscriptOptions,
     TranscriptSegment,
@@ -33,32 +32,48 @@ class WorkerRunnerProtocol(Protocol):
         ...
 
 
+class YTFetchedProto(Protocol):
+    """Protocol for a fetched transcript (youtube_transcript_api >= 1.x).
+
+    The 1.x library returns a FetchedTranscript object of snippet objects;
+    ``to_raw_data`` is its own conversion back to the plain dicts the
+    adapter validates and coerces to RawTranscriptItem.
+    """
+
+    def to_raw_data(self) -> list[dict[str, JSONValue]]: ...
+
+
 class YTTranscriptResourceProto(Protocol):
     """Protocol for a YouTube transcript resource."""
 
-    def fetch(self) -> list[RawTranscriptItem]: ...
+    def fetch(self) -> YTFetchedProto: ...
 
 
 class YTListingProto(Protocol):
-    """Protocol for YouTube transcript listing."""
+    """Protocol for YouTube transcript listing.
 
-    def find_transcript(self, languages: list[str]) -> YTTranscriptResourceProto | None: ...
+    The 1.x library's ``find_transcript`` raises ``NoTranscriptFound``
+    rather than returning None; the adapter maps that exception, so the
+    protocol return stays non-optional.
+    """
+
+    def find_transcript(self, languages: list[str]) -> YTTranscriptResourceProto: ...
     def translate(self, language: str) -> YTTranscriptResourceProto: ...
 
 
 class YTApiProto(Protocol):
-    """Protocol for YouTube Transcript API.
+    """Protocol for the YouTube Transcript API (youtube_transcript_api >= 1.x).
 
-    Note: get_transcript returns list[dict[str, JSONValue]] to match the real
-    youtube_transcript_api library. The caller (youtube_client.py) validates
-    and coerces these dicts to RawTranscriptItem.
+    The 1.x library is instance-based: ``YouTubeTranscriptApi()`` with
+    ``fetch``/``list`` methods, replacing the 0.x static
+    ``get_transcript``/``list_transcripts``. ``fetch`` returns an object
+    whose ``to_raw_data`` yields the plain dicts the adapter validates and
+    coerces to RawTranscriptItem.
     """
 
-    @staticmethod
-    def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]: ...
+    def fetch(self, video_id: str, languages: list[str]) -> YTFetchedProto: ...
 
-    @staticmethod
-    def list_transcripts(video_id: str) -> YTListingProto: ...
+    def list(self, video_id: str) -> YTListingProto: ...
 
 
 class YTExceptionsProto(Protocol):
@@ -329,7 +344,7 @@ def _default_openai_client_factory(
 def _default_yt_api_factory() -> YTApiProto:
     """Production implementation - creates real YouTube API."""
     mod = __import__("youtube_transcript_api")
-    api: YTApiProto = mod.YouTubeTranscriptApi
+    api: YTApiProto = mod.YouTubeTranscriptApi()
     return api
 
 
@@ -341,6 +356,18 @@ def _default_yt_exceptions_factory() -> tuple[type[Exception], type[Exception], 
     transcripts_disabled: type[Exception] = mod.TranscriptsDisabled
     video_unavailable: type[Exception] = mod.VideoUnavailable
     return (no_transcript_found, transcripts_disabled, video_unavailable)
+
+
+def _default_yt_translate_exceptions_factory() -> tuple[type[Exception], type[Exception]]:
+    """Production implementation - returns the real translate exception classes.
+
+    The 1.x library's ``Transcript.translate`` raises these two rather than
+    the RuntimeError the 0.x adapter mapped.
+    """
+    mod = __import__("youtube_transcript_api")
+    not_translatable: type[Exception] = mod.NotTranslatable
+    translation_unavailable: type[Exception] = mod.TranslationLanguageNotAvailable
+    return (not_translatable, translation_unavailable)
 
 
 def _default_yt_dlp_factory(opts: dict[str, JSONValue]) -> YtDlpProto:
@@ -460,6 +487,11 @@ yt_exceptions_factory: Callable[[], tuple[type[Exception], type[Exception], type
     _default_yt_exceptions_factory
 )
 
+# Hook for YouTube translate exception classes factory
+yt_translate_exceptions_factory: Callable[[], tuple[type[Exception], type[Exception]]] = (
+    _default_yt_translate_exceptions_factory
+)
+
 # Hook for yt-dlp factory
 yt_dlp_factory: YtDlpFactoryProto = _default_yt_dlp_factory
 
@@ -502,6 +534,7 @@ __all__ = [
     "WorkerRunnerProtocol",
     "YTApiProto",
     "YTExceptionsProto",
+    "YTFetchedProto",
     "YTListingProto",
     "YTTranscriptResourceProto",
     "YtDlpFactoryProto",
@@ -520,6 +553,7 @@ __all__ = [
     "_default_yt_api_factory",
     "_default_yt_dlp_factory",
     "_default_yt_exceptions_factory",
+    "_default_yt_translate_exceptions_factory",
     "audio_chunker_factory",
     "ffmpeg_available",
     "mkdtemp",
@@ -536,4 +570,5 @@ __all__ = [
     "yt_api_factory",
     "yt_dlp_factory",
     "yt_exceptions_factory",
+    "yt_translate_exceptions_factory",
 ]

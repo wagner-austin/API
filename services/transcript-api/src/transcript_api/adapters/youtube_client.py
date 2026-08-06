@@ -17,13 +17,24 @@ from ..types import RawTranscriptItem
 
 
 @runtime_checkable
+class _YTFetchedProto(Protocol):
+    """A fetched transcript (youtube_transcript_api >= 1.x).
+
+    ``to_raw_data`` is the library's own conversion back to the plain dicts
+    this adapter validates and coerces to RawTranscriptItem.
+    """
+
+    def to_raw_data(self) -> list[dict[str, JSONValue]]: ...
+
+
+@runtime_checkable
 class _YTResourceProto(Protocol):
-    def fetch(self) -> list[RawTranscriptItem]: ...
+    def fetch(self) -> _YTFetchedProto: ...
 
 
 @runtime_checkable
 class _YTListingProto(Protocol):
-    def find_transcript(self, languages: list[str]) -> _YTResourceProto | None: ...
+    def find_transcript(self, languages: list[str]) -> _YTResourceProto: ...
     def translate(self, language: str) -> _YTResourceProto: ...
 
 
@@ -37,12 +48,44 @@ class _ListTranscriptsFn(Protocol):
     def __call__(self, video_id: str) -> _YTListingProto: ...
 
 
+def _coerce_items(raw_items: list[dict[str, JSONValue]]) -> list[RawTranscriptItem]:
+    """Validate and coerce the library's plain dicts to RawTranscriptItem.
+
+    The external library returns untyped dicts; every field is checked
+    before use and a wrong shape raises rather than degrades.
+
+    Args:
+        raw_items: The library's ``to_raw_data`` output.
+
+    Returns:
+        The coerced items.
+
+    Raises:
+        JSONTypeError: When an item carries a field of the wrong type.
+    """
+    coerced: list[RawTranscriptItem] = []
+    for item in raw_items:
+        text = item.get("text", "")
+        start = item.get("start", 0.0)
+        duration = item.get("duration", 0.0)
+
+        if not isinstance(text, str):
+            raise JSONTypeError("Expected string for 'text' in transcript item")
+        if not isinstance(start, int | float):
+            raise JSONTypeError("Expected int or float for 'start' in transcript item")
+        if not isinstance(duration, int | float):
+            raise JSONTypeError("Expected int or float for 'duration' in transcript item")
+
+        coerced.append({"text": text, "start": float(start), "duration": float(duration)})
+    return coerced
+
+
 class _YTResource(TranscriptResource):
     def __init__(self, inner: _YTResourceProto) -> None:
         self._inner = inner
 
     def fetch(self) -> list[RawTranscriptItem]:
-        return self._inner.fetch()
+        return _coerce_items(self._inner.fetch().to_raw_data())
 
 
 class _YTListing(TranscriptListing):
@@ -50,16 +93,18 @@ class _YTListing(TranscriptListing):
         self._inner = inner
 
     def find_transcript(self, languages: list[str]) -> TranscriptResource | None:
+        no_transcript_found = _test_hooks.yt_exceptions_factory()[0]
         try:
             res = self._inner.find_transcript(languages)
-        except KeyError as exc:
+        except no_transcript_found as exc:
             raise TranscriptLanguageUnavailableError(str(exc)) from None
-        return _YTResource(res) if res is not None else None
+        return _YTResource(res)
 
     def translate(self, language: str) -> TranscriptResource:
+        translate_exceptions = _test_hooks.yt_translate_exceptions_factory()
         try:
             res = self._inner.translate(language)
-        except (RuntimeError, JSONTypeError) as exc:
+        except translate_exceptions as exc:
             get_logger(__name__).info("translate failed: %s", exc)
             raise TranscriptTranslateUnavailableError(str(exc)) from None
         return _YTResource(res)
@@ -67,10 +112,10 @@ class _YTListing(TranscriptListing):
 
 @runtime_checkable
 class _YTApiProto(Protocol):
-    @staticmethod
-    def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]: ...
-    @staticmethod
-    def list_transcripts(video_id: str) -> _YTListingProto: ...
+    """The 1.x instance API: ``fetch``/``list`` replace the 0.x statics."""
+
+    def fetch(self, video_id: str, languages: list[str]) -> _YTFetchedProto: ...
+    def list(self, video_id: str) -> _YTListingProto: ...
 
 
 def _create_yt_api() -> _YTApiProto:
@@ -88,25 +133,7 @@ def _yt_get_transcript(video_id: str, languages: list[str]) -> list[RawTranscrip
     exc_classes = _get_yt_transcript_exceptions()
 
     try:
-        # The external library returns list[dict[str, Any]] - we validate and coerce
-        raw_transcript_result = yt_api.get_transcript(video_id, languages=languages)
-        coerced_transcript: list[RawTranscriptItem] = []
-        for item in raw_transcript_result:
-            text = item.get("text", "")
-            start = item.get("start", 0.0)
-            duration = item.get("duration", 0.0)
-
-            if not isinstance(text, str):
-                raise JSONTypeError("Expected string for 'text' in transcript item")
-            if not isinstance(start, int | float):
-                raise JSONTypeError("Expected int or float for 'start' in transcript item")
-            if not isinstance(duration, int | float):
-                raise JSONTypeError("Expected int or float for 'duration' in transcript item")
-
-            coerced_transcript.append(
-                {"text": text, "start": float(start), "duration": float(duration)}
-            )
-        return coerced_transcript
+        return _coerce_items(yt_api.fetch(video_id, languages=languages).to_raw_data())
     except exc_classes as exc:
         from ..provider import DirectTranscriptUnavailableError
 
@@ -125,7 +152,7 @@ def _yt_list_transcripts(video_id: str) -> _YTListingProto:
     exc_classes = _get_yt_listing_exceptions()
 
     try:
-        return yt_api.list_transcripts(video_id)
+        return yt_api.list(video_id)
     except exc_classes as exc:
         from ..provider import TranscriptListingError
 

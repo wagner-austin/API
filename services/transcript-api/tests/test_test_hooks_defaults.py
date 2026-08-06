@@ -293,13 +293,17 @@ def test_default_stt_provider_factory_creates_provider() -> None:
 
 
 def test_default_yt_api_factory_returns_api() -> None:
-    """Test _default_yt_api_factory returns the YouTubeTranscriptApi class."""
+    """Test _default_yt_api_factory returns a YouTubeTranscriptApi instance.
+
+    The 1.x library is instance-based: fetch/list replace the 0.x static
+    get_transcript/list_transcripts.
+    """
     from transcript_api._test_hooks import YTApiProto, _default_yt_api_factory
 
     api: YTApiProto = _default_yt_api_factory()
     # Verify it conforms to YTApiProto by accessing methods - these would fail if missing
-    method_ref_1 = api.get_transcript
-    method_ref_2 = api.list_transcripts
+    method_ref_1 = api.fetch
+    method_ref_2 = api.list
     assert callable(method_ref_1)
     assert callable(method_ref_2)
 
@@ -311,6 +315,16 @@ def test_default_yt_exceptions_factory_returns_exceptions() -> None:
     exc_tuple = _default_yt_exceptions_factory()
     # Verify it returns 3 exception classes
     assert len(exc_tuple) == 3
+    for exc_cls in exc_tuple:
+        assert issubclass(exc_cls, Exception)
+
+
+def test_default_yt_translate_exceptions_factory_returns_exceptions() -> None:
+    """Test the translate-exceptions default returns the 1.x pair."""
+    from transcript_api._test_hooks import _default_yt_translate_exceptions_factory
+
+    exc_tuple = _default_yt_translate_exceptions_factory()
+    assert len(exc_tuple) == 2
     for exc_cls in exc_tuple:
         assert issubclass(exc_cls, Exception)
 

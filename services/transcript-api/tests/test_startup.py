@@ -9,7 +9,6 @@ from transcript_api._test_hooks import YTApiProto
 from transcript_api.startup import make_app_from_env
 from transcript_api.types import (
     OpenAIClientProto,
-    RawTranscriptItem,
     SupportsToDictRecursive,
     YtDlpProto,
     _AudioProto,
@@ -54,13 +53,18 @@ class _FakeOpenAIClient:
         return _FakeAudio()
 
 
-class _FakeYTResource:
-    def fetch(self) -> list[RawTranscriptItem]:
+class _FakeYTFetched:
+    def to_raw_data(self) -> list[dict[str, JSONValue]]:
         return []
 
 
+class _FakeYTResource:
+    def fetch(self) -> _FakeYTFetched:
+        return _FakeYTFetched()
+
+
 class _FakeYTListing:
-    def find_transcript(self, languages: list[str]) -> _FakeYTResource | None:
+    def find_transcript(self, languages: list[str]) -> _FakeYTResource:
         return _FakeYTResource()
 
     def translate(self, language: str) -> _FakeYTResource:
@@ -68,12 +72,10 @@ class _FakeYTListing:
 
 
 class _FakeYTApi:
-    @staticmethod
-    def get_transcript(video_id: str, languages: list[str]) -> list[dict[str, JSONValue]]:
-        return []
+    def fetch(self, video_id: str, languages: list[str]) -> _FakeYTFetched:
+        return _FakeYTFetched()
 
-    @staticmethod
-    def list_transcripts(video_id: str) -> _FakeYTListing:
+    def list(self, video_id: str) -> _FakeYTListing:
         return _FakeYTListing()
 
 
@@ -111,7 +113,7 @@ def test_make_app_from_env() -> None:
 
     # Set up hooks for YouTube API
     def _yt_api_factory() -> YTApiProto:
-        api: YTApiProto = _FakeYTApi
+        api: YTApiProto = _FakeYTApi()
         return api
 
     def _yt_exc_factory() -> tuple[type[Exception], type[Exception], type[Exception]]:

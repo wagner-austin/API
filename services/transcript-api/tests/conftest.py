@@ -29,6 +29,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     original_openai_client_factory = _test_hooks.openai_client_factory
     original_yt_api_factory = _test_hooks.yt_api_factory
     original_yt_exceptions_factory = _test_hooks.yt_exceptions_factory
+    original_yt_translate_exceptions_factory = _test_hooks.yt_translate_exceptions_factory
     original_yt_dlp_factory = _test_hooks.yt_dlp_factory
     original_audio_chunker_factory = _test_hooks.audio_chunker_factory
     original_ffmpeg_available = _test_hooks.ffmpeg_available
@@ -55,6 +56,7 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.openai_client_factory = original_openai_client_factory
     _test_hooks.yt_api_factory = original_yt_api_factory
     _test_hooks.yt_exceptions_factory = original_yt_exceptions_factory
+    _test_hooks.yt_translate_exceptions_factory = original_yt_translate_exceptions_factory
     _test_hooks.yt_dlp_factory = original_yt_dlp_factory
     _test_hooks.audio_chunker_factory = original_audio_chunker_factory
     _test_hooks.ffmpeg_available = original_ffmpeg_available
