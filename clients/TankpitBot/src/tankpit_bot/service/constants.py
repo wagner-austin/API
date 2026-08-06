@@ -13,6 +13,8 @@ comment there flags this coupling.
 
 from __future__ import annotations
 
+from tankpit_bot import _test_hooks
+
 SERVICE_HOST = "0.0.0.0"
 """Bind interface for the aiohttp server.
 
@@ -33,15 +35,46 @@ bind but NOT via ``netsh interface ipv4 show excludedportrange``.
 27100 sits well below that range so it stays bindable across boots.
 """
 
-HEALTH_URL = f"http://127.0.0.1:{SERVICE_PORT}/health"
-"""Fixed loopback + port + path the existence-probe targets.
 
-Used by :func:`tankpit_bot.service.probe.default_probe_existing_instance`.
-Tests target a fixture-owned aiohttp test server on a random port
-via :func:`tankpit_bot.service.probe.probe_health_url` — never this
-URL — so tests stay stable regardless of whether a real service
-happens to be running on the developer's machine.
-"""
+def resolve_service_port() -> int:
+    """Resolve this process's service port from the environment.
+
+    ``TANKPIT_BOT_SERVICE_PORT`` lets a second bot instance run its
+    own service beside the first (2026-08-06, the two-bots-one-map
+    lift). Unset or empty means :data:`SERVICE_PORT` — the port the
+    fiesta nginx proxy targets; a second instance is curl-only unless
+    nginx grows a matching location block.
+
+    Returns:
+        The validated TCP port.
+
+    Raises:
+        ValueError: If the value is not an integer in [1024, 65535].
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_SERVICE_PORT")
+    if raw is None or raw == "":
+        return SERVICE_PORT
+    port = int(raw)
+    if not 1024 <= port <= 65535:
+        raise ValueError(f"TANKPIT_BOT_SERVICE_PORT {port} outside [1024, 65535]")
+    return port
+
+
+def health_url(port: int) -> str:
+    """Return the loopback health-probe URL for one service port.
+
+    Args:
+        port: The service's resolved TCP port.
+
+    Returns:
+        The ``/health`` URL the existence probe targets. Tests target
+        a fixture-owned aiohttp test server on a random port via
+        :func:`tankpit_bot.service.probe.probe_health_url` — never
+        this URL — so they stay stable regardless of whether a real
+        service is running on the developer's machine.
+    """
+    return f"http://127.0.0.1:{port}/health"
+
 
 SERVICE_IDLE_EXIT_SECONDS = 1800.0
 """Idle self-exit threshold (2026-07-18 lifecycle pass).
@@ -58,9 +91,10 @@ SERVICE_IDLE_POLL_SECONDS = 60.0
 
 
 __all__ = [
-    "HEALTH_URL",
     "SERVICE_HOST",
     "SERVICE_IDLE_EXIT_SECONDS",
     "SERVICE_IDLE_POLL_SECONDS",
     "SERVICE_PORT",
+    "health_url",
+    "resolve_service_port",
 ]

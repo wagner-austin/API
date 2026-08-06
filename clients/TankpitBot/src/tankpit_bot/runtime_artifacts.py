@@ -7,11 +7,14 @@ tests use the same path model.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, require_str
 from typing_extensions import TypedDict
+
+from tankpit_bot import _test_hooks
 
 _RUNS_DIR = Path("runs")
 _BOT_DIR = _RUNS_DIR / "bot"
@@ -107,23 +110,73 @@ def make_run_stamp(now: datetime | None = None) -> str:
     return current.strftime("%Y%m%d-%H%M%S")
 
 
-def build_bot_run_artifacts(stamp: str) -> BotRunArtifactsDict:
+_INSTANCE_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+
+
+def resolve_bot_instance() -> str:
+    """Resolve this process's bot-instance namespace from the environment.
+
+    ``TANKPIT_BOT_INSTANCE`` names one of several bots sharing the
+    machine (2026-08-06, the two-bots-one-map lift): each instance
+    gets its own artifact directory (``runs/bot/<instance>/``) so
+    parallel processes never overwrite each other's latest.* files or
+    captures. Unset or empty means THE sole-bot namespace
+    (``runs/bot/`` directly) — the single-bot layout is the primary
+    configuration, not a fallback.
+
+    Returns:
+        The validated instance name, or ``""`` for the sole-bot
+        namespace.
+
+    Raises:
+        ValueError: If the name is not lowercase alphanumeric with
+            ``-``/``_`` (max 32 chars) — path separators and dots
+            must never reach the filesystem layer.
+    """
+    raw = _test_hooks.get_env("TANKPIT_BOT_INSTANCE")
+    if raw is None or raw == "":
+        return ""
+    if not _INSTANCE_NAME.match(raw):
+        raise ValueError(
+            f"TANKPIT_BOT_INSTANCE {raw!r} is not a valid instance name "
+            "(lowercase alphanumeric plus -_, max 32 chars)"
+        )
+    return raw
+
+
+def bot_run_dir(instance: str) -> Path:
+    """Return the artifact directory for one bot instance.
+
+    Args:
+        instance: Validated instance name, or ``""`` for the sole-bot
+            namespace.
+
+    Returns:
+        ``runs/bot`` or ``runs/bot/<instance>``.
+    """
+    return _BOT_DIR / instance if instance else _BOT_DIR
+
+
+def build_bot_run_artifacts(stamp: str, instance: str) -> BotRunArtifactsDict:
     """Build canonical artifact paths for a bot run.
 
     Args:
         stamp: Timestamp stamp from :func:`make_run_stamp`.
+        instance: Instance namespace from :func:`resolve_bot_instance`
+            (``""`` for the sole-bot layout).
 
     Returns:
         Bot artifact path bundle.
     """
+    run_dir = bot_run_dir(instance)
     return BotRunArtifactsDict(
-        log_dir=str(_BOT_DIR),
-        latest_log_path=str(_BOT_DIR / "latest.log"),
-        archive_log_path=str(_BOT_DIR / f"bot-{stamp}.log"),
-        latest_events_path=str(_BOT_DIR / "latest.events.jsonl"),
-        archive_events_path=str(_BOT_DIR / f"bot-{stamp}.events.jsonl"),
-        latest_capture_path=str(_BOT_DIR / "latest.capture_session.json"),
-        archive_capture_path=str(_BOT_DIR / f"bot-{stamp}.capture_session.json"),
+        log_dir=str(run_dir),
+        latest_log_path=str(run_dir / "latest.log"),
+        archive_log_path=str(run_dir / f"bot-{stamp}.log"),
+        latest_events_path=str(run_dir / "latest.events.jsonl"),
+        archive_events_path=str(run_dir / f"bot-{stamp}.events.jsonl"),
+        latest_capture_path=str(run_dir / "latest.capture_session.json"),
+        archive_capture_path=str(run_dir / f"bot-{stamp}.capture_session.json"),
     )
 
 
@@ -308,6 +361,7 @@ __all__ = [
     "BotRunArtifactsDict",
     "ProbeRunArtifactsDict",
     "SniffRunArtifactsDict",
+    "bot_run_dir",
     "build_bot_run_artifacts",
     "build_probe_run_artifacts",
     "build_sniff_run_artifacts",
@@ -318,4 +372,5 @@ __all__ = [
     "encode_probe_run_artifacts",
     "encode_sniff_run_artifacts",
     "make_run_stamp",
+    "resolve_bot_instance",
 ]

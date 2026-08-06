@@ -25,13 +25,14 @@ from tankpit_bot.bot.config import (
     resolve_target_url,
 )
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
+from tankpit_bot.runtime_artifacts import resolve_bot_instance
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service._test_hooks import SiteRunnerProtocol
 from tankpit_bot.service.constants import (
     SERVICE_HOST,
     SERVICE_IDLE_EXIT_SECONDS,
     SERVICE_IDLE_POLL_SECONDS,
-    SERVICE_PORT,
+    resolve_service_port,
 )
 from tankpit_bot.service.frame_bus import FrameBus, FrameBusProtocol
 from tankpit_bot.service.http_server import SessionRunnerHTTPProtocol, make_app
@@ -42,7 +43,20 @@ from tankpit_bot.service.types import idle_session_status
 
 log = get_logger(__name__)
 
-_DEFAULT_STOP_FILE = Path("runs/state/STOP")
+
+def resolve_service_stop_file() -> Path:
+    """Return this instance's stop-file sentinel path.
+
+    Instance-scoped (2026-08-06, the two-bots-one-map lift): two
+    services must not share one sentinel, or stopping one bot stops
+    both. The sole-bot namespace keeps ``runs/state/STOP``.
+
+    Returns:
+        The sentinel path for this process's instance.
+    """
+    instance = resolve_bot_instance()
+    state_dir = Path("runs/state") / instance if instance else Path("runs/state")
+    return state_dir / "STOP"
 
 
 async def run_service_forever(
@@ -131,16 +145,18 @@ async def exit_when_idle(
             return
 
 
-async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> None:
+async def _async_main(host: str = SERVICE_HOST, port: int | None = None) -> None:
     """Wire the primitives, publish an initial idle frame, and serve forever.
 
     Site construction goes through :data:`service_hooks.build_site` so
     tests can inject a fake site without opening a real port.
 
     Args:
-        host: Loopback host the HTTP server binds to.
-        port: TCP port the HTTP server binds to.
+        host: Bind host for the HTTP server.
+        port: TCP port to bind; ``None`` resolves this instance's
+            port from the environment (``resolve_service_port``).
     """
+    bound_port = resolve_service_port() if port is None else port
     mode_bridge: ModeBridgeProtocol = ModeBridge()
     status_bus: StatusBusProtocol = StatusBus()
     frame_bus: FrameBusProtocol = FrameBus()
@@ -153,12 +169,12 @@ async def _async_main(host: str = SERVICE_HOST, port: int = SERVICE_PORT) -> Non
         mode_bridge=mode_bridge,
         status_bus=status_bus,
         frame_bus=frame_bus,
-        stop_file_path=_DEFAULT_STOP_FILE,
+        stop_file_path=resolve_service_stop_file(),
     )
     status_bus.publish(idle_session_status(get_current_time_ms()))
     stop_event = asyncio.Event()
     app = make_app(runner, mode_bridge, status_bus, frame_bus, stop_event.set)
-    site = await service_hooks.build_site(app, host, port)
+    site = await service_hooks.build_site(app, host, bound_port)
     idle_monitor = asyncio.create_task(
         exit_when_idle(
             runner,
@@ -198,7 +214,7 @@ def main() -> None:
         log.info(
             "tankpit-bot-service already responding on %s:%d; exiting idempotently.",
             SERVICE_HOST,
-            SERVICE_PORT,
+            resolve_service_port(),
         )
         return
     try:

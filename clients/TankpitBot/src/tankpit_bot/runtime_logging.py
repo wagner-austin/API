@@ -25,6 +25,7 @@ from tankpit_bot.runtime_artifacts import (
     build_probe_run_artifacts,
     build_sniff_run_artifacts,
     make_run_stamp,
+    resolve_bot_instance,
 )
 
 _EMITTER_LOGGER = get_logger("tankpit_bot.runtime.events")
@@ -353,7 +354,7 @@ def configure_bot_runtime_logging(stamp: str | None = None) -> BotRunArtifactsDi
     """
     global _BOT_ARTIFACTS, _SNIFF_ARTIFACTS, _PROBE_ARTIFACTS
     resolved_stamp = stamp if stamp is not None else make_run_stamp()
-    artifacts = build_bot_run_artifacts(resolved_stamp)
+    artifacts = build_bot_run_artifacts(resolved_stamp, resolve_bot_instance())
     setup_rich_logging(level="INFO")
     _reset_artifact_files(
         Path(artifacts["latest_log_path"]),

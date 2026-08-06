@@ -8,7 +8,7 @@ own module gives it a single-concern home and drops the hook module
 back to pure DI plumbing.
 
 Production callers use :func:`default_probe_existing_instance`, which
-targets :data:`HEALTH_URL`. Tests use :func:`probe_health_url` directly
+targets the resolved instance's health URL. Tests use :func:`probe_health_url` directly
 with a fixture-owned test server URL — see
 :mod:`tests.service.test_probe`.
 """
@@ -20,14 +20,9 @@ from urllib.parse import urlparse
 
 from platform_core.logging import get_logger
 
-from tankpit_bot.service.constants import HEALTH_URL
+from tankpit_bot.service.constants import health_url, resolve_service_port
 
 log = get_logger(__name__)
-
-
-# ``HEALTH_URL`` re-exported for callers that only import from
-# :mod:`tankpit_bot.service.probe`. Every value lives in
-# :mod:`tankpit_bot.service.constants` — single source of truth.
 
 
 def probe_health_url(url: str) -> bool:
@@ -47,7 +42,7 @@ def probe_health_url(url: str) -> bool:
 
     Args:
         url: Health-endpoint URL to probe. Production wires this to
-            :data:`HEALTH_URL`; tests wire it to a fixture-owned
+            the resolved health URL; tests wire it to a fixture-owned
             aiohttp test server on a random port.
 
     Returns:
@@ -84,7 +79,7 @@ def probe_health_url(url: str) -> bool:
 
 
 def default_probe_existing_instance() -> bool:
-    """Production probe fixed to :data:`HEALTH_URL`.
+    """Production probe against this instance's resolved port.
 
     Trivial delegate — split out so
     :data:`tankpit_bot.service._test_hooks.probe_existing_instance`
@@ -94,11 +89,10 @@ def default_probe_existing_instance() -> bool:
     Returns:
         See :func:`probe_health_url`.
     """
-    return probe_health_url(HEALTH_URL)
+    return probe_health_url(health_url(resolve_service_port()))
 
 
 __all__ = [
-    "HEALTH_URL",
     "default_probe_existing_instance",
     "probe_health_url",
 ]

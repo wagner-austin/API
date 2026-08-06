@@ -15,8 +15,8 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
+from tankpit_bot.service.constants import health_url, resolve_service_port
 from tankpit_bot.service.probe import (
-    HEALTH_URL,
     default_probe_existing_instance,
     probe_health_url,
 )
@@ -141,7 +141,7 @@ class TestDefaultProbeExistingInstance:
     """The production wrapper wired to the fixed loopback URL."""
 
     def test_default_probe_delegates_to_probe_health_url_on_fixed_url(self) -> None:
-        """The wrapper is exactly ``probe_health_url(HEALTH_URL)``.
+        """The wrapper is exactly ``probe_health_url`` on the resolved URL.
 
         The exact truthy/falsy outcome depends on whether a real
         :program:`tankpit-bot-service` happens to be running on the
@@ -150,4 +150,6 @@ class TestDefaultProbeExistingInstance:
         MUST agree. That equality proves the wrapper is a faithful
         delegate without depending on the environment.
         """
-        assert default_probe_existing_instance() == probe_health_url(HEALTH_URL)
+        assert default_probe_existing_instance() == probe_health_url(
+            health_url(resolve_service_port())
+        )
