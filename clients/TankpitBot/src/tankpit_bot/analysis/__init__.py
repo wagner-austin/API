@@ -16,7 +16,6 @@ every other package here.
 from __future__ import annotations
 
 from tankpit_bot.analysis.scan import (
-    RECEIVED_DIRECTION,
     decode_session_frames,
     load_capture_session,
     scan_archive,
@@ -37,7 +36,6 @@ from tankpit_bot.analysis.types import (
 )
 
 __all__ = [
-    "RECEIVED_DIRECTION",
     "SESSION_SKIP_REASONS",
     "DecodedFrameDict",
     "ScannedSessionDict",

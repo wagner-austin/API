@@ -31,11 +31,23 @@ from platform_core.json_utils import (
 #: Why a capture session yielded no decodable frames. The vocabulary is
 #: closed: a new skip site means a new documented reason here, not an
 #: invented string, so ``skipped`` tallies stay comparable across runs.
-SessionSkipReason = Literal["no_magic"]
+#: ``unframed_payload`` (added 2026-08-06 with the direction extension)
+#: marks a session whose payloads violate the framing contract —
+#: measured archive-wide: 2 of 62,095 sent payloads, both in the one
+#: pre-framing capture ``bot-20260331-230406``; 0 of 217,678 received.
+SessionSkipReason = Literal["no_magic", "unframed_payload"]
 
 #: Every value :data:`SessionSkipReason` admits, for validation and for
 #: exhaustive reporting by callers that tally skips.
-SESSION_SKIP_REASONS: tuple[SessionSkipReason, ...] = ("no_magic",)
+SESSION_SKIP_REASONS: tuple[SessionSkipReason, ...] = ("no_magic", "unframed_payload")
+
+#: Which side of the wire a frame travelled. Sent frames carry our own
+#: commands (the same XOR cipher covers both directions); received
+#: frames are the server's stream.
+FrameDirection = Literal["received", "sent"]
+
+#: Every value :data:`FrameDirection` admits.
+FRAME_DIRECTIONS: tuple[FrameDirection, ...] = ("received", "sent")
 
 
 class SkippedSessionDict(TypedDict):
@@ -52,17 +64,24 @@ class SkippedSessionDict(TypedDict):
 
 
 class DecodedFrameDict(TypedDict):
-    """One received wire frame, decoded, with its capture timestamp.
+    """One wire frame in either direction, decoded, with its timestamp.
 
     Attributes:
         timestamp_ms: Capture time of the containing message, carried
             through so miners can correlate frames across channels
             without re-reading the session.
+        direction: Which side of the wire the frame travelled
+            (:data:`FRAME_DIRECTIONS`). Sent frames are our own
+            commands; received frames are the server stream.
         msg_type: First byte of the frame, before XOR decoding.
-        body: XOR-decoded frame body, excluding the type byte.
+        body: The whole frame passed through the session cipher,
+            including the type-byte position — exactly the shape
+            ``protocol.decode_message`` and ``sim.commands.
+            decode_client_command`` take as their data argument.
     """
 
     timestamp_ms: int
+    direction: FrameDirection
     msg_type: int
     body: bytes
 
@@ -73,7 +92,7 @@ class ScannedSessionDict(TypedDict):
     Attributes:
         path: Filesystem path of the capture session file.
         session_id: Identifier carried by the capture itself.
-        frames: Every received frame in capture order.
+        frames: Every frame, both directions, in capture order.
     """
 
     path: str
@@ -147,6 +166,7 @@ def encode_decoded_frame(frame: DecodedFrameDict) -> JSONObject:
     """
     return {
         "timestamp_ms": frame["timestamp_ms"],
+        "direction": frame["direction"],
         "msg_type": frame["msg_type"],
         "body": frame["body"].hex(),
     }
@@ -167,9 +187,30 @@ def decode_decoded_frame(data: JSONObject) -> DecodedFrameDict:
     """
     return DecodedFrameDict(
         timestamp_ms=require_int(data, "timestamp_ms"),
+        direction=require_frame_direction(require_str(data, "direction")),
         msg_type=require_int(data, "msg_type"),
         body=require_hex_bytes(require_str(data, "body")),
     )
+
+
+def require_frame_direction(value: str) -> FrameDirection:
+    """Narrow a string to a :data:`FrameDirection`.
+
+    Args:
+        value: Candidate direction string.
+
+    Returns:
+        The same value, narrowed.
+
+    Raises:
+        JSONTypeError: If the value is not a known direction; the
+            message names the closed vocabulary.
+    """
+    for direction in FRAME_DIRECTIONS:
+        if value == direction:
+            return direction
+    known = ", ".join(FRAME_DIRECTIONS)
+    raise JSONTypeError(f"unknown frame direction '{value}'; known directions: {known}")
 
 
 def require_hex_bytes(value: str) -> bytes:
@@ -197,8 +238,10 @@ def require_hex_bytes(value: str) -> bytes:
 
 
 __all__ = [
+    "FRAME_DIRECTIONS",
     "SESSION_SKIP_REASONS",
     "DecodedFrameDict",
+    "FrameDirection",
     "ScannedSessionDict",
     "SessionSkipReason",
     "SkippedSessionDict",
@@ -206,6 +249,7 @@ __all__ = [
     "decode_skipped_session",
     "encode_decoded_frame",
     "encode_skipped_session",
+    "require_frame_direction",
     "require_hex_bytes",
     "require_session_skip_reason",
 ]

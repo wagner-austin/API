@@ -1,5 +1,9 @@
 """Byte-mine what a teleport displacement RECEIPT implies about the tile.
 
+Migrated 2026-08-06 onto ``tankpit_bot.analysis.scan`` (the typed
+capture-scan owner, direction-tagged frames) - the private
+load/XOR/frame-walk pipeline is deleted; results reproduce exactly.
+
 The proposed displacement-receipt law ("a displaced landing writes an
 obstruction observation at the requested tile") needs three questions
 answered from the archive before a line of it enters the bot:
@@ -30,70 +34,53 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.analysis.scan import scan_session
 from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
 from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sniffer.decoders import _is_text_route
-from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
 LANDING_WINDOW_MS = 3_000
 LANDING_MAX_CHEBYSHEV = 8
 BODY_FRESH_MS = 5_000
 
 
-def _iter_frames(data: bytes) -> list[bytes]:
-    frames: list[bytes] = []
-    offset = 0
-    while offset + 2 < len(data):
-        length = data[offset] | (data[offset + 1] << 8)
-        offset += 2
-        if length == 0 or offset + length > len(data):
-            return frames
-        frames.append(data[offset : offset + length])
-        offset += length
-    return frames
+def _decode_all(path: Path) -> list[tuple[int, str, dict]] | None:
+    """Decode every frame as (t, "cmd"|"msg", decoded), or None on a skip.
 
-
-def _decode_all(session: dict) -> list[tuple[int, str, dict]]:
-    """Decode every frame as (t, "cmd"|"msg", decoded).
-
-    Raises:
-        ValueError: When the session carries no XOR magic, so no frame in
-            it can be decoded. Caller reports it as a SKIP.
+    Transport is ``tankpit_bot.analysis.scan`` (the typed capture-scan
+    owner with direction-tagged frames) - this script's private
+    load/XOR/frame-walk pipeline was migrated onto it 2026-08-06. Sent
+    frames become client commands, received frames become protocol
+    messages, and frames neither decoder accepts are dropped exactly
+    as before. A magicless or unframed capture is a typed skip.
     """
-    magic = session.get("magic")
-    if magic is None:
-        raise ValueError("session has no XOR magic; nothing in it can be decoded")
-    reset_xor_state()
-    build_global_xor_table(magic)
+    result = scan_session(path)
+    if "reason" in result:
+        return None
     out: list[tuple[int, str, dict]] = []
-    for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
-        t = message["timestamp_ms"]
-        data = decode_base64_safe(message.get("payload", ""))
-        if not data:
+    for frame in result["frames"]:
+        t = frame["timestamp_ms"]
+        body = frame["body"]
+        if not body:
             continue
-        if message.get("direction") == "sent":
-            for body in _iter_frames(data):
-                if not body:
-                    continue
-                try:
-                    cmd = dict(decode_client_command(xor_decode(body)))
-                except Exception:
-                    continue
-                out.append((t, "cmd", cmd))
-            continue
-        for body in _iter_frames(data):
-            if not body or try_decode_plaintext_ack(body) is not None:
-                continue
-            if _is_text_route(body[0], body):
-                continue
+        if frame["direction"] == "sent":
             try:
-                decoded = dict(decode_message(body[0], xor_decode(body)))
+                cmd = dict(decode_client_command(body))
             except Exception:
                 continue
-            out.append((t, "msg", decoded))
+            out.append((t, "cmd", cmd))
+            continue
+        if try_decode_plaintext_ack(body) is not None:
+            continue
+        if _is_text_route(frame["msg_type"], body):
+            continue
+        try:
+            decoded = dict(decode_message(frame["msg_type"], body))
+        except Exception:
+            continue
+        out.append((t, "msg", decoded))
     return out
 
 
@@ -119,8 +106,10 @@ def _elect_self_id(events: list[tuple[int, str, dict]]) -> int:
 
 
 def mine(path: Path, agg: dict, static_terrain) -> None:
-    session = json.loads(path.read_text(encoding="utf-8"))
-    events = _decode_all(session)
+    events = _decode_all(path)
+    if events is None:
+        agg["skipped"] += 1
+        return
     self_id = _elect_self_id(events)
     if self_id == -1:
         agg["sessions_no_self"] += 1
@@ -312,6 +301,7 @@ def main() -> int:
             paths.append(path)
     agg: dict = {
         "sessions": 0,
+        "skipped": 0,
         "sessions_no_self": 0,
         "displaced_total": 0,
         "displaced_mine_known_before": 0,

@@ -136,7 +136,14 @@ def test_decode_session_frames_decodes_body_with_the_real_cipher(tmp_path: Path)
     frames = decode_session_frames(load_capture_session(path))
     reset_xor_state()
     build_global_xor_table(MAGIC)
-    assert frames == [{"timestamp_ms": 4242, "msg_type": 0x53, "body": xor_decode(body)}]
+    assert frames == [
+        {
+            "timestamp_ms": 4242,
+            "direction": "received",
+            "msg_type": 0x53,
+            "body": xor_decode(body),
+        }
+    ]
 
 
 def test_decode_session_frames_keeps_capture_order(tmp_path: Path) -> None:
@@ -159,16 +166,27 @@ def test_decode_session_frames_keeps_capture_order(tmp_path: Path) -> None:
     ]
 
 
-def test_decode_session_frames_ignores_sent_frames(tmp_path: Path) -> None:
-    """Our own commands are not part of the received stream."""
+def test_decode_session_frames_tags_sent_frames(tmp_path: Path) -> None:
+    """Our own commands decode with the same cipher, tagged ``sent``.
+
+    The direction extension (2026-08-06): command-correlating miners
+    (displacement semantics, cost pairing) need both sides of the
+    wire, so sent frames are decoded and tagged instead of dropped.
+    """
+    body = bytes([0x70, 0x05])
     sent: JSONObject = {
         "timestamp_ms": 1,
         "direction": "sent",
-        "payload": _payload(bytes([0x70, 0x05])),
+        "payload": _payload(body),
         "ws_url": "wss://tankpit.com/ws",
     }
     path = _write(tmp_path, "f.capture_session.json", _session_json(messages=[sent]))
-    assert decode_session_frames(load_capture_session(path)) == []
+    frames = decode_session_frames(load_capture_session(path))
+    reset_xor_state()
+    build_global_xor_table(MAGIC)
+    assert frames == [
+        {"timestamp_ms": 1, "direction": "sent", "msg_type": 0x70, "body": xor_decode(body)}
+    ]
 
 
 def test_decode_session_frames_ignores_empty_payload(tmp_path: Path) -> None:
@@ -229,7 +247,14 @@ def test_scan_session_returns_frames_for_a_decodable_capture(tmp_path: Path) -> 
     assert result == {
         "path": str(path),
         "session_id": "s-1",
-        "frames": [{"timestamp_ms": 99, "msg_type": 0x4C, "body": xor_decode(body)}],
+        "frames": [
+            {
+                "timestamp_ms": 99,
+                "direction": "received",
+                "msg_type": 0x4C,
+                "body": xor_decode(body),
+            }
+        ],
     }
 
 
@@ -237,6 +262,26 @@ def test_scan_session_skips_a_magicless_capture(tmp_path: Path) -> None:
     """No magic is a typed value, not an exception and not a crash."""
     path = _write(tmp_path, "k.capture_session.json", _session_json(magic=None))
     assert scan_session(path) == {"path": str(path), "reason": "no_magic"}
+
+
+def test_scan_session_classifies_an_unframed_payload_as_a_typed_skip(tmp_path: Path) -> None:
+    """The pre-framing archaeology class is a value, not a crash.
+
+    The archive holds exactly one capture (``bot-20260331-230406``)
+    whose sent blobs predate the framing protocol; a truncated payload
+    reproduces the same contract violation here. The direct decoder
+    still raises (the strictness pin above); the SESSION-level answer
+    is the typed skip that keeps the tally honest.
+    """
+    truncated = base64.b64encode(encode_frame(bytes([0x53, 0x11, 0x22]))[:-1]).decode("ascii")
+    sent: JSONObject = {
+        "timestamp_ms": 1,
+        "direction": "sent",
+        "payload": truncated,
+        "ws_url": "wss://tankpit.com/ws",
+    }
+    path = _write(tmp_path, "u.capture_session.json", _session_json(messages=[sent]))
+    assert scan_session(path) == {"path": str(path), "reason": "unframed_payload"}
 
 
 def test_scan_archive_visits_every_session_in_name_order(tmp_path: Path) -> None:

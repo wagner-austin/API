@@ -17,11 +17,15 @@ the one session shape that cannot be analysed.
 
 Strictness note. ``split_frames`` raises on a payload that ends
 mid-frame, where the scripts it replaces silently returned the frames
-they had. That leniency was never exercised: measured over the whole
-bot archive on 2026-08-06, 217,678 received payloads across 286
-sessions split cleanly and ZERO raised. The strict walk therefore costs
-nothing on real captures and turns genuine corruption into a reported
-failure instead of a quietly shortened analysis.
+they had. Measured over the whole bot archive on 2026-08-06: 217,678
+received payloads across 286 sessions split cleanly with ZERO raises,
+and - after the direction extension the same night - 62,095 sent
+payloads split cleanly with exactly TWO raises, both inside the one
+pre-framing capture ``bot-20260331-230406`` (3-byte sent blobs from
+before the framing protocol existed). :func:`scan_session` classifies
+that archaeology as a typed ``unframed_payload`` skip; the strict walk
+still turns any NEW corruption into a reported value instead of a
+quietly shortened analysis.
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from platform_core.json_utils import JSONTypeError, load_json_str
+from platform_core.logging import get_logger
 
 from tankpit_bot.analysis import _test_hooks
 from tankpit_bot.analysis.types import (
@@ -37,13 +42,11 @@ from tankpit_bot.analysis.types import (
     SkippedSessionDict,
 )
 from tankpit_bot.capture.xor import decode_base64_safe
-from tankpit_bot.protocol.framing import split_frames
+from tankpit_bot.protocol.framing import FramingError, split_frames
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import CaptureSession, decode_capture_session
 
-#: Direction marking a frame the server sent to us. Sent frames carry
-#: our own commands and are not part of the received wire stream.
-RECEIVED_DIRECTION = "received"
+log = get_logger(__name__)
 
 
 def load_capture_session(path: Path) -> CaptureSession:
@@ -68,7 +71,12 @@ def load_capture_session(path: Path) -> CaptureSession:
 
 
 def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
-    """Decode every received frame in a session, in capture order.
+    """Decode every frame in a session, both directions, in capture order.
+
+    Sent frames carry our own commands and share the session cipher, so
+    the direction extension (2026-08-06) tags each frame instead of
+    dropping half the traffic - the command-correlating miners
+    (displacement semantics, cost pairing) need both sides.
 
     The XOR table is global state owned by :mod:`tankpit_bot.sniffer.xor`,
     so this resets it and rebuilds it from the session's own magic
@@ -79,10 +87,11 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
         session: A session whose ``magic`` is known to be present.
 
     Returns:
-        Every received frame, decoded.
+        Every frame, decoded and direction-tagged.
 
     Raises:
-        FramingError: If a payload ends mid-frame.
+        FramingError: If a payload ends mid-frame (see the module
+            strictness note; :func:`scan_session` classifies this).
         ValueError: If ``session["magic"]`` is None. Callers reach this
             function through :func:`scan_session`, which classifies
             that case as a skip rather than calling here.
@@ -94,8 +103,6 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
     build_global_xor_table(magic)
     frames: list[DecodedFrameDict] = []
     for message in session["messages"]:
-        if message["direction"] != RECEIVED_DIRECTION:
-            continue
         payload = decode_base64_safe(message["payload"])
         if not payload:
             continue
@@ -105,6 +112,7 @@ def decode_session_frames(session: CaptureSession) -> list[DecodedFrameDict]:
             frames.append(
                 DecodedFrameDict(
                     timestamp_ms=message["timestamp_ms"],
+                    direction=message["direction"],
                     msg_type=body[0],
                     body=xor_decode(body),
                 )
@@ -121,6 +129,13 @@ def scan_session(path: Path) -> ScannedSessionDict | SkippedSessionDict:
     other fault — unreadable file, malformed JSON, a payload violating
     the framing contract — propagates.
 
+    A payload that violates the framing contract is likewise a typed
+    skip (``unframed_payload``), not a crash: the archive holds exactly
+    one such capture (``bot-20260331-230406``, sent blobs predating the
+    framing protocol - see the module strictness note), and a skip
+    keeps that archaeology visible in every tally while any NEW
+    corruption surfaces the same loud way.
+
     Args:
         path: Capture-session JSON file.
 
@@ -131,15 +146,19 @@ def scan_session(path: Path) -> ScannedSessionDict | SkippedSessionDict:
         OSError: If the file cannot be read.
         InvalidJsonError: If the file is not valid JSON.
         JSONTypeError: If the JSON is not a capture session.
-        FramingError: If a payload ends mid-frame.
     """
     session = load_capture_session(path)
     if session["magic"] is None:
         return SkippedSessionDict(path=str(path), reason="no_magic")
+    try:
+        frames = decode_session_frames(session)
+    except FramingError as error:
+        log.info("Skipping unframed capture %s: %s", path, error)
+        return SkippedSessionDict(path=str(path), reason="unframed_payload")
     return ScannedSessionDict(
         path=str(path),
         session_id=session["session_id"],
-        frames=decode_session_frames(session),
+        frames=frames,
     )
 
 
@@ -158,13 +177,11 @@ def scan_archive(directory: Path) -> list[ScannedSessionDict | SkippedSessionDic
         OSError: If a file cannot be read.
         InvalidJsonError: If a file is not valid JSON.
         JSONTypeError: If a file is not a capture session.
-        FramingError: If a payload ends mid-frame.
     """
     return [scan_session(path) for path in _test_hooks.list_session_paths(directory)]
 
 
 __all__ = [
-    "RECEIVED_DIRECTION",
     "decode_session_frames",
     "load_capture_session",
     "scan_archive",

@@ -19,14 +19,15 @@ from tankpit_bot.analysis.types import (
     decode_skipped_session,
     encode_decoded_frame,
     encode_skipped_session,
+    require_frame_direction,
     require_hex_bytes,
     require_session_skip_reason,
 )
 
 
 def test_skip_reason_vocabulary_is_exactly_the_documented_set() -> None:
-    """The closed vocabulary is one reason, and the tuple says so."""
-    assert SESSION_SKIP_REASONS == ("no_magic",)
+    """The closed vocabulary is two reasons, and the tuple says so."""
+    assert SESSION_SKIP_REASONS == ("no_magic", "unframed_payload")
 
 
 def test_skipped_session_round_trips() -> None:
@@ -65,6 +66,7 @@ def test_decoded_frame_round_trips_including_body_bytes() -> None:
     """Bytes survive the hex hop exactly, including high bytes and NUL."""
     original = DecodedFrameDict(
         timestamp_ms=1_700_000_000_123,
+        direction="received",
         msg_type=0x53,
         body=bytes([0x00, 0x01, 0x7F, 0x80, 0xFF]),
     )
@@ -74,14 +76,19 @@ def test_decoded_frame_round_trips_including_body_bytes() -> None:
 def test_decoded_frame_encodes_body_as_hex() -> None:
     """The encoded body is lowercase hex of the raw bytes."""
     encoded = encode_decoded_frame(
-        DecodedFrameDict(timestamp_ms=7, msg_type=0x41, body=bytes([0xDE, 0xAD]))
+        DecodedFrameDict(timestamp_ms=7, direction="sent", msg_type=0x41, body=bytes([0xDE, 0xAD]))
     )
-    assert encoded == {"timestamp_ms": 7, "msg_type": 0x41, "body": "dead"}
+    assert encoded == {
+        "timestamp_ms": 7,
+        "direction": "sent",
+        "msg_type": 0x41,
+        "body": "dead",
+    }
 
 
 def test_decoded_frame_round_trips_an_empty_body() -> None:
     """A zero-length body encodes to an empty string and back."""
-    original = DecodedFrameDict(timestamp_ms=1, msg_type=2, body=b"")
+    original = DecodedFrameDict(timestamp_ms=1, direction="received", msg_type=2, body=b"")
     assert decode_decoded_frame(encode_decoded_frame(original)) == original
 
 
@@ -109,4 +116,17 @@ def test_require_hex_bytes_accepts_uppercase() -> None:
 def test_decode_decoded_frame_rejects_bad_body_hex() -> None:
     """A malformed body fails the record, not just the field."""
     with pytest.raises(JSONTypeError):
-        decode_decoded_frame({"timestamp_ms": 1, "msg_type": 2, "body": "xy"})
+        decode_decoded_frame(
+            {"timestamp_ms": 1, "direction": "received", "msg_type": 2, "body": "xy"}
+        )
+
+
+def test_require_frame_direction_narrows_and_rejects() -> None:
+    """Both directions narrow; anything else names the vocabulary."""
+    assert require_frame_direction("received") == "received"
+    assert require_frame_direction("sent") == "sent"
+    with pytest.raises(JSONTypeError) as excinfo:
+        require_frame_direction("sideways")
+    message = str(excinfo.value)
+    assert "unknown frame direction 'sideways'" in message
+    assert "received" in message and "sent" in message
