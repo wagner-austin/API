@@ -8,6 +8,8 @@ tripping the reverse-coverage rule.
 
 from __future__ import annotations
 
+from enum import IntEnum
+
 ANSWER = 42
 TRUTHY = True
 NAME = "fixture"
@@ -15,6 +17,24 @@ NAME = "fixture"
 #: ``__all__`` so reverse coverage stays a two-symbol surface; the
 #: bytes tests bind it explicitly by address.
 GREETING = b"A1"
+
+
+class Colour(IntEnum):
+    """Enum for the ``members`` claim-kind tests."""
+
+    RED = 0
+    BLUE = 1
+
+
+#: Mapping, sequence and set for the ``members`` claim-kind tests. All
+#: kept OUT of ``__all__`` for the same reason as ``GREETING``.
+COLOUR_FUEL: dict[Colour, int] = {Colour.RED: 10, Colour.BLUE: 20}
+COLOUR_NAMES: tuple[str, ...] = ("red", "blue")
+ODD_CODES: frozenset[int] = frozenset({3, 1, 2})
+#: A mapping whose VALUES are enum members, not ints. Nothing in the
+#: currently-bound modules has this shape, so without it the enum arm
+#: of the normalizer's element unwrapping is never executed.
+COLOUR_BY_NAME: dict[str, Colour] = {"red": Colour.RED, "blue": Colour.BLUE}
 
 
 def double(value: int) -> int:

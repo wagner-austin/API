@@ -230,6 +230,387 @@ See [[deactivation-format]] for hit/kill semantics and [[shoot-event-format]] fo
      128+ = custom text (remaining bytes)
 ```
 
+## Machine-checked binding to `protocol/constants.py`
+
+The coverage table above names wire message types; the block below binds
+each one to its Python constant, and the `physics_claims` guard stage of
+`make check` imports the symbol and compares. The table and the code
+cannot drift apart without the gate going red.
+
+This page is also the **canonical home for the 0x52 supervisor refusal
+vocabulary**. Those eleven codes were previously stated only in passing
+across seven pages with no single authority; `SUPERVISOR_ERROR_NAMES` is
+bound here as a `members` claim, so the whole name table is verified as a
+unit — an omitted code fails as loudly as an invented one.
+
+Reverse coverage makes the binding total: every public symbol of
+`tankpit_bot.protocol.constants` must be claimed exactly once, so a new
+message type added to the module without a wiki claim fails the build.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "msg-action-done",
+      "code": "tankpit_bot.protocol.constants:MSG_ACTION_DONE",
+      "value": 84,
+      "means": "0x54 action completed"
+    },
+    {
+      "id": "msg-active-forces",
+      "code": "tankpit_bot.protocol.constants:MSG_ACTIVE_FORCES",
+      "value": 42,
+      "means": "0x2a active-forces listing"
+    },
+    {
+      "id": "msg-active-players",
+      "code": "tankpit_bot.protocol.constants:MSG_ACTIVE_PLAYERS",
+      "value": 47,
+      "means": "0x2f active-players listing"
+    },
+    {
+      "id": "msg-build-pickup",
+      "code": "tankpit_bot.protocol.constants:MSG_BUILD_PICKUP",
+      "value": 66,
+      "means": "0x42 movable-block pick up / drop"
+    },
+    {
+      "id": "msg-cache-update",
+      "code": "tankpit_bot.protocol.constants:MSG_CACHE_UPDATE",
+      "value": 67,
+      "means": "0x43 cache update"
+    },
+    {
+      "id": "msg-chat",
+      "code": "tankpit_bot.protocol.constants:MSG_CHAT",
+      "value": 77,
+      "means": "0x4d chat message"
+    },
+    {
+      "id": "msg-deactivate",
+      "code": "tankpit_bot.protocol.constants:MSG_DEACTIVATE",
+      "value": 65,
+      "means": "0x41 deactivation - fires for own kills too"
+    },
+    {
+      "id": "msg-decoration",
+      "code": "tankpit_bot.protocol.constants:MSG_DECORATION",
+      "value": 78,
+      "means": "0x4e decoration"
+    },
+    {
+      "id": "msg-disconnect",
+      "code": "tankpit_bot.protocol.constants:MSG_DISCONNECT",
+      "value": 126,
+      "means": "0x7e disconnect"
+    },
+    {
+      "id": "msg-enemy-detect",
+      "code": "tankpit_bot.protocol.constants:MSG_ENEMY_DETECT",
+      "value": 72,
+      "means": "0x48 nearest-enemy detection result"
+    },
+    {
+      "id": "msg-equip-gain",
+      "code": "tankpit_bot.protocol.constants:MSG_EQUIP_GAIN",
+      "value": 103,
+      "means": "0x67 equipment gained"
+    },
+    {
+      "id": "msg-equip-toggle",
+      "code": "tankpit_bot.protocol.constants:MSG_EQUIP_TOGGLE",
+      "value": 116,
+      "means": "0x74 equipment slot toggled"
+    },
+    {
+      "id": "msg-fuel-deposit",
+      "code": "tankpit_bot.protocol.constants:MSG_FUEL_DEPOSIT",
+      "value": 100,
+      "means": "0x64 fuel deposited into a container"
+    },
+    {
+      "id": "msg-fuel-gain",
+      "code": "tankpit_bot.protocol.constants:MSG_FUEL_GAIN",
+      "value": 68,
+      "means": "0x44 fuel gained"
+    },
+    {
+      "id": "msg-inventory",
+      "code": "tankpit_bot.protocol.constants:MSG_INVENTORY",
+      "value": 73,
+      "means": "0x49 inventory contents"
+    },
+    {
+      "id": "msg-map-data",
+      "code": "tankpit_bot.protocol.constants:MSG_MAP_DATA",
+      "value": 76,
+      "means": "0x4c full map blob, positions frozen at open time"
+    },
+    {
+      "id": "msg-map-update",
+      "code": "tankpit_bot.protocol.constants:MSG_MAP_UPDATE",
+      "value": 90,
+      "means": "0x5a map update (same byte as MSG_VIEWPORT)"
+    },
+    {
+      "id": "msg-mine-detonate",
+      "code": "tankpit_bot.protocol.constants:MSG_MINE_DETONATE",
+      "value": 69,
+      "means": "0x45 mine detonation"
+    },
+    {
+      "id": "msg-mine-place",
+      "code": "tankpit_bot.protocol.constants:MSG_MINE_PLACE",
+      "value": 75,
+      "means": "0x4b mine placement"
+    },
+    {
+      "id": "msg-movement",
+      "code": "tankpit_bot.protocol.constants:MSG_MOVEMENT",
+      "value": 71,
+      "means": "0x47 movement echo"
+    },
+    {
+      "id": "msg-move-response",
+      "code": "tankpit_bot.protocol.constants:MSG_MOVE_RESPONSE",
+      "value": 61,
+      "means": "0x3d movement response carrying the settled position"
+    },
+    {
+      "id": "msg-overlay-update",
+      "code": "tankpit_bot.protocol.constants:MSG_OVERLAY_UPDATE",
+      "value": 64,
+      "means": "0x40 overlay (mine ownership) update"
+    },
+    {
+      "id": "msg-ping",
+      "code": "tankpit_bot.protocol.constants:MSG_PING",
+      "value": 96,
+      "means": "0x60 ping reply"
+    },
+    {
+      "id": "msg-promotion",
+      "code": "tankpit_bot.protocol.constants:MSG_PROMOTION",
+      "value": 43,
+      "means": "0x2b rank promotion"
+    },
+    {
+      "id": "msg-radar-result",
+      "code": "tankpit_bot.protocol.constants:MSG_RADAR_RESULT",
+      "value": 70,
+      "means": "0x46 radar result - lists only newly revealed hidden entities"
+    },
+    {
+      "id": "msg-radar-scan",
+      "code": "tankpit_bot.protocol.constants:MSG_RADAR_SCAN",
+      "value": 79,
+      "means": "0x4f radar scan"
+    },
+    {
+      "id": "msg-shoot",
+      "code": "tankpit_bot.protocol.constants:MSG_SHOOT",
+      "value": 83,
+      "means": "0x53 shot fired - final byte is weapon type, not hit/miss"
+    },
+    {
+      "id": "msg-statistics",
+      "code": "tankpit_bot.protocol.constants:MSG_STATISTICS",
+      "value": 86,
+      "means": "0x56 statistics"
+    },
+    {
+      "id": "msg-supervisor",
+      "code": "tankpit_bot.protocol.constants:MSG_SUPERVISOR",
+      "value": 82,
+      "means": "0x52 supervisor refusal carrying one error code"
+    },
+    {
+      "id": "msg-supervisor-text",
+      "code": "tankpit_bot.protocol.constants:MSG_SUPERVISOR_TEXT",
+      "value": 60,
+      "means": "0x3c supervisor message in text form"
+    },
+    {
+      "id": "msg-sync",
+      "code": "tankpit_bot.protocol.constants:MSG_SYNC",
+      "value": 63,
+      "means": "0x3f session sync"
+    },
+    {
+      "id": "msg-tank-entry",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_ENTRY",
+      "value": 40,
+      "means": "0x28 tank entered the viewport"
+    },
+    {
+      "id": "msg-tank-exit",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_EXIT",
+      "value": 41,
+      "means": "0x29 tank left the viewport"
+    },
+    {
+      "id": "msg-tank-info",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_INFO",
+      "value": 33,
+      "means": "0x21 roster entry: name + team, no coordinates (the login dump)"
+    },
+    {
+      "id": "msg-tank-pos",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_POS",
+      "value": 61,
+      "means": "0x3d tank position (same byte as MSG_MOVE_RESPONSE)"
+    },
+    {
+      "id": "msg-tank-remove",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_REMOVE",
+      "value": 88,
+      "means": "0x58 tank removed from the viewport"
+    },
+    {
+      "id": "msg-tank-stats",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_STATS",
+      "value": 46,
+      "means": "0x2e per-tank stats sync"
+    },
+    {
+      "id": "msg-tank-status",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_STATUS",
+      "value": 62,
+      "means": "0x3e tank status"
+    },
+    {
+      "id": "msg-tank-status-full",
+      "code": "tankpit_bot.protocol.constants:MSG_TANK_STATUS_FULL",
+      "value": 62,
+      "means": "0x3e full tank status (same byte as MSG_TANK_STATUS)"
+    },
+    {
+      "id": "msg-terrain-update",
+      "code": "tankpit_bot.protocol.constants:MSG_TERRAIN_UPDATE",
+      "value": 74,
+      "means": "0x4a terrain patch - carries atomic ferry move pairs"
+    },
+    {
+      "id": "msg-top10",
+      "code": "tankpit_bot.protocol.constants:MSG_TOP10",
+      "value": 49,
+      "means": "0x31 leaderboard"
+    },
+    {
+      "id": "msg-viewport",
+      "code": "tankpit_bot.protocol.constants:MSG_VIEWPORT",
+      "value": 90,
+      "means": "0x5a viewport patch (same byte as MSG_MAP_UPDATE)"
+    },
+    {
+      "id": "supervisor-error-already-there",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_ALREADY_THERE",
+      "value": 6,
+      "means": "code 6 - already at the requested tile"
+    },
+    {
+      "id": "supervisor-error-cant-do",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_CANT_DO",
+      "value": 0,
+      "means": "code 0 - the action is not permitted at all"
+    },
+    {
+      "id": "supervisor-error-cant-go",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_CANT_GO",
+      "value": 1,
+      "means": "code 1 - the destination is unreachable; a tank tile reads as impassable-occupied"
+    },
+    {
+      "id": "supervisor-error-congratulations",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_CONGRATULATIONS",
+      "value": 10,
+      "means": "code 10 - congratulations (not a refusal)"
+    },
+    {
+      "id": "supervisor-error-empty-container",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_EMPTY_CONTAINER",
+      "value": 4,
+      "means": "code 4 - the container is known-drained"
+    },
+    {
+      "id": "supervisor-error-friendly-fire",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_FRIENDLY_FIRE",
+      "value": 3,
+      "means": "code 3 - refused: the target is on your own team"
+    },
+    {
+      "id": "supervisor-error-insufficient-fuel",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_INSUFFICIENT_FUEL",
+      "value": 8,
+      "means": "code 8 - the teleport costs more fuel than the tank holds"
+    },
+    {
+      "id": "supervisor-error-inventory-full",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_INVENTORY_FULL",
+      "value": 7,
+      "means": "code 7 - every equipment slot is at rank cap"
+    },
+    {
+      "id": "supervisor-error-names",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_NAMES",
+      "members": {
+        "0": "cant_do",
+        "1": "cant_go",
+        "2": "uncontrollable",
+        "3": "friendly_fire",
+        "4": "empty_container",
+        "5": "tank_full_clamp_receipt",
+        "6": "already_there",
+        "7": "inventory_full",
+        "8": "insufficient_fuel",
+        "9": "no_enemies",
+        "10": "congratulations"
+      },
+      "means": "Canonical name for each 0x52 refusal code - the single home of this vocabulary."
+    },
+    {
+      "id": "supervisor-error-no-enemies",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_NO_ENEMIES",
+      "value": 9,
+      "means": "code 9 - no enemies to detect"
+    },
+    {
+      "id": "supervisor-error-tank-full",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_TANK_FULL",
+      "value": 5,
+      "means": "code 5 - at rank capacity; the clamp receipt"
+    },
+    {
+      "id": "supervisor-error-uncontrollable",
+      "code": "tankpit_bot.protocol.constants:SUPERVISOR_ERROR_UNCONTROLLABLE",
+      "value": 2,
+      "means": "code 2 - the tank is not controllable right now"
+    },
+    {
+      "id": "text-msg-types",
+      "code": "tankpit_bot.protocol.constants:TEXT_MSG_TYPES",
+      "members": [
+        96,
+        36,
+        37,
+        42,
+        43,
+        45,
+        82,
+        61,
+        126
+      ],
+      "means": "Message types delivered as text rather than XOR-encoded binary."
+    },
+    {
+      "id": "is-text-message",
+      "code": "tankpit_bot.protocol.constants:is_text_message",
+      "law": "True when a message type is delivered as text rather than XOR-encoded binary - i.e. membership of TEXT_MSG_TYPES."
+    }
+  ]
+}
+```
+
 [^1]: three-way cross-check, all on disk: `tpclient.js` (blob-pinned in frontmatter) is the JS side; the bot's decoder tree `src/tankpit_bot/protocol/` + `src/tankpit_bot/container/` is our side; production capture `runs/bot/bot-20260619-053210.capture_session.json` (frontmatter-pinned) plus `bot-20260619-050303` are the wire side. Standing receipt: every live session decodes through this exact pipeline — a wrong mapping surfaces as decode garbage immediately.
 [^13]: corpus-sweep ground truth: `analysis_scripts/crack_tank_update.py` and `analysis_scripts/crack_tank_status_short.py` (both on disk, verified 2026-07-23) re-derive the 597→1 collapse and the per-type sample counts from the `runs/` capture corpus; the deletions themselves are 2026-06-20 commits in git history.
 [^8]: `runs/bot/bot-20260619-053210` capture: 7/7 single-byte 0x2E bodies had subtype 0x54. The unified dispatcher requires 0x54 ActionDone to have inner ≥ 1 byte so the bare 1-byte form falls through to length-based teleport_landed

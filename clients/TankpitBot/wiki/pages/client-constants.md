@@ -305,4 +305,130 @@ KeyK: Toggle Microphone (41)
 
 Key messages for bot: 4="HELP - Enemy!", 6="HELP - Fuel low!", 8="Fuel detected here", 9="Equipment detected here", 53="I need equipment!", 54="I need fuel!"[^1]
 
+## Machine-checked binding to `protocol/constants.py`
+
+The team, rank, equipment and terrain vocabularies above are extracted
+from tpclient.js; the block below binds them to the Python enums and
+tables that mirror them, verified on every `make check`. `members`
+claims compare the WHOLE container — every enum member, every mapping
+entry, in order where order is meaningful (`RANK_NAMES` is indexed by
+rank, so its order is the fact).
+
+What this proves: the Python vocabulary and this page agree. It does not
+re-derive either from tpclient.js — that extraction is [^1], dated
+2026-06-19.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "damage-names",
+      "code": "tankpit_bot.protocol.constants:DAMAGE_NAMES",
+      "members": [
+        "critical",
+        "medium",
+        "light",
+        "full"
+      ],
+      "means": "Damage-state names as the client renders tank shading."
+    },
+    {
+      "id": "rank-fuel",
+      "code": "tankpit_bot.protocol.constants:RANK_FUEL",
+      "members": {
+        "RECRUIT": 1000,
+        "PRIVATE": 1100,
+        "CORPORAL": 1200,
+        "SERGEANT": 1300,
+        "LIEUTENANT": 1400,
+        "CAPTAIN": 1500,
+        "MAJOR": 1600,
+        "COLONEL": 1700,
+        "GENERAL": 1800
+      },
+      "means": "Starting fuel by rank, reset on death or respawn: 1000 at recruit, +100 per rank."
+    },
+    {
+      "id": "rank-names",
+      "code": "tankpit_bot.protocol.constants:RANK_NAMES",
+      "members": [
+        "recruit",
+        "private",
+        "corporal",
+        "sergeant",
+        "lieutenant",
+        "captain",
+        "major",
+        "colonel",
+        "general"
+      ],
+      "means": "Rank names indexed by rank value; the order IS the mapping."
+    },
+    {
+      "id": "team-names",
+      "code": "tankpit_bot.protocol.constants:TEAM_NAMES",
+      "members": [
+        "red",
+        "purple",
+        "blue",
+        "orange"
+      ],
+      "means": "Team names indexed by team value; the order IS the mapping."
+    },
+    {
+      "id": "equipment",
+      "code": "tankpit_bot.protocol.constants:Equipment",
+      "members": {
+        "ARMOR_SHIELD": 0,
+        "DUAL_SHOT": 1,
+        "MISSILE_SHOT": 2,
+        "HOMING_SHOT": 3,
+        "EXTRA_RADAR": 4
+      },
+      "means": "The five equipment slots, 0-4."
+    },
+    {
+      "id": "rank",
+      "code": "tankpit_bot.protocol.constants:Rank",
+      "members": {
+        "RECRUIT": 0,
+        "PRIVATE": 1,
+        "CORPORAL": 2,
+        "SERGEANT": 3,
+        "LIEUTENANT": 4,
+        "CAPTAIN": 5,
+        "MAJOR": 6,
+        "COLONEL": 7,
+        "GENERAL": 8
+      },
+      "means": "The nine rank levels, 0-8; rank indexes fuel capacity and equipment caps."
+    },
+    {
+      "id": "team",
+      "code": "tankpit_bot.protocol.constants:Team",
+      "members": {
+        "RED": 0,
+        "PURPLE": 1,
+        "BLUE": 2,
+        "ORANGE": 3
+      },
+      "means": "The four team colours, 0-3."
+    },
+    {
+      "id": "terraintype",
+      "code": "tankpit_bot.protocol.constants:TerrainType",
+      "members": {
+        "GROUND": 0,
+        "ROCK_A": 1,
+        "ROCK_B": 2,
+        "ROCK_AB": 3,
+        "FERRY": 5,
+        "FERRY_ROCK": 7
+      },
+      "means": "Wire terrain codes. 4 and 6 are unused; 5 is a ferry and 7 a ferry-rock."
+    }
+  ]
+}
+```
+
 [^1]: tpclient.js — every constant above carries its `(array/function, line N)` locator inline; file pinned by `source_paths` + `source_git_blobs` (traced 2026-06-19; fuel/action-dispatch facts re-mined 2026-07-06).

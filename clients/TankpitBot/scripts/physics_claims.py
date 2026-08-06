@@ -42,6 +42,7 @@ import importlib
 import importlib.util
 import pkgutil
 import sys
+from enum import IntEnum
 from pathlib import Path
 from types import CodeType, ModuleType
 from typing import Protocol
@@ -49,24 +50,32 @@ from typing import Protocol
 from platform_core.json_utils import (
     InvalidJsonError,
     JSONObject,
+    JSONValue,
     load_json_str,
 )
 from platform_core.logging import get_logger
 
 PHYSICS_PACKAGE = "tankpit_bot.physics"
 COMMANDS_MODULE = "tankpit_bot.protocol.commands"
+PROTOCOL_CONSTANTS_MODULE = "tankpit_bot.protocol.constants"
 
 #: Every target the wiki must bind, in onboarding order. A package
 #: binds every public symbol of every submodule; a bare module binds
 #: only its own ``__all__``. Adding a target here is a commitment:
 #: reverse coverage immediately requires a claim for each of its
 #: public symbols, so the claims land in the same commit.
-CLAIM_TARGETS: tuple[str, ...] = (PHYSICS_PACKAGE, COMMANDS_MODULE)
+CLAIM_TARGETS: tuple[str, ...] = (
+    PHYSICS_PACKAGE,
+    COMMANDS_MODULE,
+    PROTOCOL_CONSTANTS_MODULE,
+)
 
 CLAIM_FENCE_OPEN = "```json claims"
 CLAIM_FENCE_CLOSE = "```"
-#: Claim kinds. Exactly one must appear on every claim.
-CLAIM_KINDS: tuple[str, ...] = ("value", "bytes", "probes", "law")
+#: Claim kinds. Exactly one must appear on every claim. ``law`` is the
+#: weak one — existence plus prose — and exists only for symbols no
+#: other kind can verify; prefer any of the others when they fit.
+CLAIM_KINDS: tuple[str, ...] = ("value", "bytes", "members", "probes", "law")
 
 _LOGGER = get_logger(__name__)
 
@@ -234,6 +243,118 @@ def _check_bytes_claim(
     expected = expected_text.encode("latin-1")
     if constant != expected:
         return [f"{prefix}: claim says {expected!r}, code has {constant!r}"]
+    return []
+
+
+#: Element type of every container this rule can verify. The bound
+#: modules hold enum members, ints and strings; ``object`` is banned in
+#: annotations by the ``typing`` guard, so the union is spelled out.
+_MemberItem = IntEnum | int | str
+#: Container shapes a ``members`` claim can bind. The read site
+#: annotates ``getattr`` with this and then re-checks by ``isinstance``,
+#: the same narrow-then-verify idiom :func:`_check_value_claim` uses for
+#: ``constant: int``.
+_MemberSymbol = (
+    type[IntEnum]
+    | dict[_MemberItem, _MemberItem]
+    | set[_MemberItem]
+    | frozenset[_MemberItem]
+    | tuple[_MemberItem, ...]
+)
+
+
+def _unwrap(item: _MemberItem) -> JSONValue:
+    """Reduce one container element to its JSON-comparable value.
+
+    Args:
+        item: A container element, possibly an ``IntEnum`` member.
+
+    Returns:
+        The element's int value when it is an enum member, else the
+        element itself.
+    """
+    if isinstance(item, IntEnum):
+        return item.value
+    return item
+
+
+def _normalize_members(value: _MemberSymbol) -> tuple[JSONValue | None, bool]:
+    """Project a container symbol into a JSON-comparable shape.
+
+    Four container shapes carry game facts the wiki states literally,
+    and all four were previously only expressible as prose ``law``
+    claims — which verify existence and nothing else:
+
+    * ``IntEnum`` subclass -> ``{member name: int value}``
+    * ``dict`` -> ``{key: value}``, keys taken from the enum member
+      name when the key is an enum, else ``str(key)``
+    * ``tuple`` / ``list`` -> array, ORDER-SENSITIVE: ``RANK_NAMES``
+      is indexed by rank, so its order IS the fact being claimed
+    * ``set`` / ``frozenset`` -> array, order-INSENSITIVE, since a
+      set has no order to state
+
+    Args:
+        value: The resolved symbol.
+
+    Returns:
+        Pair of (projection, ordered). The projection is None when the
+        symbol is not a supported container. ``ordered`` is False only
+        for sets, whose claim may list members in any order.
+    """
+    # An IntEnum CLASS is detected by its ``__members__`` mapping rather
+    # than ``isinstance(value, type)``: the bare ``type`` builtin reads as
+    # ``type[type]`` under ``disallow_any_expr`` and fails mypy. The
+    # mapping is also exactly the projection wanted here.
+    enum_members: dict[str, IntEnum] | None = getattr(value, "__members__", None)
+    if enum_members is not None:
+        return {name: member.value for name, member in enum_members.items()}, True
+    if isinstance(value, dict):
+        out: dict[str, JSONValue] = {}
+        for key, item in value.items():
+            name = key.name if isinstance(key, IntEnum) else str(key)
+            out[name] = _unwrap(item)
+        return out, True
+    if isinstance(value, (set, frozenset)):
+        return [_unwrap(item) for item in value], False
+    if isinstance(value, tuple):
+        return [_unwrap(item) for item in value], True
+    return None, True
+
+
+def _check_members_claim(
+    claim: JSONObject,
+    module: ModuleType,
+    symbol_name: str,
+    prefix: str,
+) -> list[str]:
+    """Verify a container claim against the symbol's full contents.
+
+    Equality is TOTAL, not subset: a member the wiki omits fails as
+    loudly as one it invents. That is deliberate — a partially stated
+    table reads as complete to the next person, which is the failure
+    this whole rule exists to prevent.
+
+    Args:
+        claim: Claim object carrying ``members``.
+        module: Imported module.
+        symbol_name: Symbol the claim binds.
+        prefix: ``page#id`` for violation messages.
+
+    Returns:
+        Violations (empty when the contents match exactly).
+    """
+    expected = claim.get("members")
+    if not isinstance(expected, (dict, list)):
+        return [f"{prefix}: 'members' must be a JSON object or array"]
+    symbol: _MemberSymbol = getattr(module, symbol_name)
+    actual, ordered = _normalize_members(symbol)
+    if actual is None:
+        return [f"{prefix}: symbol is not an enum, mapping, sequence or set"]
+    if not ordered and isinstance(actual, list) and isinstance(expected, list):
+        actual = sorted(actual, key=repr)
+        expected = sorted(expected, key=repr)
+    if actual != expected:
+        return [f"{prefix}: claim members {expected!r} != code {actual!r}"]
     return []
 
 
@@ -405,13 +526,40 @@ def _check_claim(
         return claim_id, code, import_violations
     if not hasattr(module, symbol_name):
         return claim_id, code, [f"{prefix}: '{symbol_name}' not found in {module_name}"]
-    if kinds_present[0] == "value":
-        return claim_id, code, _check_value_claim(claim, module, symbol_name, prefix)
-    if kinds_present[0] == "bytes":
-        return claim_id, code, _check_bytes_claim(claim, module, symbol_name, prefix)
-    if kinds_present[0] == "probes":
-        return claim_id, code, _check_probe_claim(claim, module, symbol_name, prefix)
-    return claim_id, code, _check_law_claim(claim, prefix)
+    return claim_id, code, _run_kind_check(kinds_present[0], claim, module, symbol_name, prefix)
+
+
+def _run_kind_check(
+    kind: str,
+    claim: JSONObject,
+    module: ModuleType,
+    symbol_name: str,
+    prefix: str,
+) -> list[str]:
+    """Dispatch one claim to the checker for its kind.
+
+    Split out of :func:`_check_claim` to keep that function under the
+    complexity bar as kinds are added.
+
+    Args:
+        kind: The single kind present on the claim.
+        claim: Claim object.
+        module: Imported module the claim binds into.
+        symbol_name: Symbol the claim binds.
+        prefix: ``page#id`` for violation messages.
+
+    Returns:
+        Violations from the kind's checker.
+    """
+    if kind == "value":
+        return _check_value_claim(claim, module, symbol_name, prefix)
+    if kind == "bytes":
+        return _check_bytes_claim(claim, module, symbol_name, prefix)
+    if kind == "members":
+        return _check_members_claim(claim, module, symbol_name, prefix)
+    if kind == "probes":
+        return _check_probe_claim(claim, module, symbol_name, prefix)
+    return _check_law_claim(claim, prefix)
 
 
 def _module_addresses(module_name: str) -> tuple[list[str], list[str]]:

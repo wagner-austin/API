@@ -200,15 +200,19 @@ Most of this document is a discipline, but four families are enforced by the
 Separately, `scripts/physics_claims.py` machine-checks the ` ```json claims `
 blocks against the code they bind, in both directions. Its bound targets are
 listed in `CLAIM_TARGETS`: the `tankpit_bot.physics` package (since 2026-07-21)
-and the `tankpit_bot.protocol.commands` module (since 2026-08-05). A target may
+and the `tankpit_bot.protocol.commands` + `tankpit_bot.protocol.constants`
+modules (both 2026-08-05). A target may
 be a package or a single module — module granularity exists so a large package
 can be onboarded a module at a time, because reverse coverage is
 all-or-nothing per target: **every** public symbol of a bound target must be
 claimed exactly once, so adding a constant without a wiki claim fails the gate.
-Claim kinds are `value` (int), `bytes` (latin-1 payload), `probes` (formula
-checked at explicit points), and `law` (prose + existence, for symbols no int
-grid can verify). The module name is historical — it binds more than physics
-now. Everything else here — atomicity, citation quality, link-don't-restate
+Claim kinds are `value` (int), `bytes` (latin-1 payload), `members` (an enum,
+mapping, sequence or set compared in FULL — order matters for sequences, not
+for sets), `probes` (formula checked at explicit points), and `law` (prose +
+existence, the weak one, for symbols no other kind can verify). `members`
+equality is total: a table entry the wiki omits fails as loudly as one it
+invents, because a partially stated table reads as complete. The module name is
+historical — it binds more than physics now. Everything else here — atomicity, citation quality, link-don't-restate
 — is reviewed by humans and AIs, not by the gate.
 
 ## Storage

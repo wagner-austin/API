@@ -22,7 +22,7 @@ FIXTURE_PACKAGE = "tests.scripts.physics_fixture"
 FIXTURE_MODULE = f"{FIXTURE_PACKAGE}.facts"
 #: The exactly-one-of-kinds message, kept in one place so adding a
 #: claim kind updates every assertion that quotes it.
-_ONE_OF = "claim needs exactly one of value/bytes/probes/law"
+_ONE_OF = "claim needs exactly one of value/bytes/members/probes/law"
 
 GREEN_PAGE = f"""# Fixture Economy
 
@@ -567,6 +567,119 @@ def test_non_string_bytes_field_is_reported(
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
     assert "physics_claim_violation bad.md#x: 'bytes' must be a latin-1 string" in out
+
+
+def test_members_claim_binds_an_enum(tmp_path: Path) -> None:
+    """An IntEnum class is claimed as its full name -> value mapping."""
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [2], "expect": 4}]},'
+        f'{{"id": "colour", "code": "{FIXTURE_MODULE}:Colour",'
+        ' "members": {"RED": 0, "BLUE": 1}}'
+        "]}"
+    )
+    _write_page(tmp_path, "m.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_members_claim_on_mapping_sequence_and_set(tmp_path: Path) -> None:
+    """Mappings, ordered sequences and unordered sets all verify."""
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [2], "expect": 4}]},'
+        f'{{"id": "fuel", "code": "{FIXTURE_MODULE}:COLOUR_FUEL",'
+        ' "members": {"RED": 10, "BLUE": 20}},'
+        f'{{"id": "names", "code": "{FIXTURE_MODULE}:COLOUR_NAMES",'
+        ' "members": ["red", "blue"]},'
+        f'{{"id": "codes", "code": "{FIXTURE_MODULE}:ODD_CODES",'
+        ' "members": [2, 3, 1]}'
+        "]}"
+    )
+    _write_page(tmp_path, "m.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_members_unwraps_enum_valued_containers(tmp_path: Path) -> None:
+    """A container whose VALUES are enum members compares by int value.
+
+    Claimed as ``{"red": 0}``, not ``{"red": "Colour.RED"}`` — the wiki
+    states the wire number, so the projection must reach it. No
+    currently-bound module has this shape, which is exactly why the
+    fixture carries one: otherwise the unwrapping arm is never run and
+    the first enum-valued table added to a bound module would compare
+    against a repr.
+    """
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [2], "expect": 4}]},'
+        f'{{"id": "by-name", "code": "{FIXTURE_MODULE}:COLOUR_BY_NAME",'
+        ' "members": {"red": 0, "blue": 1}}'
+        "]}"
+    )
+    _write_page(tmp_path, "m.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_members_sequence_order_is_load_bearing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A tuple's order IS the fact — RANK_NAMES is indexed by rank."""
+    claims = (
+        f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:COLOUR_NAMES",'
+        ' "members": ["blue", "red"]}]}'
+    )
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: claim members" in out
+
+
+def test_members_omitting_an_entry_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Equality is total: an omitted entry fails like an invented one.
+
+    A partially stated table reads as complete to the next reader,
+    which is the failure the whole rule exists to prevent.
+    """
+    claims = (
+        f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:COLOUR_FUEL",'
+        ' "members": {"RED": 10}}]}'
+    )
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: claim members" in out
+
+
+def test_members_on_scalar_symbol_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A members claim on an int is the wrong kind."""
+    claims = (
+        f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER", "members": {{"a": 1}}}}]}}'
+    )
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "bad.md#x: symbol is not an enum, mapping, sequence or set" in out
+
+
+def test_members_must_be_object_or_array(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A scalar members field is rejected before comparison."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:COLOUR_FUEL", "members": 7}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: 'members' must be a JSON object or array" in out
 
 
 def test_module_target_matches_exactly_not_by_prefix(
