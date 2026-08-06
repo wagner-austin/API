@@ -18,8 +18,10 @@ from pathlib import Path
 from statistics import median
 
 from platform_core.json_utils import load_json_str
+from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message
 from tankpit_bot.protocol.commands import CMD_RADAR, COMMAND_PREFIX
+from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.constants import MSG_MIN_LENGTHS
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 from tankpit_bot.types import decode_capture_session
@@ -194,7 +196,7 @@ def scan_session(path: Path, agg: dict) -> None:
                 continue
             try:
                 m = decode_message(mt, data)
-            except Exception:  # noqa: BLE001 - survey sweep, count and move on
+            except (DecodeError, ContainerDecodeError):
                 agg["decode_errors"] += 1
                 continue
             k = m["msg_type"]
@@ -391,7 +393,7 @@ def main() -> None:
     for p in paths:
         try:
             scan_session(p, agg)
-        except Exception as exc:  # noqa: BLE001 - survey; name the bad file
+        except (OSError, ValueError, KeyError, DecodeError, ContainerDecodeError) as exc:
             print(f"SESSION_ERROR {p.name}: {exc}", file=sys.stderr)
 
     # hits-before-teleport by rank

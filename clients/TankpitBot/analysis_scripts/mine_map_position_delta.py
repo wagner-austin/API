@@ -24,7 +24,9 @@ from collections import Counter
 from pathlib import Path
 
 from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
@@ -46,8 +48,15 @@ def _iter_frames(data: bytes) -> list[bytes]:
 
 def mine(path: Path, agg: dict) -> None:
     session = json.loads(path.read_text(encoding="utf-8"))
+    magic = session.get("magic")
+    if magic is None:
+        # A session whose XOR key was never captured cannot be decoded at
+        # all. Rare but real: 1 of 287 archived bot captures. Same guard
+        # mine_bot_policy.py already applies.
+        agg["skipped_no_magic"] = int(agg.get("skipped_no_magic", 0)) + 1
+        return
     reset_xor_state()
-    build_global_xor_table(session["magic"])
+    build_global_xor_table(magic)
     # Per tank: list of (t, x, y) wire fixes, and (t, x, y) map entries.
     wire: dict[int, list[tuple[int, int, int]]] = {}
     mapped: dict[int, list[tuple[int, int, int]]] = {}
@@ -133,7 +142,7 @@ def main() -> int:
         try:
             mine(path, agg)
             agg["sessions"] += 1
-        except Exception as error:  # noqa: BLE001 - archive files vary; report and continue
+        except (OSError, ValueError, KeyError, DecodeError, ContainerDecodeError) as error:
             print(f"SKIP {path.name}: {error}")
     agg["delta_hist"] = dict(agg["delta_hist"].most_common(20))
     print(json.dumps(agg, indent=1))

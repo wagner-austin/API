@@ -31,7 +31,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sim.commands import decode_client_command
 from tankpit_bot.sniffer.decoders import _is_text_route
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
@@ -55,9 +57,17 @@ def _iter_frames(data: bytes) -> list[bytes]:
 
 
 def _decode_all(session: dict) -> list[tuple[int, str, dict]]:
-    """Decode every frame as (t, "cmd"|"msg", decoded)."""
+    """Decode every frame as (t, "cmd"|"msg", decoded).
+
+    Raises:
+        ValueError: When the session carries no XOR magic, so no frame in
+            it can be decoded. Caller reports it as a SKIP.
+    """
+    magic = session.get("magic")
+    if magic is None:
+        raise ValueError("session has no XOR magic; nothing in it can be decoded")
     reset_xor_state()
-    build_global_xor_table(session["magic"])
+    build_global_xor_table(magic)
     out: list[tuple[int, str, dict]] = []
     for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
         t = message["timestamp_ms"]
@@ -335,7 +345,7 @@ def main() -> int:
         try:
             mine(path, agg, static_terrain)
             agg["sessions"] += 1
-        except Exception as error:  # noqa: BLE001 - archive files vary; report and continue
+        except (OSError, ValueError, KeyError, DecodeError, ContainerDecodeError) as error:
             print(f"SKIP {path.name}: {error}")
     print(json.dumps(agg, indent=1))
     return 0

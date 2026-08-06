@@ -18,7 +18,9 @@ import sys
 from pathlib import Path
 
 from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
@@ -63,7 +65,7 @@ def scan_capture(path: Path, show_context: bool) -> int:
                 continue
             try:
                 decoded = decode_message(body[0], xor_decode(body))
-            except Exception:  # noqa: BLE001 - archive holds torn frames
+            except (DecodeError, ContainerDecodeError):
                 timeline.append((t, "recv", f"undecodable:{body[0]:#04x}"))
                 continue
             msg_type = decoded.get("msg_type")

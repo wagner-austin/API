@@ -17,7 +17,9 @@ import sys
 from pathlib import Path
 
 from tankpit_bot.capture.xor import decode_base64_safe
+from tankpit_bot.container.helpers import ContainerDecodeError
 from tankpit_bot.protocol import decode_message, try_decode_plaintext_ack
+from tankpit_bot.protocol.helpers import DecodeError
 from tankpit_bot.sniffer.decoders import _is_text_route
 from tankpit_bot.sniffer.xor import build_global_xor_table, reset_xor_state, xor_decode
 
@@ -53,8 +55,12 @@ def _label(decoded: dict) -> str:
 
 def mine(path: Path) -> None:
     session = json.loads(path.read_text(encoding="utf-8"))
+    magic = session.get("magic")
+    if magic is None:
+        print(f"SKIP {path.name}: session has no XOR magic")
+        return
     reset_xor_state()
-    build_global_xor_table(session["magic"])
+    build_global_xor_table(magic)
     events: list[tuple[int, str]] = []
     deposit_times: list[int] = []
     for message in sorted(session["messages"], key=lambda m: m["timestamp_ms"]):
@@ -72,7 +78,7 @@ def mine(path: Path) -> None:
                 continue
             try:
                 decoded = decode_message(body[0], xor_decode(body))
-            except Exception:  # noqa: BLE001 - archive holds torn frames
+            except (DecodeError, ContainerDecodeError):
                 events.append((t, f"RECV undecodable {body[:2].hex()}"))
                 continue
             events.append((t, "RECV " + _label(dict(decoded))))
