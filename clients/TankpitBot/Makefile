@@ -7,7 +7,7 @@ SHELL := powershell.exe
 # overwritten. Reference historical sessions by their archive path.
 OUTPUT ?=
 
-.PHONY: help lint test check install sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
+.PHONY: help lint test check install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe track bot run service analyze analyze-timing queue-probe download-fields decode discover analyze-viewport smoke debug-run audit wiki-anchors roundtrip sim-run sim-run-practice shadow
 
 help:
 	@Write-Host ""
@@ -48,6 +48,7 @@ help:
 	@Write-Host "  make run                         5-min timed session + scorecard"
 	@Write-Host "  make service                     long-running SPA-driven HTTP + SSE server"
 	@Write-Host "  make analyze                     issue report + run audit + cross-session stats"
+	@Write-Host "  make digest                      compact per-run truth table (works on crashed runs)"
 	@Write-Host "  make sniff                       capture WebSocket session to disk"
 	@Write-Host ""
 	@Write-Host "Offline tools:" -ForegroundColor Yellow
@@ -275,6 +276,11 @@ run: install
 	@Write-Host ""
 	@Write-Host "==> scorecard" -ForegroundColor Cyan
 	poetry run tankpit-issue-report runs/bot/latest.events.jsonl
+
+digest:
+	@Write-Host ""
+	@Write-Host "==> digest (latest run)" -ForegroundColor Cyan
+	poetry run tankpit-run-digest runs/bot/latest.events.jsonl
 
 analyze:
 	@Write-Host ""
