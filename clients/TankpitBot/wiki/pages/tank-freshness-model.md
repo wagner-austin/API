@@ -12,7 +12,7 @@ source_paths:
   - "src/tankpit_bot/state"
 source_git_blobs:
   "src/tankpit_bot/state": "01f57c7928f05025a5ca0c14ab82ec4ff320031b"
-fact_checked: "2026-07-31"
+fact_checked: "2026-08-04"
 confidence: high
 hubs: [architecture]
 ---
@@ -111,14 +111,17 @@ from the registry self-tank id.[^1]
 
 ## Gates
 
-The gates are TTL constants in `bot/ai/threats.py`, applied inline at
-their decision sites -- there are no `is_wire_present()` /
-`is_position_fresh()` helper functions:[^1]
+The wire/position TTLs live in `bot/ai/threats.py`, applied inline at
+their decision sites; `VIEWPORT_PRESENCE_TTL_MS` moved to
+`state/types/tank.py` (2026-08-04) beside the field it gates, because
+tile occupancy (`state/occupancy.py`) became its second consumer and
+the two must never drift:[^1]
 
 - **`VIEWPORT_PRESENCE_TTL_MS`** -- 5000 ms against
   `last_viewport_observation_ms`. **Acquisition gate**, applied first in
   `analyze_threats`; also gates the greeting approach
-  (`bot/ai/greeting.py`).
+  (`bot/ai/greeting.py`) and tank-body occupancy
+  ([[terrain-composition]]).
 - **`WIRE_PRESENCE_TTL_MS`** -- 7000 ms (two fight-cadence periods)
   against `last_wire_seen_ms`. Ghost gate.
 - **`POSITION_FRESHNESS_TTL_MS`** -- 7000 ms against
@@ -128,6 +131,58 @@ their decision sites -- there are no `is_wire_present()` /
 
 Order at the combat site: viewport presence, then wire presence, then
 position freshness, then the miss-on-moved-target re-aim path.[^1]
+
+## Login choreography: every tank starts position-less (measured 2026-08-04)
+
+The server opens every session with a **full-roster 0x21 TankInfo
+dump** -- name and team for every tank on the map, NO coordinates --
+and positions only arrive with the first position-bearing sync.
+Measured across three captures (113 tanks): every first sighting was
+0x21 (one 0x3D), and the first-sight-to-first-position window was
+uniform per session -- 10.9 s (bot-20260802-205105), 9.1 s
+(bot-20260803-180918), 45.7 s (sniff-20260620-190228, the user did
+not open the map for 45 s). The window ends at one event for the
+whole roster, so it is login choreography, not a per-tank race.[^7]
+
+Until that first position message a registry entry sits at the
+``(0, 0)`` construction default (`apply_tank_observation` creates
+unknown tanks from any observation, defaulting absent fields). The
+``(0, 0)`` state is therefore the NORMAL opening state of every tank
+the bot ever meets -- and (0, 0) is also a legal tile.
+
+**The canonical predicate** is
+`state.types.has_known_position(tank)`: coordinates differ from the
+default, OR `last_position_update_ms > 0` (covers a tank
+authoritatively placed exactly on (0, 0); the coordinate check alone
+covers radar EnemyDetect, which writes real coords without advancing
+the kill-shot timestamp). Seven modules used to hand-copy the inline
+`x == 0 and y == 0` comparison and an eighth consumer
+(`state/occupancy.py`, 2026-08-04) shipped without it -- walling off
+the map corner with the whole roster's phantom bodies for the
+session's first 5 s. All sites now consume the predicate, and the
+guard rule `scripts/state_sentinel_rules.py` bans the inline idiom
+outside `state/types/tank.py`.
+
+One deliberate non-consumer: the HELLO greeting
+(`bot/ai/greeting.py`). User ruling 2026-07-31 -- "hello can run
+anytime... as long as the other player is on the map logged in" -- a
+human still at the roster default gets greeted the moment their
+identity broadcast lands; the predicate gates targeting and the
+stand-off visit, never the chat.
+
+Team and rank share the same defaulting mechanism (`team=0` is a real
+team) but NOT the same exposure: the only creation route without a
+team is `_update_tank_position` (0x47/0x53/0x42 sources), and the
+measurement shows the 0x21 roster dump -- which carries team --
+always wins the creation race. Latent, undefended, empirically never
+fires. Mines and containers are immune by construction: their
+factories require every field.[^7]
+
+[^7]: First-sight probe over runs/bot/bot-20260802-205105,
+    runs/bot/bot-20260803-180918, runs/sniff/sniff-20260620-190228
+    (2026-08-04): per-tank first message type and
+    first-sight-to-first-position gap, decoded through
+    `protocol.decode_message` -- method in wiki log 2026-08-04.
 
 ## How the historical bug manifested
 

@@ -2563,3 +2563,229 @@ The requested increment ("go start with ghosts"), closing the "opponents aren't 
 **Three fidelity findings en route, fixed at the law:** (a) the first cut marked every first-read container dotted — the live bot round-2-hopped at a phantom 1,073-dot atlas; the exposed set is the recording's own 0x4C (plus visible-layer reads), radar reveals stay hidden, unread atlas dots seed drained; (b) the same over-dotting lived in ATLAS seeding — 6,675 drained dots of 120-day exposure history versus the live ~620-1,077 census dragged sessions superlinear (120 rounds = 172 s); ghost mode now bounds the exposed set exactly and heuristic mode gates drained dots on 7-day freshness (400 rounds = 120 s); (c) `relocate_tank` initially double-announced entering ghosts (explicit 0x3D + the membership diff's).
 
 Also: `sim/run.py` split per the 400-600 rule (`sim/scenarios.py` now owns worlds + mode resolution + CLI parsing; run.py owns boot/loop/clock). Gate: guard 0 violations, mypy clean, **5,705 tests at 100.00%**.
+
+---
+## [2026-08-02] live run | 20-kill soak (bot-20260802-205105) — loop scan clean, pipeline fed end-to-end
+
+First live session on the post-differ code, run unattended to a kill target ("so we dont wanna just run a 20 kill run and see how it does? identify any radar or ferry loops?").
+
+**The run.** 20 kills / 0 deaths in 1,571 s (780 ticks), 229 shots at 99% hit rate, exit `session_complete` with a clean `quit_game` to lobby, ending inventory maxed (fuel 1100, duals/homings/radars 25/25/25). A first launch attempt hung 13 min inside Playwright's browser launch (never navigated, no outbound connection) — killed and relaunched clean; transient, not bot code. A cosmetic Playwright teardown traceback fires after `quit_game` (CDP event racing the closed connection; no bot frames in the stack).
+
+**Loop scan: nothing loops.** No radar loop — radar economy netted positive (9 scans vs +gains, ended at cap). No ferry confusion. Map-opens paired ~1:1 with teleports. Run-audit: 2 critical, 0 warnings — both criticals are the SERVER failing to answer a `map_open` (21:04:18, 21:06:36); the bot burned its 10.3 s stall budget, replanned, and the retry answered in 2 s. Server flakiness handled correctly; explains the dispatched=112/completed=110 delta. All consistency channels agree exactly (20 kills = 20 wire 0x41s = 20 DOM banners; 56 wire 0x52s = 56 ledger).
+
+**Rejection chatter decoded live.** 48 code-5s are post-clamp double-sips (drink to cap, immediately re-sip the remainder, server refuses "tank full") — 48 fresh live receipts for the [[fuel-system]] clamp choreography. 6 code-4 drained races, 2 code-1 cant_go bounces (fresh [[flag-triage-20260729]] F6 samples). All replanned, zero stalls. Soft fix candidate: skip the re-sip when fuel just hit cap (pure wasted action, ~2 s each).
+
+**Pipeline fed end-to-end on the fresh capture.**
+- Differ (live catalogue regrown): every lane's dominant live shape still matches the sim laws — pickup_fuel 59.4% clamp / 13.8% drain, radar 45.7/38.3 split, shoot 92.5% bare 53self, teleport 5A->3Dself->landed, and **scope now n=59 live samples at 83.1% `5A+3Dself`** — the [[viewport-shift-protocol]] anchor law's sample base keeps growing.
+- Atlas re-mined with the new observations; the miner surfaced **182 fuel<->equipment type-flip tiles** (a tile's record changing kind across captures) — new texture for the deposit-attribution question in [[game-economy]].
+- Ghost baseline: the run's own capture self-replayed under the same code — tracked 10/150, first divergence round 2, final drift 53. Recorded in [[capture-differ]] as the STANDING live-capture baseline (live self-replays fork at the first radar because the seeded world is the atlas approximation; compare future numbers against this, not the 19/21 sim-recording figure).
+
+No code changed. Fix candidates queued: post-clamp re-sip guard; optional teardown-race silencer on shutdown.
+
+---
+## [2026-08-03] lift | The 0x52 refusal laws single-sourced — physics/supervisor.py, dispatch prediction, three constant forks deleted
+
+The user's mandate, verbatim: "im worried were just tacking on random band aid fixes instead of properly addressing thw root of the issue and presenting a properly integrated solution" / "no forking, no duplicste coxe ir divergenet code" — after the 20-kill soak's 48 refused at-cap fuel sips traced to `_find_combat_pickup` never consulting fuel headroom.
+
+**The audit first.** The bug was one instance of a class: the "would the server refuse this?" question was re-derived per call site. Found and inventoried: (a) THREE parallel namings of the 0x52 vocabulary — canonical `SUPERVISOR_ERROR_*` in `protocol/constants.py`, a private `_COMMAND_ERROR_*` fork in `bot/tick_loop_actions.py` + `bot/tick_loop.py`, and a third name-dict in `sniffer/world_state_dispatch.py`; (b) the refusal LAWS living only inline at sim emission sites; (c) `inventory_all_full` re-encoding the code-7 condition client-side; (d) `sim/equipment.py` hard-coding cap 25 (a rank-1 corpus artifact) beside the rank-derived `inventory_capacity` law; (e) the missing headroom gate itself. NOT broken: `physics/` as the shared law layer (both consumers already import capacities/costs/damage from it), and the 8 planner-side `fuel >= capacity` sites that are POLICY (break bands, deficit math), not law — deliberately left alone.
+
+**The lift, following the repo's own pattern.** New `physics/supervisor.py` — `fuel_pickup_close_code` (close-by-stockedness), `fuel_pickup_refusal` (known-drained -> 4; at-rank-capacity -> 5), `equipment_pickup_refusal` (all five slots at rank cap -> 7), `teleport_refusal` (cost > fuel -> 8) plus `TELEPORT_RING1_COST_SLACK = 9` (floor(6*(d-sqrt2)) bound for target-based prediction under displacement). Wiki claims bound in [[fuel-system]], [[teleport-mechanics]], [[game-economy]] (the physics_claims gate enforces the binding). Consumers:
+- SIM EMITS with them: `emit_fuel_pickup_close` close code, `resolve_equipment_pickup` refusal branch (cap now `inventory_capacity(rank)` — the corpus 25 is `inventory_capacity(1)`; `shadow_laws` states its all-private corpus as `ARCHIVE_EQUIPMENT_CAP`), `process_teleport` affordability.
+- BOT PREDICTS with them at the executor chokepoint: a `pickup_fuel`/`pickup_equipment`/`teleport` whose refusal the belief PROVES is suppressed pre-wire (`dispatch_suppressed` diagnostic, predicted code logged); belief-uncertain cases (drained races, no container record) stay optimistic by design. `_find_combat_pickup` consults the same predicates to fall through to the useful container kind. `inventory_all_full` — a fourth pre-existing re-encoding of the code-7 condition — was DELETED outright (post-lift it was a one-line wrapper with a single caller; the caller consumes the law via the new `inventory_counts` shape adapter). Second-pass sweep under the no-wrappers/no-aliases/no-fallbacks mandate also re-expressed `fuel_pickup_refusal` THROUGH `fuel_pickup_close_code` (a refusal IS a predicted no-transfer closed by stockedness — one branch table, not two).
+
+**Forks deleted, class killed.** All three constant re-declarations replaced by imports of the canonical set (+ `SUPERVISOR_ERROR_NAMES` canonicalized into `protocol/constants.py`); new guard rule `scripts/protocol_constant_rules.py` (wired into `scripts.guard`, mirrored tests) bans any future assignment matching the error-constant name patterns with embedded integer literals outside `protocol/constants.py` — enforcement, not discipline.
+
+Test fixtures the new laws falsified (all fixed at the fixture, not the law): two teleport tests hopping unaffordable distances, one combat-pickup test with an over-cap inventory, one whose "fuel skip" was masked by equipment-first ordering (rewritten to prove the gate: at-cap -> None, cap-1 -> sip).
+
+Gate: guard 0 violations (incl. the new rule), ruff + mypy clean, **5,733 tests at 100.00%**.
+
+---
+## [2026-08-03] validate + build | Suppression receipt, deposit law mined, stage 5 closed, reactive ghosts
+
+One day, four deliverables, all gated (**5,741 tests at 100.00%**, `make shadow` green across all seven laws):
+
+**1. The refusal-law lift validated end to end.** Offline: four sim soaks under the new predicates (arena kill, practice roster, ferry harvest, ghost replay); ghost self-replay IDENTICAL to baseline (10/150, div tick 2, drift 53 — the lift changed no macro behavior); fresh-baseline differ (`sim-lift*`): every closed law's dominant shape still matches live. Live: validation run bot-20260803-180918 — 14 kills / 1 death / 1,293 ticks — and, missed in the first report and recovered by the 2026-08-03 autopsy: the session held the FIRST TWO LIVE HUMAN FIGHTS of the fair-fight stack. Belton (id 984): greeted HELLO once + greeting approach at 18:09:35, fought with correct break math, killed THREE times (18:11, 18:28, 18:43). nope (id 2678): greeted 18:28:46, a 7-minute war (41 incoming 45/90 hits, 45 shots back, two correct break-engagement calls at fuel 500/516) ending in the session's one death at 18:37:55 — the F21 partial-restock lane ("refuel to 750 nearby and resume") sent the bot foraging a WAR-DRAINED pocket under fire: five straight code-4s, one +57 sliver, teleport unaffordable at 17 fuel, dead at 0. The failure is not the break math (it fired, correctly) but the resume-refuel leg assuming nearby fuel exists — contract ruling owed: desert-escape teleport while affordable and/or a last-resort quit floor. The refusal-law receipt: **32 code-5 windows, every one a clamp SUCCESS with a same-window fuel transfer; ZERO no-transfer at-cap refusals (was 48)**. The waste class is dead by absence: the scanner-side gate stops the dispatches from being planned at all (0 executor suppressions needed). Remaining rejections: 18 code-4 drained races (correctly optimistic), 10 code-1 (F6: terrain-checked 2026-08-03 — 8/10 refused targets are PASSABLE per static terrain, 2/10 impassable planner feeds; the passable majority points at live movable BLOCKS the reachability check does not consult, [[flag-triage-20260729]]), 1 code-0 teleport. New small bug filed: the scorecard's shot counter printed 23 vs 223 actual wire shoots. The teardown traceback fired once more — the run predated the fix below.
+- Differ sim-only residuals recorded in [[capture-differ]]: teleport-landing equipment grant (13 windows, SUSPECTED INVENTED LAW — live suggests only fuel auto-picks on landing) and `53self+landed` queue-compression artifact (8).
+
+**2. The deposit choreography byte-mined** ([[fuel-system]]) — answering "dont we have recordings where ive deposited fuel?": yes, five manual deposits in user session sniff-20260620-190228. Shape: sent 0x07 -> self 0x2E + 0x64 (absolute post-deposit fuel) + container record x1 (the new remaining = amount). Single record (vs every pickup's double) = the wire discriminator; max-deposit leaves exactly `DEPOSIT_FLOOR` (294 -> 100 on camera); third-party deposits client-only (the atlas's zero cross-tank 0x64s). Ferry rides located too (bot-20260720-005424 rode 78 ticks; drift lives in 0x4A block moves — mining pass queued).
+
+**3. Playwright teardown race fixed at the root.** The CDP session was never detached; late frame events raced `browser.close()` in the sync bridge (ERROR traceback, zero bot frames). `Bot._detach_cdp_session()` now runs after the capture save, absorbing the already-gone case like the graceful quit; three tests pin it.
+
+**4. Stage 5 closed — the bot-policy differ + reactive ghosts** ([[capture-differ]]). Policy re-judged on the grown archive (310 sessions, 29 bot-hours): 5,975/5,975 weapon-0 singles, 95.7% in the reflex window, thresholds re-pinned (7/8 at modes 87/117), reactivation gap mode = the 22 s corpse window. The differ's first real catches were INSTRUMENT bugs: `sync-cadence` now medians CLEAN gaps only (74/266 "failures" were 2 s cores wrapped in 18-943 s viewport-absence holes) and `bot-reactivation` skips re-sights far past the corpse window (34/35 were third-party-damaged bots drifting back into view). True anomalies left: one 16 s early re-sync, 10 cadence outliers. Then the build: **reactive ghosts** — `PracticeRoomDriver` refactored to own policy states over EXISTING tanks (`seed_practice_roster` extracted; no wrapper), bot-named ghosts carry the certified policy UNDER their timeline (recorded events hold the tick; withheld returns fire on the next quiet one — `tests/sim/test_ghost_reactive.py`), killed bot ghosts reactivate by the corpse law. Reactive replay of the 20-kill capture: 150/150 rounds, divergence signature shifted (12/150, drift 78 vs pure 10/150, drift 53) — ghosts that shoot back change the fight, as they must.
+
+---
+## [2026-08-03] lift | Fight instrumentation promoted to the gated layer, three more forks dead
+
+The user's charter pass ("reliable, robust, deliberate... no shims, no forks, no drift") applied to the nope-fight aftermath:
+
+**1. `validate/fight_timeline.py`** — human episodes and the per-event play-by-play as typed products of the EXISTING `extract_shadow_timeline` (no second decode path; the loose ungated `render_fight.py` deleted). `HumanEpisodeDict` carries exactly-computable engagement facts incl. the `max_stationary_streak` turret metric; `FightRowDict` rows attribute every self fuel delta by measured cause. First real-capture run immediately caught its own bug (self listed as its own opponent — fixed, regression-pinned) and rendered the death: Belton 13 taken/141 returned/2 kills, nope 32 taken/68 returned/1 death.
+
+**2. `tankpit-fight` CLI** (`diagnostics/fight_report.py`) — episodes + windowed play-by-play in the house build/render/one-log shape; a death autopsy is now one command. **Run-audit** grew `human_episode` (INFO) and `turret_exchange` (WARNING at stationary streak >= 4 under fire) findings — a human fight can never again hide inside a rejection stream.
+
+**3. Forks deleted:** the practice-bot name regex existed THREE times (bot/ai/humans, validate/shadow_bot_laws, + capturing-group variant); now one canonical `protocol/naming.py` (capturing color group as API) with all nine call sites updated — humans.py keeps only the priority-tier doctrine. The respawn path's hand-picked carry-list (which dropped the hit/miss/reject counters — the 23-vs-223 scorecard bug) replaced by `make_respawn_ai_state` with the seven session-scoped fields documented field-by-field. The wait-layer's "rejected by server" now reads **"closed by server receipt <name>"** for collect codes 4/5/7 (the choreography's closes), keeping "rejected" only for genuine refusals — the wording that hid 32 successful drinks from three autopsy passes.
+
+Gate: guard 0 violations, ruff + mypy clean over src/tests/scripts, full coverage.
+
+---
+## [2026-08-04] lift | F6 closed at the law: four blockers, two questions — occupancy composed, landing split from walking
+
+(Entry written retroactively 2026-08-04 during review — the operation itself ran 01:02-02:16.)
+
+The F6 `cant_go` residual resolved into its stated root cause and fixed there. The user supplied the server contract verbatim — *"you walk until you hit the block then stop and you get the error message"* with the full blocker set (terrain, another tank, a movable block, a visible mine) — and corrected the routing claim: the server auto-paths around VISIBLE mines only ([[walk-mechanics]] footnote 4; hidden mines arrest by detonation instead). Re-read against the 2026-08-03 run, code 1 is therefore NOT a refusal — the server ACCEPTS the walk, goes as far as the corridor allows, stops at the first blocker, and reports; 9 of the 10 live code-1s show the tank moved before stopping. The eight earlier falsification verdicts tested properties of the REQUEST when the variable was what stood in the CORRIDOR.
+
+**The build:** new `state/occupancy.py` (`is_tank_body_present` / `occupied_tank_keys` — not-self, viewport-fresh) folded into `FerryAwareTerrain` so all four blocker classes answer through the ONE composed passability view ([[terrain-composition]]). En route the fix exposed the opposite defect: landing selection asked the WALK question, and an enemy always occupies its own tile — so `TerrainMapProtocol` grew the second question, `is_landing_legal` (terrain only; the server displaces landings off mines and bodies per [[mine-mechanics]]), consumed by `find_teleport_landing_tile` and both `combat_landing` choosers. `VIEWPORT_PRESENCE_TTL_MS` un-forked from `bot/ai/threats.py` into `state/types/tank.py` beside the field it gates. Wiki: [[terrain-composition]] two-questions section, [[walk-mechanics]] visible-mines correction, F6 diagnosis rewrite in [[flag-triage-20260729]].
+
+Gate: guard 0 violations, ruff + mypy clean, 5,777 tests at 100.00%.
+
+---
+## [2026-08-04] audit + lift | The (0,0) phantom: login-roster law measured, has_known_position canonicalized, sentinel class guarded dead
+
+Review of the overnight F6 lift ("check the code my other ai did some work on the codebase") confirmed the design and found one wrong docstring claim with a real edge behind it: occupancy read `(x, y)` gated on viewport freshness alone, but 0x21 TankInfo and 0x3E TankStatus route as viewport with NO coordinates — and `apply_tank_observation` creates unknown tanks at the `(0, 0)` default.
+
+**The law, byte-measured (first-sight probe, 3 captures, 113 tanks):** the server opens every session with a full-roster 0x21 dump — every tank's FIRST sighting is the position-less kind — and positions arrive only with the first position-bearing sync (10.9 s / 9.1 s / 45.7 s after first sight, uniform per session). The `(0, 0)` phantom is the NORMAL opening state of every tank, which is why seven modules had hand-copied the `x == 0 and y == 0` sentinel — and why the eighth consumer forgetting it was inevitable. Recorded in [[tank-freshness-model]]. Same probe killed the sibling worry: `team=0` defaulting shares the mechanism but the team-carrying 0x21 always wins the creation race (latent, never fires); mines and containers are immune by construction.
+
+**The lift:** canonical `has_known_position(tank)` in `state/types/tank.py` — coords differ from the default OR `last_position_update_ms > 0` (radar-known tanks pass via the former, an authoritative (0,0) via the latter). Consumed by occupancy (phantom wall dead) and all seven former sentinel sites (threats x3, hunt_acquire, resource_search, tactics, combat_probe); the two ad-hoc tile-occupancy re-derivations (`combat_landing._is_dynamically_occupied`, `movement._is_occupied_by_enemy`) now express their tank halves through `is_tank_body_present` with `now_ms` threaded through both landing choosers (F6 open sub-question 3 closed). NOT lifted, by ruling: the HELLO greeting stays position-blind (user 2026-07-31, "hello can run anytime") — the existing test `test_position_unsynced_human_is_greeted_anyway` caught the attempted gate and won. New guard `scripts/state_sentinel_rules.py` (AST, same-base both-axes zero-compare, canonical module exempt) bans the ninth copy forever.
+
+Test fixtures the law falsified (fixed at the fixture): six blocking tanks across movement/landing/consent suites now state viewport freshness — a stale entry no longer vetoes a tile, which is the point.
+
+Gate: guard 0 violations (incl. the new rule), ruff + mypy clean, **5,792 tests at 100.00%**.
+
+---
+## [2026-08-04] crack + lift | The cant_go choreography byte-proven, sim walk law rebuilt: partial walks, team-scoped mine visibility
+
+Answering "what about the sim?" after the occupancy lift: two sim-server divergences from the corrected walk laws, both closed, the first only after the measurement overturned the standing account.
+
+**The crack first** (`analysis_scripts/mine_cant_go_choreography.py` — the exact-window echo measure F6 recorded as owed): for each of the 12 live code-1s (both 2026-08 runs), pair the event-log rejection line (both log wordings) with the capture's decoded 0x47 self echoes and 0x52 receipts. First honest result was a false negative — the miner filtered 0x3D, but walk echoes are 0x47 — and the corrected result REWRITES the law's shape: **11 of 12 code-1s carry a same-window 0x47 prefix echo** (the server plans the route AS IF clear, walks it, stops at the first blocker — 18:12:35's 14-step `ssseeessseeeen` stopped at (16,24) with Belton's body on (16,23); 18:23:46 stopped beside bot 520), **1 of 12 is the zero-tile pure refusal** (bare 0x52, no echo, no movement — the first step was already blocked), and echo+receipt land in one processing batch. Supersedes the 9/10 nearest-sample measure. Recorded as [[walk-mechanics]] "The cant_go partial-walk law".
+
+**Mid-build user contract, load-bearing:** mine visibility is TEAM-scoped — "if someone on our team scanned the mines previously they're visible... if any new mines are planted, even if we're on the same viewport as the planting tank, we cannot see them... unless someone on our team radars." The reveal tracking being written per-tank was moved to `SimWorldDict.revealed_mine_keys_by_team` ([[walk-mechanics]] footnote 5).
+
+**The sim rebuild** (`sim/movement.py` + `sim/actions.py` + `sim/emissions.py` + `sim/world.py`): `process_radar` is now the reveal event (per-team key set, encode/decode round-tripped); the primary route avoids tanks + TEAM-REVEALED enemy mines + block obstacles; a severed corridor plans terrain-only and executes step-by-step (`_execute_walk`) stopping BEFORE the first tank/revealed-mine/block (cant_go WITH the walked prefix; the 0x47 echo precedes the 0x52 in the same batch), stepping ONTO a hidden enemy mine (walk-over detonation-arrest, 45, no code 1 — hidden mines no longer detour, which the old sim wrongly did omnisciently), and pure-refusing only when static terrain severs (bare 0x52, no movement — matching the one echo-less live sample). Own-tile clicks keep their echoed zero-tile moved form (the fuel-choreography tests pinned it).
+
+Nine new law tests (corridor cork, revealed-mine wall, block wall, pure refusal, hidden-mine fallback arrest, team-scope reveal via a real teammate scan, adjacency zero-tile). Gate: `make shadow` green on all seven laws, sim soak 150/150 healthy, guard 0 violations, **5,800 tests at 100.00%**.
+
+---
+## [2026-08-04] crack | Corpses don't block — F6 question 2 dissolved from the archive, no live probe needed
+
+The user's suggestion ("cant we just do an action lab for that? kill an enemy and see when the corpse disappears?") decomposed better than a probe: the corpse LIFETIME was already a green shadow law (kill -> 0x58 = 22 s exactly, 40 samples); the unproven part was whether the body BLOCKS walking during it — and the bot's post-kill habit (restock from the current viewport's containers) meant the archive already held the answer. Correction folded in same-day: kills drop NO loot (user contract 2026-08-04, recorded in [[gameplay-loop]] — which had carried the "kill loot funds the loop" attribution error since 2026-07-01); the corpse-tile crossings below are incidental restock-route traffic, which makes them UNBIASED evidence.
+
+**The measure** (`analysis_scripts/mine_corpse_blocking.py`, 34 kills across both 2026-08 runs): for every kill, fix the corpse tile from the victim's last wire position, then classify every self 0x47 echo around the window. Result: **six clean walks ONTO a fresh corpse tile at +2 to +10 s — inside the 22 s window — and zero blocked crossings.** Corpses do not block walking; the window governs respawn choreography, not passability.
+
+**The disproof caught a regression before it ran live:** `is_tank_body_present` deliberately counted deactivated tanks ("a corpse stands where it died"), so the composed terrain would have vetoed the bot's own post-kill restock walks wherever they cross the corpse tile, for up to the 5 s presence TTL. Now gated on ``liveness == "alive"`` — matching the sim server's `_blocked_by_world`, which always did. F6 open question 2 struck as dissolved (its premise, not its answer, was wrong); no deactivation timestamp needed.
+
+Gate: guard 0 violations, ruff + mypy clean, **5,800 tests at 100.00%**.
+
+---
+## [2026-08-04] crack + lift | Ferry movement law mined: no drift, atomic 0x4A pairs, the unfinished-command close — and cluster A's true cause
+
+Task #21 (queued since the deposit mining) closed, with two corrections riding along.
+
+**The mechanism** (`analysis_scripts/mine_ferry_drift.py`, rewritten off the failed 0x3D approach): a ferry's position is restated by 0x5A repaints; its movement is ONE atomic 0x4A pair — old tile restored to water, new tile painted 5 — in rider-move-sized legs (Manhattan 1-12). Archive sweep over all 312 captures: **148 distinct moves, 136 rider-attributed** (a tank stated the departing/arriving tile within 2.5 s); the 12 residuals are isolated singles with no cadence — under-observed riders, not drift. **No autonomous drift law exists**; the sim's rider-following model is validated at scale. (First classifier pass said "all unridden" — it matched riders against the OLD tile only, and the rider's echo lands before the 0x4A; the corrected window matches either endpoint.)
+
+**Cluster A reattributed — third time, now terminal.** `make download-fields` + the ferry move log put the truth together: a ferry sat ON (59,28) — WATER on field01 — from 18:20:44 to 18:27:20, bracketing all four cluster-A code-1s; every echo starts at (59,28) with the one-step `w` disembark onto (58,28) LAND. The bot was RIDING; its land collects were disembark-truncated by the single-command surface law and closed code 1. The tank-cork BFS story was coincidental (the composition fix stays right — 18:12:35's Belton stop is a genuine tank block). Recorded in [[flag-triage-20260729]] F6 and [[walk-mechanics]].
+
+**The unfinished-command close, byte-split three ways:** transition stop SHORT of the click → echo + code 1 (5 live samples); transition stop that IS the click → silent; mine walk-over arrest → silent (18 archive detonations, ZERO paired code-1s — the negative probe that stopped a wrong "any unfinished command" generalization). Sim now emits all three (`MoveOutcomeDict.stop_reason`/`dest_reached`, `emit_move` close rule; three emission-law tests in `tests/sim/test_ferry.py`).
+
+Gate: `make shadow` green on all seven laws, guard 0 violations, **5,803 tests at 100.00%**.
+
+---
+## [2026-08-04] live run + fix | 19 kills / 0 deaths / ZERO rejections, then the relay ping-pong — wrong selector, one-line rewire
+
+**Run bot-20260804-230342** (kill target 20): first live session under the full 2026-08-04 stack (occupancy composition + corpse/phantom gates, landing/walking split, partial-walk sim laws). **19 kills / 0 deaths in 19.5 min at a steady ~70 s cadence — and ZERO server rejections of ANY code the whole session** (the 08-02 baseline had 48 code-5s + 18 code-4s + code-1s; the 08-03 run had 32+18+10). The refusal-prediction and reachability stack is receipt-clean end to end.
+
+**Then the 20th kill never came.** The nearby roster farmed out, the lock fell on a target 98 tiles away, chase 588 > max affordable 450 ("refuel cannot fix distance"), and the relay branch entered a **two-tile teleport ping-pong**: (206,254)<->(207,254) for two minutes, a 3-hop drift, then (225,253)<->(225,254) — one hop per 2 ticks, every landing exact, forever. Killed at 26.5 min per the standing rule (events + log saved; the wire capture was lost to the hard kill — teardown save never ran).
+
+**Root cause — a fork-and-miss, not a scoring tune.** The beyond-refuel-reach branch in `combat_strategy` called `make_resource_search_hop` — the COLLECT dot-ranker, whose `dots*walkable/cost` score makes the dot under the tank's feet ~50x cheaper than any dot toward the prey, unbeatable by the ~2x proximity bias; with the own-tile veto excluding the current dot, two adjacent dots form a stable 2-cycle. The correct selector had existed all along: `hunt_relay._pick_relay_dot` — strict-progress, monotone by construction, leg-capped ("terminates at the enemy or runs out of qualifying dots"). **Fix: the branch now calls `hunt_relay.relay_toward`** (lock preserved through the leg), and when no progress dot exists and refuel cannot help (at cap), the target is **blocked and replanned** instead of treadmilled. Two regressions pinned: neighbor-dot-vs-progress-dot (the ping-pong shape), and no-progress-at-cap -> `blocked_combat_targets`.
+
+Gate: guard 0 violations, ruff + mypy clean, **5,805 tests at 100.00%**.
+
+---
+## [2026-08-05] live run + fix | Rerun 5 kills then the ferry-boarding deadlock — the missing ride leg, built
+
+**Run bot-20260804-234008** (rerun under the relay fix): blistering start — 5 kills / 0 deaths in the first 5 minutes including a WAR-DRINK (fight parked on a 1043-volume well vs bot 516: took 45s every 2 s, drank +642 back to cap MID-FIGHT, won the sustain trade), clamp receipts flowing as lawful drink closes throughout. Then a long engagement drained to ~296 and the refuel leg found the second stall of the night.
+
+**The deadlock, exact-window:** the larder's F5 ferry-boarding branch served a water-locked 469-volume container at (106,11) with boarding landing (112,15) — and the LANDING'S command window ((108,0)-(123,15) live) does not contain the container. Three mechanisms interlocked: (a) a pickup can only be dispatched inside the actionable window, so the locked pickup vetoed every tick ("not executable - holding plan"); (b) the hold releases only on a move-failed mark, which requires a dispatch that never happened; (c) the cascade fell through to the larder, which re-selected the same boarding hop — **~230 hop selections, 56 exact landings on (112,15)/(112,14) over 11 minutes**, zero ferry_belief_expired (exact landings never disprove the belief), fuel bleeding 296 -> 250. Killed at ~25 min per the standing rule.
+
+**The fix — the missing RIDE leg, not a selection band-aid:** waiting can never fix an out-of-window lock (the window has to move), and the window-mover already existed as `walk_or_teleport`'s pure-move approach path (edge-clamped move — which on a boarded ferry RIDES the water and shifts the window; on land walks/hops closer). `collect_locks` now issues that approach for BOTH lock kinds when the pickup veto is specifically the actionability gate: next tick the target is in-window and the pickup dispatches, or the move fails and the structural release fires — monotone either way. Regression pinned (`test_out_of_window_locked_fuel_approaches_instead_of_holding`). The larder's boarding selection stays untouched — the server's window placement after a landing is not client-predictable (live landed window (108,0) vs centered prediction (104,7)), so gating selection on a predicted window would have been an invented model.
+
+Session tally across both runs tonight: 24 kills / 0 deaths, zero at-cap waste receipts, two distinct stall classes found live and root-fixed same-night (relay ping-pong; out-of-window lock deadlock). Gate: guard 0 violations, ruff + mypy clean, **5,806 tests at 100.00%**.
+
+---
+## [2026-08-05] live run + fix | Run 3 stalled in the SAME pocket — the ride-exists gate closes the F5 boarding hole for good
+
+**Run bot-20260805-070006** spawned near the (106,12) pocket and hit the deadlock class within 2 minutes, before any kills — but as the EQUIPMENT variant, proving the previous night's out-of-window lock fix was treating a symptom: with the target IN the window the approach leg correctly never fired, and the ferry hop + one-step disembark + re-hop cycle ran anyway (the "one tile at a time" movement the user watched live: each single step is the 2026-07-19 disembark contract firing after every futile boarding teleport). Killed at ~3 min.
+
+**Root cause, terrain-proven:** `find_ferry_boarding_tile` selected ferries by DISTANCE ALONE — its own docstring admitted "the same-water-body assumption is usually safe." field01 truth: the container's pond holds 4,456 water tiles and does NOT contain the ferry's tile at (112,15); one land ridge at (111,15) separates two water bodies. The bot teleported onto a boat in a puddle to reach fuel in a lake — both nights' deadlocks (fuel AND equipment lanes) through this one function.
+
+**The fix — the ride must EXIST:** `find_ferry_boarding_tile` now takes the terrain view and requires the candidate ferry to float on the goal's own water body (4-connected flood from the goal; a live ferry tile counts as water — on the composed view it renders `~` OVER the lake, and the first cut treating it as a wall broke the sim's own ferry-harvest e2e, which is exactly the layer that caught it before live). All three call sites (fuel larder, equipment hop, scope-scout goals) share the gate. Two bonus catches: the equipment-hop unit fixture had its ferry on unconnected ground BY ACCIDENT — the exact live-deadlock geometry sitting in the test suite asserting success — now corrected to state the ride honestly; and the disjoint-pond case is pinned in both the larder suite and a new direct `test_ferry_landing.py`.
+
+Why the sim missed the original bug: the ferry scenario only encodes the happy geometry (same lake). Sims catch what their authored worlds contain; live play authored the adversarial one. A wrong-pond sim scenario variant is the queued follow-up.
+
+Gate: guard 0 violations, ruff + mypy clean, **5,809 tests at 100.00%**.
+
+---
+## [2026-08-05] revert | The out-of-window approach leg was the regression — hold-and-fall-through restored, and the real resolution mechanism named
+
+Run bot-20260805-075502 (run 4, 1 kill) stalled at 07:57 in a NEW loop of my own making, and tracing it answered the question the previous night's fix skipped: **how does an out-of-window lock normally resolve?** Answer, from the log: the hold returns NO decision, the cascade falls through, and the equipment-hop lane teleports ONTO the target (07:57:02: `equipment hop to (170,111) landing (170,111) cost=134`, deferred one tick for a map open). The landing recenters the window; the pickup dispatches. The lock machinery was never the stuck part.
+
+The approach leg I added on 08-05 00:30 broke exactly that: the lock continuation runs FIRST in the cascade, the leg returned an edge-walk decision every tick, so the cascade never reached the hop again — the one-tick-away teleport was starved forever while the tank walked (174,96)<->(174,97) at the window edge. Doubly wrong because a recorded law already forbade the mechanism: with autoscroll OFF, walking can never shift the window ([[viewport-shift-protocol]]; the F5 notes say it verbatim). The prior night's "deadlocked hold" was a symptom of the ferry-pond bug (target permanently unservable), not a defect of holding.
+
+**Reverted:** both lock paths hold again on any inexecutable tick, with the run-4 mechanism documented at the hold site; the regression test now pins the HOLD (decision None, lock retained) so no future "helpful" leg can short-circuit the cascade unnoticed. The pond ride-exists gate — the fix for the actual root cause — stands. Gate: guard 0 violations, ruff + mypy clean, **5,808 tests at 100.00%**.
+
+---
+## [2026-08-05] lift | The unservable release — the lock law completed instead of patched around
+
+The honest completion the reverted approach leg should have been: the enumerated plan-release law gains **``unservable``** — a locked container with NO legal teleport landing AND NO fresh ferry on its OWN water body cannot be walked to, hopped to, or ridden to, and no move-failed mark will ever arrive because nothing is ever dispatched. That is the exact run-2 (bot-20260804-234008) hold: released now in one tick instead of held for 11 minutes. The verdict reuses the selectors' own primitives (`find_teleport_landing_tile` + the pond-gated `find_ferry_boarding_tile`) — no new policy, no movement changes, and affordability/viewport misalignment deliberately stay HOLDS (they change with fuel and motion; committed-intent law untouched). `PlanReleaseReason` vocabulary extended and documented; both lock kinds release through the one predicate.
+
+Fixture corrections the new law forced, each toward honesty: two strategy-coverage hold tests and the water-locked hold test premised on "a ferry can serve it later" while seeding NO ferry — each now floats a fresh ferry on the target's pond so the hold they pin is genuinely transient; new pins for the unservable release and the no-terrain no-verdict hold.
+
+Gate: guard 0 violations, ruff + mypy clean, **5,811 tests at 100.00%**.
+
+---
+## [2026-08-05] live run | THE CLEAN 20 — every fix lane proven in one session
+
+**Run bot-20260805-083117: 20 kills / 0 deaths in 22.5 minutes, exit `session_complete`, wound down fully stocked at 1100, graceful quit, capture saved, ZERO errors.** The first kill-target session to complete since the fix cycle began, and every lane built this week fired live:
+
+- **The relay chain closed three kills.** 8 monotone dot legs across the session; the signature arc: orange-5 acquired ~90 tiles out -> three progress hops -> kill in ~90 s. Same for orange-3 and the 20th kill itself (orange-7) — the exact scenario that hung run 1 at 19/20 forever.
+- **The ferry contract ran clean:** one disembark, immediately resolved, kill 8 seconds later. No boarding churn — the pond gate kept every hop honest (no wrong-pond ferry was ever selected, so the `unservable` release was never needed: 0 firings, which is the healthy count).
+- **Receipts:** 45 code-5 drink closes (ledger outcome `clamped_transfer` — every one carried fuel), 5 code-4 drained races, **1 code-1** — diagnosed in-run: a teleport-displacement pocket at (38,112) (something on the container tile), the adjacent collect's walk cut by the same obstruction, replanned same tick. Zero at-cap waste, zero code-0.
+- Analyzer top-level issues: exactly one — a single server-side map_open dispatch/completion delta (the known flake class from 08-02).
+
+The week's arc, for the record: 24 kills across five sessions of finding-and-fixing (relay ping-pong, out-of-window lock deadlock -> reverted approach leg -> completed release law, ferry pond gate), then this. Gate remains green at 5,811 tests / 100.00%.
+
+---
+## [2026-08-05] crack | The map_open stall characterized: a July 29-30 server incident window, not a bot behavior
+
+Answering "why did the map take a while to open" for run 5's single stall — with the archive, after the capture ruled out every client-side suspect for that instance (tank stationary; both the mine-clearance shoot and the map_open frames present in the SENT capture; 28 inbound frames flowing through the gap; the swallowed open never answered late — the analyzer's dispatched=104/completed=103 delta is one open eaten outright, not delayed).
+
+**Archive sweep (all runs, 32,437 ledgered actions): 286 stall_timeouts — 276 map_open, 6 scan, 3 collect, 1 teleport — collapsing into 22 EPISODES, and 19 of the 22 start inside one 27-hour window: 2026-07-29 20:55 -> 2026-07-30 23:22** (worst: seven consecutive swallowed map_opens over 75 s at 07-30 22:23, retries stalling too, a scan eaten at the episode head). Outside that window the two-month archive holds three episodes total (2 on 08-02, 1 today). Hypotheses tested and disconfirmed: client rate (stalled opens' prior-60s frequency median 5 = answered opens' median 5, answered p90 higher); movement; connection death; dispatch sequencing (the superseded-shot-then-map pattern occurs 3 other times this run alone, all answered).
+
+**The law for the wiki:** the server's per-tank command processing goes episodically deaf — broadcasts continue, commands are silently dropped (never NACKed: no 0x52, no late answer) — overwhelmingly during the 07-29/30 degraded period, residually ~once per session-hours since. The client's stall-budget + replan is the complete correct handling; there is no client-side fix for a frame the server drops. The 08-02 run's "2 critical" analyzer findings were this incident's tail, not a bot defect. Future stalls should be read against this baseline (a NEW episode cluster on a fresh date = server having another bad day, not a regression).
+
+**Addendum — the deterministic-rule hunt, run to exhaustion (same day):** challenged ("code is reliable and algorithmic"), two rule-shaped mechanisms were formulated and byte-tested. (1) *Already-open map opens are ignored*: refuted — the pre-stall window shows six map_opens in 32 s all served, and the human session sniff-20260701-191133 re-opens freely and is always served. (2) *Commands are dropped while the map is open*: refuted — the human choreography shows NO close command exists on the wire at all (open is sent cmd=3 -> 0x4C; moves/teleports flow immediately after the 0x4C, all answered). The episode-start fingerprint test (20 of 25 episodes had a teleport between the last served map and the stall) killed the map-state family for the July window too. Standing conclusion: the trigger is not a function of anything the client sends — deterministic on the server's side of the wire, unobservable from ours. Byte-facts banked for [[map-data-decode]]: map open = sent cmd 3 (len 5); no wire close exists; repeat opens are re-served; actions interleave legally with an open map.
+
+---
+## [2026-08-05] crack + lift | The no_viable_targets exits root-caused: liveness rule 4 (map presence IS life) — three of my theories killed by the user's pushback en route
+
+The 100-kill chain (32 record + 26 + 24 + 0 = 82) kept ending sessions in "empty" rooms the user insisted were full. The user was right; the trail of dead theories and the surviving law:
+
+- "The room starves / respawns come in waves" — DEAD (wiki already recorded 22 s reactivation; I theorized before checking, against standing discipline).
+- "Rejoining repopulates the roster" — DEAD (nothing spawns; rejoin merely discards the client's phantom registry).
+- "Re-killed bots were revived by entering the viewport" — DEAD (the five re-kills were revived by GLOBAL 0x3D movement broadcasts; asserted-then-falsified).
+- **The law:** the server's 0x4C map is a strictly living-tanks list — victims absent from 58/58 in-corpse-window snapshots, present in 204/204 after; Belton (human, id kept across 3 deaths — page correction) absent during each window, back at +24 s. Idle respawns are otherwise WIRE-SILENT (27/32 victims: zero bytes ever again), so the June rule "map never touches liveness" (built against departed-player afterimages) starved acquisition of the only signal that exists: sessions exited no_viable_targets with 27 live enemies on the map, each "corpse" position faithfully tracking its living owner.
+- **The lift:** liveness rule 4 in `state/mutations.py` — a deactivated tank LISTED in a map snapshot flips alive (the flag pair position-authoritative + not-wire-sourced is unique to 0x4C; radar/DOM stay excluded). Two pins in the mutations suite. Rejected on the way, correctly, by the user: a respawn-displacement tile comparison ("brittle") and a corpse-window timer — the direct server-curated signal needed neither.
+- **Chain post-mortem:** session 4 (0 kills, 43 min) was NOT a regression — same binary as session 3's 24 kills — but drained-map inheritance: same-room rejoin 90 s after a heavy farm + the ~1 dot/min container regen ([[game-economy]]) + hunt-only-when-full = collect-trapped. Recorded in [[enemy-bot-behavior]] with the map-liveness law. **RETRACTED same day — see the next entry.**
+
+Gate: guard 0 violations, ruff + mypy clean, `make shadow` green, **5,813 tests at 100.00%**.
+
+---
+## [2026-08-05] correction + crack | Session-4 "drained map" retracted — the 0-kill session was a mine-landing geometry trap; the century closed at 100/100
+
+The chain post-mortem above cited a law [[game-economy]] itself falsified on 2026-07-25 (container "regen" was our own radar exposure; refills are discrete deposits). The user rejected the story and the session's own events (bot-20260805-173034.events.jsonl) convict a client-side loop instead:
+
+- **Hunt gate closed by 2 homings.** Spawn inventory homing 23/25; 27 live enemies in viewport from tick 6. The gate — not the room — kept it from hunting.
+- **The trap:** nearest equipment (58,95) is sealed by water + mines on every approach ((58,94)* , (59,95)*, (57,95)W; southern neighbor (58,96) is a second equipment container walled by water). The hop planner chose landing (59,95) — a KNOWN mine — so the server displaced all teleports: 534 `teleport_displacement` events, **1,068 of 1,130 hops aimed at this single tile** across 43 min.
+- **No release ever fired for it:** `unservable` requires no landing candidate at all; `target_gone` requires the container to vanish; repeated displacement is uncounted. The lock re-armed every tick.
+- **The loop ate its own gate:** per-cycle scans burned radars 22 → 0; when weapons later capped via incidental pickups, radars ≥ cap−5 became the failing gate condition. Fuel was never scarce — `tank_at_capacity` fired 19 times mid-loop.
+- Defects opened: landing selector is mine-blind; no displacement-failure/no-progress detector on collect hops; gate resource spent by the gate-satisfying loop. [[enemy-bot-behavior]] corollary rewritten with this diagnosis.
+
+**The century closed anyway:** the chain runner fired session 5 (bot latest, 18:14-18:35) before the stop landed — bounded 18 kills, delivered **18/18 kills, 209/209 shots (100%), 0 deaths, exit session_complete**, first live session with liveness rule 4 in the binary. Chain total: 32 + 26 + 24 + 0 + 18 = **100/100**.

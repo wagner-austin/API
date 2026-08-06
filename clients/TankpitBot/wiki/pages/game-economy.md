@@ -413,6 +413,11 @@ to follow (and vice versa).
       "id": "deposit-floor",
       "code": "tankpit_bot.physics.capacity:DEPOSIT_FLOOR",
       "value": 100
+    },
+    {
+      "id": "equipment-pickup-refusal",
+      "code": "tankpit_bot.physics.supervisor:equipment_pickup_refusal",
+      "law": "An equipment pickup is refused 0x52 code 7 (Inventory full) exactly when all five slots sit at the rank cap (20 + 5 * rank); any single deficient slot makes the pickup grantable, slot choice being the server's (1,149-grant archive law 2026-07-22, zero past-cap counts; recruit cap 20 confirmed by the bot-20260725-211120 promotion crossing)."
     }
   ]
 }

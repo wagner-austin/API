@@ -89,6 +89,14 @@ archive-wide).
 | assorted ``(silent)`` windows | — | ARTIFACT — response latency past the next command send truncates the window |
 | radar ``...+pickup+pickup`` | 2,006 | ARTIFACT — landing-scan windows absorb the teleport's own pickup records |
 
+Sim-only rows (shapes the LIVE archive never produces — post-lift
+baseline ``sim-lift*``, 2026-08-03):
+
+| Shape (sim-only) | n | Bucket |
+|---|---|---|
+| teleport ``5A+3Dself+landed+67+49+pickup`` | 13 | SUSPECTED INVENTED LAW — the sim grants equipment on teleport landing, but live's dominant explicit-pickup shape is own-tile ``67+49+pickup``, suggesting the real server auto-picks only FUEL on landing and equipment needs the explicit command. Needs one byte-mined live equipment-hop landing window before changing the sim. |
+| shoot ``53self+landed`` | 8 | ARTIFACT — sim queue compression resolves a queued teleport inside the shot's window |
+
 ## Stage 4 — ghost replay (2026-08-01)
 
 `sim/ghost.py` + `tankpit-sim-run --ghost CAPTURE [--from-atlas]`:
@@ -117,14 +125,48 @@ today's immediately acquired and killed orange-2, a truthful measure
 of three days of behavior change. A 400-round live-capture replay
 runs in ~120 s.
 
-Honest limits (v1, documented in the module): ghosts follow the
-recording, not the live bot (the divergence point IS the metric);
-off-viewport ghosts freeze between sightings; ghost fuel is
-unobservable (they seed at rank capacity); a ghost the live bot
-kills early stops consuming its timeline. Next stage: the bot-policy
-differ (predict each roster bot's action from a candidate policy,
-diff against 276 sessions of recorded behavior) and per-player human
-style models.
+Standing baseline (2026-08-02, run bot-20260802-205105 — the 20-kill
+soak): replaying the run's own capture under the same code tracked
+10/150 rounds, first divergence round 2, final drift 53. A LIVE
+capture self-replay diverges far earlier than a sim-capture
+self-replay (19/21 above) because the seeded world is the atlas
+approximation, not the live field: the first radar answers
+differently and the hunt forks from there. Compare future ghost
+numbers against THIS baseline, not against the sim-recording one.
+
+Honest limits (v1, documented in the module): off-viewport ghosts
+freeze between sightings; ghost fuel is unobservable (they seed at
+rank capacity); a ghost the live bot kills early stops consuming its
+timeline (though a BOT-named one now reactivates by the corpse law).
+
+## Stage 5 — the bot-policy differ + reactive ghosts (2026-08-03)
+
+The roster policy was already archive-mined (2026-07-24,
+``sim/bot_policy.py``); stage 5 re-judged it against the GROWN
+archive (310 sessions, 29 bot-hours) and closed the loop:
+
+* **Policy re-confirmed at scale**: 5,975/5,975 bot shots are
+  weapon-0 singles, 95.7% inside the 3 s reflex window; rank
+  teleport-off thresholds re-pinned (mode 7 at recruit / 87 samples,
+  8 at private / 117); reactivation-gap mode exactly the 22 s corpse
+  window. ``make shadow`` is green across all seven laws.
+* **Two validators were judging our line of sight, not the law** —
+  the differ's first catches were instrument bugs: ``sync-cadence``
+  now medians CLEAN gaps only (absence holes excluded — 74/266 false
+  mismatches were 2 s cores wrapped in 18-943 s viewport-exit holes)
+  and ``bot-reactivation`` skips re-sights far past the corpse
+  window (34/35 "failures" were bots damaged by third parties before
+  drifting back into view). Residual true anomalies: one early
+  (16 s) re-sync, 10 cadence outliers.
+* **Reactive ghosts**: a bot-named ghost carries the certified
+  policy UNDER its recorded timeline (``PracticeRoomDriver`` over
+  ghost ids — the same driver, states over existing tanks). The live
+  bot's shots draw the mined shot-for-shot return and team aggro
+  even where the recording holds no answer; recorded events keep
+  per-tick authority (held policy commands fire on the next quiet
+  tick, pinned by ``tests/sim/test_ghost_reactive.py``); killed bot
+  ghosts reactivate by the corpse-window law. Human-named ghosts
+  stay pure recordings. Remaining: per-player human style models.
 
 ## How to re-run
 

@@ -113,6 +113,69 @@ of a clamped transfer, code 4 the empty close — exactly the typed
 choreography is executable in the sim (`emit_fuel_pickup_close`,
 pinned by `tests/sim/test_fuel_choreography.py`).
 
+The close-by-stockedness law and the locally-provable refusals live
+in ``physics/supervisor.py`` (added 2026-08-03 after the 20-kill soak
+bot-20260802-205105 sent 48 provably-refusable pickups): the sim
+emits with them, the bot predicts with them.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "fuel-pickup-close-code",
+      "code": "tankpit_bot.physics.supervisor:fuel_pickup_close_code",
+      "formula": "5 (Tank full) while the container keeps any fuel, 4 (Empty container) once drained",
+      "probes": [
+        {"args": [231], "expect": 5},
+        {"args": [1], "expect": 5},
+        {"args": [0], "expect": 4}
+      ]
+    },
+    {
+      "id": "fuel-pickup-refusal",
+      "code": "tankpit_bot.physics.supervisor:fuel_pickup_refusal",
+      "law": "A fuel pickup transfers nothing when the container is drained (closes code 4; the walk still executes) or when the tank is at rank fuel capacity against a stocked container (closes code 5, the no-transfer branches). Both are pure functions of client-known state; every other case transfers and is not a refusal (48 live code-5 receipts at exactly-full fuel, bot-20260802-205105)."
+    }
+  ]
+}
+```
+
+## The fuel-deposit wire choreography (byte-mined 2026-08-03)
+
+Five manual deposits from the user-piloted session
+sniff-20260620-190228 (2026-06-20, the capacity-verification
+experiments), every window field-verified:
+
+| # | Fuel before -> after | Container record | Amount |
+|---|---|---|---|
+| 1 | 1100 -> 300 | (174,47) remaining 800 | 800 |
+| 2 | 294 -> 100 | (174,49) remaining 194 | 194 (max-deposit -> the floor) |
+| 3 | (post) 686 | (178,54) remaining 400 | 400 |
+| 4 | 1100 -> 800 | (177,51) remaining 300 | 300 |
+| 5 | 1100 -> 900 | (178,50) remaining 200 | 200 |
+
+The measured shape, single server tick: **self 0x2E (absolute
+post-deposit fuel) + 0x64 FuelDeposit (the same absolute fuel) +
+container record x1 with the container's new remaining volume.** Key
+laws inside it:
+
+* The container record comes ONCE — deposits do NOT double their
+  record the way every pickup does. On the observer side that is the
+  byte-level discriminator between a drink and a deposit.
+* ``amount = fuel_before - fuel_after`` equals the record's new
+  remaining exactly (fresh containers; a deposit CREATES the
+  container record at the clicked tile).
+* The max-deposit click leaves exactly ``DEPOSIT_FLOOR`` (window 2:
+  294 -> 100) — the [[game-economy]]#deposit-floor law, now seen as
+  bytes.
+* Third-party deposits are wire-invisible (the 120-day atlas found
+  zero cross-tank 0x64s and zero cross-tank refill records despite
+  hundreds of inferred refills) — the 0x64 AND the record are
+  client-only sends to the depositor.
+* The sent command is type 0x07 with an XOR-encoded payload
+  (coordinates + amount; encoding not yet cracked — only needed if
+  the bot ever deposits).
+
 ## Fuel recovery cascade
 
 When `fuel <= fuel_low_threshold` the bot enters the unified `COLLECT`

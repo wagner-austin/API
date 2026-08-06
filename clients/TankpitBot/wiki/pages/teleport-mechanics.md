@@ -35,6 +35,30 @@ Teleport is the primary mobility model for search and hunting. Never propose rep
 
 The distance is measured to the **actual landing tile**, not the clicked target: when the server displaces the landing (occupied tile, mines, terrain — see Placement above), the fuel charge matches `floor(6 × euclid(start, landing))` exactly. 624 drift hops confirm this; the planner's target-based estimate is off by only a few fuel on drifted hops, so no code change is warranted.[^3]
 
+An unaffordable hop answers 0x52 code 8 ("Insufficient fuel" — 0.3%
+of 7,364 live teleports). The affordability law lives in
+``physics/supervisor.py`` (2026-08-03): the sim refuses with it at
+the resolved landing; the bot predicts with it from the requested
+target, discounted by the ring-1 displacement slack, and suppresses
+only provably-dead dispatches.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "teleport-refusal",
+      "code": "tankpit_bot.physics.supervisor:teleport_refusal",
+      "law": "A teleport whose cost floor(6 x euclid) to the resolved landing tile exceeds the tank's fuel is refused 0x52 code 8; a cost exactly equal to fuel spends the tank dry and lands (sim router law, differ-verified against the 7,364-teleport live catalogue)."
+    },
+    {
+      "id": "teleport-ring1-cost-slack",
+      "code": "tankpit_bot.physics.supervisor:TELEPORT_RING1_COST_SLACK",
+      "value": 9
+    }
+  ]
+}
+```
+
 ## Map requirement
 
 The map must be open to teleport. `CMD_MAP_OPEN` (0x6c) opens it; teleport auto-closes it via `CMD_MAP_TELEPORT` (0x74). See [[map-mechanics]].[^4]

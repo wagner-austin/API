@@ -267,3 +267,67 @@ future session against it (first full-archive run: 2,247 samples,
 [^5]: user (Austin), 2026-06-16 — "shields don't return miss. they return a positive hit. a corpse returns a positive hit"
 [^6]: Sigma's TankPit Tournament Guide v3.4, 16-Jan-2015 (`docs/sources/sigmas-tankpit-guide-v3.4.pdf`), §"Fill-fighting to Lieutenant" and Technical Note #1 (shot counts + shade shortcut); §"2 – How to maximize PPH" item 5 (bots return singles); §"Initial equipment fill" tip 1 (chat commands to same-color bots). 2015 human observation, not wire-verified in this project.
 [^7]: user (Austin), 2026-07-19, plus wire forensics from run bot-20260719-222903: orange-2 damage 1 (0x2E sync 22:29:54) -> teleport departure (0x58 22:30:00) -> damage 2 (0x4C map entry 22:30:16). Cross-channel encoding check over the same run's captures: every near-in-time (0x2E sync, 0x4C map) damage pair agrees (1=1 x1, 2=2 x1, 3=3 x15), so the recovery is a real state change, not an encoding artifact.
+
+## The map is a living-tanks list — and idle respawns are wire-silent (measured 2026-08-05)
+
+Three corrections to this page's earlier reactivation account, all from
+run bot-20260805-095935 (32 kills, the first session to farm past 20)
+plus the 08-03 human fight:
+
+- **Idle tanks emit NOTHING.** 27 of 32 victims never appeared on the
+  wire again after death — no 0x2E resync, no anything — for up to 35
+  minutes. Even never-killed bots sent only 4-7 syncs in 36 minutes.
+  The earlier "reactivation = same-id 0x2E at full fuel" signature only
+  fires for respawns that MOVE (the five re-killed bots were revived by
+  global 0x3D movement broadcasts from across the map, alive facing).
+  A respawn that idles at its spawn point is invisible on the wire.
+- **The 0x4C map is a strictly LIVING-tanks list.** Victims were absent
+  from all 58 map snapshots taken during their corpse windows and
+  present in all 204 taken after; the human Belton vanished from the
+  map during each of his three corpse windows and returned at +24 s.
+  Presence in map data IS aliveness — the server curates the dead out
+  within the same second they die. Client liveness rule 4
+  (`state/mutations.py`, 2026-08-05) now consumes this: a deactivated
+  tank listed in a map snapshot flips alive. Before that rule the
+  registry filled with phantom corpses (positions faithfully tracking
+  their living owners via map updates, liveness stuck dead) and
+  sessions exited `no_viable_targets` in a full room.
+- **Deactivated humans KEEP their wire id.** Belton was id 984 through
+  all three deaths and respawns. The earlier "human respawns join as
+  new ids" claim appears to describe leaving/rejoining the ROOM, not
+  in-room deactivation.
+
+CORRECTION (2026-08-05, same day): the first write-up of session
+bot-20260805-173034 blamed "drained-map inheritance + ~1 dot/min
+container regeneration" — citing a law [[game-economy]] had already
+FALSIFIED on 2026-07-25 (dot appearances are our own radar exposure;
+refills are discrete deposits, never regen). The real cause, mined
+from the session's own events, is a client-side geometry trap:
+
+- Spawn inventory was homing 23/25 → the hunt-only-when-full gate was
+  closed by exactly 2 homings, with 27 live enemies in the viewport
+  from tick 6 onward.
+- The nearest equipment, (58,95), is enclosed on all sides by water
+  and mines ((58,94) mine, (59,95) mine, (57,95) water; its southern
+  neighbor (58,96) is another equipment container itself walled by
+  water). The hop planner selected landing (59,95) — a KNOWN mine
+  tile — so the server displaced every teleport (534
+  `teleport_displacement` events; 1,068 of 1,130 `hop_selected`
+  events targeted this one tile over 43 min). Nothing counts repeated
+  displacement failures: the `unservable` release law only fires when
+  NO landing candidate exists, `target_gone` never fires because the
+  equipment stays visible, so the lock re-armed every tick.
+- The loop consumed its own gate resource: each cycle re-scanned,
+  burning radars 22 → 0. When weapons later hit cap via incidental
+  pickups, radars ≥ cap−5 had become the failing condition instead.
+- Fuel was never scarce: the tank hit capacity 19 times mid-loop
+  (`tank_at_capacity` releases). Sessions 1-3 and 5 farmed the SAME
+  room normally — room state was irrelevant; session 4 merely spawned
+  two tiles from the trap.
+
+Open defects exposed: (1) the teleport landing selector does not
+avoid known-mine tiles even when displacement is certain; (2) no
+displacement-failure counter or no-progress detector exists on
+collect hops, so a geometrically unreachable target is retried
+forever; (3) the gate resource (radars) is spent by the very loop
+that is trying to satisfy the gate.

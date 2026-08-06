@@ -37,23 +37,52 @@ SurfaceRouteTerrain(view, water=riding)     <- pickup routing only:
   |  intersects base passability with          one surface per click
   |  the current routing surface               (user contract 2026-07-19/20)
   v
-FerryAwareTerrain(base, wire, riding, hostile_mine_keys)
-  |  1. hostile mine key -> impassable        (composed 2026-07-20)
-  |  2. live wire ferry tile -> "~", passable (composed 2026-06-12)
-  |  3. water -> passable iff riding
-  |  4. ground -> passable, rock -> not
+FerryAwareTerrain(base, wire, riding, hostile_mine_keys,
+  |                                     occupied_tank_keys)
+  |  1. hostile mine key -> unwalkable        (composed 2026-07-20)
+  |  2. tank-body key -> unwalkable           (composed 2026-08-04)
+  |  3. wire block 1 -> bridge, passable      (composed 2026-07-20)
+  |     wire block 2/3 -> obstacle, not
+  |  4. live wire ferry tile -> "~", passable (composed 2026-06-12)
+  |  5. water -> passable iff riding
+  |  6. ground -> passable, rock -> not
   v
 TerrainMap (static minimap, decoded from the field GIF)
 ```
 
-`compose_decision_terrain(world, terrain)` assembles this per tick
-from three world-state inputs: the static map, the wire terrain
-overlay (`world["terrain"]`, ferries), and
+`compose_decision_terrain(world, terrain, now_ms)` assembles this per
+tick from four world-state inputs: the static map, the wire terrain
+overlay (`world["terrain"]` — ferries AND movable blocks),
 `hostile_mines(world)` (`bot/ai/equipment.py` — the team filter:
 same-team mines are passable per [[mine-mechanics]], enemy mines are
-not). `DecideCtx.terrain` carries the composed view into every
-planner; `tick_loop_actions` composes the same view for its
-stall-clearing reachability checks.
+not), and `occupied_tank_keys(world, now_ms)`
+(`state/occupancy.py` — other tanks' bodies, viewport-fresh only).
+`DecideCtx.terrain` carries the composed view into every planner;
+`tick_loop_actions` composes the same view for its stall-clearing
+reachability checks.
+
+## Two questions, not one
+
+The view answers **two** questions, and they are not the same
+question ([[walk-mechanics]], [[flag-triage-20260729]] F6):
+
+| Method | Question | Blockers respected |
+|---|---|---|
+| `is_passable` | Can the tank WALK onto this tile? | terrain, blocks, mines, tank bodies |
+| `is_landing_legal` | May the server PLACE the tank here? | terrain, blocks only |
+
+The split exists because a teleport aimed at a mined or occupied tile
+is **not refused** — the server displaces the landing to an adjacent
+tile and charges the plain cost ([[mine-mechanics]], live-proven
+2026-07-28). Landing selection therefore must never ask the walk
+question: an enemy always occupies its own tile, so doing so silently
+downgrades every direct approach teleport into a stand-off and
+abandons enemies whose neighbours are terrain-blocked.
+
+`find_teleport_landing_tile` and both choosers in `combat_landing.py`
+ask `is_landing_legal`; pathfinding, reachability, and the move clamps
+ask `is_passable`. Both are on `TerrainMapProtocol`, so an
+implementation cannot satisfy the protocol while answering only one.
 
 ## Why mines are terrain (physics)
 

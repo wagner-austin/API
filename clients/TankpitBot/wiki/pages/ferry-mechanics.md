@@ -99,6 +99,45 @@ completion): a container floating on water is NEVER walk territory —
 the larder keeps in-viewport water containers instead of ceding them
 to the walk step that can't reach them (`larder._is_walk_territory`).
 
+## Movement announcements and the no-drift result (measured 2026-08-04)
+
+How the wire states ferry motion, from the archive-wide sweep
+(`analysis_scripts/mine_ferry_drift.py` + the full-archive pass, 312
+captures):[^7]
+
+- A ferry's POSITION is restated by 0x5A viewport repaints (the
+  2026-07-20 ride's ferry showed at (223,195) across three repaints,
+  stationary for 14 s while unridden).
+- A ferry's MOVEMENT is **one atomic 0x4A message** carrying both
+  halves — old tile restored to water, new tile painted ferry:
+  ``[(223,195,0), (226,196,5)]``. Moves are rider-move-sized LEGS
+  (Manhattan 1-12 observed), not single steps.
+- **148 distinct moves across the archive; 136 are rider-attributed**
+  (a tank stated the departing or arriving tile within 2.5 s). The 12
+  residuals are isolated singles with no cadence (mostly one per
+  session, gaps 12-56 s) — the signature of riders whose positions
+  happened not to be wire-stated in the window, not of an autonomous
+  behavior. **No ferry drift law exists in the archive**; the sim's
+  rider-following model is validated at scale and needs no drift
+  term. If a future session parks beside an unridden ferry for
+  minutes and its 0x4A stays silent, that closes the residual to
+  zero.
+
+**The unfinished-command close (live 2026-08-03):** a
+surface-transition stop SHORT of the click gets a code-1 close in
+the same batch as the truncation echo — the 08-03 run's cluster-A
+collects (bot riding the ferry afloat on (59,28) water, land targets
+inland) each echoed the one-step disembark then the 0x52. A
+transition stop that IS the click (boarding the clicked ferry tile)
+closes silently, and a mine walk-over arrest closes silently too (18
+archive detonations, zero paired code-1s). The sim emits all three
+shapes (`sim/emissions.py::emit_move`,
+`MoveOutcomeDict.stop_reason`/`dest_reached`).
+
+[^7]: Sweep output in wiki log 2026-08-04; classifier: every 0x4A
+    leave/arrive pair (Manhattan <= 40) against every tank position
+    statement (0x28/0x3D direct, 0x47 echo finals) within +-2.5 s.
+
 ## Autoscroll riding doctrine (user ruling 2026-08-01, OPEN)
 
 User, verbatim: "tbh when i use ferries i use auto scroll on so i

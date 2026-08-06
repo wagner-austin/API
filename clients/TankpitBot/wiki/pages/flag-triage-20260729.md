@@ -180,6 +180,134 @@ lesson as the 2026-07-20 mine-veto loop recorded in `ferry.py`:
 every dynamic blocker must compose into the ONE passability answer —
 tanks and movable land blocks are still missing.[^1]
 
+**2026-08-03 falsification sweep** (10 fresh code-1s from run
+bot-20260803-180918, 8 at statically passable targets): eight
+hypotheses tested against the capture, ALL RULED OUT — (1) target
+terrain (8/10 passable; the 2 rock feeds are a separate planner
+bug), (2) blocks placed in-session (zero 0x4A at any refused tile),
+(3) pre-existing blocks via the cache layer (0x5A/0x43/0x4F reads at
+every tile are ordinary container values), (4) mines (102 wire
+sightings, none within 2 tiles of a refusal), (5) tank on target or
+on route (known positions blocked in BFS — routes survive),
+(6) distance (one refusal at chebyshev 1), (7) path length (server
+walks are provably 4-CONNECTED — 1,736 archive steps, alphabet
+exactly nsew, a NEW routing law — but successful walks reach 40
+steps while refusals include 4-connected length 6), (8) route
+confined to the sender's recorded 16x16 viewport (all 8 reachable
+in-window, 4-connected).
+
+**2026-08-04 — RESOLVED by the pilot; the sweep asked the wrong
+question.** User law, verbatim: *"you walk until you hit the block
+then stop and you get the error message"*, and it fires for
+**terrain, another tank, a movable block, or a visible mine**
+alike. Code 1 is therefore NOT a refusal: the server ACCEPTS the
+command, walks the tank as far as the route allows, stops it at the
+first blocker, and reports that it could not finish. Confirmed
+against the same run — 9 of the 10 code-1s show the tank in a
+DIFFERENT position after the event than before (nearest-sample
+measure, ~2 s granularity; **superseded 2026-08-04 by the
+exact-window echo measure** — 11 of 12 code-1s across both runs
+carry a paired 0x47 prefix echo, two stopping cardinally adjacent to
+a known tank body, one a zero-tile pure refusal with no echo;
+[[walk-mechanics]] "The cant_go partial-walk law" has the full
+table). Every hypothesis above tests a
+property of the REQUEST (target passability, distance, path length,
+viewport confinement) when the actual variable is what stood in the
+CORRIDOR at the instant of processing. The 411-sample sweep is
+therefore unnecessary for naming the rule — the rule is named.
+
+Consequence: the eight "ruled out" verdicts stand only as evidence
+that those properties don't predict code 1; none of them was ever a
+candidate cause. The diagnosis reverts to F6's ORIGINAL 2026-07-30
+statement, unchanged and now confirmed — tanks and movable land
+blocks must compose into the one passability answer (hostile mines
+already do, `FerryAwareTerrain.hostile_mine_keys`). Note the mine
+half is consistent with [[walk-mechanics]]: the server routes around
+VISIBLE mines, so a revealed field that severs the last corridor
+produces this same walk-to-the-wall stop, while a HIDDEN mine
+instead arrests by detonation ([[mine-mechanics]]).
+
+**2026-08-04 — FIXED.** Tank bodies now compose into the one
+passability answer (`state/occupancy.py` → `occupied_tank_keys`, folded
+into `FerryAwareTerrain` alongside mines and blocks; see
+[[terrain-composition]]). A body counts when it is not self and was
+viewport-observed within `VIEWPORT_PRESENCE_TTL_MS`, which is now
+single-sourced beside the field it gates in `state/types/tank.py`
+(it was forked in `bot/ai/threats.py`).
+
+The fix surfaced a second, opposite defect: landing selection was
+asking the WALK question. Since an enemy always occupies its own tile,
+composing bodies would have made every direct approach teleport
+impossible and abandoned enemies ringed by terrain. `TerrainMapProtocol`
+therefore now carries `is_landing_legal` beside `is_passable`, and
+`find_teleport_landing_tile` plus both `combat_landing.py` choosers ask
+it — the displacement rule ([[mine-mechanics]], 2026-07-28) made this
+distinction real for mines already; nothing had encoded it.
+
+**2026-08-04 — cluster A reattributed (third and final time).** The
+ferry-move sweep put a ferry ON (59,28) — WATER on field01 — from
+18:20:44 to 18:27:20, exactly bracketing the four cluster-A refusals
+(18:22:42-18:24:00), and every cluster-A echo starts at (59,28) with
+a one-step ``w`` onto (58,28) LAND: the bot was RIDING, its land
+collects were disembark-truncated by the single-command surface law
+([[ferry-mechanics]]), and the code 1 is the unfinished-command
+close. The earlier "tank bodies plug the maze corridors" BFS
+conclusion was coincidental — the composition fix it motivated stays
+correct and byte-supported by the genuine blocker stop (18:12:35,
+Belton), but cluster A itself was never a corridor problem. The
+18:40 pair (bot riding at (57,13) water) is the same ferry class.
+
+Open sub-questions, deliberately not guessed at:
+
+1. A moving tank or a block placed between our 2 s position fixes is
+   unobservable in reconstruction, so composition cannot be perfect —
+   the bot should treat a code 1 as a belief correction (mark the
+   inferred corridor tile suspect, re-scan) rather than only a
+   failed-pickup mark on the target. The blocked tile is inferrable:
+   it is the neighbour our own 4-connected pathfinder would have
+   stepped to next from the stop tile.
+2. ~~A corpse occupies its tile for ~22 s but the registry carries no
+   deactivation timestamp~~ **DISSOLVED 2026-08-04** — the premise
+   was wrong. Archive measure
+   (`analysis_scripts/mine_corpse_blocking.py`, 34 kills across both
+   2026-08 runs): six clean 0x47 echoes of the bot walking ONTO a
+   fresh corpse tile 2-10 s after its own kill — inside the 22 s
+   window — and zero blocked crossings. **Corpses do not block
+   walking**; the 22 s window governs respawn choreography, not
+   passability. Kills drop NO loot (user contract 2026-08-04, and
+   many kills land via homing shots from range) — the crossings are
+   ordinary post-kill restock collection routes through the current
+   viewport that happen to pass the corpse tile, which makes them
+   incidental and therefore unbiased evidence.
+   `is_tank_body_present` now gates on ``liveness == "alive"``
+   (matching the sim server's ``_blocked_by_world``, which always
+   did); the first cut's corpse-blocks assumption would have walled
+   off tiles on those restock routes after every kill. No
+   deactivation timestamp is needed for occupancy.
+3. ~~`combat_landing._is_dynamically_occupied` still re-derives tank
+   occupancy locally~~ **RESOLVED 2026-08-04**: the landing choosers
+   now thread `now_ms` and both ad-hoc occupied checks
+   (`combat_landing._is_dynamically_occupied`,
+   `movement._is_occupied_by_enemy`) express their tank halves
+   through `is_tank_body_present`; containers and mines stay as
+   chooser-local displacement policy.
+
+**2026-08-04 — occupancy audit.** The first review of the composition
+fix found it read `(x, y)` gated only on viewport freshness — but
+0x21 TankInfo and 0x3E TankStatus route as viewport with NO
+coordinates, and the measured login choreography
+([[tank-freshness-model]]) makes the position-less kind FIRST for
+every tank (113/113 first sightings were the roster 0x21 dump;
+positions arrive 9-46 s later). Every tank therefore opens at the
+`(0, 0)` construction default, and occupancy walled off the map
+corner with the whole roster's phantom bodies for the session's
+first 5 s. Fixed at the root: canonical
+`state.types.has_known_position` (the provenance question the seven
+hand-copied `x == 0 and y == 0` sentinels were each re-encoding),
+consumed by occupancy and every former sentinel site, enforced by
+guard `scripts/state_sentinel_rules.py`. Sub-questions 1 and 2 above
+remain open.
+
 **F7 — Fuel locks are never re-validated (old flag 13, 23:59:24).**
 After the red-4 kill at fuel 893, "continue locked fuel target at
 (249,18) vol=84" drank a near-empty remainder left by an earlier
