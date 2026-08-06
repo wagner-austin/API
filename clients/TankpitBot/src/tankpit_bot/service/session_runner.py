@@ -71,12 +71,20 @@ class BotFactoryProtocol(Protocol):
 class RunnableBotProtocol(Protocol):
     """Minimal surface :class:`SessionRunner` needs from :class:`Bot`."""
 
-    def run(self, *, session_seconds: int, stop_file_path: Path) -> None:
-        """Run one session until the stop file appears or seconds elapse.
+    def run(
+        self,
+        *,
+        session_seconds: int,
+        session_kills: int = 0,
+        stop_file_path: Path,
+    ) -> None:
+        """Run one session until a bound trips or the stop file appears.
 
         Args:
             session_seconds: Bounded session length in seconds; zero or
                 negative runs until externally stopped.
+            session_kills: Kill-count bound; zero or negative means
+                unbounded.
             stop_file_path: Sentinel file whose existence requests a
                 graceful shutdown.
         """
@@ -165,13 +173,19 @@ class SessionRunner:
         with self._state_lock:
             return self._state != "idle"
 
-    def start(self) -> None:
+    def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
         """Run one session start-to-finish on the calling thread.
 
         Blocks until the tick loop exits (via stop file, tick budget,
-        or session error). Rejects a second concurrent call with
-        :class:`SessionAlreadyRunningError` so the HTTP layer can
-        translate to ``409 Conflict``.
+        kill bound, or session error). Rejects a second concurrent
+        call with :class:`SessionAlreadyRunningError` so the HTTP
+        layer can translate to ``409 Conflict``.
+
+        Args:
+            session_seconds: Bounded session length in seconds; zero
+                runs until externally stopped (the phone flow's
+                default — ``POST /start`` with no body).
+            session_kills: Kill-count bound; zero means unbounded.
 
         Raises:
             SessionAlreadyRunningError: A session is already running
@@ -224,7 +238,8 @@ class SessionRunner:
             )
             log.info("Session start: running bot")
             bot.run(
-                session_seconds=0,
+                session_seconds=session_seconds,
+                session_kills=session_kills,
                 stop_file_path=self._stop_file_path,
             )
             log.info("Session end: bot.run returned")

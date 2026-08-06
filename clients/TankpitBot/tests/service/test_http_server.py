@@ -59,6 +59,8 @@ class _RecordingRunner:
         """
         self.start_calls: int = 0
         self.stop_calls: int = 0
+        self.last_session_seconds: int = -1
+        self.last_session_kills: int = -1
         self._starts_reject = starts_reject
         self._already_running = already_running
         self._on_start = on_start
@@ -66,8 +68,10 @@ class _RecordingRunner:
     def is_running(self) -> bool:
         return self._already_running
 
-    def start(self) -> None:
+    def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
         self.start_calls += 1
+        self.last_session_seconds = session_seconds
+        self.last_session_kills = session_kills
         if self._on_start is not None:
             self._on_start.set()
         if self._starts_reject:
@@ -150,6 +154,60 @@ class TestStartRoute:
         # The executor thread runs start() asynchronously; wait for it.
         assert on_start.wait(timeout=1.0), "start() never invoked"
         assert runner.start_calls == 1
+        assert runner.last_session_seconds == 0
+        assert runner.last_session_kills == 0
+
+    @pytest.mark.asyncio
+    async def test_json_body_sets_session_bounds(
+        self,
+        client: TestClient[web.Request, web.Application],
+        runner: _RecordingRunner,
+    ) -> None:
+        """``{"seconds": 2700, "kills": 30}`` reaches the runner verbatim."""
+        on_start = threading.Event()
+        runner._on_start = on_start
+
+        payload: dict[str, int] = {"seconds": 2700, "kills": 30}
+        response = await client.post("/start", json=payload)
+
+        assert response.status == 202
+        assert on_start.wait(timeout=1.0), "start() never invoked"
+        assert runner.last_session_seconds == 2700
+        assert runner.last_session_kills == 30
+
+    @pytest.mark.asyncio
+    async def test_partial_body_defaults_the_missing_bound(
+        self,
+        client: TestClient[web.Request, web.Application],
+        runner: _RecordingRunner,
+    ) -> None:
+        """Either key may be omitted; the other defaults to unbounded."""
+        on_start = threading.Event()
+        runner._on_start = on_start
+
+        payload: dict[str, int] = {"kills": 29}
+        response = await client.post("/start", json=payload)
+
+        assert response.status == 202
+        assert on_start.wait(timeout=1.0), "start() never invoked"
+        assert runner.last_session_seconds == 0
+        assert runner.last_session_kills == 29
+
+    @pytest.mark.asyncio
+    async def test_bad_bounds_are_a_400_not_a_session(
+        self,
+        client: TestClient[web.Request, web.Application],
+        runner: _RecordingRunner,
+    ) -> None:
+        """Non-integer and negative bounds reject without touching the runner."""
+        bad_payload: dict[str, str] = {"kills": "many"}
+        negative_payload: dict[str, int] = {"seconds": -5}
+        bad_type = await client.post("/start", json=bad_payload)
+        negative = await client.post("/start", json=negative_payload)
+
+        assert bad_type.status == 400
+        assert negative.status == 400
+        assert runner.start_calls == 0
 
     @pytest.mark.asyncio
     async def test_conflict_when_already_running(
@@ -217,7 +275,8 @@ class TestExecutorCrashLogging:
         from tankpit_bot.service.http_server import _run_session_and_log_rejection
 
         class _CrashingRunner:
-            def start(self) -> None:
+            def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
+                _ = (session_seconds, session_kills)
                 raise ValueError("simulated pre-log crash")
 
             def request_stop(self) -> None:
@@ -227,7 +286,7 @@ class TestExecutorCrashLogging:
                 return False
 
         with pytest.raises(ValueError, match="simulated pre-log crash"):
-            _run_session_and_log_rejection(_CrashingRunner())
+            _run_session_and_log_rejection(_CrashingRunner(), 0, 0)
 
 
 class TestShutdownRoute:
@@ -1006,7 +1065,7 @@ class TestRunSessionAndLogRejectionHelper:
 
         runner = _RecordingRunner()
 
-        _run_session_and_log_rejection(runner)
+        _run_session_and_log_rejection(runner, 0, 0)
 
         assert runner.start_calls == 1
 
@@ -1016,6 +1075,6 @@ class TestRunSessionAndLogRejectionHelper:
 
         runner = _RecordingRunner(starts_reject=True)
 
-        _run_session_and_log_rejection(runner)
+        _run_session_and_log_rejection(runner, 0, 0)
 
         assert runner.start_calls == 1

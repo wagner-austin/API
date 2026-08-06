@@ -47,9 +47,11 @@ from typing import Protocol
 
 from aiohttp import web
 from platform_core.json_utils import (
+    JSONTypeError,
     dump_json_str,
     load_json_bytes,
     narrow_json_to_dict,
+    narrow_json_to_int,
 )
 from platform_core.logging import get_logger
 
@@ -104,7 +106,7 @@ class SSEResponseProtocol(Protocol):
 class SessionRunnerHTTPProtocol(Protocol):
     """The :class:`SessionRunner` methods the HTTP surface consumes."""
 
-    def start(self) -> None:
+    def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
         """Run one session start-to-finish. Blocks the calling thread.
 
         Raises:
@@ -152,13 +154,32 @@ def make_app(
         return web.Response(text="ok")
 
     async def start(request: web.Request) -> web.Response:
-        """``POST /start`` — accept and offload the session start."""
-        _ = request
+        """``POST /start`` — accept and offload the session start.
+
+        Optional JSON body sets the session bounds:
+        ``{"seconds": 2700, "kills": 30}`` — either key may be
+        omitted; an empty body (the phone flow) runs unbounded, as
+        before. Non-integer or negative bounds are a 400.
+        """
+        body = await request.read()
+        try:
+            session_seconds, session_kills = _parse_session_bounds(body)
+        except (JSONTypeError, ValueError) as error:
+            return web.Response(status=400, text=f"bad session bounds: {error}")
         if runner.is_running():
             return web.Response(status=409, text="session already running")
         loop = asyncio.get_running_loop()
-        loop.run_in_executor(None, _run_session_and_log_rejection, runner)
-        return web.Response(status=202, text="starting")
+        loop.run_in_executor(
+            None,
+            _run_session_and_log_rejection,
+            runner,
+            session_seconds,
+            session_kills,
+        )
+        return web.Response(
+            status=202,
+            text=f"starting (seconds={session_seconds}, kills={session_kills})",
+        )
 
     async def stop(request: web.Request) -> web.Response:
         """``POST /stop`` — request the running session end."""
@@ -268,7 +289,35 @@ def _add_watch_routes(app: web.Application, frame_bus: FrameBusProtocol) -> None
     app.router.add_get("/frame", frame)
 
 
-def _run_session_and_log_rejection(runner: SessionRunnerHTTPProtocol) -> None:
+def _parse_session_bounds(body: bytes) -> tuple[int, int]:
+    """Parse the optional ``POST /start`` bounds body.
+
+    Args:
+        body: Raw request body; empty means unbounded (the phone
+            flow's buttons send no body).
+
+    Returns:
+        ``(session_seconds, session_kills)`` — zero means unbounded.
+
+    Raises:
+        JSONTypeError: Malformed JSON or non-integer bound values.
+        ValueError: Negative bounds.
+    """
+    if not body:
+        return 0, 0
+    data = narrow_json_to_dict(load_json_bytes(body))
+    session_seconds = narrow_json_to_int(data.get("seconds", 0))
+    session_kills = narrow_json_to_int(data.get("kills", 0))
+    if session_seconds < 0 or session_kills < 0:
+        raise ValueError("negative")
+    return session_seconds, session_kills
+
+
+def _run_session_and_log_rejection(
+    runner: SessionRunnerHTTPProtocol,
+    session_seconds: int,
+    session_kills: int,
+) -> None:
     """Invoke :meth:`SessionRunner.start` on the executor thread.
 
     A :class:`SessionAlreadyRunningError` from a two-``POST /start``
@@ -282,7 +331,7 @@ def _run_session_and_log_rejection(runner: SessionRunnerHTTPProtocol) -> None:
     not for ``run_in_executor``.
     """
     try:
-        runner.start()
+        runner.start(session_seconds=session_seconds, session_kills=session_kills)
     except SessionAlreadyRunningError as exc:
         log.warning("Session start rejected: %s", exc)
     except Exception:

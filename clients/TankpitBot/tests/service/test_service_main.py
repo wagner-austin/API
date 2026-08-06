@@ -113,7 +113,13 @@ class _RecordingBot:
         """Initialise the call log."""
         self.runs: list[tuple[int, Path]] = []
 
-    def run(self, *, session_seconds: int, stop_file_path: Path) -> None:
+    def run(
+        self,
+        *,
+        session_seconds: int,
+        session_kills: int = 0,
+        stop_file_path: Path,
+    ) -> None:
         """Record one ``run`` invocation."""
         self.runs.append((session_seconds, stop_file_path))
 
@@ -470,7 +476,7 @@ class _IdleProbeRunner:
         """Start with the given running answer."""
         self.running = running
 
-    def start(self) -> None:
+    def start(self, *, session_seconds: int = 0, session_kills: int = 0) -> None:
         """Unused — the idle monitor never starts sessions."""
         raise AssertionError("exit_when_idle must never call start()")
 

@@ -72,7 +72,13 @@ class _RecordingBot:
         self.calls: list[tuple[int, Path]] = []
         self._on_run = on_run
 
-    def run(self, *, session_seconds: int, stop_file_path: Path) -> None:
+    def run(
+        self,
+        *,
+        session_seconds: int,
+        session_kills: int = 0,
+        stop_file_path: Path,
+    ) -> None:
         """Record the arguments and invoke the optional side-effect."""
         self.calls.append((session_seconds, stop_file_path))
         if self._on_run is not None:
