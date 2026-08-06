@@ -38,7 +38,15 @@ class AccountStatsDict(TypedDict):
         deactivated: Lifetime own-deactivation count.
         promotion_points: Lifetime promotion points.
         rank_name: Current rank label (e.g. ``private``).
-        rank_points: Current rank point value from the rank line.
+        rank_number: The COUNTDOWN rank number in parentheses after the
+            rank name -- "Rank: private (26)". Descends toward 1 as
+            promotion points accumulate (user, 2026-08-05: "im
+            currently rank 26. as we get more kills ill move down to
+            25, 24, ..., and eventually 1"); measured 151 (June 11) ->
+            27 -> 26 across the archive. NOT a points total -- the
+            points live in ``promotion_points``. The same number is
+            wire-visible per tank as registry field ``s``
+            ([[tank-registry]]).
     """
 
     play_time_s: int
@@ -46,7 +54,7 @@ class AccountStatsDict(TypedDict):
     deactivated: int
     promotion_points: int
     rank_name: str
-    rank_points: int
+    rank_number: int
 
 
 def encode_account_stats(stats: AccountStatsDict) -> JSONObject:
@@ -64,7 +72,7 @@ def encode_account_stats(stats: AccountStatsDict) -> JSONObject:
         "deactivated": stats["deactivated"],
         "promotion_points": stats["promotion_points"],
         "rank_name": stats["rank_name"],
-        "rank_points": stats["rank_points"],
+        "rank_number": stats["rank_number"],
     }
 
 
@@ -86,7 +94,7 @@ def decode_account_stats(data: JSONObject) -> AccountStatsDict:
         deactivated=require_int(data, "deactivated"),
         promotion_points=require_int(data, "promotion_points"),
         rank_name=require_str(data, "rank_name"),
-        rank_points=require_int(data, "rank_points"),
+        rank_number=require_int(data, "rank_number"),
     )
 
 
@@ -130,7 +138,7 @@ def parse_account_stats(page_text: str) -> AccountStatsDict | None:
         deactivated=int(deactivated.group(1)),
         promotion_points=int(promotion.group(1)),
         rank_name=rank.group(1),
-        rank_points=int(rank.group(2)),
+        rank_number=int(rank.group(2)),
     )
 
 
@@ -187,7 +195,7 @@ def emit_account_stats_sample(
         deactivated=stats["deactivated"],
         promotion_points=stats["promotion_points"],
         rank_name=stats["rank_name"],
-        rank_points=stats["rank_points"],
+        rank_number=stats["rank_number"],
     )
 
 
