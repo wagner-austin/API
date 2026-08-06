@@ -2850,3 +2850,15 @@ User rulings applied ("lift dont fork"; struck: extra radar usage, landing-as-cl
 3. **`SelfAccountDict`** (`state/types/self_account.py`) — the account self: name, persistent id, decoration, panel rank_name + countdown rank_number, promotion points, lifetime totals. Filled by the self 0x21 dispatch and the startup scrape; read via `get_self_account()`. The plug-in point for rank-aware features.
 
 Gate: **5,880 tests at 100.00%**, guard 0 violations (incl. the new rule), `make shadow` all laws PASS. Commits 48784efa, 6b848684, 07e61332.
+
+---
+## [2026-08-06] lift | Two bots, one map — instance namespaces land first-class
+
+User: "we have unlimited time, tokens and context. lift, dont fork" + "no back compat shims, no thin wrappers, no fallbacks, no legacy code, no type alias." The two-bots-one-map recipe is now: two env blocks, two `make service` processes, two curls.
+
+- **`TANKPIT_BOT_INSTANCE`** (`resolve_bot_instance`, validated `[a-z0-9][a-z0-9_-]{0,31}`) is a REQUIRED parameter of `build_bot_run_artifacts`: a named instance nests its whole artifact bundle under `runs/bot/<instance>/`; empty is the sole-bot layout — the primary configuration, not a fallback.
+- **`TANKPIT_BOT_SERVICE_PORT`** (`resolve_service_port`, range-validated) binds a second service beside the first. The `HEALTH_URL` constant is DELETED (no legacy) for `health_url(port)`; the idempotency probe targets the resolved instance. Note: fiesta's nginx proxies only 27100 — a second instance is curl-only until nginx grows a location block.
+- **Stop sentinel instance-scoped** (`resolve_service_stop_file` → `runs/state/<instance>/STOP`): stopping one bot can never stop the other.
+- Earlier same night: `POST /start` gained the `{"seconds", "kills"}` bounds body (commit 5c94e66c) — service sessions had been running fully unbounded.
+
+Account selection already existed (`TANKPIT_ACCOUNT` + accounts.json). Same-team pairs share radar exposure server-side ([[game-economy]] team-scope); opposite teams is bot-vs-bot sparring under the fair-fight stack. Gate: 5,890 tests at 100.00% (run with the parallel session's in-flight `analysis/` dirs excluded — see tree note), commit 49eb754b.
