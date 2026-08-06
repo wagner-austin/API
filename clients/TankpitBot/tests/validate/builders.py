@@ -237,12 +237,29 @@ def sent_command_message(
     return frame_message(timestamp_ms, xor_encode_body(0x21, payload), "sent")
 
 
-def make_session(messages: list[CapturedMessage], magic: str | None = MAGIC) -> CaptureSession:
-    """Assemble a capture session around the given messages."""
+def make_session(
+    messages: list[CapturedMessage],
+    magic: str | None = MAGIC,
+    start_timestamp_ms: int = 0,
+) -> CaptureSession:
+    """Assemble a capture session around the given messages.
+
+    Args:
+        messages: The session's captured messages.
+        magic: XOR magic (None builds a magicless session).
+        start_timestamp_ms: Session start anchor. Real captures share
+            the calendar day with their messages — pass the fixture's
+            first message timestamp when a consumer resolves
+            wall-clock windows against the anchor
+            (``diagnostics.fight_report.window_bounds_ms``).
+
+    Returns:
+        The assembled capture session.
+    """
     return CaptureSession(
         session_id="validate-test",
-        start_timestamp_ms=0,
-        end_timestamp_ms=100_000,
+        start_timestamp_ms=start_timestamp_ms,
+        end_timestamp_ms=start_timestamp_ms + 100_000,
         base_url="https://tankpit.com/play",
         messages=messages,
         magic=magic,

@@ -116,6 +116,25 @@ class TestSyncCadence:
         evidence = shadow_sync_cadence([timeline])
         assert evidence["samples"] == 0
 
+    def test_absence_holes_do_not_poison_the_median(self) -> None:
+        """A 2 s core interrupted by viewport-exit holes stays exact.
+
+        The 2026-08-03 sweep: 74/266 archive tanks "failed" the raw
+        median purely from 18-943 s absence holes around clean 2 s
+        cores — the holes are line-of-sight, not cadence.
+        """
+        core = _syncs(ENEMY_ID, 0, TICK_MS, 6)
+        resumed = _syncs(ENEMY_ID, 600_000, TICK_MS, 6)
+        timeline = _timeline(syncs=core + resumed)
+        evidence = shadow_sync_cadence([timeline])
+        assert (evidence["samples"], evidence["exact"]) == (1, 1)
+
+    def test_holes_alone_leave_no_clean_gaps_to_judge(self) -> None:
+        """A tank glimpsed only across absences is unobserved, not off-law."""
+        timeline = _timeline(syncs=_syncs(ENEMY_ID, 0, 30_000, 8))
+        evidence = shadow_sync_cadence([timeline])
+        assert evidence["samples"] == 0
+
 
 class TestGrantInvariants:
     def test_in_range_stack_roll_is_exact(self) -> None:

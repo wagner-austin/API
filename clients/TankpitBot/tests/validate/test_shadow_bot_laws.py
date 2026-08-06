@@ -227,6 +227,22 @@ class TestBotReactivation:
         evidence = shadow_bot_reactivation([timeline])
         assert (evidence["samples"], evidence["exact"]) == (1, 0)
 
+    def test_late_damaged_resight_is_unobserved_not_a_mismatch(self) -> None:
+        """A first re-sight far past the corpse window judges nothing.
+
+        The bot reactivated at full OFF-viewport and was damaged by
+        someone else before drifting back into view — 34/35 of the
+        2026-08-03 sweep's "failures" were exactly this shape (gaps to
+        1,047 s, all non-full). The reactivation moment was unobserved.
+        """
+        timeline = _timeline(
+            _names(),
+            kills=[_kill(1000, BOT_ID)],
+            syncs=[_sync(1000 + CORPSE_MS + 300_000, BOT_ID, 1)],
+        )
+        evidence = shadow_bot_reactivation([timeline])
+        assert evidence["samples"] == 0
+
     def test_death_with_no_later_sync_is_skipped(self) -> None:
         timeline = _timeline(
             _names(),
