@@ -7,7 +7,7 @@ source_paths:
   - monorepo-guards.toml
   - libs/monorepo_guards/
   - README.md
-fact_checked: "2026-07-20"
+fact_checked: "2026-07-31"
 confidence: high
 hubs: [infrastructure]
 ---
@@ -18,34 +18,34 @@ The api monorepo enforces three cross-cutting rules on every service and library
 
 ## Strict mypy — zero `Any`
 
-Every `pyproject.toml` in `services/` and `libs/` runs mypy in strict mode. Explicit `Any` — as annotation, cast target, or return type — is a lint failure. Third-party libraries without type stubs get typed wrappers in the appropriate `platform_*` lib; the service consumes the wrapper, not the untyped import.
+Every `pyproject.toml` in `services/` and `libs/` runs mypy in strict mode — verified across all 36 of them[^2]. Explicit `Any` — as annotation, cast target, or return type — is a lint failure[^2]. Third-party libraries without type stubs get typed wrappers in the appropriate `platform_*` lib; the service consumes the wrapper, not the untyped import.
 
-This makes function signatures the ground truth: reading a service's `main.py` and `api/*.py` tells you the request/response shape without running the code. It also makes refactors safe — mypy catches every consumer at edit time.
+This makes function signatures the ground truth: reading a service's `main.py` and `api/*.py` tells you the request/response shape without running the code. It also makes refactors safe — mypy catches every consumer at edit time[^1].
 
 ## 100% coverage — statements + branches
 
-Coverage runs statement-level AND branch-level. A partially-covered `if x is None` branch fails even when the statement lines are hit. This forces test authors to think through the negative and edge paths, not just the happy path.
+Coverage runs statement-level AND branch-level — `branch = true` and `fail_under = 100` in all 36 packages[^3]. A partially-covered `if x is None` branch fails even when the statement lines are hit. This forces test authors to think through the negative and edge paths, not just the happy path.
 
-Coverage is per-package. `services/data-bank-api` covers its own code; it doesn't count coverage of `libs/platform_core` (which has its own 100%). Tests that reach into another package to hit its lines are a smell — mock the shared lib's public interface (via DI hooks, not `unittest.mock`) and test the wrapper's behavior locally.
+Coverage is per-package[^3]. `services/data-bank-api` covers its own code; it doesn't count coverage of `libs/platform_core` (which has its own 100%). Tests that reach into another package to hit its lines are a smell — mock the shared lib's public interface (via DI hooks, not `unittest.mock`) and test the wrapper's behavior locally.
 
 ## `monorepo_guards` — the static analysis rule engine
 
-Lives in [`libs/monorepo_guards/`](../../libs/monorepo_guards/). Config in [`monorepo-guards.toml`](../../monorepo-guards.toml). 20+ rules that fire from every service's `make lint`. Categories:
+Lives in [`libs/monorepo_guards/`](../../libs/monorepo_guards/). Config in [`monorepo-guards.toml`](../../monorepo-guards.toml). 20+ rules that fire from every service's `make lint`[^4]. Categories:
 
 - **Anti-patterns** — banned imports, banned function calls, banned dependency shapes
 - **Contract enforcement** — required helpers, required error handlers, required lifecycle wiring
 - **Rust guards** — parallel rule set for `cleargbm_rs` (Rust core) that catches unsafe patterns per-crate
 
-Adding a new rule is a small PR in `libs/monorepo_guards/`. Any service or lib that starts violating the new rule after the merge fails `make lint` — which is the point.
+Adding a new rule is a small PR in `libs/monorepo_guards/`[^4]. Any service or lib that starts violating the new rule after the merge fails `make lint` — which is the point.
 
 ## Why the three together
 
-Any one of these alone leaves gaps. Together:
+Any one of these alone leaves gaps[^1]. Together:
 - **mypy** catches type-shape drift at edit time (before the tests run).
 - **coverage** catches logic paths that no test exercises (before the drift ships).
 - **guards** catch anti-patterns that pass typecheck AND tests but produce production incidents (bare error capture, missing lifecycle, forked helpers).
 
-Each layer catches drift the others miss. Removing any one opens a class of incident that historically produced a real fire.
+Each layer catches drift the others miss[^5]. Removing any one opens a class of incident that historically produced a real fire.
 
 ## Practical implications
 
@@ -54,6 +54,10 @@ Each layer catches drift the others miss. Removing any one opens a class of inci
 - **Never `pragma: no cover`** except at genuine unreachable boundaries (e.g. `if __name__ == "__main__":` in a library).
 - **Never `# noqa`** to silence a monorepo_guard — fix the underlying pattern.
 
-If your change makes any of the three rules seem too restrictive, that's usually a signal the change is fighting the architecture, not that the rule needs an exception.
+If your change makes any of the three rules seem too restrictive, that's usually a signal the change is fighting the architecture, not that the rule needs an exception[^5].
 
 [^1]: [README.md § Services table](../../README.md) — "Type Safety: mypy strict mode, zero `Any` types. 100% Test Coverage: Statements and branches."
+[^2]: Verified 2026-07-31 by sweeping every `pyproject.toml` at depth ≤ 2 under `libs/` and `services/`: 36 of 36 declare `strict = true`. `libs/covenant_ml/pyproject.toml:44,49-52` is representative — `strict = true` plus `disallow_any_unimported`, `disallow_any_expr`, `disallow_any_decorated`, and `disallow_any_explicit` all `true`, which is what makes an explicit `Any` a failure rather than a warning.
+[^3]: Same sweep, 2026-07-31 — 36 of 36 `pyproject.toml` files declare both `branch = true` and `fail_under = 100`, with no exceptions. `libs/covenant_ml/pyproject.toml:88,93` is representative. Per-package scoping follows from each package carrying its own `[tool.coverage]` block rather than a repo-level one.
+[^4]: `libs/monorepo_guards/src/monorepo_guards/` — 30 modules defining 33 `*Rule` classes across 31 distinct rule names (counted 2026-07-31), so "20+ rules" holds with margin. Config at `monorepo-guards.toml` in the repo root.
+[^5]: [synthesis] — the three-layer argument is this page's own reasoning, not a claim read off a source. The layers themselves are verified ([^2], [^3], [^4]); the assertion that removing one "historically produced a real fire" is an editorial judgement and no incident record is cited for it here.

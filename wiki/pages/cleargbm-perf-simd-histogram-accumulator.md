@@ -17,13 +17,13 @@ hubs: [libs]
 
 # ClearGBM perf — SIMD histogram accumulator
 
-The last unshipped item from the 2026-07-21 perf roadmap. **Its original premise is now obsolete**: the roadmap was written against a scalar accumulate loop that no longer exists, and the version of "SIMD" it proposed as Approach 1 has effectively already shipped by hand. What remains is the harder Approach 2, against a much smaller gap than the roadmap assumed.
+The last unshipped item from the 2026-07-21 perf roadmap[^8]. **Its original premise is now obsolete**: the roadmap was written against a scalar accumulate loop that no longer exists[^1], and the version of "SIMD" it proposed as Approach 1[^9] has effectively already shipped by hand. What remains is the harder Approach 2[^9], against a much smaller gap than the roadmap assumed[^7].
 
 ## What the code actually does now
 
 The hot loop is `build_histogram_ordered_trusted`, taking a `HistogramRequest`[^1]. It is manually unrolled 8-wide: eight `index_widen` calls, then eight `bins[idx]` gathers grouped together, then eight sequential `ordered_gradients[pos + k]` / `ordered_hessians[pos + k]` reads, then eight `gradient_sums[b] += g; hessian_sums[b] += h; counts[b] += 1` triples, with a scalar remainder tail[^1]. Bins are `&[u8]` and column-major[^2]; grad/hess are `f64` end to end[^3].
 
-Three claims in the roadmap's original "what's wrong today" are now false:
+Three claims in the roadmap's original "what's wrong today"[^9] are now false[^1]:
 
 - **"Delegates to `HistogramBuffer::accumulate`"** — it does not. `accumulate` still exists at `src/types/mod.rs:236`[^4] but every caller is under `src/**/tests/`; it is test-only surface, not the hot path.
 - **"Zero unrolling"** — it is unrolled 8-wide[^1].
@@ -33,13 +33,13 @@ Both prerequisites the page named are shipped: [[cleargbm-perf-column-major-samp
 
 ## Why Approach 1 is already done
 
-The roadmap's Approach 1 conceded its own ceiling: scatter is not a native SIMD op on x86, so the proposal reduced to "load 4 vectorized, then unroll 4 scalar scatters." That is a description of the current loop — grouped gathers, sequential loads, then unrolled scalar read-modify-writes. Adding `wide` to express the same shape in `f64x4` types would restate what the code already does; the load pipelining and bounds-check savings it promised have both been collected.
+The roadmap's Approach 1 conceded its own ceiling[^9]: scatter is not a native SIMD op on x86, so the proposal reduced to "load 4 vectorized, then unroll 4 scalar scatters." That is a description of the current loop[^1] — grouped gathers, sequential loads, then unrolled scalar read-modify-writes. Adding `wide` to express the same shape in `f64x4` types would restate what the code already does; the load pipelining and bounds-check savings it promised have both been collected.
 
-The remaining cost is intrinsic to the operation. Accumulating into `gradient_sums[bin]` is an indexed RMW — a scatter — and two samples in the same 8-wide block can land in the same bin, so the adds carry a potential dependency that vector lanes cannot resolve without conflict detection (AVX-512CD). This is the structural reason the histogram accumulate resists vectorization, and no amount of restating the loop in SIMD types changes it.
+The remaining cost is intrinsic to the operation[^10]. Accumulating into `gradient_sums[bin]` is an indexed RMW — a scatter — and two samples in the same 8-wide block can land in the same bin, so the adds carry a potential dependency that vector lanes cannot resolve without conflict detection (AVX-512CD). This is the structural reason the histogram accumulate resists vectorization, and no amount of restating the loop in SIMD types changes it.
 
 ## What is actually left: Approach 2
 
-Bin-first reordering — group sample indices by bin (radix-sort by bin, O(N)) so per-bin accumulation becomes a contiguous SIMD reduce rather than a scatter. This is the only version of the idea with headroom left, and it changes the algorithm's control flow plus adds a scratch buffer for the grouping pass.
+Bin-first reordering — group sample indices by bin (radix-sort by bin, O(N)) so per-bin accumulation becomes a contiguous SIMD reduce rather than a scatter[^9]. This is the only version of the idea with headroom left, and it changes the algorithm's control flow plus adds a scratch buffer for the grouping pass.
 
 Weigh it against a real risk: ClearGBM has now measured **three consecutive losses** from splitting fused hot-loop work into more passes — ordered-arrays unpooled (−4%), counts-backfill (−5%), `cnt_factor` reconstruction (−16%), plus the f32 narrowing revert[^6][^3]. A bin-grouping pre-pass is exactly that shape: one more pass over the data to make a later pass cheaper. The recorded meta-lesson is that this consistently loses more to overhead than it gains, and Approach 2 has no measurement contradicting it.
 
@@ -68,3 +68,6 @@ That reframes the whole item. The remaining raw gap is mostly a tree-shape artif
 [^5]: `libs/cleargbm_rs/src/histogram/mod.rs:15-19` — "both functions establish invariants by construction... There is no validated entry point — validation happens at the top-level pyo3 boundary in `pyo3_module::training_fns`, not at the per-histogram level"; the `# Panics` doc at `:78-80` states a violation "is a bug in the caller, not a recoverable runtime error."
 [^6]: [[cleargbm-perf-experiments-2026-07-21]] § negative results — the three measured regressions and the recorded meta-lesson that extra passes lose more to overhead than they gain from bandwidth reduction.
 [^7]: [[cleargbm-leaf-normalized-benchmarking]] — authoritative 2026-07-24 table: lightgbm 0.8981s ± 0.0719 / 30.96 leaves, cleargbm 1.2809s ± 0.0638 / 47.15 leaves; raw ratio 1.426×, per-leaf ratio 0.937×. Harness and manifest cited there.
+[^8]: `libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md:60` — the roadmap entry this page derives from, verbatim: "**SIMD histogram accumulator** — Rust `wide` crate or nightly `std::simd`. AVX2/AVX-512 accumulation. Expected: 2-3× faster on the histogram phase, which is where most of cleargbm's remaining runtime lives." Listed under fixes not yet applied; "Expected" marks it a projection, never a measurement.
+[^9]: This page's own pre-rewrite revision, commit `35700d41` "wiki: cleargbm perf roadmap — 4 atomic pages, each implementation-ready" [synthesis] — the Approach 1 / Approach 2 decomposition, the "what's wrong today" claims, and the bin-first proposal are that revision's text, superseded by commit `3166ebe4`. The original Approach 2 read: "Instead of 'for each sample, add to its bin', flip to 'for each bin, sum the samples that landed in it'. This requires a bin-first pass that groups sample indices by bin (radix-sort by bin, O(N)) before accumulation. Once samples are grouped by bin, the per-bin accumulation is a straight SIMD `reduce` — every op is contiguous. LightGBM's fast path is a variant of this." Recover with `git show 35700d41:wiki/pages/cleargbm-perf-simd-histogram-accumulator.md`.
+[^10]: [synthesis] — read off the loop shape at `libs/cleargbm_rs/src/histogram/mod.rs:109-186`[^1]: the accumulate is `gradient_sums[b] += g` for a `b` derived from data, i.e. an indexed read-modify-write whose target is not known until the gather completes, and nothing in the loop constrains two lanes of one 8-wide block to distinct bins. The AVX-512CD (conflict-detection) reference is architectural background, not a measurement on this codebase; no SIMD variant of this loop has been benchmarked here.
