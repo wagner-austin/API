@@ -85,6 +85,22 @@ class InMemoryTerrainMap:
         terrain = self.get_terrain(x, y)
         return terrain not in (self.ROCK, self.WATER)
 
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        """Check if the server may place the tank on the tile.
+
+        This builder carries terrain only -- no mines, no tank bodies
+        -- so the walk and landing questions coincide here, exactly as
+        they do on the production static map.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+
+        Returns:
+            True if a teleport may be aimed at the tile.
+        """
+        return self.is_passable(x, y)
+
     def render_viewport(
         self,
         center_x: int,
