@@ -7,8 +7,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "744443e972df97d609f4c2530ef056e25c877db5"
-fact_checked: "2026-07-31"
+  "src/tankpit_bot": "238116afef165cc82b0d7213e11804b4764cf060"
+fact_checked: "2026-08-05"
 confidence: high
 hubs: [codebase]
 ---
@@ -87,6 +87,6 @@ All three consumers (Bot, ProbeBase, BrowserSession) inherit from `SessionBase` 
 
 Standalone CLI tools, each with a `main()` entry point registered in `pyproject.toml`. Probes (`teleport_probe.py`, `fuel_probe.py`, etc.) wrap `action_lab/` probe classes. Analysis scripts (`analyze_session_timing.py`, `analyze_shot_viewport.py`) process capture files offline.[^2]
 
-[^1]: architecture phases A-F, 52 commits on combat-rework; see [[inheritance-chain]]
-[^2]: pyproject.toml [tool.poetry.scripts] section — all CLI entry points
-[^3]: Verified 2026-07-31 — a grep for `from tankpit_bot.bot` / `import tankpit_bot.bot` under `src/tankpit_bot/physics/`, `facts/`, `ledger/`, and `contracts/` returns **zero** matches in all four packages, so the leaf-layer direction holds by construction rather than by convention.
+[^1]: Architecture phases A-F landed on the `combat-rework` branch, tip `c8a1d40eec64c3a0ce198d21f57af35df7449606`, fully merged (`git log main..origin/combat-rework` is empty). The arc opens at `e1d8f060` — "Extract WorldService class to own all mutable game state", 2026-06-14 — which is phase A. Recounted 2026-08-05: **56** commits dated 2026-06-14 through 2026-06-16, of which **41** touch `clients/TankpitBot`. **Corrected 2026-08-05:** this footnote said "52 commits", which matches neither count on either scoping. Both figures are reproducible from any checkout against the pinned tip sha. [[inheritance-chain]] carries the same figure and is corrected identically.
+[^2]: `pyproject.toml` `[tool.poetry.scripts]` — **34** `main()` entry points as of 2026-08-05, e.g. `tankpit-teleport-probe = "scripts.teleport_probe:main"` at `:33`. This count is volatile: it was 33 earlier the same day and gained `tankpit-run-digest` in commit `29131c95`. Re-derive rather than trust the number — `awk '/^\[tool.poetry.scripts\]/{f=1;next} /^\[/{f=0} f && /=/{n++} END{print n}' pyproject.toml`.
+[^3]: Re-verified 2026-08-05 (previously 2026-07-31, before the 84-file source change this page's pin now spans): a grep for `from tankpit_bot.bot` / `import tankpit_bot.bot` under `src/tankpit_bot/physics/`, `facts/`, `ledger/`, and `contracts/` returns **zero** matches in all four packages, so the leaf-layer direction still holds by construction rather than by convention. Representative modules in each, all present at re-verification: `physics/costs.py`, `facts/fact.py`, `ledger/fuel_book.py`, `contracts/base.py`.

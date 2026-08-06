@@ -8,8 +8,8 @@ related:
 source_paths:
   - "src/tankpit_bot"
 source_git_blobs:
-  "src/tankpit_bot": "744443e972df97d609f4c2530ef056e25c877db5"
-fact_checked: "2026-07-31"
+  "src/tankpit_bot": "238116afef165cc82b0d7213e11804b4764cf060"
+fact_checked: "2026-08-05"
 confidence: high
 hubs: [codebase]
 ---
@@ -62,7 +62,7 @@ cdp_service = CDPService()
 commands = CommandService(send_ws_bytes=send_websocket_bytes)
 probe = probe_class(target_url=url, cdp_service=cdp_service, command_service=commands)
 ```
-All 14 probe entry points go through this factory: combat, density, enemy-teleport, enemy-tracking, fuel, key, larder, mine-landing, movement, queue, radar-watch, respawn-watch, teleport, viewport.[^3]
+All 14 probe entry points go through this factory: combat, density, enemy-teleport, enemy-tracking, fuel, key, larder, mine-landing, movement, queue, radar-watch, respawn-watch, teleport, viewport.[^3] Note the arithmetic mismatch this invites: 14 `action_lab` modules call the factory, but only **13** carry a registered `[tool.poetry.scripts]` name — `queue_probe` has a `main()` at `scripts/queue_probe.py:39` and is not registered, so it runs via `python -m scripts.queue_probe` rather than a `tankpit-*` console script.
 
 **BrowserSession**: same pattern — SessionBase constructor accepts the kwargs.[^2]
 
@@ -74,7 +74,7 @@ Standalone hookable functions in `browser/lifecycle.py`, used by both bot and sn
 - `gather_intel()` — extracts static XOR key, terrain, field info
 - `cleanup_browser()` — closes browser and cleans up
 
-[^1]: architecture phases A-C (WorldService, CommandService, CDPService) — 2026-06-14
-[^2]: architecture phase D + bot decomposition — SessionBase composition, 2026-06-16
-[^3]: action_lab/probe_factory.py — create_probe() and create_probe_services()
+[^1]: Architecture phases A-C, landed 2026-06-14 on the merged `combat-rework` branch (commit accounting on [[module-map]] [^1]). Verified against the current tree 2026-08-05, since the whole-tree pin has drifted 84 files since this page was written: the three service modules are `src/tankpit_bot/browser/cdp_service.py`, `src/tankpit_bot/bot/command_service.py`, and `src/tankpit_bot/sniffer/world_service.py`, all present; the two injected as constructor kwargs appear in the `SessionBase.__init__` signature at `src/tankpit_bot/browser/session_base.py:38-45`, which is keyword-only for `headless`, `prefer_account`, `cdp_service`, `command_service`.
+[^2]: Architecture phase D + bot decomposition, 2026-06-16 (same commit accounting as [^1]). The composition it produced is verified in the [[inheritance-chain]] line table, re-measured 2026-08-05. The four standalone lifecycle functions named above are in `src/tankpit_bot/browser/lifecycle.py`.
+[^3]: `src/tankpit_bot/action_lab/probe_factory.py:18` — `create_probe_services()`; `create_probe()` is defined in the same module. Call sites counted 2026-08-05: 14 modules under `src/tankpit_bot/action_lab/` contain `= create_probe(`, matching the list above exactly (`queue_probe.py:542` is the one whose factory import is function-local).
 [^4]: sniffer/world_state.py:18-33 — `_service = WorldService()` at module scope; `get_world_service()` returns it; `reset_world_state()` rebinds the global for tests. Verified 2026-07-31 against `browser/session_base.py:38-45`, whose `__init__` keyword-only parameters are `headless`, `prefer_account`, `cdp_service`, `command_service` — no `world_service`.
