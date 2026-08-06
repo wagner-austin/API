@@ -166,6 +166,9 @@ class Terrain:
     def is_passable(self, x: int, y: int) -> bool:
         return self.get_terrain(x, y) == self.GROUND
 
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        return self.is_passable(x, y)
+
     def render_viewport(
         self,
         center_x: int,

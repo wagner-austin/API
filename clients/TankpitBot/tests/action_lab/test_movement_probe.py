@@ -647,6 +647,10 @@ class _TerrainMapStub:
         _ = (x, y)
         return True
 
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        _ = (x, y)
+        return True
+
     def render_viewport(
         self,
         center_x: int,

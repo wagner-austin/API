@@ -67,7 +67,7 @@ _FUEL_CAPTURE_PATH = Path(__file__).resolve().parents[2] / "fuel_probe.capture_s
 class _EnemyTeleportModuleProtocol(Protocol):
     analyze_threats: Callable[[WorldStateDict, SelfStateDict], list[EnemyThreatDict]]
     choose_combat_landing_tile: Callable[
-        [WorldStateDict, SelfStateDict, EnemyThreatDict, TerrainMapProtocol | None],
+        [WorldStateDict, SelfStateDict, EnemyThreatDict, TerrainMapProtocol | None, int],
         tuple[int, int],
     ]
     _wait_for_teleport_outcome: _WaitForTeleportOutcomeProtocol
@@ -730,8 +730,9 @@ def test_probe_single_enemy_attempt_returns_no_landing_tile() -> None:
         self_state: SelfStateDict,
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
+        now_ms: int,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain)
+        _ = (world, self_state, target, terrain, now_ms)
         return (-1, -1)
 
     enemy_module._require_fresh_enemy_threat = _enemy_found
@@ -769,8 +770,9 @@ def test_probe_single_enemy_attempt_raises_when_teleport_dispatch_fails() -> Non
         self_state: SelfStateDict,
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
+        now_ms: int,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain)
+        _ = (world, self_state, target, terrain, now_ms)
         return (119, 130)
 
     enemy_module._require_fresh_enemy_threat = _enemy_found
@@ -805,8 +807,9 @@ def test_probe_single_enemy_attempt_records_teleport_timeout() -> None:
         self_state: SelfStateDict,
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
+        now_ms: int,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain)
+        _ = (world, self_state, target, terrain, now_ms)
         return (119, 130)
 
     def _timeout_result(
@@ -912,8 +915,9 @@ def test_probe_single_enemy_attempt_settles_after_landed_result() -> None:
         self_state: SelfStateDict,
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
+        now_ms: int,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain)
+        _ = (world, self_state, target, terrain, now_ms)
         return (119, 130)
 
     def _landed_result(
@@ -1046,8 +1050,9 @@ def test_probe_single_enemy_attempt_records_landed_outcome(
         self_state: SelfStateDict,
         target: EnemyThreatDict,
         terrain: TerrainMapProtocol | None,
+        now_ms: int,
     ) -> tuple[int, int]:
-        _ = (world, self_state, target, terrain)
+        _ = (world, self_state, target, terrain, now_ms)
         return (119, 130)
 
     def _landed_result(

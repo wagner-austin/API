@@ -32,6 +32,10 @@ class _FlatTerrain:
         _ = (x, y)
         return True
 
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        _ = (x, y)
+        return True
+
     def get_terrain(self, x: int, y: int) -> str:
         _ = (x, y)
         return "."
