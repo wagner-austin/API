@@ -94,6 +94,32 @@ def has_known_position(tank: TankStateDict) -> bool:
     return tank["last_position_update_ms"] > 0
 
 
+def has_real_coordinates(tank: TankStateDict) -> bool:
+    """Return whether ``(x, y)`` holds actual coordinates, not the default.
+
+    The strict-coordinates sibling of :func:`has_known_position`: no
+    freshness escape hatch. The login roster's 0x28/0x21 entries carry
+    ``(0, 0)`` with an advancing freshness stamp, so
+    ``has_known_position`` (correctly, for occupancy) counts them
+    known — but the MAP-POSITION DEFER
+    (``state/mutations.py::apply_tank_observation``) must not protect
+    that construction default from the 0x4C snapshot's real fix. The
+    pathological tank standing exactly on the map corner loses this
+    coin toss, exactly as it does for radar refinements.
+
+    This module remains the ONLY home of the ``(0, 0)`` comparison
+    (guard: ``scripts/state_sentinel_rules.py``).
+
+    Args:
+        tank: Tank registry entry to test.
+
+    Returns:
+        True when the stored coordinates differ from the ``(0, 0)``
+        construction default.
+    """
+    return tank["x"] != 0 or tank["y"] != 0
+
+
 _DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
     "viewport": "wire_0x28_tank_entry",
     "radar": "wire_0x48_enemy_detect",

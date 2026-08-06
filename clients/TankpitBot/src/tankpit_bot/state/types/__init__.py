@@ -81,6 +81,7 @@ from tankpit_bot.state.types.tank import (
     decode_tank_state,
     encode_tank_state,
     has_known_position,
+    has_real_coordinates,
     make_tank_state,
 )
 from tankpit_bot.state.types.tank_observation import (
@@ -168,6 +169,7 @@ __all__ = [
     "encode_viewport_state",
     "encode_world_state",
     "has_known_position",
+    "has_real_coordinates",
     "make_container_state",
     "make_empty_world_state",
     "make_mine_state",

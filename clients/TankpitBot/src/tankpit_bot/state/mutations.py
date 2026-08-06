@@ -13,6 +13,7 @@ from tankpit_bot.state.types import (
     TankObservation,
     WorldStateDict,
     coord_key,
+    has_real_coordinates,
     make_self_state,
     make_tank_state,
     make_terrain_tile,
@@ -22,6 +23,17 @@ from tankpit_bot.state.viewport_geometry import (
     make_visible_viewport_state,
     viewport_patch_world_coords,
 )
+
+MAP_POSITION_DEFER_MS = 2000
+"""How recently a position must have updated for a map fix to defer.
+
+The 0x4C snapshot's aging window, from the 2026-08-06 delta mining
+(2,851 same-tank map/wire pairs within 2 s: deltas are a movement
+spectrum — patrol steps and teleport hops — never a decode artifact).
+Inside this window the existing position is at least as true as the
+snapshot's; outside it the tank is stationary-or-unseen and the map
+fix is the best statement available.
+"""
 
 # =============================================================================
 # World State Update Functions (from protocol messages)
@@ -245,6 +257,25 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     is_self = self_state is not None and self_state["tank_id"] == obs["tank_id"]
 
     obs_position = obs["position"]
+    # Map-position freshness defer (archive-mined 2026-08-06,
+    # analysis_scripts/mine_map_position_delta.py — 2,851 same-tank
+    # map/wire pairs: the 0x4C payload is a snapshot that AGES before
+    # arrival; 53% disagree with a within-2s wire fix by a movement
+    # spectrum of walk steps and teleport hops, with zero decode
+    # artifacts). Presence stays exact, so liveness rule 3 below is
+    # untouched, but a map position must never overwrite a position
+    # updated within the snapshot's own aging window — arrival time
+    # lies about content age. A stationary tank (no update in the
+    # window) still takes the map position and its freshness.
+    if (
+        obs["position_is_authoritative"]
+        and not obs["is_wire_sourced"]
+        and obs_position is not None
+        and existing is not None
+        and has_real_coordinates(existing)
+        and obs["timestamp_ms"] - existing["last_position_update_ms"] < MAP_POSITION_DEFER_MS
+    ):
+        obs_position = None
     if obs_position is not None:
         new_x, new_y = obs_position
     elif existing is not None:
