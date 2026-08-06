@@ -69,17 +69,30 @@ never eat more than one mine hit** (45 fuel, [[game-economy]]
 walking-into-a-mine row) — a tank crossing a dense field pays one
 mine per movement command, not a chain.[^6]
 
-## Teleport landings displace off mines (live-proven 2026-07-28)
+## Teleport landings displace off ENEMY mines (live-proven 2026-07-28; team scope archive-proven 2026-08-06)
 
-A teleport aimed AT a mined tile never lands on it: the server
+A teleport aimed AT an enemy-mined tile never lands on it: the server
 displaces the tank to an adjacent tile, charges only the pure
 teleport cost, and the mine survives. User law (verbatim: "it
 displaces you"), wire-confirmed the same day by the mine-landing
 probe (`make mine-landing-probe`, run `mine-landing-20260728-161432`):
 3/3 teleports aimed dead-on at enemy mines landed exactly one tile
 beside them, `extra_loss = 0` on every attempt, all three mines
-intact in the registry afterward. Mine tiles join occupied tiles in
-the displacement-excluded set.[^7]
+intact in the registry afterward. Enemy-mine tiles join occupied
+tiles in the displacement-excluded set.[^7]
+
+**Team scope, archive-proven 2026-08-06**
+(`analysis_scripts/mine_displacement_semantics.py`, 329 captures):
+displacements off a known-mine tile split **1,227 enemy vs 2
+friendly**, and 20 exact landings sat cleanly ON known friendly
+mines — own-color mines do not displace, exactly mirroring their
+walk-passability. The sim already encodes this
+(`sim/actions.py::_tile_blocked_for_landing`). Corollary of the same
+sweep: **an EXACT landing is a mine-clear receipt** — 88 exact
+landings on live enemy-mine beliefs mean the belief was stale
+(off-screen walk-over detonations never reach the wire); a live
+enemy mine displaces deterministically (534/534 in
+bot-20260805-173034), so landing on the tile proves the mine gone.
 
 Doctrine consequence ([[bot-behavior-contract]] §6, ring-2 item
 RESOLVED): aiming an approach teleport at a mine-ringed enemy is

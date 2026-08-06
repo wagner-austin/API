@@ -63,6 +63,10 @@ Per tank (5 bytes):
 
 The previously-undecoded `(packed>>2)&3` field is **rank_category** — stored as `.u` on the tank object, also used in TankEntry (0x28) and TankStatusFull (0x3E) messages. See [[map-data-algorithm]] for the complete parse function.[^4]
 
+## Tank positions: presence-exact, position-approximate (archive-mined 2026-08-06)
+
+The 0x4C tank list is a strictly living-tanks roster ([[enemy-bot-behavior]] map-liveness law) whose POSITIONS are a snapshot that ages before arrival. 2,851 same-tank map/wire pairs inside 2 s across 286 captures (`analysis_scripts/mine_map_position_delta.py`): 47% tile-exact, **zero** swapped axes, **zero** scale factors, no constant offset — the decode is correct; the deltas are a pure movement spectrum (±1/±2 walk steps dominant — patrol amplitude — with a ±16/±30/±60 teleport-hop tail). Consequence: map entries may seed presence and approximate location but must NEVER overwrite a fresher 0x3D/0x28 wire fix (arrival time hides content age; folding map positions into the wire table collapsed body attribution 1053→277 in the displacement audit). Liveness rule 4 consumes presence only and is unaffected; tile-precise consumers (occupancy, landings, adjacency) stay wire-only.
+
 ## Viewport entities (separate from MAP_DATA)
 
 Viewport entity IDs are NOT tank IDs. They use a separate system: `entity_id == -1` (0xFFFF) = equipment container, `entity_id > 0` = fuel container (entity_id ~ fuel volume). Tanks are tracked via separate protocol messages, not viewport entities.[^5]

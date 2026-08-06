@@ -24,7 +24,7 @@ Teleport is the primary mobility model for search and hunting. Never propose rep
 **Click directly on the target** — enemy tank, container, or tile. The server handles placement:[^2]
 - If the tile is open, you land exactly there
 - If a **tank** occupies the tile, the server places you adjacent (typically cardinal)
-- If **mines** occupy the tile, displaced to nearest open tile
+- If **ENEMY mines** occupy the tile, displaced to nearest open tile — own-color mines never displace (archive 2026-08-06: 1,227 enemy vs 2 friendly displacements, 20 clean exact landings on friendly mines; [[mine-mechanics]] § team scope)
 - If **terrain** (rocks or water) at the target, displaced to nearest open tile
 
 **Do NOT compute adjacent tiles client-side.** The server is authoritative for placement. Teleporting to an enemy's exact coordinates is correct — the server places you adjacent. This is how human players play.[^8]
