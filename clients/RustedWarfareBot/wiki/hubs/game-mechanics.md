@@ -16,6 +16,7 @@ The game is its own oracle here. `-printunits` emits a complete stat catalogue o
 [Unit Catalogue and the Mobility Predicate](../pages/mechanics-unit-catalogue.md) -- 90 units with prices, HP and weapons from the engine's own -printunits; speed>0 is the read mobility test
 [Resource Pools and the Placement Rule](../pages/mechanics-resource-pools.md) -- credits come from a tileset property: `res_pool` tiles, the `placeOnlyOnResPool` flag, and where an extractor may stand
 [Build Actions: Two Families, Two Verbs, Five Gates](../pages/mechanics-build-actions.md) -- placing and producing are one mechanism dispatched two ways, and the five conditions that stop an order, four of which say nothing
+[Healing: Repair Bays, Combat Engineers, and the Verification Tiers](../pages/mechanics-healing.md) -- the repair bay heals automatically at radius 230 (decompiled); the combat engineer's auto-heal is inferred pending one probe
 [Threat: Choosing Ground the Builder Survives](../pages/policy-threat.md) -- pools are chosen by who can shoot the walk there, with hostility read from the engine's alliance test rather than from ownership
 [The Shipped AI's Zone System](../pages/engine-ai-zones.md) -- the AI's unit of place: five zone kinds, one-unit-one-zone, and expansion sited on resource pools at random
 [The Shipped AI's Build and Attack Triggers](../pages/engine-ai-triggers.md) -- when it builds, makes units and commits: a credit ladder, a unit budget, and fill-then-commit attack groups of 3, 5, 7

@@ -1,0 +1,62 @@
+Community PvP-level analysis, pasted by Austin from Steam discussions
+(captured 2026-08-04): the 2v1 exchange-rate post, turret-rush counters, an
+"impossible skirmish" turtle account, and a 100+ hour player's unit balance
+review.
+
+VERBATIM PASTE (abridged header only) FOLLOWS
+=============================================
+[the 2v1 post] ...You are down a command center firepower; 18 income less;
+and 4000 less starting credits... you must manage to gain a +4500 credit
+worth of combat exchange rate for starting units and another +2400 credit
+exchange rate... a 23 small tank worth of positive exchange rate...
+1. Turret rush: Turrets offer excellent exchange rate if they're built in
+   the first place. Try drag battle within Turret fire and dismantle them
+   after the battle ends.
+2. Land forces commanding: Use centralized fire tactic and retreat hurt
+   units tactic to optimize your combat exchange rate.
+3. Air forces commanding: Use beaconing and flank tactic...
+4. Raiding: Destroying defenseless building is pure exchange rate gaining.
+   Sneak attack vulnerable sites and retreat to gain positive exchanges.
+5. Counter exploit: use your info advantages to counter enemy units.
+   Counter units offer great exchange rates.
+...Avoid late game and end it during mid-game with advantages you've
+managed to gain.
+
+[turret-rush counters] Small tanks opening to catch unprotected builders...
+If they upgrade a turret to artillery, it's a big, big mistake... artillery
+tower dps is catastrophically low... build a gun turret on its face...
+If they upgrade to a T2 gun: use land units and concentrated forces...
+If they build a Maginot line: Minigun mech can obliterate all defences
+without T3 gun or T2 lightning, its range is a little bit longer. If T3 gun
+is applied, avoid that area entirely.
+
+[rush-vs-2 advice] ...deny an extractor spot or kill an extractor and you
+take the initiative. Put a scout unit between your base and theirs to be
+alerted early... and between their bases to see if one reinforces the
+other, then raid the one who isn't reinforced. Knowledge is power...
+Do your build a few times in single-player... speed is everything.
+
+[impossible turtle account] "defense is your greatest offense" -- capture
+as many extractor points as I can before the ai gets to them; mid game up
+the defense and turrets of those extractors while building fabricators;
+slowly conquer enemy extractors 1 by 1...
+
+[100+ hour balance review]
+Amphibious Jet: bread-and-butter spammable, scales nonlinearly (15 easy,
+30 tough, 40+ overwhelming), not hard-countered by anything -- to kill
+them you build Amph Jets yourself.
+Machine Gun Mech: long range + fast gun (hard-counters laser defense),
+no air defense, weak against spammed units.
+Gun T3, artillery T2: part of the problem with overly strong bases. Five
+together take tremendous effort; a base with 10 -- ughhh.
+Nautilus, Heavy Air Defense Mech, Plasma Mecha, Hovertanks, shielded
+hovertanks: why do these exist? Never seen them used successfully.
+Heavy Tank: another versatile spammable unit, more balanced than jets.
+Particle Beam fighters: not good for their price.
+Bomber: supposed anti-turtle, doesn't do it well, too expensive.
+Flak cannon: falls short in practice.
+Fire bee: spammed fairly effectively to counter heavy defenses.
+Flying fortress: versatile and fun.
+Experimental Tank: a "win harder" unit, not a tide changer.
+Spider: walking nuke play inside anti-nuke zones; modules get scary but
+all-in expensive.

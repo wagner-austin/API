@@ -82,6 +82,16 @@ The agent publishes the owned-entity roster and dispatches against an index into
 
 The roster is short at skirmish start: the Command Center, one Builder, and an entity parked at (-1000, -1000).[^7] That third one is unexplained and is a lead, not a finding.
 
+## The verb roster, current
+
+Seven order verbs cross the wire as of 2026-08-01: move, attack-move, build,
+produce, attack, ability (a unit's own action fired by its interned key —
+the tech unlock's dispatch, [[mechanics-build-actions]]), and posture (a unit
+TYPE's standing reflex row: reach, speed, kite, health floor — not an order
+to a unit at all). Ack is the eighth line kind and is about the exchange,
+not a unit. The sections below record each verb's verification as it was
+earned.
+
 ## Attack-move — the fifth verb, and the flag that makes it
 
 The wire's verbs were move, build, produce and attack; attack-move is the

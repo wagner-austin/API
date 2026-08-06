@@ -1,0 +1,103 @@
+Community accounts of beating the Impossible AI, pasted by Austin from Steam
+discussions (captured 2026-08-04, multiple authors, dates visible where the
+paste kept them — one post stamped Nov 16, 2021).
+
+VERBATIM PASTE FOLLOWS
+======================
+
+So if you're talking about the Lava Maze 4 player skirmish map, then if you
+start north west (default start for player 1) there's one extractor in your
+base, one direct east, and two east and south. The two extractors in the
+south east (actually middle of the map) look like you can take them, but I
+wasn't able to hold them due to getting hit from both sides by blue and red.
+Instead, you should concentrate your defense around the one extractor direct
+east and the one in your main base. Two T3 guns, some T2 AA turrets, some T2
+arty turrets, four repair bays and some laser shields in each of those two
+zones should give you time to eco up with fabricators and then you should
+push out fairly soon to clear the middle. I used 2 Flame mechs and 5 Plasma
+with 2 Mech Engineers to push just as far as middle and kill the enemy
+extractors.
+
+After that you can mop up however you want. I pulled back my mechs to repair
+and built a few Experimental Spiders. The early game is the hard part so
+getting a T3 turret at the extractor to the east before overclocking an
+extractor is definitely recommended. Also, be sure to clear out middle even
+if you can't hold it, as the AI's resource multiplier is insane, and
+knocking out two T3 extractors sets them back a fair bit.
+
+There's probably a more aggressive way to play this, but this works 100% as
+I was able to win even after losing quite a lot of resources trying to hold
+the middle.
+
+[Orange, Nov 16, 2021]
+Impossible AI gets amounts of money, don't feel bad if you can't beat it. In
+my experience beating impossible AI takes strategy that isn't applicable to
+humans - mainly heavily fortifying chokepoints and doing very bite-and-hold
+heavy style attacking and defending. Humans will circumvent strong defense
+points and try and counter your tactics that work against the AI.
+
+Against humans in multiplayer, it is a battle of speed and resources. Think
+about everything in terms of cost efficiency - is the money you spend worth
+it? Is this 1200 turret upgrade going to kill 1200 or more in enemy units?
+Will upgrading this extractor pay off before the game is over?
+
+Pay attention to the battles you lose. What did you lose to? How did you
+lose? Try and replicate those things.
+
+[link pasted: https://youtu.be/9MDkUE0JJ-M]
+
+I mean, turtle up and eco.
+
+If you don't wanna be lame though, here's my general advice:
+- use units that can get value then disengage for repairs
+- be hyper-aggressive early. Do not allow an excessive eco advantage.
+- try to rush a t3 turret somewhere strong
+- if AI FFA, it is crucial to constantly apply pressure on different
+  opponents and make sure no AI gets too strong. If they keep eachother in
+  stalemate, you have a better chance.
+
+just go naval
+ai doesnt know how to combat submarines.
+
+t2 artillery mixed with t3 Gun turrets make short work of them.
+
+T2 towers mixed with laser defense and repair stations. I mostly turtle and
+slowly build up my eco to match their cheating eco.
+
+[long post, abridged only by the paste itself]
+Your income and cash is more than enough to beat this map 5x over...
+- like you can have like 4, 6 or more battleships and a carrier...
+- You can grab a flying fortress, 2 exp tanks and a Shield hover... using
+  combat engis or basic builders spamming repair bays to keep the extanks
+  alive...
+- or just use a single spooder... spider turret spam combo and slowly spam
+  and turret push...
+Then again 2 mill is enough to fund 6 to 10 or more launchers and the enemy
+generally forget to fill their anti nukes...
+
+Letting impossible AI expand on large maps in favor of trying to out-eco
+them is a very poor decision. You can't out-eco impossible ai.
+
+And it really doesn't matter if the AI is making even infinite eco if they
+can't even get their army comp straight. Like the only 3 units you should be
+cautious around is the shield hover, flying Fort, and the carrier... The AI
+just throw units at you at random and a good turret wall can counter
+practically everything in game... bring a builder or 2 to the frontlines and
+start building things like repair bays and Lazer shields on mass.
+
+...the AI love using attack move meaning they always stop to fight the thing
+right in front of them meaning once they see a wall of turrets they just
+stand there until they or the wall dies and like 1 t3 turret as far as I can
+remember can solo most ground units in game now imagine a wall of them (same
+goes for arty) and 4 Sam's can counter a fire bee just fine with some repair
+bay support, 4t3 Sam's just delete all air units and AI flying fort control
+is terrible really and if you place them next to water, cliffs or lava and
+they don't have anywhere close to land they can never land any armys.
+
+Nah in fact I'd say somewhat underprepped. Like your first instinct against
+any AI is to cut off all choke points and points of interest... doing the
+good ol turret wall strat... Flying fortresses and shielded hovers are your
+only Achilles heels and they are a general breeze to counter really.
+
+...you need to learn on how to be more aggressive my guy... push your turret
+lines closer to the shore since it's easier to deal with dropships...

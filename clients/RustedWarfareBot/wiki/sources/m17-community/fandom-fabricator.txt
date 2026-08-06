@@ -1,0 +1,174 @@
+Sign In	
+		Create a Free Account	
+	Rusted Warfare RTS Wikia
+Explore
+Main Page
+Discuss
+All Pages
+Community
+Interactive Maps
+Recent Blog Posts
+Wiki Content
+Recently Changed Pages
+Rusted Warfare
+Modular Spider
+Heavy Tank
+Strategies
+Builder
+Battleship
+Artillery
+Units
+Land Units
+Naval Units
+Air Force Units
+Artillery
+AA Mech
+Laser Tank
+Artillery Mech
+T2
+Combat Engineer
+Heavy Tank
+AA Missile Tank
+Amphibious Jet
+Missile Airship
+Carrier
+Community
+Help
+				Sign In			
+				Don't have an account?			
+				Create a Free Account			
+				Sign In			
+Home
+Explore
+Saved
+Progress
+History
+Utilities
+More
+		Advertisement
+Skip to content
+					Rusted Warfare RTS Wikia				
+72
+pages
+Explore
+Main Page
+Discuss
+All Pages
+Community
+Interactive Maps
+Recent Blog Posts
+Wiki Content
+Recently Changed Pages
+Rusted Warfare
+Modular Spider
+Heavy Tank
+Strategies
+Builder
+Battleship
+Artillery
+Units
+Land Units
+Naval Units
+Air Force Units
+Artillery
+AA Mech
+Laser Tank
+Artillery Mech
+T2
+Combat Engineer
+Heavy Tank
+AA Missile Tank
+Amphibious Jet
+Missile Airship
+Carrier
+Community
+Help
+Fabricator
+Sign In to Save
+Save
+						Edit					
+											History										
+											Purge										
+											Talk (0)										
+Fabricator T1
+Cost
+2200$
+Build Time
+Depends on amount of building units
+Health
+500
+Income
++2$
+Units
+None
+Requirements
+None
+Fabricator T2
+Cost
++4400$ (6600$ Total)
+Build Time
+65.6s
+Health
+1000
+Income
++5$ (7$ Total)
+Units
+None
+Requirements
+Fabricator T1
+Fabricator T3
+Cost
++7500$ (14100$ Total)
+Build Time
+93.3s
+Health
+2200
+Income
++7$ (14$ total)
+Units
+None
+Requirements
+Fabricator T2
+Alternative building for generating Credits. The primary building for this purpose is the 
+Extractor
+. As the Extractor, it can be upgraded twice.
+The Fabricator differs from the Extractor in that it can be built anywhere on the map, which apart from being easier to defend also means that it can be built in almost unlimited quantity, whereas Extractors are restricted to Resource Pools.
+However, due to their far lower efficiency and steep cost, it is advisable to only build these late in the game, when all available Extractors have been taken and upgraded, and a stalemate on the fronts makes additional income desirable.
+		Community content is available under 
+CC-BY-SA
+ unless otherwise noted.	
+		Advertisement
+		Advertisement
+		Advertisement
+Explore properties
+																	Fandom															
+																	Fanatical															
+																	GameSpot															
+																	Metacritic															
+																	TV Guide															
+																	Honest Entertainment															
+Follow Us
+Overview
+																	What is Fandom?															
+																	Essentials															
+																	About															
+																	Careers															
+																	Press															
+																	Contact															
+																	Terms of Use															
+																	Privacy Policy															
+																	Digital Services Act															
+																	Global Sitemap															
+																	Local Sitemap															
+Community
+																	Community Central															
+																	Support															
+																	Help															
+																	Accessibility Statement															
+Advertise
+																	Media Kit															
+																	Contact															
+Fandom Apps
+			Take your favorite fandoms with you and never miss a beat.	
+Rusted Warfare RTS Wikia is a Fandom Games Community.
+					View Mobile Site

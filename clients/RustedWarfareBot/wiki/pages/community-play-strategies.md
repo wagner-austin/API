@@ -71,6 +71,19 @@ every underwater-capable producer is seaFactory or experimental-tier. The
 matrix's favourite unit is a mid-game investment here, not the cheap answer
 the guide implies (log: 2026-07-29, the amphib arm).
 
+## The damage-type layer under the matrix (2026-08-01)
+
+The counter matrix works through a mechanics layer the bot's combat profiles
+do not carry: **damage types and shields**. The registry's own descriptions
+name it -- the amphibious jet "shoots lightning" at Direct Damage "45
+(total: 90.0)", doubled against the right target and "weak vs grounded
+buildings"; the minigun mech "has shield (weak vs lightning)"; the tesla
+mech is "very strong vs shields".[^7] Our profiles read hp and reach only,
+so a shielded unit fights stronger than the bot's volley math believes and
+a lightning unit against the right target fights double. This is the
+largest named gap in the shallow-mechanics audit ([[mechanics-healing]]
+records the healing half of that audit).
+
 ## Micro exists, and it is exactly one move
 
 "Exploit the range of your Minigun Mechs and walk backwards when engaging to
@@ -136,6 +149,132 @@ ground.[^4]
 5. **Raiding** — implied throughout (harass early, streams at the front,
    claim while advancing); no guide treats sitting at home as viable.
 
+## The prescriptions, measured at Impossible (2026-08-01)
+
+One night, one seed (12345, duel_lake, difficulty 3), one knob per arm off
+the techprobe champion (baseline: dies ~2,650-2,850 samples, rival worst
+dip 2,450). Every arm still loses; what moved and what did not:[^8]
+
+- **Fabricators** (tech-fab): wiped 2,750, dip 2,350. Both built, tech
+  unlocked, heavies fielded — and nothing changed. Confirms the corpus's
+  own warning and the 2026-07-30 arithmetic above: at this match length
+  fabricator income is dead credits.
+- **Scouting** (tech-scout): wiped 2,590, dip 2,500. Thirteen scouts died
+  for 9,100 credits with no measurable counter payoff. The prescription
+  assumes surviving long enough to act on the intel; as a composition tax
+  under this pressure it is refuted.
+- **Mobile Turrets** (tech-mech v1-v3): the corpus's named anti-horde
+  counter, three iterations. v1 exposed a doctrine trap — a 4,500-credit
+  composition entry silently raises the derived reserve to 4,500 and
+  starves every channel (defeated 2,655, dip 1,400, income 0/s). v2 pinned
+  the reserve at 900: the economy breathed and produced the **best rival
+  dip ever measured, 3,900 — with zero bunkers fielded** (production never
+  once held 4,500; asked 1,178, got 0). v3 funded two through the saving
+  hire channel: they fielded, cost 9,000, and the dip *fell* to 2,050.
+  Expensive AOE is refuted; what v2 shows is that economy health drives
+  the damage we do.
+- **Cheap AOE instead** (tech-mecharty): six Artillery Mechs (1,400 each,
+  area 100) through ordinary production — **defeated 3,190, the longest
+  survival of the batch**, dip 2,800. Cheap AOE beats expensive AOE on
+  both axes.
+- **Reflex pair at Impossible** (kite + flee-hurt): wiped 2,983, dip
+  2,250. Buys survival time, zero lethality ([[policy-situation]]).
+- **The shared death**: every arm ends `income 0/s, extractors 0` — the
+  AI kills the extractors and the bot dies broke, identically, regardless
+  of composition.
+- **Guarded cover** (tech-cover): the prescription aimed at that shared
+  death, and the batch's breakthrough — **survival 3,215 and rival worst
+  dip 9,100, both records**, the dip more than double the previous best.
+  Two turrets for 1,000 credits (defence starved after them) still
+  transformed the whole match: 202 attack orders against every other
+  arm's 25-131, 610 interceptions, eight heavy tanks — survival
+  compounding into tech throughput. Caveats recorded in the code: cover
+  is granted nearest-the-anchor first, so the frontier extractors that
+  actually die are covered last, and the defence channel ran out of
+  funding at two turrets ([[policy-holding-ground]]).
+- **The winners do not stack** (warden): cover + pinned reserve +
+  artillery mechs in goals *and* heavies — wiped 2,385, dip 2,000, the
+  worst survival of the batch. Nine 1,400-credit mechs (12,600) tilted
+  the production ratio away from the cheap swarm and starved the heavy
+  tanks (one, against the cover run's eight), the turrets (one) and the
+  attacks (18 against 202) — the same cannibalisation that sank the
+  funded bunkers, one price tier down. tech-cover stands as the champion
+  candidate on its own, pending multi-seed validation — the AA arm's
+  12-seed doubling dissolving at 24 seeds is the protocol's own warning
+  against reading one seed's 9,100 as real ([[policy-holding-ground]]).
+- **Seed validation** (2026-08-01, seeds 777/424242): the survival gain
+  held (3,203 and a then-record 3,698); the dip is high-variance — 2,050
+  and 6,950 against seed 12345's 9,100. Cover is real; the 9,100 was
+  partly luck.
+- **Funded defence** (tech-cover-fund, same doctrine, the carried-deficit
+  withhold in code): the starvation is *solved* — defence asked 19, got
+  19, plus 9 AA flak, ending on "every structure already has cover", the
+  first match in the record where the cover channel finished its job.
+  Single-seed outcome sat inside the family's spread (defeated 2,753,
+  dip 3,300), so the fix is judged on paired seeds, not one run
+  ([[policy-economy]]).
+- **Flame turrets** (tech-flame: cover + funded defence + two flame
+  conversions, the community's anti-horde static): **wiped at 3,938 —
+  the longest survival ever recorded, near the 4,000-sample cap** — dip
+  6,200, 88 enemies destroyed, 8 turrets landed, both conversions
+  completed at the engine's own 700-credit price.
+- **THE SWEEP VERDICT (12 seeds, identical conditions, 2026-08-01 —
+  supersedes every single-run claim below)**: tech-flame 0/12,
+  techprobe 0/12. Dip distributions indistinguishable — stack median
+  ~4,100 (1,850-8,250) against control ~4,200 (1,850-6,100); the
+  "reliable 6-7k dips" dissolved at twelve seeds exactly as the AA
+  doubling did at twenty-four. What survives: extractor retention (54
+  drops vs 71), median ending worth (350 vs 0), income alive at the end
+  in 3 matches vs 1. The funded-defence and flame mechanisms work as
+  built; they do not change verdicts. The single-run records below are
+  preserved as the variance lesson they turned out to be.[^10]
+- **The stack validated — and the first non-loss at Impossible**
+  (2026-08-01, paired seeds): tech-flame against the unfunded champion
+  on identical seeds — 3,938 vs 3,215 (seed 12345), 2,827 vs 3,203
+  (777), and at 424242 **`survived (sample_limit)`: the full 4,000-sample
+  match with the bot still standing, the first non-loss in roughly
+  ninety Impossible attempts**, 100 enemies destroyed. The dips tell the
+  deeper story: 6,200 / 7,050 / 6,550 where the unfunded champion swung
+  2,050-9,100 — the fortification line kills 6-7k of their army
+  *reliably*, which is the precondition the momentum strike window was
+  shelved for ("no wave dies on our line" — [[policy-situation]]). The
+  strike arm on top of this line is the next measurement.[^9]
+- **Strike on the wall — NOT refuted; the run measured something else**
+  (flame-strike, strike 5000, seed 12345): wiped 2,253, dip 2,050,
+  marches 0. Corrected reading (the first version of this entry blamed
+  hold semantics and was wrong): ``strike_window`` needs a rival drop of
+  5,000 and this run's worst drop was 2,050, so **the window never
+  opened and the strike machinery never acted** — the decisions were
+  those of plain tech-flame. The divergence from tech-flame's 3,938 /
+  6,200 at the *same seed* is therefore a determinism finding, not a
+  strike finding: tech-flame ran beside a second engine, flame-strike
+  ran solo, and the sweep caveat (parallel runs are not bit-identical)
+  evidently extends to ad-hoc concurrency — same-seed runs are
+  comparable only under identical load, and single-run survival deltas
+  of ~1,100 samples sit inside this noise band. Two consequences: every
+  single-run comparison above carries that band, and the *consistency*
+  claims (dips clustering 6-7k across varied conditions) are the robust
+  ones. Strike itself remains unmeasured on the champion; it also needs
+  ``rush 1`` to convert a release into a march — released units without
+  visible targets stand still ([[policy-situation]], [[policy-combat]]).
+- **The walking wall, refuted on the champion** (flame-creep, creep 50,
+  seed 12345): wiped 2,769, dip 3,500 against the champion's 3,938 /
+  6,200. Eleven thousand credits of advancing turrets and repair bays
+  starved the home fortress, and forward pieces die in contested ground
+  — bastion's fire_bridge lesson, confirmed on the new chassis.
+
+[^10]: `runs/sweeps/imp-flame/` — 24 scorecards; `python -m
+    scripts.analyze_sweep imp-flame` for the table, 2026-08-01.
+
+[^9]: `runs/tech-flame{,-s777,-s424242}.out` — verdicts, dips and the
+    `convert:c_turret_t2_flame` ledger lines, 2026-08-01.
+
+[^8]: `runs/tech-{fab,scout2,mech,mech2,mech3,mecharty2}.out`,
+    `runs/reflex-imp3.out` — full spend ledgers and reach censuses,
+    2026-08-01.
+
+[^7]: `wiki/sources/m0-probe/printunits.log` -- the Amphibious Jet, Minigun
+    Mech and Tesla Mech stat blocks, with the quoted descriptions.
 [^1]: https://steamcommunity.com/sharedfiles/filedetails/?id=1858207046 — "Multiplayer Basics", Steam guide.
 [^2]: https://steamcommunity.com/sharedfiles/filedetails/?id=1449760671 — "RTS Defence", Steam guide.
 [^3]: https://www.chaptercheats.com/cheat/pc/388370/rusted-warfare/hint/136775 — "Text Walk Through".

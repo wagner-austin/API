@@ -1,0 +1,384 @@
+Rusted Warfare/Building - NamuWiki
+RecentChanges
+Rusted Warfare/Building
+ Last Modified: 
+2026-07-14 22:36:42
+Category
+Rusted Warfare
+in-game information
+  Parent article:
+1
+. Command
+2
+. resource building
+2.1
+. Extractor
+2.2
+. Fabricator
+3
+. turret
+3.1
+. Turret
+3.2
+. Artillery Turret
+3.3
+. Flame Turret
+3.4
+. Lightning Turret (Lightning)
+3.5
+. Anti-air turret
+3.6
+. Anti-air Flak
+4
+. factory
+4.1
+. Land Factory
+4.2
+. Air Factory
+4.3
+. Sea Factory
+4.4
+. Mech Factory
+4.5
+. Experimental Factory
+5
+. defense building
+5.1
+. Laser Shield
+5.2
+. Anti-Nuke Defense
+5.3
+. Repair Bay
+6
+. etc
+6.1
+. Nuke Launcher
+6.2
+. Watch Tower
+7
+. other buildings
+7.1
+. crystal (crystal_mid)
+7.2
+. Money Crate (credits_crate)
+7.3
+. Supply Depot (supply_Depot)
+7.4
+. Laboratory
+1.
+Command
+See 
+Command (Rusted Warfare)
+ .
+2.
+resource building
+2.1.
+Extractor
+extractor
+price
+700$
+health
+800
+defense
+1
+income
++8
+buildable units
+engineer
+combat sapper
+robot technician
+experimental spider robot
+modular spider
+location of the building
+ground, resource pit
+Extractor T2
+price
+2100$ (construction)
+1400$ (upgrade)
+health
+1000
+defense
+1
+income
++12
+buildable units
+combat sapper
+robot technician
+location of the building
+ground, resource pit
+Requirements and upgrade time
+Extractor T1 upgrade, 27.7 seconds
+Extractor T3
+price
+4700$ (construction)
+4000$ (upgrade)
+health
+2000
+defense
+1
+income
++20
+buildable units
+doesn't exist
+location of the building
+ground, resource pit
+Requirements and upgrade time
+Extractor T2 upgrade, 55.5 seconds
+extractor. They increase income more than collectors and can be upgraded cheaply, but can only be installed in 'resource pits' in the form of green holes. Build a lot of these buildings to increase your income, so you can build a lot of strong units, so make sure you have as many resource pits as possible. As the tech goes up, health and income increase, equal to or higher than the income of one command.
+Augmented Extractor
+price
+4700$ (construction)
+3000$ (upgrade)
+shield
+800
+health
+4700
+defense
+2
+income
++20
+ability
+Self-repair function
+buildable units
+doesn't exist
+location of the building
+ground, resource pit
+Requirements and upgrade time
+Extractor T3 upgrade, 23.8 seconds
+accelerated extractor
+price
+8700$ (construction)
+8000$ (upgrade)
+health
+1100
+defense
+0
+income
++30
+buildable units
+doesn't exist
+location of the building
+ground, resource pit
+Requirements and upgrade time
+Extractor T3 upgrade, 83.3 seconds
+From the T3 extractor, it can be enhanced with Overclock and Reinforce.
+Overclock earns more, but is expensive and loses a lot of stamina. Reinforce keeps your income the same, but adds health, shields and self-repair capabilities. Both can be returned to the T3 extractor. Don't forget to build defensive turrets if your extractor is on the enemy side or in a location that is at risk of being invaded, as your income will decrease if your extractor is destroyed.
+2.2.
+Fabricator
+collector
+price
+2200$
+health
+500
+defense
+1
+income
++2
+buildable units
+engineer
+combat sapper
+robot technician
+experimental spider robot
+modular spider
+location of the building
+ground
+Collector T2
+price
+4400$ (build/upgrade)
+health
+1000
+defense
+1
+income
++7
+buildable units
+doesn't exist
+location of the building
+ground
+Requirements and upgrade time
+Collector T1 upgrade, 65.6 seconds
+Collector T3
+price
+7500$ (build/upgrade)
+health
+2200
+defense
+1
+income
++14
+buildable units
+doesn't exist
+location of the building
+ground
+Requirements and upgrade time
+Collector T2 upgrade, 93.2 seconds
+Unlike extractors, it is a resource facility that can be installed freely, and it increases income when installed on the ground. As you upgrade, your stamina and income increase. Instead, 
+the price is more than three times that of the extractor, but the import is one-fourth.
+ So, you should avoid building in the beginning, and if you don't have enough income even after raising all extractors to T3, it is recommended to build. However, it is often seen in multiplayer mode where income is set to 2.5x.
+When the extractor is destroyed, it deals explosive damage that does not cover enemies around it. However, the damage and range are not so great that it is practically nonexistent.
+It's an imported building, and it's expensive, so it's important to build it near your main base and thoroughly defend it.
+3.
+turret
+An attacking building installed to defend a base. Generally, the more you upgrade, the stronger you become.
+For reference, in the beginning, turrets are more about quantity than quality. It's best to build as many as you can and upgrade later.
+[1]
+3.1.
+Turret
+A typical ground turret. Units in the air cannot attack.
+[2]
+There are several ways to upgrade. If you upgrade to a regular T2, the range, attack speed, and health will increase. A 3-stage upgrade costs $11,000. The T3 turret has a range of 320, which is the second highest after the long-range turret, and it boasts an incredible attack speed. Therefore, a base with a lot of T3 turrets is difficult to invade with just a few troops.
+Other special second-level upgrades are divided into three categories:
+3.2.
+Artillery Turret
+It is convenient to think of it as 
+coastal artillery
+ (?). It can be upgraded in the T1 turret. The range is 
+350
+ , which is the longest among almost all units , the damage goes up, and there is a splash. When installed on the base, it can kill enemy ranged units attacking the base. However, the attack speed is extremely slow. Obviously, air units cannot attack. Additionally, the 1.14 update brought the T2 long-range turret. When upgraded, the long range increases from 350 to 
+460
+ , and the stamina, attack power, and attack speed are much better than the existing long-range turrets.
+3.3.
+Flame Turret
+flamethrower. Set fire to units that come within range. Since it is a wide-area attack, the more units in the attack range, the more damage it can inflict. They have higher health and auto-repair, so once you've got a couple of them, you won't have to worry about hover tanks/other early units that tend to send rushes in groups.
+[3]
+However, it still cannot attack air units, and its range is shorter than normal turrets, so if you have a long range or a lot of air troops, you will have to take other measures.
+3.4.
+Lightning Turret (Lightning)
+The turret added to version 1.14 is attached to the turret with the guns of the giant tank. Just as a huge tank shoots electricity, this turret also shoots electricity, but all specs are better than a huge tank except for health. You can 
+also upgrade to the strongest turret
+ T2.
+In the early stages, the range and lightning attack match well to keep the minigun robot in check, but be careful as you can't win 1v1.
+3.5.
+Anti-air turret
+A standard surface-to-air missile turret. Can only attack air units. The higher the tech, the higher the range and attack power/speed. Upgrading to T3 makes it a powerful turret with 
+a range of 400 and attack power of 200
+ .
+3.6.
+Anti-air Flak
+flak. It can be upgraded from the T1 surface-to-air turret. It fires shells, but the attack is instantaneous and cannot be blocked with lasers. Increases stamina and creates a protective shield. This shell does not have high attack power, but it is capable of wide area attack, so it is a building specialized in dealing with many enemy air units. However, since the range is relatively short and the attack power is not high, you should not be relieved after installing this one.
+If you can afford it thanks to its wide-area attack and high physical strength, you can easily block dozens of enemy air attacks by building an anti-aircraft wall.
+4.
+factory
+4.1.
+Land Factory
+General military factory. You can create various ground units. Upgrade can create more ground units.
+4.2.
+Air Factory
+The English name is Air Factory, but it looks like a helicopter landing site, which can produce various air units. Upgrade can create more kinds of air units.
+4.3.
+Sea Factory
+C -shaped factory. It can only be installed in the sea. It serves as a shipyard to create a maritime unit such as various ships and submarines, and upgrades can create more kinds of maritime units.
+4.4.
+Mech Factory
+It looks like a square hangar. Create various robot units. Upgrade can create more robot units. But upgrade when you can afford it because the upgrade cost is 4000 $ higher than other factories.
+4.5.
+Experimental Factory
+A huge above-ground factory. It creates incredibly large and powerful units for its size. See special section below.
+5.
+defense building
+A defensive building installed to protect a base.
+5.1.
+Laser Shield
+Intercepts enemy projectile attacks with a laser.
+[4]
+ Upgrading increases health and laser charge/hold.
+You can block the bomber attack! Even if there is only a T1, the bomber's bombs will be useless in an instant. If you don't want to see your hard-built turrets destroyed by bomber raids, let's install them. 
+Bombers became surplus because of this building.
+5.2.
+Anti-Nuke Defense
+It is a base that makes and stores 
+interceptor missiles
+ for nuclear missile defense . If an opponent's nuclear missile is detected within a certain range, an interceptor missile is automatically launched. However, even if the opponent's nuclear missile is launched, interception is impossible if it is outside the interception range.
+[5]
+Up to 12 missiles can be stored, and the cost of making interceptor missiles is cheaper than the cost of making nuclear missiles, and the speed of making them is much faster.
+5.3.
+Repair Bay
+Automatically repairs allied buildings or units within range.
+[6]
+ Enemy buildings or units cannot be repaired. If you fight several times, no matter how well you install the laser shield above, there will be a turret that will reduce your health, so if you don't want to repair it, let's install it. Increases base survivability.
+6.
+etc
+6.1.
+Nuke Launcher
+You can create up to 4 nuclear missiles per Nuke Launcher. Nuclear missiles made here 
+do not have a range limit.
+[7]
+ When a nuclear missile lands on the ground, it deals 
+5600
+ damage from the center !
+[8]
+ But for some reason, the command only takes 25 million damage and doesn't explode. The power is great, but the problem is that the launch pad itself costs 45,000 dollars and the missile is also very expensive at 11,000 dollars. As for how expensive it is, you can pull out four test tanks for the price of one launcher and missile. Besides, nuclear defenses or aircraft carriers 
+can obliterate nuclear missiles with interceptor missiles!
+ Even if the missile cannot be intercepted, it takes 3.5 seconds after the launch command to launch the missile, and it takes time for the missile to arrive at the target point, so it is necessary to predict the enemy's movement to some extent. In other words, it is a high-risk, high-return type that is difficult to use and expensive, but inflicts great damage to the opponent once it explodes.
+If used well, it can vaporize all the huge amount of air units in the base. 
+When the money grows to the point where it is difficult to spend all of it, it is used instead of exploration...
+It is disadvantageous to attack an opponent's base purely with nuclear missiles. It's not that great in terms of cost and time. However, when defending, it is quite powerful.
+In games with a lot of starting funds in multiplayer, you can often see users who build nuclear missile launch pads as soon as they start.
+6.2.
+Watch Tower
+A tower that illuminates a very large area when there is fog on the map. T2 is also present.
+[9]
+7.
+other buildings
+Some buildings have a purpose, but most of them have no clear purpose. It is only used in some modes or custom maps.
+7.1.
+crystal (crystal_mid)
+It's a building that gives you $3000 if you dismantle it.
+7.2.
+Money Crate (credits_crate)
+You can get 800$ by dismantling it like a crystal.
+7.3.
+Supply Depot (supply_Depot)
+A building containing items presumed to be ammunition and fuel. It was probably used to increase the population. T2 also exists.
+7.4.
+Laboratory
+This building was added in 1.14 and has a very large size, but has no effect. It is presumed to be researching and strengthening crystals or something else. And when it explodes, it causes a nuclear explosion. 
+Who said to turn the lab into a nuclear power plant?
+[1]
+ At this time, if you have self-propelled guns, it is good to raise 2-3 ground turrets as self-propelled turrets or install laser defense facilities.
+[2]
+ Units in the air only. Even if it is classified as an air unit, it can attack if it lands and is in the ground state. Conversely, the Anti-air Turret can only attack units in the air.
+[3]
+ Because of these characteristics, it is useful in endless survival.
+[4]
+ Units using immediate attacks, not projectiles, cannot block attacks. For example a laser tank.
+[5]
+ However, the range is very wide, so if you build only two or three missiles on one map and fill them with missiles, you can say that there is no worry about getting hit by nuclear missiles.
+[6]
+ Repair speed equals sapper.
+[7]
+ It may be because the map is narrow, but there is a range limit. If you make a custom large-sized map and look at it yourself, you can see that there is a range limit.
+[8]
+ To put it in a word, everything is destroyed. Also, if the distance to an ally is close, the ally will also take damage.
+[9]
+ If you're not sure what the T2 watchtower's line of sight is, try installing it on an island in the middle of the Volcano Crafter map in Custom Maps. 
+Normal watchtowers can see the entire island, and T2 watchtowers can see the surrounding land.
+thisdocument all or part of the
+Rusted Warfare
+document
+r182
+boardTaken from 
+Go to Previous History
+This document is available under 
+CC BY-NC-SA 2.0 KR
+. (except for some documents and illustrations where licenses are specified)
+The copyright of the contributed document belongs to each contributor, and each contributor owns the copyright of the part they contribute.
+RecentChanges
+namu.wiki
+Contáctenos
+Términos de uso
+Operado por umanle S.R.L.
+Hecho con ❤️ en Asunción, República del Paraguay
+ Su zona horaria es 
+GMT
+Impulsado por the seed engine
+한국어
+ This site is protected by reCAPTCHA and the Google 
+Privacy Policy
+ and 
+Terms of Service
+ apply. This site is protected by hCaptcha and its 
+Privacy Policy
+ and 
+Terms of Service
+ apply.

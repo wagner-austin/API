@@ -38,11 +38,14 @@ The agent publishes what it sees as newline-delimited JSON and the planner decod
 Records are discriminated by `kind`. A `frame` record opens a sample and declares how many records of each following kind it carries; each `entity` record is one visible unit or building, carrying the engine id an order is dispatched against ([[issuing-orders]]); each `pool` record is one visible resource pool ([[mechanics-resource-pools]]); and each `option` record is one thing an owned unit can currently make.[^1][^2][^7][^9]
 
 ```
-{"kind":"frame","frame":3521,"clock_ms":11822,"visible":19,"pools":46,"options":123,"credits":4315}
-{"kind":"entity","frame":3521,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hostile":true,"hp":4000.0,"max_hp":4000.0,"complete":true,"queued":0}
-{"kind":"pool","frame":3521,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0}
-{"kind":"option","frame":3521,"index":5,"unit_id":214,"produces":"landFactory","action":1,"placed":true,"available":true}
+{"kind":"frame","frame":3492,"clock_ms":11751,"visible":19,"pools":46,"options":161,"players":5,"credits":4315,"defeated":false,"wiped":false,"players_left":5}
+{"kind":"entity","frame":3492,"index":0,"id":207,"type":"commandCenter","class":"…units.d.e","x":410.0,"y":990.0,"team":5,"mine":false,"hostile":true,"movement":"NONE","group":-3,"flying":false,"submerged":false,"touching_water":false,"hp":4000.0,"max_hp":4000.0,"complete":true,"queued":0}
+{"kind":"pool","frame":3492,"index":0,"tile_x":115,"tile_y":6,"x":2310.0,"y":130.0,"group_land":4}
+{"kind":"option","frame":3492,"index":0,"unit_id":213,"produces":"","key":"c_1","placed":false,"available":true,"makes_something":false,"price":0}
+{"kind":"player","frame":3492,"index":0,"team":0,"local":true,"hostile":false,"defeated":false,"wiped":false,"income":18,"army_value":500,"building_value":3000}
 ```
+
+The option record's `key` is the engine's interned action key — the dispatch handle an ability order fires back, because the engine's per-action index is not a selector — and `price` is the engine's own charge, the only reading that tells a tier unlock from a rally point ([[mechanics-build-actions]]). The `player` records are the engine's own scoreboard, unfogged for every player; the situation layer reads them for the strike window ([[ai-opponent-strategy]]).
 
 `frame` and `clock_ms` are the engine's own counters, read from the same fields measured at ~300 Hz and 1 kHz ([[engine-tick-and-clock]]). Fields are limited to what has been verified against the engine rather than everything reachable ([[engine-entity-model]]).
 

@@ -1,0 +1,2316 @@
+Rusted Warfare/Unit - NamuWiki
+RecentChanges
+Rusted Warfare/Unit
+ Last Modified: 
+2026-07-14 22:36:42
+Category
+Rusted Warfare
+in-game information
+  Parent article:
+1
+. ground
+1.1
+. Builder
+1.2
+. Combat Engineer
+1.3
+. Scout
+1.4
+. Tank
+1.5
+. Heavy Tank
+1.6
+. Hovertank
+1.7
+. Heavy Hovertank
+1.8
+. Artillery
+1.9
+. Heavy Artillery
+1.10
+. Plasma Tank
+1.11
+. Laser Tank
+1.12
+. AA Missile Tank
+1.13
+. Mammoth Tank
+2
+. sea
+2.1
+. Builder Ship
+2.2
+. Gunboat
+2.3
+. Underwater Probe
+2.4
+. Missile Ship
+2.5
+. Landing Craft
+2.6
+. Battle Ship
+2.7
+. Heavy AA Ship
+2.8
+. Heavy Battleship
+2.9
+. Attack Submarine
+2.10
+. Heavy Missile Ship
+2.11
+. Heavy Sub
+2.12
+. Nautilus
+2.12.1
+. Scout bot
+2.13
+. Carrier
+3
+. Public
+3.1
+. Light Gun Ship
+3.2
+. Helicopter
+3.3
+. Interceptor
+3.4
+. Drop Ship
+3.5
+. Gun Ship
+3.6
+. Heavy Interceptor
+3.7
+. Spy Drone
+3.8
+. Amphibious Jet
+3.9
+. Bomber
+3.10
+. AA Beam Gunship
+3.11
+. Missile Airship
+4
+. robot
+4.1
+. Basic Mech
+4.2
+. Anti-air Mech
+4.3
+. Artillery Mech
+4.4
+. Mobile Turret
+4.5
+. Mech Engineer
+4.6
+. Minigun Mech
+4.7
+. Heavy Anti-Air Mech
+4.8
+. Plasma Mech
+4.9
+. Flame Mech
+4.10
+. Mechflying
+5
+. Experiment
+5.1
+. Fire Bee
+5.2
+. Experimental Tank
+5.3
+. Shielded Hovertank
+5.4
+. Flying Fortress
+5.5
+. Experimental Spider
+5.6
+. Modular spider
+5.6.1
+. module list
+5.7
+. Support Hovertank
+1.
+ground
+Units that can be produced at the Land Factory. However, some units can be produced without a ground factory process.
+1.1.
+Builder
+engineer
+• Build and repair buildings.
+• Cannot attack
+production cost
+500$
+health
+170
+attack or not
+doesn't exist
+production available
+headquarters
+ground factory
+robot factory
+combat sapper
+aerial fortress
+experimental spider robot
+modular spider
+unit location
+ground
+weak unit
+All attacking units and defenses
+unit production time
+8.3 seconds (Command, Ground Factory, Robot Factory)
+2.7 seconds (aerial fortress)
+A sapper constructing a building
+characteristic
+All tier 1 buildings can be built, except for headquarters, watchtowers and upgraded buildings.
+Since the building is built at a long range, you can build several buildings in one place.
+When several sappers gather to build a building, the construction speed is increased.
+This is a general worker unit that is used consistently from the beginning to the end. There is no attack function, and since there are buildings in this game that extract resources separately, resources are not collected.
+[1]
+ Engineers only build buildings as intended, and can also repair and dismantle buildings. 
+On servers where team control is enabled, you can freely dismantle buildings belonging to users on the same team.
+If an engineer constructing a defense line dies, a catastrophe could occur, so it is always best to be careful. Moreover, since it is one of the glass-bodied units in the game along with the self-propelled artillery, 
+it is killed in one hit by the experimental spider robot's self-propelled artillery.
+A unit repair function also existed during the Alpha days, but was nerfed due to balance issues, and Combat Engineers inherited this function.
+1.2.
+Combat Engineer
+combat sapper
+• Build some units and T2 buildings
+• Heavily armed ground attack
+• Anti-submarine attack possible while floating on water
+• Can move on water
+price
+3500
+health
+1000
+offense power
+30, 45 (torpedoes)
+crossroads
+170
+attack or not
+on land, underwater
+production available
+T2 ground mill
+pilot plant
+aerial fortress
+experimental spider robot
+modular spider
+unit location
+land, sea
+[hover]
+strong unit
+submarine
+weak unit
+air units, self-propelled guns
+unit production time
+33.3 seconds (T2 ground plant, test plant)
+11.1 seconds (aerial fortress)
+A hover unit that can build and attack. It is a superior compatible unit that complements all the shortcomings of a regular engineer. While the above engineer cannot attack other units, this combat engineer can attack other units. Of course, the cost-effectiveness is not very good, so it is better to focus on the fact that it can defend to some extent against reconnaissance vehicles and hover tanks. It can move on water and even shoot torpedoes!
+[3]
+ You can set it to start with 3 of these before starting the game.
+Also, unlike regular engineers, they can heal units and create T2 extractors, T2 ground/air/sea/robot factories, heavy tanks, and amphibious jets right away, so they are often acquired around mid-game and used to fill out tech tree buildings or extractors. It has an automatic repair function. Produces +1$ per unit.
+In the past, it was possible to build T2 Collector and T2 Robot Factory, but due to balance issues, T2 Robot Factory was inherited by Robot Engineer, and T2 Collector was deleted and replaced with Watchtower Construction.
+Because it can repair units, it produces a lot of combat engineers and shows excellent performance for the purpose of supporting experimental units.
+patch history
+buff
+nerf
+1.15
+Cost reduced (4500 -> 3500)
+Can be produced in experimental factories
+Health decrease (1500 -> 1000)
+1.3.
+Scout
+Scout
+• Medium level gloves
+• Cost inefficient for combat use
+Can see farther
+• Can attack air and ground
+production cost
+700
+health
+350
+offense power
+17
+crossroads
+110
+production available
+headquarters
+ground factory
+aerial fortress
+experimental spider robot
+modular spider
+unit location
+land, sea
+[hover]
+strong unit
+non-combat units, production buildings
+weak unit
+Most units except non-combat units
+unit production time
+11.1 seconds (command, ground plant)
+3.7 seconds (aerial fortress)
+Reconnaissance vehicle showing overwhelming quantity
+With a stamina of 350, it has more stamina than the tanks that appear in the beginning. Anti-air/ground attacks are possible. Because it has the advantage of having a wide field of view, this unit is used in one way or another for the purpose of clearing away fog in the early stages. Usually, after the initial battle, the main unit is changed to another unit or the scout is replaced by a hover tank, so it is a very difficult unit to see in fights between players. In AI battles, it is often seen as the AI ​​uses hover tanks as its main force.
+However, it is 
+clearly
+ stated in the unit description that 
+the cost-effectiveness
+ is not good . If possible, refrain from using this unit in battle. Instead, since it has a wide field of view, it can be considered for use for early exploration and containment purposes. Even this, if the fog of war is not set, it is better not to use it.
+1.4.
+Tank
+Train
+• Ground attack only
+• Fast but low stamina
+production cost
+350
+health
+210
+offense power
+25
+crossroads
+160
+attack or not
+ground
+production available
+ground factory
+aerial fortress
+unit location
+ground
+strong unit
+T1 turret, anti-aircraft gun
+weak unit
+AoE units/turrets/air units
+unit production time
+8.3 seconds (ground plant)
+2.7 seconds (aerial fortress)
+It is a common train. It is impossible to anti-air and has weak specifications, but it is cheap and easy to collect, so it is used in the early rush.
+In the beginning, there is no need to draw unless the opponent is frantically checking, but the true value of this unit is that it is specialized in 
+humane tactics
+ . Small tank units are defeated by ranged attack units, but if you use the above-mentioned attack tactics, it is a unit with fearsome performance that can slaughter even experimental tanks, which are notorious for ranged attacks.
+As the main force in the early stages, it is mainly used to attack or check enemy expansion areas with poor defense, or as a front line maintenance force in the early stages.
+However, if you go to the T2 ground factory tech tree, there will be little activity in the middle to produce high-compatible heavy tanks, and as mentioned above, unlike heavy tanks, anti-air is impossible. Because of this, be careful as they all oxidize the moment they encounter an air range attack unit.
+1.5.
+Heavy Tank
+heavy tank
+• heavily armed
+• Can attack ground
+• Possible weak anti-air attack
+production cost
+800
+health
+600
+offense power
+50
+crossroads
+160
+attack or not
+ground, air
+production available
+T2 ground mill
+combat sapper
+aerial fortress
+experimental spider robot
+modular spider
+unit location
+ground
+strong unit
+ground and weak air units
+weak unit
+Robot Unit, AoE Turret/Unit
+unit production time
+15.1 seconds (T2 ground plant)
+5.0 seconds (aerial fortress)
+A huge number of heavy tanks break through the enemy's defenses.
+It has twin cannons, four caterpillars, and even a weak anti-aircraft gun.
+ Due to balance, self-repair is impossible.
+In the case of a general battle, it is in charge of the main force of the ground forces in the early and mid-season. This is because it has the 3 combination of reasonable price, reasonable performance, and reasonable production time. However, because it is difficult to break through the defense tower properly installed
+[5]
+ You need to be careful and find out where the enemy's defense is weak.
+It is a major troop in the mid -to -mid, and has a low price and a compliant firepower. However, because of the weak anti -aircraft guns, each one with a strong air unit is not good with strong robot units.
+1.6.
+Hovertank
+hover tank
+• light gloves
+• Can move on water
+• Cost inefficient for combat use
+production cost
+450
+health
+150
+offense power
+23
+crossroads
+140
+attack or not
+ground, air
+production available
+ground factory
+nautilus
+aerial fortress
+location of the unit
+land, sea
+[hover]
+strong unit
+T1 turret, air unit
+weak unit
+Flamethrower, AoE Unit
+unit production time
+8.3 seconds (ground plant)
+4.2 seconds (Nautilus)
+2.7 seconds (aerial fortress)
+A unit that can travel on land and water. Aerial attacks are possible, and if you put them in a group at the opponent's base, you can see the opponent's turret being destroyed. However, their physical strength is very weak, so when attacking in groups, be careful of flamethrowers and wide-area units that use wide-area attacks.
+Along with the scout car, it is the AI ​​player's main unit. 
+Also, it
+ is faster when moving on water than on land. The same goes for heavy hover tanks and landing craft.
+It is a unit that boasts good cost-effectiveness even for reconnaissance. It is cheaper than a reconnaissance car, has a quick production time, and is free to move, so it boasts excellent performance for the purpose of checking sappers who are constructing reconnaissance and expansion bases rather than using it as a full force. Because of this, it is currently a unit that is being re-evaluated in multiplayer.
+counter unit
+Wide Area Unit/Building
+Hover tanks have the 2nd lowest health among ground units.
+[7]
+ Because it possesses it, it shows all units/buildings in a wide area being oxidized in less than 2 seconds. Therefore, be careful, because if you only compete based on the number of hover tanks, the moment your opponent draws wide-area units, the tide may turn.
+tank, basic robot
+Although they are units produced at the same time, they are very superior in performance compared to hover tanks. In the case of tanks, 4 tanks take down 5 hover tanks, the default robot is a higher-level tank unit, and because of its excellent health and attack speed, the 3 base robots take out all 6 hover tanks without losing a single one. do.
+Self-Propelled Artillery, Enhanced Self-Propelled Artillery, Artillery Robot, Mobile Turret
+Since these units perform ranged attacks, 
+they are truly fatal units against hover tanks with weak health.
+ The self-propelled howitzer has the same weak health as the hover tank, but its range is very long, so the hover tank is reversed, the artillery robot has high health and a wide damage range, and the reinforced self-propelled howitzer has a built-in laser shield that nullifies attacks twice and has higher stamina than existing self-propelled guns. In the case of a mobile turret, when switched to turret mode, the entire hover tank melts due to its high defense and fast rate of fire.
+patch history
+buff
+nerf
+1.11
+doesn't exist
+Health nerf (200 → 150)
+1.7.
+Heavy Hovertank
+heavy hovertank
+• light gloves
+• Can move on water
+• Can attack air and ground
+• Cost inefficient for combat use
+production cost
+1000
+health
+450
+offense power
+40
+crossroads
+160
+attack or not
+ground / air
+production available
+T2 ground factory
+experimental spider robot
+modular spider
+unit location
+land, sea
+[hover]
+strong unit
+Lightly armored units such as gunships and tanks
+weak unit
+range attack unit
+Heavy hovertank taking down weak enemies with ease
+A reinforced version of the hover tank. Although it has weak tenacity, it is capable of anti-air attack like a hover tank, so it is sometimes used as a main unit. However, because it is expensive compared to its performance, it is not used as much as heavy tanks unless it is a map where naval battles are the main focus.
+patch history
+buff
+nerf
+1.11
+doesn't exist
+Health nerf (550 → 450)
+1.8.
+Artillery
+self-propelled gun
+• Ground attack only
+• long range
+production cost
+900
+health
+140
+offense power
+80
+crossroads
+290
+attack or not
+ground
+production available
+ground factory
+experimental spider robot
+modular spider
+unit location
+ground
+strong unit
+Tanks, short-range units
+weak unit
+air unit
+A self-propelled gun that uses a long range to safely attack enemies
+A typical self-propelled artillery and support unit. It has a long range and decent attack power, but its tenacity is very weak, so you must be careful when attaching or using escort troops.
+The basic method of operation is to harass the enemy and shoot from outside the range of enemy turrets and units with superior range. Since this is a unit that AI often uses along with hover tanks, it is a good idea to install a self-propelled artillery turret.
+1.9.
+Heavy Artillery
+heavy self-propelled guns
+• Can attack ground only
+• long range
+• Limited laser defense
+production cost
+3100
+health
+600
+offense power
+110
+crossroads
+290
+attack or not
+ground
+production available
+T2 ground mill
+unit location
+ground
+strong unit
+Tank + self-propelled gun + few bombers
+weak unit
+air unit
+Heavy self-propelled guns that attack enemies while blocking enemy projectiles
+The DPS is twice that of the self-propelled gun and the HP is about 5 times higher. Additionally, it can intercept up to two enemy artillery strikes with a laser. However, the price reaches 3100, so it is an unlucky unit that is usually used for other resources. 
+Rather than picking this, it is more efficient to pick 4 heavy tanks.
+However, it can be used like a tank and has a long range, so if you have money left over, try using it as a substitute for a heavy tank.
+patch history
+buff
+nerf
+1.13.3
+Production cost buff ($3,800 → $3,100)
+doesn't exist
+1.10.
+Plasma Tank
+plasma tank
+• Extremely tough gloves
+• Can attack ground only
+• Shields are weak against lightning attacks.
+production cost
+1000
+health
+220
+shield
+430
+offense power
+100
+crossroads
+165
+attack or not
+ground
+production available
+T2 ground mill
+aerial fortress
+unit location
+ground
+strong unit
+turrets, weak units
+weak unit
+Air units, units that use lightning attacks
+[9]
+A tank with considerable defensive and offensive power for a 1000$ subject. You can only do ground attacks. Attack speed is slightly slow. You can also rush with this unit and anti-air units in the early stages.
+1.11.
+Laser Tank
+laser chariot
+• Can attack air and ground
+• Weak against multiple enemies
+• Powerful single attack, slow reload
+production cost
+1600
+health
+400
+offense power
+350
+crossroads
+190
+attack or not
+ground, air
+production available
+T2 ground mill
+aerial fortress
+unit location
+ground
+strong unit
+units with high stamina
+weak unit
+mass charge
+A laser tank that destroys enemies with powerful attacks
+It has low stamina, but it deals 350 damage per hit. The T2 turret was half-blooded after being hit by one of this tank's attacks. In exchange for tremendous attack power, the reload time is ridiculously long at 6 seconds.
+Because of the weakness, if there is no ally in front of you, it is easy to attack once after attacking. It is a good idea to attach a troop or operate a few like a joker card. Contrary to the appearance, air attacks are possible, and as described, it is not good to use it as a focus because it is very vulnerable to many enemies and volume -type units. However, it can be used as a counter of the laser turret because it ignores the defense of the laser turret.
+counter unit
+Chariots, Basic Robots, Hover Tanks
+Since the laser tank is very weak against mass units, it is countered by these units, and even by 
+hover tanks
+ with weak health. If the opponent selects a quantity unit, the battle will turn in an instant, so 
+the troop system must be changed immediately.
+1.12.
+AA Missile Tank
+anti-aircraft missile tank
+• Long-range anti-aircraft missiles
+• A little shield
+production cost
+2500
+health
+1100
+shield
+700
+offense power
+120×2
+crossroads
+340
+attack or not
+Public
+production available
+T2 ground mill
+aerial fortress
+unit location
+ground
+strong unit
+air unit
+weak unit
+ground unit
+In the previous version, it was capable of ground/anti-air attacks, had a long range, and had wide-area damage from missiles, so it was one of the main units used as a substitute for self-propelled artillery to destroy the opponent's base or engage in an all-out war. However, with the patch, ground attacks were removed, so it is no longer used as often as before.
+Instead, it still has wide-area damage, is still strong, and has the firepower of a T2 anti-aircraft gun, making it useful as an anti-aircraft support unit. In terms of volume and price, it is significantly better and does not lag behind in performance. It is especially useful when defending a base. Even if there are just a few of them, dropships can be easily shot down.
+The field of view is about 1.5 times wider than normal units.
+patch history
+buff
+nerf
+1.12
+unit is remade
+ground attack impossible
+1.13.
+Mammoth Tank
+giant tank
+• Strong Armor
+• Attack the ground with lightning
+• Lightning attacks are weak against buildings and strong against shields.
+production cost
+3900
+health
+2600
+offense power
+130
+crossroads
+190
+attack or not
+ground
+production available
+T2 ground factory
+aerial fortress
+unit location
+ground
+strong unit
+Units/buildings with built-in shields, advanced units
+weak unit
+air unit, robot unit
+An upgraded version of the laser tank above. Previously, it was produced in an experimental factory, but was downgraded to a military factory with a patch.
+Coming down to the military factory, you can see that it is often used as tank damage for the T2 military factory all-in rush because there are few units in Dongtech that can compete with price, health, and attack power.
+[10]
+ It shoots lightning and deals 130 damage, making it quite painful.
+A unit that uses electric attacks can only inflict 50% damage to buildings, but when it attacks an enemy with a shield, it deals 100% damage to the shield and also takes 90% damage to health.
+[11]
+ This applies to all units using electric attacks below.
+As a counter unit to the Shield Hover Tank, even if 5 of these units are gathered together, the Shield Hover Tank becomes a can that can't do anything unless it trolls.
+2.
+sea
+A unit that can be produced at the Sea Factory.
+Units here cannot be used if there is no sea on the map. Since almost half of the maps do not have an ocean, they are not used often, but they are powerful units.
+2.1.
+Builder Ship
+sapper ship
+production cost
+500
+health
+500
+crossroads
+240
+production available
+offshore plant
+robot engineer
+nautilus
+modular spider
+unit location
+sea
+Engineer ships building structures at sea
+Naval support unit. It's just a sapper floating on water. The range at which buildings can be built is slightly longer than that of engineers.
+It is one of the units that artificial intelligence never produces or uses.
+2.2.
+Gunboat
+high-speed boat
+• fast speed
+• attack the ground
+production cost
+300
+health
+170
+offense power
+12
+crossroads
+120
+attack or not
+ground
+production available
+offshore plant
+nautilus
+unit location
+sea
+strong unit
+anti tank
+weak unit
+Most attack units, turrets
+As a reconnaissance and main unit in early naval battles, it is cheap but has low health and does not have strong attack power. A unit positioned similar to a hover tank on the ground. Instead, it is fast and cheap, so it is powerful in volume battles. If you collect dozens of them, even a battleship can go by quickly. 
+It's better to buy battleships with the money you would save for dozens of them.
+2.3.
+Underwater Probe
+submersible
+• very weak
+• Only weak torpedo attacks
+production cost
+450
+health
+80
+offense power
+10
+crossroads
+100
+attack or not
+sea, underwater
+production available
+offshore plant
+missile ship
+nautilus
+unit location
+underwater
+strong unit
+Naval units without anti-submarine capabilities
+weak unit
+unit with anti-submarine ability
+It is the cheapest unit that can be submerged. It cannot come out to sea and its rotational speed is slightly faster than that of a submarine. The problem is that both HP and attack power are very low, the range is short, and it is more expensive than expected. With two of these, 100 won per submarine remains.
+There are not many units that can attack underwater units in the early stages, so it can be used for early reconnaissance, but it is better to select a scout vehicle, hover tank, or speedboat to use this.
+2.4.
+Missile Ship
+missile speedboat
+• Can attack air and ground
+• Use of anti-submarine light torpedoes
+production cost
+900
+health
+350
+offense power
+62
+crossroads
+200
+attack or not
+ground, air, underwater
+production available
+offshore plant
+nautilus
+unit location
+sea
+strong unit
+T2 turret, weak air/sea units
+weak unit
+A unit with strong attack power
+Although it is not comparable to a battleship, it has twice the health of a high-speed boat and can fire torpedoes. It also has a fairly long range, so it can destroy submarines and T2 turrets without getting hit.
+As the name implies, it attacks while shooting missiles. Sometimes, after firing a missile, it is destroyed by an opponent's unit, and at the same time, the missile fired right before being destroyed also destroys the opponent's unit.
+It is used as the flagship unit of a small sea battle because there is no attack that cannot be aired, underwater or on the ground. However, because of the ambiguous stamina, it is abandoned after some power is accumulated.
+patch history
+buff
+nerf
+1.11
+doesn't exist
+Attack power nerfed (70 → 62)
+2.5.
+Landing Craft
+landing craft
+• transport units
+• Can cross land and sea
+• Cannot attack
+price
+600
+health
+450
+manufacturing plant
+offshore plant
+T2 ground mill
+modular spider
+location of the unit
+land, sea
+[hover]
+Landing craft transporting units
+A small transport surface floating ship. It can move on the ground and has 4 transport compartments. However, some large units use two transport slots, and experimental units with five transport slots cannot be carried at all. Your speed increases when you are on the water. It is semi-required on maps that only have islands. It can also be made at a military factory. 
+It's barely the size of a heavy tank, so everything goes into it. From four giant tanks to two ultra-large units of flamethrower robots.
+Full-scale
+Incheon landing operation
+In camps where the dropship defense is thorough, it can be a one-shot. It can also be created in T2 ground factories.
+2.6.
+Battle Ship
+battleship
+• Mid-range ground attack
+• strong
+• No anti-air and anti-submarine attacks
+production cost
+1500
+health
+1200
+offense power
+65x2
+crossroads
+250
+attack or not
+ground
+production available
+offshore plant
+unit location
+sea
+strong unit
+turret, naval unit
+weak unit
+water and air units
+A battleship that safely strikes enemies from a distance
+It has a lot of stamina and has a longer range than other units of the same class, so it can be used as a self-propelled artillery in the sea. Like a self-propelled artillery, it has good attack power and high stamina, so it is easy to pick up several units and combine them in large battles, and it shows excellent performance in terms of anti-aircraft, anti-ground, and cost-effectiveness. The coastal bombardment capabilities are also amazing. However, it does not have anti-submarine anti-air capabilities, so it is very vulnerable to submarines and air units.
+However, the ultimate in coastal bombardment is missile ships, which will be explained below, and pure battleships are useful for a short time in the beginning, but it is difficult to see great benefits.
+In multiplayer, a naval battle map, you can win early in the battle by quickly rushing the battleship. Instead, it is not an invincible strategy without a check, so let's carefully consider the situation and use it.
+2.7.
+Heavy AA Ship
+anti-aircraft
+• Can only attack air
+• Ranged attack with long range
+• Hard gloves with shields
+production cost
+3500
+health
+1800
+shield
+2200
+offense power
+70x2
+crossroads
+320
+attack or not
+Public
+production capacity
+T2 offshore plant
+unit location
+sea
+A unit that compensates for the lack of anti-aircraft capabilities of naval units. It is a ship equipped with anti-aircraft guns identical to those of an aircraft carrier, and is the only ship currently equipped with a shield. It shows good compatibility when used with ships with weak anti-aircraft capabilities.
+2.8.
+Heavy Battleship
+large battleship
+• long-range ground attack
+• Anti-air capability
+• Anti-submarine light torpedoes
+production cost
+6000
+health
+4000
+offense power
+110×2 (naval guns), 65 (torpedoes), 50×2 (anti-aircraft guns)
+crossroads
+290
+attack or not
+every
+manufacturing plant
+T2 offshore plant
+unit location
+sea
+strong unit
+ground, submerged units and turrets
+weak unit
+Multiple air units, large submarines
+The attack is not bad, and there is also a torpedo attack, so even if a large submarine comes, you can deal well with it by pulling it back. And with a slightly longer range than a battleship, it can destroy most of the bases along the coast. On the other hand, this side has strong attack power and high stamina, so there are many cases where there is little or no loss. However, it has anti-air ability, but it is rather weak, so it can't win the 5th gunship. It's ambiguous to say that it's moving speed is fast, so you can't escape easily, so let's attach some escort troops.
+As a side note, it has the feature of being able to attack ground, air, and underwater units at the same time. However, it is very rare to encounter air, ground, and underwater units at the same time, so this feature is rarely noticeable.
+2.9.
+Attack Submarine
+attack submarine
+• Most units cannot attack underwater.
+• Can attack underwater units
+• Can be levitated to attack ground and air units
+production cost
+800
+health
+260
+offense power
+42
+crossroads
+180 (submerged), 250 (at sea)
+attack or not
+Sea, underwater (submerged state), land, air (floating state)
+production available
+offshore plant
+unit location
+underwater/sea
+strong unit
+battleship + speed boat + turret (except T3)
+weak unit
+units that can be hit
+An attack submarine that rises from the water and attacks the enemy.
+common submarine. When it encounters another submarine or enemy ship, it attacks with torpedoes.
+By clicking on the unit and pressing the Surface button, it can rise to the surface, and when it rises to the surface, it can shoot missiles to attack ground and air. Also, this range is larger than that of battleships. When the quantity is accumulated, the enemy's turret can be replaced with much less consumption than the battleship.
+Like a missile high-speed boat, it can destroy turrets up to T2 without getting hit, and it can use its submersible property to gather supplies and destroy the opponent's extractor or factory.
+2.10.
+Heavy Missile Ship
+heavy missile ship
+• Can attack air and ground
+• long range
+production cost
+18000
+health
+3000
+offense power
+250×4
+crossroads
+390
+attack or not
+ground, air
+production available
+T2 offshore plant
+unit location
+sea
+strong unit
+most units
+weak unit
+underwater unit
+production unit
+submersible
+An all-purpose ship that has the range of a large battleship and destroys everything with missiles. Because they have a very long range of 
+390
+ and deal damage of 
+250x4
+ in a wide area, properly assembled missile ships show their true value on maritime maps.
+[13]
+ However, its attack speed is very slow, so it cannot penetrate laser defenses well and cannot attack submarines, and its movement speed is also slow, so attaching escort troops or some control is required.
+The field of view is very wide, so it shows a wider field of view than a reconnaissance vehicle.
+2.11.
+Heavy Sub
+large submarine
+• Powerful armor with torpedoes.
+• Units out of water cannot attack.
+production cost
+5500
+health
+1000
+offense power
+95x2
+crossroads
+210
+attack or not
+underwater
+production available
+T2 offshore plant
+unit location
+underwater
+strong unit
+All naval units, scout vehicles, experimental spider robots, modular spiders, and water-landed support hovertanks.
+weak unit
+bomber, combat sapper
+Nuclear submarine
+ thug of the sea. It is about 7 times more expensive than the regular submarine above, but is just as powerful. It is weak in small numbers, but as its numbers increase, it has the power to capture and kill most naval units. If you have about 10 of them, you can easily rob an opponent's fleet. He has strong stamina and strong attack power. Unlike regular submarines, it cannot rise to the surface.
+By keeping 2 to 4 of them in your submarine inventory, you can take out opposing fleets with less damage or inflict significant damage to amphibious jets that dive to attack submarines.
+2.12.
+Nautilus
+nautilus
+• Powerful armament and armor
+• Can attack underwater
+• Can rise and walk on the ground
+• Can attack air and ground when injured
+• Can create anti-nuclear missiles
+production cost
+18000
+health
+4000
+offense power
+215x6 (sea, ground conditions)
+50×6 (submerged state)
+crossroads
+240
+attack or not
+Underwater, at sea (submerged)
+ground, air (sea, ground conditions)
+production available
+T2 offshore plant
+pilot plant
+unit location
+sea, underwater, land
+strong unit
+air quantity
+weak unit
+large submarine
+production unit
+submersible
+high-speed boat
+missile speedboat
+sapper
+hover tank
+Nautilus floating and moving to the ground
+A submarine about four times larger than a large submarine. Even when submerged, it makes a torpedo attack with enough firepower to fight like a large submarine, but it shows its true value when it surfaces.
+It is a strong attack power and has a strong attack power and a range attack, so it is very strong against the air unit, and it is possible to walk on the land.
+[14]
+ It can be quite useful. However, compared to the expensive price,
+[15]
+ The speed of movement is slow, so the control is required.
+Using its strong attack power and diving ability, it can quickly rise to the surface like a submarine, fire a series of attacks, and quickly dive and hide in time to reload.
+In addition , it has a unit transport capacity of 3 spaces and is capable of producing its own engineer ships, high-speed ships, and high-speed missile ships. And the field of view is also quite wide, wider than that of a reconnaissance vehicle and the same as that of the missile ship above.
+Many abilities were added with patch 1.15. It can now be made at the Test Factory, its vision range is the same as that of the scout vehicle, and it can make and store up to 4 nuclear interceptor missiles.
+[16]
+ , for 250 won, it has a short lifespan, can repair and dismantle units and buildings, and has the ability to fire two units that can come out of the water and walk like a Nautilus at a range of about 450. He has truly become an all-round supporter.
+Even if an amphibious jet comes in bulk while rolling the Nautilus, don't dive. Amphibious jets also become submerged, and while submerged, their splash missiles become normal 
+single-attack
+ torpedoes.
+2.12.1.
+Scout bot
+scout robot
+production cost
+-
+health
+650
+offense power
+17
+crossroads
+110
+attack or not
+ground / air
+production available
+nautilus
+unit location
+land / sea
+strong unit
+Units with weak health, units with low attack power
+weak unit
+Units with high health, units with high attack power, and underwater units
+Nautilus launching a scout robot
+This is an object that can be produced by launching a reconnaissance robot, which is Nautilus' special ability. Two objects are created at once. The overall performance is similar to that of a scout car, but it has 300 more stamina, is judged to be a robot, can climb hills, and can be repaired and dismantled, so its performance is not bad. However, it automatically explodes and dies 35 seconds after it is created.
+In particular, the true value of this unit is 
+its unit repair
+ ability, with each unit having 
+twice
+ the amount of healing as a combat engineer. So, if both of them focus on healing, they can recover approximately 
+1500
+ points in 35 seconds , so if you attach them to a high-level unit, you can create zombies.
+A few scout robots are weak, but if you gather several Nautilus and launch the scout robots at once and charge into the enemy camp, you will turn the enemy camp into chaos with more tenacity than expected. This makes it possible to operate like 
+a Legion Host
+ in StarCraft 2. However, considering the price of the Nautilus...
+2.13.
+Carrier
+aircraft carrier
+• Powerful armament and armor
+• Produce air units at twice the speed.
+• Laser Defense and Repair Capable
+• Anti-air capability
+• Built-in collector
+• Can create anti-nuclear missiles
+• Causes a nuclear explosion upon death (provided nuclear is allowed)
+production cost
+30000
+health
+6000
+offense power
+110×2 (ship guns), 65 (torpedoes), 80×2 (anti-aircraft guns)
+crossroads
+250 (ground), 290 (torpedoes, anti-aircraft guns)
+attack
+every
+production available
+T2 offshore plant
+unit location
+sea
+strong unit
+Air Units, T1 Turrets, Tanks
+weak unit
+large battleships, large submarines
+production unit
+piety
+Helicopter
+interceptor
+carrier
+gunship
+amphibious jet
+bomber
+missile fighter
+important strike
+It is 
+a large and beautiful
+ ship that can be compared to an experimental spider robot . It is armed with two ground attack guns on each side, an anti-aircraft gun between them, and even anti-submarine torpedoes. The guns on both sides cannot attack enemies located 120 degrees away from each other.
+[17]
+It has built-in laser defense facilities and has the ability to self-recover and repair itself. Instead, the repair speed is not as fast as the experimental spider robot. Just one sapper level.
+Considering that its attack performance only comes out after the mid-game thanks to its high price of $30,000, it seems to be possible to defend itself in one way or another. As a ship that is more faithful to its auxiliary role using repair functions and radar shields, there is one major unique feature.
+Due to the fact that the production time of air units is 
+twice as fast
+ , it is often used as a hidden card because it can shake the enemy by poking the enemy's bad points with a flashing air unit molbang in the second half when resources start to run out. In addition, it is possible to produce "nuclear interceptor missiles" in the ship, but it costs 6,000 won per shot.
+Like the experimental spider robot, it explodes into a nuclear explosion when it dies.
+[18]
+ However, due to the space limitations of water, the versatility of the suicide operation is lower than that of the experimental spider robot.
+Initially, the name was 
+Experimental Carrier
+ .
+counter unit
+large battleship
+If fought alone, the aircraft carrier wins due to the large difference in specs, but if three large battleships and one aircraft carrier fight, the aircraft carrier has a hard time catching a single unit with a lot of health, so in reality, only one large battleship is lost and the large battleship wins. If you control it here, you can reverse tour the aircraft carrier without losing a single aircraft. Of course, there is a chance of winning if you control an aircraft carrier or engage while producing an air force, but since three large battleships can shoot down most air units, they are effectively a counter unit to the aircraft carrier.
+patch history
+buff
+nerf
+1.14
+Production cost buff ($38,000 → $30,000)
+Increase repair speed (half of experimental spider robot)
+Reduced production rate (x5 → x2)
+3.
+Public
+A unit that can be produced at the Air Factory. It is recommended to upgrade to Tier 2. If you encounter a missile ship or Nautilus, they will explode in an instant, so it is best to deal with them as quickly as possible or avoid them.
+3.1.
+Light Gun Ship
+piety
+• very weak
+• Only weak ground attacks are possible
+• slow
+production cost
+250
+health
+50
+offense power
+10
+crossroads
+120
+attack or not
+ground
+production available
+aerial factories, aircraft carriers
+unit location
+Public
+strong unit
+Weak unit unable to attack air
+weak unit
+Units that can attack ground and air
+The cheapest and weakest unit in the game. It has a drone-like appearance and is very small. It can only attack on the ground and has very weak stamina. Additionally, the field of view is about twice as narrow as that of other units. Since it is a cheap, fast, and air unit, it appears to be designed to check early reconnaissance.
+It is best not to use it as your main focus. Although they are still powerful when gathered together, if you encounter an anti-aircraft defense/unit with splash by mistake, you will be shot down and your money will fly into the air.
+3.2.
+Helicopter
+Helicopter
+• Cost inefficient for combat use
+• Can attack air and ground
+production cost
+700
+health
+150
+offense power
+17
+crossroads
+130
+attack range
+ground, air
+production available
+aerial factory
+aircraft carrier
+unit location
+Public
+A typical helicopter. It attacks both on the ground and in the air, but its attack power is low and its tenacity is weak, so it is ineffective in direct combat. A unit that will always be in check. It is fast, but not as fast as an interceptor.
+In multiplayer, you won't see anything like that. Because both ground and air can be completely covered by amphibious jets.
+3.3.
+Interceptor
+interceptor
+• fast speed
+• Can only attack air
+production cost
+600
+health
+250
+offense power
+25
+crossroads
+170
+attack or not
+ground
+production available
+aerial factories, aircraft carriers
+unit location
+Public
+strong unit
+weak air unit
+weak unit
+ground unit
+It is an interceptor, but it is not the interceptor we usually think of, but a drone-like unit. Only units in the air can attack, and their attack power is strong, so if you collect a lot of them, they are effective in taking out air-to-ground air units such as gunships. However, like a drone, the tenacity is at the level of 
+a paper airplane
+ .
+Since it is fast, it can be used for reconnaissance, but because it is very weak, reconnaissance may fail if the opponent has well-established air defense networks.
+3.4.
+Drop Ship
+transport
+• transport units
+• Cannot attack
+production cost
+700
+health
+500
+production available
+aerial factory
+aircraft carrier
+unit location
+Public
+Transport planes that drop troops on enemy lines
+Similar to a landing craft, it can accommodate most ground units and can carry up to 4 units. In the case of a large unit, it uses the capacity of 2 units and can only be raised and lowered on the ground. During transportation, it is in an airborne state and its speed is quite fast. However, if you encounter an anti-aircraft turret or unit, it will explode in an instant and all four units loaded inside will disappear, so move to a safe place and land.
+3.5.
+Gun Ship
+gunship
+• Can only attack ground
+• Powerful Attack
+• heavy armor
+production cost
+800
+health
+260
+offense power
+35
+crossroads
+140
+attack or not
+ground
+production available
+aerial factories, aircraft carriers
+unit location
+Public
+strong unit
+weak ground unit
+weak unit
+air units, anti-air turrets
+Unit from T2. It has decent performance at a low cost of 800 won. Only ground attacks are possible, and the performance of the main attack aircraft that appears in the same T2 is at the level of an aerial killer in the early stages, so it is difficult to expect tenacity. Taking advantage of the reasonable price and quick production time, there is a tactic of pushing back with multiple gunships and heavy bombers when the enemy's air defense is weak.
+3.6.
+Heavy Interceptor
+important strike
+• very fast
+• Can only attack air
+• Powerful Armaments and Shields
+• Shields are weak against lightning attacks.
+production cost
+600
+health
+150
+shield
+450
+offense power
+12×2
+crossroads
+170
+attack or not
+Public
+production available
+aerial factories, aircraft carriers
+unit location
+Public
+strong unit
+most air units
+weak unit
+Amphibious jets, ground-to-air units
+A unit from the T2 Aerial Factory. It costs 1,200 won, twice as much as a regular interceptor, but is slightly faster and has a protective shield. Only air attacks are possible, and the more you attack, the faster the attack speed becomes.
+In multiplayer, the strategy of using the gunship as the main unit is the best unit, but its health excluding the shield is lower than that of the interceptor, so it melts in an instant when hit by an electric attack. 
+Especially the amphibious jet below...
+3.7.
+Spy Drone
+recon drone
+• Cannot attack
+• Can see farther
+• Decent stamina and speed
+• Self-repair available
+production cost
+1500
+health
+1500
+production available
+T2 aerial mill
+unit location
+Public
+weak unit
+Any unit capable of anti-air attack
+production time
+8 seconds
+Aerial version of the reconnaissance vehicle. The field of view is smaller than that of a reconnaissance vehicle and is approximately 1.5 times that of a regular unit. Although it has no attack ability, it has excellent health and movement speed, has a self-repair function, and, best of all, its production time is only 8 seconds. The only drawback is that it can only be produced at the T2 Aerial Factory.
+3.8.
+Amphibious Jet
+amphibious jet
+• Inflicts lightning strikes while in the air or underwater.
+• Lightning attacks are weak against structures.
+price
+1800
+health
+530
+offense power
+45×2
+crossroads
+170 (basic), 100 (dive)
+attack or not
+Ground, air, underwater (during diving)
+production available
+T2 Aerial Factory, Aircraft Carrier, Combat Engineer
+unit location
+Air, underwater (during diving)
+strong unit
+Submarines, shielded units, critical bombers
+weak unit
+Nautilus, anti-air units, structures
+Amphibious jets that submerge and attack enemy underwater units.
+As its name suggests, it is an amphibious aircraft that is capable of flying and diving. It is an attack that shoots electric sparks at the opponent. Since it is an electric attack, it ignores shields, but does less damage to buildings. The dive button is activated when on the water.
+[19]
+ Since it is not a projectile attack, the laser shield cannot block it, and if it is attacked in groups, you can see the base being robbed even if it is defended with a laser shield. The main culprit that causes anti-aircraft buildings to be piled up because the damage is quite painful.
+If you submerge and attack with counters to submarines and important attack aircraft, the submarine will melt in an instant, and the important attack aircraft will be robbed by amphibious jets in an instant as they have only a lot of shields and poor physical strength. It is the most used air unit in multiplayer.
+3.9.
+Bomber
+bomber
+• Very hard but slow speed
+• Needs time to recharge after dropping bombs
+• Weak anti-submarine attack
+production cost
+4000
+health
+3000
+offense power
+370 (3 times), 70 (3 times, torpedoes)
+attack or not
+on land, underwater
+crossroads
+45
+production available
+T2 aerial factory, aircraft carrier, experimental spider, modular spider
+unit location
+air, ground (when landing)
+A representative reason why you should install a laser shield at your base.
+ The bomb fills up over time, and since this bomb is a projectile attack, it can be blocked with a laser shield. Drop three bombs at one point. The reason this bomber is so threatening is because of its insane attack power of 
+370
+ , which destroys the T2 turret with three bombs and also deals area attack damage . With a stamina of 3000, it shows a majestic appearance as it simply chews through a decent amount of anti-aircraft defenses, goes in, hits the bombing, and returns.
+There are torpedo attacks like 
+anti-submarine patrol aircraft,
+ but the damage is weak, so it is difficult to damage submarines, and it is difficult for submarines to drop them, so bombers are rarely used to attack submarines. No matter how well-defended the base is, the safety of the turrets cannot be guaranteed if there is a lack of laser shields in a situation where bombers are coming in droves.
+If no command is given from the ground, it will land there. This is the same for transport ships. A more serious disadvantage than 
+the VTOL
+certification
+ is that the production time takes more than a minute, the second is that it is blocked by the laser shield as mentioned earlier, the third is the slow burst speed of 0.45, and ultimately, after firing three shots, you must fill the ammo 
+to the end
+ . Also, the reload speed is very slow, so you have to use the method of firing once and then bouncing right away. Additionally, since it can only attack on the ground, it is very vulnerable to air units as well. In particular, the important bombers and anti-aircraft beam gunships are nothing short of superb.
+If you only select an aircraft carrier, the biggest problem, the long production time, is broken in an instant, so the deal versus time in the second half is good.
+3.10.
+AA Beam Gunship
+anti-aircraft gunship
+• fast speed
+• Can only attack air
+production cost
+6000
+health
+2500
+offense power
+22
+crossroads
+280
+attack or not
+Public
+production available
+T2 aerial mill
+unit location
+Public
+strong unit
+most air units
+weak unit
+Non-air unit capable of anti-air attack
+Anti-aircraft beam gunship moving fast with afterburn
+A unit that only attacks air units with lasers. After firing the laser, the reload time is approximately 2.8 seconds. It has the slowest speed among all air units, along with bombers. It has a fairly long range and is specialized for moving shots. If there are several of them, they are very good at capturing air fortresses. The play style is very different from other interceptors.
+Its special ability is 
+Afterbrun
+ . When used, speed increases to 2.29 for 5 seconds and 
+cannot attack.
+ Instead, it is possible to cancel midway. Cool time is 25 seconds.
+Its attack power is weak compared to its price and its movement speed is in the lower tier, but on the other hand, its range is second to none in the air, making it suitable for helping ground troops. When defending, it is best to know in advance that the opponent's air unit is coming and use Afterbrun to follow it and make a moving shot. A unit where physical strength is important in many ways.
+For reference, beam attacks can only inflict about 75% damage to shields, and because of that characteristic, they are very vulnerable to critical hitters, which are the only shield air units.
+3.11.
+Missile Airship
+missile aircraft
+• Air/ground missiles with area attacks.
+• Need to reload after shooting
+• Self-repair available
+production cost
+3900
+health
+1000
+offense power
+80
+crossroads
+180
+attack or not
+ground, air
+production available
+T2 aerial factory, aircraft carrier
+unit location
+Public
+strong unit
+Units without anti-air capabilities, units with low health
+weak unit
+Powerful units with anti-air abilities
+A unit with a mechanism that fires loaded missiles one at a time. Both anti-air and ground are possible. Since there are no aircraft in this game that need to keep moving, this aircraft stays in the air like a helicopter. Like bombers, missiles have residual capacity, and this residual capacity is gradually replenished.
+[20]
+The price is 4,200 won, which is 200 won more expensive than the bomber, but the missile has a long loading time compared to its attack power, so you have to use a hit-and-run strategy. Occasionally, if you get a carrier buff in the second half and spread it with a huge production time, or if you start with a lot of starting funds in the beginning, you can see the sight of sweeping the enemy base by sending only this one from the beginning.
+However,
+ since it fires at important artillery pieces in 
+a 1-on-1
+ combat , dogfights should be avoided.
+4.
+robot
+A unit that can be produced at the Mech Factory.
+It is characterized by two people, four -family walking and moving the hill terrain.
+[21]
+ Most of the prices are quite high, but the production speed is about 10-33 seconds, so if you have a lot of money, it's a good idea to fight the middle of the ground with a stronger robot than a tank.
+4.1.
+Basic Mech
+basic robot
+• Can only attack ground
+• Higher health than tanks, but slower
+production cost
+600
+health
+500
+offense power
+23
+crossroads
+130
+attack or not
+ground
+production available
+Robot Factory, Robot Engineer
+unit location
+ground
+strong unit
+Ground units with low health
+weak unit
+almost all units
+A typical robot. Only ground attacks are possible. It has better health and attack power than a tank, and moves slower. It is not good to use it in one way or another unless you collect the quantity, but it is useful in the beginning because it is in a similar position to a tank. If you put it against a tank without any conditions, you can see that this one is stronger. 
+Of course it's more expensive
+However, surprisingly, there is a method that can be used well even in the latter half of the game: collecting supplies. If you collect at least 40 units, you cannot ignore even the strongest units. Not only all kinds of tank units, but even one or two of those strong flamethrower robots can be swarmed by numerous robots and take them out without any trouble. If you collect more than 80 to 100, you can push out a defensive position with multiple T3 turrets. However, due to the limited quantity, it has the disadvantage of being easily wiped out if the opponent decides to bombard the flamethrower turret or bring in a range attack such as an experimental tank, a long-range unit, or an air unit.
+Users who played 
+the StarCraft series
+ sometimes call this unit a 
+Goliath
+ .
+4.2.
+Anti-air Mech
+anti-aircraft robot
+• Can only attack air
+• range attack
+• Cannot attack ground
+production cost
+900
+health
+500
+offense power
+115
+crossroads
+190
+attack or not
+grandee
+production available
+Robot Factory, Robot Engineer
+location of the unit
+ground
+strong unit
+air unit
+weak unit
+ground unit
+Anti -air support unit. It is a unit that is produced to assist a unit that lacks the early anti -aircraft capacity. It is very effective for air units because of its excellent anti -aircraft performance, but the range is short and weak.
+4.3.
+Artillery Mech
+self-propelled artillery robot
+• Can attack ground
+• long range
+• Can shoot while moving
+production cost
+1400
+health
+500
+offense power
+100
+crossroads
+290
+attack or not
+ground
+production available
+robot factory
+unit location
+ground
+strong unit
+slow ground units, short-range ground units
+weak unit
+air unit
+Ground support unit. It is a robot version of a self-propelled artillery, and unlike self-propelled artillery, it can attack while moving. It has twice as much stamina as a self-propelled howitzer, but it is only higher 
+than a self-propelled howitzer
+ , 
+and has the same stamina as a basic robot.
+ Unlike the basic robot, it can climb cliffs. Other than that, except for the bad AI, there is nothing much different from a reinforced self-propelled howitzer.
+Like a self-propelled gun, you can make your opponent very angry by repeating hit-and-run tactics using a long range. However, the movement speed is slow, and as mentioned above, the artificial intelligence is poor, so control skills are required.
+The field of view is about 1.5 times wider than normal units.
+patch history
+buff
+nerf
+1.13.3
+Production cost buff ($1,700 → $1,400)
+RangeIncreased attack range
+doesn't exist
+4.4.
+Mobile Turret
+mobile turret
+• Can attack ground
+• Can change to deploy mode for extra shield and range
+production cost
+4500
+health
+800
+shield
+500
+[22]
+offense power
+110
+crossroads
+200
+attack or not
+ground
+production available
+Robot Factory, Robot Engineer
+unit location
+ground
+strong unit
+most ground units
+weak unit
+air units, long-range units
+A mobile turret that becomes deployed and blocks enemy attacks
+Ground defense unit. Although its name is a turret, it is a unit that has four legs and can move. You can switch to turret mode at any time by pressing the Deploy button. In turret mode, movement becomes impossible, but attack speed increases and the 500 capacity shield slowly fills up. You can release the turret state with the UnDeploy button. Deploy and UnDeploy require some time. 
+It looks like a turret, but the AI ​​just uses it like a unit.
+However, its attack power is weak compared to its price and its range is short, so it is better to just rebuild a basic turret than to use it, so it is not used much. Interestingly, when deploying, it is determined to be a 3×3 building, so you cannot build a building on top of it and only receive half of the electric attacks. The field of view is about 1.5 times wider than that of a regular unit.
+AI never uses batch functions. Even if you force the placement in sandbox mode, the AI ​​forcibly cancels the placement.(...)
+patch history
+buff
+nerf
+1.12
+doesn't exist
+unable to move in water
+4.5.
+Mech Engineer
+robot sapper
+• Can build robots and T2 buildings
+• Anti-air attack possible
+• lots of stamina
+• Repair other units
+production cost
+5000
+health
+2000
+offense power
+140
+crossroads
+220
+attack or not
+Public
+production available
+T2 Robot Factory
+unit location
+ground
+strong unit
+most air units
+weak unit
+ground unit
+A reinforced robot version of a sapper. You can immediately create basic robots, anti-aircraft robots, mobile turrets, and engineering ships, as well as T2 factories, extractors, and collectors. Strangely, a regular ground factory cannot be built. The rest is the same as for engineers.
+You can fight and win against weak air units with anti-air range attacks.
+4.6.
+Minigun Mech
+minigun robot
+• Can attack ground
+• Fast attack speed
+• The more you shoot, the faster your attack speed.
+• Has a shield (weak against lightning attacks)
+production cost
+5000
+health
+600
+shield
+800
+offense power
+55
+crossroads
+210
+attack or not
+ground
+production available
+T2 Robot Factory
+unit location
+ground
+strong unit
+Laser shield, multi-volume offensive
+weak unit
+air unit
+A robot with a 
+minigun
+ attached to its arm . This minigun starts operating when it detects an enemy, and its attack speed gradually increases over time until it reaches its maximum attack speed.
+[23]
+ Conversely, when there are no enemies, the attack speed gradually decreases. It is one of the most cost-effective units among robots, so it is a unit often seen in Rush. If you have this unit in the beginning, you can attack up to the T2 turret without being hit, and it has high DPS, so it is useful for attacking, and when defending, it also reigns as a great counter to the opponent's spam attacks.
+It can also be used to destroy the energy of an enemy's laser shield. Instead, if you don't pay attention to the controls when using it, you may be cut down by other turrets beforehand, so you need some level of defense or escort troops/support units. The field of view is about 1.5 times wider than that of a regular unit.
+4.7.
+Heavy Anti-Air Mech
+heavy air robot
+• Powerful, long-range anti-air attack
+• Anti-air attacks deal area damage.
+• Possible weak ground attack
+production cost
+5000
+health
+2500
+shield
+500
+offense power
+240×2 (air) 35 (ground)
+crossroads
+310 (air), 170 (ground)
+attack or not
+air, ground
+production available
+T2 Robot Factory
+unit location
+ground
+strong unit
+all air units
+weak unit
+Ground units, naval units, self-propelled guns, and units with lightning strikes.
+A robot capable of strong anti-air attacks and weak ground attacks. There is a shield and anti-air attacks are range attacks. A unit that is unusually good at tanking among anti-aircraft units. Even if just 3 of them are gathered together, they are very good, but the production price is 
+$8,500
+ . As the second most expensive robot unit, the performance is not that good compared to the price.
+The shield costs 500, which is less than the price and plays slowly. And although it can attack on the ground, it is very weak and loses to 8 hover tanks. It is better to focus on the function that can prevent general anti-aircraft robots from being destroyed by weak ground units. Alternatively, when attacking, the ground attack power can be slightly increased along with other ground attack robots. The fact that this guy is attacking on the ground means that the line was pushed back and it was ruined.
+At 1.15, the price buff was quite large and it became worth researching.
+It is a medium-sized anti-aircraft unit that is sturdy and has excellent range, so it is quite excellent for defense. As it is an expensive unit, it is used in the mid to late stages. In PVP, this is the time when air units are usually mass produced, so the high damage of the splay is quite significant.
+patch history
+buff
+nerf
+1.15
+Price reduction (10,000 -> 8,500)
+X
+4.8.
+Plasma Mech
+plasma robot
+• Can attack air and ground
+• Need to reload after shooting
+• long range
+production cost
+7000
+health
+1200
+offense power
+90
+crossroads
+310
+attack or not
+air, ground
+production available
+T2 Robot Factory
+unit location
+ground
+strong unit
+short-range unit
+weak unit
+multiple units
+Ground support unit. A robot that has a long range and is expensive, but was abandoned due to its lack of attack power. When it finds an enemy, it fires 3 rounds of plasma in succession and takes a short reload time. The price is high compared to its attack power, so unless you specifically need this robot, it is better to save up a little more money and buy the flamethrower robot below. It is true that the range is long, but it is shorter than the T1 long-range turret, T3 turret, or missile ship, and even with only one laser shield, the loading speed is hindered and it is not effective, so it is difficult to take advantage of the range from the mid to late game.
+Of course, its firepower is not bad and it still has a very long range among units, so it is operated as 
+a small elite unit
+ and is used for keeping the navy in check, using long range hit-and-run 
+tactics,
+ and sniping or destroying neglected high-level units. The field of view is about 1.5 times wider than that of a regular unit.
+4.9.
+Flame Mech
+flamethrower robot
+• Fire that deals ranged attacks.
+• Can attack ground only
+• High stamina capable of self-repair
+production cost
+12000
+health
+4500
+offense power
+12×2
+crossroads
+170
+attack or not
+ground
+production available
+T2 Robot Factory
+unit location
+ground
+strong unit
+All land and sea units except experimental units
+weak unit
+air unit, experimental unit
+A flamethrower robot that hits multiple enemies with ranged attacks.
+Ground War Limited Gangster
+ A robot with high health, high attack power, and "range damage". When heavy tanks recklessly attack and hit this robot, it becomes like a hover tank that encounters a flamethrower turret. Instead, they are expensive and take up the capacity of two ships when loaded onto a carrier.
+Although it is the last rush force in the late game, it has a very big weakness in that it cannot perform air attacks.
+4.10.
+Mechflying
+flying robot
+production cost
+8000
+health
+1500
+offense power
+110
+crossroads
+310
+attack or not
+air, ground
+production available
+X
+unit location
+ground, air (in flight)
+strong unit
+almost all units
+weak unit
+Heavy missile ships, heavy anti-air robots (in flight)
+Flying robot attacking enemies in flight mode
+Dummy data unit. It is dummy data and cannot be produced. You can change to air mode through flight mode and move quickly. Although it is a dummy data unit, it has a range of 310, an attack power of 110, and an attack speed of 0.33, making it a useful unit if you can use it.
+In addition to these fraudulent specifications, there are no debuffs in flight mode, perhaps because it is dummy data. Thanks to this, you can deal with virtually any unit while in flight with high speed and moving shots. Most anti-air units have weak attack power to kill flying robots, and the only ones that can deal with them are T3 anti-air turrets and heavy anti-air robots, which can be defeated by simply transforming into ground mode. The only counter unit is the heavy missile ship, which can attack from the ground and has a range of 390, making it the only unit that can effectively hit flying robots.
+5.
+Experiment
+These are units that can be produced at the Experimental Factory. All units in the experimental factory share a production time of 83.3 seconds.
+5.1.
+Fire Bee
+unpunished
+• Powerful Armament
+• Can attack ground
+• Moderate anti-air attack
+• Need to reload after shooting
+• Self-repair available
+production cost
+12000
+health
+4900
+offense power
+22×2 (laser attack), 45×6 (missile)
+crossroads
+210
+attack or not
+air, ground
+production available
+pilot plant
+unit location
+Public
+strong unit
+quantity unit
+weak unit
+Anti-Air Beam Gunship, Heavy-Air Robot
+Powerful air unit. Attacks ground and air units with lasers, and ground units fire an additional missile range attack. Missile attacks have a short recharge time. Self-repair ability is a bonus.
+The missile attack power is so powerful that it is quite powerful against the ground unit, but it is weak enough to be fooled by the interceptor because it cannot attack the missile. In particular, the speed is quite slow, so if you attack around the surrounding area, you will win importantly.
+Due to its strong HP, it sometimes picks up a lot of this unit to attack when the enemy base can't be penetrated at the end.
+When it was first added, it showed deceptive performance that could overwhelm all units, but after the 1.13.2 update, it was properly nerfed, making it difficult to use it as a main weapon.
+patch history
+buff
+nerf
+1.13.2
+doesn't exist
+Health nerf (5,400 → 4,900)
+Unit production time increased (59.9 seconds → 83.3 seconds)
+5.2.
+Experimental Tank
+experimental tank
+• Extremely powerful attack
+• 4 guns
+• Can attack ground
+• Weak anti-air attack
+production cost
+14000
+health
+6000
+offense power
+120×4 (ground), 60×2 (anti-air)
+crossroads
+310
+attack or not
+air, ground
+production available
+pilot plant
+unit location
+ground
+strong unit
+most ground units
+weak unit
+Air Units, Nautilus, Shield Hover Tanks
+A very large tank equipped with four main guns.
+ The purpose is similar to that of self-propelled artillery. It has a fairly long range and fires four main guns one after another. Shells have area damage. Its attack power is not high compared to its size, price, and movement speed, so it is not often used among experimental units. In addition, since the shield hover tank that comes next reigns supreme as a counter, if this unit walks confidently from the enemy base, it may have to go a long way (...)
+It appears out of nowhere in the beginning in Endless Play mode, causing shock and fear. They appear out of nowhere before you can properly set up your base, so don't try to catch them with ground forces. Since its anti-aircraft capabilities are very weak, it is better to attack it with a large number of airborne troops.
+It is very compatible
+ with the shield hover tank . The experimental tank compensates for the disadvantages of the shield hover tank, which are weak in stamina and quantity warfare, and the shield hover tank complements the shortcomings of the experimental tank, which are aerial attacks and a single unit with a lot of health.
+patch history
+buff
+nerf
+1.13.3
+increase attack power
+Attack speed nerfed (Normal → Slow)
+5.3.
+Shielded Hovertank
+shield hover tank
+• Extremely powerful attacks and shields
+• Can attack air and ground
+• Can move on water
+production cost
+21000
+health
+3500
+shield
+5000
+offense power
+continuous attack
+[24]
+crossroads
+180
+attack or not
+ground, air
+production available
+pilot plant
+unit location
+land, sea
+[hover]
+strong unit
+Buildings, units with a lot of health
+weak unit
+Lightning turrets, giant tanks, amphibious fighters
+A defensive unit boasting an enormous shield and tenacity. The shield is 5000 and the health is 3500, and considering the shield's ability to recover easily, the actual survival rate is much higher.
+[26]
+ In addition, it has terrible attack power. In fact, it is the strongest in 1:1 combat and has a form of continuously irradiating a laser to reduce stamina. The higher the enemy's stamina, the more light it emits (...)
+[27]
+ You can even witness the scene where the enemy simply pushes in and destroys all of the areas where many buildings are built.
+[28]
+ The same experimental factory units
+[29]
+ It reigns as a counter to giant maritime weapons.
+[30]
+ In addition, since it has the perfect mobility ability called hovering, you can often witness monsters playing with enemies with their possessed controls on the sea map.
+[31]
+Thanks to the price of 21000 and production time of 82.3 seconds, it usually appears in the second half, but
+[32]
+ , If the game is long, you can see a terrible team fight consisting of a large number of shield hover tanks and experimental factory units. However, it is difficult to see because of the aerial blade.
+5.4.
+Flying Fortress
+flying fortress
+• transporting troops;
+• Unit production available
+• Anti-air attack possible
+• Can attack ground while landing
+• Self-repair and collector functions
+production cost
+30000
+health
+8000
+income
++$4
+offense power
+35×2
+crossroads
+210
+attack or not
+In the air (in flight), on the ground (when landing)
+production available
+pilot plant
+unit location
+air, ground
+strong unit
+weak anti-air unit
+weak unit
+Anti-Air Beam Gunship, T3 Anti-Air Gun
+production unit
+engineer
+scout car
+combat sapper
+Train
+hover tank
+heavy tank
+plasma tank
+giant tank
+anti-aircraft missile tank
+laser chariot
+A flying fortress that drops a large number of troops on enemy lines.
+30000 won. Large and many units can be transported at once,
+[33]
+It can transport experimental tanks, shield hover tanks, and experimental spider robots.
+ There is one turret on each wing of the aircraft.
+[34]
+ In addition, heavy tanks and laser tanks can be created, air attacks when floating in the air and ground attacks when landing on the ground, and because the self-repair ability is very good, the purpose of assaulting an area where the enemy's defense is not thick is often used as
+There is a tactic of making a lot of these, transporting a lot of experimental spider robots, and then crashing them into the enemy base and blowing them up. This is a method used when the opponent's nuclear missile defense is well established.
+In the past, it appeared under the name of "Experimental Dropship", and unlike the present, there were no plasma cannons on the wings, and it only played the role of a real dropship.
+5.5.
+Experimental Spider
+experimental spider robot
+• Very powerful but slow
+• Can construct buildings and units
+• Automatic repair of nearby units
+• Laser defense function
+can move on water
+• Causes a nuclear explosion when destroyed (only if nuclear allowed)
+production cost
+70000
+health
+10000
+income
++$18
+offense power
+80×2 (plasma turrets), 190 (propelled guns)
+crossroads
+200 (Plasma Turret), 290 (SPG)
+attack or not
+air, ground
+production available
+pilot plant
+unit location
+land, sea
+strong unit
+almost all units
+weak unit
+Underwater Unit, Shield Hover Tank
+production unit
+engineer
+combat sapper
+heavy tank
+heavy hover tank
+self-propelled gun
+scout car
+bomber
+buildable building
+turret
+self-propelled turret
+anti-aircraft turret
+extractor
+ground factory
+aerial factory
+robot factory
+laser defense
+repair base
+Except for the modular spider, which is 
+the universal strongest unit
+ , and the mobile headquarters, which is a dummy data unit, no other unit can defeat the experimental spider 1:1.
+A large spider robot with six legs. It has a high attack power, and the level is a specification that allows you to withstand three nuclear missiles.
+[35]
+ Building or repairing buildings is possible, and its performance is more than four or five engineers. The only disadvantage is 
+that it is an attacking target of the underwater unit at sea, so
+ it is obtained by the submarine. In particular, throwing a spider robot in a submerged or even tillus causes great losses. This feature is especially often on maritime maps.
+Each unit produces +18$, the same as a Command Tower or T3 Extractor. If you have a lot of money in the latter half of the game but don't have enough land to build a collector, you can produce several and use them as base defense and a source of income.
+There are two types of attack guns, so there are two types of range indicators. The long-range guns have a relatively slow attack speed, but have the same range as the self-propelled guns.
+[36]
+ It can be operated like a self-propelled artillery, has two short-range guns on each side, and has a high attack speed, so it has firepower similar to that of a shield hover tank.
+The T2 laser shield is built in, and there is also a built -in collector that earns 18 $, and it is a large robot unit, so it can move over the hills and move in both land and water. In addition, the field of view is 1.5 times wider than the general unit.
+In the end,
+ it is destroyed by a nuclear explosion, so if you allow an enemy experimental spider robot to approach a place where important things are gathered, you will be beaten to death, but then a nuclear explosion occurs and the game is ruined. There is a tactic that uses this to pummel the opponent's base. However, the production cost is 70,000 won and it is an all-purpose unit, so if it is caught midway, you will lose a lot of power. The opponent will know that the same thing will happen if this unit enters the base, so they will use their might to block it, so it is a difficult tactic to try unless you are in a state where you can clearly break through.
+Because it has such diverse abilities that it is nicknamed the Moving Command, each player can start with one of these as an option before starting the game.
+counter unit
+shield hover tank
+The shield hover tank's attack cannot be blocked by the T2 laser shield built into the experimental spider robot. In addition, the shield hover tank had formidable defensive power. For this reason, if you fight alone without reinforcements, the experimental spider robot may catch the shield hover tank with about 500 to 1,000 health remaining, 
+or the experimental spider robot may be destroyed altogether.
+ If you control the experimental spider robot, the shield hover tank will actually be reversed.
+killer alpha
+Although it is a dummy data unit, like the Shield Hover Tank above, it can independently reduce the health of the experimental spider robot by 1,000 to 900. Of course, if you control this side too, you will be 
+reversed
+ .
+patch history
+buff
+nerf
+1.10
+Add self-repair function
+Add auto repair function
+Increased production cost ($70,000)
+Causes a nuclear explosion when destroyed
+5.6.
+Modular spider
+modular spider robot
+• 6 turrets and modules can be built on the upper body
+• Very powerful but slow
+• Speed ​​decreases as weapon is attached.
+• Can build units and buildings
+Automatic repair of nearby units
+• Can move on water
+• Collector built in
+• Causes a nuclear explosion when destroyed (only if nuclear allowed)
+production cost
+90000
+health
+10000
+shield
+5000
+income
++$30
+offense power
+X
+crossroads
+290
+attack or not
+X
+production available
+X
+unit location
+land, sea
+strong unit
+almost all units
+weak unit
+Underwater units, giant tanks, lightning turrets, amphibious jets
+production unit
+engineer
+sapper ship
+combat sapper
+heavy tank
+landing craft
+heavy hover tank
+self-propelled gun
+scout car
+bomber
+buildable building
+turret
+self-propelled turret
+anti-aircraft turret
+extractor
+collector
+ground factory
+aerial factory
+robot factory
+offshore plant
+laser defense
+repair base
+Modular spider robot equipped with various modules
+This is a spider robot added since 1.14. When first produced, a shield is built-in and can be constructed. It is larger than existing spider robots and has eight legs. What is unique is that 6 modules can be added to the empty space at the top. There are a total of 9 modules. Installed modules can be sold through Reclaim slots.
+[37]
+Depending on the type of module, it can be the strongest attacker that can crush even experimental spider robots, or it can be a walking supply depot.
+Each module has stamina, so if you blow up all the modules, you won't be able to do anything. If you face it, aim for the module first. Also, like the spider robot, it is still attacked by underwater units at sea. In particular, thanks to the shield, the possibility of being hit by an amphibious jet is very high.
+5.6.1.
+module list
+Modules that can be attached to the modular spider robot. Since each module is treated as a single unit, it has health and can be attacked.
+plasma turret
+• Can attack air and ground
+T1 Plasma Turret
+T2 Plasma Turret
+construction cost
+700
+3000
+health
+1000
+2000
+offense power
+70
+70
+attack speed
+1.33
+0.5
+crossroads
+290
+attack or not
+ground, air
+A versatile turret capable of hitting both ground and air targets. The price is cheap, but as cheap as it is, performance is pushed back compared to other turrets. However, it has the advantage of being the only one that can attack both air and ground.
+cannon
+파일:RW.MS.gun.jpg
+• Can attack ground
+T1 cannon
+T2 cannon
+construction cost
+2000
+16000
+health
+2000
+3000
+offense power
+44
+44
+attack speed
+0.33
+0.21
+crossroads
+290
+attack or not
+ground
+Although the performance is slightly different, you can think of it as a T2 and T3 turret respectively. As the number increases, the firepower of ground warfare increases significantly. The T3 upgrade only increases attack speed by 1.1 and costs 16000, so it is better not to do it unless you have a lot of money.
+lightning turret
+파일:RW.MS.lightning
+• Can attack ground
+• Strong against shields
+lightning turret
+construction cost
+6000
+health
+2000
+offense power
+130
+attack speed
+2.5
+crossroads
+290
+attack or not
+ground
+Practically a really useless turret. It's really useless unless the enemy often mixes up units with shields or the enemy camp is plastered with laser defenses. Self-propelled guns are better in terms of damage, attack speed, range, and price. Also, you can just pierce the laser defense with the high DPS of the autocannon. As mentioned above, unless the enemy uses a shield unit, do not equip it.
+self-propelled gun
+파일:RW.MS.lightning
+• Can attack ground
+• slow fire rate
+self-propelled gun
+construction cost
+5000
+health
+3000
+offense power
+190
+attack speed
+2.16
+crossroads
+350
+attack or not
+ground
+A turret that can attack from long distances. It is the same as the self-propelled gun that the spider robot is wearing. It has the highest attack power among ground attack weapons, so it is effective against a single target, but its DPS is slow, making it vulnerable to targets with laser defense.
+SAM turret
+파일:RW.MS.sam.jpg
+• Can attack air
+• Effective against multiple units
+[Flak]
+T1 SAM turret
+T2 SAM turret
+T2 Flak Turret
+construction cost
+2000
+16000
+10000
+health
+2000
+3000
+3000
+offense power
+180
+200×2
+100×2
+attack speed
+1.41
+1.16
+2.66
+crossroads
+290
+400
+200
+attack or not
+Public
+The only anti-aircraft attack module. It's always easier to keep at least one item attached. If you add a T2 SAM, it is well worth the price. Anti-aircraft guns are only effective against weak air units and do not deal much damage against air units with high health, so it is better to use T2 SAM.
+maker
+파일:RW.MS.fabricator.jpg
+T1 Maker
+T2 Maker
+construction cost
+3000
+5000
+health
+3000
+3000
+income
++$5
++$10
+A module that produces credits. If you cover all the modules of the modular spider with the T2 maker, you can make a moving money bag with a whopping income +$90. However, as precious as the module compartment is, there is no case where it is used alone.
+laser defense
+파일:RW.MS.laserdefense.jpg
+• Disintegrates incoming projectiles before units are hit
+• Need to recharge after overload
+laser defense
+construction cost
+3000
+health
+3000
+energy
+1
+A module that blocks projectiles. Since the energy is 1, the staying power does not last long, so it is not used often.
+shield regenerator
+파일:RW.MS.shieldgen.jpg
+• Increased shield regeneration rate
+shield regenerator
+construction cost
+6000
+health
+3000
+A module that regenerates the shield by 40 at certain intervals. Even if all 6 module slots are filled with this, it is not used often because it is a miraculous module with poor shield regeneration ability.
+speed module
+파일:RW.MS.speed.jpg
+• Increased movement speed
+• 
+non-overlapping
+• Removed speed reduction from building turrets.
+speed module
+construction cost
+6000
+health
+3000
+A module that literally increases movement speed. The speed increases by 0.1 more. Building a turret prevents the speed from being set to 0.4 and instead sets it to 0.7.
+nuclear interceptor missile
+파일:RW.MS.antinuke.jpg
+• Intercepting nuclear launches from nuclear launch pads
+• Must craft missiles
+• Range 1500
+• Can be turned on and off
+nuclear interceptor missile
+construction cost
+7000
+health
+3000
+crossroads
+1500
+Nuclear interceptor missile. A total of 12 missiles can be loaded, and thanks to the interception range of 1500, it blocks most nuclear missiles. It can be turned on and off, and you must craft a missile to use it. As many as six of these can be installed, so theoretically, they can block 72 nuclear missiles at once. 
+Damn the money
+flashing module
+파일:RW.MS.blink.jpg
+• short distance flashing
+flashing module
+construction cost
+15000
+health
+3000
+Flashers like those used by support hover tanks. Once installed, it can be used infinitely and has a range of 400. It blinks after a 5-second standby time and can be reused every 25 seconds. A module of great strategic value that can be used to quickly escape in an emergency or to 
+flash ahead
+ of enemy lines. However, its health is still 3000, so it is a module that is easily targeted by enemies, so defend it well or place it in the rear.
+5.7.
+Support Hovertank
+support hover tank
+• building units
+• Can attack air and ground
+• Anti-nuclear defense possible
+• Blinkable
+unit can be transported
+• Can change to deploy mode for extra shield and range
+production cost
+140000
+health
+8000
+shield
+5000 (when deployed)
+income
++$30
+transport compartment
+5
+offense power
+35×2 (plasma turrets), 350 (propelled guns)
+crossroads
+270 (Plasma Turret), 320 (SPG) -> 390 (when deployed)
+attack or not
+air, ground
+production available
+X
+unit location
+land, sea (when deployed at sea)
+strong unit
+almost all units
+weak unit
+Underwater type units (when deployed)
+production unit
+engineer
+scout car
+hover tank
+heavy hover tank
+combat sapper
+buildable building
+extractor
+ground factory
+offshore plant
+laser defense
+watchtower
+turret
+T2 turret
+SPG turret
+anti-aircraft turret
+T2 anti-aircraft turret
+Mobile base. It boasts an incredible price of 140,000. However, one thing is certain: performance. You can use the placement mode, and once placed, it becomes fixed in place and becomes a building. In this state, the shield is filled, buildings are built faster, and the self-propelled gun's range increases to 390. You can also make nuclear interceptor missiles for 5,000 won, and you can accumulate up to 12 in total. However, if a missile does not come within 400 distance from you, it will not fire an interceptor missile. For 10,000 won, you can install a flashing module and teleport to any location within 1,000 distance every 25 seconds.
+The only downside is low stamina. It does not have a self-repair function, so if you keep getting it and bursting, it will eventually explode. Also, it is possible to change to deployment mode at sea, but in that case, it will be caught as a target by an underwater unit and hit by a submarine. A unit that needs to be managed well in many ways.
+[1]
+ The collection function is only partially implemented. In Sandbox mode, you can find and build Crystal_Mind, a dummy data facility, and give orders to engineers to collect Crystal_Mind and collect money. Considering that it still exists in the data, this feature appears to have been created in the alpha or beta era.
+[hover] 
+2.1
+2.2
+2.3
+2.4
+2.5
+2.6
+ hover unit
+[3]
+ Submarines cannot attack these combat engineers unless they surface.
+[5]
+ Assuming there is no repair facility or laser shield, the 1st level defense tower will take 2 heavy tanks.
+[7]
+ The lowest unit is 
+the lightship
+ , and the lowest ground unit is 
+the self-propelled gun
+ , which can counter hover tanks .
+[9]
+ Perfect for an amphibious jet that has both characteristics
+[10]
+ Be careful as it is a counter of various advanced ground units.
+[11]
+ In the case of a building with a shield, damage reduction is applied first, giving 45% damage to the shield for 50% HP.
+[13]
+ T3 turret blows up on 3-4 attacks from this ship.
+[14]
+ When it approaches land while floating on the surface, its six legs will unfold and it will be able to walk. Instead, in this case, the movement speed is noticeably slower than that of water.
+[15]
+ It is the largest among submarines.
+[16]
+ It costs 6,000 won per foot, which is 2,000 won more expensive than normal, and works even in a submerged state, which is a pretty big advantage.
+[17]
+ Therefore, in order to focus one-on-one firepower, control that directly returns the player is necessary.
+[18]
+ Of course, this won't happen if hacks are disabled in the settings.
+[19]
+ When moving in water, the speed is not that fast.
+[20]
+ It is much slower than the unit's attack speed.
+[21]
+ However, basic robots and anti-aircraft robots, which are small in size, cannot move on hilly terrain.
+[22]
+ The shield is activated only when changing to deployment mode.
+[23]
+ It shoots at a speed similar to that of the T3 ground turret.
+[24]
+ The method of applying damage is a bit unusual, but the damage inflicted gradually increases over time. While it produces about 83 dps against a godly ship with the least health, it shows enormous damage of about 
+360 dps
+ against experimental tanks.
+[26]
+ The difference in multiplayer is that there is a battleship at sea and a minigun robot on the ground, and it is weak to spam attacks, so if you throw it, it will just cut it unless the enemy's control is bad.
+[27]
+ Of course, as the volume accumulates, the large volume also increases, but you may be overwhelmed by that volume.
+[28]
+ For reference, this is the most usable use of this unit.
+[29]
+ If it's a transport ship that pulls out a giant tank, be careful as it counters in reverse.
+[30]
+ Instead, if you have an escort, you will be like a moth to fire, so you need to gather about 10 of them. It might be more profitable to choose a battleship with that money, and if you control the sea...
+[31]
+ However, if you meet other people, there will be a true landscape.
+[32]
+ That's because the compatibility itself is strong against late-game units.
+[33]
+ up to 12 slots.
+[34]
+ It is the same type of turret attached to the experimental spider robot, and the damage is strong.
+[35]
+ Stamina is 
+10,000
+ . However, in most cases, it is destroyed when two nuclear missiles are planted on it.
+[36]
+ With a maximum range of 290, it is shorter than a plasma robot.
+[37]
+ Regardless of the type of module, it all takes 3 seconds and 50% of the original price is refunded.
+[Flak]
+ anti-aircraft only
+thisdocument all or part of the
+Rusted Warfare
+document
+r182
+boardTaken from 
+Go to Previous History
+This document is available under 
+CC BY-NC-SA 2.0 KR
+. (except for some documents and illustrations where licenses are specified)
+The copyright of the contributed document belongs to each contributor, and each contributor owns the copyright of the part they contribute.
+RecentChanges
+namu.wiki
+Contáctenos
+Términos de uso
+Operado por umanle S.R.L.
+Hecho con ❤️ en Asunción, República del Paraguay
+ Su zona horaria es 
+GMT
+Impulsado por the seed engine
+한국어
+ This site is protected by reCAPTCHA and the Google 
+Privacy Policy
+ and 
+Terms of Service
+ apply. This site is protected by hCaptcha and its 
+Privacy Policy
+ and 
+Terms of Service
+ apply.

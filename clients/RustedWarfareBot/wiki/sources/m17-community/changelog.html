@@ -1,0 +1,729 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+  <title>Corroding Games</title>
+
+  <meta name=viewport content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="stylesheet" type="text/css" href="style.css?2" />
+  <script src="/libs/jquery/jquery-3.4.0.min.js"></script>
+
+  <link rel="stylesheet" href="/libs/fancybox/jquery.fancybox.min.css" />
+  <script src="/libs/fancybox/jquery.fancybox.min.js"></script>
+  <script src="/scripts.js"></script>
+  
+  <meta http-equiv="content-type" content="text/html;charset=utf-8" />
+  <meta name="description" content="Corroding Games" />
+  <meta name="keywords" content="Corroding Games development" />
+  
+</head>
+
+<body>
+
+<div id="wrap" class="styleStatic">
+
+  <div id="headerWrap">
+    <!--<div id="Header">
+	    <img src="images/logo6.png" alt="Corroding games" ></img>
+    </div>-->
+    
+    <div class="navigation" id="navigation"> 
+      <a class='inactive' href="index"><span>Home</span></a>
+	    
+      <a class='active' href="rusted_warfare"><span>Rusted Warfare</span></a>
+	    
+      <a class='inactive' href="links"><span>Links</span></a>
+      <a class='inactive' href="forums/"><span>Forums</span></a>
+      <div class="push"></div>
+    </div>
+        
+    
+  
+  </div>
+  <div id="staticHeader">
+  <div id="Header">
+    <img src="images/logo6C.png" alt="Corroding games" ></img>
+  </div>
+  <div class="navigation static" id="navigation-static"> 
+      <a class='inactive' href="index"><span>Home</span></a>
+	    
+      <a class='active' href="rusted_warfare"><span>Rusted Warfare</span></a>
+	    
+      <a class='inactive' href="links"><span>Links</span></a>
+      <a class='inactive' href="forums/"><span>Forums</span></a>
+      <div class="push"></div>
+    </div>
+      </div>
+  
+  <div id="navigation_strip"></div>
+  
+  
+  <div id="panel">
+    <div id="bodyContent">
+      <div class="pad">
+
+
+<!----------- Content ------------->
+
+
+  <style>  
+    h3
+    {
+      padding-top:3em;
+    }
+  
+    #changelogs > ul:not(.html)
+    {
+      white-space: pre;
+    }
+    
+    #changelogs ul
+    {
+      
+      font-size:0.9em;
+      
+    }
+    
+    .date
+    {
+      font-size:0.7em !important;
+    }
+    
+  </style>
+
+<div id="changelogs">
+
+
+
+  <h2>Rusted Warfare - Changelog</h2>
+  
+  <br/>
+
+
+<!--
+<h3>Rusted Warfare v</h3>
+  <ul>
+    
+  </ul>
+-->
+
+<h3>Rusted Warfare v1.14</h3> <p class="date">17th november 2020</p>
+
+<a href="https://store.steampowered.com/newshub/app/647960/view/2923359684790597864">See on steam</a>
+
+  <ul class="">
+    
+<b>New Unit: Modular Spider</b>
+
+
+  -A walking mobile base
+  -Starts with no weapons but has 6 slots where turrets, or modules can be built and upgraded.
+  -Is a Starting unit only, picked from the Game Options (cannot be built normally unless using mods)
+  -Possible add-on modules:
+  ---Shield Gen, Anti-Nuke, Fabricator T1 & T2, Laser Defense, Lightning, Flak, Artillery, Sam T1 & T2, Gun T1 & T2, Plasma T1 & T2
+  -Very heavily armored but slow
+  -Base speed is reduced if any weapons are attached
+  -Can build units and buildings
+  -Auto repairs nearby units
+  -Can move over water
+  -Built-in Fabricator
+  -Goes nuclear on death (if nukes are enabled)
+
+<b>New Turrets and buildings</b>
+
+  -Lightning Turret T1 & T2 - Upgraded from basic land turret
+  -Artillery Turret T2 - Upgraded from artillery turret
+  -Watch tower - Sees through fog in a large range, built from T2 builders
+
+<b>Extractor T3 upgrades</b>
+
+
+New optional upgrades, only one can be picked at a time:
+  -Overclock: Much less health. Generates credits faster. Can be reverted back to T3 for a 50% refund.
+  -Reinforce: More health. [Adds shield. Self-repair. But generates same credits. Can be reverted back to T3 for a 50% refund.
+
+<b>New Unit: AA Beam Gunship</b>
+
+  -Anti-air particle-beam weapon
+  -Beam weak vs shields
+  -Can not attack land
+  -Slow speed unless using afterburner action
+  -Balance wise this unit is meant to counter Amphibious Jets but be countered it's self by Heavy Interceptors (creating a triangle)
+
+<b>New Unit: Heavy Anti-Air Mech</b>
+
+  -Strong and long range air attack
+  -Area affect anti-air
+  -Weak land attack
+
+<b>New servers</b>
+  -Relay servers for easier hosting of games (useful when mixing in Android/iOS clients that cannot use steam invite)
+  ---To setup a relayed game use 'direct join' to one of: us1.relay, us2.relay, asia1.relay
+  ---Other players will be able to join your game by entering the shown Room Code into direct join.
+  ---Games aren't public yet, so share your room id with friends or on the discord server.
+  -Modular Spider FFA battle royale servers (with up to 100 players!)
+  ---Closing borders to force battles between players
+  ---Crates randomly drop around the map that can be reclaimed
+  ---(This was setup before AoE also did this lol)
+
+<b>Releasing on iOS very soon</b>
+  -Store page here: <a href="https://apps.apple.com/au/app/rusted-warfare-rts/id1514329124">https://apps.apple.com/au/app/rusted-warfare-rts/id1514329124</a>
+  -Cross-platform multiplayer between Windows, Linux, Mac, Android, and iOS
+  -Any support on release would be great. (Pre-orders would be helpful too but I know people don't like to do that.)
+
+<b>Other major changes.</b>
+-New maps: Hills (2p), Manipulation (4p), Two Large Islands (10p), Wetlands (10p)
+-Spectator support, players can be set as spectators to just watch games. And all players can be set as spectators from team layout.
+-Borderless fullscreen option on Windows/Linux
+-PC version uses a lot less memory loading images from mods so it can support bigger mods
+-Can create replays in sandbox (and play them back within the editor) useful for creating videos, trailers or machinima
+-Can hide the interface in sandbox and replays for screenshots and videos
+-New background map added to menu rotation
+-Nicer map rendering when zoomed out
+-Afk players players get shared control turned on to their allies as if they disconnected
+-Much faster rejoins and resyncs in multiplayers, with less impact on replays
+-Adds 1.5x, 2.5x income multipliers to the existing 2x setting
+-The host can pause multiplayer games by typing ‘-pause’
+-The host can type ‘-roomlock true’ in battle room to stop new players joining
+-Android: Now has export as map in sandbox
+-Fix attack move on bombers, etc
+-Defeat stats screen
+-Flying fortress can be picked as a starting unit
+-Carrier $38000->$30000, x5 factory speed to x2 factory speed. To help make this a more general purpose unit.
+-Fabricator $1500->$2200 (as well as upgrades), to promote more extractor focused gameplay.
+-Android: Much faster map and fog rendering (27x faster in extreme benchmarks, yes really)
+-Android: See-through interface from PC, can be switched back to classic style in settings
+-Android: Unit cap can be changed in settings, up to 10,000 units per team
+-Lots of new map scripting features for creating custom missions
+-A bit of a tutorial help added to mission 1
+-Improved pathfinding with better performance
+-Fix fog not being restored when loading saves
+-Fix streaming maps from compressed .rwmod files in multiplayer
+-Better performance on units with large numbers of actions
+-Much faster unit/mod loading times
+-Better handling of out of memory while loading mods
+-FPS cap upped to 300fps for high refresh rate screens
+-Fix xOffsetAbsolute, yOffsetAbsolute, xOffsetAbsoluteRandom and yOffsetAbsoluteRandom weren't working on [effect], this might cause issues for mods that expect them to be broken.
+-New 500x500 pixel map thumbnail image limit, recommended is 100-200px (note: this is just the preview image, not the map size)
+-Fix false positive warning message with addTeamTags/removeTeamTags map scripts
+-Fix income multiplier and no nuke option not working in single player skirmish
+
+<b>Lots of new modding features</b>
+-See: <a href="https://docs.google.com/spreadsheets/d/1aeP3pUic0IutZlgGix_cM8xR7LEH44gS4itAxETK954/edit#gid=890975357">Rusted Warfare: Beta Modding Reference</a> for complete 1.14 reference
+-Added: [graphics]isVisibleToEnemies and [graphics]showOnMinimapToEnemies - allows creation of stealth systems when used with canOnlyBeAttackedByUnitsWithTags, and converting to revealed versions
+-Added: [ai]lowPriorityTargetForOtherUnits and [ai]notPassivelyTargetedByOtherUnits - Allows better wall buildings that units don’t target by default.
+-[action]addActionCooldownTime, [action]addAllActionCooldownsTime and [action]clearAllActionCooldowns - Player cannot use action again till timeout expires
+-[animation]effect_Xs: { x, y, name } - Spawn effects while playing an animation
+-Added: [action]convertTo_keepCurrentTags
+-Added: [core]disableDeathOnZeroHp
+-Added: [action]takeResources_directTransferStoppingAtZero
+-Per unit leg limit is now 20
+-Added %{self.playerName}, %{self.teamName}, %{self.resource.X} to showMessageToAllPlayers, etc actions to create dynamic messages
+-Added: [turret]aimOffsetSpread
+-Added: [action]addWaypoint_position_relativeOffsetFromSelf
+-Added: [action]whenBuilding_rotateTo_aimAtActionTarget and [action]whenBuilding_rotateTo_rotateTurretX (BETA NOTE: is broken in some cases)
+-Added: [attachment]showAllActionsFrom (logic boolean) - shows actions from the attachment when parent is selected, when clicked actions will be applied to the attachment as if they were selected. Can be used to create inventory systems, or control subsystems of a unit, etc.
+-[action]isAlsoViewableByEnemies and [action]isAlsoViewableByAllies - Allows other players to see actions from this unit, useful for showing stats to other players (eg missile count, items collected)
+-transportedUnitsToTransfer=X option added to unitSpawn fields - Moves units from the source unit into the newly created unit. Can be used to create parachutes from planes, teleport effects, etc
+-Added: [movement]heightChangeRate
+-Added: [movement]fallingAcceleration, [movement]fallingAccelerationDead
+-New logic function: self.height()
+-Added: [effect]alsoEmitEffectsOnDeath
+-Added: [effect]lifeRandom
+-spawnPoint_eachActiveTeam option added to [core]onNewMapSpawn
+-Added: [action]addWaypoint_triggerActionIfMatched
+-Added: [action]showMessageToAllEnemyPlayers  (need test)
+-Added support for ranges in flag ids (eg: unsetFlag=1-5)
+-Note unit flags are now unset before new flags are set
+-unitRef feature with functions: self, self.parent(), self.transporting(slot=x), self.attachment(slot=X) - eg: [action]textAddUnitName: unitRef self.attachment(slot="1")
+-Added: [action]textAddUnitName: unitType or unitRef
+-Added: [action]descriptionAddFromUnit: unitType or unitRef
+-Added: [action]descriptionAddUnitStats: unitType or unitRef
+-Changed: [action]unitShownInUI: now also supports as unitRef 
+-Added: [action]unitShownInUIWithHpBar - (boolean) default true, Only used when unitShownInUI is a unitRef
+-Added: [action]unitShownInUIWithProgressBar - (boolean) default true, Only used when unitShownInUI is a unitRef. Replaces HP bar if active
+-Added: [action]attachments_unload
+-Added: [action]forceUnloadTransportNow_onlyOnSlot
+-Added: [resource]displayRoundedDown
+-Added: [projectile]wobbleAmplitude
+-Added: [projectile]wobbleFrequency
+-Added: [projectile]turnSpeed
+-Added: [projectile]spawnProjectilesOnEndOfLife (projectile types) - eg: spawnProjectilesOnEndOfLife: torpedo_split(offsetDir=90), torpedo_split(offsetDir=-90)
+-Added: [projectile]spawnProjectilesOnExplode (projectile types)
+-Added: [projectile]spawnProjectilesOnCreate (projectile types)
+-spawnProjectile options: spawnChance, maxSpawnLimit, recursionLimit, offsetX, offsetY, offsetRandomXY, offsetRandomX, offsetRandomY, offsetHeight, offsetRandomDir, offsetDir
+-Added: [turret]canAttackMaxAngle
+-transportUnloadedOrRemovedUnit added to [action]autoTriggerOnEvent
+-Changed: [projectile]pushForce / pushVelocity now working on all units
+-Added: [turret]barrelOffsetX_onOddShots
+-Added: [core]canReclaimUnitsOnlyWithTags
+-Added: [core]canRepairUnitsOnlyWithTags
+-Added: [placementRule_X] section - allows creation of 
+-[placementRule]anyRuleInGroup:X (Only require 1 of the rules in this group pass, instead of all. Use the same group name on other placement rules to create a group.)
+---[placementRule]searchTags:X
+---[placementRule]searchTeam:[TeamRelation] defaults to own
+---[placementRule]searchOffsetX: defaults to 0
+---[placementRule]searchOffsetY: defaults to 0
+---[placementRule]searchDistance:X
+---[placementRule]excludeIncompleteBuildings: [true/false]
+---[placementRule]excludeNonBuildings: [true/false]
+---[placementRule]minCount:X
+---[placementRule]maxCount:X
+---[placementRule]blocksPlacement: [true/false]
+---[placementRule]cannotPlaceMessage: Message shown to player if this rule fails (will be first failing rule in mergedRuleGroup)
+---[placementRule]checkEachTile: [true/false] defaults to true (set to false to only test unit center)
+-Added: [projectile]mutatorX_addResourcesDirectHit
+-Added: [projectile]mutatorX_addResourcesAreaHit
+-Added: [core]exitHeightIgnoreParent
+-Added: [core]ignoreInUnitCapCalculation (defaults to true for buildings)
+-Added: [action]iconExtraImage
+-Added: [action]iconExtraColor
+-Added: [action]iconExtraIsVisible (logic boolean)
+-Added: [core]explodeTypeOnDeath - (options: verysmall, small, normal, large, largeUnit, building, buildingNoShockwaveOrSmoke, verylargeBuilding)
+-Added: [core]fogOfWarSightRangeWhileNotBuilt
+-Added: [projectile]moveWithParent
+-Added: [projectile]sweepOffset
+-Added: [projectile]sweepSpeed
+-Added: [turret]idleSweepAngle
+-Added: [turret]idleSweepDelay
+-Added: [turret]idleSweepSpeed
+-Added: [turret]idleSweepCondition
+-Added: [turret]idleSweepAddRandomDelay
+-Added: [turret]idleSweepAddRandomAngle
+-Added [turret]altProjectile (Projectile) and [turret]altProjectileCondition (LogicBoolean)
+-Added numberOfUnitsInAggressiveTeam() logic boolean (for the special 'aggressive to all' team)
+-Added logic boolean self.numberOfUnitsInAllyNotOwnTeam
+-Added: [attachment]keepWaypointsNeedingMovement
+-Added: [core]effectOnDeathIfUnbuilt
+-Added: [action]setBuilt (float 0-1)
+-Added: [action]offsetSelfAbsolute: x,y,[height]
+-Added: [action]alwaysSinglePress (default false) - No confirmation needed on mobile, use with canPlayerCancel: false and allowMultipleInQueue: false to also hide the queue interface.
+-Added: [action]addActionCooldownApplyToActions (actions)
+-Fix requireConditional on queue items causing false positive desync message to show
+-Added [core]isUnselectableAsTarget (boolean) and [attachment]isUnselectableAsTarget (boolean) (defaults to the isUnselectable's field)
+-Added 'tookDamage' to autoTriggerOnEvent
+-Added [effect]animateFrameLooping (boolean)
+-Added [projectile]hullDamageMultiplier (float) - can be used to create EMP weapons that affect shields only
+-Added [turret]onShoot_triggerActions (actions)
+-[attack]canAttackFlyingUnits/canAttackLandUnits/canAttackUnderwaterUnits no longer required if [attack]canAttack is false
+-Added: [attached]redirectDamageToParent (boolean) and [attached]redirectDamageToParent_shieldOnly (boolean)
+-Added [graphics]image_shield
+-[action]resourceAmount, [action]convertResource_* now also support built-in types like: energy, ammo, credits, hp, shield
+-Added [action]addWaypoint_target_randomUnit_tagged (needs testing)
+-Added [action]addWaypoint_target_randomUnit_team (needs test)
+-Added [action]addWaypoint_target_randomUnit_maxRange (needs test)
+-Added 'teamTagDetect' map trigger type (parameters: team, teamTag)
+-Added 'setPassiveTarget' waypoint type (needs test)
+-Added 'techLevel' to unit spawn parameters, mostly for built-in units and setting damagingBorder size.
+-Added 'alwayStartDirAtZero' to unit spawn parameters
+-Added 'xOffsetRelative' and 'yOffsetRelative' to projectile spawn parameters
+-Fix: newly captured buildings don't reveal fog
+-Added [projectile]beamImage (image)
+-Added [projectile]beamImageOffsetRate (float)
+-Added [projectile]beamImageStart (image)
+-Added [projectile]beamImageEnd (image)
+-Added [projectile]autoTargetingOnDeadTargetRange
+-Added [projectile]autoTargetingOnDeadTargetLead
+-Added [projectile]retargetingInFlight (needs test)
+-Added [projectile]retargetingInFlightSearchDelay (time)
+-Added [projectile]retargetingInFlightSearchRange (float)
+-Added [projectile]retargetingInFlightSearchLead (float)
+-Added [projectile]retargetingInFlightSearchOnlyTags (tags)
+-Added [projectile]sweepOffsetFromTargetRadius (note: shielded hovertank uses 0.4 for it's attack)
+-[projectile]moveWithParent now locks with turret instead of unit body for smoother beam effects
+-Added[projectile]instantReuseLast_alsoChangeTurretAim - Make turret's aim include last projectile's spread and sweep offsets, useful for beam weapons
+-Added [projectile]instantReuseLast_keepAreaDamageList - default false. Keeping the list was the normal behaviour in 1.13 making area damage not apply a second time but this is not useful. Use this only if you want the old behaviour.
+-Added [projectile]targetGround_includeTargetHeight for area affect AA weapons
+-Added [graphics]showShieldBar and [graphics]showQueueBar
+-Added [projectile]beamImageEndRotated and [projectile]beamImageStartRotated
+-Allow built-in resources with self.resource() and self.isResourceLargerThan() 
+-Added moveCamera map trigger
+-Added [projectile]targetGroundHeightOffset for shooting over or under a target. Might be useful for projectiles that split and rain down.
+-Added [projectile]teamColorRatio_sourceRatio default is (1-teamColorRatio)
+    
+  </ul>
+
+<h3>Rusted Warfare v1.13.3</h3> <p class="date">7th september 2019</p>
+
+  <ul class="">
+New map: Many Islands Large (10p)
+New unit: Mech Engineer - T2 Mech builder with AA attack
+Path finding system has 2x-3x better performance and uses less memory.
+Team layout changer when hosting a game or in advanced skirmish. (eg easily switch to 5v5, 3v3v3, FFA and shuffle players)
+Better AI that is more aggressive late game.
+A new mod importer on android to make installing mods easy
+Support for loading compressed mods
+Game handles more mods installed at the same time
+Significantly reduced texture memory use on PC version
+Game doesn’t load data from inactive mods by default to save memory
+Running out of memory loading a texture replaces it with a placeholder and warns instead of crashing
+Running out of memory loading mod audio just warns instead of crashing
+
+Long list of new modding features for people to make cool mods with including creating their own custom resources, attaching units together, and controlling unit behaviour
+Advanced sandbox game setup
+New 'modded' tab in sandbox to sort through a large number of modded units
+Fixing desyncs playing multiplayer survival
+Any required mods now shown before joining a server in server list
+Lots of bug fixes
+
+== Balance Changes ==
+Experimental Tank - Larger damage AoE, slightly slower attack
+Tesla Mech - Removed air attack
+Artillery Mech price changed $1700 -> $1400
+Heavy Artillery price changed $3800 -> $3100
+Artillery Turret - Larger AoE and slightly more damage
+  </ul>
+  
+<h3>Rusted Warfare v1.13.2 (New maps, surrendering, context map pings, new features)</h3> <p class="date">3th march 2019</p>
+
+  <ul class="html">
+<br><b>Main new features:</b><br>-Surrender voting system added to multiplayer<br>-Map ping with context (eg ‘attack here’, ‘build here’), extra useful when playing with people from other languages<br>-Allow players to change their own teams in multiplayer even if they aren’t hosts<br>-New map: Valley Arena (10p) [by uber]<br>-New map: Kingdoms (10p) [by Vulkan]<br>-Start advanced skirmish from a custom map screen<br>-Double click to attack-move setting added<br><br><b>Other changes:</b><br>-Units better follow paths and take a wider gap around obstacles when in a group<br>-Fixed replays and saves played on maps that were streamed to you from a server<br>-Fixes for map vibration on some zoom/resolutions<br>-Preview which units will be selected by box selection before releasing<br>-Better interactions with dedicated servers, battleroom interface improvements<br>-Show colored HP bars by team<br>-Fix useless T2 upgrade showing on mech factory<br>-Random values are more random<br>-Fixed attack-move melee units pushing targets<br>-Fixed attachedTo and effect shadows<br>-Smarter ally / enemy team starting locations in skirmish<br>-AI now starts building immediately on game start<br>-Remove blur from map at some zoom levels<br>-Fix client ids if game with preferences.ini copied to another machine <br>-Fixes for setting teams on dedicated servers<br>-Resync and rejoins are now much faster<br>-French and Dutch translations<br>-Keep current unit selection after resyncs<br>-Don’t make screen blank while resyncing<br>-Fix for ‘unit cap reached’ shown at multiplayer start<br>-Fog revealer is now unselectable<br>-Capture neutral in multiplayer<br><br><b>Balance:</b><br>  -Flame turret damage: 3 -&gt; 4<br>  -Fire Bee: Hp 5400 -&gt; 4900, Build speed: 59.5s -&gt; 83s<br>  -Fabricator: Build time 11.9s -&gt; 27.7s<br>   --Fabricator T2 Upgrade time: 41.6s -&gt; 55.5s<br>   --Fabricator T3 Upgrade time: 55.5s -&gt; 83.3s<br>  -laser tank: Added track animations, more HP but higher cost<br>  -Scout and Light gunship build times increased<br><br><br><b>New modding features:</b><br>-Added numberOfUnitsInTeam(withTag, withinRange, incompleteBuildings=true/false, factoryQueue=true/false, ...) logic boolean - Useful for building prerequisites, tech unlocks, hero respawning, etc.<br>-added self.kills() and self.isOnNeutralTeam() logic booleans<br>-[leg/arm]hidden now allows a logic boolean<br>-[turret]invisible now allows a logic boolean<br>-New effects on victory screen<br>-added [turret]image_applyTeamColors<br>-added [turret]image_drawOffsetX / Y<br>-added [effect]teamColorRatio<br>-added isUnselectable and canNotBeDirectlyAttacked<br>-added IGNORE ini value, to skip keys and not load key in [core]copyFrom target<br>-[action] text and description support multiple languages<br>-[action] iconImage added<br>-[graphics]icon_zoomed_out added<br>-[action] deleteNumUnitsFromTransport added<br>-[core]canBuild_X_isVisible added (logic boolean)<br>-[core]canBuild_X_isLocked added (logic boolean)<br>-[core]canBuild_X_isLockedMessage added (text)<br>-[leg] drawLegWhenZoomedOut, drawFootWhenZoomedOut (boolean) - for performance<br>-[core]extraBuildRangeWhenBuildingThis (float)<br>-[core]disableAllUnitCollisions - (boolean)<br>		
+  </ul>
+
+<h3>Rusted Warfare v1.13 (Huge performance boost, 100s of new modding features, 8 new units, smarter AI, ...)</h3><p class="date">2 dec 2018</p>
+  <ul class="html">
+    <b>Main new features:</b><br><ul class="bb_ul"><li>A new set of units<br><ul class="bb_ul"><li>  <b>Light gunship</b> - Very weak but cheap<br></li><li>  <b>Underwater probe</b> - weak scout<br></li><li>  <b>Plasma tank</b> - Strong land attack, Shield weak vs lightning<br></li><li>  <b>Heavy Interceptor</b> - Heavily armed with shield, Shield weak vs lightning<br></li><li>  <b>Telsa Mech</b><br></li><li>  <b>Fire bee</b><br></li><li>  <b>Nautilus</b> - Amphibious submarine<br></li><li>  <b>Aircraft carrier</b> Heavily armed and armored, Builds air units (at x5 speed), Laser defence &amp; repairbay, Anti-air, Can build anti-nuke missiles</li></ul></li><li>Better smarter AI. Better able to defend itself, expand, smarter experimental spider usage, etc<br></li><li>Large performance improvements and much better at handling large maps (like the 1500*1500 crazy maps in the workshop)<br></li><li>3 new maps<br></li><li>1 new mission<br></li><li><b>Patrol order</b> - will move between points forever, or guard an area will help repair/build any nearby units, will move to attack any nearby targets or anything that damages it.<br></li><li><b>Guard order</b> - will follow a target, repairing it and helping it build. Will move to attack any nearby targets or anything that damages target.<br></li><li>Cloud effects<br></li><li>Lightning attacks now bypass shields allowing many units to be countered <br></li><li>Music and sound system (with faster startup speed and reduced memory usage)<br></li><li>Improved effects and graphics<br></li><li>Converted over many core units into the mod ini format for people to change and use in mods<br></li><li>Lots of bugs fixes.</li></ul><br><b>Main new modding features:</b><br><ul class="bb_ul"><li>Around <b>250 new options and systems added</b><br></li><li>Keyframe animation system (including arm/leg animations for smooth opening blast doors, etc)<br></li><li>Automatic action triggers (eg convert unit when it’s over water, low HP, etc)<br></li><li>Ability to embed images into maps to include your own <b>custom tileset graphics</b><br></li><li>Custom price system.<br></li><li>Custom sounds (with custom sounds on order)<br></li><li>Multi-Targeting/Target per turret system<br></li><li>Teleporting, units spawning<br></li><li>Pre unit turret limit upped to 30<br></li><li>Reduced memory usage of each mod and inactive mods<br></li><li>Manual turret firing (eg moddable nuke launchers)<br></li><li>Shield damage bypass and unit armour<br></li><li>Flexible custom moddable effects. (Create custom projectile explosions, turret shooting effects, etc)<br></li><li>Enhanced boolean logic with many more functions. (Including ‘and’, ‘or’, and brackets)<br></li><li>  Adds self.isOverPassableTile(type), self.tags(includes), self.energy(greaterThan/lessThan/empty/full), self.transportingCount(...), self.ammo(...), etc<br></li><li>Projectile intercepting projectiles (eg moddable anti-nuke)<br></li><li>Ammo variable, and 32 boolean flags for misc mod usage<br></li><li>Turret angle restrictions<br></li><li>Starting units can be added to with custom units<br></li><li>Many many more new features - see full list in the Modding Reference doc</li></ul><br>
+  </ul>
+
+
+<h3>Rusted Warfare v1.12 (Workshop modding for units/missions/maps! Also new units, faster performance and extra shrapnel)</h3><p class="date">5 feb 2018</p>
+<ul class="html">
+<ul class="bb_ul"><li>Large performance boost handling lots of units and large battles. Up to 10x the framerate in some special test cases<br></li><li>More efficient pathfinding and prioritization of path solving threads<br></li><li><b>Steam workshop support for units and maps!</b><br>  <ul class="bb_ul">  <li>Mods and workshop items can be added or uploaded from mods screen<br>  </li><li>Thank you to the modders who have already added content!<br>  </li><li>Maps will be automatically streamed from the host, but units require everyone to have them installed right now<br>  </li></ul></li><li>Placing lines of buildings by click dragging (very useful)<br></li><li><b>New Heavy artillery</b> - T2 artillery with limited laser defence<br></li><li><b>New Heavy Missile Ship</b> - powerful long range<br></li><li><b>New T3 anti-air sam</b>, and flak anti-air<br></li><li>Many old units have been converted into the newer moddable format<br></li><li>Added reload unit data button to sandbox - Modders should now never need to restart<br></li><li>Logic bug causing AI to get stronger on very easy &amp; easy settings (I'm so sorry!!)<br></li><li>Game statistics now show on victory screen<br></li><li>Translation files are now under 'assets/translations' for people to add their own translations. Send them in for official inclusion<br></li><li>Mobile turret nerf, now cannot move over water<br></li><li>Missile tank renamed to AA Missile tank, buffed for anti-air but cannot attack land<br></li><li>Faster rendering code for minimap, selections, image drawing<br></li><li>The 'Live Reload' option is now multithread to remove any freezes<br></li><li>Fixed cleared key binding being reset<br></li><li>Fixed crashes loading save with missing modded units<br></li><li>Fixed crash bugs<br></li><li>Lots of little details (that most of people might not notice)<br>  <ul class="bb_ul">  <li>Most unit turrets have recoil<br>  </li><li>New trees of different types<br>  </li><li>Leaves when trees fall<br>  </li><li>Better graphics on lots of projectiles<br>  </li><li>Dust on reversing units<br>  </li><li>Better water waves on ships<br>  </li><li>Shrapnel bits fly of units when they explode<br>  </li><li>Better laser effects<br>  </li><li>Nicer render of the map when zoomed out<br>  </li></ul></li></ul>
+</ul>
+
+<h3>Rusted Warfare v1.11 (Replays, new mechs, lots of optimisations, etc)</h3><p class="date">23 sep 2017</h3>
+<ul class="html">
+  -New Multiplayer Replays!<br> --Watch recorded multiplayer games at up to 64x speed<br> --You can create saves at any point in a replay to start a new multiplayer game from or edit in sandbox<br>-3 new mechs<br> --Mobile Turret - Deploys for extra range and a shield<br> --Artillery Mech - Long range, can move while firing<br> --Minigun Mech - Fast firing, speeds up as it fires<br>-New mission: 'Spider battle' (Note: this is a fun setup in multiplayer!)<br>-List of all selected units showed in the side bar (left click: select only that type, right click: unselect that type)<br>-Lots of path finding optimisations<br> --Solved paths are shared between clients to reduce load<br> --Units are more responsive to new orders in multiplayer<br> --Spamming orders shouldn't make your units pause movement in multiplayer<br>-Dynamic step rate in multiplayer to allow smoother games<br>-UI system has been optimised.<br> --Lobby screen with 100s of servers should no longer drop framerate.<br>-Nerf to light/heavy hovertank units, missile airship<br>-Buff to sea units to better survive fights vs hovertanks<br>-Mech factory can no longer build light/heavy hovertanks<br>-Large mechs now use 2 transport slots<br>-Plasma mech rechanges 15% faster<br>-Added 'disablePassiveTargeting', 'action_X_addEnergy' for modders to better create custom nuclear silo like buildings/units<br>-Leg positions on units better saved and synced<br>-Survive waves stop after being defeated<br>-Shield information shown under unit HP text<br>-List of selected units shown on PC<br>-Old chat log messages shown when menu is shown<br>-Better icons shown when zoomed out<br>-Send '.share off' and '.share on' in multiplayer to disable shared control for yourself in case of trolls <br>-Starting credits now goes up to $200,000<br>-Buffed: Missile ship, Artillery, Missile mech<br>-Less HP on basic sub<br>-Basic mech, missile mech build times longer to match tanks<br>-Missile airship, heavytank, heavy hovertank build times longer to reduce spamming<br>-Buffed bomber HP and damage<br>-Extra splash damage on experimental tank<br>-Fixed plamsa mech sometimes not firing after recharging<br>-Fixed UDP networking memory leak with some use cases<br>-Fixed crash after picking last server in the list sometimes happening after refresh<br>-Fixed rare desync issue caused by purchases ordered just as a unit dies<br>-Fixed desyncs warnings when a modded unit was transformed into a new unit without actions that were already queued (they will now be refunded)
+</ul>
+
+
+<h3>Rusted Warfare v1.10 (Shared control, mechs, maps, better AI)</h3><p class="date">13 aug 2017</h3>
+<ul class="html">
+  <ul class="bb_ul"><li>Shared ally control can be setup for multiplayer games<br></li><li>Disconnected players automatically get all their units shared to allies till they return<br></li><li>Mech Factory added, with a set of initial mechs<br><ul class="bb_ul">  <li><b>Basic mech</b> - Land only<br>  </li><li><b>Anti-air mech</b> - Area effect anti-air only<br>  </li><li><b>Plasma Mech</b> - Long range air &amp; ground attack<br>  </li><li><b>Flame Mech</b> - Short range flamethrower with high HP</li></ul></li><li>T3 gun turret upgrade<br></li><li>New map: Enclosed Island (10p)<br></li><li>Spider mech now costs $70000 and uses up 5 transport slots. And it's death nuke is disabled when 'no nukes' game setting is on.<br></li><li>New building gird placement system and reworked footprint of many buildings<br></li><li>Modded units are now loaded from 'mods/units/' and can be enabled or disabled in-game<br></li><li>Lots of new modding features<br><ul class="bb_ul">  <li>Modded units can now have upgrade actions<br>  </li><li>Can dynamically switch any property with convert actions<br>  </li><li>Custom projectile graphics with more options<br>  </li><li>Modded units can override builtin units<br>  </li><li>Lots more</li></ul></li><li>Fixed pathing issues causing builders with queued buildings to pause<br></li><li>Fixed pathing issue causing units from factories to sometimes pause before moving to rally<br></li><li>Builders now wait up to ~15 seconds if there is not enough money to place a building before giving up<br></li><li>Fixed pathing issues with units loading into transports in multiplayer<br></li><li>Softer speedups on laggy networks and better handling of high ping<br></li><li>Builder ships can build more building types<br></li><li>All builders can reclaim buildings<br></li><li>Repairbay automatically repairs allies units and helps build buildings<br></li><li>More robust server networking code<br></li><li>Spider mech automatically repairs units<br></li><li>When a unit can both repair damaged transport or load into it will toggle between load up and repair<br></li><li>'lava votex' map balance fix<br></li><li>T1 builder can no longer build nuke launchers<br></li><li>Lots of AI improvements and fixes<br><ul class="bb_ul">  <li>AI can better use modded units<br>  </li><li>AI builds anti-nuke, repairbays, and laser defenses<br>  </li><li>AI cannot hijack the sandbox editor to build units (haha)<br>  </li><li>Builds attacking units more reliability<br>  </li><li>Expands better</li></ul></li></ul>				
+</ul>
+
+<h3>Rusted Warfare v1.05</h3>
+  <ul>
+    -Lots of bug fixes
+    -New unit: Combat Engineer - Heavily armored builder (with T2 buildings, torpedos, self repair, fabricator, hover)
+    -New unit: Heavy Sub - Heavily armored submarine
+    -New big map: 'Interlocked Large' 
+    -Added immersive full-screen option for modern devices
+    -Builder queue fixes, and improvements
+    -Turret rush nerf: Buildings under construction take 75% extra damage, turrets take longer to build
+    -Don't show disabled tech 3 upgrade on tech 3 extractors
+    -Skirmish and online win condition changed to 'all factories and builders'
+    -Fixed more android 2.2 crashes
+    -Experimental UDP networking for low lag games, and better handling of packet loss on wifi networks
+    -Game uses multiple masterservers for increased reliability
+    -Dedicated servers now require 2 or more players to start a game
+    -Fix crashes related to bitmaps
+    -Errors loading custom units now show an alert to help modders
+    -Network list now sorted
+    -Fixed blueprints orders not moving when on edge of screen
+    -By request 'Unselect All' is always shown
+    -Game balancing:
+      -Small buff on tanks, hovertanks
+      -Buff on Heavy tanks, Mammoth Tank, Missile tanks, Heavy battleship
+    -Lots of other changes and fixes
+
+  </ul>
+
+  <h3>Rusted Warfare v1.04</h3>
+  <ul>
+    -Over double frame rate with large armies and battles
+    -New map 'Huge Subdivide' could fit 4 large maps inside it
+    -New updates to turrets:
+     --Flamethrower upgrade with area damage but short range
+     --Artillery upgrade with long range but slow speed
+    -Multiple buildings can now be quickly queued for builders
+    -Added blueprints previews of queued buildings
+    -Fixed game not running on old android versions
+    -Added unit previews to menus
+    -Fabricator upgrade improved
+    -Artillery shots are no longer homing but have an area affect
+    -Added team chat (start message with '-t')
+    -Lots of bug fixes﻿
+  </ul>
+  
+  <h3>Rusted Warfare v1.03</h3>
+  <ul>
+    -New unit 'Experimental Dropship' - Armed flying transport which can also build units
+    -New unit 'Heavy Battleship'
+    -New unit 'Missile Tank' - Long range air/land missiles
+    -2 new maps - Volcano Crater (8p), and Flying Fortress Challenge Map
+    -AI difficulty can be set in multiplayer
+    -Large AI improvements, and now uses a wider range of units
+    -Made 'Impossible' AI difficulty harder
+    -Waypoint and pathing fixes
+    -Start of unit modding support for creating new units
+    -Better unit target prioritization
+    -Fixed AI sometimes spamming transports
+    -Custom maps over network can now resync without crashing
+    -Fixed crash if no one was in slot 1 and AIs were playing
+    -Other fixes and changes
+    -Late game speedups
+    -Fixed box select moving units
+    -fixed false positive desync warning showing up when loading and resyncing
+    -Lots more changes and fixes
+  </ul>
+  
+  <h3>Rusted Warfare v1.01</h3>
+  <ul>
+    -7 skirmish maps from 'hxyy'/华夏_有衣 (more maps to come)
+    -2 new units - Nuke launcher and Anti-Nuke launcher
+    -Map thumbnails shown in single player map list
+    -3 finger zoom now also works with pinching
+    -Unit limit increased to 250 in multiplayer and 500 in single player
+    -Tech 3 resource extractors
+    -Start of russian translations by Aleksandr Loktionov (work in progress)
+    -Units should no longer get stuck both moving to the same spot between them
+    -Fixed freeze returning to menu after winning the last mission
+    -Fog of war is now shared between allies
+    -Shielded Hovertank's shield and speed nerfed slightly
+    -Allies can now be added in singleplayer skirmish games
+    -New double income mode for multiplayer
+    -Nukes can be disabled in multiplayer games
+    -Starting credits can be set on dedicated servers
+    -Better and more noticeable attack notifications
+    -Range of some unit's attacks now shown
+    -Unit's name and hp shown on sidebar﻿
+  </ul>
+  
+  <h3>Rusted Warfare v0.98</h3>
+  <ul>
+    THE SEA UPDATE
+    -3 new skirmish maps
+    -3 new units: Submarines, Builder Ships, Amphibious Jets
+    -Players can rejoin multiplayer games they dropped out of and the server will resynchronise the game
+    -AI can now build sea factories and ships.
+    -T2 upgrade added to air factory, and fabricator
+    -Initial support for translations starting with chinese simplified and traditional (still incomplete)
+    -Large performance improvements to rendering, path finding and AI
+    -Trees added (only in some maps for now)
+    -Dedicated servers controlled though GUI
+    -Save games are now compressed
+    -Lobby now shows number of players
+    -Fixed gunship able to attack air
+    -Username sometimes not saved
+    -Nerfs to make builder/turret aggressive pushing strategies less effective.
+    -Fixed not all units in a group entering transports
+    -Removed false positive desync warning
+    -Fixed followers pausing for a bit while moving in formation
+    -Fixed units doing circles when moving to unreachable target
+    -GUI now shows if other units are ally or enemy, and the player name
+    -Fixed crashes in pathfinding, network checksum and scorch mark code
+    -Workaround for reduce command lag when playing network games with large number of units (better fix soon)
+    -Lots more bug fixes and improvements
+  </ul>
+  
+  <h3>Rusted Warfare v0.97</h3>
+  <ul>
+  -Dedicated servers
+  -Public chat server which all game from any version can join
+  -New multithread rendering engine, allowing update and draw to run at the same time on multi-core phones
+  -New 8 player map "Many Islands", largest map yet
+  -New building 'Fabricator': Generates credits much slower then an extractor but can be placed anywhere.
+  -New T2 upgrade for anti-air turrets
+  -Number of multiplayer desync fixes
+  -Up 3x better framerate
+  -New effects and animations including new construction effect for builders
+  -New terrain graphic system (which will make future changes much easier)
+  -New hardware accelerated rendering.
+  -Reduced lag in multiplayer games
+  -Builder now has cost more but has more HP (to reduce the effectiveness of builder spamming early game)
+  -Battery saving option using framerate limiting
+  -Added an 'impossible' AI difficulty
+  -AI Improvements
+  -In-game pause button
+  -Pause menu shown when paused, allows saving, etc on new android devices without menu button
+  -Clients can now see other players ping in multiplayer games 
+  -Fixed common crash occurring on game start.
+  -Shockwave effect
+  -Lava effects
+  -Smoke emitter
+  -Shadows on units
+  -Dust from units
+  -Fixed slow downs late game
+  -Players get notified of activity in background multiplayer games
+  -Repair bay can now repair buildings, longer range, but slower repair speed
+  -Laser defense dims when rechanging, shorter range
+  -Now uses halo theme
+  </ul>
+  
+  <h3>Rusted Warfare v0.96</h3>
+  <ul>
+  -6 new skirmish maps
+  -Performance improvements
+  -USB mouse support: such as click and drag box selection (Android 4.0+)
+  -USB Keyboard support:
+  --0-9 unit groups
+  --shift and ctrl select modifiers
+  --arrow and WASD screen movement
+  --alt: drag box select
+  --space: deselect all
+  -Improved the handling of touches on minimap. and visual feedback given for move orders though minimap.
+  -Units groups now display a popup when touched to better show how they are used, and give feedback
+  -Added menu option to show player list in-game
+  -Fixed intermittent crash loading menu background
+  -Fixed thread synchronization crash when exiting, or switching windows
+  -Fixed crash in menu when all player's units were killed in last game
+  -Fixed crash in network lobby when custom maps or saved maps are empty
+  -Fixed bug that allowed players to resume a menu level
+  -Fixed crashes in 4.3 from surfaceView unlocking issue
+  -Fixed network desync bug under high load
+  -Lots of other small improvements
+  </ul>
+  
+  <h3>Rusted Warfare v0.95</h3>
+  <ul>
+  -Menu screen now shows battles in the background, or if there is an active game being played it is shown frozen
+  -Pathfinding system is now completely multithreaded: this should remove nearly all freezes, and allow the game to run better on multi-core phones
+  -Pathfinding system now uses significantly less memory and runs faster.
+  -Experimental unit factory added
+  -Experimental tank added (powerful tank with 4 turrets)
+  -Mammoth tank added (strong tank that shoots lightning bolts)
+  -1 new skirmish map, 1 new mission
+  -Much better support for running on high density screens, like the S4.
+  -Zoom button can now been hidden in settings (for people just using 3 finger zoom)
+  -Better unit movements, helicopters and hover units are able to slide and move around better, better movement of large units
+  -Units can now have any number of turrets attached
+  -New unit art for: missile ship, (battle ship), laser tank, repair bay, laser defence, sea factory.
+  -Unit balances changes for multiplayer
+  -laser tank changed. attack damage reduced, now has a charge up delay, but faster fire rate.
+  -hover tank nerfed (speed slowed, reduced attack damage)
+  -Fixed reported bug: Rare null pointer were projectiles had no target.
+  -Fixed reported bug: Game crashes when setting spawn point to an unoccupied spot
+  -Fixed reported bug: Rare crash when repairing or loading into a unit which is removed from the game
+  -Other bug fixes
+  </ul>
+  
+  <h3>Rusted Warfare v0.89</h3>
+  <ul>
+  -Added laser defence building to counter artillery and missiles
+  -Added dropship, a flying transport
+  -Added new skirmish/multiplayer map 'Big island'
+  -Reduced lag, and interface delays in network games
+  -Taping the zoom button now cycles between zoom levels
+  -Reduced memory usage, faster map loading, system able to load in much larger maps.
+  -Large performance improvements to the pathfinding engine, especially on island maps
+  -Can chat while in-game when playing network games
+  -Default network port changed to 5123
+  -doesn't crash if port is already in use
+  -Can change the port number used for multiplayer games
+  -Disconnecting handled better in multiplayer games
+  -Lots of bugs fixed, and other small changes
+  </ul>
+  
+  <h3>Rusted Warfare v</h3>
+  <ul>
+  -Added unit groups buttons/hotkeys. To allow quick selection of different units. (short press to add, long press to replace, double tap to focus)
+  -Rally points can now be set for all factories
+  -Added new unit 'Heavy Hovertank'
+  -Start of Tech Trees, land factories can now be upgraded to T2
+  -Fixed another game save bug were corrupt game saves could be created
+  -Made the game able to load corrupt save files this bug causes without crashing
+  (Please if you still have problems email me your save file, I know people have problems, but I have received none so far!)
+  -Lots of other small changes and some performance improvements
+  </ul>
+  
+  <h3>Rusted Warfare v</h3>
+  <ul>
+  -Fixed 4.1 crashes on start
+  -Some AI Improvements, start of AI difficulty levels (see settings)
+  -New unit graphics, and music
+  -Added a new battle ship unit
+  -new skirmish map 'Ice Island (2p)'
+  -factory exits can no longer be blocked by buildings
+  -fixed minimap drawing dead units
+  -bugs fixes and performance improvements
+  </ul>
+  
+  <h3>Rusted Warfare v0.82</h3>
+  <ul>
+  -Added proper saving and loading support! You can now save games to the SD card.
+  -new challenge mission - 'Beachhead Landing'
+  -option to rendering the game with 2x pixel size, workaround for very high res screens.
+  -Game Over message for survival mode
+  -Made circle selection grow larger
+  -Other changes, and bug fixes
+  </ul>
+  
+  <h3>Rusted Warfare v0.80</h3>
+  <ul>
+    -Added gunship air unit. Can attack ground only. Strong attack and heavily armored
+    -You can now load custom maps and missions from the SD card (see the corrodinggames forums for details on making your own maps)
+    -3 new maps: skirmish/multiplayer map - 'Large Ice Outcrop', Mission 6 'Snowy Outcrop', challenge - Ice Base
+    -Hover Tanks cost more but beefed up to be more useful. Has more HP, can shoot while moving and attacks air and land
+    -Added shadows to buildings, stopped flicking between map and units while scrolling
+    -Skirmish levels now have victory conditions 
+    -Host can pick map in network game
+    -player's name, and last used ip address now remembered between network games
+    -Fixed network sync bug, which could cause crashes
+    -Game now checks network games are in sync, and displays messages if desync is detected
+    -Made network code display warnings instead of crashing on sync problems
+    -Updated network GUI, for lobby and battleroom
+    -Extractor cheaper (now $800), and generates resources faster
+    -Giving orders over fog now shows move marker
+    -HP bar still shown for transported units (if 'Always show HP bar' was on)
+    -bug fixes
+  </ul>
+  
+  <h3>Rusted Warfare v0.75</h3>
+  <ul>
+    -Added challenge missions for experienced players. Currently two missions. '1v3 Island' and 'Artillery'
+    -AI is smarter. Defends itself better and is more aggressive. More improvements planned.
+    -Fixed map victory conditions requiring turrets to be destroyed
+    -Nicer unit formations
+    -Darkened unit wreckages so it's easier to see live units
+    -Added ingame warning about Samsung Galaxy S2's audio bug
+    -Fixed a few bugs
+  </ul>
+  
+  <h3>Rusted Warfare v0.x</h3>
+  <ul>
+    -Zooming out to full map shows unit icons, making easier to give orders while increasing performance (can be disabled in settings)
+    -Extractors can now be upgraded
+    -Added help screens for new users
+    -Local IP address now shown to multiplayer hosts
+    -Can see mission briefing again from option menu
+    -Progress bars on units now always shown
+    -Option to always show unit HP bar
+    -Optimised fog rendering
+    -Fixed HP being hard to see when zoomed out
+    -Made units on mini-map easier to see
+    -Hold selection radius bigger, and fixed selection radius not matching shown circle when zoomed out
+    -Cost of builders increased to 300
+  </ul>
+  
+  <h3>Rusted Warfare v0.x</h3>
+  <ul>
+    -Sidebar can be now used to select units of specific types
+    -Added scroll speed option in the settings
+    -Fixed render artifacts on edge of screen when loading new map if zoomed in.
+    -Fixed rounding bug, that allowed units to drive off the top and left of the map
+  </ul>
+
+</div>
+
+
+<!----------- Footer ------------->
+	    
+			    </div>
+		    </div>
+        
+        </div>
+        
+
+		<div id="footer">
+					</div>
+		
+	</div>
+
+</body>
+
+</html>
+

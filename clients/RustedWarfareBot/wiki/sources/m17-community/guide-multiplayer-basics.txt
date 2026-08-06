@@ -1,0 +1,306 @@
+Steam Community :: Guide :: Multiplayer Basics
+									Sign in								
+				Store			
+						Home											
+						Discovery Queue											
+						Wishlist											
+						Points Shop											
+						News											
+						Charts											
+				Community			
+						Home											
+						Discussions											
+						Workshop											
+						Market											
+						Broadcasts											
+				About			
+				Support			
+									Change language								
+Get the Steam Mobile App
+										View desktop website									
+								© Valve Corporation. All rights reserved. All trademarks are property of their respective owners in the US and other countries.								
+Privacy Policy
+									 |  
+Legal
+									 |  
+Accessibility
+									 |  
+Steam Subscriber Agreement
+									 |  
+Refunds
+									 |  
+Cookies
+				STORE			
+						Home											
+						Discovery Queue											
+						Wishlist											
+						Points Shop											
+						News											
+						Charts											
+				COMMUNITY			
+						Home											
+						Discussions											
+						Workshop											
+						Market											
+						Broadcasts											
+				About			
+				SUPPORT			
+							Install Steam						
+sign in
+											 | 
+language
+											简体中文 (Simplified Chinese)																					
+											繁體中文 (Traditional Chinese)																					
+											日本語 (Japanese)																					
+											한국어 (Korean)																					
+											ไทย (Thai)																					
+											Bahasa Indonesia (Indonesian)																					
+											Bahasa Melayu (Malay)																							
+BETA
+											Български (Bulgarian)																					
+											Čeština (Czech)																					
+											Dansk (Danish)																					
+											Deutsch (German)																					
+											Español - España (Spanish - Spain)																					
+											Español - Latinoamérica (Spanish - Latin America)																					
+											Ελληνικά (Greek)																					
+											Français (French)																					
+											Italiano (Italian)																					
+											Magyar (Hungarian)																					
+											Nederlands (Dutch)																					
+											Norsk (Norwegian)																					
+											Polski (Polish)																					
+											Português (Portuguese - Portugal)																					
+											Português - Brasil (Portuguese - Brazil)																					
+											Română (Romanian)																					
+											Русский (Russian)																					
+											Suomi (Finnish)																					
+											Svenska (Swedish)																					
+											Türkçe (Turkish)																					
+											Tiếng Việt (Vietnamese)																					
+											Українська (Ukrainian)																					
+Report a translation problem
+Store Page
+Rusted Warfare - RTS
+All
+Discussions
+Screenshots
+Artwork
+Broadcasts
+Videos
+Workshop
+News
+Guides
+Reviews
+								All							
+								Discussions							
+								Screenshots							
+								Artwork							
+								Broadcasts							
+								Videos							
+								Workshop							
+								News							
+								Guides							
+								Reviews							
+Rusted Warfare - RTS
+Store Page
+Rusted Warfare - RTS
+> 
+Guides
+> 
+Space_Captainface's Guides
+			This item has been removed from the community because it violates Steam Community & Content Guidelines. It is only visible to you. If you believe your item has been removed by mistake, please contact 
+Steam Support
+.					
+							This item is incompatible with Rusted Warfare - RTS. Please see the 
+instructions page
+ for reasons why this item might not work within Rusted Warfare - RTS.					
+37 ratings
+Multiplayer Basics
+By Space_Captainface
+Basic Builds and Insights
+(**Amphibious Jets info outdated)
+Clever
+Gold medal in mental gymnastics.
+Award gives creators 800 Steam Points.&nbsp;Given by 2 people.
+		" data-tooltip-class="reaction_award_hover">
+2
+Extra Helpful
+If this were any more helpful I wouldn't need a brain.
+Award gives creators 100 Steam Points.&nbsp;Given by 1 person.
+		" data-tooltip-class="reaction_award_hover">
+1
+3
+Award
+Favorite
+Favorited
+Unfavorite
+Share
+This item has been added to your 
+Favorites
+.
+Created by
+				Space_Captainface
+		Offline
+Category: 
+Gameplay Basics
+, 
+Multiplayer
+Languages: 
+English
+Posted 
+Updated 
+Sep 8, 2019 @ 10:51pm
+Apr 10, 2020 @ 5:19pm
+1,854
+Unique Visitors
+41
+Current Favorites
+Guide Index
+Overview
+Who this guide is for
+Generic RTS Basics
+First: Scouting
+Then: Know Counters
+Countering Amphibious Jets
+Finally: Adapt to Different Map/Game Types
+GLHF to the GGWP
+Comments
+								Who this guide is for															
+								This is for people who want to get into Rusted Warfare multiplayer games, but don't feel like spending much time experimenting with what units are good against what units and just want to quickly learn how to be useful in a team match.								
+								Generic RTS Basics															
+								When you play any RTS, there are a lot of different concepts to wrap your head around, and it's tough to do it all as fast as you need to. If you're struggling, try practising a basic loop of tasks that you concentrate on, one at a time. For example (with Rusted Warfare actions):
+Expand map control (move your military forward; build extractors and turrets together away from your base), then
+Build military (try to build only ever-so-slightly more than your opponent, and put the rest towards your economy until you can totally swamp them), then
+Grow economy (upgrade Fabricators, then build more of them)
+If you can get those down to a basic cycle, you'll be able to play most RTS games well, and sort out a play style that works for you from there. Maybe you're the aggressive player that focuses more on attacking and early map control; or maybe you're a defensive player that likes to secure any map control you get behind layers of turrets to make sure you don't lose it again (you ♥♥♥♥♥♥♥ turtle); or something between those two.
+Totally up to you and no judgment. Unless you're a turtle.								
+								First: Scouting															
+								In Rusted Warfare, unlike many other RTS games that require you to get an upgrade to build non-land units, you're able to build Land, Sea, and Air factories right from the beginning with your first Builder. There is no research tier system for types of units, you can only upgrade your factories to make them create stronger units. This creates a massive question-mark as to what your first battle will look like and makes it challenging to respond, as your opponent may already be on the way by the time you find out their "build" (chosen unit types).
+On larger maps, build an Air Factory and send out a couple Interceptors to check out their base; on smaller maps, build a Scout and do the same thing.
+KEEP. DOING. THIS.
+Scouting continually is the difference between coming away from games wondering how you lost so badly when you were so busy building so many (wrong) units, and a fair fight.
+Even if your Interceptor gets shot down every time**, an Interceptor is dirt cheap relative to how much it will cost your opponent when you're prepared for their attacking unit types or can see a weakness in their defense. 
+** I mean... try to notice where it got shot down and keep the next one alive, or get a Heavy Interceptor that can withstand a couple hits if you find it hard to control them due to lag/arthritis
+								Then: Know Counters															
+								You've sent your Interceptor/Scout, found out they're making... units. Well, shoot -- here's your time to shine, because 
+IF THEY ARE BUILDING
+:
+Mass T1 Land Units (Tanks, Hovertanks, Small Mechs), 
+THEN YOU BUILD 
+One or two Mobile Turrets buffered by some smaller units (Mech Factory T1). The AOE damage, range, and firing rate of the mobile turrets will destroy large groups of smaller units. Fight until you can mass Amphibious Jets.
+Mass T1 Air Units (Light Gun Ship, Helicopter) 
+THEN YOU BUILD 
+Enough Interceptors to hold them back, but get AA Mechs ASAP to counter their air army while building other land attack units. Or Amphibious Jets.
+T2 Land Units (Plasma Tank, Heavy Tank), 
+THEN YOU BUILD 
+As many Minigun Mechs as you can. Exploit the range of your Minigun Mechs and walk backwards when engaging to avoid damage while still cutting them down. Or go Amphibious Jets if you have lots of money.
+T2 Mech Units (Minigun Mech, Plasma Mech), 
+THEN YOU BUILD 
+Amphibious Jets. They get a lightning bonus against the Minigun Mech, and will be able to out-manoeuvre anything else that can threaten your defences.
+(Water Maps)A T1 Navy, 
+THEN YOU BUILD
+ Most *definitely* Amphibious Jets. Be prepared to dive them if a bunch of Interceptors show up. Be prepared to Fly if a Heavy Sub shows up, but then just dive on top of it and that slow poke will be dead too.
+T2 Air, (Gunships and Heavy Interceptors), 
+THEN YOU BUILD 
+ Some heckin Amphibious Jets. Amphibious Jets get lightning bonus damage to Heavy Interceptors, and can blow one up in 2 shots.
+T2 Air (Amphibious Jets), 
+THEN YOU 
+ Look at my Countering Amphibious Jets part, as I discuss it a bit more there.
+Bear in mind turrets in good spots will also hold back some of these, so feel free to mix and match, but you will be giving up ALL map control beyond where you place your turret if you don't also build a military. I use them for aggressively holding forward positions while continuing to attack, supplementing my unit cap once I'm in SUPER late game, or one or two near extractors outside of my base to protect them, but that's about it.								
+								Countering Amphibious Jets															
+								Amphibious Jets are... a bit of an issue in the current meta.
+Amphibious Jets aren't actually overpowered themselves -- their damage output is a bit higher, but they have fairly low-ish health. However, because of how mobile and versatile they are, a large group of them counters almost everything, and is only really countered by a few things:
+A wall of AA Turrets
+Large numbers of Missile Ships (due to their AoE damage) or, 
+Large numbers of AA Mechs (same reason).
+More Amphibious Jets
+Unfortunately, AA Turrets are hard to attack with/can usually be flown around, Missile Ships are expensive and slow to build in large numbers (making them late-game only), and AA Mechs 
+are units you'd only build if you knew your opponent was building lots of air units already
+, making their first attack with a group of them likely game-ending. This is why you 
+need to know
+ if your opponent is building them, why an early Interceptor/Scout is so important.
+Remember: Amphibious Jets are only a HARD COUNTER to UNAWARE PLAYERS.
+In addition, multiple Interceptors can actually hold their own against Amphibious Jets as well; while your opponent is busy upgrading their T1 Air Factories to T2, you can be creating several Interceptors to buy you time (and scout the map) while you can get a Mech Factory building AA Mechs.								
+								Finally: Adapt to Different Map/Game Types															
+								Once you have the "standard game" and an idea of what units counter which, then you'll need to adapt your style to work with different game options. Here are some common ones, and some adjustments to make to what you're doing:
+Start game with Small Army
+ If there's a land connection, RUSH your tanks to approximately midway (and hope your allies join you), then frantically try to get a foothold on the middle of the map with some turrets, claim the extractors, and build up advanced units at your base. If it's water, continue with build as normal.
+Start game with Combat Engineers/Experimental Spider
+ If 1000-5000, build a few Heavy Tanks or Amphibious Jets (sigh) to harass your opponents while otherwise doing your build as normal.
+If 50,000-100,000, consider one Experimental Factory and pick the unit of your choice (I like Flying Fortresses, as they are great for ferrying a bunch of laser tanks into the middle of an opponent's base), then build T2 Factories and mass Amphibious Jets until you can figure out what your opponents are doing and adjust accordingly. Odds are they're not going mass AA Mech, so you may even straight up win.
+If 200,000, same as 50-100k, but consider a Nuke Launcher if your allies don't. DON'T launch it as soon as it's finished though, as most players currently do build an Anti-Nuke Defence. Try to use it after your first assault once you've either 1) Confirmed they don't have an Anti-Nuke Defence, or 2) Blown up their Anti-Nuke Defence.
+								GLHF to the GGWP															
+								Hope you enjoyed or got something out of the writing, took about 3-4 hours to put together and make sense. If you have any comments or suggestions, I'd be happy to hear them.
+GLHF!! 彼此友善！ 别让我进入非产卵岗位!!								
+15
+ Comments							
+>
+WeirdCat
+						Jan 10, 2025 @ 5:46am 
+				I want a T-shift with an army of Amphibious Jets now, great guide			
+Space_Captainface
+ [author]
+						Oct 23, 2023 @ 2:30pm 
+				@Auber: This guide is for RTS, not baby-time scaredy-cat fun modes.			
+Space_Captainface
+ [author]
+						Oct 23, 2023 @ 2:29pm 
+				@maxbear123: Late reply here, but so was yours ;-)
+AA beam jets are AA only, expensive, slow to build, slow to move, and tough to micro as a dense swarm (unlike amphib jets). As soon as you switch to building enough AA jets to counter your opponent, your opponent can either go ground efficiently, or switch to missile jets and do high-density missile shots (that switch to nearby targets once one is destroyed).
+AA beam jets may buy time and prevent a loss, but it's not a winning counter. Besides, I'd put my money on a swarm of fast amphib jets doing more sustained damage overall against a defender's attempts to distribute AA jets effectively.			
+maxbear123
+						Oct 30, 2021 @ 8:59am 
+				Beam AA jets were introduced to counter amphibious jets			
+Space_Captainface
+ [author]
+						Jul 9, 2020 @ 5:58pm 
+				@Juny Foo: Good question -- that's my favourite build. It's difficult to counter if the player has good micro.
+Minigun and AA mech is an expensive and slow mid-to-late game build, so if they've committed to that from the beginning and you scout it, you can probably just hard counter early game by swarming with cheap tanks.
+Situationally:
+Situation 1: Minigun/AA mechs are attacking -- Hold back with artillery, pick off unprotected minigun mechs with air (you can force them out of position by drawing their AA with a few air units, then punch more air units into another part of their army). Try to swarm them with fast units when they're weakened.
+Situation 2: Minigun/AA mechs aren't attacking yet -- Build T3/artillery turrets to secure a "front" (and have scouts elsewhere to see if they try to go around). Mechs are slow, so you can attack their base once they've left. Or you can "crawl" forward and eventually overwhelm them. It will probably be a long game.			
+Juny Foo
+						Jul 9, 2020 @ 1:14pm 
+				any countering tips to mini-gun mech and anti-air mech combo?			
+Auber
+						Apr 8, 2020 @ 11:29am 
+				one thing you should have factored in is that some servers have no fog, completely getting rid of the need to use interceptors and such to scout.			
+KusoLP
+						Feb 23, 2020 @ 10:03pm 
+				But nowadays i play with mods, so rarely use vanilla			
+KusoLP
+						Feb 23, 2020 @ 10:02pm 
+				Well a few years			
+Space_Captainface
+ [author]
+						Feb 23, 2020 @ 4:44pm 
+				@ISPfanneros When did you start playing? They were OP when this guide was made (Sep 2019)			
+>
+Share to your Steam activity feed
+			Link: 
+You need to sign in or create an account to do that.
+Sign In
+Create an Account
+Cancel
+Update
+COMMENTS SECTION (captured 2026-08-04 from Austin's paste; absent from the
+original 2026-07-29 capture)
+============================
+Space_Captainface [author], on countering minigun+AA mech combo:
+"Minigun and AA mech is an expensive and slow mid-to-late game build, so if
+they've committed to that from the beginning and you scout it, you can
+probably just hard counter early game by swarming with cheap tanks.
+Situation 1: Minigun/AA mechs are attacking -- Hold back with artillery,
+pick off unprotected minigun mechs with air (you can force them out of
+position by drawing their AA with a few air units, then punch more air
+units into another part of their army). Try to swarm them with fast units
+when they're weakened.
+Situation 2: Minigun/AA mechs aren't attacking yet -- Build T3/artillery
+turrets to secure a 'front' (and have scouts elsewhere to see if they try
+to go around). Mechs are slow, so you can attack their base once they've
+left. Or you can 'crawl' forward and eventually overwhelm them."
+On AA beam jets: "AA only, expensive, slow... may buy time and prevent a
+loss, but it's not a winning counter."
+Reminder from the guide body, restated: "Amphibious Jets are only a HARD
+COUNTER to UNAWARE PLAYERS."
