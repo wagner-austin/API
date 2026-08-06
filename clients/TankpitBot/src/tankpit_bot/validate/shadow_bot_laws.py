@@ -22,9 +22,8 @@ was lawful team aggro, not noise.
 
 from __future__ import annotations
 
-import re
-
 from tankpit_bot.physics.capacity import damage_tier, fuel_capacity
+from tankpit_bot.protocol.naming import PRACTICE_BOT_NAME_PATTERN
 from tankpit_bot.sim.bot_policy import (
     AGGRO_SIGHT_RADIUS,
     BOT_RETURN_WEAPON,
@@ -43,8 +42,6 @@ REACTIVATION_TOLERANCE_MS = 1000
 boundary (frame timing jitter — the same tolerance the corpse-window
 law uses)."""
 
-BOT_NAME_PATTERN = re.compile(r"^(red|purple|blue|orange)-\d+$")
-"""Practice-bot naming from the JS ``sd()`` initializer: team-N."""
 
 _TEAM_BY_COLOR = {"red": 0, "purple": 1, "blue": 2, "orange": 3}
 """Roster color → team id (join-roster ground truth: red-1 arrives
@@ -62,7 +59,7 @@ def _bot_teams(timeline: ShadowTimelineDict) -> dict[int, int]:
     """
     teams: dict[int, int] = {}
     for tank_id, name in timeline["names"].items():
-        match = BOT_NAME_PATTERN.match(name)
+        match = PRACTICE_BOT_NAME_PATTERN.match(name)
         if match is not None:
             teams[tank_id] = _TEAM_BY_COLOR[match.group(1)]
     return teams
@@ -80,7 +77,7 @@ def _bot_ids(timeline: ShadowTimelineDict) -> frozenset[int]:
     return frozenset(
         tank_id
         for tank_id, name in timeline["names"].items()
-        if BOT_NAME_PATTERN.match(name) is not None
+        if PRACTICE_BOT_NAME_PATTERN.match(name) is not None
     )
 
 
@@ -279,6 +276,7 @@ def shadow_bot_reactivation(timelines: list[ShadowTimelineDict]) -> ClaimEvidenc
         Evidence for the ``bot-reactivation`` claim.
     """
     corpse_ms = CORPSE_WINDOW_TICKS * TICK_MS
+    observed_window_ms = corpse_ms + 2 * TICK_MS
     samples = 0
     exact = 0
     for timeline in timelines:
@@ -291,10 +289,19 @@ def shadow_bot_reactivation(timelines: list[ShadowTimelineDict]) -> ClaimEvidenc
             sync = _first_sync_after(timeline["syncs"], kill["victim_id"], kill["timestamp_ms"])
             if sync is None:
                 continue
+            gap = sync["timestamp_ms"] - kill["timestamp_ms"]
+            if gap > observed_window_ms:
+                # The reactivation happened OFF-viewport: the first
+                # re-sight arrived minutes later, after the bot may
+                # have fought (and been damaged by) someone else.
+                # Judging its tier would test our line of sight, not
+                # the law — 34 of the 2026-08-03 sweep's 35 "failures"
+                # were exactly these late damaged re-sights (gaps up
+                # to 1,047 s, every one full=False). Unobserved, not
+                # violated: skip, like deaths with no later sync.
+                continue
             samples += 1
-            gap_ok = (
-                sync["timestamp_ms"] - kill["timestamp_ms"] >= corpse_ms - REACTIVATION_TOLERANCE_MS
-            )
+            gap_ok = gap >= corpse_ms - REACTIVATION_TOLERANCE_MS
             full_tier = damage_tier(fuel_capacity(sync["rank"]), sync["rank"])
             if gap_ok and sync["damage_state"] == full_tier:
                 exact += 1
@@ -308,7 +315,7 @@ def shadow_bot_reactivation(timelines: list[ShadowTimelineDict]) -> ClaimEvidenc
 
 
 __all__ = [
-    "BOT_NAME_PATTERN",
+    "PRACTICE_BOT_NAME_PATTERN",
     "REACTIVATION_TOLERANCE_MS",
     "shadow_bot_reactivation",
     "shadow_bot_return_fire",
