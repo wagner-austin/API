@@ -69,6 +69,20 @@ is not enough:[^1]
 - **0x4C MapData** (map snapshot) carries positions for every tank on
   the map but is NOT wire presence proof -- a departed tank lingers in
   the snapshot for minutes. Advances `timestamp_ms` only.
+- **Map-position freshness defer (2026-08-06):** the 0x4C payload is
+  a snapshot that AGES before arrival ([[map-data-decode]] § tank
+  positions: 53% of within-2s map/wire pairs disagree by a movement
+  spectrum). A map-sourced authoritative position therefore DEFERS --
+  keeps the existing `(x, y)` and its freshness -- when the existing
+  position holds REAL coordinates updated within
+  `MAP_POSITION_DEFER_MS` (2000 ms). The strict predicate is
+  `has_real_coordinates` (tank.py, beside `has_known_position`): the
+  login roster's fresh-stamped `(0, 0)` entries are NOT protected, so
+  the map still lifts sentinel tanks onto real tiles. Stationary
+  tanks (no update in the window) take the map fix and its freshness
+  exactly as before. Pinned in `tests/world_state/
+  test_tank_observation.py` (defer, wire-never-deferred, sentinel
+  lift).
 
 ## The single mutator
 

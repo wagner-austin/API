@@ -37,7 +37,7 @@ in parentheses after the rank name on the stats panel ("Rank: private
 accumulate ("im currently rank 26. as we get more kills ill move down
 to 25, 24, ..., and eventually 1"); own-tank trace across the archive:
 160 (Jun 10) → 151 (Jun 11) → 27 → 26 (Aug 5, one 20-kill session
-apart). Startup scrape lands in `session_account_stats.rank_number`.
+apart). Startup scrape lands in `session_account_stats.rank_number` and, as of 2026-08-06, in the canonical runtime account model `SelfAccountDict` (`state/types/self_account.py`, read via `sniffer.world_state.get_self_account()`) -- the plug-in point for rank-aware features.
 
 - Persistent across sessions AND across deaths (purple-3 died at s=559, respawned still 559)[^2]
 - Counts DOWN as the tank earns promotion points[^2]
