@@ -44,6 +44,7 @@ from tankpit_bot.sniffer.world_state_combat import (
     check_and_clear_combat_hit,
     check_and_clear_our_shot_response,
 )
+from tankpit_bot.state.types import has_known_position
 
 log = get_logger(__name__)
 
@@ -95,7 +96,7 @@ def _enemy_from_world_state(
 ) -> tuple[int, int] | None:
     """Return (x, y) for a tank from the world state dict (map-known)."""
     tank = probe.get_world_state()["tanks"].get(str(tank_id))
-    if tank is None or (tank["x"] == 0 and tank["y"] == 0):
+    if tank is None or not has_known_position(tank):
         return None
     return (tank["x"], tank["y"])
 
@@ -326,6 +327,7 @@ class CombatProbe(ProbeBase):
             self._require_self_state(),
             enemy,
             get_terrain_map(),
+            action_hooks.get_current_time_ms(),
         )
         if landing_x == -1 and landing_y == -1:
             log.warning("COMBAT: no landing tile for %s", enemy["name"])

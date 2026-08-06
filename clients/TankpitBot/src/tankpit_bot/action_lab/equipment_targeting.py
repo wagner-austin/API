@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from tankpit_bot.action_lab import _test_hooks as action_hooks
 from tankpit_bot.bot.ai.equipment_search import find_nearest_equipment, find_teleport_landing_tile
 from tankpit_bot.bot.ai.ferry import compose_decision_terrain
 from tankpit_bot.bot.ai.reachability import is_collection_reachable_in_viewport
@@ -79,7 +80,11 @@ def visible_equipment_requires_reposition(
     if self_state is None:
         raise EquipmentTargetingError("self state is unavailable")
     world = probe.get_world_state()
-    terrain = compose_decision_terrain(world, get_terrain_map())
+    terrain = compose_decision_terrain(
+        world,
+        get_terrain_map(),
+        action_hooks.get_current_time_ms(),
+    )
     if terrain is None:
         raise EquipmentTargetingError("terrain map is unavailable")
     return not is_collection_reachable_in_viewport(

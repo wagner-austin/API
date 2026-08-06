@@ -369,6 +369,7 @@ class EnemyTrackingProbe(ProbeBase):
             self_state,
             target_enemy,
             get_terrain_map(),
+            action_hooks.get_current_time_ms(),
         )
         if landing_x == -1 and landing_y == -1:
             return None
