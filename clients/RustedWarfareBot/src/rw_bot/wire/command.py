@@ -5,12 +5,15 @@ one line, in exactly the shape ``rwbot.agent.CommandRecord`` accepts — the
 agent rejects anything else loudly rather than skipping it, so this encoder
 exists to make malformed lines unrepresentable rather than merely unlikely.
 
-Six verbs are defined, matching the six the agent can dispatch: move a unit to a
-world position, attack-move it there so it engages what it meets, attack a named
-target, have a builder place a structure, have a building produce a unit, and
-fire a unit's own action by selector. All address a unit by its engine identity,
-never by roster position — position renumbers whenever anything is built or
-dies.
+Seven order verbs are defined here, of the eight lines the agent can
+dispatch: move a unit to a world position, attack-move it there so it
+engages what it meets, attack a named target, have a builder place a
+structure, have a building produce a unit, fire a unit's own action by its
+interned key, and fire such an action at a chosen ground point. Every one
+addresses a unit by its engine identity, never by roster position — position
+renumbers whenever anything is built or dies. The eighth line, the reflex
+posture, addresses a *type* rather than a unit, which is why it lives in
+:mod:`rw_bot.wire.posture` rather than among the orders.
 
 Placing and producing are separate verbs because the engine keeps them
 separate. A structure goes where the planner chooses and travels there as a
@@ -152,6 +155,38 @@ class AbilityOrder(TypedDict):
     key: str
 
 
+class TargetedAbilityOrder(TypedDict):
+    """Have one unit fire an action at a chosen ground point.
+
+    The finisher's verb. The nuke launcher's launch is declared
+    ``fireTurretXAtGround``: the engine aims the silo turret at the point
+    the command carries, so the point is the whole decision -- and the
+    plain ability verb can never express it, because that verb sends the
+    unit's own position, which for a production action nothing reads
+    ([[mechanics-build-actions]]). Same dispatch, same key, with the point
+    chosen by the planner instead of defaulted by the agent.
+
+    A verb of its own rather than an optional field on ``ability``,
+    matching the wire's rule that every verb carries exactly its own
+    fields: an ability that takes no point refuses one, and an ability
+    fired at the ground cannot leave the point out.
+
+    Attributes:
+        kind: Discriminator, always ``"ability_at"``.
+        unit_id: Engine identity of the unit whose action it is.
+        key: The action's interned key name, exactly as the option carried
+            it.
+        x: Target world x.
+        y: Target world y.
+    """
+
+    kind: Literal["ability_at"]
+    unit_id: int
+    key: str
+    x: float
+    y: float
+
+
 def attack_order(*, unit_id: int, target_id: int) -> AttackOrder:
     """Build a validated attack order.
 
@@ -193,18 +228,31 @@ def ability_order(*, unit_id: int, key: str) -> AbilityOrder:
             character the flat wire format cannot -- a keyless action cannot
             be dispatched, and the agent would refuse the order.
     """
-    if key.strip() == "":
-        raise CommandError(
-            _BAD_ACTION,
-            "an ability order needs the option stream's action key",
-        )
-    for forbidden in ('"', "\\", "\n", "\r"):
-        if forbidden in key:
-            raise CommandError(
-                _BAD_ACTION,
-                f"action key {key!r} contains a character the wire format does not carry",
-            )
+    _require_action_key(key)
     return AbilityOrder(kind="ability", unit_id=unit_id, key=key)
+
+
+def targeted_ability_order(*, unit_id: int, key: str, x: float, y: float) -> TargetedAbilityOrder:
+    """Build a validated targeted ability order.
+
+    Args:
+        unit_id: Engine identity of the unit whose action it is.
+        key: The action's interned key name, from the option stream.
+        x: Target world x.
+        y: Target world y.
+
+    Returns:
+        The order.
+
+    Raises:
+        CommandError: ``RW-CMD-004`` when the key is blank or carries a
+            character the flat wire format cannot, ``RW-CMD-002`` when a
+            coordinate is not finite.
+    """
+    _require_action_key(key)
+    require_finite(x, "x")
+    require_finite(y, "y")
+    return TargetedAbilityOrder(kind="ability_at", unit_id=unit_id, key=key, x=x, y=y)
 
 
 def encode_ability(order: AbilityOrder) -> str:
@@ -217,6 +265,25 @@ def encode_ability(order: AbilityOrder) -> str:
         One JSON object, without a trailing newline.
     """
     return f'{{"kind":"ability","unit_id":{order["unit_id"]},"key":"{order["key"]}"}}'
+
+
+def encode_targeted_ability(order: TargetedAbilityOrder) -> str:
+    """Render a targeted ability order as one wire line.
+
+    The key is emitted unescaped, which is safe because
+    :func:`targeted_ability_order` already refused any key the flat format
+    cannot carry.
+
+    Args:
+        order: The order to encode.
+
+    Returns:
+        One JSON object, without a trailing newline.
+    """
+    return (
+        f'{{"kind":"ability_at","unit_id":{order["unit_id"]},'
+        f'"x":{order["x"]!r},"y":{order["y"]!r},"key":"{order["key"]}"}}'
+    )
 
 
 def encode_ack() -> str:
@@ -259,8 +326,8 @@ def move_order(*, unit_id: int, x: float, y: float) -> MoveOrder:
     Raises:
         CommandError: ``RW-CMD-002`` when a coordinate is not finite.
     """
-    _require_finite(x, "x")
-    _require_finite(y, "y")
+    require_finite(x, "x")
+    require_finite(y, "y")
     return MoveOrder(kind="move", unit_id=unit_id, x=x, y=y)
 
 
@@ -278,8 +345,8 @@ def attack_move_order(*, unit_id: int, x: float, y: float) -> AttackMoveOrder:
     Raises:
         CommandError: ``RW-CMD-002`` when a coordinate is not finite.
     """
-    _require_finite(x, "x")
-    _require_finite(y, "y")
+    require_finite(x, "x")
+    require_finite(y, "y")
     return AttackMoveOrder(kind="attack_move", unit_id=unit_id, x=x, y=y)
 
 
@@ -315,9 +382,9 @@ def build_order(*, unit_id: int, type_name: str, x: float, y: float) -> BuildOrd
             character the wire format cannot, ``RW-CMD-002`` when a coordinate
             is not finite.
     """
-    _require_type_name(type_name, "build")
-    _require_finite(x, "x")
-    _require_finite(y, "y")
+    require_type_name(type_name, "build")
+    require_finite(x, "x")
+    require_finite(y, "y")
     return BuildOrder(kind="build", unit_id=unit_id, type_name=type_name, x=x, y=y)
 
 
@@ -335,7 +402,7 @@ def produce_order(*, unit_id: int, type_name: str) -> ProduceOrder:
         CommandError: ``RW-CMD-001`` when the type name is blank or carries a
             character the wire format cannot.
     """
-    _require_type_name(type_name, "produce")
+    require_type_name(type_name, "produce")
     return ProduceOrder(kind="produce", unit_id=unit_id, type_name=type_name)
 
 
@@ -381,7 +448,7 @@ def encode_produce(order: ProduceOrder) -> str:
     return f'{{"kind":"produce","unit_id":{order["unit_id"]},"type":"{order["type_name"]}"}}'
 
 
-def _require_type_name(type_name: str, verb: str) -> None:
+def require_type_name(type_name: str, verb: str) -> None:
     """Reject a unit-type name the flat wire format cannot carry.
 
     Checked when the order is built rather than when it is encoded, so a
@@ -407,7 +474,32 @@ def _require_type_name(type_name: str, verb: str) -> None:
             )
 
 
-def _require_finite(value: float, field: str) -> None:
+def _require_action_key(key: str) -> None:
+    """Reject an action key the flat wire format cannot carry.
+
+    Shared by the two ability verbs, so a key is legal on one exactly when
+    it is legal on the other.
+
+    Args:
+        key: The action's interned key name.
+
+    Raises:
+        CommandError: ``RW-CMD-004`` when the key is blank or unencodable.
+    """
+    if key.strip() == "":
+        raise CommandError(
+            _BAD_ACTION,
+            "an ability order needs the option stream's action key",
+        )
+    for forbidden in ('"', "\\", "\n", "\r"):
+        if forbidden in key:
+            raise CommandError(
+                _BAD_ACTION,
+                f"action key {key!r} contains a character the wire format does not carry",
+            )
+
+
+def require_finite(value: float, field: str) -> None:
     """Reject a coordinate JSON cannot carry.
 
     Args:
@@ -429,6 +521,7 @@ __all__ = [
     "CommandError",
     "MoveOrder",
     "ProduceOrder",
+    "TargetedAbilityOrder",
     "ability_order",
     "attack_move_order",
     "attack_order",
@@ -440,6 +533,10 @@ __all__ = [
     "encode_build",
     "encode_move",
     "encode_produce",
+    "encode_targeted_ability",
     "move_order",
     "produce_order",
+    "require_finite",
+    "require_type_name",
+    "targeted_ability_order",
 ]
