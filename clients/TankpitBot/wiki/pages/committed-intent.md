@@ -10,9 +10,9 @@ source_paths:
   - "src/tankpit_bot/bot/ai/intent.py"
   - "src/tankpit_bot/bot/ai/collect_mode.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/ai/intent.py": "74bcd19f55ef923ab28a40c02993d19fb7a7cacc"
-  "src/tankpit_bot/bot/ai/collect_mode.py": "81c893b10c143da3c9db8f316d912c225454373b"
-fact_checked: "2026-07-30"
+  "src/tankpit_bot/bot/ai/intent.py": "d74b42c51c71b4d8ad2787af496c7b2eb3c9919d"
+  "src/tankpit_bot/bot/ai/collect_mode.py": "250f21128e74649f5de0fbc059f5f24342334dff"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [architecture]
 ---
@@ -77,8 +77,16 @@ raw field mutation stays in `context.py` (`set_resource_target` /
 `tank_at_capacity` (completion — the fuel plan's purpose is served),
 `superior_candidate`, `not_executable`, `landing_scan_reset`,
 `walk_for_fuel_override`, `target_gone`, `target_not_pursuable`,
-`kind_invalid`[^4]. A new release site means a new documented reason in
-`intent.PLAN_RELEASE_REASONS`, not an invented string[^4].
+`kind_invalid`, `unservable`[^4]. A new release site means a new
+documented reason in `intent.PLAN_RELEASE_REASONS`, not an invented
+string[^4].
+
+**`unservable` (added 2026-08-05)** is the *structural* release, and the
+only one that fires without a failure signal: the locked container has
+no legal teleport landing AND no fresh ferry on its own water body, so
+no lane — walk, hop, or ride — can ever serve it, and no move-failed
+mark will ever arrive to invalidate the lock. Without it such a lock is
+held forever; run `bot-20260804-234008` held one for 11 minutes.[^4]
 
 Churn query: count `diagnostic_kind=plan_released` per reason per
 run[^5]. High `superior_candidate` counts = lock thrash; `not_executable`
@@ -121,6 +129,6 @@ window = ticks spent re-planning under fire.
 [^1]: [synthesis] — the motivating behaviour, recorded from live runs rather than measured in a test. The specific receipt is the s8-2 flag on run `bot-20260730-025337` (03:00:00) described in [[flag-triage-20260729]]: an escape hop landed on its own locked equipment and the next derivation selected a fresh teleport to it. `src/tankpit_bot/bot/ai/intent.py:23-26` records the same rationale in the module doc — every release emits a `plan_released` diagnostic "so plan churn is measurable in the events stream instead of silent".
 [^2]: `src/tankpit_bot/bot/ai/intent.py` — the four-function API that implements the question: `current_collect_plan(ai_state)` at `:174`, `plan_completes_here(plan, self_x, self_y)` at `:198`, `release_collect_plan(...)` at `:215`, and `validate_collect_plan(...)` at `:251`, the last "run at ``DecideCtx`` construction" per the module doc at `:20-21`.
 [^3]: `src/tankpit_bot/bot/ai/intent.py:28-30` — module doc, verbatim: "Raw field mutation stays in :mod:`tankpit_bot.bot.ai.context` (``set_resource_target`` / ``clear_resource_target``); this layer adds meaning, not a parallel mechanism." Both mutators exist at `src/tankpit_bot/bot/ai/context.py:183` and `:164` respectively, and carry the plan's persistent fields, so no new state was introduced.
-[^4]: `src/tankpit_bot/bot/ai/intent.py:72-81` — `PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...]` is the closed tuple `("tank_at_capacity", "superior_candidate", "not_executable", "landing_scan_reset", "walk_for_fuel_override", "target_gone", "target_not_pursuable", "kind_invalid")`, matching this section's list exactly and in order; its docstring at `:82-84` names it a "Closed vocabulary of plan-release reason codes". `release_collect_plan`'s `reason` parameter is documented against it at `:232`.
+[^4]: `src/tankpit_bot/bot/ai/intent.py:72-82` — `PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...]` is the closed tuple `("tank_at_capacity", "superior_candidate", "not_executable", "landing_scan_reset", "walk_for_fuel_override", "target_gone", "target_not_pursuable", "kind_invalid", "unservable")`, matching this section's list exactly and in order; its docstring at `:83` names it a "Closed vocabulary of plan-release reason codes" and describes `unservable` and the 11-minute `bot-20260804-234008` lock at `:85-91`. **Corrected 2026-08-06:** this page's "closed" list omitted `unservable`, which was added to the code 2026-08-05 — caught by the `intent.py` pin, and exactly the failure the code comment warns about ("a new release site means a new documented reason here, not an invented string").
 [^5]: `src/tankpit_bot/bot/ai/intent.py:23-26,88` — every release "emits a ``plan_released`` diagnostic with a specific reason code, so plan churn is measurable in the events stream instead of silent", and `plan_released` events are grouped "by this field". The churn interpretations below (lock thrash, the F6 passability family, re-planning under fire) are this page's reading of that data, not a recorded measurement.
 [^6]: `src/tankpit_bot/bot/ai/collect_mode.py:110` — `def _escape_under_fire_decision(...)`, called at `:400` before the hop-selection path.

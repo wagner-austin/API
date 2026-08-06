@@ -9,8 +9,8 @@ source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/equipment.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/equipment.py": "17815a7fde8141fe2b21bfdf88552ec578c97f41"
-fact_checked: "2026-07-27"
+  "src/tankpit_bot/sim/equipment.py": "b8b334fef24b91465d7142edc966f2b9ea4dd398"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -39,8 +39,18 @@ very next frame) shows:[^8]
 
 - **Exactly ONE slot gains per pickup** (the 1,149 ``show_message=True``
   container pickups; see the radar-zero exception below).
-- **Hard cap 25** — zero grants pushed a count past it; gains clip at
-  the cap (every gain of 1-4 on a weapon slot was a cap-clip).
+- **Cap is RANK-DERIVED, not a flat 25** — `20 + 5 * rank`
+  (`physics/capacity.py:103` `inventory_capacity`, sourced from the
+  official rules table: recruit 20, +5 per rank). Zero grants pushed a
+  count past the cap; gains clip at it (every gain of 1-4 on a weapon
+  slot was a cap-clip). **Corrected 2026-08-06:** this row previously
+  read "Hard cap 25" as an absolute. 25 is `inventory_capacity(1)` —
+  the Private value — and the corpus it was measured from was
+  all-private, so the rank term was invisible. Recruit cap 20 is
+  confirmed by the `bot-20260725-211120` promotion crossing, where slot
+  counts crossed 20 only after the promoting kill. Note the cap moves
+  at the promoting KILL while the wire rank field stays stale, so the
+  true current rank is what governs.
 - **True stack rolls, visible when below the deficit**: dual and
   homing roll **5-9** (uncapped distribution ≈ uniform); radar rolls
   **2-4**. Radar really is the smallest stack — the user's
@@ -52,8 +62,9 @@ very next frame) shows:[^8]
   need" feel comes from the common state where only one slot is
   deficient. Armor gains when deficient too (2 samples); missile was
   never observed deficient.
-- armor=25, dual=25, missile=25, homing=25, radar=25 → server returns
-  **"Inventory full"** (0x52 error 7), no pickup, container stays.[^6]
+- every slot at the rank cap (armor/dual/missile/homing/radar all 25 in
+  the observed all-Private corpus) → server returns **"Inventory full"**
+  (0x52 error 7), no pickup, container stays.[^6]
 
 **The radar-zero KILL REWARD (cracked 2026-07-22)**: the archive's 5
 ``show_message=False`` multi-slot 0x67s are all same-frame with an
@@ -92,7 +103,7 @@ command, done.[^10]
 
 ## "Inventory full" wire signal
 
-Server returns 0x52 CommandResult error code **7 (`SUPERVISOR_ERROR_INVENTORY_FULL`)** when the bot dispatches ``pickup_equipment`` while every inventory slot is at 25. The error code is defined in `protocol/constants.py:147` and is in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`) as of 2026-06-21, so today the bot:[^7]
+Server returns 0x52 CommandResult error code **7 (`SUPERVISOR_ERROR_INVENTORY_FULL`)** when the bot dispatches ``pickup_equipment`` while every inventory slot is at the rank cap (`20 + 5 * rank`; 25 at Private, which is where this was observed). The error code is defined in `protocol/constants.py:147` and is in `_ACTION_BLOCKING_COMMAND_ERRORS` (`bot/tick_loop_actions.py:44`) as of 2026-06-21, so today the bot:[^7]
 
 1. dispatches the pickup
 2. server rejects with code 7 on 0x52

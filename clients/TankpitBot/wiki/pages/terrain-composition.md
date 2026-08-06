@@ -12,9 +12,9 @@ source_paths:
   - "src/tankpit_bot/terrain.py"
   - "tpclient.js"
 source_git_blobs:
-  "src/tankpit_bot/terrain.py": "32901c5ed745e8b8df212b5f388961b461cfcd3c"
+  "src/tankpit_bot/terrain.py": "38871a35766c9d5bb8f491a46786db2526d474fc"
   "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
-fact_checked: "2026-07-31"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [architecture]
 ---
@@ -206,5 +206,5 @@ source value). The executor is now pure dispatch — the end state
 [^1]: Loop capture: `runs/bot/bot-20260720-165935.events.jsonl` ticks 128–150 — 23 × `hop_selected` (37,153) → `action_outcome outcome=discarded_hostile_mine duration_ms=0`, fuel and inventory unchanged throughout.
 [^2]: Verification soak: `runs/bot/bot-20260720-192320.events.jsonl` (latest.* at time of writing); analyzer output "no top-level issues detected"; discard/error/replan counts measured by direct event scan 2026-07-20.
 [^3]: Executor veto origin: commit dc696282 (2026-04-10) "Add executor-side command validation against current world state". Mine-veto deletion + composition: commit 6d2afdbe (2026-07-20). Ferry composition precedent: 2026-06-12, run 131003 ("marooned island" that was a ferry).
-[^4]: Displacement physics: user (Austin) 2026-06-16 — "you get moved off if there are mines, or if there is terrain in the way"; documented in [[teleport-mechanics]] Placement.
-[^5]: user (Austin), 2026-07-20 — root-cause ruling on the fixed-point loop, quoted verbatim above.
+[^4]: Displacement physics. Originally a user (Austin) statement of 2026-06-16 — "you get moved off if there are mines, or if there is terrain in the way" — made in conversation, with no transcript in the repo. The law it states is now carried by the code and readable there: `src/tankpit_bot/terrain.py:151-165`, whose docstring gives the reason the two predicates can share an implementation on the static view — "The static minimap carries no mines and no tank bodies -- the only blockers a landing is exempt from -- so on this view the two questions have the same answer. Views that compose dynamic blockers (`FerryAwareTerrain`) are where they diverge." The diverging views are `src/tankpit_bot/bot/ai/ferry.py:161` and `:306`. Also documented at [[teleport-mechanics]] Placement.
+[^5]: User (Austin) root-cause ruling of 2026-07-20 on the fixed-point loop, quoted verbatim above; the conversation is not recorded in the repo. What IS on record: `wiki/log.md:1390`, which narrates the two-owner era and its fixed-point loop and pins the fix as commit `6d2afdbe` (26 files, +358/−318). **The run this section names, `bot-20260720-165935`, is NOT in the archive** — the nearest retained 2026-07-20 captures are `bot-20260720-005424` and `bot-20260720-171140` — so the "23 consecutive ticks, ~46 s" figures cannot be re-derived from an artifact and rest on the contemporaneous narrative alone.
