@@ -1,6 +1,14 @@
 # Covenant Radar API
 
-Loan covenant monitoring and breach prediction API service. Deterministic rule evaluation, seven pluggable classification backends plus four regression backends, Optuna hyperparameter optimization, feature importance explainers, a domain-agnostic Kafka streaming worker, and PostgreSQL persistence.
+**Multi-domain risk prediction behind one protocol.** This began as loan-covenant
+breach monitoring and was then generalized: adding a risk domain is a
+*registration*, not a fork. Three ship today — `covenant`, `weather`, `esports` —
+each its own package, reusing the same training, hyperparameter-search,
+explainability and streaming machinery without modifying any of it.
+
+Loan covenants remain the reference domain, and the CRUD plus rule-evaluation
+surface below is specific to them. Everything under `/ml/*` and the streaming
+worker is domain-agnostic.
 
 **Detailed documentation lives alongside the code:**
 
@@ -16,24 +24,36 @@ Loan covenant monitoring and breach prediction API service. Deterministic rule e
 | Google AI (Gemini) alert summaries | [docs/integrations/google_ai.md](./docs/integrations/google_ai.md) |
 | Optimization / submission / AMEX CLIs | [optimize](./scripts/optimize/README.md), [submit](./scripts/submit/README.md), [amex](./scripts/amex/README.md) |
 
-## Features
+## The design decisions worth knowing
 
-- **Deal Management**: CRUD operations for loan deals with structured metadata
-- **Covenant Definitions**: Configurable rules with formulas, thresholds, and frequencies
-- **Financial Measurements**: Time-series metric ingestion for covenant calculations
-- **Rule Evaluation**: Deterministic covenant compliance checking with OK/NEAR_BREACH/BREACH status
-- **Breach Prediction**: Seven pluggable ML backends for risk tier prediction (LOW/MEDIUM/HIGH/CRITICAL)
-- **Regression**: Continuous-target counterparts of the classification routes
-- **Hyperparameter Optimization**: Optuna TPE with categorical and continuous spaces, DART boosting for XGBoost and LightGBM, early stopping on validation AUC
-- **Model Explainability**: Feature importance via `/ml/explain` — permutation for every backend, `shap_tree` for tree models, gradients for neural networks
-- **Background Training**: Redis + RQ worker for model training jobs
-- **Monitoring Dashboard**: `/dashboard` serves an HTML monitoring UI with vendored Chart.js
-- **Kafka Streaming**: Confluent Cloud integration for real-time inference, with a dead-letter topic for undecodable payloads
-- **Pluggable Streaming Domains**: One domain-agnostic worker serves `weather` and `esports`, selected at runtime by `STREAMING__DOMAIN`
-- **Gemini AI Integration**: Human-readable alert summaries with token usage and latency metrics
-- **Observability**: Datadog APM tracing and custom metrics
-- **Type Safety**: mypy strict mode, zero `Any` types, Protocol-based DI
-- **100% Test Coverage**: Statements and branches
+- **A domain is a package, not a branch.** One domain-agnostic streaming worker
+  serves every registered domain, selected at runtime by `STREAMING__DOMAIN`.
+  Adding a domain means writing a package that satisfies the protocol — the
+  training, explainability and streaming code is untouched. That constraint is
+  what took this from a loan-covenant tool to a risk-prediction platform.
+- **Deterministic rules and learned models are kept apart.** Covenant compliance
+  is exact rule evaluation (`OK` / `NEAR_BREACH` / `BREACH`) with formulas,
+  thresholds and frequencies. Breach *risk* is the ML path. Conflating the two
+  would make a compliance answer probabilistic, which is worse than useless.
+- **Eleven model backends behind one interface** — seven classifiers (XGBoost,
+  LightGBM, ClearGBM, logistic regression, random forest, PyTorch MLP, and a
+  bidirectional LSTM for temporal sequences) plus four regressors, swappable
+  per request.
+- **Explainability adapts to the backend.** One `/ml/explain` endpoint, three
+  strategies chosen by model type: permutation importance for anything, SHAP
+  TreeExplainer for tree models, input and integrated gradients for the neural
+  ones.
+- **Optuna TPE search** over categorical and continuous spaces, with DART
+  boosting for XGBoost and LightGBM and early stopping on validation AUC.
+- **Kafka on Confluent Cloud** for real-time inference, with a dead-letter topic
+  so an undecodable payload can't stall the stream.
+- **Gemini** for human-readable alert summaries, with token-usage and latency
+  metrics attached.
+
+Also here: deal / covenant / measurement CRUD, Redis + RQ background training, a
+`/dashboard` monitoring UI with vendored Chart.js, Datadog APM tracing, and
+PostgreSQL persistence. Strict mypy and full statement + branch coverage, as
+everywhere in this monorepo.
 
 ## Quick Start
 
