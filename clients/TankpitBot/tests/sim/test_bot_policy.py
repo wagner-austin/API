@@ -248,11 +248,13 @@ def test_team_aggro_skips_principals_third_teams_and_far_allies() -> None:
 def test_practice_room_ignores_shots_from_unknown_shooters() -> None:
     """A 0x53 whose shooter left the world never ignites anything."""
     from tankpit_bot.protocol.types import ShootEventDict
-    from tankpit_bot.sim.practice_room import PracticeRoomDriver
+    from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_roster
 
     world = make_sim_world("field01_r.gif")
     world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 900)
-    driver = PracticeRoomDriver(world, InMemoryTerrainMap(), 9, ((510, 1, 0, 108, 100),))
+    driver = PracticeRoomDriver(
+        seed_practice_roster(world, InMemoryTerrainMap(), ((510, 1, 0, 108, 100),))
+    )
     ghost_shot = ShootEventDict(
         msg_type=0x53,
         team=0,

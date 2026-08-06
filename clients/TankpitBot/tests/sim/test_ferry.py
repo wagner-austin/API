@@ -10,8 +10,9 @@ the move on the transition tile.
 from __future__ import annotations
 
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.protocol.types import BinaryMessage
 from tankpit_bot.sim.movement import (
-    _truncate_at_transition,
+    _execute_walk,
     ferry_at,
     process_move,
     tile_surface,
@@ -97,6 +98,65 @@ def test_disembark_stops_one_step_onto_land() -> None:
     assert len(outcome["path"]) == 8
 
 
+def test_overshoot_disembark_closes_with_cant_go() -> None:
+    """A transition stop SHORT of the click gets the code-1 close.
+
+    Live 2026-08-03 cluster A: the bot rode the ferry afloat on
+    (59,28) water and collected at land targets inland — every
+    command echoed the one-step disembark and then the 0x52. The
+    receipt says "your command did not finish", not "your walk was
+    refused".
+    """
+    from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_CANT_GO
+    from tankpit_bot.sim.emissions import emit_move
+
+    world = _world(13, 10)
+    outcome = process_move(world, _channel_map(), 9, 25, 10)
+    assert outcome["kind"] == "moved"
+    assert outcome["stop_reason"] == "transition"
+    assert outcome["dest_reached"] is False
+    messages: list[BinaryMessage] = []
+    emit_move(world, 9, outcome, messages)
+    assert messages[0]["msg_type"] == 0x47
+    closes = [m for m in messages if m["msg_type"] == 0x52]
+    assert [m["error_code"] for m in closes] == [SUPERVISOR_ERROR_CANT_GO]
+
+
+def test_transition_stop_on_the_clicked_tile_closes_silently() -> None:
+    """Boarding the ferry tile the click named is a FINISHED command."""
+    from tankpit_bot.sim.emissions import emit_move
+
+    world = _world(10, 10)
+    outcome = process_move(world, _channel_map(), 9, 13, 10)
+    assert outcome["stop_reason"] == "transition"
+    assert outcome["dest_reached"] is True
+    messages: list[BinaryMessage] = []
+    emit_move(world, 9, outcome, messages)
+    assert messages[0]["msg_type"] == 0x47
+    assert [m for m in messages if m["msg_type"] == 0x52] == []
+
+
+def test_mine_walk_over_arrest_closes_silently() -> None:
+    """The hidden-mine arrest emits 0x45, never a code 1.
+
+    Archive 2026-07-29/30: 18 detonations, zero paired code-1s.
+    """
+    from tankpit_bot.sim.emissions import emit_move
+    from tankpit_bot.sim.world import SimMineDict
+
+    world = _world(10, 10)
+    world["mines"].append(SimMineDict(x=11, y=10, team=2))
+    outcome = process_move(world, _channel_map(), 9, 12, 10)
+    assert outcome["kind"] == "moved"
+    assert outcome["stop_reason"] == "mine"
+    assert outcome["dest_reached"] is False
+    messages: list[BinaryMessage] = []
+    emit_move(world, 9, outcome, messages)
+    assert messages[0]["msg_type"] == 0x47
+    assert any(m["msg_type"] == 0x45 for m in messages)
+    assert [m for m in messages if m["msg_type"] == 0x52] == []
+
+
 def test_floating_container_picks_up_while_riding() -> None:
     """A container on water drains normally from the ferry."""
     world = _world(13, 10)
@@ -144,15 +204,18 @@ def test_viewport_patches_carry_ferry_tiles_and_reverts() -> None:
 def test_truncation_carries_the_surface_across_unclassified_tiles() -> None:
     """A hand-built path over rock keeps the last known surface.
 
-    The router never routes across rock, but the truncation walk is
+    The router never routes across rock, but the execution walk is
     total over arbitrary step strings: an unclassifiable tile leaves
     ``previous`` unchanged instead of guessing.
     """
     world = _world(10, 10)
     terrain = InMemoryTerrainMap(terrain_data={(11, 10): _ROCK})
-    walked, x, y = _truncate_at_transition(world, terrain, 10, 10, "land", "ee")
+    walked, x, y, reason = _execute_walk(
+        world, terrain, world["tanks"][9], "land", "ee", stop_on_contact=False
+    )
     assert walked == "ee"
     assert (x, y) == (12, 10)
+    assert reason == "exhausted"
 
 
 def test_out_of_window_ferry_tiles_wait_for_the_window() -> None:

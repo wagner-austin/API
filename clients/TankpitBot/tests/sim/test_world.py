@@ -90,9 +90,24 @@ def test_decode_world_rejects_malformed_sections() -> None:
         ("mines", {}),
         ("equipment", "nope"),
         ("ferries", 3),
+        ("revealed_mine_keys_by_team", "nope"),
+        ("revealed_mine_keys_by_team", {"0": "10,11"}),
+        ("revealed_mine_keys_by_team", {"0": [7]}),
     ]
     for key, bad in cases:
         broken = dict(good)
         broken[key] = bad
         with pytest.raises(ValueError):
             decode_sim_world(broken)
+
+
+def test_revealed_mine_keys_round_trip_per_team() -> None:
+    """Team-scoped reveal knowledge survives encode/decode intact."""
+    world = make_sim_world("field01_r.gif")
+    world["revealed_mine_keys_by_team"]["0"] = ["10,11", "12,13"]
+    world["revealed_mine_keys_by_team"]["2"] = ["200,143"]
+    decoded = decode_sim_world(encode_sim_world(world))
+    assert decoded["revealed_mine_keys_by_team"] == {
+        "0": ["10,11", "12,13"],
+        "2": ["200,143"],
+    }

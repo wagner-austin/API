@@ -1,8 +1,11 @@
 """Law 7 addendum — equipment containers and the archive-mined 0x67 grant.
 
 The grant law comes from 1,149 exact-pre ``0x67 -> next 0x49`` pairs
-(2026-07-22 corpus mining): one slot per grant, hard cap 25, weapon
-stacks 5-9 / radar stacks 2-4, all-full rejected with 0x52 error 7.
+(2026-07-22 corpus mining): one slot per grant, hard cap at the rank
+inventory capacity (25 across the all-private corpus), weapon stacks
+5-9 / radar stacks 2-4, all-full rejected with 0x52 error 7 — the
+refusal is the shared ``physics.supervisor.equipment_pickup_refusal``
+law.
 The sim's deterministic approximation grants the most-deficient slot
 with the measured midpoint stacks (7 weapons / 3 radar).
 """
@@ -10,11 +13,11 @@ with the measured midpoint stacks (7 weapons / 3 radar).
 from __future__ import annotations
 
 from tankpit_bot.bot.tick_loop import _tick_once
+from tankpit_bot.physics.capacity import inventory_capacity
 from tankpit_bot.protocol.constants import SUPERVISOR_ERROR_INVENTORY_FULL
 from tankpit_bot.sim.combat import SLOT_DUAL, SLOT_HOMING, SLOT_RADAR
 from tankpit_bot.sim.commands import ClientCommandDict
 from tankpit_bot.sim.equipment import (
-    EQUIPMENT_CAP,
     RADAR_STACK,
     WEAPON_STACK,
     resolve_equipment_pickup,
@@ -60,7 +63,7 @@ def test_grant_clips_at_the_cap() -> None:
     if grant is None:
         raise AssertionError("the tile holds a container - a grant record is required")
     assert grant["gained"] == [0, 0, 0, 2, 0]
-    assert world["tanks"][9]["counts"][SLOT_HOMING] == EQUIPMENT_CAP
+    assert world["tanks"][9]["counts"][SLOT_HOMING] == inventory_capacity(1)
 
 
 def test_radar_grants_use_the_smaller_measured_stack() -> None:

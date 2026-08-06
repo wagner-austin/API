@@ -7,7 +7,7 @@ import pytest
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.map import MAP_DOT_MIN_VOLUME
 from tankpit_bot.protocol.types import ShootEventDict
-from tankpit_bot.sim.practice_room import PracticeRoomDriver
+from tankpit_bot.sim.practice_room import PracticeRoomDriver, seed_practice_roster
 from tankpit_bot.sim.world import SimWorldDict, make_sim_tank, make_sim_world
 from tankpit_bot.sim.world_seed import (
     DOTTED_FUEL_COUNT,
@@ -125,7 +125,7 @@ def test_practice_room_rejects_a_roster_tile_far_at_sea() -> None:
     """A mined position with no open tile within 16 is bad layout data."""
     sealed = InMemoryTerrainMap(default=InMemoryTerrainMap.WATER)
     with pytest.raises(RuntimeError, match="no open tile within 16"):
-        PracticeRoomDriver(_world(), sealed, 9, ((510, 1, 0, 101, 100),))
+        seed_practice_roster(_world(), sealed, ((510, 1, 0, 101, 100),))
 
 
 def test_practice_room_notes_hits_and_returns_fire() -> None:
@@ -134,10 +134,11 @@ def test_practice_room_notes_hits_and_returns_fire() -> None:
     world = _world()
     world["tanks"][9] = make_sim_tank(9, 2, 1, 100, 100, 1100)
     driver = PracticeRoomDriver(
-        world,
-        InMemoryTerrainMap(),
-        9,
-        ((510, 1, 0, 101, 100), (511, 1, 0, 103, 100)),
+        seed_practice_roster(
+            world,
+            InMemoryTerrainMap(),
+            ((510, 1, 0, 101, 100), (511, 1, 0, 103, 100)),
+        )
     )
     shot = ShootEventDict(
         msg_type=0x53,

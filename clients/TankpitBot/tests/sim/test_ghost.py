@@ -35,11 +35,11 @@ _MAGIC = "ghosttestmagic"
 _T0 = 1_785_000_000_000
 
 
-def _world_for_statements() -> SimWorldDict:
+def _world_for_statements(ghost_name: str = "Yuppler") -> SimWorldDict:
     """A statement-builder world: recorded self 77 and ghost 500."""
     world = make_sim_world("field01_r.gif")
     world["tanks"][77] = make_sim_tank(77, 2, 3, 100, 100, 900)
-    world["tanks"][500] = make_sim_tank(500, 1, 2, 108, 100, 600, name="Yuppler")
+    world["tanks"][500] = make_sim_tank(500, 1, 2, 108, 100, 600, name=ghost_name)
     return world
 
 
@@ -78,9 +78,9 @@ def _capture(timeline: list[tuple[int, list[BinaryMessage]]]) -> str:
     )
 
 
-def _fight_capture() -> str:
+def _fight_capture(ghost_name: str = "Yuppler") -> str:
     """A tiny recorded fight: join, ghost sighted, moves, shoots, chats."""
-    world = _world_for_statements()
+    world = _world_for_statements(ghost_name)
     join: list[BinaryMessage] = [
         identity_statement(world, 77),
         position_statement(world, 77),
@@ -530,7 +530,9 @@ def test_ghost_atlas_composition_underlays_the_mined_room(fake_fs: FakeFileSyste
     }
     fake_fs.write_text(DEFAULT_ATLAS_PATH, dump_json_str({"1|field01.gif": atlas_tiles}))
     fake_fs.write_text(Path(SIM_FIELD), "fake-gif-bytes")
-    fake_fs.write_text(Path("runs/ghost-input.capture_session.json"), _fight_capture())
+    # A BOT-named ghost: the reactive-policy driver constructs over it
+    # (the certified roster policy under the recorded timeline).
+    fake_fs.write_text(Path("runs/ghost-input.capture_session.json"), _fight_capture("orange-2"))
     _test_hooks.load_terrain_map = lambda gif_path: InMemoryTerrainMap()
     exit_code = main(
         [
