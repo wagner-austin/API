@@ -1,9 +1,10 @@
 """What match to play, and the agent settings that ask for it.
 
-Separated from :mod:`rw_bot.harness.launch`, which knows how to start *a* game,
-because this knows *which* game. The distinction matters now that the match is
-an experiment variable: the map, the opponent count and the difficulty are arms
-in a sweep exactly as the seed is, rather than whatever the engine defaults to.
+Knows *which* game rather than how to start one -- starting belongs to the
+PowerShell harness (`scripts/make/play.ps1`), which assembles the engine's
+command line. The distinction matters because the match is an experiment
+variable: the map, the opponent count and the difficulty are arms in a sweep
+exactly as the seed is, rather than whatever the engine defaults to.
 
 **The engine defaults are not a choice anyone made.** ``-sandbox`` queues a
 script naming a ten-player map, and the setup is read out of a GUI document
@@ -142,8 +143,8 @@ def agent_options(
         match: Which match to play, or None to leave the engine's own default.
 
     Returns:
-        The option string, to be handed to
-        :func:`~rw_bot.harness.launch.build_argv` as one argv element.
+        The option string, handed to the ``-javaagent`` flag as one argv
+        element by the harness recipe.
     """
     settings = [f"channelPort={port}", f"sampleIntervalMs={sample_ms}"]
     if seed:

@@ -13,7 +13,7 @@ marker with no stack trace. They therefore carry no ``encode_*``/``decode_*``
 pair: their members are already JSON-shaped scalars and tuples that
 ``json.dumps`` serialises directly, and no untyped payload is ever turned back
 into one, so an encoder would be a thin wrapper over identity.
-:class:`~rw_bot.harness.launch.LaunchConfig` does cross an untyped boundary and
+:class:`~rw_bot.harness.match.MatchConfig` does cross an untyped boundary and
 carries the full encode/decode/``require_*`` chain.
 """
 
