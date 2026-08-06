@@ -13,12 +13,16 @@ from pathlib import Path
 import pytest
 from scripts.physics_claims import (
     CLAIM_FENCE_OPEN,
-    PHYSICS_PACKAGE,
+    CLAIM_TARGETS,
+    _public_symbol_addresses,
     run_physics_claim_rules,
 )
 
 FIXTURE_PACKAGE = "tests.scripts.physics_fixture"
 FIXTURE_MODULE = f"{FIXTURE_PACKAGE}.facts"
+#: The exactly-one-of-kinds message, kept in one place so adding a
+#: claim kind updates every assertion that quotes it.
+_ONE_OF = "claim needs exactly one of value/bytes/probes/law"
 
 GREEN_PAGE = f"""# Fixture Economy
 
@@ -154,7 +158,7 @@ def test_claim_with_value_and_probes_is_reported(
     _write_page(tmp_path, "bad.md", _claims_page(claims))
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
-    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
+    assert f"physics_claim_violation bad.md#x: {_ONE_OF}" in out
 
 
 def test_claim_with_neither_value_nor_probes_is_reported(
@@ -165,7 +169,7 @@ def test_claim_with_neither_value_nor_probes_is_reported(
     _write_page(tmp_path, "bad.md", _claims_page(claims))
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
-    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
+    assert f"physics_claim_violation bad.md#x: {_ONE_OF}" in out
 
 
 def test_code_without_colon_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -420,7 +424,7 @@ def test_unclaimed_public_symbol_is_reported(
     _write_page(tmp_path, "pages.md", _claims_page(claims))
     assert _run(tmp_path) == 1
     out = capsys.readouterr().out
-    assert f"{FIXTURE_MODULE}:double: public physics symbol has no wiki claim" in out
+    assert f"{FIXTURE_MODULE}:double: public bound symbol has no wiki claim" in out
 
 
 def test_doubly_claimed_symbol_is_reported(
@@ -439,15 +443,47 @@ def test_doubly_claimed_symbol_is_reported(
     assert f"{FIXTURE_MODULE}:ANSWER: bound by 2 claims, expected exactly 1" in out
 
 
-def test_unresolvable_package_is_reported(
+def test_unresolvable_target_is_reported(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A package name that is not a package fails the reverse sweep."""
+    """A target that names nothing importable fails the reverse sweep."""
     _write_page(tmp_path, "pages.md", "# Empty\n")
-    count = run_physics_claim_rules(tmp_path, package_name=FIXTURE_MODULE)
+    count = run_physics_claim_rules(tmp_path, package_name="tests.scripts.no_such_target")
     assert count == 1
     out = capsys.readouterr().out
-    assert f"package '{FIXTURE_MODULE}' does not resolve to a package" in out
+    assert "target 'tests.scripts.no_such_target' does not resolve" in out
+
+
+def test_module_target_binds_only_its_own_all(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A bare module is a legal target, enumerating just its __all__.
+
+    Module targets are what let a large package be onboarded a module
+    at a time instead of in one big-bang commit — the reverse-coverage
+    rule is all-or-nothing per target, so the target has to be
+    scopeable below package granularity.
+    """
+    _write_page(tmp_path, "pages.md", "# Empty\n")
+    count = run_physics_claim_rules(tmp_path, package_name=FIXTURE_MODULE)
+    # facts.__all__ is exactly ANSWER + double, and neither is claimed.
+    assert count == 2
+    out = capsys.readouterr().out
+    assert f"{FIXTURE_MODULE}:ANSWER: public bound symbol has no wiki claim" in out
+    assert f"{FIXTURE_MODULE}:double: public bound symbol has no wiki claim" in out
+
+
+def test_module_target_goes_green_when_claimed(tmp_path: Path) -> None:
+    """The module arm satisfies reverse coverage like the package arm."""
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [4], "expect": 8}]}'
+        "]}"
+    )
+    _write_page(tmp_path, "mod.md", _claims_page(claims))
+    assert run_physics_claim_rules(tmp_path, package_name=FIXTURE_MODULE) == 0
 
 
 def test_module_without_all_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -456,14 +492,97 @@ def test_module_without_all_is_reported(tmp_path: Path, capsys: pytest.CaptureFi
     count = run_physics_claim_rules(tmp_path, package_name="tests.scripts.physics_fixture_noall")
     assert count == 1
     out = capsys.readouterr().out
-    assert "tests.scripts.physics_fixture_noall.bare: physics module lacks __all__" in out
+    assert "tests.scripts.physics_fixture_noall.bare: bound module lacks __all__" in out
 
 
 def test_real_repo_binding_is_green() -> None:
-    """THE test: the actual wiki claims match the actual physics package."""
+    """THE test: the real wiki claims match the real code, all targets.
+
+    Runs with no ``package_name`` override, so it exercises the same
+    multi-target path the guard uses — including reverse coverage
+    pooled across every entry of :const:`CLAIM_TARGETS`.
+
+    This replaced a single-target form pinned to ``PHYSICS_PACKAGE``.
+    Once a second target existed, that form was actively wrong: the
+    override restricts which targets claims may bind INTO, so the 61
+    ``protocol.commands`` claims all reported "is outside
+    tankpit_bot.physics". A single-target assertion cannot describe a
+    repo with more than one bound target.
+    """
     repo_root = Path(__file__).resolve().parents[2]
     assert (repo_root / "wiki" / "pages").is_dir()
-    assert run_physics_claim_rules(repo_root, package_name=PHYSICS_PACKAGE) == 0
+    assert run_physics_claim_rules(repo_root) == 0
+
+
+def test_claim_targets_are_all_importable() -> None:
+    """Every declared target resolves; a typo here silently binds nothing."""
+    for target in CLAIM_TARGETS:
+        addresses, violations = _public_symbol_addresses(target)
+        assert violations == []
+        assert addresses, f"{target} contributed no public symbols"
+
+
+def test_bytes_claim_matching_constant_is_green(tmp_path: Path) -> None:
+    """A bytes claim whose latin-1 text equals the constant passes."""
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [1], "expect": 2}]},'
+        f'{{"id": "greeting", "code": "{FIXTURE_MODULE}:GREETING", "bytes": "A1"}}'
+        "]}"
+    )
+    _write_page(tmp_path, "bytes.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_bytes_claim_mismatch_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A bytes claim that disagrees with the constant is a violation."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:GREETING", "bytes": "A0"}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: claim says b'A0', code has b'A1'" in out
+
+
+def test_bytes_claim_on_non_bytes_symbol_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Binding a bytes claim to an int constant is rejected."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER", "bytes": "42"}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: symbol is not a bytes constant" in out
+
+
+def test_non_string_bytes_field_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The bytes field must be a string; JSON has no bytes literal."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:GREETING", "bytes": 1}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: 'bytes' must be a latin-1 string" in out
+
+
+def test_module_target_matches_exactly_not_by_prefix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A claim outside the bound module is rejected by name.
+
+    Guards the exact-match arm of ``_binds_into_target``: without it a
+    module target could never be satisfied, since a module never
+    startswith itself + '.'.
+    """
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_PACKAGE}.other:Z", "value": 1}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert run_physics_claim_rules(tmp_path, package_name=FIXTURE_MODULE) >= 1
+    out = capsys.readouterr().out
+    assert f"'{FIXTURE_PACKAGE}.other' is outside {FIXTURE_MODULE}" in out
 
 
 def test_law_claim_binds_a_symbol_green(tmp_path: Path) -> None:
@@ -513,4 +632,4 @@ def test_law_with_value_is_reported(tmp_path: Path, capsys: pytest.CaptureFixtur
     _write_page(tmp_path, "bad.md", _claims_page(claims))
     assert _run(tmp_path) >= 1
     out = capsys.readouterr().out
-    assert "physics_claim_violation bad.md#x: claim needs exactly one of value/probes/law" in out
+    assert f"physics_claim_violation bad.md#x: {_ONE_OF}" in out

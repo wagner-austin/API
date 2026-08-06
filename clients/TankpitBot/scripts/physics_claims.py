@@ -1,16 +1,32 @@
-"""Guard rule: wiki physics claims must match the physics package.
+"""Guard rule: wiki claims must match the code they bind.
 
-The wiki is the source of truth for game physics; the code acts on
-it. This rule machine-checks the binding in both directions on every
-``make check`` (see ``wiki/pages/physics-module-roadmap.md`` Phase 1):
+The wiki is the source of truth for the game's measured laws and the
+protocol vocabulary; the code acts on them. This rule machine-checks
+the binding in both directions on every ``make check`` (see
+``wiki/pages/physics-module-roadmap.md`` Phase 1):
 
 * Forward: every ``json claims`` fenced block in ``wiki/pages/*.md``
-  names a symbol in :mod:`tankpit_bot.physics` and its expected value
-  (an int constant) or probe grid (a formula checked at explicit
-  points). The rule imports the symbol and verifies computationally.
-* Reverse: every public symbol (``__all__``) of every submodule of
-  :mod:`tankpit_bot.physics` must be bound by exactly one claim —
-  a physics fact the wiki does not claim is a violation too.
+  names a symbol in one of :const:`CLAIM_TARGETS` and its expected
+  value (an int or bytes constant) or probe grid (a formula checked
+  at explicit points). The rule imports the symbol and verifies
+  computationally.
+* Reverse: every public symbol (``__all__``) of every bound target
+  must be claimed by exactly one claim — a fact the wiki does not
+  state is a violation too.
+
+**Targets are packages OR single modules.** Reverse coverage is
+all-or-nothing per target: binding a target obliges the wiki to claim
+every one of its public symbols. That is the property worth having —
+it is what makes "the wiki does not mention this" a build failure
+rather than an omission nobody notices — but it means a target is
+onboarded in one deliberate pass, not incrementally. Module-level
+targets exist so a large package can be onboarded a module at a time
+instead of in a 221-symbol big bang.
+
+The module name is historical: this rule shipped 2026-07-21 binding
+only :mod:`tankpit_bot.physics`, and the live references to
+``physics_claims`` across the wiki, README and SCHEMA have not yet
+been renamed. It binds :const:`CLAIM_TARGETS` now, not physics alone.
 
 Claim blocks are validated by manual narrowing over ``JSONValue``
 (no schema framework); every malformed shape produces a specific,
@@ -38,8 +54,19 @@ from platform_core.json_utils import (
 from platform_core.logging import get_logger
 
 PHYSICS_PACKAGE = "tankpit_bot.physics"
+COMMANDS_MODULE = "tankpit_bot.protocol.commands"
+
+#: Every target the wiki must bind, in onboarding order. A package
+#: binds every public symbol of every submodule; a bare module binds
+#: only its own ``__all__``. Adding a target here is a commitment:
+#: reverse coverage immediately requires a claim for each of its
+#: public symbols, so the claims land in the same commit.
+CLAIM_TARGETS: tuple[str, ...] = (PHYSICS_PACKAGE, COMMANDS_MODULE)
+
 CLAIM_FENCE_OPEN = "```json claims"
 CLAIM_FENCE_CLOSE = "```"
+#: Claim kinds. Exactly one must appear on every claim.
+CLAIM_KINDS: tuple[str, ...] = ("value", "bytes", "probes", "law")
 
 _LOGGER = get_logger(__name__)
 
@@ -174,6 +201,60 @@ def _check_value_claim(
     return []
 
 
+def _check_bytes_claim(
+    claim: JSONObject,
+    module: ModuleType,
+    symbol_name: str,
+    prefix: str,
+) -> list[str]:
+    """Verify a bytes-constant claim against the resolved symbol.
+
+    The wire vocabulary includes literal byte payloads that are not
+    numbers — the plain-text commands ``PLAIN_QUIT`` (``b"-"``),
+    ``PLAIN_AUTOSCROLL_ON`` (``b"A1"``) and friends. JSON has no bytes
+    literal, so the claim carries a string and the comparison encodes
+    it latin-1: every byte value 0-255 round-trips, and the common
+    all-ASCII case stays readable in the wiki block.
+
+    Args:
+        claim: Claim object carrying ``bytes``.
+        module: Imported module.
+        symbol_name: Symbol the claim binds.
+        prefix: ``page#id`` for violation messages.
+
+    Returns:
+        Violations (empty when the constant matches).
+    """
+    expected_text = claim.get("bytes")
+    if not isinstance(expected_text, str):
+        return [f"{prefix}: 'bytes' must be a latin-1 string"]
+    constant: bytes = getattr(module, symbol_name)
+    if not isinstance(constant, bytes):
+        return [f"{prefix}: symbol is not a bytes constant"]
+    expected = expected_text.encode("latin-1")
+    if constant != expected:
+        return [f"{prefix}: claim says {expected!r}, code has {constant!r}"]
+    return []
+
+
+def _binds_into_target(module_name: str, target: str) -> bool:
+    """Report whether a claim's module sits inside one bound target.
+
+    A package target matches its submodules; a module target matches
+    only itself. Without the exact-match arm a module target could
+    never be satisfied, since ``"a.b.c".startswith("a.b.c.")`` is
+    false.
+
+    Args:
+        module_name: Dotted module path from the claim's code address.
+        target: One entry of :const:`CLAIM_TARGETS`.
+
+    Returns:
+        True when the claim binds into that target.
+    """
+    return module_name == target or module_name.startswith(f"{target}.")
+
+
 def _decode_probe(probe: JSONObject, prefix: str) -> tuple[list[int], int, list[str]]:
     """Decode one probe entry into args and expected value.
 
@@ -291,14 +372,14 @@ def _check_law_claim(claim: JSONObject, prefix: str) -> list[str]:
 def _check_claim(
     claim: JSONObject,
     page: str,
-    package_name: str,
+    targets: tuple[str, ...],
 ) -> tuple[str, str, list[str]]:
     """Fully verify one claim.
 
     Args:
         claim: Claim object.
         page: Page name for violation messages.
-        package_name: Package every claim must bind into.
+        targets: Bound targets; the claim must bind into one of them.
 
     Returns:
         Tuple of (claim id, bound code address, violations). The id and
@@ -309,14 +390,16 @@ def _check_claim(
     if not isinstance(claim_id, str) or not isinstance(code, str):
         return "", "", [f"{page}: claim needs string 'id' and 'code' fields"]
     prefix = f"{page}#{claim_id}"
-    kinds_present = [kind for kind in ("value", "probes", "law") if kind in claim]
+    kinds_present = [kind for kind in CLAIM_KINDS if kind in claim]
     if len(kinds_present) != 1:
-        return claim_id, code, [f"{prefix}: claim needs exactly one of value/probes/law"]
+        joined_kinds = "/".join(CLAIM_KINDS)
+        return claim_id, code, [f"{prefix}: claim needs exactly one of {joined_kinds}"]
     if ":" not in code:
         return claim_id, code, [f"{prefix}: code '{code}' is not 'module:symbol'"]
     module_name, _, symbol_name = code.partition(":")
-    if not module_name.startswith(f"{package_name}."):
-        return claim_id, code, [f"{prefix}: '{module_name}' is outside {package_name}"]
+    if not any(_binds_into_target(module_name, target) for target in targets):
+        joined = ", ".join(targets)
+        return claim_id, code, [f"{prefix}: '{module_name}' is outside {joined}"]
     module, import_violations = _import_claim_module(module_name, prefix)
     if module is None:
         return claim_id, code, import_violations
@@ -324,45 +407,66 @@ def _check_claim(
         return claim_id, code, [f"{prefix}: '{symbol_name}' not found in {module_name}"]
     if kinds_present[0] == "value":
         return claim_id, code, _check_value_claim(claim, module, symbol_name, prefix)
+    if kinds_present[0] == "bytes":
+        return claim_id, code, _check_bytes_claim(claim, module, symbol_name, prefix)
     if kinds_present[0] == "probes":
         return claim_id, code, _check_probe_claim(claim, module, symbol_name, prefix)
     return claim_id, code, _check_law_claim(claim, prefix)
 
 
-def _public_symbol_addresses(package_name: str) -> tuple[list[str], list[str]]:
-    """Enumerate every public symbol address of the physics package.
+def _module_addresses(module_name: str) -> tuple[list[str], list[str]]:
+    """Enumerate one module's public symbol addresses.
 
     Args:
-        package_name: Dotted package to enumerate submodules of.
+        module_name: Dotted module to read ``__all__`` from.
 
     Returns:
         Pair of (addresses ``module:symbol``, violations).
     """
-    spec = importlib.util.find_spec(package_name)
-    if spec is None or spec.submodule_search_locations is None:
-        return [], [f"package '{package_name}' does not resolve to a package"]
+    module = importlib.import_module(module_name)
+    exported: list[str] | None = getattr(module, "__all__", None)
+    if exported is None:
+        return [], [f"{module_name}: bound module lacks __all__"]
+    return [f"{module_name}:{name}" for name in exported], []
+
+
+def _public_symbol_addresses(target_name: str) -> tuple[list[str], list[str]]:
+    """Enumerate every public symbol address of one bound target.
+
+    A target that resolves to a package contributes every public
+    symbol of every submodule; a target that resolves to a plain
+    module contributes its own ``__all__`` only. The module arm is
+    what lets a large package be onboarded a module at a time.
+
+    Args:
+        target_name: Dotted package or module to enumerate.
+
+    Returns:
+        Pair of (addresses ``module:symbol``, violations).
+    """
+    spec = importlib.util.find_spec(target_name)
+    if spec is None:
+        return [], [f"target '{target_name}' does not resolve"]
+    if spec.submodule_search_locations is None:
+        return _module_addresses(target_name)
     addresses: list[str] = []
     violations: list[str] = []
     for module_info in pkgutil.iter_modules(list(spec.submodule_search_locations)):
-        module_name = f"{package_name}.{module_info.name}"
-        module = importlib.import_module(module_name)
-        exported: list[str] | None = getattr(module, "__all__", None)
-        if exported is None:
-            violations.append(f"{module_name}: physics module lacks __all__")
-            continue
-        addresses.extend(f"{module_name}:{name}" for name in exported)
+        module_addresses, module_violations = _module_addresses(f"{target_name}.{module_info.name}")
+        addresses.extend(module_addresses)
+        violations.extend(module_violations)
     return addresses, violations
 
 
 def _scan_wiki_claims(
     pages_dir: Path,
-    package_name: str,
+    targets: tuple[str, ...],
 ) -> tuple[dict[str, str], list[str]]:
     """Check every claim block under a wiki pages directory.
 
     Args:
         pages_dir: Directory holding the wiki content pages.
-        package_name: Package every claim must bind into.
+        targets: Bound targets every claim must bind into.
 
     Returns:
         Pair of (claim id -> bound code address, violations).
@@ -379,7 +483,7 @@ def _scan_wiki_claims(
             claims, parse_violations = _parse_claim_block(raw, page)
             violations.extend(parse_violations)
             for claim in claims:
-                claim_id, code, claim_violations = _check_claim(claim, page, package_name)
+                claim_id, code, claim_violations = _check_claim(claim, page, targets)
                 violations.extend(claim_violations)
                 if claim_id and claim_id in claim_codes:
                     violations.append(f"{page}#{claim_id}: duplicate claim id")
@@ -392,10 +496,10 @@ def _reverse_coverage_violations(
     addresses: list[str],
     claim_codes: dict[str, str],
 ) -> list[str]:
-    """Require every public physics symbol to be claimed exactly once.
+    """Require every bound public symbol to be claimed exactly once.
 
     Args:
-        addresses: Public symbol addresses of the physics package.
+        addresses: Public symbol addresses of every bound target.
         claim_codes: Claim id -> bound code address.
 
     Returns:
@@ -406,7 +510,7 @@ def _reverse_coverage_violations(
     for address in addresses:
         count = bound_codes.count(address)
         if count == 0:
-            violations.append(f"{address}: public physics symbol has no wiki claim")
+            violations.append(f"{address}: public bound symbol has no wiki claim")
         elif count > 1:
             violations.append(f"{address}: bound by {count} claims, expected exactly 1")
     return violations
@@ -415,13 +519,15 @@ def _reverse_coverage_violations(
 def run_physics_claim_rules(
     project_root: Path,
     *,
-    package_name: str = PHYSICS_PACKAGE,
+    package_name: str | None = None,
 ) -> int:
     """Run the wiki-claim binding rule over a project tree.
 
     Args:
         project_root: Project root containing ``wiki/pages``.
-        package_name: Physics package to bind (overridable for tests).
+        package_name: Bind this single target instead of
+            :const:`CLAIM_TARGETS`. Used by tests to drive the rule
+            against a synthetic fixture package.
 
     Returns:
         Number of violations found (0 means the rule passes).
@@ -429,9 +535,13 @@ def run_physics_claim_rules(
     pages_dir = project_root / "wiki" / "pages"
     if not pages_dir.is_dir():
         return 0
-    claim_codes, violations = _scan_wiki_claims(pages_dir, package_name)
-    addresses, package_violations = _public_symbol_addresses(package_name)
-    violations.extend(package_violations)
+    targets = CLAIM_TARGETS if package_name is None else (package_name,)
+    claim_codes, violations = _scan_wiki_claims(pages_dir, targets)
+    addresses: list[str] = []
+    for target in targets:
+        target_addresses, target_violations = _public_symbol_addresses(target)
+        addresses.extend(target_addresses)
+        violations.extend(target_violations)
     violations.extend(_reverse_coverage_violations(addresses, claim_codes))
     for violation in violations:
         sys.stdout.write(f"physics_claim_violation {violation}\n")
@@ -440,6 +550,9 @@ def run_physics_claim_rules(
 
 __all__ = [
     "CLAIM_FENCE_OPEN",
+    "CLAIM_KINDS",
+    "CLAIM_TARGETS",
+    "COMMANDS_MODULE",
     "PHYSICS_PACKAGE",
     "run_physics_claim_rules",
 ]

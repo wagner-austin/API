@@ -198,8 +198,17 @@ Most of this document is a discipline, but four families are enforced by the
 | Counts | each index row's `(N pages)` equals that hub's real link count; the `N content pages` total equals the files in `pages/` |
 
 Separately, `scripts/physics_claims.py` machine-checks the ` ```json claims `
-blocks on physics pages against the `tankpit_bot.physics` package, in both
-directions. Everything else here — atomicity, citation quality, link-don't-restate
+blocks against the code they bind, in both directions. Its bound targets are
+listed in `CLAIM_TARGETS`: the `tankpit_bot.physics` package (since 2026-07-21)
+and the `tankpit_bot.protocol.commands` module (since 2026-08-05). A target may
+be a package or a single module — module granularity exists so a large package
+can be onboarded a module at a time, because reverse coverage is
+all-or-nothing per target: **every** public symbol of a bound target must be
+claimed exactly once, so adding a constant without a wiki claim fails the gate.
+Claim kinds are `value` (int), `bytes` (latin-1 payload), `probes` (formula
+checked at explicit points), and `law` (prose + existence, for symbols no int
+grid can verify). The module name is historical — it binds more than physics
+now. Everything else here — atomicity, citation quality, link-don't-restate
 — is reviewed by humans and AIs, not by the gate.
 
 ## Storage

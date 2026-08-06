@@ -11,6 +11,10 @@ from __future__ import annotations
 ANSWER = 42
 TRUTHY = True
 NAME = "fixture"
+#: Bytes constant for the ``bytes`` claim-kind tests. Kept OUT of
+#: ``__all__`` so reverse coverage stays a two-symbol surface; the
+#: bytes tests bind it explicitly by address.
+GREETING = b"A1"
 
 
 def double(value: int) -> int:

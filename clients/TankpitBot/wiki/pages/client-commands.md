@@ -173,6 +173,379 @@ The shoot command (Lb, code 's') is only sent when:[^2]
 
 The last 2 bytes (target_id) are set to the tank's `.id` if a tank is at the target tile, or 0 for empty ground fire. This matters because the server uses this for homing shot targeting ([[weapon-selection]], [[shoot-event-format]]).[^2]
 
+## Machine-checked binding to `protocol/commands.py`
+
+Every opcode, direction byte, type byte and plain-text payload above is
+bound to its Python constant by the claim block below, and the
+`physics_claims` guard stage of `make check` imports each `code`
+address and compares the value. The wiki table and the code cannot
+drift apart without the gate going red.
+
+The binding is **total**: reverse coverage requires every public symbol
+of `tankpit_bot.protocol.commands` to be claimed exactly once, so a
+constant added to the module without a wiki claim is also a build
+failure. Callables and the two TypedDicts carry `law` claims — prose
+plus an existence check — because their behaviour is not an int
+comparison; the 34 integer opcodes and 5 byte payloads are verified
+computationally.
+
+What this does and does not prove: it proves the wiki table and the
+Python constants agree. It does **not** independently re-derive either
+from `tpclient.js` — that trace is [^1], dated 2026-06-19. The binding
+catches drift from here on; it does not re-audit the original
+reverse-engineering.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "cmd-active-forces",
+      "code": "tankpit_bot.protocol.commands:CMD_ACTIVE_FORCES",
+      "value": 42,
+      "means": "'x' key - show active forces"
+    },
+    {
+      "id": "cmd-active-players",
+      "code": "tankpit_bot.protocol.commands:CMD_ACTIVE_PLAYERS",
+      "value": 47,
+      "means": "'/' key - show active players"
+    },
+    {
+      "id": "cmd-block",
+      "code": "tankpit_bot.protocol.commands:CMD_BLOCK",
+      "value": 98,
+      "means": "'b' long press - pick up / drop a movable block"
+    },
+    {
+      "id": "cmd-enter-game",
+      "code": "tankpit_bot.protocol.commands:CMD_ENTER_GAME",
+      "value": 63,
+      "means": "click to enter the game"
+    },
+    {
+      "id": "cmd-inventory",
+      "code": "tankpit_bot.protocol.commands:CMD_INVENTORY",
+      "value": 105,
+      "means": "'i' key - show inventory"
+    },
+    {
+      "id": "cmd-map-open",
+      "code": "tankpit_bot.protocol.commands:CMD_MAP_OPEN",
+      "value": 108,
+      "means": "'f' key - open the map view"
+    },
+    {
+      "id": "cmd-map-teleport",
+      "code": "tankpit_bot.protocol.commands:CMD_MAP_TELEPORT",
+      "value": 116,
+      "means": "map click - teleport (fuel cost varies by distance)"
+    },
+    {
+      "id": "cmd-mine",
+      "code": "tankpit_bot.protocol.commands:CMD_MINE",
+      "value": 107,
+      "means": "'d' key - drop a mine"
+    },
+    {
+      "id": "cmd-move",
+      "code": "tankpit_bot.protocol.commands:CMD_MOVE",
+      "value": 112,
+      "means": "mouse click - walk the tank to a tile"
+    },
+    {
+      "id": "cmd-nearest-enemy",
+      "code": "tankpit_bot.protocol.commands:CMD_NEAREST_ENEMY",
+      "value": 104,
+      "means": "'e' key - target the nearest enemy"
+    },
+    {
+      "id": "cmd-pickup-equipment",
+      "code": "tankpit_bot.protocol.commands:CMD_PICKUP_EQUIPMENT",
+      "value": 106,
+      "means": "'j' long press - pick up equipment"
+    },
+    {
+      "id": "cmd-pickup-fuel",
+      "code": "tankpit_bot.protocol.commands:CMD_PICKUP_FUEL",
+      "value": 100,
+      "means": "'d' long press - pick up fuel"
+    },
+    {
+      "id": "cmd-ping",
+      "code": "tankpit_bot.protocol.commands:CMD_PING",
+      "value": 46,
+      "means": "'F6' key - ping the server, returns latency in ms"
+    },
+    {
+      "id": "cmd-radar",
+      "code": "tankpit_bot.protocol.commands:CMD_RADAR",
+      "value": 102,
+      "means": "'s' key - toggle the radar display"
+    },
+    {
+      "id": "cmd-scope",
+      "code": "tankpit_bot.protocol.commands:CMD_SCOPE",
+      "value": 90,
+      "means": "arrow / page keys - pan the camera view"
+    },
+    {
+      "id": "cmd-shoot",
+      "code": "tankpit_bot.protocol.commands:CMD_SHOOT",
+      "value": 115,
+      "means": "spacebar - fire at a target position"
+    },
+    {
+      "id": "cmd-statistics",
+      "code": "tankpit_bot.protocol.commands:CMD_STATISTICS",
+      "value": 118,
+      "means": "'c' key - show statistics"
+    },
+    {
+      "id": "cmd-toggle-equipment",
+      "code": "tankpit_bot.protocol.commands:CMD_TOGGLE_EQUIPMENT",
+      "value": 114,
+      "means": "'1'-'5' keys - toggle an equipment slot"
+    },
+    {
+      "id": "cmd-top10",
+      "code": "tankpit_bot.protocol.commands:CMD_TOP10",
+      "value": 49,
+      "means": "leaderboard; extra byte ff=all, 00-03=team"
+    },
+    {
+      "id": "command-prefix",
+      "code": "tankpit_bot.protocol.commands:COMMAND_PREFIX",
+      "value": 33,
+      "means": "every binary command frame opens with the '!' prefix byte"
+    },
+    {
+      "id": "plain-autoscroll-off",
+      "code": "tankpit_bot.protocol.commands:PLAIN_AUTOSCROLL_OFF",
+      "bytes": "A0",
+      "means": "'a' key - autoscroll off (JS emits \"A\" + Number(false))"
+    },
+    {
+      "id": "plain-autoscroll-on",
+      "code": "tankpit_bot.protocol.commands:PLAIN_AUTOSCROLL_ON",
+      "bytes": "A1",
+      "means": "'a' key - autoscroll on (JS emits \"A\" + Number(true))"
+    },
+    {
+      "id": "plain-quit",
+      "code": "tankpit_bot.protocol.commands:PLAIN_QUIT",
+      "bytes": "-",
+      "means": "'q' key - quit the game and return to the lobby"
+    },
+    {
+      "id": "plain-sound-off",
+      "code": "tankpit_bot.protocol.commands:PLAIN_SOUND_OFF",
+      "bytes": "V040",
+      "means": "'l' key - sound off"
+    },
+    {
+      "id": "plain-sound-on",
+      "code": "tankpit_bot.protocol.commands:PLAIN_SOUND_ON",
+      "bytes": "V140",
+      "means": "'l' key - sound on"
+    },
+    {
+      "id": "scope-center",
+      "code": "tankpit_bot.protocol.commands:SCOPE_CENTER",
+      "value": 8,
+      "means": "recenter the window on the tank (user-confirmed 2026-08-01)"
+    },
+    {
+      "id": "scope-east",
+      "code": "tankpit_bot.protocol.commands:SCOPE_EAST",
+      "value": 2,
+      "means": "ArrowRight; measured three times - window left = tank_x"
+    },
+    {
+      "id": "scope-north",
+      "code": "tankpit_bot.protocol.commands:SCOPE_NORTH",
+      "value": 0,
+      "means": "ArrowUp; measured - extend view N puts window top at tank_y-15"
+    },
+    {
+      "id": "scope-northeast",
+      "code": "tankpit_bot.protocol.commands:SCOPE_NORTHEAST",
+      "value": 1,
+      "means": "measured - extend view NE puts the window at (tank_x, tank_y-15)"
+    },
+    {
+      "id": "scope-northwest",
+      "code": "tankpit_bot.protocol.commands:SCOPE_NORTHWEST",
+      "value": 7,
+      "means": "Home key; clockwise-table completion"
+    },
+    {
+      "id": "scope-south",
+      "code": "tankpit_bot.protocol.commands:SCOPE_SOUTH",
+      "value": 4,
+      "means": "clockwise-table completion; UNOBSERVED on the wire"
+    },
+    {
+      "id": "scope-southeast",
+      "code": "tankpit_bot.protocol.commands:SCOPE_SOUTHEAST",
+      "value": 3,
+      "means": "PageDown; measured twice - window sits on the tank tile exactly"
+    },
+    {
+      "id": "scope-southwest",
+      "code": "tankpit_bot.protocol.commands:SCOPE_SOUTHWEST",
+      "value": 5,
+      "means": "End key; clockwise-table completion"
+    },
+    {
+      "id": "scope-west",
+      "code": "tankpit_bot.protocol.commands:SCOPE_WEST",
+      "value": 6,
+      "means": "ArrowLeft; measured - window left = tank_x-15"
+    },
+    {
+      "id": "tick-rate-ms",
+      "code": "tankpit_bot.protocol.commands:TICK_RATE_MS",
+      "value": 2000,
+      "means": "the server processes queued commands on a fixed tick (verified by fire-spam testing)"
+    },
+    {
+      "id": "type-combat",
+      "code": "tankpit_bot.protocol.commands:TYPE_COMBAT",
+      "value": 6,
+      "means": "type byte for combat commands (shoot)"
+    },
+    {
+      "id": "type-movement",
+      "code": "tankpit_bot.protocol.commands:TYPE_MOVEMENT",
+      "value": 4,
+      "means": "type byte for movement commands (move, pickup, teleport)"
+    },
+    {
+      "id": "type-query",
+      "code": "tankpit_bot.protocol.commands:TYPE_QUERY",
+      "value": 2,
+      "means": "type byte for query commands (radar, mine, inventory)"
+    },
+    {
+      "id": "type-ui",
+      "code": "tankpit_bot.protocol.commands:TYPE_UI",
+      "value": 3,
+      "means": "type byte for UI commands (scope, leaderboard, equipment toggle)"
+    },
+    {
+      "id": "actioncommand",
+      "code": "tankpit_bot.protocol.commands:ActionCommand",
+      "law": "Variable-length action frame: '!' + type byte + cmd byte + data."
+    },
+    {
+      "id": "commandtype",
+      "code": "tankpit_bot.protocol.commands:CommandType",
+      "law": "The two frame shapes this module encodes, as a Literal: 'query' or 'action'."
+    },
+    {
+      "id": "querycommand",
+      "code": "tankpit_bot.protocol.commands:QueryCommand",
+      "law": "Three-byte query frame: '!' + type byte + cmd byte, no payload."
+    },
+    {
+      "id": "build-block-command",
+      "code": "tankpit_bot.protocol.commands:build_block_command",
+      "law": "Length-prefixed block pick-up / drop frame for a cardinally adjacent tile."
+    },
+    {
+      "id": "build-move-command",
+      "code": "tankpit_bot.protocol.commands:build_move_command",
+      "law": "Length-prefixed MOVE frame for a destination tile."
+    },
+    {
+      "id": "build-pickup-equipment-command",
+      "code": "tankpit_bot.protocol.commands:build_pickup_equipment_command",
+      "law": "Length-prefixed equipment-pickup frame for a container tile."
+    },
+    {
+      "id": "build-pickup-fuel-command",
+      "code": "tankpit_bot.protocol.commands:build_pickup_fuel_command",
+      "law": "Length-prefixed fuel-pickup frame for a container tile."
+    },
+    {
+      "id": "build-query-command",
+      "code": "tankpit_bot.protocol.commands:build_query_command",
+      "law": "Length-prefixed payload-free query frame for any query cmd id."
+    },
+    {
+      "id": "build-quit-command",
+      "code": "tankpit_bot.protocol.commands:build_quit_command",
+      "law": "Length-prefixed graceful-quit frame."
+    },
+    {
+      "id": "build-scope-command",
+      "code": "tankpit_bot.protocol.commands:build_scope_command",
+      "law": "Length-prefixed SCOPE frame carrying one of the nine direction bytes."
+    },
+    {
+      "id": "build-shoot-command",
+      "code": "tankpit_bot.protocol.commands:build_shoot_command",
+      "law": "Length-prefixed SHOOT frame carrying tile and target id (0 when the tile holds no tank)."
+    },
+    {
+      "id": "build-teleport-command",
+      "code": "tankpit_bot.protocol.commands:build_teleport_command",
+      "law": "Length-prefixed MAP_TELEPORT frame for a map-click destination."
+    },
+    {
+      "id": "build-toggle-equipment-command",
+      "code": "tankpit_bot.protocol.commands:build_toggle_equipment_command",
+      "law": "Length-prefixed frame toggling one equipment slot."
+    },
+    {
+      "id": "decode-action-command",
+      "code": "tankpit_bot.protocol.commands:decode_action_command",
+      "law": "Rebuild an ActionCommand from a dict, validating every field."
+    },
+    {
+      "id": "decode-query-command",
+      "code": "tankpit_bot.protocol.commands:decode_query_command",
+      "law": "Rebuild a QueryCommand from a dict, validating every field."
+    },
+    {
+      "id": "deserialize-command",
+      "code": "tankpit_bot.protocol.commands:deserialize_command",
+      "law": "Parse wire bytes back into a command AFTER XOR decoding, dispatching on the type byte."
+    },
+    {
+      "id": "encode-action-command",
+      "code": "tankpit_bot.protocol.commands:encode_action_command",
+      "law": "Project an ActionCommand to a JSON-serializable dict."
+    },
+    {
+      "id": "encode-query-command",
+      "code": "tankpit_bot.protocol.commands:encode_query_command",
+      "law": "Project a QueryCommand to a JSON-serializable dict."
+    },
+    {
+      "id": "make-action-command",
+      "code": "tankpit_bot.protocol.commands:make_action_command",
+      "law": "Construct an ActionCommand from a cmd id and its payload bytes."
+    },
+    {
+      "id": "make-query-command",
+      "code": "tankpit_bot.protocol.commands:make_query_command",
+      "law": "Construct a payload-free QueryCommand from a cmd id."
+    },
+    {
+      "id": "serialize-action-command",
+      "code": "tankpit_bot.protocol.commands:serialize_action_command",
+      "law": "Render an ActionCommand to wire bytes BEFORE XOR encoding."
+    },
+    {
+      "id": "serialize-query-command",
+      "code": "tankpit_bot.protocol.commands:serialize_query_command",
+      "law": "Render a QueryCommand to wire bytes BEFORE XOR encoding."
+    }
+  ]
+}
+```
+
 [^1]: tpclient.js lines 25-31 (K subclasses) and 6-10 (va subclasses) — every command class traced 2026-06-19; file pinned via `source_paths` line anchors
 [^2]: tpclient.js Lb class + Cb dispatch + toolbar click handler — same 2026-06-19 trace; target_id semantics wire-confirmed via the id-targeted reroute law ([[shoot-event-format]])
 [^3]: user (Austin), 2026-07-24 — quoted verbatim above; corroborating captures on disk: `bot_watch_probe.capture_session.json` and companions at repo root (the three designed watch runs), recorded in the wiki-log entries of 2026-07-24 ("bot-watch run 1" through "push-on-activity stream discovered")
