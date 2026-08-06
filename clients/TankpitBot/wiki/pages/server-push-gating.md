@@ -12,8 +12,8 @@ source_paths:
   - "src/tankpit_bot/action_lab/enemy_teleport.py"
 source_git_blobs:
   "bot_watch_probe.capture_session.json": "694fa343cbc2c92ad1fb30b4c7fb30d2bcbf58f6"
-  "src/tankpit_bot/action_lab/enemy_teleport.py": "f2d95297743937c055fd0a89b36edafe6f9dad67"
-fact_checked: "2026-07-24"
+  "src/tankpit_bot/action_lab/enemy_teleport.py": "79f215b0c07d3ed82d83de632b6a93bdf140a0fe"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [protocol]
 ---
@@ -122,9 +122,13 @@ position instead of repeating run 7's frozen-origin rejections.[^2]
     wiki/log.md entries of 2026-07-24 (anomaly → falsifications →
     law), captures `bot_watch_nomap_probe`, `bot_watch_wake_probe`,
     `bot_watch_nomap_hb_probe` at repo root.
-[^2]: `src/tankpit_bot/action_lab/enemy_teleport.py` —
-    `_heartbeat_action` / `_settle_dwell` (per-beat drain + shuffle);
-    `make bot-watch` in [[make-targets]].
+[^2]: `src/tankpit_bot/action_lab/enemy_teleport.py:186` —
+    `_heartbeat_action` (per-beat drain) and `_settle_dwell` at `:207`
+    (shuffle); driven by `make bot-watch` (`Makefile:172`), see
+    [[make-targets]]. Re-verified 2026-08-06 and repinned: the file
+    changed only by threading a clock argument
+    (`action_hooks.get_current_time_ms()`) into one landing call at
+    `:396`, which touches neither method this footnote cites.
 [^4]: radar-watch captures 2026-07-24/25:
     `radar_watch_probe.capture_session.json` (sessions 1–2 overwrote
     the same path; session 2 is the committed one),

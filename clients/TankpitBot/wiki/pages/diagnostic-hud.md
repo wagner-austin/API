@@ -9,7 +9,11 @@ source_paths:
   - "src/tankpit_bot/browser/overlay.py"
   - "src/tankpit_bot/browser/overlay_hud.py"
   - "src/tankpit_bot/browser/flag_capture.py"
-fact_checked: "2026-07-29"
+source_git_blobs:
+  "src/tankpit_bot/browser/overlay.py": "d7c588bb375aa605518f368dfefb9c1e69f8dfe1"
+  "src/tankpit_bot/browser/overlay_hud.py": "67877546967b5fc8025baf94aa84c2af3bcab3fd"
+  "src/tankpit_bot/browser/flag_capture.py": "29b74c4d65e877914ede877679ff867d91aba273"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [architecture]
 ---
@@ -82,13 +86,23 @@ spot in the event stream:
 4. File findings on a triage page (first: [[flag-triage-20260729]])
    with a fix-status table; close rows only with run/sim receipts.[^1]
 
-[^1]: `src/tankpit_bot/browser/overlay.py` (payload + slot renderer),
-    `overlay_hud.py` (install-once template, `build_hud_expression`),
-    tick wiring in `bot/tick_loop.py` step 9.
-[^2]: fiesta SPA `~/PROJECTS/MCPs/fiesta/src/style.css`
-    (`.screen-panel` glass recipe, `.console-button` face) and
-    `src/services/theme.ts` (`RETRO_THEME`, user-pinned 2026-07-05).
-[^3]: `src/tankpit_bot/browser/flag_capture.py`
-    (`FlagCaptureService`, ring size 8); binding-vs-fetch rationale
-    measured 2026-07-29 in `browser/live_view.py` module docs.
+[^1]: `src/tankpit_bot/browser/overlay.py` (payload + slot renderer);
+    `src/tankpit_bot/browser/overlay_hud.py:181` —
+    `build_hud_expression`, the install-once template; tick wiring at
+    `src/tankpit_bot/bot/tick_loop.py:868` (step 9, "Update the in-page
+    HUD so a human watching the browser sees what…"). All three
+    re-verified and pinned 2026-08-06.
+[^2]: The fiesta SPA, in a DIFFERENT repository —
+    `~/PROJECTS/MCPs/fiesta/src/style.css` (`.screen-panel` glass
+    recipe, `.console-button` face; 4 matching selectors) and
+    `~/PROJECTS/MCPs/fiesta/src/services/theme.ts` (`RETRO_THEME`,
+    user-pinned 2026-07-05). Both files confirmed present 2026-08-06.
+    They sit outside this project's `workspaceRoot`, so they cannot
+    appear in `source_paths` or carry a `source_git_blobs` pin here —
+    cited by path only, and drift in them is NOT detectable by this
+    wiki's gate.
+[^3]: `src/tankpit_bot/browser/flag_capture.py:50` —
+    `FlagCaptureService`, with `FLAG_RING_SIZE = 8` at `:46`;
+    binding-vs-fetch rationale measured 2026-07-29 in
+    `src/tankpit_bot/browser/live_view.py` module docs.
 [^4]: `src/tankpit_bot/runtime_logging.py:45` — `RUNTIME_CONTEXT_KEYS: frozenset[str] = frozenset({"tick_n", "bot_state", "in_flight_action_kind"})`, the context stamped onto every emitted diagnostic (field docs at `:57-67`). The flag's own fields come from `src/tankpit_bot/browser/flag_capture.py:100-105`: `emit_diagnostic(diagnostic_kind="human_flag", flag_seq=..., clicked_at_ms=..., recent_ticks=...)`.

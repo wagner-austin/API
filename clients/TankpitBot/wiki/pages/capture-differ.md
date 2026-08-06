@@ -10,7 +10,10 @@ source_paths:
   - "analysis_scripts/mine_container_atlas.py"
   - "analysis_scripts/diff_server_laws.py"
   - "runs/analysis"
-fact_checked: "2026-08-01"
+source_git_blobs:
+  "analysis_scripts/mine_container_atlas.py": "65ef05e6be1bc49b50dc8c2600e15a650d732dce"
+  "analysis_scripts/diff_server_laws.py": "46e3f09302349150b02f7fd515c7463f500b61bb"
+fact_checked: "2026-08-06"
 confidence: high
 hubs: [protocol]
 ---
