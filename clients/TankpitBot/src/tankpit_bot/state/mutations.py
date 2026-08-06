@@ -294,7 +294,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
             existing["last_viewport_observation_ms"] if existing else 0
         )
 
-    # Liveness transition. Three rules, evaluated in order:
+    # Liveness transition. Four rules, evaluated in order:
     #   1. New tank or wire-sourced position update with alive sprite
     #      direction (< 32) -- ``alive``. This covers fresh joins,
     #      MovementResponse arrivals, and the respawn flow (a previously
@@ -305,9 +305,12 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     #      we made (0x41 firing first, then 0x3D with dir=32) and the
     #      kill we observed someone else make (no 0x41 victim_id match
     #      but the 0x3D arrives).
-    #   3. Otherwise preserve existing liveness. MapData entries
-    #      (is_wire_sourced=False) don't change liveness; they're
-    #      authoritative for position only.
+    #   3. A deactivated tank LISTED in a map snapshot is alive -- the
+    #      server's map is a strictly living-tanks list (rule body
+    #      below has the measurements). Radar and DOM refinements
+    #      (both flags False) stay excluded.
+    #   4. Otherwise preserve existing liveness -- including
+    #      damage-only syncs and the corpse window's trailing wire.
     new_liveness: TankLiveness
     if existing is None or (
         obs["is_wire_sourced"]
@@ -317,6 +320,31 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
         new_liveness = "alive"
     elif obs["direction"] is not None and obs["direction"] >= DIRECTION_DEAD_THRESHOLD:
         new_liveness = "deactivated"
+    elif (
+        existing["liveness"] == "deactivated"
+        and not obs["is_wire_sourced"]
+        and obs["position_is_authoritative"]
+    ):
+        # Rule 4 — map presence IS life (byte-proven 2026-08-05). The
+        # 0x4C map snapshot is the only observation with this flag
+        # pair (position-authoritative, not wire-sourced), and the
+        # server curates it as a strictly LIVING-tanks list: across
+        # session bot-20260805-095935, victims were absent from all
+        # 58 in-corpse-window snapshots and present in all 204
+        # post-window ones; the 08-03 run's human (Belton, id kept
+        # across 3 deaths) vanished for every corpse window and
+        # returned at +24 s. So a deactivated tank LISTED in map data
+        # cannot be its corpse — it is the living respawn. This is
+        # the ONLY revival path for idle respawns, which emit no wire
+        # at all (27 of 32 victims never sent another byte; only
+        # MOVING respawns self-revive via rule 1's global 0x3D).
+        # Without this rule the registry filled with phantom corpses
+        # and the session exited no_viable_targets in a room of 27
+        # live enemies. The June "afterimage" fear that motivated
+        # map-never-touches-liveness is disproven by the same
+        # measurement: the server drops the dead from the map within
+        # the same second they die.
+        new_liveness = "alive"
     else:
         new_liveness = existing["liveness"]
 

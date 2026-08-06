@@ -76,9 +76,11 @@ from tankpit_bot.state.types.self_state import (
     make_self_state,
 )
 from tankpit_bot.state.types.tank import (
+    VIEWPORT_PRESENCE_TTL_MS,
     TankStateDict,
     decode_tank_state,
     encode_tank_state,
+    has_known_position,
     make_tank_state,
 )
 from tankpit_bot.state.types.tank_observation import (
@@ -135,6 +137,7 @@ __all__ = [
     "TERRAIN_FERRY",
     "TERRAIN_FERRY_ROCK",
     "TERRAIN_GROUND",
+    "VIEWPORT_PRESENCE_TTL_MS",
     "ContainerRefreshKind",
     "ContainerStateDict",
     "EntitySource",
@@ -164,6 +167,7 @@ __all__ = [
     "encode_terrain_tile",
     "encode_viewport_state",
     "encode_world_state",
+    "has_known_position",
     "make_container_state",
     "make_empty_world_state",
     "make_mine_state",

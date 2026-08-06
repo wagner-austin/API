@@ -32,6 +32,68 @@ from tankpit_bot.state.types.constants import (
     require_tank_liveness,
 )
 
+# The viewport-presence horizon for ``last_viewport_observation_ms``:
+# how long a viewport-sourced observation still proves the tank is in
+# the bot's local sensing window. Lives here, beside the field it
+# gates, because two independent consumers ask the same question and
+# must never drift apart: HUNT acquisition
+# (:func:`tankpit_bot.bot.ai.threats.analyze_threats` -- may I engage
+# this tank) and tile occupancy
+# (:func:`tankpit_bot.state.occupancy.occupied_tank_keys` -- does this
+# tank's body block a walk route).
+#
+# Live-run 2026-06-21 tracking probe captured the cost of skipping the
+# gate: open_map's 0x4C MapData refreshed every-tank timestamps, then
+# global TankStatusSync kept them fresh, so analyze_threats returned 27
+# tanks while the JS client's viewport registry held only 1. Set to
+# 5 s -- viewport-bound updates (0x47 Movement, 0x3D MovementResponse,
+# 0x28 TankEntry) arrive every 1-3 s for tanks the bot can actually
+# see, so 5 s tolerates short cadence gaps but rejects the 5-6 s global
+# broadcast cycle that wire-presence alone cannot.
+VIEWPORT_PRESENCE_TTL_MS = 5000
+
+
+def has_known_position(tank: TankStateDict) -> bool:
+    """Return whether this tank's ``(x, y)`` was ever actually observed.
+
+    The registry upserts tanks from every message kind, and the login
+    choreography makes the position-less kinds FIRST: the server opens
+    every session with a full-roster 0x21 TankInfo dump (name + team,
+    no coordinates), and positions only arrive with the first
+    position-bearing sync — measured 2026-08-04 across three captures
+    (113 tanks, every one 0x21-first, 9-46 s to first position). Until
+    then the entry sits at the construction default ``(0, 0)`` — a
+    coordinate that is also a legal tile. Any consumer that reads
+    ``(x, y)`` without asking this question aims at, walks around, or
+    walls off the map corner.
+
+    Two conditions, either sufficient:
+
+    * The coordinates differ from the ``(0, 0)`` construction default.
+      This is how radar EnemyDetect and DOM-registry refinements
+      qualify: they write real (tile-coarse) coordinates but
+      deliberately do not advance ``last_position_update_ms`` (that
+      field is the kill-shot gate and must stay wire-authoritative).
+    * ``last_position_update_ms`` is nonzero — an authoritative
+      position message has stated the coordinates, which also covers
+      the pathological tank standing exactly on (0, 0).
+
+    This predicate is the ONLY place the ``(0, 0)`` default may be
+    compared against; the guard (``scripts/state_sentinel_rules.py``)
+    bans the inline idiom everywhere else.
+
+    Args:
+        tank: Tank registry entry to test.
+
+    Returns:
+        True when ``(tank["x"], tank["y"])`` reflects an observation
+        rather than the constructor default.
+    """
+    if tank["x"] != 0 or tank["y"] != 0:
+        return True
+    return tank["last_position_update_ms"] > 0
+
+
 _DEFAULT_FACT_SOURCE_BY_ENTITY_SOURCE: dict[EntitySource, FactSource] = {
     "viewport": "wire_0x28_tank_entry",
     "radar": "wire_0x48_enemy_detect",
@@ -384,9 +446,11 @@ def _optional_int(data: JSONObject, key: str, default: int) -> int:
 
 
 __all__ = [
+    "VIEWPORT_PRESENCE_TTL_MS",
     "TankStateDict",
     "decode_tank_state",
     "encode_tank_state",
+    "has_known_position",
     "make_tank_state",
     "tank_default_fact_source",
 ]
