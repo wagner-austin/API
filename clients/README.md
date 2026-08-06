@@ -1,13 +1,27 @@
 # clients/
 
-Client applications that consume backend services from the monorepo. Each client is a standalone Poetry package with strict typing, 100% test coverage, and event-driven architecture.
+Standalone applications, each a Poetry package with strict typing and 100% test
+coverage. They fall into two groups: **service clients** that consume backend
+services from the monorepo, and **system-identification instruments** that infer the
+rules of undocumented systems and prove the inferred model matches reality.
 
 ## Clients
 
 | Client | Description | Backend Services |
 |--------|-------------|------------------|
 | [DiscordBot](./DiscordBot) | Discord bot with slash commands for QR codes, transcripts, digit recognition, and model training | qr-api, transcript-api, handwriting-ai, model-trainer |
-| [TankpitBot](./TankpitBot) | Tankpit.com WebSocket protocol reverse-engineering and autonomous game bot (HFSM AI, CDP capture, XOR codec) | (standalone) |
+| [TankpitBot](./TankpitBot) | System identification against an undocumented network protocol — CDP capture, XOR codec, live probes, provenance-carrying beliefs, archive-priced validators, server twin | (standalone) |
+| [RustedWarfareBot](./RustedWarfareBot) | System identification against an obfuscated binary — JVM bytecode injection, build-pinned engine claims, doctrine-controlled experiments, seeded reproducible matches | (standalone) |
+
+### The instruments
+
+TankpitBot and RustedWarfareBot solve the same problem from opposite ends: one
+reverses a network protocol from the outside, the other instruments a runtime from
+the inside. Both target systems that publish no spec, cannot be verified directly,
+and drift without notice — so both invest more in *learning and checking* the system
+than in acting on it: controlled probes, beliefs carrying confidence and provenance,
+conformance validation against an archive, and claims pinned to the build or capture
+they were measured on.
 
 ## Design Principles
 
