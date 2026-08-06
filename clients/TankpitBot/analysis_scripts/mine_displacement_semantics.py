@@ -207,6 +207,34 @@ def mine(path: Path, agg: dict) -> None:
                 distance = max(abs(lx - rx), abs(ly - ry))
                 bucket = "1" if distance == 1 else ("2" if distance == 2 else "3+")
                 agg["no_cause_distance"][bucket] = agg["no_cause_distance"].get(bucket, 0) + 1
+                # The divergence question: had the server itself declared
+                # this tile mine-free, and how recently? A fresh clean
+                # statement followed by displacement is a REAL world-model
+                # divergence; "never stated" is a plain sensor gap.
+                clean_ages = [t - st for st, present, _team in timeline if st <= t and not present]
+                if not timeline or not any(st <= t for st, _p, _tm in timeline):
+                    coverage = "never_stated"
+                elif not clean_ages:
+                    coverage = "stated_but_never_clean"
+                else:
+                    age_s = min(clean_ages) / 1000
+                    coverage = (
+                        "clean_within_30s"
+                        if age_s <= 30
+                        else ("clean_within_5m" if age_s <= 300 else "clean_older")
+                    )
+                    if age_s <= 30 and len(agg["divergence_samples"]) < 12:
+                        agg["divergence_samples"].append(
+                            f"{path.name} t={t} ({rx},{ry})->({lx},{ly}) clean_{age_s:.0f}s_before"
+                        )
+                agg["no_cause_coverage"][coverage] = agg["no_cause_coverage"].get(coverage, 0) + 1
+                # Stale-body candidate: ANY tank ever last seen on this
+                # tile, no freshness cap.
+                if any(
+                    tid != self_id and (px, py) == (rx, ry)
+                    for tid, (px, py, _pt) in tank_pos.items()
+                ):
+                    agg["no_cause_stale_body_candidate"] += 1
                 if len(agg["no_cause_samples"]) < 10:
                     agg["no_cause_samples"].append(f"{path.name} t={t} ({rx},{ry})->({lx},{ly})")
         else:
@@ -246,6 +274,9 @@ def main() -> int:
         "displaced_off_friendly_mine": 0,
         "displaced_off_enemy_mine": 0,
         "no_cause_distance": {},
+        "no_cause_coverage": {},
+        "no_cause_stale_body_candidate": 0,
+        "divergence_samples": [],
         "displaced_mine_revealed_after": 0,
         "displaced_body_present": 0,
         "displaced_no_visible_cause": 0,
