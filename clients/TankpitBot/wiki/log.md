@@ -2808,3 +2808,16 @@ Gate: guard 0 violations, ruff+mypy clean, **5,835 tests at 100.00%**, `make sha
 ## [2026-08-05] lift | Ferry memory goes positional — the 60s TTL retired by the no-drift law
 
 User ruling ("do the positional invalidation for the ferry memory"). The TTL's premise — "ferries drift freely" — was falsified by our own movement mining (136/148 wire movements rider-attributed, zero spontaneous; bots never ride). Three channels already retire a wrong belief positionally: 0x4A atomic move pairs overwrite both tiles, viewport re-observation rewrites the tile's truth, and a boarding teleport displaced off a believed ferry deletes it on contact (`_expire_disproven_ferry_belief`). The clock on top only FORGOT true ferries — rediscovery pans and the chain's release→re-lock churn. `find_ferry_boarding_tile` drops the freshness gate; stale-belief tests flip to pin the new law. Residual risk (a human rides it away unseen) costs one displaced hop and self-heals via channel 3 — the same accepted economics as stale container hops. Gate: 5,835 tests at 100.00%, shadow green. Commit 8614316a.
+
+---
+## [2026-08-05] operation | Second century of the day: 100 kills, 0 deaths — the new collect stack proven at scale
+
+User-ordered 100-kill run under the attainability + general-clearance binary. One 46-minute session died silently at 41 kills (no traceback, no WER event, log cut mid-tick — external process kill; prime suspect is harness background-task lifetime, nothing has survived past ~43-46 min; artifacts archived as bot-20260805-204515, capture lost since only teardown saves it). Finished in bounded sessions: **41 (crashed) + 30 + 29 = 100 kills, 0 deaths total**, sessions 2-3 clean `session_complete` at 27m52s and 33m32s.
+
+- **The trap class never appeared**: worst displacement tile x9 (an UNREVEALED mine — the parked displacement-receipt law's case, bounded by the move-failed mark), everything else ≤x3 across ~160 displacements; all hunt-close transport bounces.
+- **General clearance trigger live tally**: 11 shots across the three sessions, 7 converting to a pickup within 10 s (the non-converters were at-capacity moments); first firing 45 s into session 1.
+- **`unservable` release live tally**: 4, each one tick — the session-4 failure shape now costs nothing.
+- **Rank countdown receipts** (`session_account_stats.rank_number`): 27 at 20:19 → 26 at 20:45 → **25** by 21:33, holding 25 into the closer; promotion points 241,167 → 381,015 across the evening.
+- All three sessions read via `make digest` ([[log]] entry above) — kills/timeline/clearance/release numbers in this entry are computed digest fields, not grepped.
+
+Sessions 2-3 also carried the positional ferry memory (TTL retired same evening). Follow-ups parked: displacement-receipt obstruction law (mining started), `make service` adoption for harness-independent long runs.
