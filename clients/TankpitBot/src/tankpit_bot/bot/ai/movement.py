@@ -666,7 +666,7 @@ def _teleport_fallback_command(
     plain legality: they only need to arrive NEAR, and displacement is
     acceptable there.
     """
-    landing = find_attainable_landing_tile(terrain, ctx.world["mines"], tx, ty)
+    landing = find_attainable_landing_tile(terrain, tx, ty)
     if landing is None:
         return None
     lx, ly = landing

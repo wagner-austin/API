@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tankpit_bot.bot.ai.collect_hops import hop_toward_equipment
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.state.types import make_container_state
 from tests.bot.ai._support import make_inventory, make_scanned_ai_state, make_world
@@ -361,14 +362,20 @@ def test_hop_skips_a_mine_denied_nearest_and_takes_the_next_candidate() -> None:
     world, self_state = make_world(self_x=100, self_y=100, fuel=1200, containers=containers)
     # (130,100) sits on water; three cardinals are water, the sole
     # ground neighbor (131,100) carries a hostile mine.
-    world["mines"]["131,100"] = make_mine_state(x=131, y=100, mine_type=0, tank_id=-1, team=1)
-    terrain = InMemoryTerrainMap(
-        {
-            (130, 100): InMemoryTerrainMap.WATER,
-            (129, 100): InMemoryTerrainMap.WATER,
-            (130, 99): InMemoryTerrainMap.WATER,
-            (130, 101): InMemoryTerrainMap.WATER,
-        }
+    world["mines"]["131,100"] = make_mine_state(x=131, y=100, mine_type=0, tank_id=-1, team=2)
+    terrain = FerryAwareTerrain(
+        InMemoryTerrainMap(
+            {
+                (130, 100): InMemoryTerrainMap.WATER,
+                (129, 100): InMemoryTerrainMap.WATER,
+                (130, 99): InMemoryTerrainMap.WATER,
+                (130, 101): InMemoryTerrainMap.WATER,
+            }
+        ),
+        {},
+        riding=False,
+        hostile_mine_keys=frozenset({"131,100"}),
+        occupied_tank_keys=frozenset(),
     )
     inventory = make_inventory(default_count=15)
     ctx = DecideCtx(world, self_state, make_scanned_ai_state(), inventory, 100000, terrain, "")

@@ -109,6 +109,68 @@ def _module_violations(path: Path) -> list[str]:
     return violations
 
 
+_MINE_LAYER_ALLOWED = frozenset({"equipment.py", "context.py"})
+"""bot/ai modules that may touch the raw mine layer.
+
+``equipment.py`` owns :func:`hostile_mines` — the ONE team-scoping
+site; ``context.py`` only reconstructs ``WorldStateDict`` structurally.
+Everything else in ``bot/ai`` must consume the composed decision
+view's team-scoped answers (``is_passable``,
+``is_landing_attainable``) or the hostile filter. Live origin: the
+2026-08-05 attainability predicate took a caller-chosen mine layer
+and one call site passed ALL teams — the bot refused to land in its
+own minefields until the archive sweep (1,227 enemy vs 2 friendly
+displacements) exposed it. This rule makes the layer choice
+structural instead of reviewable.
+"""
+
+
+def _mine_layer_violations(path: Path) -> list[str]:
+    """Collect raw ``["mines"]`` reads in one bot/ai module.
+
+    Args:
+        path: Python file to scan.
+
+    Returns:
+        Violation messages, one per raw mine-layer subscript.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.slice, ast.Constant)
+            and node.slice.value == "mines"
+        ):
+            violations.append(
+                f"{path}:{node.lineno} raw mine-layer read in bot/ai - "
+                "consume the composed view or equipment.hostile_mines"
+            )
+    return violations
+
+
+def run_mine_layer_rules(project_root: Path) -> int:
+    """Run the raw-mine-layer guard rule over ``bot/ai``.
+
+    Args:
+        project_root: Project root containing ``src/tankpit_bot``.
+
+    Returns:
+        Number of violations found (0 means the rule passes).
+    """
+    ai_root = project_root / "src" / "tankpit_bot" / "bot" / "ai"
+    if not ai_root.is_dir():
+        return 0
+    violations: list[str] = []
+    for module_path in sorted(ai_root.rglob("*.py")):
+        if module_path.name in _MINE_LAYER_ALLOWED:
+            continue
+        violations.extend(_mine_layer_violations(module_path))
+    for violation in violations:
+        sys.stdout.write(f"mine_layer_violation {violation}\n")
+    return len(violations)
+
+
 def run_state_sentinel_rules(project_root: Path) -> int:
     """Run the inline-sentinel guard rule over a project tree.
 
@@ -134,5 +196,6 @@ def run_state_sentinel_rules(project_root: Path) -> int:
 
 __all__ = [
     "CANONICAL_MODULE",
+    "run_mine_layer_rules",
     "run_state_sentinel_rules",
 ]

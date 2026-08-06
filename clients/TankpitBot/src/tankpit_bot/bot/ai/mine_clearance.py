@@ -98,32 +98,38 @@ def _service_tiles(goal_x: int, goal_y: int) -> list[tuple[int, int]]:
     return tiles
 
 
-def _mines_after_blast(
-    mines: dict[str, MineStateDict],
-    aim_x: int,
-    aim_y: int,
-    rank: int,
-) -> dict[str, MineStateDict]:
-    """Return the mine layer as it would stand after a shot at the aim.
+def _blast_opens_landing(
+    terrain: TerrainMapProtocol,
+    blast: set[tuple[int, int]],
+    goal_x: int,
+    goal_y: int,
+) -> bool:
+    """Return whether a blast would open an attainable landing at the goal.
 
     The 0x45 detonation removes every mine in the blast area
-    regardless of team ([[mine-mechanics]] cascade dispatch law).
+    regardless of team ([[mine-mechanics]] cascade dispatch law), so a
+    service tile opens when it is landing-legal AND either already
+    attainable or inside the blast (its mine dies with the shot). Pure
+    view logic — no counterfactual mine layer is ever assembled, so no
+    call site can pick a wrong one.
 
     Args:
-        mines: Full known mine layer indexed by ``"x,y"``.
-        aim_x: Aim tile X.
-        aim_y: Aim tile Y.
-        rank: Shooter's true rank (blast reach).
+        terrain: Composed decision terrain.
+        blast: Tiles the shot clears.
+        goal_x: Target container X.
+        goal_y: Target container Y.
 
     Returns:
-        The mine layer minus every mine inside the blast.
+        True when some service tile becomes attainable after the shot.
     """
-    blast = set(_blast_tiles(aim_x, aim_y, rank))
-    return {key: mine for key, mine in mines.items() if (mine["x"], mine["y"]) not in blast}
+    return any(
+        terrain.is_landing_legal(tile_x, tile_y)
+        and (terrain.is_landing_attainable(tile_x, tile_y) or (tile_x, tile_y) in blast)
+        for tile_x, tile_y in _service_tiles(goal_x, goal_y)
+    )
 
 
 def _aim_opens_target(
-    world: WorldStateDict,
     self_state: SelfStateDict,
     terrain: TerrainMapProtocol | None,
     aim_x: int,
@@ -136,7 +142,6 @@ def _aim_opens_target(
     """Return whether a shot at the aim restores access to the container.
 
     Args:
-        world: Current world state.
         self_state: The bot's own state (rank for blast reach).
         terrain: Composed decision terrain; ``None`` disables the
             landing-attainability arm.
@@ -154,11 +159,7 @@ def _aim_opens_target(
     if covered and (container["x"], container["y"]) in blast:
         return True
     if blocked and terrain is not None:
-        remaining = _mines_after_blast(world["mines"], aim_x, aim_y, self_state["rank"])
-        return (
-            find_attainable_landing_tile(terrain, remaining, container["x"], container["y"])
-            is not None
-        )
+        return _blast_opens_landing(terrain, blast, container["x"], container["y"])
     return False
 
 
@@ -193,7 +194,7 @@ def find_service_clearance_aim(
     """
     if terrain is None:
         return None
-    if find_attainable_landing_tile(terrain, world["mines"], goal_x, goal_y) is not None:
+    if find_attainable_landing_tile(terrain, goal_x, goal_y) is not None:
         return None
     hostile = hostile_mines(world)
     left, top, right, bottom = viewport_visible_bounds(world["viewport"])
@@ -213,8 +214,8 @@ def find_service_clearance_aim(
             world["terrain"],
         ):
             continue
-        remaining = _mines_after_blast(world["mines"], tile_x, tile_y, self_state["rank"])
-        if find_attainable_landing_tile(terrain, remaining, goal_x, goal_y) is None:
+        blast = set(_blast_tiles(tile_x, tile_y, self_state["rank"]))
+        if not _blast_opens_landing(terrain, blast, goal_x, goal_y):
             continue
         distance = abs(self_state["x"] - tile_x) + abs(self_state["y"] - tile_y)
         if best is None or distance < best_distance:
@@ -251,8 +252,7 @@ def _denied_containers(
             continue
         covered = container_key in hostile
         blocked = terrain is not None and (
-            find_attainable_landing_tile(terrain, world["mines"], container["x"], container["y"])
-            is None
+            find_attainable_landing_tile(terrain, container["x"], container["y"]) is None
         )
         if not covered and not blocked:
             continue
@@ -315,7 +315,6 @@ def find_mine_clearance_shot(
             1
             for container, covered, blocked in denied
             if _aim_opens_target(
-                world,
                 self_state,
                 terrain,
                 aim_x,

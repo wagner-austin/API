@@ -229,6 +229,44 @@ class TestInvariantPositionFreshnessRequiresAuthoritativePosition:
         result = apply_tank_observation(state, obs)
         assert result["tanks"][key]["last_position_update_ms"] == 5000
 
+    def test_map_position_defers_to_a_fresh_position(self) -> None:
+        """A 0x4C fix never overwrites a position updated inside its aging window.
+
+        The 2026-08-06 delta mining (2,851 same-tank map/wire pairs
+        within 2 s): the snapshot payload AGES before arrival — 53%
+        disagree with a fresh wire fix by walk steps or teleport hops,
+        zero decode artifacts. Presence stays exact (liveness rule 3
+        untouched); the position and its freshness both hold, so an
+        aged snapshot cannot smear a kill-shot-fresh wire fix.
+        """
+        state, key = make_world_with_seed(tank_id=42, x=10, y=20, last_position_update_ms=4500)
+        obs = make_tank_observation(
+            tank_id=42,
+            timestamp_ms=5000,
+            is_wire_sourced=False,
+            position_is_authoritative=True,
+            storage_source="world_state",
+            position=(50, 60),
+        )
+        result = apply_tank_observation(state, obs)
+        assert (result["tanks"][key]["x"], result["tanks"][key]["y"]) == (10, 20)
+        assert result["tanks"][key]["last_position_update_ms"] == 4500
+
+    def test_wire_position_is_never_deferred(self) -> None:
+        """The defer is map-only: a wire fix always lands, however fresh the seed."""
+        state, key = make_world_with_seed(tank_id=42, x=10, y=20, last_position_update_ms=4500)
+        obs = make_tank_observation(
+            tank_id=42,
+            timestamp_ms=5000,
+            is_wire_sourced=True,
+            position_is_authoritative=True,
+            storage_source="world_state",
+            position=(50, 60),
+        )
+        result = apply_tank_observation(state, obs)
+        assert (result["tanks"][key]["x"], result["tanks"][key]["y"]) == (50, 60)
+        assert result["tanks"][key]["last_position_update_ms"] == 5000
+
     def test_non_authoritative_position_preserves_position_freshness(self) -> None:
         """Radar / DOM-refinement positions are not authoritative; freshness stays.
 
@@ -806,3 +844,28 @@ class TestTankObservationCodec:
         }
         with pytest.raises(JSONTypeError, match=r"position\[1\] must be int"):
             decode_tank_observation(data)
+
+
+class TestMapPositionDeferSentinel:
+    """The defer never protects the (0,0) construction default."""
+
+    def test_map_fix_lands_on_a_roster_sentinel_tank(self) -> None:
+        """A fresh-stamped (0,0) roster entry still takes the snapshot fix.
+
+        The login choreography seeds tanks at (0,0) with advancing
+        freshness; protecting that default from the map's real
+        coordinates would freeze phantom corner tanks — the exact
+        class ``has_known_position`` was built against.
+        """
+        state, key = make_world_with_seed(tank_id=42, x=0, y=0, last_position_update_ms=4500)
+        obs = make_tank_observation(
+            tank_id=42,
+            timestamp_ms=5000,
+            is_wire_sourced=False,
+            position_is_authoritative=True,
+            storage_source="world_state",
+            position=(50, 60),
+        )
+        result = apply_tank_observation(state, obs)
+        assert (result["tanks"][key]["x"], result["tanks"][key]["y"]) == (50, 60)
+        assert result["tanks"][key]["last_position_update_ms"] == 5000

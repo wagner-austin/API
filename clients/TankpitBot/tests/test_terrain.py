@@ -427,3 +427,13 @@ def test_format_viewport_column_headers() -> None:
 
     lines = result.split("\n")
     assert "8 9 0 1" in lines[0]
+
+
+def test_static_map_attainability_collapses_to_legality(tmp_path: Path) -> None:
+    """The static map carries no mine knowledge: attainable == legal."""
+    gif_path = tmp_path / "test.gif"
+    create_test_gif(gif_path, make_uniform_pixels(_GROUND_COLOR))
+    terrain = TerrainMap(gif_path)
+
+    assert terrain.is_landing_attainable(0, 0) is terrain.is_landing_legal(0, 0)
+    assert terrain.is_landing_attainable(0, 0) is True

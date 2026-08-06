@@ -14,7 +14,6 @@ from tankpit_bot.bot.ai.reachability import (
     is_collection_reachable_in_viewport,
     is_move_reachable_in_viewport,
 )
-from tankpit_bot.state.types import make_mine_state
 from tests.bot.ai._support import make_world
 from tests.in_memory_terrain_map import InMemoryTerrainMap
 
@@ -282,50 +281,54 @@ class TestAttainableLanding:
     """Landing attainability -- the bot-20260805-173034 failure class.
 
     Legality says the server accepts the aim; attainability says the
-    tank ends up standing there. A known mine on the tile displaces
-    the landing every time (probe 3/3 2026-07-28), which for a pickup
-    means the mission never completes: the live session re-aimed 534
-    displaced teleports at one known mine over 43 minutes.
+    tank ends up standing there. A known HOSTILE mine on the tile
+    displaces the landing every time (probe 3/3 2026-07-28; team scope
+    archive 2026-08-06: 1,227 enemy vs 2 friendly displacements). The
+    team decision lives in the composed view's hostile-mine set --
+    built once per tick from the self model's team -- so these tests
+    compose exactly as production does.
     """
 
     def test_clean_legal_goal_is_the_landing(self) -> None:
         """Unmined legal ground lands exactly on the goal."""
-        assert find_attainable_landing_tile(InMemoryTerrainMap(), {}, 100, 100) == (100, 100)
+        assert find_attainable_landing_tile(InMemoryTerrainMap(), 100, 100) == (100, 100)
 
-    def test_mined_goal_falls_to_a_clean_cardinal(self) -> None:
-        """A mine on the goal shifts the aim to a mine-free neighbor."""
-        mines = {"100,100": make_mine_state(x=100, y=100, mine_type=0, tank_id=-1, team=1)}
+    def test_hostile_mined_goal_falls_to_a_clean_cardinal(self) -> None:
+        """A hostile mine on the goal shifts the aim to a clean neighbor."""
+        terrain = _mined_terrain(InMemoryTerrainMap(), frozenset({"100,100"}))
 
-        assert find_attainable_landing_tile(InMemoryTerrainMap(), mines, 100, 100) == (101, 100)
+        assert find_attainable_landing_tile(terrain, 100, 100) == (101, 100)
 
-    def test_friendly_mine_also_displaces_the_landing(self) -> None:
-        """Displacement is team-blind (user law 2026-06-16) -- own mines skip too."""
-        mines = {"100,100": make_mine_state(x=100, y=100, mine_type=0, tank_id=-1, team=2)}
+    def test_friendly_mines_never_repel_a_landing(self) -> None:
+        """Own-color mines are absent from the hostile set by construction.
 
-        assert find_attainable_landing_tile(InMemoryTerrainMap(), mines, 100, 100) == (101, 100)
+        The composed view receives ONLY hostile keys (team-scoped at
+        composition), so a friendly mine leaves the goal attainable --
+        the archive's 20 clean exact landings on friendly mines.
+        """
+        terrain = _mined_terrain(InMemoryTerrainMap(), frozenset())
+
+        assert find_attainable_landing_tile(terrain, 100, 100) == (100, 100)
 
     def test_session4_pocket_has_no_attainable_landing(self) -> None:
-        """Water goal, water west/south, mined north/east: nothing attainable."""
-        terrain = InMemoryTerrainMap(
+        """Water goal, water west/south, hostile-mined north/east: nothing."""
+        base = InMemoryTerrainMap(
             {
                 (58, 95): InMemoryTerrainMap.WATER,
                 (57, 95): InMemoryTerrainMap.WATER,
                 (58, 96): InMemoryTerrainMap.WATER,
             }
         )
-        mines = {
-            "58,94": make_mine_state(x=58, y=94, mine_type=0, tank_id=-1, team=1),
-            "59,95": make_mine_state(x=59, y=95, mine_type=0, tank_id=-1, team=1),
-        }
+        terrain = _mined_terrain(base, frozenset({"58,94", "59,95"}))
 
-        assert find_attainable_landing_tile(terrain, mines, 58, 95) is None
+        assert find_attainable_landing_tile(terrain, 58, 95) is None
 
     def test_out_of_bounds_goal_has_no_landing(self) -> None:
         """Off-map goals are never landable."""
-        assert find_attainable_landing_tile(InMemoryTerrainMap(), {}, 300, 100) is None
+        assert find_attainable_landing_tile(InMemoryTerrainMap(), 300, 100) is None
 
     def test_map_edge_goal_skips_out_of_bounds_neighbors(self) -> None:
         """A mined corner goal only scans in-bounds cardinal neighbors."""
-        mines = {"0,0": make_mine_state(x=0, y=0, mine_type=0, tank_id=-1, team=1)}
+        terrain = _mined_terrain(InMemoryTerrainMap(), frozenset({"0,0"}))
 
-        assert find_attainable_landing_tile(InMemoryTerrainMap(), mines, 0, 0) == (1, 0)
+        assert find_attainable_landing_tile(terrain, 0, 0) == (1, 0)

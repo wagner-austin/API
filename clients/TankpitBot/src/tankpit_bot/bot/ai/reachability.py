@@ -14,11 +14,9 @@ afterwards (the displacement law bounces landings off mines,
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.pathfinding import path_exists
-from tankpit_bot.state.types import MineStateDict, WorldStateDict
+from tankpit_bot.state.types import WorldStateDict
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 _ADJACENT_DIRECTIONS: tuple[tuple[int, int], ...] = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -124,47 +122,46 @@ def is_collection_reachable_in_viewport(
 
 def find_attainable_landing_tile(
     terrain: TerrainMapProtocol,
-    mines: Mapping[str, MineStateDict],
     goal_x: int,
     goal_y: int,
 ) -> tuple[int, int] | None:
     """Find a teleport landing the tank will actually END UP on.
 
     Legality (``is_landing_legal``) only says the server accepts the
-    aim; the displacement law then bounces the landing off any mine on
-    the tile ([[mine-mechanics]] § teleport landings displace, probe
-    3/3 2026-07-28). For a pickup that is fatal: the measured transfer
-    choreography needs the tank ON the container or cardinally
+    aim; the displacement law then bounces the landing off any HOSTILE
+    mine on the tile ([[mine-mechanics]] § team scope, archive
+    2026-08-06: 1,227 enemy vs 2 friendly displacements — own-color
+    mines never displace). For a pickup that is fatal: the measured
+    transfer choreography needs the tank ON the container or cardinally
     adjacent, so a landing that displaces never completes the mission.
     Session bot-20260805-173034 spent 43 minutes re-aiming at a known
     mine — 534 displaced teleports, zero pickups — because the
     selector answered legality when the plan needed attainability.
 
-    Every known mine displaces regardless of team (user law
-    2026-06-16, verbatim: "you get moved off if there are mines") —
-    pass the full ``world["mines"]`` layer, not the hostile filter.
+    The team scoping lives in the terrain view, not here: the composed
+    decision view (``FerryAwareTerrain``) answers
+    ``is_landing_attainable`` from its per-tick hostile-mine set, so
+    no call site ever selects a mine layer (the 2026-08-05
+    all-team-mines over-reach was exactly a call site choosing the
+    wrong layer).
 
     Args:
-        terrain: Terrain view answering landing legality.
-        mines: Known mines indexed by ``"x,y"`` key (all teams).
+        terrain: Terrain view answering landing attainability.
         goal_x: Target container X coordinate.
         goal_y: Target container Y coordinate.
 
     Returns:
-        The first service tile (target, then cardinal neighbors) that
-        is terrain-legal AND mine-free, or ``None`` when every service
+        The first service tile (target, then cardinal neighbors) the
+        tank would actually stand on, or ``None`` when every service
         tile would refuse or displace the landing.
     """
     if not (_MAP_MIN <= goal_x <= _MAP_MAX and _MAP_MIN <= goal_y <= _MAP_MAX):
         return None
-    if terrain.is_landing_legal(goal_x, goal_y) and f"{goal_x},{goal_y}" not in mines:
+    if terrain.is_landing_attainable(goal_x, goal_y):
         return (goal_x, goal_y)
     for landing_x, landing_y in _collection_landing_tiles(goal_x, goal_y):
-        if not terrain.is_landing_legal(landing_x, landing_y):
-            continue
-        if f"{landing_x},{landing_y}" in mines:
-            continue
-        return (landing_x, landing_y)
+        if terrain.is_landing_attainable(landing_x, landing_y):
+            return (landing_x, landing_y)
     return None
 
 

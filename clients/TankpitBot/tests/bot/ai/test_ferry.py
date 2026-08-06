@@ -561,3 +561,40 @@ class TestSurfaceRouteTerrain:
         assert SurfaceRouteTerrain(view, water=False).render_viewport(
             100, 100, 1, 1
         ) == view.render_viewport(100, 100, 1, 1)
+
+
+class TestSurfaceAttainability:
+    """Surface-view landing attainability delegates through the wrap."""
+
+    def test_hostile_mine_blocks_attainability_on_the_surface(self) -> None:
+        """The wrapped view's team-scoped mine knowledge survives the wrap."""
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
+
+        base = InMemoryTerrainMap()
+        ferry_view = FerryAwareTerrain(
+            base,
+            {},
+            riding=False,
+            hostile_mine_keys=frozenset({"101,100"}),
+            occupied_tank_keys=frozenset(),
+        )
+        surface = SurfaceRouteTerrain(ferry_view, water=False)
+
+        assert surface.is_landing_attainable(101, 100) is False
+        assert surface.is_landing_attainable(100, 100) is True
+
+    def test_off_surface_tiles_are_unattainable(self) -> None:
+        """A clean tile off the routing surface still cannot be landed on."""
+        from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain
+
+        base = InMemoryTerrainMap({(101, 100): "W"})
+        ferry_view = FerryAwareTerrain(
+            base,
+            {},
+            riding=True,
+            hostile_mine_keys=frozenset(),
+            occupied_tank_keys=frozenset(),
+        )
+        ground_surface = SurfaceRouteTerrain(ferry_view, water=False)
+
+        assert ground_surface.is_landing_attainable(101, 100) is False

@@ -295,7 +295,13 @@ def test_mine_denied_locked_fuel_releases_when_no_shot_exists() -> None:
         (130, 101): "W",
         (130, 99): "W",
     }
-    terrain = InMemoryTerrainMap(terrain_data=terrain_data)
+    terrain = FerryAwareTerrain(
+        InMemoryTerrainMap(terrain_data=terrain_data),
+        {},
+        riding=False,
+        hostile_mine_keys=frozenset({"131,100"}),
+        occupied_tank_keys=frozenset(),
+    )
     world, self_state = make_world(
         self_x=100,
         self_y=100,

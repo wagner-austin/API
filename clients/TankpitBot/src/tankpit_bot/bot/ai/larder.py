@@ -216,9 +216,7 @@ def select_fuel_larder_hop(
         if _is_walk_territory(ctx, container, sx, sy):
             too_close += 1
             continue
-        landing = find_attainable_landing_tile(
-            terrain, ctx.world["mines"], container["x"], container["y"]
-        )
+        landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
         if landing is None:
             # Water-locked container: a believed ferry near it is the
             # boarding-tile landing — teleport to the ferry, then the

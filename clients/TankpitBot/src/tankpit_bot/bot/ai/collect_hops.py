@@ -62,9 +62,7 @@ def _equipment_hop_landing(
         Landing coordinates, or ``None`` when neither ground nor a
         fresh believed ferry serves the container.
     """
-    landing = find_attainable_landing_tile(
-        terrain, ctx.world["mines"], container["x"], container["y"]
-    )
+    landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
     if landing is not None:
         return landing
     return find_ferry_boarding_tile(
@@ -403,9 +401,7 @@ def desperation_fuel_hop(
             continue
         if is_container_blacklisted(container["x"], container["y"]):
             continue
-        landing = find_attainable_landing_tile(
-            terrain, ctx.world["mines"], container["x"], container["y"]
-        )
+        landing = find_attainable_landing_tile(terrain, container["x"], container["y"])
         if landing is None:
             continue
         landing_x, landing_y = landing

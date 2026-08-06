@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from tankpit_bot.state.types import TankStateDict, has_known_position, make_tank_state
+from tankpit_bot.state.types import (
+    TankStateDict,
+    has_known_position,
+    has_real_coordinates,
+    make_tank_state,
+)
 
 
 def _tank(*, x: int, y: int, last_position_update_ms: int = 0) -> TankStateDict:
@@ -52,3 +57,19 @@ class TestHasKnownPosition:
         """A tank an authoritative message placed exactly on (0, 0)
         is at (0, 0), not a phantom."""
         assert has_known_position(_tank(x=0, y=0, last_position_update_ms=1_000)) is True
+
+
+def test_has_real_coordinates_rejects_the_construction_default() -> None:
+    """(0,0) is never real coordinates, however fresh the stamp.
+
+    The strict sibling exists for the map-position defer: the login
+    roster's (0,0)-with-fresh-freshness entries must not be protected
+    from the 0x4C snapshot's real fix.
+    """
+    assert has_real_coordinates(_tank(x=0, y=0, last_position_update_ms=99999)) is False
+
+
+def test_has_real_coordinates_accepts_any_nonzero_axis() -> None:
+    """Either axis off the default makes the coordinates real."""
+    assert has_real_coordinates(_tank(x=5, y=0)) is True
+    assert has_real_coordinates(_tank(x=0, y=5)) is True

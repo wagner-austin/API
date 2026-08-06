@@ -165,6 +165,22 @@ class TerrainMap:
         """
         return self.is_passable(x, y)
 
+    def is_landing_attainable(self, x: int, y: int) -> bool:
+        """Check if a teleport aimed here will actually stand here.
+
+        The static minimap carries no mine knowledge, so attainability
+        collapses to legality on this view; the composed decision view
+        is where the hostile-mine intersection lives.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport aimed here lands here.
+        """
+        return self.is_landing_legal(x, y)
+
     def render_viewport(
         self,
         center_x: int,

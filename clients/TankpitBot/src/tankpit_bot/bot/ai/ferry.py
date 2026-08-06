@@ -184,6 +184,28 @@ class FerryAwareTerrain:
             return self._riding
         return False
 
+    def is_landing_attainable(self, x: int, y: int) -> bool:
+        """Check if a teleport aimed here will actually stand here.
+
+        Landing legality intersected with the composed view's
+        TEAM-SCOPED hostile-mine set — the same set the walk side
+        already consumes, built once per tick from the self model's
+        team. Own-color mines never displace ([[mine-mechanics]]
+        § team scope, archive 2026-08-06: 1,227 enemy vs 2 friendly),
+        so they are absent from this set by construction and never
+        repel a landing.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport aimed here lands here.
+        """
+        if not self.is_landing_legal(x, y):
+            return False
+        return f"{x},{y}" not in self._hostile_mine_keys
+
     def render_viewport(
         self,
         center_x: int,
@@ -296,6 +318,24 @@ class SurfaceRouteTerrain:
             True if a teleport may be aimed at the tile.
         """
         if not self._base.is_landing_legal(x, y):
+            return False
+        return self._is_on_routing_surface(x, y)
+
+    def is_landing_attainable(self, x: int, y: int) -> bool:
+        """Check if a teleport aimed here will actually stand here.
+
+        Delegates to the wrapped view's attainability (which carries
+        the team-scoped hostile-mine knowledge) intersected with the
+        routing surface.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport aimed here lands here on this surface.
+        """
+        if not self._base.is_landing_attainable(x, y):
             return False
         return self._is_on_routing_surface(x, y)
 

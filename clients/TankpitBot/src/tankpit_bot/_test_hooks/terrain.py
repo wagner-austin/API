@@ -74,6 +74,34 @@ class TerrainMapProtocol(Protocol):
         """
         ...
 
+    def is_landing_attainable(self, x: int, y: int) -> bool:
+        """Check if a teleport aimed here will actually STAND here.
+
+        The third terrain question, between legality and walkability.
+        Legality says the server accepts the aim; attainability says
+        the tank ends up on the tile — a known HOSTILE mine displaces
+        the landing every time (wiki ``mine-mechanics`` § team scope,
+        archive 2026-08-06: 1,227 enemy vs 2 friendly displacements;
+        own-color mines never displace, 20 clean exact landings).
+        Pickup-serving teleports must ask THIS question; transport
+        aims (combat, scouting) keep plain legality because arriving
+        near is acceptable there.
+
+        Views without mine knowledge (the static map, bare test
+        doubles) answer with plain legality; the composed decision
+        view intersects legality with its team-scoped hostile-mine
+        set, so the self model's team is consulted exactly once, at
+        composition.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport aimed here lands here.
+        """
+        ...
+
     def render_viewport(
         self,
         center_x: int,

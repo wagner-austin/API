@@ -101,6 +101,18 @@ class InMemoryTerrainMap:
         """
         return self.is_passable(x, y)
 
+    def is_landing_attainable(self, x: int, y: int) -> bool:
+        """Terrain-only data: attainability collapses to legality.
+
+        Args:
+            x: X coordinate.
+            y: Y coordinate.
+
+        Returns:
+            True if a teleport aimed here lands here.
+        """
+        return self.is_landing_legal(x, y)
+
     def render_viewport(
         self,
         center_x: int,

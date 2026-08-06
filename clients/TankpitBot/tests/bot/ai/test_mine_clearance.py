@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tankpit_bot.bot.ai.ferry import FerryAwareTerrain
 from tankpit_bot.bot.ai.mine_clearance import find_mine_clearance_shot
 from tankpit_bot.state import (
     SelfStateDict,
@@ -15,6 +16,25 @@ from tankpit_bot.state.types import (
     make_viewport_state,
 )
 from tests.in_memory_terrain_map import InMemoryTerrainMap
+
+
+def _composed(base: InMemoryTerrainMap, hostile_keys: frozenset[str]) -> FerryAwareTerrain:
+    """Compose the decision view exactly as production does.
+
+    Args:
+        base: Static terrain data.
+        hostile_keys: Team-scoped hostile-mine "x,y" keys.
+
+    Returns:
+        The composed terrain view.
+    """
+    return FerryAwareTerrain(
+        base,
+        {},
+        riding=False,
+        hostile_mine_keys=hostile_keys,
+        occupied_tank_keys=frozenset(),
+    )
 
 
 def _world_with_self(*, rank: int = 1) -> tuple[WorldStateDict, SelfStateDict]:
@@ -190,7 +210,7 @@ def test_blast_clips_at_the_map_edge() -> None:
     assert find_mine_clearance_shot(world, self_state, InMemoryTerrainMap()) == (0, 0)
 
 
-def _session4_pocket() -> tuple[WorldStateDict, SelfStateDict, InMemoryTerrainMap]:
+def _session4_pocket() -> tuple[WorldStateDict, SelfStateDict, FerryAwareTerrain]:
     """Rebuild the bot-20260805-173034 geometry trap, verbatim.
 
     Equipment at (58,95) sits ON water; its west and south service
@@ -221,12 +241,15 @@ def _session4_pocket() -> tuple[WorldStateDict, SelfStateDict, InMemoryTerrainMa
             tank_id=-1,
             team=1,
         )
-    terrain = InMemoryTerrainMap(
-        {
-            (58, 95): InMemoryTerrainMap.WATER,
-            (57, 95): InMemoryTerrainMap.WATER,
-            (58, 96): InMemoryTerrainMap.WATER,
-        }
+    terrain = _composed(
+        InMemoryTerrainMap(
+            {
+                (58, 95): InMemoryTerrainMap.WATER,
+                (57, 95): InMemoryTerrainMap.WATER,
+                (58, 96): InMemoryTerrainMap.WATER,
+            }
+        ),
+        frozenset({"58,94", "59,95"}),
     )
     return world, self_state, terrain
 
@@ -272,16 +295,19 @@ def test_los_blocked_flank_mines_defer_the_unlock_shot() -> None:
     """Rock between the bot and every service mine defers the clearance."""
     world, self_state, _ = _session4_pocket()
     self_state["x"], self_state["y"] = 63, 95
-    terrain = InMemoryTerrainMap(
-        {
-            (58, 95): InMemoryTerrainMap.WATER,
-            (57, 95): InMemoryTerrainMap.WATER,
-            (58, 96): InMemoryTerrainMap.WATER,
-            (61, 93): InMemoryTerrainMap.ROCK,
-            (61, 94): InMemoryTerrainMap.ROCK,
-            (61, 95): InMemoryTerrainMap.ROCK,
-            (61, 96): InMemoryTerrainMap.ROCK,
-        }
+    terrain = _composed(
+        InMemoryTerrainMap(
+            {
+                (58, 95): InMemoryTerrainMap.WATER,
+                (57, 95): InMemoryTerrainMap.WATER,
+                (58, 96): InMemoryTerrainMap.WATER,
+                (61, 93): InMemoryTerrainMap.ROCK,
+                (61, 94): InMemoryTerrainMap.ROCK,
+                (61, 95): InMemoryTerrainMap.ROCK,
+                (61, 96): InMemoryTerrainMap.ROCK,
+            }
+        ),
+        frozenset({"58,94", "59,95"}),
     )
 
     assert find_mine_clearance_shot(world, self_state, terrain) is None
@@ -319,13 +345,16 @@ def test_edge_of_viewport_container_with_out_of_view_mine_waits() -> None:
     world["mines"].clear()
     world["containers"]["67,94"] = make_container_state(x=67, y=94, is_fuel=False, volume=0)
     world["mines"]["68,94"] = make_mine_state(x=68, y=94, mine_type=0, tank_id=-1, team=1)
-    terrain = InMemoryTerrainMap(
-        {
-            (67, 94): InMemoryTerrainMap.WATER,
-            (66, 94): InMemoryTerrainMap.WATER,
-            (67, 93): InMemoryTerrainMap.WATER,
-            (67, 95): InMemoryTerrainMap.WATER,
-        }
+    terrain = _composed(
+        InMemoryTerrainMap(
+            {
+                (67, 94): InMemoryTerrainMap.WATER,
+                (66, 94): InMemoryTerrainMap.WATER,
+                (67, 93): InMemoryTerrainMap.WATER,
+                (67, 95): InMemoryTerrainMap.WATER,
+            }
+        ),
+        frozenset({"68,94"}),
     )
 
     assert find_mine_clearance_shot(world, self_state, terrain) is None
@@ -365,16 +394,19 @@ class TestServiceClearanceAim:
 
         world, self_state, _ = _session4_pocket()
         self_state["x"], self_state["y"] = 63, 95
-        terrain = InMemoryTerrainMap(
-            {
-                (58, 95): InMemoryTerrainMap.WATER,
-                (57, 95): InMemoryTerrainMap.WATER,
-                (58, 96): InMemoryTerrainMap.WATER,
-                (61, 93): InMemoryTerrainMap.ROCK,
-                (61, 94): InMemoryTerrainMap.ROCK,
-                (61, 95): InMemoryTerrainMap.ROCK,
-                (61, 96): InMemoryTerrainMap.ROCK,
-            }
+        terrain = _composed(
+            InMemoryTerrainMap(
+                {
+                    (58, 95): InMemoryTerrainMap.WATER,
+                    (57, 95): InMemoryTerrainMap.WATER,
+                    (58, 96): InMemoryTerrainMap.WATER,
+                    (61, 93): InMemoryTerrainMap.ROCK,
+                    (61, 94): InMemoryTerrainMap.ROCK,
+                    (61, 95): InMemoryTerrainMap.ROCK,
+                    (61, 96): InMemoryTerrainMap.ROCK,
+                }
+            ),
+            frozenset({"58,94", "59,95"}),
         )
 
         assert find_service_clearance_aim(world, self_state, terrain, 58, 95) is None
@@ -393,13 +425,16 @@ class TestServiceClearanceAim:
         self_state["rank"] = 0
         world["mines"]["58,95"] = make_mine_state(x=58, y=95, mine_type=0, tank_id=-1, team=1)
         del world["mines"]["58,94"]
-        terrain_water_north = InMemoryTerrainMap(
-            {
-                (58, 95): InMemoryTerrainMap.WATER,
-                (57, 95): InMemoryTerrainMap.WATER,
-                (58, 96): InMemoryTerrainMap.WATER,
-                (58, 94): InMemoryTerrainMap.WATER,
-            }
+        terrain_water_north = _composed(
+            InMemoryTerrainMap(
+                {
+                    (58, 95): InMemoryTerrainMap.WATER,
+                    (57, 95): InMemoryTerrainMap.WATER,
+                    (58, 96): InMemoryTerrainMap.WATER,
+                    (58, 94): InMemoryTerrainMap.WATER,
+                }
+            ),
+            frozenset({"58,95", "59,95"}),
         )
 
         assert find_service_clearance_aim(world, self_state, terrain_water_north, 58, 95) == (

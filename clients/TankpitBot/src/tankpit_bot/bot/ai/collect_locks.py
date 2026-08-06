@@ -74,10 +74,7 @@ def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -
     """
     if ctx.terrain is None:
         return False
-    if (
-        find_attainable_landing_tile(ctx.terrain, ctx.world["mines"], target_x, target_y)
-        is not None
-    ):
+    if find_attainable_landing_tile(ctx.terrain, target_x, target_y) is not None:
         return False
     if (
         find_service_clearance_aim(ctx.filtered, ctx.self_state, ctx.terrain, target_x, target_y)
