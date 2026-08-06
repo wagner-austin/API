@@ -524,6 +524,92 @@ class TestRemoveTank:
 class TestDeactivateTank:
     """Tests for deactivate_tank (0x41 corpse-window handler)."""
 
+    def test_map_snapshot_revives_a_deactivated_tank(self) -> None:
+        """Rule 4: presence in map data flips a corpse belief to alive.
+
+        Byte-proven 2026-08-05 (run bot-20260805-095935): the server's
+        0x4C map is a strictly LIVING-tanks list — victims absent from
+        all 58 in-corpse-window snapshots, present in all 204
+        post-window ones. A deactivated tank listed in a map snapshot
+        is therefore the living respawn; without this rule 27 of 32
+        idle (wire-silent) respawns stayed phantom corpses and the
+        session exited no_viable_targets in a full room.
+        """
+        from tankpit_bot.state import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation
+
+        state = make_empty_world_state()
+        state = apply_tank_observation(
+            state,
+            make_tank_observation(
+                tank_id=505,
+                timestamp_ms=500,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(202, 194),
+                team=3,
+                rank=1,
+                name="orange-6",
+                is_bot=True,
+            ),
+        )
+        state = deactivate_tank(state, tank_id=505, timestamp_ms=1000)
+        assert state["tanks"]["505"]["liveness"] == "deactivated"
+
+        revived = apply_tank_observation(
+            state,
+            make_tank_observation(
+                tank_id=505,
+                timestamp_ms=30_000,
+                is_wire_sourced=False,
+                storage_source="world_state",
+                fact_source="wire_0x4C_map_data",
+                position_is_authoritative=True,
+                position=(40, 61),
+            ),
+        )
+
+        assert revived["tanks"]["505"]["liveness"] == "alive"
+        assert revived["tanks"]["505"]["x"] == 40
+
+    def test_radar_detection_does_not_revive_a_corpse(self) -> None:
+        """Radar and DOM refinements (both flags False) stay excluded:
+        their positions are estimates, not the server's living list."""
+        from tankpit_bot.state import apply_tank_observation
+        from tankpit_bot.state.types import make_tank_observation
+
+        state = make_empty_world_state()
+        state = apply_tank_observation(
+            state,
+            make_tank_observation(
+                tank_id=505,
+                timestamp_ms=500,
+                is_wire_sourced=True,
+                storage_source="viewport",
+                position=(202, 194),
+                team=3,
+                rank=1,
+                name="orange-6",
+                is_bot=True,
+            ),
+        )
+        state = deactivate_tank(state, tank_id=505, timestamp_ms=1000)
+
+        still_dead = apply_tank_observation(
+            state,
+            make_tank_observation(
+                tank_id=505,
+                timestamp_ms=30_000,
+                is_wire_sourced=False,
+                storage_source="world_state",
+                fact_source="wire_0x48_enemy_detect",
+                position_is_authoritative=False,
+                position=(40, 61),
+            ),
+        )
+
+        assert still_dead["tanks"]["505"]["liveness"] == "deactivated"
+
     def test_marks_tank_deactivated(self) -> None:
         """Existing tank flips to ``liveness="deactivated"`` and keeps tile.
 
