@@ -2821,3 +2821,15 @@ User-ordered 100-kill run under the attainability + general-clearance binary. On
 - All three sessions read via `make digest` ([[log]] entry above) — kills/timeline/clearance/release numbers in this entry are computed digest fields, not grepped.
 
 Sessions 2-3 also carried the positional ferry memory (TTL retired same evening). Follow-ups parked: displacement-receipt obstruction law (mining started), `make service` adoption for harness-independent long runs.
+
+---
+## [2026-08-05] crack | Displacement-receipt semantics mined archive-wide — the law's evidentiary basis, plus a team-scope refinement of the displacement law itself
+
+`analysis_scripts/mine_displacement_semantics.py` (calibrated on session bot-20260805-173034: 534/534 displacements attributed to the known mine, 0 misses) swept 329 captures: 3,418 displaced sent-teleport/0x3D pairs, 6,134 exact. Artifact: `runs/analysis/displacement_semantics.json`.
+
+- **Only ENEMY mines displace teleport landings.** Displacements off a known-mine tile: 1,227 enemy vs **2** friendly; exact landings ON a known friendly mine: 20, all clean. The user's 2026-06-16 law ("you get moved off if there are mines") is team-scoped exactly like walk-passability. CODE IMPLICATION (not yet applied): `find_attainable_landing_tile` currently avoids ALL known mines — over-conservative; should consult the hostile filter.
+- **An exact landing is a mine-CLEAR receipt.** 88 exact landings sat on live ENEMY-mine beliefs — stale beliefs, since a live enemy mine displaces deterministically (534/534, probe 3/3). Off-screen walk-over detonations never reach the wire, so beliefs rot; our own landing is server truth the tile is clean and should DELETE the belief.
+- **Displacement causes decompose**: 36% mine known before, 31% tracked body present, 0.5% mine revealed later, 33% no visible cause — and the no-cause distances are 81% ring-1 (unseen single obstruction: bodies with stale positions or never-revealed mines), 5% ring-3+.
+- **Displacement is ~99% deterministic**: 19 of 1,827 repeat-displaced tiles ever produced a second landing.
+
+The receipt law this licenses: a displaced landing at a believed-clear tile writes an obstruction observation (mine-or-body, ring-1-dominant) consumed by the attainability predicate; an exact landing clears any mine belief at the tile. Both are pure knowledge channels — no counters. Implementation awaits the user's word.
