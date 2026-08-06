@@ -8,6 +8,10 @@ source_paths:
   - libs/cleargbm_rs/src/tree/builder.rs
   - libs/cleargbm_rs/src/tree/mod.rs
   - libs/cleargbm_rs/src/training/config.rs
+source_git_blobs:
+  "libs/cleargbm_rs/src/tree/builder.rs": b28c382a41a489df68fa9cd7c2c87bafee26a6a9
+  "libs/cleargbm_rs/src/tree/mod.rs": ef4ab30d8be7e5684d8d2c9deeeecefc42a3f1d9
+  "libs/cleargbm_rs/src/training/config.rs": b0b59d60edc871f4808c72dc582eaac15087f39b
 fact_checked: "2026-07-31"
 confidence: medium
 hubs: [libs]

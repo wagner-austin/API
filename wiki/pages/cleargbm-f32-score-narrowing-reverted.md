@@ -9,6 +9,10 @@ source_paths:
   - libs/cleargbm_rs/src/narrow.rs
   - libs/cleargbm_rs/src/training/train.rs
   - libs/cleargbm_rs/src/histogram/mod.rs
+source_git_blobs:
+  "libs/cleargbm_rs/src/narrow.rs": d12500f3eddc2f4f075274ad3e4492060bf9f381
+  "libs/cleargbm_rs/src/training/train.rs": 9e8a944dcd1c2c12f222118181a64a5ef11bbe2d
+  "libs/cleargbm_rs/src/histogram/mod.rs": 930b2ce059cd5314ca5650a74cd44e31f8cfa8c8
 fact_checked: "2026-07-30"
 confidence: medium
 hubs: [libs]

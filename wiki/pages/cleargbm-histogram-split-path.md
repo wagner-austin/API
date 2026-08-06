@@ -14,6 +14,17 @@ source_paths:
   - libs/cleargbm/src/cleargbm/ensemble.py
   - libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md
   - libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md
+source_git_blobs:
+  "libs/cleargbm_rs/src/histogram/mod.rs": 930b2ce059cd5314ca5650a74cd44e31f8cfa8c8
+  "libs/cleargbm_rs/src/split/mod.rs": c359aec3d503808e258a5c3798e10936c432141d
+  "libs/cleargbm_rs/src/tree/builder.rs": b28c382a41a489df68fa9cd7c2c87bafee26a6a9
+  "libs/cleargbm_rs/src/tree/histograms.rs": 681166b919d3f740b0564516ae68cbf8b139b2e5
+  "libs/cleargbm_rs/src/losses/derivatives.rs": 398e2a3ad3cd564d76f0361626e105d2ad9c2e6f
+  "libs/cleargbm_rs/src/losses/sigmoid_arr.rs": e73feb1e3d0604709332eb3885539d27062e006b
+  "libs/cleargbm/src/cleargbm/_rust.py": 29fb9d5d5bc96129757d2545fda52d9c6467f33c
+  "libs/cleargbm/src/cleargbm/ensemble.py": c60640610f62458f20e017392104ba5a219a6b11
+  "libs/cleargbm/docs/VALIDATION_REPORT_2026-07-20.md": c601efb92c2f596c97e60fdddade03d9dc1fa379
+  "libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md": 3f95cc90aaf624a9f250c4b5f892c570ac27c4df
 fact_checked: "2026-07-21"
 confidence: high
 hubs: [libs]
@@ -27,7 +38,7 @@ Split finding runs entirely in Rust. The Python surface (`cleargbm.ensemble.trai
 
 Rust's `find_best_split_from_histogram` scans `n_regular_bins - 1` bins with prefix sums for gradient sums, hessian sums, and counts. Wall-time is bounded by K (= `max_bins`), independent of the number of samples in the node. Empirically measured on random inputs at K=64: 100× more samples produces 0.92× the split-scan time [^2].
 
-`max_bins` is 64 by default in `GradientBoostingConfig`, and bin edges + per-sample bin assignments are precomputed once per training run and reused across every tree [^3].
+`max_bins` has **no default** in `GradientBoostingConfig` — it is a required parameter, validated to `2 <= max_bins <= 255` (`libs/cleargbm_rs/src/training/config.rs:129,138-141`, the upper bound being the `u8` bin index). Bin edges + per-sample bin assignments are precomputed once per training run and reused across every tree [^3]. **Corrected 2026-08-05:** this sentence read "`max_bins` is 64 by default in `GradientBoostingConfig`". No such default exists anywhere in the Rust config or the Python surface; every `64` in the tree is a test fixture (`libs/cleargbm/tests/conftest.py:14`) or the benchmark harness, which is where the figure came from — see [[cleargbm-perf-uint8-histogram-bins]], which correctly attributes 64 to the harness rather than the library.
 
 ## Sibling subtraction
 

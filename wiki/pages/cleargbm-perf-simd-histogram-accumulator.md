@@ -10,6 +10,10 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/types/mod.rs
   - libs/cleargbm_rs/Cargo.toml
+source_git_blobs:
+  "libs/cleargbm_rs/src/histogram/mod.rs": 930b2ce059cd5314ca5650a74cd44e31f8cfa8c8
+  "libs/cleargbm_rs/src/types/mod.rs": b12e123111b6150ce710ed1cc6c03d2478d79922
+  "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
 fact_checked: "2026-07-30"
 confidence: medium
 hubs: [libs]

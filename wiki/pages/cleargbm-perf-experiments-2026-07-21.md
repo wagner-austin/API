@@ -11,6 +11,10 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/tree/histograms.rs
   - libs/cleargbm/docs/BENCHMARK_MANIFEST_2026-07-21_phase_e.json
+source_git_blobs:
+  "libs/cleargbm_rs/src/histogram/mod.rs": 930b2ce059cd5314ca5650a74cd44e31f8cfa8c8
+  "libs/cleargbm_rs/src/tree/histograms.rs": 681166b919d3f740b0564516ae68cbf8b139b2e5
+  "libs/cleargbm/docs/BENCHMARK_MANIFEST_2026-07-21_phase_e.json": 5083163e2a733bed485cdeb5f253c2de0ee32d0f
 fact_checked: "2026-07-31"
 confidence: high
 hubs: [libs]
