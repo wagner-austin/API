@@ -253,6 +253,55 @@ class TestBotRunMethod:
 
         assert bot._commands.cdp is bot._cdp
 
+    def test_detach_cdp_session_unsubscribes_before_close(self, fake_env: FakeEnv) -> None:
+        """Teardown detaches the CDP session so no event races the close.
+
+        The end of bot-20260802-205105 logged an ERROR-level Playwright
+        callback traceback: a CDP frame event dispatched during
+        ``browser.close()`` after ``quit_game`` dropped the socket. An
+        explicitly detached session receives nothing.
+        """
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes.base import FakeCDPSession
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        fake_cdp = FakeCDPSession()
+        bot._cdp = fake_cdp
+
+        bot._detach_cdp_session()
+
+        assert fake_cdp._detached is True
+
+    def test_detach_cdp_session_absorbs_gone_target(self, fake_env: FakeEnv) -> None:
+        """A session whose target already died detaches as a logged no-op."""
+        from playwright._impl._errors import Error as PlaywrightError
+
+        from tankpit_bot.bot.base import Bot
+        from tests.fakes.base import FakeCDPSession
+
+        class _GoneSession(FakeCDPSession):
+            def detach(self) -> None:
+                raise PlaywrightError("Connection closed")
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        gone = _GoneSession()
+        bot._cdp = gone
+
+        bot._detach_cdp_session()
+
+        assert bot._cdp is gone
+
+    def test_detach_cdp_session_without_session_is_a_no_op(self, fake_env: FakeEnv) -> None:
+        """No bound session (boot failed before attach) detaches nothing."""
+        from tankpit_bot.bot.base import Bot
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._cdp = None
+
+        bot._detach_cdp_session()
+
+        assert bot._cdp is None
+
     def test_save_capture_session_returns_when_runtime_artifacts_missing(
         self,
         fake_env: FakeEnv,

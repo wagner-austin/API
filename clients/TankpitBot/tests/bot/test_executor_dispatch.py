@@ -15,6 +15,12 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.inventory import InventoryItem, InventoryState
+from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
+from tankpit_bot.sniffer.world_state import get_world_service, reset_world_state
+from tankpit_bot.sniffer.world_state_containers import update_world_state_from_fuel_total
+from tankpit_bot.state.types import WorldStateDict, make_container_state
+from tankpit_bot.state.types.coord import coord_key
 from tests.bot._executor_support import (
     _make_bot,
     _make_snapshot,
@@ -22,6 +28,33 @@ from tests.bot._executor_support import (
     _WorldOnlyBot,
 )
 from tests.conftest import FakeEnv
+
+
+def _believe_container(x: int, y: int, *, is_fuel: bool, volume: int) -> None:
+    """Install one believed container into the live world service."""
+    ws = get_world_service()
+    ws.world_state = WorldStateDict(
+        **{
+            **ws.world_state,
+            "containers": {
+                coord_key(x, y): make_container_state(
+                    x=x, y=y, is_fuel=is_fuel, volume=volume, timestamp_ms=1000
+                )
+            },
+        }
+    )
+
+
+def _fill_inventory_to(count: int) -> None:
+    """Set every believed inventory slot to one count."""
+    item = InventoryItem(count=count, enabled=True)
+    get_world_service().inventory_state = InventoryState(
+        armor_shields=item,
+        dual_shots=item,
+        missile_shots=item,
+        homing_shots=item,
+        extra_radars=item,
+    )
 
 
 class TestDispatchCommand:
@@ -176,14 +209,87 @@ class TestDispatchCommand:
         self,
         fake_env: FakeEnv,
     ) -> None:
-        """Teleport skips the precondition map_open when the map is already open."""
+        """Teleport skips the precondition map_open when the map is already open.
+
+        The hop must be affordable — (120,120) from (100,100) costs 169
+        against 800 fuel; an unaffordable target is now suppressed by
+        the ``physics/supervisor.py`` refusal prediction before the send.
+        """
         bot, fake_cdp = _make_bot(fake_env)
         result = dispatch_command(
             bot,
-            make_teleport_command(200, 200),
+            make_teleport_command(120, 120),
             _make_snapshot(map_visible=True),
         )
         assert result is True
         sent_methods = fake_cdp._sent_methods
         runtime_calls = [m for m in sent_methods if m == "Runtime.evaluate"]
         assert len(runtime_calls) == 1
+
+
+class TestDispatchRefusalPrediction:
+    """Belief-refuted commands are suppressed at the chokepoint.
+
+    The ``physics/supervisor.py`` laws applied to live belief — the
+    20-kill soak bot-20260802-205105 sent 48 provably-refusable fuel
+    pickups (code 5) that this seam now suppresses.
+    """
+
+    def test_fuel_pickup_at_capacity_is_suppressed(self, fake_env: FakeEnv) -> None:
+        """Full tank + stocked believed container: no wire traffic."""
+        bot, fake_cdp = _make_bot(fake_env)
+        ws = get_world_service()
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("fixture bot must have a self state")
+        update_world_state_from_fuel_total(ws, fuel_capacity(self_state["rank"]))
+        _believe_container(80, 90, is_fuel=True, volume=508)
+        result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
+        assert result is False
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+
+    def test_fuel_pickup_on_equipment_belief_dispatches(self, fake_env: FakeEnv) -> None:
+        """A non-fuel record at the target proves nothing about fuel."""
+        bot, fake_cdp = _make_bot(fake_env)
+        ws = get_world_service()
+        self_state = ws.world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("fixture bot must have a self state")
+        update_world_state_from_fuel_total(ws, fuel_capacity(self_state["rank"]))
+        _believe_container(80, 90, is_fuel=False, volume=0)
+        result = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
+        assert result is True
+        assert "Runtime.evaluate" in fake_cdp._sent_methods
+
+    def test_equipment_pickup_all_slots_full_is_suppressed(self, fake_env: FakeEnv) -> None:
+        """Every slot at the rank cap: code 7 predicted, nothing sent."""
+        bot, fake_cdp = _make_bot(fake_env)
+        self_state = get_world_service().world_state["self_state"]
+        if self_state is None:
+            raise AssertionError("fixture bot must have a self state")
+        _fill_inventory_to(inventory_capacity(self_state["rank"]))
+        result = dispatch_command(bot, make_pickup_equipment_command(80, 90), _make_snapshot())
+        assert result is False
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+
+    def test_unaffordable_teleport_is_suppressed(self, fake_env: FakeEnv) -> None:
+        """(200,200) from (100,100) costs 848 against 800 fuel: even the
+        cheapest ring-1 landing is out of reach, so nothing is sent."""
+        bot, fake_cdp = _make_bot(fake_env)
+        result = dispatch_command(
+            bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True)
+        )
+        assert result is False
+        assert "Runtime.evaluate" not in fake_cdp._sent_methods
+
+    def test_missing_self_state_stays_optimistic(self, fake_env: FakeEnv) -> None:
+        """No self belief proves nothing: pickup and teleport dispatch."""
+        bot, fake_cdp = _make_bot(fake_env)
+        reset_world_state()
+        picked = dispatch_command(bot, make_pickup_fuel_command(80, 90), _make_snapshot())
+        hopped = dispatch_command(
+            bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True)
+        )
+        assert picked is True
+        assert hopped is True
+        assert fake_cdp._sent_methods.count("Runtime.evaluate") == 2

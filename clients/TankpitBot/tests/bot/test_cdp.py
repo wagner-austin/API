@@ -792,20 +792,28 @@ class TestBotAIIntegration:
         from tankpit_bot.bot.executor import dispatch_command
         from tankpit_bot.bot.types import make_teleport_command
         from tankpit_bot.sniffer.world_state import (
+            get_world_service,
             reset_world_state,
             update_world_state_from_position,
+        )
+        from tankpit_bot.sniffer.world_state_containers import (
+            update_world_state_from_fuel_total,
         )
         from tests.fakes import FakeCDPSession, FakePage
 
         reset_world_state()
         update_world_state_from_position(50, 50)
+        # The hop must be affordable or the executor's refusal
+        # prediction (physics/supervisor.py) suppresses the send:
+        # (50,50) -> (150,150) costs 848 against 1100 fuel.
+        update_world_state_from_fuel_total(get_world_service(), 1100)
         bot = Bot("https://test.tankpit.com/", headless=True)
         fake_cdp: FakeCDPSession = FakeCDPSession()
         bot._cdp = fake_cdp
         bot._page = FakePage(fake_cdp)
         bot._state_data = bot._state_data.copy()
         bot._state_data["state"] = "IDLE"
-        dispatch_command(bot, make_teleport_command(200, 200), _make_snapshot(map_visible=True))
+        dispatch_command(bot, make_teleport_command(150, 150), _make_snapshot(map_visible=True))
         assert bot.get_state() == "TELEPORTING"
 
     def test_dispatch_command_teleport_defers_until_map_open(self, fake_env: FakeEnv) -> None:
