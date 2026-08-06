@@ -11,6 +11,8 @@ from __future__ import annotations
 from rw_bot.control.channel import AgentChannel
 from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
+from rw_bot.policy.expander import economy_floor
+from rw_bot.wire.state import Sample
 from tests.campaign_fixtures import (
     BUILDER,
     CATALOGUE,
@@ -114,28 +116,82 @@ def test_both_are_afforded_when_the_credits_are_there() -> None:
     assert report["expanded_factories"] == 0
 
 
+def _race_world(extractors: int, pools_visible: int) -> Sample:
+    """A duel_lake-shaped race: extractors standing on the first pools.
+
+    Each owned extractor stands exactly on one pool, so the survey reads the
+    rest as free and the census carries the map's true size.
+    """
+    sites = tuple(pool(index=n, x=300.0 + 200.0 * n) for n in range(pools_visible))
+    standing = tuple(entity(400 + n, "extractorT1", x=300.0 + 200.0 * n) for n in range(extractors))
+    return sample(
+        CENTRE,
+        BUILDER,
+        *standing,
+        credits=1000,
+        pools=sites,
+        options=(option(214, "extractorT1", placed=True),),
+    )
+
+
 def test_the_reserve_keeps_expansion_off_the_armys_credits_once_there_is_an_economy() -> None:
     """Expansion is investment and may not take what replaces a loss --
     **after** the economy that funds the army exists.
 
-    Four extractors is where that line sits, and it is measured rather than
-    chosen: across 46 duels a final income at or above 50 credits a second won
-    36 of 36, and at or below 38 it failed 6 of 7. Base income is 18 and an
-    extractor pays 8, so 50/s is four of them ([[policy-holding-ground]]).
+    The line is the map's own answer now, re-measured three times. Four was
+    where an economy exists (across 46 duels, final income >= 50/s won 36 of
+    36); seven was where duel_lake's expansion race is won -- every winning
+    solo trace reached 6-7 extractors by s1500 while every loss stalled at
+    4-5 (`runs/traces/vh-solo24`, log 2026-08-03); and carried to four other
+    maps that literal seven lost or stalemated every match, because a floor
+    the map cannot fund is never crossed (`runs/sweeps/xmap-*`,
+    log 2026-08-05). Nine pools with none unreachable derive exactly the
+    seven the traces demanded ([[policy-holding-ground]]).
     """
-    held_back = sample(
-        CENTRE,
-        BUILDER,
-        *(entity(400 + n, "extractorT1", x=900.0 + 60 * n, y=0.0) for n in range(4)),
-        credits=1000,
-        pools=(pool(x=300.0),),
-        options=(option(214, "extractorT1", placed=True),),
-    )
+    held_back = _race_world(extractors=7, pools_visible=9)
     _, spent = run_campaign(held_back, times=1, reserve=0)
     assert verb(spent, "build")
 
     _, held = run_campaign(held_back, times=1, reserve=400)
     assert verb(held, "build") == []
+
+
+def test_below_the_derived_floor_expansion_still_takes_the_armys_credits() -> None:
+    """The race side of the same boundary: at six of duel_lake's nine pools
+    the race is not yet won, so the claim is protected and the reserve does
+    not hold it back."""
+    racing = _race_world(extractors=6, pools_visible=9)
+    _, peer = run_campaign(racing, times=1, reserve=400)
+    assert verb(peer, "build")
+
+
+def test_a_small_map_lowers_the_floor_to_what_it_can_fund() -> None:
+    """The cross-map fix. Champion flame-close carried duel_lake's literal
+    seven to four maps whose extractor peaks were 2-4 and went 0W/5L/3S:
+    a floor the map cannot fund is never crossed, so expansion claimed
+    protected forever and the army channels starved (`runs/sweeps/xmap-*`,
+    log 2026-08-05). Three visible pools derive a floor of one, so the
+    second extractor already yields to the reserve."""
+    modest = _race_world(extractors=1, pools_visible=3)
+    _, peer = run_campaign(modest, times=1, reserve=400)
+    assert verb(peer, "build") == []
+
+
+def test_the_derived_floor_is_the_reachable_pools_less_the_rivals_share() -> None:
+    """duel_lake recovered exactly: nine pools, none unreachable, floor seven
+    -- the number the solo traces measured (`runs/traces/vh-solo24`). Pools
+    the builder cannot walk to at all never funded anyone's race."""
+    assert economy_floor(9, 0) == 7
+    assert economy_floor(8, 0) == 6
+    assert economy_floor(10, 6) == 2
+
+
+def test_the_derived_floor_never_drops_below_the_first_extractor() -> None:
+    """However few pools a map offers, matches with no economy at all lost
+    outright -- final income at or below 38/s failed 6 of 7 across 46 duels
+    ([[policy-holding-ground]])."""
+    assert economy_floor(2, 0) == 1
+    assert economy_floor(0, 0) == 1
 
 
 def test_the_economy_outranks_the_army_until_it_can_pay_for_one() -> None:

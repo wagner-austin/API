@@ -26,7 +26,9 @@ from rw_bot.wire.command import (
     build_order,
     move_order,
     produce_order,
+    targeted_ability_order,
 )
+from rw_bot.wire.posture import posture_order
 
 _FRAME_3 = (
     '{"kind":"frame","frame":854,"clock_ms":2907,"visible":3,"pools":0,"options":0,"players":0,'
@@ -237,6 +239,14 @@ def test_an_ability_order_leaves_in_the_agent_format() -> None:
     assert peer.sent == ['{"kind":"ability","unit_id":213,"key":"c_2"}']
 
 
+def test_a_targeted_ability_order_leaves_in_the_agent_format() -> None:
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_targeted_ability(
+        targeted_ability_order(unit_id=213, key="c_3", x=512.5, y=768.0)
+    )
+    assert peer.sent == ['{"kind":"ability_at","unit_id":213,"x":512.5,"y":768.0,"key":"c_3"}']
+
+
 def test_an_ack_leaves_in_the_agent_format() -> None:
     """Sent unconditionally, so the planner need not know the agent's mode."""
     peer = _ScriptedPeer([])
@@ -270,3 +280,13 @@ def test_an_attack_move_order_leaves_in_the_agent_format() -> None:
     peer = _ScriptedPeer([])
     AgentChannel(peer).send_attack_move(attack_move_order(unit_id=7, x=990.0, y=2010.0))
     assert peer.sent == ['{"kind":"attack_move","unit_id":7,"x":990.0,"y":2010.0}']
+
+
+def test_a_posture_row_leaves_in_the_agent_format() -> None:
+    peer = _ScriptedPeer([])
+    AgentChannel(peer).send_posture(
+        posture_order(type_name="heavyTank", reach=160.0, speed=0.8, kite=True, hp_floor=25)
+    )
+    assert peer.sent == [
+        '{"kind":"posture","type":"heavyTank","reach":160.0,"speed":0.8,"kite":1,"hp_floor":25}'
+    ]

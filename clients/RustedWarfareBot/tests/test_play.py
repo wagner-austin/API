@@ -24,7 +24,8 @@ from scripts.play import (
     reinforcements,
 )
 
-from rw_bot.policy.doctrine import Doctrine, DoctrineError, format_doctrine
+from rw_bot.policy.doctrine import Doctrine, DoctrineError
+from rw_bot.policy.doctrine_file import format_doctrine
 from tests.wire_fixtures import ScriptedPeer, StubbedConnect
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -409,9 +410,22 @@ def test_the_style_can_be_given_as_a_doctrine_file(
                     scout=False,
                     raid=0,
                     rush=False,
-                    creep=False,
+                    creep=0,
                     riposte=False,
                     tech=0,
+                    lurk=0,
+                    allin=0,
+                    decoys=0,
+                    kite=False,
+                    income_ladder=False,
+                    hp_floor=0,
+                    strike=0,
+                    medics=0,
+                    bunkers=0,
+                    flame=0,
+                    close=0,
+                    guns=0,
+                    nukes=0,
                 )
             )
         )

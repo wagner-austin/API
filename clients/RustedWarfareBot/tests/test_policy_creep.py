@@ -223,3 +223,86 @@ def test_the_worker_is_assigned_so_the_next_tick_sees_it_working() -> None:
         _world(), _CATALOGUE, _PROFILES, Budget(4000, reserve=0), (_BUILDER,), workforce
     )
     assert workforce.claims() == ((165.0, 0.0),)
+
+
+def test_the_walk_holds_at_its_percent_of_the_line() -> None:
+    """Hold 50 on a 1,000-unit line stops the wall at (500, 0).
+
+    A turret within half a step of the hold point ends the walk: the next
+    projected site would pile onto the wall rather than advance it, and the
+    whole point of the hold is a wall that stays where the terrain pays
+    ([[community-play-strategies]]).
+    """
+    catalogue = {**_CATALOGUE, "repairbay": _unit("repairbay", speed=0.0, price=1500)}
+    held_front = entity(30, "c_turret_t1", x=450.0, y=0.0)
+    creeper = Creeper()
+    orders = creeper.advance(
+        _world(held_front),
+        catalogue,
+        _PROFILES,
+        Budget(4000, reserve=0),
+        (_BUILDER,),
+        Workforce(45),
+        hold=50,
+    )
+    assert orders == ()
+    # The same front under the full walk keeps going.
+    walking = Creeper().advance(
+        _world(held_front),
+        catalogue,
+        _PROFILES,
+        Budget(4000, reserve=0),
+        (_BUILDER,),
+        Workforce(45),
+        hold=100,
+    )
+    assert len(walking) == 1
+
+
+def test_every_third_wall_structure_is_a_repair_bay() -> None:
+    """An unhealed turret is a turret bought twice.
+
+    The cycle is counted on orders, so the third build order the walk sends
+    is the healer whatever happened to the first two
+    ([[community-play-strategies]]).
+    """
+    catalogue = {**_CATALOGUE, "repairbay": _unit("repairbay", speed=0.0, price=1500)}
+    creeper = Creeper()
+    creeper.ordered = 2
+    orders = creeper.advance(
+        _world(),
+        catalogue,
+        _PROFILES,
+        Budget(4000, reserve=0),
+        (_BUILDER,),
+        Workforce(45),
+        hold=100,
+    )
+    assert len(orders) == 1
+    assert orders[0]["type_name"] == "repairbay"
+
+
+def test_a_refused_wall_piece_withholds_its_price() -> None:
+    """The wall saves toward its next piece, or the healer blocks the wall.
+
+    The walk is sequential by design, so its head entry gates everything
+    behind it -- measured: `creep:repairbay asked 2,378 got 0`, two turrets
+    standing all match while the bridge went unmanned (log 2026-07-31).
+    """
+    catalogue = {**_CATALOGUE, "repairbay": _unit("repairbay", speed=0.0, price=1500)}
+    creeper = Creeper()
+    creeper.ordered = 2
+    budget = Budget(1000, reserve=0)
+    orders = creeper.advance(
+        _world(),
+        catalogue,
+        _PROFILES,
+        budget,
+        (_BUILDER,),
+        Workforce(45),
+        hold=100,
+    )
+    assert orders == ()
+    # The healer's price is now spoken for: even a protected claim behind
+    # it is bound, because for a creep arm the wall IS the army.
+    assert budget.claim("produce:c_tank", 350, protected=True)["granted"] is False

@@ -90,6 +90,36 @@ def test_a_negative_withholding_is_refused_loudly() -> None:
     assert caught.value.code == "RW-BUDGET-003"
 
 
+def test_a_release_hands_a_withholding_back_to_later_claims() -> None:
+    """The late claimant's half of the saving pair.
+
+    Defence claims last, so a withholding it placed early in the tick would
+    bind its own claim too -- the deficit is withheld early, binding produce
+    and upgrades, and released where the expander runs (log 2026-08-01).
+    """
+    budget = Budget(800, reserve=0)
+    budget.withhold(500)
+    assert budget.claim("produce:c_tank", 350)["granted"] is False
+    budget.release(500)
+    assert budget.claim("expand:c_turret_t1", 500)["granted"] is True
+
+
+def test_a_release_never_frees_more_than_stands_withheld() -> None:
+    """Over-releasing must not mint credits a later tick never withheld."""
+    budget = Budget(1000, reserve=0)
+    budget.withhold(300)
+    budget.release(500)
+    assert budget.spendable() == 1000
+
+
+def test_a_negative_release_is_refused_loudly() -> None:
+    """A negative would withhold credits rather than free them."""
+    budget = Budget(1000, reserve=0)
+    with pytest.raises(BudgetError) as caught:
+        budget.release(-1)
+    assert caught.value.code == "RW-BUDGET-003"
+
+
 def test_a_reserve_larger_than_the_balance_is_an_ordinary_early_state() -> None:
     """Not an error -- it means every credit is spoken for."""
     budget = Budget(100, reserve=500)

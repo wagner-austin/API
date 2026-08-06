@@ -86,3 +86,35 @@ def test_contact_hands_the_units_to_the_engagement_policy() -> None:
     rusher = Rusher()
     assert rusher.march(_world(), _CATALOGUE, (_tank(10),), True) == ()
     assert rusher.marches == 0
+
+
+def test_a_forced_march_deals_itself_across_the_enemy_side_pools() -> None:
+    """The income field, not the start point.
+
+    Three time-triggered dumps crossed the map at one point, traded up to
+    even against the standing army, and dented six-figure rivals by nothing
+    -- the army is the 3.7x-replaceable thing, and the extractors that pay
+    for it stand on pools every sample already carries (log 2026-07-31).
+    """
+    world = _world(_tank(10), _tank(11), _tank(12))
+    # The start reflects the anchor through the pool centroid; both pools
+    # sit inside income reach of it, so both become posts.
+    assert mirror_point(world, _CATALOGUE) == (900.0, 700.0)
+    orders = Rusher().march(
+        world,
+        _CATALOGUE,
+        (_tank(10), _tank(11), _tank(12)),
+        # Contact at home: only a forced march goes anyway.
+        True,
+        force=True,
+    )
+    assert len(orders) == 3
+    targets = {(o["x"], o["y"]) for o in orders}
+    # Both pools within reach of the start are struck; the round-robin
+    # brings the third marcher back to the nearest.
+    assert targets == {(300.0, 300.0), (700.0, 500.0)}
+
+
+def test_an_unforced_march_still_yields_to_contact() -> None:
+    world = _world(_tank(10))
+    assert Rusher().march(world, _CATALOGUE, (_tank(10),), True) == ()

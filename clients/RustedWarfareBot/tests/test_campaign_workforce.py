@@ -17,6 +17,7 @@ from tests.campaign_fixtures import (
     CATALOGUE,
     CENTRE,
     ENEMY,
+    FACTORY,
     PLACEMENTS,
     PROFILES,
     WAVE,
@@ -123,6 +124,72 @@ def test_a_cheaper_defence_does_not_jump_the_queue_while_income_is_merely_short(
     peer = ScriptedPeer(lines(world))
     play(AgentChannel(peer), (), catalogue, placements, profiles, 1, expand=True)
     assert [line for line in order_lines(peer) if '"kind":"build"' in line] == []
+
+
+def test_a_starved_cover_saves_toward_its_turret_across_ticks() -> None:
+    """The champion's named defect, fixed: defence claims last, a fresh
+    budget lives one tick, and so the validated champion's ledger read
+    ``defence reached 954 acted 2`` while its two landed turrets set the
+    survival and dip records (log 2026-08-01). A priced-out cover wait now
+    withholds the turret's price early next tick -- binding production --
+    and the expander releases it where income and defence arbitrate in
+    their measured order.
+    """
+    catalogue, placements, profiles = defence_world()
+    bare = entity(400, "extractorT1", x=900.0, y=0.0)
+    options = (
+        option(214, "c_turret_t1", placed=True),
+        option(300, "c_tank", index=1),
+    )
+    # Tick one: 300 credits, a bare extractor, no pool in sight -- cover is
+    # reached, priced out, and the deficit is recorded.
+    starved = sample(CENTRE, BUILDER, FACTORY, bare, credits=300, options=options)
+    # Tick two: 800 credits. Unfunded, production's protected 350 would
+    # leave 450 and the 500 turret starves again, forever.
+    flush = sample(CENTRE, BUILDER, FACTORY, bare, credits=800, options=options)
+    peer = ScriptedPeer(lines(starved, flush))
+    play(
+        AgentChannel(peer),
+        (),
+        catalogue,
+        placements,
+        profiles,
+        2,
+        reinforce=("c_tank",),
+        expand=True,
+    )
+    built = [line for line in order_lines(peer) if '"kind":"build"' in line]
+    assert len(built) == 1
+    assert '"c_turret_t1"' in built[0]
+    # The withholding bound the tank that would have drained the save.
+    assert [line for line in order_lines(peer) if '"kind":"produce"' in line] == []
+
+
+def test_without_a_recorded_deficit_production_spends_freely() -> None:
+    """The control arm: same flush tick, no starved tick before it -- the
+    tank is bought and no turret is, which is exactly the starvation the
+    carried deficit exists to end."""
+    catalogue, placements, profiles = defence_world()
+    bare = entity(400, "extractorT1", x=900.0, y=0.0)
+    options = (
+        option(214, "c_turret_t1", placed=True),
+        option(300, "c_tank", index=1),
+    )
+    flush = sample(CENTRE, BUILDER, FACTORY, bare, credits=800, options=options)
+    peer = ScriptedPeer(lines(flush))
+    play(
+        AgentChannel(peer),
+        (),
+        catalogue,
+        placements,
+        profiles,
+        1,
+        reinforce=("c_tank",),
+        expand=True,
+    )
+    produced = [line for line in order_lines(peer) if '"kind":"produce"' in line]
+    assert len(produced) == 1
+    assert '"c_tank"' in produced[0]
 
 
 def test_two_workers_do_not_both_claim_the_same_pool() -> None:

@@ -95,6 +95,42 @@ def test_one_credit_short_of_the_true_price_is_refused() -> None:
     )
     assert orders == ()
     assert budget.spent() == 0
+    # And without the ladder, a refusal saves nothing: the Impossible
+    # measurement (unconditional saving lost) is the default.
+    assert budget.claim("produce:c_tank", _T1_UPGRADE_PRICE - 1)["granted"] is True
+
+
+def test_the_income_ladder_saves_only_toward_the_tier_that_never_funds() -> None:
+    """The Very Hard counter-measurement, timed by its own casualty list.
+
+    The ceiling: worth flatlined at ~30-35k on every seed while the T3
+    conversion asked thousands of times and funded never
+    (`runs/traces/vh-debounce`). The raw ladder that saved toward every
+    tier went 2 won / 12 lost -- the early T2-phase withholds starved the
+    wall in the window survival is decided, while its two wins broke the
+    ceiling outright (83k at 138/s). T2 conversions fund organically in
+    every match, so only the T3 saves (`runs/sweeps/vh-t3`, log 2026-08-02).
+    """
+    # A refused T3 conversion saves: the withheld 4,000 binds later claims.
+    world = sample(
+        entity(400, "extractorT2"),
+        credits=3_000,
+        options=(option(400, "extractorT3", placed=False),),
+    )
+    budget = Budget(3_000, 0)
+    assert upgrade_income(world, _catalogue(), budget, set(), ladder=True) == ()
+    assert budget.claim("produce:c_tank", 3_000)["granted"] is False
+    # A refused T2 conversion saves nothing even with the ladder on.
+    budget = Budget(_T1_UPGRADE_PRICE - 1, 0)
+    orders = upgrade_income(
+        _offering(400, credits_held=_T1_UPGRADE_PRICE - 1),
+        _catalogue(),
+        budget,
+        set(),
+        ladder=True,
+    )
+    assert orders == ()
+    assert budget.claim("produce:c_tank", _T1_UPGRADE_PRICE - 1)["granted"] is True
 
 
 def test_ordering_stops_at_the_first_refusal() -> None:

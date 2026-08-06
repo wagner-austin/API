@@ -284,3 +284,35 @@ def test_a_distant_hostile_does_not_bypass_the_wave_gate() -> None:
     _, attacks = waves.command(_world(*army, hostiles=(afar,)), _CATALOGUE, _PROFILES, army)
     assert attacks == ()
     assert waves.intercepts == 0
+
+
+def test_the_allin_releases_everything_from_its_observation_onward() -> None:
+    """Release on time, not on size.
+
+    Forty-seven Impossible matches released on size and met an army that
+    had compounded past answering, so the all-in holds everything to a
+    chosen observation and then releases every muster -- the dump, and the
+    stream of reinforcements behind it ([[policy-combat]]).
+    """
+    army = (_tank(10), _tank(11), _tank(12), _tank(13))
+    quiet = _world(*army)
+
+    waves = WaveController(ladder=(10,), allin_at=3)
+    waves.command(quiet, _CATALOGUE, _PROFILES, army)
+    waves.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert waves.released() == frozenset()
+    waves.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert waves.released() == {10, 11, 12, 13}
+    # The stream respects the anti-trickle floor: one straggler is held,
+    # a first-wave's worth goes straight in.
+    grown = (*army, _tank(14))
+    waves.command(_world(*grown), _CATALOGUE, _PROFILES, grown)
+    assert waves.released() == {10, 11, 12, 13}
+    packet = (*grown, _tank(15), _tank(16))
+    waves.command(_world(*packet), _CATALOGUE, _PROFILES, packet)
+    assert waves.released() == {10, 11, 12, 13, 14, 15, 16}
+
+    patient = WaveController(ladder=(10,))
+    for _ in range(4):
+        patient.command(quiet, _CATALOGUE, _PROFILES, army)
+    assert patient.released() == frozenset()

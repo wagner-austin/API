@@ -17,9 +17,8 @@ from rw_bot.policy.doctrine import (
     DoctrineError,
     decode_doctrine,
     encode_doctrine,
-    format_doctrine,
-    parse_doctrine_lines,
 )
+from rw_bot.policy.doctrine_file import format_doctrine, parse_doctrine_lines
 from rw_bot.validation import DecodeError
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,9 +42,22 @@ def _doctrine(name: str = "rush", counter: bool = False) -> Doctrine:
         scout=False,
         raid=0,
         rush=False,
-        creep=False,
+        creep=0,
         riposte=False,
         tech=0,
+        lurk=0,
+        allin=0,
+        decoys=0,
+        kite=False,
+        income_ladder=False,
+        hp_floor=0,
+        strike=0,
+        medics=0,
+        bunkers=0,
+        flame=0,
+        close=0,
+        guns=0,
+        nukes=0,
     )
 
 
@@ -219,9 +231,89 @@ def test_a_negative_tech_count_is_refused() -> None:
     assert caught.value.code == "RW-DOCTRINE-012"
 
 
+def test_a_negative_lurk_count_is_refused() -> None:
+    """Zero already means no lurkers; below it is a typo, not restraint."""
+    payload = encode_doctrine(_doctrine())
+    payload["lurk"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-013"
+
+
+def test_a_negative_bunker_count_is_refused() -> None:
+    """Zero already means no mobile turrets; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["bunkers"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-020"
+
+
+def test_a_negative_flame_count_is_refused() -> None:
+    """Zero already means no flame turrets; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["flame"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-021"
+
+
+def test_a_negative_close_ratio_is_refused() -> None:
+    """Zero already means never close; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["close"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-022"
+
+
+def test_a_negative_gun_count_is_refused() -> None:
+    """Zero already means no gun ladder; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["guns"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-023"
+
+
+def test_a_negative_nuke_count_is_refused() -> None:
+    """Zero already means no finisher; below it is a typo."""
+    payload = encode_doctrine(_doctrine())
+    payload["nukes"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-024"
+
+
 def test_a_missing_field_is_an_error_not_a_default() -> None:
     """The same rule the sweep's job lines follow, for the same reason."""
     lines = tuple(line for line in format_doctrine(_doctrine()) if not line.startswith("mass "))
     with pytest.raises(DecodeError) as caught:
         parse_doctrine_lines(lines)
     assert caught.value.code == "RW-DECODE-001"
+
+
+def test_a_negative_allin_sample_is_refused() -> None:
+    """Zero already means never; below it is a typo, not a deeper delay."""
+    payload = encode_doctrine(_doctrine())
+    payload["allin"] = -1
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-014"
+
+
+def test_a_creep_hold_past_one_hundred_is_refused() -> None:
+    """The hold is a percent of the line; beyond the end is not a place."""
+    payload = encode_doctrine(_doctrine())
+    payload["creep"] = 101
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-015"
+
+
+def test_an_hp_floor_outside_the_percent_range_is_refused() -> None:
+    payload = encode_doctrine(_doctrine())
+    payload["hp_floor"] = 101
+    with pytest.raises(DoctrineError) as caught:
+        decode_doctrine(payload)
+    assert caught.value.code == "RW-DOCTRINE-017"
