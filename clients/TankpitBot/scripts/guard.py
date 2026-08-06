@@ -12,6 +12,8 @@ from typing import Protocol
 
 from scripts.contract_rules import run_contract_rules
 from scripts.physics_claims import run_physics_claim_rules
+from scripts.protocol_constant_rules import run_protocol_constant_rules
+from scripts.state_sentinel_rules import run_state_sentinel_rules
 from scripts.wiki_rules import run_wiki_rules
 from tankpit_bot import _hooks_guard
 
@@ -124,6 +126,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     local_violations = (
         run_contract_rules(target_root)
         + run_physics_claim_rules(target_root)
+        + run_protocol_constant_rules(target_root)
+        + run_state_sentinel_rules(target_root)
         + run_wiki_rules(target_root)
     )
     if local_violations > 0 and rc == 0:
