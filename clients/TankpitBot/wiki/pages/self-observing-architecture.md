@@ -241,6 +241,540 @@ The 15 items above are not features — they are the shape of what "a bot that c
 
 Design conversation: 2026-07-06 session, driven by user's observation "we were missing standardized WHY, and WHAT — what else are we missing?" Full architectural spec in `docs/handoffs/self-observing-bot-architecture.md`.[^1]
 
+## Machine-checked binding to `ledger/`
+
+Every public symbol of `tankpit_bot.ledger` is bound by the block below
+and checked on every `make check`. Reverse coverage is total, so a new
+book, outcome kind or record field added to the package without a wiki
+claim fails the build.
+
+**Read the claim kinds, not the count.** This binding is deliberately
+weaker than the protocol ones, and the split is worth stating plainly:
+of 76 symbols, 7 are constants verified by value and 2 are tables
+verified member-by-member, 13 are record types whose FIELD SETS are
+verified, and 54 are functions and Literal aliases carrying `law`
+claims — prose plus an existence check. A `law` claim does not verify
+behaviour; it catches deletion and rename, nothing more. The
+behavioural guarantees for this package come from
+`scripts/contract_rules.py` (which requires `@enforce_contract` on
+every public `record_*`/`apply_*`/`mutate_*` here) and from the run
+auditor, not from this block.
+
+One structural note the binding surfaced: `ledger.outcome` re-exports
+all seven outcome Literal aliases from `ledger.outcomes`, so both
+addresses are public and both must be claimed. The seven claims on the
+`outcome` package say so rather than restating the definition, which
+lives on `outcomes`.
+
+```json claims
+{
+  "claims": [
+    {
+      "id": "ammo-book-slot-armor",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_ARMOR",
+      "value": 0,
+      "means": "equipment slot index for armor/shield"
+    },
+    {
+      "id": "ammo-book-slot-dual",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_DUAL",
+      "value": 1,
+      "means": "equipment slot index for the dual shot"
+    },
+    {
+      "id": "ammo-book-slot-homing",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_HOMING",
+      "value": 3,
+      "means": "equipment slot index for the homing shot"
+    },
+    {
+      "id": "ammo-book-slot-missile",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_MISSILE",
+      "value": 2,
+      "means": "equipment slot index for the missile shot"
+    },
+    {
+      "id": "ammo-book-slot-radar",
+      "code": "tankpit_bot.ledger.ammo_book:SLOT_RADAR",
+      "value": 4,
+      "means": "equipment slot index for the extra radar"
+    },
+    {
+      "id": "ammo-book-ammoactivitycontract",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoActivityContract",
+      "law": "Structural invariants on a counted scan or gain."
+    },
+    {
+      "id": "ammo-book-ammobookdict",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoBookDict",
+      "keys": [
+        "divergences",
+        "enemy_shots",
+        "gains",
+        "last_counts",
+        "shots",
+        "snapshots"
+      ],
+      "means": "The running ammo account between 0x49 snapshots."
+    },
+    {
+      "id": "ammo-book-ammoshotcontract",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoShotContract",
+      "law": "Structural invariants on a counted shot echo."
+    },
+    {
+      "id": "ammo-book-ammosnapshotcontract",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoSnapshotContract",
+      "law": "Structural invariants on a 0x49 count snapshot."
+    },
+    {
+      "id": "ammo-book-ammoverdictdict",
+      "code": "tankpit_bot.ledger.ammo_book:AmmoVerdictDict",
+      "keys": [
+        "balanced",
+        "detail"
+      ],
+      "means": "Reconciliation result for one snapshot-to-snapshot interval."
+    },
+    {
+      "id": "ammo-book-make-ammo-book",
+      "code": "tankpit_bot.ledger.ammo_book:make_ammo_book",
+      "law": "Return an empty ammo book."
+    },
+    {
+      "id": "ammo-book-record-ammo-enemy-shot",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_enemy_shot",
+      "law": "Count one enemy shot echo (bounds armor consumption)."
+    },
+    {
+      "id": "ammo-book-record-ammo-gain",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_gain",
+      "law": "Count one 0x67 equipment gain (any slots may rise)."
+    },
+    {
+      "id": "ammo-book-record-ammo-scan",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_scan",
+      "law": "Count one dispatched radar scan against the radar slot."
+    },
+    {
+      "id": "ammo-book-record-ammo-shot",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_shot",
+      "law": "Count one own shot echo against its ammo slot."
+    },
+    {
+      "id": "ammo-book-record-ammo-snapshot",
+      "code": "tankpit_bot.ledger.ammo_book:record_ammo_snapshot",
+      "law": "Reconcile one 0x49 snapshot against the recorded activity."
+    },
+    {
+      "id": "damage-book-confirmedincomingdict",
+      "code": "tankpit_bot.ledger.damage_book:ConfirmedIncomingDict",
+      "keys": [
+        "cost",
+        "shooter_id",
+        "timestamp_ms"
+      ],
+      "means": "One fuel-confirmed incoming hit, timestamped for rate windows."
+    },
+    {
+      "id": "damage-book-damagebookdict",
+      "code": "tankpit_bot.ledger.damage_book:DamageBookDict",
+      "keys": [
+        "confirmed_incoming",
+        "dealt",
+        "pending_dealt_weapon",
+        "pending_incoming",
+        "taken"
+      ],
+      "means": "The two-sided per-enemy damage ledger."
+    },
+    {
+      "id": "damage-book-enemydamagesidedict",
+      "code": "tankpit_bot.ledger.damage_book:EnemyDamageSideDict",
+      "keys": [
+        "dual",
+        "fuel",
+        "homing",
+        "missile",
+        "name",
+        "single",
+        "unknown"
+      ],
+      "means": "One direction of the ledger against one enemy."
+    },
+    {
+      "id": "damage-book-incomingshotcontract",
+      "code": "tankpit_bot.ledger.damage_book:IncomingShotContract",
+      "law": "Structural invariants on an incoming enemy shot record."
+    },
+    {
+      "id": "damage-book-ownshotechocontract",
+      "code": "tankpit_bot.ledger.damage_book:OwnShotEchoContract",
+      "law": "Structural invariants on a paired own-shot echo."
+    },
+    {
+      "id": "damage-book-pendingincomingdict",
+      "code": "tankpit_bot.ledger.damage_book:PendingIncomingDict",
+      "keys": [
+        "cost",
+        "deadline_ms",
+        "shooter_id"
+      ],
+      "means": "One incoming shot awaiting fuel-reading confirmation."
+    },
+    {
+      "id": "damage-book-confirm-incoming-damage",
+      "code": "tankpit_bot.ledger.damage_book:confirm_incoming_damage",
+      "law": "Confirm queued incoming shots against an observed fuel drop."
+    },
+    {
+      "id": "damage-book-incoming-damage-window",
+      "code": "tankpit_bot.ledger.damage_book:incoming_damage_window",
+      "law": "Return confirmed incoming (hits, fuel) inside the trailing window."
+    },
+    {
+      "id": "damage-book-make-damage-book",
+      "code": "tankpit_bot.ledger.damage_book:make_damage_book",
+      "law": "Return an empty damage book."
+    },
+    {
+      "id": "damage-book-record-incoming-shot",
+      "code": "tankpit_bot.ledger.damage_book:record_incoming_shot",
+      "law": "Count an enemy shot fired at us and queue its confirmation."
+    },
+    {
+      "id": "damage-book-record-own-shot-echo",
+      "code": "tankpit_bot.ledger.damage_book:record_own_shot_echo",
+      "law": "Hold the weapon byte of our just-echoed shot for hit pairing."
+    },
+    {
+      "id": "damage-book-resolve-dealt",
+      "code": "tankpit_bot.ledger.damage_book:resolve_dealt",
+      "law": "Charge a confirmed hit to its victim using the paired weapon."
+    },
+    {
+      "id": "damage-book-summarize-side",
+      "code": "tankpit_bot.ledger.damage_book:summarize_side",
+      "law": "Render one ledger direction as a compact human-readable line."
+    },
+    {
+      "id": "decision-decisionrecordcontract",
+      "code": "tankpit_bot.ledger.decision:DecisionRecordContract",
+      "law": "Structural invariants on a recorded decision."
+    },
+    {
+      "id": "decision-decisionrecorddict",
+      "code": "tankpit_bot.ledger.decision:DecisionRecordDict",
+      "keys": [
+        "action_kind",
+        "cmd_type",
+        "event_id",
+        "mode",
+        "reason_context",
+        "reason_kind",
+        "score",
+        "target_id",
+        "target_x",
+        "target_y"
+      ],
+      "means": "One recorded planner decision."
+    },
+    {
+      "id": "decision-decision-record",
+      "code": "tankpit_bot.ledger.decision:decision_record",
+      "law": "Return the recorded decision for an event id, if any."
+    },
+    {
+      "id": "decision-latest-decision-event-id",
+      "code": "tankpit_bot.ledger.decision:latest_decision_event_id",
+      "law": "Return the most recently recorded decision's event id."
+    },
+    {
+      "id": "decision-record-decision",
+      "code": "tankpit_bot.ledger.decision:record_decision",
+      "law": "Record a dispatchable planner decision; return its event id."
+    },
+    {
+      "id": "decision-reset-decision-records",
+      "code": "tankpit_bot.ledger.decision:reset_decision_records",
+      "law": "Clear the decision store. Called from test-isolation fixtures."
+    },
+    {
+      "id": "decision-verify-outcome-invariant",
+      "code": "tankpit_bot.ledger.decision:verify_outcome_invariant",
+      "law": "Session-end sweep: every recorded decision resolved or pending."
+    },
+    {
+      "id": "events-action-kinds",
+      "code": "tankpit_bot.ledger.events:ACTION_KINDS",
+      "members": [
+        "scan",
+        "move",
+        "teleport",
+        "collect",
+        "map_open",
+        "shoot"
+      ],
+      "means": "every dispatchable action kind the ledger books outcomes for"
+    },
+    {
+      "id": "events-actionkind",
+      "code": "tankpit_bot.ledger.events:ActionKind",
+      "law": "ActionKind."
+    },
+    {
+      "id": "events-next-event-id",
+      "code": "tankpit_bot.ledger.events:next_event_id",
+      "law": "Return the next process-wide monotonic event id."
+    },
+    {
+      "id": "events-reset-event-ids",
+      "code": "tankpit_bot.ledger.events:reset_event_ids",
+      "law": "Reset the event counter. Called from test-isolation fixtures."
+    },
+    {
+      "id": "fuel-book-block-reading-cap",
+      "code": "tankpit_bot.ledger.fuel_book:BLOCK_READING_CAP",
+      "value": 50,
+      "means": "max absolute wire fuel readings folded into one open block"
+    },
+    {
+      "id": "fuel-book-fuel-entry-kinds",
+      "code": "tankpit_bot.ledger.fuel_book:FUEL_ENTRY_KINDS",
+      "members": [
+        "shot_single",
+        "shot_dual",
+        "shot_missile",
+        "shot_homing",
+        "homing_carry",
+        "walk",
+        "radar",
+        "mine_press",
+        "teleport",
+        "pickup",
+        "enemy_hit",
+        "detonation"
+      ],
+      "means": "every predicted fuel effect the fuel book can record"
+    },
+    {
+      "id": "fuel-book-fuelbookdict",
+      "code": "tankpit_bot.ledger.fuel_book:FuelBookDict",
+      "keys": [
+        "block_start_fuel",
+        "divergences",
+        "entries",
+        "entries_at_last_reading",
+        "last_fuel",
+        "readings_in_block",
+        "totals",
+        "windows"
+      ],
+      "means": "The running account between QUIET wire fuel readings."
+    },
+    {
+      "id": "fuel-book-fuelentrydict",
+      "code": "tankpit_bot.ledger.fuel_book:FuelEntryDict",
+      "keys": [
+        "hi",
+        "kind",
+        "lo"
+      ],
+      "means": "One predicted fuel effect with its feasibility interval."
+    },
+    {
+      "id": "fuel-book-fuelentrykind",
+      "code": "tankpit_bot.ledger.fuel_book:FuelEntryKind",
+      "law": "FuelEntryKind."
+    },
+    {
+      "id": "fuel-book-fuelkindtotaldict",
+      "code": "tankpit_bot.ledger.fuel_book:FuelKindTotalDict",
+      "keys": [
+        "count",
+        "hi_sum",
+        "lo_sum"
+      ],
+      "means": "Cumulative session totals for one entry kind."
+    },
+    {
+      "id": "fuel-book-fuelwindowverdictdict",
+      "code": "tankpit_bot.ledger.fuel_book:FuelWindowVerdictDict",
+      "keys": [
+        "balanced",
+        "entry_kinds",
+        "hi",
+        "lo",
+        "residual"
+      ],
+      "means": "Reconciliation result for one reading-to-reading window."
+    },
+    {
+      "id": "fuel-book-make-fuel-book",
+      "code": "tankpit_bot.ledger.fuel_book:make_fuel_book",
+      "law": "Return an empty fuel book."
+    },
+    {
+      "id": "fuel-book-record-fuel-entry",
+      "code": "tankpit_bot.ledger.fuel_book:record_fuel_entry",
+      "law": "Record one predicted fuel effect into the open window."
+    },
+    {
+      "id": "fuel-book-record-fuel-reading",
+      "code": "tankpit_bot.ledger.fuel_book:record_fuel_reading",
+      "law": "Fold one absolute wire fuel reading into the open block."
+    },
+    {
+      "id": "mode-transition-modetransitionrecorddict",
+      "code": "tankpit_bot.ledger.mode_transition:ModeTransitionRecordDict",
+      "keys": [
+        "caused_by",
+        "event_id",
+        "from_mode",
+        "reason_kind",
+        "to_mode"
+      ],
+      "means": "One recorded mode transition."
+    },
+    {
+      "id": "mode-transition-emit-mode-transition",
+      "code": "tankpit_bot.ledger.mode_transition:emit_mode_transition",
+      "law": "Record one AI mode flip as a first-class event."
+    },
+    {
+      "id": "mode-transition-mode-transitions",
+      "code": "tankpit_bot.ledger.mode_transition:mode_transitions",
+      "law": "Return every mode transition recorded this session, in order."
+    },
+    {
+      "id": "mode-transition-reset-mode-transitions",
+      "code": "tankpit_bot.ledger.mode_transition:reset_mode_transitions",
+      "law": "Clear the transition log. Called from test-isolation fixtures."
+    },
+    {
+      "id": "outcome-actionoutcome",
+      "code": "tankpit_bot.ledger.outcome:ActionOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:ActionOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-collectoutcome",
+      "code": "tankpit_bot.ledger.outcome:CollectOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:CollectOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-mapopenoutcome",
+      "code": "tankpit_bot.ledger.outcome:MapOpenOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:MapOpenOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-moveoutcome",
+      "code": "tankpit_bot.ledger.outcome:MoveOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:MoveOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-scanoutcome",
+      "code": "tankpit_bot.ledger.outcome:ScanOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:ScanOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-shootoutcome",
+      "code": "tankpit_bot.ledger.outcome:ShootOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:ShootOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-teleportoutcome",
+      "code": "tankpit_bot.ledger.outcome:TeleportOutcome",
+      "law": "Re-export of `tankpit_bot.ledger.outcomes:TeleportOutcome` through the outcome package's __init__; the definition and its claim live on the outcomes module."
+    },
+    {
+      "id": "outcome-emit-action-outcome",
+      "code": "tankpit_bot.ledger.outcome:emit_action_outcome",
+      "law": "Record one resolved action attempt: diagnostic event + ring entry."
+    },
+    {
+      "id": "outcome-reset-action-outcome-tracking",
+      "code": "tankpit_bot.ledger.outcome:reset_action_outcome_tracking",
+      "law": "Reset attempt counters + pairing state. Test-isolation hook."
+    },
+    {
+      "id": "outcomes-actionoutcome",
+      "code": "tankpit_bot.ledger.outcomes:ActionOutcome",
+      "law": "ActionOutcome."
+    },
+    {
+      "id": "outcomes-collectoutcome",
+      "code": "tankpit_bot.ledger.outcomes:CollectOutcome",
+      "law": "CollectOutcome."
+    },
+    {
+      "id": "outcomes-mapopenoutcome",
+      "code": "tankpit_bot.ledger.outcomes:MapOpenOutcome",
+      "law": "MapOpenOutcome."
+    },
+    {
+      "id": "outcomes-moveoutcome",
+      "code": "tankpit_bot.ledger.outcomes:MoveOutcome",
+      "law": "MoveOutcome."
+    },
+    {
+      "id": "outcomes-scanoutcome",
+      "code": "tankpit_bot.ledger.outcomes:ScanOutcome",
+      "law": "ScanOutcome."
+    },
+    {
+      "id": "outcomes-shootoutcome",
+      "code": "tankpit_bot.ledger.outcomes:ShootOutcome",
+      "law": "ShootOutcome."
+    },
+    {
+      "id": "outcomes-teleportoutcome",
+      "code": "tankpit_bot.ledger.outcomes:TeleportOutcome",
+      "law": "TeleportOutcome."
+    },
+    {
+      "id": "ring-ring-capacity",
+      "code": "tankpit_bot.ledger.ring:RING_CAPACITY",
+      "value": 128,
+      "means": "per-kind outcome ring size; the oldest record is evicted at capacity"
+    },
+    {
+      "id": "ring-actionoutcomerecorddict",
+      "code": "tankpit_bot.ledger.ring:ActionOutcomeRecordDict",
+      "keys": [
+        "action_kind",
+        "attempt_id",
+        "caused_by",
+        "detail",
+        "duration_ms",
+        "event_id",
+        "outcome"
+      ],
+      "means": "One recorded action outcome."
+    },
+    {
+      "id": "ring-append-outcome-record",
+      "code": "tankpit_bot.ledger.ring:append_outcome_record",
+      "law": "Append a record to its kind's ring, evicting the oldest at capacity."
+    },
+    {
+      "id": "ring-outcome-counts",
+      "code": "tankpit_bot.ledger.ring:outcome_counts",
+      "law": "Return per-outcome counts over the kind's retained ring."
+    },
+    {
+      "id": "ring-recent-outcomes",
+      "code": "tankpit_bot.ledger.ring:recent_outcomes",
+      "law": "Return the most recent outcome records for a kind, oldest first."
+    },
+    {
+      "id": "ring-reset-outcome-rings",
+      "code": "tankpit_bot.ledger.ring:reset_outcome_rings",
+      "law": "Clear every ring. Called from test-isolation fixtures."
+    }
+  ]
+}
+```
+
 [^1]: design source on disk and blob-pinned in frontmatter: `docs/handoffs/self-observing-bot-architecture.md` — the 15-blind-spot inventory, four-layer diagram, phase table, and LoC estimates all transcribe from it; design session recorded in the wiki-log entry "[2026-07-06] design | Self-observing bot architecture (multi-phase; handoff written; NO code landed)", which carries the user's quoted prompt.
 [^2]: code truth on disk for every landed phase: `src/tankpit_bot/contracts/`, `src/tankpit_bot/facts/`, `src/tankpit_bot/ledger/`, guard rule `scripts/contract_rules.py` (runs in `make lint`) — all symbols named in these notes are greppable; landed via the 2026-07-18/19 commits in git history and the wiki-log entries "[2026-07-18] code | Phase 2 outcome fabric", "[2026-07-18] code | Phase 2 typed decisions", "[2026-07-18] code | Phase 2 COMPLETE", and "[2026-07-19] tooling | Deterministic run audit". The run audit itself is a standing instrument (`make analyze`).
 [^3]: the 2026-07-06 20:47:31 deadlock: 26 s of `_is_valid_shoot` self-rejection during that evening's `make run`, recorded in the "[2026-07-06] design" wiki-log entry (motivation section); Phase 0 deleted the veto the same week, and the whole validator family followed 2026-07-21 ([[executor-rejection-loops]]).

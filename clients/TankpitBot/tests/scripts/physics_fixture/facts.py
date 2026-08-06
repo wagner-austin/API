@@ -9,6 +9,7 @@ tripping the reverse-coverage rule.
 from __future__ import annotations
 
 from enum import IntEnum
+from typing import TypedDict
 
 ANSWER = 42
 TRUTHY = True
@@ -35,6 +36,13 @@ ODD_CODES: frozenset[int] = frozenset({3, 1, 2})
 #: currently-bound modules has this shape, so without it the enum arm
 #: of the normalizer's element unwrapping is never executed.
 COLOUR_BY_NAME: dict[str, Colour] = {"red": Colour.RED, "blue": Colour.BLUE}
+
+
+class SampleRecord(TypedDict):
+    """Record type for the ``keys`` claim-kind tests."""
+
+    left: int
+    right: str
 
 
 def double(value: int) -> int:

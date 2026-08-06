@@ -64,10 +64,13 @@ PROTOCOL_CONSTANTS_MODULE = "tankpit_bot.protocol.constants"
 #: only its own ``__all__``. Adding a target here is a commitment:
 #: reverse coverage immediately requires a claim for each of its
 #: public symbols, so the claims land in the same commit.
+LEDGER_PACKAGE = "tankpit_bot.ledger"
+
 CLAIM_TARGETS: tuple[str, ...] = (
     PHYSICS_PACKAGE,
     COMMANDS_MODULE,
     PROTOCOL_CONSTANTS_MODULE,
+    LEDGER_PACKAGE,
 )
 
 CLAIM_FENCE_OPEN = "```json claims"
@@ -75,9 +78,21 @@ CLAIM_FENCE_CLOSE = "```"
 #: Claim kinds. Exactly one must appear on every claim. ``law`` is the
 #: weak one — existence plus prose — and exists only for symbols no
 #: other kind can verify; prefer any of the others when they fit.
-CLAIM_KINDS: tuple[str, ...] = ("value", "bytes", "members", "probes", "law")
+CLAIM_KINDS: tuple[str, ...] = ("value", "bytes", "members", "keys", "probes", "law")
 
 _LOGGER = get_logger(__name__)
+
+
+class _AnnotatedRecord(Protocol):
+    """A symbol whose annotated fields a ``keys`` claim states.
+
+    ``TypedDict`` classes carry their field names in ``__annotations__``.
+    The read site still uses ``getattr`` with a default, because a claim
+    may name a symbol that has no annotations at all — that is a
+    reported violation, not a crash.
+    """
+
+    __annotations__: dict[str, str]
 
 
 class _ProbeFn(Protocol):
@@ -358,6 +373,49 @@ def _check_members_claim(
     return []
 
 
+def _check_keys_claim(
+    claim: JSONObject,
+    module: ModuleType,
+    symbol_name: str,
+    prefix: str,
+) -> list[str]:
+    """Verify a record type's field names against the wiki.
+
+    ``TypedDict`` records are the shape of most wire-adjacent
+    bookkeeping — a fuel book, a damage book, an outcome record. Their
+    FIELD SET is a real fact the wiki states, and without this kind the
+    only available claim was ``law``: prose plus an existence check,
+    which goes on passing when a field is added, renamed or dropped.
+
+    The claim lists the field names; comparison is sorted and total,
+    for the same reason :func:`_check_members_claim` is total.
+
+    Args:
+        claim: Claim object carrying ``keys``.
+        module: Imported module.
+        symbol_name: Symbol the claim binds.
+        prefix: ``page#id`` for violation messages.
+
+    Returns:
+        Violations (empty when the field set matches exactly).
+    """
+    expected = claim.get("keys")
+    if not isinstance(expected, list):
+        return [f"{prefix}: 'keys' must be a JSON array of field names"]
+    # Two steps, each with its own annotation: nesting the getattrs makes
+    # the inner call an unannotated Any expression, which
+    # ``disallow_any_expr`` rejects.
+    record: _AnnotatedRecord = getattr(module, symbol_name)
+    annotations: dict[str, str] = getattr(record, "__annotations__", {})
+    if not annotations:
+        return [f"{prefix}: symbol has no annotated fields to claim"]
+    actual = sorted(annotations)
+    wanted = sorted(str(name) for name in expected)
+    if actual != wanted:
+        return [f"{prefix}: claim keys {wanted!r} != code {actual!r}"]
+    return []
+
+
 def _binds_into_target(module_name: str, target: str) -> bool:
     """Report whether a claim's module sits inside one bound target.
 
@@ -557,6 +615,8 @@ def _run_kind_check(
         return _check_bytes_claim(claim, module, symbol_name, prefix)
     if kind == "members":
         return _check_members_claim(claim, module, symbol_name, prefix)
+    if kind == "keys":
+        return _check_keys_claim(claim, module, symbol_name, prefix)
     if kind == "probes":
         return _check_probe_claim(claim, module, symbol_name, prefix)
     return _check_law_claim(claim, prefix)

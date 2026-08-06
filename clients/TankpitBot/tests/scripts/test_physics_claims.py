@@ -22,7 +22,7 @@ FIXTURE_PACKAGE = "tests.scripts.physics_fixture"
 FIXTURE_MODULE = f"{FIXTURE_PACKAGE}.facts"
 #: The exactly-one-of-kinds message, kept in one place so adding a
 #: claim kind updates every assertion that quotes it.
-_ONE_OF = "claim needs exactly one of value/bytes/members/probes/law"
+_ONE_OF = "claim needs exactly one of value/bytes/members/keys/probes/law"
 
 GREEN_PAGE = f"""# Fixture Economy
 
@@ -624,6 +624,59 @@ def test_members_unwraps_enum_valued_containers(tmp_path: Path) -> None:
     )
     _write_page(tmp_path, "m.md", _claims_page(claims))
     assert _run(tmp_path) == 0
+
+
+def test_keys_claim_verifies_a_record_field_set(tmp_path: Path) -> None:
+    """A record type's field names are claimed and compared sorted."""
+    claims = (
+        f'{{"claims": ['
+        f'{{"id": "answer", "code": "{FIXTURE_MODULE}:ANSWER", "value": 42}},'
+        f'{{"id": "double", "code": "{FIXTURE_MODULE}:double",'
+        ' "formula": "2 * value", "probes": [{"args": [2], "expect": 4}]},'
+        f'{{"id": "rec", "code": "{FIXTURE_MODULE}:SampleRecord",'
+        ' "keys": ["right", "left"]}'
+        "]}"
+    )
+    _write_page(tmp_path, "k.md", _claims_page(claims))
+    assert _run(tmp_path) == 0
+
+
+def test_keys_claim_detects_a_renamed_field(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Renaming, adding or dropping a field breaks the claim.
+
+    This is the whole point of the kind: a ``law`` claim on a record
+    type keeps passing while its fields change underneath.
+    """
+    claims = (
+        f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:SampleRecord",'
+        ' "keys": ["left", "middle", "right"]}]}'
+    )
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "physics_claim_violation bad.md#x: claim keys" in out
+
+
+def test_keys_claim_on_symbol_without_fields_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A keys claim on a plain constant is the wrong kind."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:ANSWER", "keys": ["a"]}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "bad.md#x: symbol has no annotated fields to claim" in out
+
+
+def test_keys_field_must_be_an_array(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A non-array keys field is rejected before comparison."""
+    claims = f'{{"claims": [{{"id": "x", "code": "{FIXTURE_MODULE}:SampleRecord", "keys": 3}}]}}'
+    _write_page(tmp_path, "bad.md", _claims_page(claims))
+    assert _run(tmp_path) >= 1
+    out = capsys.readouterr().out
+    assert "bad.md#x: 'keys' must be a JSON array of field names" in out
 
 
 def test_members_sequence_order_is_load_bearing(
