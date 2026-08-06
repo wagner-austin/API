@@ -1,6 +1,14 @@
 # Turkic API
 
-Production-grade REST API for Turkic language corpus processing with **100% test coverage**, **strict type safety**, and **zero technical debt**.
+REST API for building Turkic-language corpora: stream raw text from OSCAR,
+Wikipedia and CulturaX, identify its language with FastText, and transliterate it
+to IPA deterministically. Nine languages across Cyrillic, Latin and Arabic
+scripts.
+
+This is the corpus-construction half of the Turkic work. The mutual-intelligibility
+experiments in [LSTM](https://github.com/wagner-austin/LSTM) run on OSCAR text
+that has been language-ID filtered and transliterated to broad IPA — the pipeline
+this service exposes over HTTP.
 
 ## Features
 
