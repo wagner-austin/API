@@ -33,14 +33,44 @@ class TerrainMapProtocol(Protocol):
         ...
 
     def is_passable(self, x: int, y: int) -> bool:
-        """Check if tile is passable (not rock or water).
+        """Check if the tank can WALK onto the tile.
+
+        Answers the walk question, which composes every blocker the
+        server's route planner stops at: terrain, movable blocks,
+        visible mines, and other tanks' bodies.
 
         Args:
             x: X coordinate (0-255).
             y: Y coordinate (0-255).
 
         Returns:
-            True if passable, False if rock or water.
+            True if a walk may enter the tile.
+        """
+        ...
+
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        """Check if the server may PLACE the tank on the tile.
+
+        A strictly weaker question than :meth:`is_passable`, and a
+        different one. A teleport aimed at a mined or occupied tile is
+        not refused -- the server displaces the tank to an adjacent
+        tile, charges the plain teleport cost, and leaves the mine
+        intact (wiki ``mine-mechanics``, live-proven 2026-07-28). Only
+        terrain legality decides where a landing may be aimed, so this
+        question ignores mines and tank bodies.
+
+        Conflating the two is a live failure mode in both directions:
+        answering the walk question here makes the bot refuse to
+        teleport at any enemy (an enemy always occupies its own tile),
+        while answering this question for a walk sends it into
+        blockers.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport may be aimed at the tile.
         """
         ...
 

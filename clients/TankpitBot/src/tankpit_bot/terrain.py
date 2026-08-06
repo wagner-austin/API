@@ -148,6 +148,23 @@ class TerrainMap:
         """
         return self.get_terrain(x, y) == self.GROUND
 
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        """Check if the server may place the tank on the tile.
+
+        The static minimap carries no mines and no tank bodies -- the
+        only blockers a landing is exempt from -- so on this view the
+        two questions have the same answer. Views that compose dynamic
+        blockers (``FerryAwareTerrain``) are where they diverge.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport may be aimed at the tile.
+        """
+        return self.is_passable(x, y)
+
     def render_viewport(
         self,
         center_x: int,
