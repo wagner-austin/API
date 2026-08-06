@@ -10,6 +10,7 @@ from platform_core.json_utils import JSONObject
 
 from tankpit_bot import _hooks_guard, _test_hooks
 from tankpit_bot._test_hooks import CDPSessionProtocol
+from tankpit_bot.analysis import _test_hooks as analysis_test_hooks
 
 
 class FakeCDPSessionSimple:
@@ -147,6 +148,11 @@ def _restore_hooks() -> Generator[None, None, None]:
     _test_hooks.start_watchdog = _noop_start_watchdog
     _test_hooks.force_exit = _unexpected_force_exit
     _test_hooks.install_signal_handlers = _noop_install_signal_handlers
+    # The analysis layer owns its own seams (filesystem reads and
+    # archive enumeration). Restoring them here rather than in a
+    # per-file fixture keeps the single reset point this fixture's
+    # docstring describes.
+    analysis_test_hooks.reset_analysis_hooks()
 
     yield
 
