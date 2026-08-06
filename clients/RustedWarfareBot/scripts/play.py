@@ -25,8 +25,8 @@ from rw_bot.policy.doctrine import (
     DERIVE_RESERVE,
     Doctrine,
     DoctrineError,
-    parse_doctrine_lines,
 )
+from rw_bot.policy.doctrine_file import parse_doctrine_lines
 from rw_bot.policy.expand import expand
 from rw_bot.policy.match_report import format_report
 
@@ -408,6 +408,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         creep=doctrine["creep"],
         riposte=doctrine["riposte"],
         tech=doctrine["tech"],
+        lurk=doctrine["lurk"],
+        allin=doctrine["allin"],
+        strike=doctrine["strike"],
+        medics=doctrine["medics"],
+        bunkers=doctrine["bunkers"],
+        flame=doctrine["flame"],
+        close=doctrine["close"],
+        guns=doctrine["guns"],
+        nukes=doctrine["nukes"],
+        income_ladder=doctrine["income_ladder"],
+        decoys=doctrine["decoys"],
+        kite=doctrine["kite"],
+        hp_floor=doctrine["hp_floor"],
         ladder=ladder_to(doctrine["mass"]),
         trace=trace,
     )
