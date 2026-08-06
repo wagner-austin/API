@@ -28,7 +28,9 @@ Distance-15 "hits" in the raw data were homing shots (which track the target). E
 
 - **Shots in range never miss** — the range is cardinal adjacency (Manhattan distance 1)[^1]
 - Distance 2 has only 1 sample — not enough to trust as reliable range[^2]
-- `SHOT_RANGE_TILES = 2` in `combat_strategy.py` but `has_cardinal_combat_shot` requires distance == 1 for the proven shot[^2]
+- `SHOT_RANGE_TILES = 8` in `combat_landing.py` — the landing-diamond
+  radius — while `has_cardinal_combat_shot` still requires Manhattan
+  distance exactly 1 for the *proven* point-blank shot[^2]
 - Must be within the 18x18 viewport to hit; larger ranges miss because they're outside the viewport (`COMBAT_RANGE=8` is the awareness range, not shot range)[^3]
 
 ## Cardinal adjacency
@@ -44,7 +46,7 @@ The server rejects any `shoot` whose aim tile is outside the visible viewport wi
 Homing shots track the target regardless of distance. They bypass normal range rules. See [[weapon-log-markers]] for detection.[^1]
 
 [^1]: 350 shots analyzed from run 20260611 — Manhattan 1 = 255/255, 4+ = ~0%, distance-15 were homing
-[^2]: current code uses SHOT_RANGE_TILES=2 but has_cardinal_combat_shot gates shooting on distance==1; distance-2 data insufficient
+[^2]: **Corrected 2026-08-06 — this footnote was wrong twice over.** It said "SHOT_RANGE_TILES=2 in combat_strategy.py". The constant is `SHOT_RANGE_TILES = 8` and it lives in `src/tankpit_bot/bot/ai/combat_landing.py:29`, not `combat_strategy.py`; the comment above it at `:25-28` explains the placement ("Lives here (not combat_strategy) because landing choice and acquisition viability both key off it"). It is the radius of the landing diamond, consumed at `:123`. The 2 was presumably right when written and was never revised after the range bound was reworked — see [[flag-triage-20260729]] F8, where the radius-8 short-circuit is discussed and the conclusion is that no tile bound existed in the user's law at all. The second half of the claim still holds exactly: `has_cardinal_combat_shot` (`src/tankpit_bot/bot/ai/combat_strategy.py:1075`) gates on Manhattan distance exactly 1, its docstring calling that "the geometry required for a guaranteed hit at point-blank range". The distance-2 sample remains a single observation.
 [^3]: user (Austin), 2026-04-20 — "must be within 18x18 viewport to hit"
 [^4]: live run 2026-07-03 20:34 — five `shoot(143,237,id=530)` dispatches with viewport (129,217)-(144,232) each drew 0x52 error_code=0; game log showed five "You can't do this" lines; zero 0x53 echoes, zero ammo deltas.
 [^5]: user (Austin), 2026-07-03 — "the enemy was close enough that if we shifted the viewport down we could have seen them which makes the game prevent subsequent homing shots"
