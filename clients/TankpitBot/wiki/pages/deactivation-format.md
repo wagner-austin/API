@@ -55,9 +55,9 @@ The victim/killer IDs were originally decoded at wrong offsets (offset 0 instead
 
 Consequence (2026-07-19): the game-log kill-scraping channel was deleted from the bot; 0x41 is the single kill source. The DOM log is retained as a capture-artifact witness only.[^5]
 
-[^1]: protocol analysis 2026-06-10 — offset correction from 0→1 for victim_id, 3→4 for killer_id
+[^1]: Protocol analysis of 2026-06-10, which moved `victim_id` from offset 0→1 and `killer_id` from 3→4. Both corrections are what the decoder implements today: `src/tankpit_bot/protocol/decoders/combat.py:98` reads `victim_id=x16(data[1], data[2])` and `:92` reads `raw_killer = x16(data[4], data[5])`, against the layout comment at `:90-91` — `[status:1] [victim_id:2 LE] [promo_eligible:1] [killer_id:2 LE]`, sourced from `tpclient.js` `Pg.h (V.A)`. Re-verified 2026-08-06.
 [^4]: JS truth: `Pg.h` handler in `tpclient.js` (blob-pinned in frontmatter) — 6-byte field walk and the 65530 mine sentinel both read directly from the handler body; decode mirrored in the bot's 0x41 decoder and exercised by the [^2] capture replays.
-[^5]: wiki-log entry "[2026-07-19] falsification + teardown | 0x41 fires for own kills; DOM game-log consumption deleted (wire is the single actor)" — the teardown commit is in git history the same day.
+[^5]: `wiki/log.md:1198` — "[2026-07-19] falsification + teardown | 0x41 fires for own kills; DOM game-log consumption deleted (wire is the single actor)". The own-kill case is visible in the decoder itself: `src/tankpit_bot/protocol/decoders/combat.py:92-94` treats `raw_killer >= 65530` as the mine-kill encoding and rebases it (`killer_id = raw_killer - 65530`), surfacing `is_mine_kill` on the decoded record — so own kills are carried on the wire rather than inferred from the DOM.
 [^2]: capture replay 2026-07-19 with the modern 0x2E-tunneled decoder: `bot-20260610-005248` contains 1 own-kill 0x41 (victim 512, killer 1301 = the bot) and `bot-20260610-011333` contains 19 (killer 1301 on every one) — the very captures the "never fires" claim was drawn from. Run `bot-20260719-004608` cross-confirms live: all 4 own kills decoded as 0x41 (victims 500/513/506/511, killer_id 1301) matching the game-log banners 1:1, banners trailing by 0–2 s.
 
 ## The corpse window is exactly 22 seconds (corpus-swept 2026-07-22)
