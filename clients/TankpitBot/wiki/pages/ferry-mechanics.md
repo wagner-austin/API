@@ -9,8 +9,8 @@ source_paths:
   - "runs/sniff"
   - "src/tankpit_bot/sim/movement.py"
 source_git_blobs:
-  "src/tankpit_bot/sim/movement.py": "e397b3de7b692128e94fe27badb6e5284c7252ad"
-fact_checked: "2026-08-01"
+  "src/tankpit_bot/sim/movement.py": "2558ccfbe93d108f2f0a70c281b2081cd385a211"
+fact_checked: "2026-08-05"
 confidence: high
 hubs: [game-mechanics]
 ---
@@ -51,7 +51,10 @@ click again to reach your destination land tile. it takes two
 actions because you have to embark and disembark."[^4]
 
 Planner consequence: **pickup dispatches route on the CURRENT surface**
-(`SurfaceRouteTerrain` gate in `movement.py`) — plain ground when
+(`SurfaceRouteTerrain` gate at `src/tankpit_bot/bot/ai/movement.py:452`,
+`SurfaceRouteTerrain(terrain, water=riding)` — the PLANNER's movement
+module, not the sim's `sim/movement.py` referenced elsewhere on this
+page) — plain ground when
 standing on land, water/ferry tiles when riding. A container floating
 on water picks up normally from the ferry (user 2026-07-20: "cant you
 just pick it up essentially like we were on land?"); a land container
@@ -134,9 +137,15 @@ archive detonations, zero paired code-1s). The sim emits all three
 shapes (`sim/emissions.py::emit_move`,
 `MoveOutcomeDict.stop_reason`/`dest_reached`).
 
-[^7]: Sweep output in wiki log 2026-08-04; classifier: every 0x4A
-    leave/arrive pair (Manhattan <= 40) against every tank position
-    statement (0x28/0x3D direct, 0x47 echo finals) within +-2.5 s.
+[^7]: `analysis_scripts/mine_ferry_drift.py`, run over all 312 archive
+    captures; sweep recorded at `wiki/log.md:2678-2682` (entry
+    "[2026-08-04] crack + lift | Ferry movement law mined"). Classifier:
+    every 0x4A leave/arrive pair (Manhattan <= 40) against every tank
+    position statement (0x28/0x3D direct, 0x47 echo finals) within
+    +-2.5 s. The log entry records the same 148 moves / 136
+    rider-attributed split this section states, and notes that the
+    first classifier pass wrongly read "all unridden" because it
+    matched riders against the OLD tile only.
 
 ## Autoscroll riding doctrine (user ruling 2026-08-01, OPEN)
 
@@ -176,6 +185,6 @@ acquisition until the stand-off gate replaced strict adjacency (F4 in
 
 The "marooned one-tile island" from run 131003 was actually the tank standing ON A FERRY in a lake. It could have driven across the water the whole time. The walkability model treated all water as impassable. Fixed by making passability ferry-aware.[^3]
 
-[^1]: user (Austin), 2026-06-12 — "ferries go anywhere on water; boarding + ferry-to-land each consume a queue slot"
-[^2]: terrain type constants in state/terrain.py
-[^3]: run 131003 2026-06-12 — tank at (131,182) on ferry tile, 87 fuel, classified as "marooned" because water was impassable
+[^1]: Originally a user (Austin) statement of 2026-06-12, made in conversation and not recorded in `wiki/log.md` (which opens 2026-06-16 at `log.md:7`). Both halves are now independently held by artifacts in the repo: the go-anywhere-on-water and queue-slot rules are implemented as sim law 2b in `src/tankpit_bot/sim/movement.py:12-15` — "a ferry tile boards; while riding, water is open sea and the ferry moves with the tank. The FIRST queue-consuming surface transition — stepping onto a ferry (boarding) or from water/ferry onto land (disembarking) — STOPS the move at that tile" — and the same contract was restated verbatim by the user on 2026-07-19 and falsified live against the server, which is [^4]. Cite [^4] for the wire proof; this note records provenance only.
+[^2]: `src/tankpit_bot/state/types/constants.py:25-26` — `TERRAIN_FERRY = 5`, `TERRAIN_FERRY_ROCK = 7`; the ASCII glyph is `ASCII_FERRY = "~"` at `:47`. **Corrected 2026-08-05:** this footnote previously pointed at `state/terrain.py`, which does not define them (the module at `src/tankpit_bot/state/types/terrain.py` is a different file, and `src/tankpit_bot/terrain.py` is a third).
+[^3]: `runs/bot/bot-20260612-131003.log:7130-7160` (run 131003, 2026-06-12 13:19:08-13:19:10). The bot teleported toward a fuel dot at (131,182) for 81 fuel (`WORLD: Fuel: 168 -> 87 (-81)`) and the server placed it at **(132,180)**, whose rendered viewport row 180 reads `W W W W @ W # #` — water on both sides, rock below, i.e. the one-tile island. **Corrected 2026-08-05:** this footnote previously gave the tank's position as (131,182); that is the fuel container's tile and the teleport TARGET, rendered `F` on row 182 of the same dump. The tank was never there. "Marooned" is the bot's own state name for the condition (`src/tankpit_bot/bot/ai/collect_hops.py:365`), not a string in this log.
