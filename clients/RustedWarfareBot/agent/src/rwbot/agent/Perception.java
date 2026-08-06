@@ -4,12 +4,17 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * What the bot can see: the roster, positions, health, ownership and economy.
+ * What the bot can see: the roster, positions, health, ownership and state.
  *
  * <p>Reads only. Nothing here writes to the simulation and nothing here decides
  * anything — selection is the planner's job (wiki:
  * runtime-split-java-agent-python-brain). Dispatch is {@link Orders}; the
  * obfuscated names and the reflection are {@link EngineBindings}.
+ *
+ * <p>Two neighbours answer the questions this one deliberately does not. Where
+ * a unit can travel is {@link Mobility}; what the players are worth is {@link
+ * Scoreboard}. Both were split out of here, and the seam in each case is the
+ * subject of the question rather than the size of the file.
  *
  * <p><b>Visibility is delegated, not reimplemented.</b> The master entity list
  * holds every unit on the map, so enumerating it would give the bot perfect
@@ -166,133 +171,6 @@ final class Perception {
     }
 
     /**
-     * Returns an entity's movement layer by name, e.g. {@code "LAND"}.
-     *
-     * <p>Which layer a unit travels on decides which terrain it can cross, and
-     * the engine keeps a separate connectivity grid per layer. Reported as the
-     * enum's own constant name rather than an ordinal, because the names
-     * survived obfuscation and the field letters did not
-     * (wiki: engine-name-oracle).
-     *
-     * @param entity The entity to read.
-     * @return Its layer name.
-     */
-    static String movementOf(Object entity) {
-        Object layer =
-                EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(entity.getClass(), EngineNames.ENTITY_MOVEMENT),
-                        entity);
-        if (!(layer instanceof Enum)) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.ENTITY_MOVEMENT + "() did not return a movement"
-                            + " layer" + EngineNames.PIN);
-        }
-        return ((Enum<?>) layer).name();
-    }
-
-    /**
-     * Returns the connectivity component an entity stands in, on its own layer.
-     *
-     * <p>Two things can reach each other exactly when their component ids match
-     * and both are real. That is the engine's own reachability test reduced to
-     * a comparison, which is why this is worth carrying rather than recomputing
-     * (wiki: mechanics-movement-layers).
-     *
-     * @param entity The entity to locate.
-     * @return Its component id, or a negative when the point has none.
-     */
-    static int pathGroupOf(Object entity) {
-        float[] at = positionOf(entity);
-        Object layer =
-                EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(entity.getClass(), EngineNames.ENTITY_MOVEMENT),
-                        entity);
-        return pathGroupAt(at[0], at[1], layer);
-    }
-
-    /**
-     * Returns the connectivity component of a world point on the land layer.
-     *
-     * <p>Land specifically, and the field it feeds is named for it. Every
-     * builder in the base game travels on land, so this answers the question
-     * the planner actually asks; a hover or naval builder would need its own
-     * grid carried alongside, and naming the layer here keeps that gap visible
-     * instead of letting a mismatched comparison look like an answer.
-     *
-     * @param x World x.
-     * @param y World y.
-     * @return The component id, or a negative when the point has none.
-     */
-    static int landPathGroupAt(float x, float y) {
-        Object land = movementLayer(EngineNames.MOVEMENT_LAND);
-        int here = pathGroupAt(x, y, land);
-        if (here >= 0) {
-            return here;
-        }
-        // A resource-pool tile is itself impassable -- every one on the
-        // archived map reports -1 -- so the centre alone would call every pool
-        // unreachable and stop the economy. What matters is whether a builder
-        // can stand beside it, so the four neighbours are sampled. The engine's
-        // own AI does the same thing for the same reason: its zone-reachability
-        // check tries the centre and then four points around it before giving
-        // up (wiki: mechanics-movement-layers).
-        Object map = EngineAccess.readField(EngineHandle.current(), EngineNames.MAP);
-        float step = EngineAccess.readIntField(map, EngineNames.TILE_WIDTH);
-        float[][] neighbours = {{step, 0.0f}, {-step, 0.0f}, {0.0f, step}, {0.0f, -step}};
-        for (float[] offset : neighbours) {
-            int beside = pathGroupAt(x + offset[0], y + offset[1], land);
-            if (beside >= 0) {
-                return beside;
-            }
-        }
-        // Genuinely nothing adjacent is walkable. Reported as the centre's own
-        // answer rather than as a distinct code: every negative already means
-        // "no component here", and inventing a sixth one would only give the
-        // reader something else to interpret.
-        return here;
-    }
-
-    /** Asks the engine for the component id of a point on one layer. */
-    private static int pathGroupAt(float x, float y, Object layer) {
-        Object group =
-                EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(
-                                EngineAccess.pinnedClass(EngineNames.PATHING_CLASS),
-                                EngineNames.PATH_GROUP_AT,
-                                float.class,
-                                float.class,
-                                EngineAccess.pinnedClass(EngineNames.MOVEMENT_CLASS)),
-                        null,
-                        Float.valueOf(x),
-                        Float.valueOf(y),
-                        layer);
-        if (!(group instanceof Short)) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.PATH_GROUP_AT + "() did not return a short"
-                            + EngineNames.PIN);
-        }
-        return ((Short) group).intValue();
-    }
-
-    /** Resolves one movement-layer constant by its engine name. */
-    private static Object movementLayer(String name) {
-        Object[] layers =
-                EngineAccess.pinnedClass(EngineNames.MOVEMENT_CLASS).getEnumConstants();
-        if (layers == null) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.MOVEMENT_CLASS + " is not an enum"
-                            + EngineNames.PIN);
-        }
-        for (Object layer : layers) {
-            if (name.equals(((Enum<?>) layer).name())) {
-                return layer;
-            }
-        }
-        throw new IllegalStateException(
-                "rw-agent: no movement layer named '" + name + "'" + EngineNames.PIN);
-    }
-
-    /**
      * Returns an entity's owning team number, or -1 when it has no owner.
      *
      * @param entity The entity to read.
@@ -314,95 +192,6 @@ final class Perception {
      */
     static float[] healthOf(Object entity) {
         return new float[] {EngineAccess.readFloat(entity, EngineNames.HP), EngineAccess.readFloat(entity, EngineNames.MAX_HP)};
-    }
-
-    /**
-     * Returns the current player's team number and credit balance.
-     *
-     * @param engine The live engine instance.
-     * @return ``{team, credits}``, or null when there is no current player.
-     */
-    static double[] localPlayerState(Object engine) {
-        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
-        if (team == null) {
-            return null;
-        }
-        return new double[] {EngineAccess.readIntField(team, EngineNames.TEAM_ID), EngineAccess.readDoubleField(team, EngineNames.CREDITS)};
-    }
-
-    /**
-     * Lists every entity the current player owns, with the movement fields that
-     * decide whether it can be sent anywhere.
-     *
-     * <p>Written after ordering a Command Center to move and watching nothing
-     * happen. "First owned unit" is not a useful selection when the roster is
-     * unknown, and the engine will accept an order for an immobile building
-     * without complaint -- so the roster has to be legible before selection can
-     * be. Reports max-speed and the movement-kind field alongside the class so
-     * mobility is read rather than inferred from a package name.
-     *
-     * @param engine The live engine instance.
-     * @return A multi-line report, one line per owned entity.
-     */
-    static String describeOwned(Object engine) {
-        StringBuilder out = new StringBuilder();
-        out.append("=== owned EngineAccess.entities ===\n");
-        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
-        if (team == null) {
-            out.append("no current player\n");
-            return out.toString();
-        }
-        Class<?> treeClass = EngineAccess.pinnedClass(EngineNames.TREE_CLASS);
-        int index = 0;
-        for (Object entity : EngineAccess.entities()) {
-            if (entity == null || treeClass.isInstance(entity)) {
-                continue;
-            }
-            if (EngineAccess.readField(entity, EngineNames.OWNER) != team) {
-                continue;
-            }
-            float[] at = positionOf(entity);
-            out.append('[').append(index++).append("] ")
-                    .append(entity.getClass().getName())
-                    .append(" at (").append(at[0]).append(", ").append(at[1]).append(')')
-                    .append(describeMobility(entity))
-                    .append('\n');
-        }
-        if (index == 0) {
-            out.append("player owns nothing\n");
-        }
-        return out.toString();
-    }
-
-    /**
-     * Renders whatever float fields on an entity look like movement capability.
-     *
-     * <p>Named fields would be better, but the movement field has not been
-     * identified yet and inventing a name would be the guess this method exists
-     * to avoid. Reporting every non-zero float on the entity's own class is
-     * cheap and lets one run settle it.
-     *
-     * @param entity The entity to inspect.
-     * @return A parenthesised list of non-zero float fields, or empty.
-     */
-    private static String describeMobility(Object entity) {
-        StringBuilder out = new StringBuilder();
-        for (Field field : entity.getClass().getDeclaredFields()) {
-            if (field.getType() != float.class || java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                continue;
-            }
-            field.setAccessible(true);
-            float value;
-            try {
-                value = field.getFloat(entity);
-            } catch (IllegalAccessException e) {
-                continue;
-            }
-            if (value != 0.0f) {
-                out.append(' ').append(field.getName()).append('=').append(value);
-            }
-        }
-        return out.length() == 0 ? "" : " {" + out.toString().trim() + "}";
     }
 
     /**
@@ -491,12 +280,12 @@ final class Perception {
      */
     static int queuedCountOf(Object entity) {
         java.lang.reflect.Field queueField =
-                EngineAccess.fieldIfPresent(entity.getClass(), EngineNames.PRODUCTION_QUEUE);
+                EngineAccess.fieldIfPresent(entity.getClass(), TypeNames.PRODUCTION_QUEUE);
         // Matched by type as well as name. Obfuscation reuses single letters,
         // and reading an unrelated field of the same name off another unit
         // class is not a hypothetical -- it crashed a live run.
         if (queueField == null
-                || !EngineAccess.pinnedClass(EngineNames.QUEUE_CLASS)
+                || !EngineAccess.pinnedClass(TypeNames.QUEUE_CLASS)
                         .isAssignableFrom(queueField.getType())) {
             return 0;
         }
@@ -505,15 +294,15 @@ final class Perception {
             queue = queueField.get(entity);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(
-                    "rw-agent: cannot read " + EngineNames.PRODUCTION_QUEUE + EngineNames.PIN, e);
+                    "rw-agent: cannot read " + TypeNames.PRODUCTION_QUEUE + EngineNames.PIN, e);
         }
         if (queue == null) {
             return 0;
         }
-        Object items = EngineAccess.readField(queue, EngineNames.QUEUE_ITEMS);
+        Object items = EngineAccess.readField(queue, TypeNames.QUEUE_ITEMS);
         if (!(items instanceof java.util.Collection)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.QUEUE_ITEMS + " is not a collection"
+                    "rw-agent: " + TypeNames.QUEUE_ITEMS + " is not a collection"
                             + EngineNames.PIN);
         }
         return ((java.util.Collection<?>) items).size();
@@ -544,24 +333,6 @@ final class Perception {
     }
 
     /**
-     * Returns the current player's credits, rounded down to whole currency.
-     *
-     * <p>The engine holds this as a double and spends it in whole units, so a
-     * planner comparing against a unit price wants the floor rather than the
-     * raw value: 99.97 credits does not buy a 100-credit structure.
-     *
-     * @param engine The live engine instance.
-     * @return Credits, or 0 when there is no current player.
-     */
-    static int creditsOf(Object engine) {
-        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
-        if (team == null) {
-            return 0;
-        }
-        return (int) Math.floor(EngineAccess.readDoubleField(team, EngineNames.CREDITS));
-    }
-
-    /**
      * Returns an entity's engine-assigned identity.
      *
      * <p>Assigned once at construction, guarded by an "ID for GameObject is
@@ -587,7 +358,7 @@ final class Perception {
      * @return Its type name.
      */
     static String typeNameOf(Object entity) {
-        Object type = EngineAccess.invoke(EngineAccess.pinnedMethod(entity.getClass(), EngineNames.TYPE_ACCESSOR), entity);
+        Object type = EngineAccess.invoke(EngineAccess.pinnedMethod(entity.getClass(), TypeNames.TYPE_ACCESSOR), entity);
         if (type == null) {
             throw new IllegalStateException("rw-agent: entity has no unit type" + EngineNames.PIN);
         }
@@ -606,297 +377,11 @@ final class Perception {
      * @return Its name.
      */
     static String nameOfType(Object type) {
-        Object name = EngineAccess.invoke(EngineAccess.pinnedMethod(type.getClass(), EngineNames.TYPE_NAME_ACCESSOR), type);
+        Object name = EngineAccess.invoke(EngineAccess.pinnedMethod(type.getClass(), TypeNames.TYPE_NAME_ACCESSOR), type);
         if (!(name instanceof String)) {
             throw new IllegalStateException("rw-agent: unit type name is not a String" + EngineNames.PIN);
         }
         return (String) name;
-    }
-
-    /**
-     * Reports whether the current player has been defeated.
-     *
-     * <p>The engine's own verdict, not a count of what is left standing. It
-     * fires a notification reading "&lt;player&gt; was defeated" on the same
-     * transition, which is what pins the flag (wiki: policy-grading).
-     *
-     * @param engine The live engine instance.
-     * @return True when the current player is out of the match.
-     */
-    static boolean isDefeated(Object engine) {
-        return playerFlag(engine, EngineNames.PLAYER_DEFEATED);
-    }
-
-    /**
-     * Reports whether the current player has been wiped out.
-     *
-     * <p>Stronger than defeat: nothing owned is left at all, and no ally holds
-     * anything either. Its notification reads "&lt;player&gt; has been wiped
-     * out".
-     *
-     * @param engine The live engine instance.
-     * @return True when the current player holds nothing.
-     */
-    static boolean isWipedOut(Object engine) {
-        return playerFlag(engine, EngineNames.PLAYER_WIPED);
-    }
-
-    /** Reads one boolean flag off the current player. */
-    private static boolean playerFlag(Object engine, String field) {
-        Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
-        if (team == null) {
-            return false;
-        }
-        Object value = EngineAccess.readField(team, field);
-        if (!(value instanceof Boolean)) {
-            throw new IllegalStateException(
-                    "rw-agent: player field " + field + " is not a boolean" + EngineNames.PIN);
-        }
-        return ((Boolean) value).booleanValue();
-    }
-
-    /**
-     * One player's scoreboard, as the engine keeps it.
-     *
-     * <p>Carried per player rather than for the local one alone, because the
-     * question worth asking is comparative. "Our army is worth 3,400" says
-     * nothing; "ours is 3,400 against a leader on 22,000" is the whole of the
-     * match report.
-     */
-    static final class PlayerStat {
-
-        private final int team;
-        private final boolean local;
-        private final boolean hostile;
-        private final boolean defeated;
-        private final boolean wiped;
-        private final int income;
-        private final int armyValue;
-        private final int buildingValue;
-
-        PlayerStat(
-                int team,
-                boolean local,
-                boolean hostile,
-                boolean defeated,
-                boolean wiped,
-                int income,
-                int armyValue,
-                int buildingValue) {
-            this.team = team;
-            this.local = local;
-            this.hostile = hostile;
-            this.defeated = defeated;
-            this.wiped = wiped;
-            this.income = income;
-            this.armyValue = armyValue;
-            this.buildingValue = buildingValue;
-        }
-
-        int team() {
-            return this.team;
-        }
-
-        boolean local() {
-            return this.local;
-        }
-
-        boolean hostile() {
-            return this.hostile;
-        }
-
-        boolean defeated() {
-            return this.defeated;
-        }
-
-        boolean wiped() {
-            return this.wiped;
-        }
-
-        int income() {
-            return this.income;
-        }
-
-        int armyValue() {
-            return this.armyValue;
-        }
-
-        int buildingValue() {
-            return this.buildingValue;
-        }
-    }
-
-    /**
-     * Returns the scoreboard for every player still holding a slot.
-     *
-     * <p>Read from the engine's own statistics rather than counted here. It
-     * keeps income, army value and building value per player, charts all three,
-     * and writes them into its own save file — so these are the figures the game
-     * itself would show, and a reimplementation could disagree with them
-     * (wiki: perception-visibility).
-     *
-     * <p>Absent slots are skipped and defeated ones are not: a player who has
-     * just been eliminated is exactly who a run report wants to name, and their
-     * final army value is the measurement that says whether we killed them or
-     * somebody else did.
-     *
-     * @param engine The live engine instance.
-     * @return One entry per occupied slot, in slot order.
-     * @throws IllegalStateException When the roster or a statistic cannot be
-     *     read, which is a pinned name that has moved.
-     */
-    static java.util.List<PlayerStat> playerStats(Object engine) {
-        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
-        Object localTeam = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
-        Object roster;
-        int size;
-        try {
-            roster = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER).get(null);
-            size = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER_SIZE).getInt(null);
-        } catch (IllegalAccessException e) {
-            throw new IllegalStateException(
-                    "rw-agent: cannot read the player roster" + EngineNames.PIN, e);
-        }
-        if (!(roster instanceof Object[])) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.TEAM_ROSTER + " is not an array" + EngineNames.PIN);
-        }
-        Object[] slots = (Object[]) roster;
-        java.util.List<PlayerStat> stats = new java.util.ArrayList<PlayerStat>();
-        for (int index = 0; index < size && index < slots.length; index++) {
-            Object player = slots[index];
-            if (player == null || isAbsent(player)) {
-                continue;
-            }
-            stats.add(
-                    new PlayerStat(
-                            EngineAccess.readIntField(player, EngineNames.TEAM_ID),
-                            player == localTeam,
-                            localTeam != null && isHostileBetween(localTeam, player),
-                            EngineAccess.readBooleanField(player, EngineNames.PLAYER_DEFEATED),
-                            EngineAccess.readBooleanField(player, EngineNames.PLAYER_WIPED),
-                            statOf(player, EngineNames.STAT_INCOME),
-                            statOf(player, EngineNames.STAT_ARMY_VALUE),
-                            statOf(player, EngineNames.STAT_BUILDING_VALUE)));
-        }
-        return stats;
-    }
-
-    /**
-     * Counts the occupied slots in the player roster.
-     *
-     * <p>The lobby's join detector: the roster is a static array on the team
-     * class, filled as players connect, so a hosted lobby's "someone joined"
-     * is a second non-absent slot — no engine reference and no live match
-     * needed. Any failure to read counts as zero rather than throwing,
-     * because the poller runs from boot and the roster may simply not exist
-     * yet.
-     */
-    static int rosterCount() {
-        Object roster;
-        int size;
-        try {
-            Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
-            roster = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER).get(null);
-            size = EngineAccess.pinnedField(teamClass, EngineNames.TEAM_ROSTER_SIZE).getInt(null);
-        } catch (IllegalAccessException | RuntimeException e) {
-            return 0;
-        }
-        if (!(roster instanceof Object[])) {
-            return 0;
-        }
-        Object[] slots = (Object[]) roster;
-        int count = 0;
-        for (int index = 0; index < size && index < slots.length; index++) {
-            Object player = slots[index];
-            if (player != null && !isAbsent(player)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /** Reports whether a player slot is empty rather than occupied. */
-    private static boolean isAbsent(Object player) {
-        Object answer =
-                EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(player.getClass(), EngineNames.TEAM_ABSENT),
-                        player);
-        if (!(answer instanceof Boolean)) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.TEAM_ABSENT + "() did not return a boolean"
-                            + EngineNames.PIN);
-        }
-        return ((Boolean) answer).booleanValue();
-    }
-
-    /**
-     * Reads one named statistic for one player.
-     *
-     * <p>The constant is found by its own {@code name()} rather than by ordinal,
-     * so a reordered enum fails to find the name instead of silently returning
-     * the neighbouring statistic. {@code name()} is final on {@link Enum} and
-     * returns a stored string, so nothing engine-side runs to answer it.
-     *
-     * @param player The player to measure.
-     * @param constant The statistic's own constant name.
-     * @return The figure.
-     * @throws IllegalStateException When the enum carries no such constant, or
-     *     the read does not return an int.
-     */
-    private static int statOf(Object player, String constant) {
-        Class<?> statClass = EngineAccess.pinnedClass(EngineNames.PLAYER_STAT_CLASS);
-        Object[] constants = statClass.getEnumConstants();
-        if (constants == null) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.PLAYER_STAT_CLASS + " is no longer an enum"
-                            + EngineNames.PIN);
-        }
-        for (Object candidate : constants) {
-            if (!constant.equals(((Enum<?>) candidate).name())) {
-                continue;
-            }
-            Object value =
-                    EngineAccess.invoke(
-                            EngineAccess.pinnedMethod(
-                                    statClass,
-                                    EngineNames.PLAYER_STAT_READ,
-                                    EngineAccess.pinnedClass(EngineNames.TEAM_CLASS)),
-                            candidate,
-                            player);
-            if (!(value instanceof Integer)) {
-                throw new IllegalStateException(
-                        "rw-agent: statistic " + constant + " did not return an int"
-                                + EngineNames.PIN);
-            }
-            return ((Integer) value).intValue();
-        }
-        throw new IllegalStateException(
-                "rw-agent: " + EngineNames.PLAYER_STAT_CLASS + " carries no constant named "
-                        + constant + EngineNames.PIN);
-    }
-
-    /**
-     * Returns how many players are still in the match.
-     *
-     * <p>Asked of the engine rather than counted here. It excludes absent,
-     * defeated and wiped-out players, prints the same figure as "N players
-     * remaining", and calls its own end-of-match hook when it reaches one -- so
-     * this is the engine's scoreboard, and a reimplementation could disagree
-     * with the thing that actually ends the game.
-     *
-     * @return The count of players still playing.
-     */
-    static int playersRemaining() {
-        Class<?> teamClass = EngineAccess.pinnedClass(EngineNames.TEAM_CLASS);
-        Object value =
-                EngineAccess.invokeStatic(teamClass, EngineNames.PLAYERS_REMAINING);
-        if (!(value instanceof Integer)) {
-            throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.PLAYERS_REMAINING
-                            + "() did not return an int" + EngineNames.PIN);
-        }
-        return ((Integer) value).intValue();
     }
 
     /**

@@ -29,7 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Orders arrive on the reader thread and are dispatched through
  * {@link Orders#onGameThread}, so nothing here touches the simulation directly
- * (wiki: issuing-orders).
+ * (wiki: issuing-orders). What each parsed order then means is
+ * {@link OrderDispatch}, which was split out of here: it holds no state, and
+ * everything left in this class does.
  */
 final class CommandChannel {
 
@@ -61,6 +63,9 @@ final class CommandChannel {
     private final int port;
     private final int sampleIntervalMs;
     private final int lockstepFrames;
+
+    /** The next frame the reflex pass runs on. */
+    private int nextReflexFrame;
 
     /**
      * Whether arming is owned by the match watcher rather than the sampler.
@@ -246,91 +251,7 @@ final class CommandChannel {
             ack();
             return;
         }
-        Orders.onGameThread(() -> apply(command));
-    }
-
-    /** Applies one parsed order. Runs on the game thread. */
-    private void apply(CommandRecord command) {
-        Object engine = EngineHandle.current();
-        Object unit = Perception.findOwnedById(engine, command.unitId());
-        if (unit == null) {
-            Log.error(
-                    "channel: no owned unit with id "
-                            + command.unitId()
-                            + "; it may have died since the sample");
-            return;
-        }
-        if (command.kind() == CommandRecord.Kind.MOVE) {
-            Orders.moveTo(engine, unit, command.x(), command.y());
-            Log.info(
-                    "channel: move "
-                            + command.unitId()
-                            + " -> ("
-                            + command.x()
-                            + ", "
-                            + command.y()
-                            + ")");
-            return;
-        }
-        if (command.kind() == CommandRecord.Kind.ATTACK_MOVE) {
-            Orders.attackMoveTo(engine, unit, command.x(), command.y());
-            Log.info(
-                    "channel: attack-move "
-                            + command.unitId()
-                            + " -> ("
-                            + command.x()
-                            + ", "
-                            + command.y()
-                            + ")");
-            return;
-        }
-        if (command.kind() == CommandRecord.Kind.ATTACK) {
-            // The target is looked up among what is visible rather than what is
-            // owned, and it is looked up now rather than trusted from the
-            // sample: a target can die or slip back into fog between the
-            // planner deciding and the order arriving, and an attack on a
-            // stale identity is a command the engine would drop silently.
-            Object target = Perception.findVisibleById(engine, command.targetId());
-            if (target == null) {
-                Log.error(
-                        "channel: no visible unit with id "
-                                + command.targetId()
-                                + "; the target died or left sight since the sample");
-                return;
-            }
-            Orders.attack(engine, unit, target);
-            Log.info("channel: attack " + command.targetId() + " by " + command.unitId());
-            return;
-        }
-        if (command.kind() == CommandRecord.Kind.PRODUCE) {
-            Orders.produce(engine, unit, command.buildType());
-            Log.info(
-                    "channel: produce "
-                            + command.buildType()
-                            + " by "
-                            + command.unitId());
-            return;
-        }
-        if (command.kind() == CommandRecord.Kind.ABILITY) {
-            Orders.ability(engine, unit, command.actionKey());
-            Log.info(
-                    "channel: ability '"
-                            + command.actionKey()
-                            + "' by "
-                            + command.unitId());
-            return;
-        }
-        Orders.buildAt(engine, unit, command.buildType(), command.x(), command.y());
-        Log.info(
-                "channel: build "
-                        + command.buildType()
-                        + " by "
-                        + command.unitId()
-                        + " at ("
-                        + command.x()
-                        + ", "
-                        + command.y()
-                        + ")");
+        Orders.onGameThread(() -> OrderDispatch.apply(command));
     }
 
     /** Drains sampled world state to the planner. */
@@ -412,6 +333,13 @@ final class CommandChannel {
     private void lockstepTick() {
         Object engine = EngineHandle.current();
         int frame = EngineAccess.readIntField(engine, StateStream.FRAME_FIELD);
+        // The reflex pass rides the same every-tick hook the hold does:
+        // combat micro at the engine's pace, between the samples the
+        // planner thinks at (wiki: community-play-strategies).
+        if (frame >= nextReflexFrame) {
+            Reflexes.step(engine);
+            nextReflexFrame = frame + Reflexes.STRIDE_TICKS;
+        }
         if (nextSampleFrame < 0) {
             nextSampleFrame = frame;
         }
