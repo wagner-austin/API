@@ -7,7 +7,13 @@ the map for enemy discovery, and what equipment should be active.
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.types import AIConfigDict
-from tankpit_bot.state.types import ContainerStateDict, SelfStateDict, TankStateDict, WorldStateDict
+from tankpit_bot.state.types import (
+    ContainerStateDict,
+    SelfStateDict,
+    TankStateDict,
+    WorldStateDict,
+    has_known_position,
+)
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
 
@@ -61,7 +67,7 @@ def _is_visible_enemy_tank(
     return (
         not tank["is_self"]
         and tank["team"] != self_state["team"]
-        and not (tank["x"] == 0 and tank["y"] == 0)
+        and has_known_position(tank)
         and _is_within_observable_viewport(world, tank["x"], tank["y"])
     )
 

@@ -612,6 +612,49 @@ class AIStateDict(TypedDict):
     last_scope_scout_ms: int
 
 
+def make_respawn_ai_state(previous: AIStateDict) -> AIStateDict:
+    """Rebuild AI state after a death, preserving session-scoped fields.
+
+    A death resets LIFE-scoped state (locks, plans, blacklists — the
+    dead tank's tactical context) but must NOT reset SESSION-scoped
+    state: the scorecard counters and the social maps. The pre-lift
+    respawn path hand-listed the survivors inline and dropped the
+    hit/miss/reject counters — run bot-20260803-180918's summary
+    printed 23 shots against 223 actual wire shoots because the one
+    death zeroed them mid-session.
+
+    Session-scoped survivors, and why:
+
+    * ``session_kill_count`` / ``session_hit_count`` /
+      ``session_miss_count`` / ``session_reject_count`` — the session
+      scorecard; a death is an event IN the session, not a new one.
+    * ``wind_down`` — the shutdown phase belongs to the session clock.
+    * ``greeted_tank_ids`` / ``visited_tank_ids`` — the social
+      contracts: dying to a human must not schedule a fresh HELLO or
+      courtesy visit ([[chat-messages]] flood-mute; the stand-off
+      greeting is once per human per session).
+
+    Args:
+        previous: The AI state at the moment of deactivation.
+
+    Returns:
+        A fresh initial state carrying the session-scoped fields.
+    """
+    fresh = make_initial_ai_state(previous["config"])
+    return AIStateDict(
+        **{
+            **fresh,
+            "session_kill_count": previous["session_kill_count"],
+            "session_hit_count": previous["session_hit_count"],
+            "session_miss_count": previous["session_miss_count"],
+            "session_reject_count": previous["session_reject_count"],
+            "wind_down": previous["wind_down"],
+            "greeted_tank_ids": previous["greeted_tank_ids"],
+            "visited_tank_ids": previous["visited_tank_ids"],
+        }
+    )
+
+
 def make_initial_ai_state(
     config: AIConfigDict | None = None,
 ) -> AIStateDict:
@@ -676,4 +719,5 @@ __all__ = [
     "make_enemy_threat",
     "make_initial_ai_state",
     "make_path_step",
+    "make_respawn_ai_state",
 ]

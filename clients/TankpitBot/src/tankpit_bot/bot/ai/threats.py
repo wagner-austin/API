@@ -12,13 +12,19 @@ from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.humans import (
     DEFAULT_HUMAN_MAX_RANK,
     DEFAULT_HUMAN_MIN_RANK,
-    is_human_name,
     is_human_rank_protected,
     threat_priority_tier,
 )
 from tankpit_bot.bot.ai.types import EnemyThreatDict, make_enemy_threat
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.sniffer.world_state import get_world_service
-from tankpit_bot.state.types import SelfStateDict, TankStateDict, WorldStateDict
+from tankpit_bot.state.types import (
+    VIEWPORT_PRESENCE_TTL_MS,
+    SelfStateDict,
+    TankStateDict,
+    WorldStateDict,
+    has_known_position,
+)
 
 
 def manhattan_distance(x1: int, y1: int, x2: int, y2: int) -> int:
@@ -59,22 +65,6 @@ _WIRE_PRESENCE_TTL_MS = 7000
 
 #: Public alias for cross-module consumers (tests).
 WIRE_PRESENCE_TTL_MS = _WIRE_PRESENCE_TTL_MS
-
-# The HUNT acquisition gate. Only tanks confirmed by viewport-bound
-# wire (``storage_source == "viewport"``) within this window are
-# eligible to engage. Live-run 2026-06-21 tracking probe captured
-# the cost of skipping this gate: open_map's 0x4C MapData refreshed
-# every-tank timestamps, then global TankStatusSync kept them fresh,
-# so analyze_threats returned 27 tanks while the JS client's
-# viewport registry held only 1. Set to 5 s -- viewport-bound
-# updates (0x47 Movement, 0x3D MovementResponse, 0x28 TankEntry)
-# arrive every 1-3 s for tanks the bot can actually see, so 5 s
-# tolerates short cadence gaps but rejects the 5-6 s global
-# broadcast cycle that wire-presence alone cannot.
-_VIEWPORT_PRESENCE_TTL_MS = 5000
-
-#: Public alias for cross-module consumers.
-VIEWPORT_PRESENCE_TTL_MS = _VIEWPORT_PRESENCE_TTL_MS
 
 # Position-bearing observations (0x3D MovementResponse, 0x47 Movement,
 # 0x28 TankEntry, container TankUpdate*, radar response, MAP_DATA) refresh
@@ -202,15 +192,13 @@ def analyze_threats(
         # ``liveness == "deactivated"``.
         if tank["liveness"] != "alive":
             continue
-        # Position-confirmation sentinel. A tank we only know via
-        # 0x21 TankInfo carries name and team but no position; it sits
-        # at default (0, 0). Acquiring it would fire at tile (0, 0).
-        # Wait for a position-bearing wire (0x3D MovementResponse,
-        # 0x28 TankEntry, 0x47 Movement, etc.) before treating it as
-        # a threat. The same gate filtered deactivation sentinels
-        # before the liveness machine landed; now the liveness gate
-        # owns deactivation and this one owns the unsynced case.
-        if tank["x"] == 0 and tank["y"] == 0:
+        # Position-confirmation gate: the login roster dump (0x21
+        # TankInfo, full map, no coordinates) leaves every tank at the
+        # construction default until its first position-bearing wire.
+        # Acquiring one would fire at tile (0, 0). The predicate is
+        # canonical in ``state/types/tank.py`` -- the guard bans the
+        # inline (0, 0) comparison this used to be.
+        if not has_known_position(tank):
             continue
         # Viewport-observation gate. ``timestamp_ms`` and
         # ``last_wire_seen_ms`` are both refreshed by global
@@ -488,7 +476,7 @@ def find_locked_target_pursuit(
         return None
     if tank["liveness"] != "alive":
         return None
-    if tank["x"] == 0 and tank["y"] == 0:
+    if not has_known_position(tank):
         return None
     dist = manhattan_distance(self_state["x"], self_state["y"], tank["x"], tank["y"])
     return make_enemy_threat(
@@ -563,7 +551,7 @@ def _acquisition_rejection_reason(
         # first. Placed before the affordability gate for the same
         # relay-path reason as the rank window above.
         return "human_not_consented"
-    if tank["x"] == 0 and tank["y"] == 0:
+    if not has_known_position(tank):
         return "unsynced_position"
     if str(tank["tank_id"]) in killed:
         return "killed_cooldown"
@@ -843,7 +831,6 @@ def find_relay_travel_target(
 
 __all__ = [
     "POSITION_FRESHNESS_TTL_MS",
-    "VIEWPORT_PRESENCE_TTL_MS",
     "WIRE_PRESENCE_TTL_MS",
     "analyze_threats",
     "find_acquisition_target",

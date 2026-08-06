@@ -62,6 +62,7 @@ def _equipment_hop_landing(
         return landing
     return find_ferry_boarding_tile(
         ctx.world,
+        terrain,
         container["x"],
         container["y"],
         ctx.timestamp_ms,

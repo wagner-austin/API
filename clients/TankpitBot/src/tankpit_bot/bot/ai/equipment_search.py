@@ -37,34 +37,35 @@ def find_teleport_landing_tile(
 ) -> tuple[int, int] | None:
     """Find a legal teleport landing point for a container target.
 
-    Teleports directly to the target when it is on passable ground.
-    When the target is impassable (water, rock), checks cardinal
-    neighbors for a passable tile. Returns None when the target and
-    all neighbors are impassable (e.g. container in the middle of a
-    lake) — the caller should skip this container.
+    Teleports directly to the target when the tile is terrain-legal.
+    When it is not (water, rock), checks cardinal neighbors. Returns
+    None when the target and all neighbors are illegal (e.g. container
+    in the middle of a lake) — the caller should skip this container.
 
-    Landing choice does NOT consult mines: the server displaces on
-    landing, and hostile-mine avoidance is the planner's concern (see
-    fix C in the executor-rejection audit, wiki
-    ``executor-rejection-loops``).
+    Asks ``is_landing_legal``, never ``is_passable``: the server
+    displaces a landing off mines and off occupied tiles rather than
+    refusing it, so neither is a reason to re-aim. Using the walk
+    question here would forbid aiming at any enemy at all, since an
+    enemy always occupies its own tile.
 
     Args:
-        terrain: Terrain map for passability checks.
+        terrain: Terrain view answering landing legality.
         goal_x: Target container X coordinate.
         goal_y: Target container Y coordinate.
 
     Returns:
-        Tuple of landing coordinates, or None when unreachable.
+        Tuple of landing coordinates, or None when no legal tile
+        exists at the target or its cardinal neighbors.
     """
     if not (_MAP_MIN <= goal_x <= _MAP_MAX and _MAP_MIN <= goal_y <= _MAP_MAX):
         return None
-    if terrain.is_passable(goal_x, goal_y):
+    if terrain.is_landing_legal(goal_x, goal_y):
         return (goal_x, goal_y)
     for dx, dy in _ADJACENT_DIRECTIONS:
         nx, ny = goal_x + dx, goal_y + dy
         if not (_MAP_MIN <= nx <= _MAP_MAX and _MAP_MIN <= ny <= _MAP_MAX):
             continue
-        if terrain.is_passable(nx, ny):
+        if terrain.is_landing_legal(nx, ny):
             return (nx, ny)
     return None
 

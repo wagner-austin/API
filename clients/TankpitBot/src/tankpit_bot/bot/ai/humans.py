@@ -17,9 +17,7 @@ refuels on the way there).
 
 from __future__ import annotations
 
-import re
-
-_BOT_NAME_PATTERN = re.compile(r"^(?:red|purple|blue|orange)-\d+$")
+from tankpit_bot.protocol.naming import is_human_name
 
 PRIORITY_NAMED = 0
 """Tier for the configured priority account (outranks everything)."""
@@ -29,34 +27,6 @@ PRIORITY_HUMAN = 1
 
 PRIORITY_BOT = 2
 """Tier for practice bots and unnamed/unknown tanks."""
-
-
-def is_practice_bot_name(name: str) -> bool:
-    """Return whether a tank name matches the practice-bot pattern.
-
-    Args:
-        name: Tank display name from the registry.
-
-    Returns:
-        True for ``<team color>-<n>`` names (``orange-1``, ``red-6``).
-    """
-    return _BOT_NAME_PATTERN.match(name) is not None
-
-
-def is_human_name(name: str) -> bool:
-    """Return whether a tank name classifies as a human player.
-
-    An empty name is UNKNOWN (an unsynced tank), never human -- the
-    priority must not chase phantoms.
-
-    Args:
-        name: Tank display name from the registry.
-
-    Returns:
-        True for any non-empty name outside the practice-bot pattern
-        (account names, ``guest``).
-    """
-    return name != "" and not is_practice_bot_name(name)
 
 
 DEFAULT_HUMAN_MIN_RANK = 1
@@ -124,8 +94,6 @@ __all__ = [
     "PRIORITY_BOT",
     "PRIORITY_HUMAN",
     "PRIORITY_NAMED",
-    "is_human_name",
     "is_human_rank_protected",
-    "is_practice_bot_name",
     "threat_priority_tier",
 ]

@@ -21,8 +21,8 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.hunt_relay import relay_toward
 from tankpit_bot.bot.ai.mine_clearance import find_corridor_clearance_shot
-from tankpit_bot.bot.ai.resource_search import make_resource_search_hop
 from tankpit_bot.bot.ai.threats import analyze_threats
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
@@ -38,8 +38,10 @@ from tankpit_bot.bot.types import (
     make_shoot_command,
     make_teleport_command,
 )
+from tankpit_bot.inventory import inventory_counts
 from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.physics.line_of_sight import is_shot_line_clear
+from tankpit_bot.physics.supervisor import equipment_pickup_refusal, fuel_pickup_refusal
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import SelfStateDict
@@ -293,6 +295,7 @@ def combat_landing_tile(ctx: DecideCtx, target: EnemyThreatDict) -> tuple[int, i
         ctx.self_state,
         target,
         ctx.terrain,
+        ctx.timestamp_ms,
     )
 
 
@@ -646,10 +649,15 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
             # chase at fuel 1097/1100 hit this branch and "refueled"
             # a 3-point deficit with a 121-fuel dot teleport -- no
             # amount of fuel makes a cost above cap-minus-reserve
-            # affordable. Distance problems take the relay: a dot leg
-            # toward the target (the loot-run/hunt bias steers the
-            # ranking at the nearest enemy) that refuels itself on
-            # landing, with the lock held for the next re-derivation.
+            # affordable. Distance problems take the RELAY lane
+            # (hunt_relay.relay_toward): the strict-progress dot
+            # selector, monotone by construction. The first cut here
+            # reached for the COLLECT dot-ranker instead, whose /cost
+            # denominator makes the dot under the tank's feet beat any
+            # dot toward the prey -- live 2026-08-04 23:24-23:29: a
+            # locked target 98 tiles out produced a two-tile teleport
+            # ping-pong ((206,254)<->(207,254), then
+            # (225,253)<->(225,254)) at one hop per 2 ticks, forever.
             emit_ai(
                 "chase to %s costs %d > max affordable %d - relaying via dots "
                 "(fuel=%d, refuel cannot fix distance)",
@@ -658,15 +666,22 @@ def _combat_teleport(ctx: DecideCtx, target: EnemyThreatDict) -> TickDecisionDic
                 max_affordable,
                 ctx.fuel,
             )
-            relay = make_resource_search_hop(
+            relay = relay_toward(
                 ctx,
-                mode="HUNT",
-                score=800,
-                reason="dot_relay",
-                ai_state=_set_combat_target(ctx.base, target),
+                _set_combat_target(ctx.base, target),
+                target,
             )
             if relay is not None:
                 return relay
+            # No strict-progress dot and no below-cap refuel: the
+            # target is unreachable by relay from here. Blocking it
+            # beats treadmilling -- the next acquisition pass finds
+            # closer prey or exits honestly.
+            emit_ai(
+                "no relay progress toward %s - blocking unreachable target",
+                target["name"],
+            )
+            return block_combat_target_and_replan(ctx, target)
         emit_ai(
             "cannot afford combat teleport for %s to (%d,%d) (fuel=%d cost=%d reserve=%d)"
             " - refueling before hunt",
@@ -828,11 +843,25 @@ def _find_combat_pickup(ctx: DecideCtx) -> BotCommand | None:
             ctx.terrain,
             want_fuel=want_fuel,
         )
-        if container is not None:
-            x, y = container["x"], container["y"]
-            if want_fuel:
-                return make_pickup_fuel_command(x, y)
-            return make_pickup_equipment_command(x, y)
+        if container is None:
+            continue
+        # The shared 0x52 refusal laws (physics/supervisor.py): a sip
+        # at rank fuel capacity or a grab with every slot at the rank
+        # cap transfers nothing — skip to the other kind instead of
+        # burning the dispatch (48 refused sips in the 20-kill soak
+        # bot-20260802-205105, every one 2s after a kill at 1100/1100).
+        if want_fuel:
+            refusal = fuel_pickup_refusal(
+                self_state["fuel"], self_state["rank"], container["volume"]
+            )
+        else:
+            refusal = equipment_pickup_refusal(inventory_counts(ctx.inventory), self_state["rank"])
+        if refusal is not None:
+            continue
+        x, y = container["x"], container["y"]
+        if want_fuel:
+            return make_pickup_fuel_command(x, y)
+        return make_pickup_equipment_command(x, y)
     return None
 
 

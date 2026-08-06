@@ -221,6 +221,7 @@ def select_fuel_larder_hop(
             # F5; riding pickup law in [[ferry-mechanics]]).
             landing = find_ferry_boarding_tile(
                 ctx.world,
+                terrain,
                 container["x"],
                 container["y"],
                 ctx.timestamp_ms,

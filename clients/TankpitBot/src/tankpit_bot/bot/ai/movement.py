@@ -37,6 +37,7 @@ from tankpit_bot.sniffer.world_state import (
     is_scan_viewport_failed,
     recent_own_mine_hit,
 )
+from tankpit_bot.state.occupancy import is_tank_body_present
 from tankpit_bot.state.scan_coverage import is_viewport_fully_covered
 from tankpit_bot.state.types import viewport_scan_key
 
@@ -370,10 +371,15 @@ def _ranked_exploration_key(
 
 
 def _is_occupied_by_enemy(ctx: DecideCtx, x: int, y: int) -> bool:
-    """Return True when a tile is occupied by an enemy tank.
+    """Return True when a tile is occupied by an enemy tank's body.
 
-    Only considers tanks that are actually enemies (different team, not self).
-    Allies and the bot's own tank record do not block movement or pickup.
+    Body presence is the occupancy law
+    (:func:`~tankpit_bot.state.occupancy.is_tank_body_present`: not
+    self, position ever observed, viewport-fresh); the enemy-team
+    filter is this call site's own policy on top -- allies do not
+    block movement or pickup. Before the lift this re-derived
+    presence with no freshness or position gate, so a login-roster
+    phantom or a long-departed tank could veto a tile.
 
     Args:
         ctx: Decision context with current world state.
@@ -381,11 +387,14 @@ def _is_occupied_by_enemy(ctx: DecideCtx, x: int, y: int) -> bool:
         y: Tile Y coordinate to check.
 
     Returns:
-        True if the tile is occupied by an enemy.
+        True if the tile is occupied by an enemy body.
     """
     self_team = ctx.self_state["team"]
     return any(
-        tank["x"] == x and tank["y"] == y and not tank["is_self"] and tank["team"] != self_team
+        tank["x"] == x
+        and tank["y"] == y
+        and tank["team"] != self_team
+        and is_tank_body_present(tank, ctx.timestamp_ms)
         for tank in ctx.filtered["tanks"].values()
     )
 

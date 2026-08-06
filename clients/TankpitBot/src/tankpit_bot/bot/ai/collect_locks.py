@@ -20,7 +20,12 @@ from tankpit_bot.bot.ai.equipment import (
     is_fuel_lock_release_warranted,
     is_lock_release_warranted,
 )
-from tankpit_bot.bot.ai.equipment_search import find_best_fuel, find_nearest_equipment
+from tankpit_bot.bot.ai.equipment_search import (
+    find_best_fuel,
+    find_nearest_equipment,
+    find_teleport_landing_tile,
+)
+from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import release_collect_plan
 from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.types import AIStateDict
@@ -29,6 +34,40 @@ from tankpit_bot.physics.capacity import fuel_capacity
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state.types import ContainerStateDict
+
+
+def _locked_target_is_unservable(ctx: DecideCtx, target_x: int, target_y: int) -> bool:
+    """Return whether NO lane can ever serve the locked container.
+
+    Completes the enumerated release law with the verdict the hop
+    selectors already compute: a container with no legal teleport
+    landing (it and every cardinal neighbor terrain-illegal) AND no
+    fresh ferry floating on its own water body cannot be walked to,
+    hopped to, or ridden to — nothing in the cascade can resolve the
+    lock, and no move-failed mark will ever arrive because nothing is
+    ever dispatched. Run bot-20260804-234008 (2026-08-05 00:04) held
+    exactly such a lock for 11 minutes. Affordability and viewport
+    misalignment are deliberately NOT part of this verdict — those
+    change with fuel and movement, and holding through them is the
+    committed-intent law working.
+
+    Args:
+        ctx: Decision context.
+        target_x: Locked container X.
+        target_y: Locked container Y.
+
+    Returns:
+        True when the target is structurally unservable (release);
+        False when any serving lane remains possible (hold).
+    """
+    if ctx.terrain is None:
+        return False
+    if find_teleport_landing_tile(ctx.terrain, target_x, target_y) is not None:
+        return False
+    return (
+        find_ferry_boarding_tile(ctx.world, ctx.terrain, target_x, target_y, ctx.timestamp_ms)
+        is None
+    )
 
 
 def continue_or_release_lock(
@@ -68,6 +107,14 @@ def _continue_or_release_equipment_lock(
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="equipment")
     if locked_command is None:
         # Transient inexecutability HOLDS the plan ([[committed-intent]];
+        # this INCLUDES an out-of-window target: the hold returns no
+        # decision, the cascade falls through, and the hop lane
+        # teleports onto the target — the 2026-08-05 07:57 regression
+        # proved it by breaking it: an "approach the window edge" leg
+        # inserted here returned a decision every tick, short-circuited
+        # the cascade, and starved the already-planned hop teleport
+        # into a one-tile-walk treadmill (autoscroll OFF walking can
+        # never shift the window, [[viewport-shift-protocol]]).
         # run bot-20260730-032x ticks 361/366/371: three not_executable
         # releases fired mid-approach with the plan's own map_open in
         # flight, and each target was re-locked and served 2-3 ticks
@@ -80,6 +127,13 @@ def _continue_or_release_equipment_lock(
                 target_y,
             )
             return None, release_collect_plan(base_state, reason="not_executable")
+        if _locked_target_is_unservable(ctx, target_x, target_y):
+            emit_ai(
+                "locked equipment target at (%d,%d) is unservable by any lane - releasing",
+                target_x,
+                target_y,
+            )
+            return None, release_collect_plan(base_state, reason="unservable")
         emit_ai(
             "locked equipment target at (%d,%d) not executable this tick - holding plan",
             target_x,
@@ -133,7 +187,8 @@ def continue_or_release_fuel_lock(
     target_y = locked_target["y"]
     locked_command = walk_or_teleport(ctx, target_x, target_y, pickup_kind="fuel")
     if locked_command is None:
-        # Same transient-vs-structural law as the equipment lock.
+        # Same transient-vs-structural law as the equipment lock,
+        # including the out-of-window hold (see the note there).
         if is_move_target_failed(target_x, target_y, ctx.timestamp_ms):
             emit_ai(
                 "locked fuel target at (%d,%d) marked move-failed - releasing",
@@ -141,6 +196,13 @@ def continue_or_release_fuel_lock(
                 target_y,
             )
             return None, release_collect_plan(base_state, reason="not_executable")
+        if _locked_target_is_unservable(ctx, target_x, target_y):
+            emit_ai(
+                "locked fuel target at (%d,%d) is unservable by any lane - releasing",
+                target_x,
+                target_y,
+            )
+            return None, release_collect_plan(base_state, reason="unservable")
         emit_ai(
             "locked fuel target at (%d,%d) not executable this tick - holding plan",
             target_x,

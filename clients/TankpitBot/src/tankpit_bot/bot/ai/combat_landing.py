@@ -10,6 +10,7 @@ from tankpit_bot.bot.ai.threats import manhattan_distance
 from tankpit_bot.bot.ai.types import EnemyThreatDict
 from tankpit_bot.sniffer.world_state import is_move_target_failed
 from tankpit_bot.state import SelfStateDict, WorldStateDict
+from tankpit_bot.state.occupancy import is_tank_body_present
 
 # The server's effective shot range. User ruling 2026-07-29: "i dont
 # think i would teleport to the target if im like a few tiles away
@@ -65,7 +66,7 @@ def combat_landing_candidates(
     for candidate_x, candidate_y in candidates:
         if not (0 <= candidate_x <= 255 and 0 <= candidate_y <= 255):
             continue
-        if _is_dynamically_occupied(world, candidate_x, candidate_y):
+        if _is_dynamically_occupied(world, candidate_x, candidate_y, now_ms):
             continue
         if terrain is not None and not terrain.is_passable(candidate_x, candidate_y):
             continue
@@ -81,16 +82,20 @@ def choose_combat_landing_tile(
     self_state: SelfStateDict,
     target: EnemyThreatDict,
     terrain: TerrainMapProtocol | None,
+    now_ms: int,
 ) -> tuple[int, int]:
     """Choose the tile to teleport to for combat.
 
-    When the enemy stands on passable ground, teleports directly to
-    their coordinates: the server handles displacement — a tank on the
-    tile gets us placed on the nearest open tile (typically cardinal
-    adjacent). This is how human players teleport: click on the enemy,
-    let the server place you.
+    When the enemy stands on terrain-legal ground, teleports directly
+    to their coordinates: the server handles displacement — a tank on
+    the tile gets us placed on the nearest open tile (typically
+    cardinal adjacent). This is how human players teleport: click on
+    the enemy, let the server place you. The question asked is
+    therefore ``is_landing_legal``, never ``is_passable`` — an enemy
+    always occupies its own tile, so the walk question would reject
+    every direct approach and silently downgrade it to a stand-off.
 
-    When the enemy's own tile is impassable — a ferry rider on open
+    When the enemy's own tile is terrain-illegal — a ferry rider on open
     water (live 2026-07-29: Yuppler rode a ferry at (128,102) and
     every acquisition pass rejected him) — the server will not land us
     there, so aim instead at the passable, unoccupied tile inside the
@@ -104,12 +109,14 @@ def choose_combat_landing_tile(
         self_state: Player state (stand-off tie-break).
         target: Enemy threat currently being engaged.
         terrain: Terrain map; ``None`` trusts the server entirely.
+        now_ms: Current tick timestamp for body freshness in the
+            stand-off occupancy check.
 
     Returns:
         Tuple of landing coordinates.
     """
     target_x, target_y = target["x"], target["y"]
-    if terrain is None or terrain.is_passable(target_x, target_y):
+    if terrain is None or terrain.is_landing_legal(target_x, target_y):
         return (target_x, target_y)
     best: tuple[int, int] | None = None
     best_key: tuple[int, int] | None = None
@@ -119,9 +126,9 @@ def choose_combat_landing_tile(
             tile_x, tile_y = target_x + dx, target_y + dy
             if not (0 <= tile_x <= 255 and 0 <= tile_y <= 255):
                 continue
-            if not terrain.is_passable(tile_x, tile_y):
+            if not terrain.is_landing_legal(tile_x, tile_y):
                 continue
-            if _is_dynamically_occupied(world, tile_x, tile_y):
+            if _is_dynamically_occupied(world, tile_x, tile_y, now_ms):
                 continue
             key = (
                 abs(dx) + abs(dy),
@@ -153,6 +160,7 @@ def choose_greeting_landing_tile(
     self_state: SelfStateDict,
     target: EnemyThreatDict,
     terrain: TerrainMapProtocol | None,
+    now_ms: int,
 ) -> tuple[int, int] | None:
     """Choose a visible, non-adjacent landing near a human to greet.
 
@@ -169,6 +177,8 @@ def choose_greeting_landing_tile(
         target: The human to greet.
         terrain: Terrain map; ``None`` means passability is unknown
             and no greeting landing can be vouched for.
+        now_ms: Current tick timestamp for body freshness in the band
+            occupancy check.
 
     Returns:
         Landing coordinates a few tiles off the human, or ``None``
@@ -188,9 +198,9 @@ def choose_greeting_landing_tile(
             tile_x, tile_y = target_x + dx, target_y + dy
             if not (0 <= tile_x <= 255 and 0 <= tile_y <= 255):
                 continue
-            if not terrain.is_passable(tile_x, tile_y):
+            if not terrain.is_landing_legal(tile_x, tile_y):
                 continue
-            if _is_dynamically_occupied(world, tile_x, tile_y):
+            if _is_dynamically_occupied(world, tile_x, tile_y, now_ms):
                 continue
             key = (
                 abs(ring - GREETING_STANDOFF_TILES),
@@ -226,18 +236,30 @@ def has_cardinal_enemy_adjacency(
     )
 
 
-def _is_dynamically_occupied(world: WorldStateDict, x: int, y: int) -> bool:
-    """Return True when a tile is occupied by a tank, container, or mine.
+def _is_dynamically_occupied(world: WorldStateDict, x: int, y: int, now_ms: int) -> bool:
+    """Return True when a tile is occupied by a tank body, container, or mine.
+
+    The tank half is the occupancy law
+    (:func:`~tankpit_bot.state.occupancy.is_tank_body_present`: not
+    self, position ever observed, viewport-fresh). Before the lift this
+    counted every registry entry -- including the login-roster (0, 0)
+    phantoms, tanks long gone from the viewport, and the bot's own
+    body. Containers and hostile mines remain this chooser's own
+    displacement-avoidance policy, not part of the body law.
 
     Args:
         world: Current world state.
         x: Candidate X coordinate.
         y: Candidate Y coordinate.
+        now_ms: Current tick timestamp for body freshness.
 
     Returns:
         True if the tile is blocked by a dynamic entity.
     """
-    if any(tank["x"] == x and tank["y"] == y for tank in world["tanks"].values()):
+    if any(
+        tank["x"] == x and tank["y"] == y and is_tank_body_present(tank, now_ms)
+        for tank in world["tanks"].values()
+    ):
         return True
     if f"{x},{y}" in world["containers"]:
         return True

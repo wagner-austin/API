@@ -154,7 +154,8 @@ def _water_locked_goals(ctx: DecideCtx) -> list[tuple[int, int]]:
     for goal_x, goal_y in candidates:
         if find_teleport_landing_tile(terrain, goal_x, goal_y) is not None:
             continue
-        if find_ferry_boarding_tile(ctx.world, goal_x, goal_y, ctx.timestamp_ms) is not None:
+        boarding = find_ferry_boarding_tile(ctx.world, terrain, goal_x, goal_y, ctx.timestamp_ms)
+        if boarding is not None:
             continue
         goals.append((goal_x, goal_y))
     return goals

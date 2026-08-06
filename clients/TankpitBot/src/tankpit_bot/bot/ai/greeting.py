@@ -27,11 +27,11 @@ session): exactly one greeting per greeted tank id, latched in
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.humans import is_human_name
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import make_chat_command
 from tankpit_bot.protocol.chat import CHAT_HELLO
+from tankpit_bot.protocol.naming import is_human_name
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 
 
@@ -67,6 +67,14 @@ def attach_human_greeting(ctx: DecideCtx, decision: TickDecisionDict) -> TickDec
             continue
         if not is_human_name(tank["name"]):
             continue
+        # Deliberately NO position gate here. User ruling 2026-07-31:
+        # "hello can run anytime... as long as the other player is on
+        # the map logged in. you dont have to be near them." A human
+        # still at the login-roster (0, 0) default gets the HELLO the
+        # moment their identity broadcast lands; the distance below
+        # only orders who is greeted first, and every ungreeted human
+        # is greeted eventually. has_known_position gates targeting
+        # and the stand-off visit, never the chat.
         if str(tank["tank_id"]) in state["greeted_tank_ids"]:
             continue
         if ctx.timestamp_ms - tank["timestamp_ms"] > ctx.config["map_open_cooldown_ms"]:

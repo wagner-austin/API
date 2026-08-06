@@ -67,6 +67,7 @@ PlanReleaseReason = Literal[
     "target_gone",
     "target_not_pursuable",
     "kind_invalid",
+    "unservable",
 ]
 
 PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
@@ -78,14 +79,19 @@ PLAN_RELEASE_REASONS: tuple[PlanReleaseReason, ...] = (
     "target_gone",
     "target_not_pursuable",
     "kind_invalid",
+    "unservable",
 )
 """Closed vocabulary of plan-release reason codes.
 
 ``tank_at_capacity`` is a completion (the fuel plan's purpose is
-served); every other code is an invalidation. The vocabulary is
-closed on purpose: a new release site means a new documented reason
-here, not an invented string — churn analysis groups the
-``plan_released`` events by this field.
+served); every other code is an invalidation. ``unservable`` is the
+structural release (2026-08-05): the locked container has no legal
+teleport landing AND no fresh ferry on its own water body, so no
+lane — walk, hop, or ride — can ever serve it and no move-failed
+mark will ever arrive (run bot-20260804-234008 held such a lock for
+11 minutes). The vocabulary is closed on purpose: a new release site
+means a new documented reason here, not an invented string — churn
+analysis groups the ``plan_released`` events by this field.
 """
 
 PLAN_SERVE_REACH = 1

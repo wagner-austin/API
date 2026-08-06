@@ -28,6 +28,7 @@ from __future__ import annotations
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.equipment import hostile_mines
 from tankpit_bot.bot.ai.pathfinding import find_path
+from tankpit_bot.state.occupancy import occupied_tank_keys
 from tankpit_bot.state.types import (
     TERRAIN_BLOCK_BRIDGE,
     TERRAIN_BLOCK_LAND,
@@ -43,11 +44,14 @@ _ASCII_FERRY = "~"
 
 
 class FerryAwareTerrain:
-    """Terrain view composing live wire ferry tiles over the static map.
+    """Terrain view composing every dynamic blocker over the static map.
 
-    Implements :class:`TerrainMapProtocol`, so every existing
-    passability consumer (pathfinding, reachability, movement
-    planning, exploration) becomes ferry-aware through composition
+    Four blocker classes fold into one passability answer: live wire
+    ferry tiles and movable blocks from the wire terrain overlay,
+    hostile mines from the mine registry, and other tanks' bodies from
+    the tank registry. Implements :class:`TerrainMapProtocol`, so every
+    existing passability consumer (pathfinding, reachability, movement
+    planning, exploration) inherits all four through composition
     without per-callsite changes.
     """
 
@@ -62,6 +66,7 @@ class FerryAwareTerrain:
         *,
         riding: bool,
         hostile_mine_keys: frozenset[str],
+        occupied_tank_keys: frozenset[str],
     ) -> None:
         """Initialize the composed terrain view.
 
@@ -76,11 +81,17 @@ class FerryAwareTerrain:
                 the server displaces off mines on landing -- and is
                 deliberately not answered here (see
                 ``find_teleport_landing_tile``).
+            occupied_tank_keys: "x,y" keys of tiles holding another
+                tank's body (:func:`~tankpit_bot.state.occupancy.
+                occupied_tank_keys`). A body stops a walk at the tile
+                before it, so it is impassable here for the same
+                reason a mine is.
         """
         self._base = base
         self._wire_terrain = wire_terrain
         self._riding = riding
         self._hostile_mine_keys = hostile_mine_keys
+        self._occupied_tank_keys = occupied_tank_keys
 
     def get_terrain(self, x: int, y: int) -> str:
         """Get terrain type at game coordinates.
@@ -121,13 +132,19 @@ class FerryAwareTerrain:
         (boarding), and water is passable exactly while riding a
         ferry -- ferries can go anywhere on water. A known hostile
         mine makes any tile impassable: stepping on it detonates for
-        45 fuel. Composing mines here (like ferries) means every
+        45 fuel. Another tank's body makes any tile impassable: the
+        server walks us up to it and stops, then reports
+        ``error_code=1`` ([[walk-mechanics]] user contract
+        2026-08-04).
+
+        Composing every dynamic blocker here (like ferries) means each
         passability consumer -- pathfinding, reachability, selectors,
         clamps -- shares ONE answer to "can I walk here", instead of
-        each threading a separate mines parameter it can forget
-        (run 2026-07-20 17:16: the dot-hop selector consulted terrain
-        but not mines and looped 23 ticks against the executor's
-        mine veto).
+        each threading a separate parameter it can forget (run
+        2026-07-20 17:16: the dot-hop selector consulted terrain but
+        not mines and looped 23 ticks against the executor's mine
+        veto; run 2026-08-03 18:22-18:40: ten code-1 stops on routes
+        the mine-and-block-only view believed were open).
 
         Args:
             x: X coordinate (0-255).
@@ -136,8 +153,30 @@ class FerryAwareTerrain:
         Returns:
             True if the tank can enter the tile this tick.
         """
-        if coord_key(x, y) in self._hostile_mine_keys:
+        key = coord_key(x, y)
+        if key in self._hostile_mine_keys or key in self._occupied_tank_keys:
             return False
+        return self.is_landing_legal(x, y)
+
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        """Check if the server may place the tank on the tile.
+
+        Terrain legality only: ground and ferry tiles always qualify,
+        water qualifies exactly while riding. Mines and tank bodies are
+        deliberately ignored -- the server displaces the landing off
+        both and charges the plain teleport cost (``mine-mechanics``,
+        live-proven 2026-07-28; occupied tiles share the displacement
+        rule). Asking the walk question here would make an approach
+        teleport at any enemy impossible, since an enemy always
+        occupies its own tile.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport may be aimed at the tile.
+        """
         cell = self.get_terrain(x, y)
         if cell == _ASCII_FERRY or cell == self.GROUND:
             return True
@@ -240,6 +279,37 @@ class SurfaceRouteTerrain:
         """
         if not self._base.is_passable(x, y):
             return False
+        return self._is_on_routing_surface(x, y)
+
+    def is_landing_legal(self, x: int, y: int) -> bool:
+        """Check if the server may place the tank on the tile.
+
+        Intersects the wrapped view's landing legality with the routing
+        surface, so this view answers the landing question without the
+        wrapped view's walk-only blockers (mines, tank bodies).
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True if a teleport may be aimed at the tile.
+        """
+        if not self._base.is_landing_legal(x, y):
+            return False
+        return self._is_on_routing_surface(x, y)
+
+    def _is_on_routing_surface(self, x: int, y: int) -> bool:
+        """Return whether the tile lies on the current routing surface.
+
+        Args:
+            x: X coordinate (0-255).
+            y: Y coordinate (0-255).
+
+        Returns:
+            True for water and ferry tiles while riding, plain ground
+            on land.
+        """
         cell = self.get_terrain(x, y)
         if self._water:
             return cell == _ASCII_FERRY or cell == self.WATER
@@ -286,15 +356,27 @@ def is_riding_ferry(world: WorldStateDict) -> bool:
 def compose_decision_terrain(
     world: WorldStateDict,
     terrain: TerrainMapProtocol | None,
+    now_ms: int,
 ) -> TerrainMapProtocol | None:
-    """Compose the ferry-aware terrain view for one decision tick.
+    """Compose the decision terrain view for one tick.
+
+    Assembles all four blocker classes the server routes around into a
+    single passability answer: static minimap terrain, movable blocks
+    and ferries from the wire terrain overlay, hostile mines from the
+    mine registry, and other tanks' bodies from the tank registry.
 
     Args:
-        world: Current world state with wire terrain and self state.
+        world: Current world state with wire terrain, mines, tanks and
+            self state.
         terrain: Static minimap terrain, or None when unavailable.
+        now_ms: Current wall-clock time in milliseconds, used to age
+            tank observations out of the occupancy set. Callers pass
+            the tick timestamp they already hold, or read the canonical
+            clock (``_test_hooks.get_current_time_ms``) -- never a
+            second clock source.
 
     Returns:
-        Ferry-aware terrain view, or None when no static map exists.
+        Composed terrain view, or None when no static map exists.
     """
     if terrain is None:
         return None
@@ -303,6 +385,7 @@ def compose_decision_terrain(
         world["terrain"],
         riding=is_riding_ferry(world),
         hostile_mine_keys=frozenset(hostile_mines(world)),
+        occupied_tank_keys=occupied_tank_keys(world, now_ms),
     )
 
 

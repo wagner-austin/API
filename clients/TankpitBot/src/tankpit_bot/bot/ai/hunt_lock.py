@@ -24,7 +24,6 @@ from tankpit_bot.bot.ai.combat_strategy import (
     teleport_to_target,
 )
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.humans import is_human_name, is_practice_bot_name
 from tankpit_bot.bot.ai.mode_controller import human_fight_resume_fuel_floor
 from tankpit_bot.bot.ai.threats import (
     analyze_threats,
@@ -35,6 +34,7 @@ from tankpit_bot.bot.ai.threats import (
 from tankpit_bot.bot.ai.types import AIStateDict, EnemyThreatDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.protocol.naming import is_human_name, is_practice_bot_name
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
 from tankpit_bot.sniffer.world_state import get_incoming_damage_window
 

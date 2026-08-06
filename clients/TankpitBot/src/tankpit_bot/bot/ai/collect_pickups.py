@@ -19,8 +19,9 @@ from tankpit_bot.bot.ai.movement import walk_or_teleport
 from tankpit_bot.bot.ai.types import AIStateDict
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import BotCommand, make_shoot_command
-from tankpit_bot.inventory import inventory_all_full
-from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
+from tankpit_bot.inventory import inventory_counts
+from tankpit_bot.physics.capacity import fuel_capacity
+from tankpit_bot.physics.supervisor import equipment_pickup_refusal
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.types import ContainerStateDict
 
@@ -65,13 +66,16 @@ def select_and_pickup_equipment(
 ) -> TickDecisionDict | None:
     """Pick up the best viewport equipment, unless every slot is full.
 
-    User mechanic (2026-07-18): containers fill whatever is empty and
-    the server rejects with code 7 only at all-slots-full -- so at
-    full inventory a pickup can gain nothing and would burn a tick on
-    a guaranteed rejection (8 wasted ticks in the 2026-07-18 5-minute
-    run before this gate).
+    User mechanic (2026-07-18, verbatim): equipment containers "fill
+    whatever is empty. you will only get a full inventory message if
+    all your items are full" -- so at full inventory a pickup can gain
+    nothing and would burn a tick on a guaranteed code-7 rejection
+    (8 wasted ticks in the 2026-07-18 5-minute run before this gate).
+    The refusal is the shared ``equipment_pickup_refusal`` law in
+    ``physics/supervisor.py``.
     """
-    if inventory_all_full(ctx.inventory, inventory_capacity(ctx.self_state["rank"])):
+    refusal = equipment_pickup_refusal(inventory_counts(ctx.inventory), ctx.self_state["rank"])
+    if refusal is not None:
         return None
     selection = select_equipment_target(ctx)
     if selection is None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from tankpit_bot.bot.ai.context import DecideCtx
-from tankpit_bot.bot.ai.humans import is_human_name
 from tankpit_bot.bot.ai.modes import AIMode, AIModeState, is_valid_ai_mode_state
 from tankpit_bot.bot.ai.tactics import compute_desired_equipment
 from tankpit_bot.bot.ai.types import AIStateDict, make_behavior_score
@@ -11,6 +10,7 @@ from tankpit_bot.bot.tick_loop_types import TickDecisionDict, make_tick_decision
 from tankpit_bot.bot.types import BotCommand, make_hold_command
 from tankpit_bot.inventory import InventoryState
 from tankpit_bot.physics.capacity import fuel_capacity, inventory_capacity
+from tankpit_bot.protocol.naming import is_human_name
 
 
 def clear_ai_mode(ai_state: AIStateDict) -> AIStateDict:

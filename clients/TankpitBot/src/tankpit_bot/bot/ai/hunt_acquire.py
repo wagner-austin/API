@@ -29,9 +29,7 @@ from tankpit_bot.bot.ai.context import (
     target_position_is_fresh,
 )
 from tankpit_bot.bot.ai.humans import (
-    is_human_name,
     is_human_rank_protected,
-    is_practice_bot_name,
 )
 from tankpit_bot.bot.ai.hunt_lock import (
     locked_target_pursuit,
@@ -54,7 +52,9 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import make_map_open_command, make_teleport_command
 from tankpit_bot.physics.costs import teleport_cost
+from tankpit_bot.protocol.naming import is_human_name, is_practice_bot_name
 from tankpit_bot.runtime_logging import emit_ai, emit_diagnostic
+from tankpit_bot.state.types import has_known_position
 
 
 def search_for_enemies(
@@ -256,7 +256,7 @@ def _unvisited_unconsented_human(
     for tank in ctx.filtered["tanks"].values():
         if tank["is_self"] or tank["team"] == ctx.self_state["team"]:
             continue
-        if tank["liveness"] != "alive" or (tank["x"] == 0 and tank["y"] == 0):
+        if tank["liveness"] != "alive" or not has_known_position(tank):
             continue
         if not is_human_name(tank["name"]):
             continue
@@ -313,7 +313,13 @@ def _greeting_approach(
     candidate = _unvisited_unconsented_human(ctx, ai_state)
     if candidate is None:
         return None
-    landing = choose_greeting_landing_tile(ctx.filtered, ctx.self_state, candidate, ctx.terrain)
+    landing = choose_greeting_landing_tile(
+        ctx.filtered,
+        ctx.self_state,
+        candidate,
+        ctx.terrain,
+        ctx.timestamp_ms,
+    )
     if landing is None:
         return None
     landing_x, landing_y = landing
