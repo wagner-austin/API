@@ -29,6 +29,11 @@ _TESTS = _PROJECT_ROOT / "tests"
 #: why in the same commit.
 _LOOP_MODULE = "campaign.py"
 
+#: The loop's sending arm: the only other module allowed to touch the
+#: channel. The pair IS the loop; a third sender is the regression this
+#: guard exists to catch ([[policy-loop]]).
+_SENDING_MODULE = "dispatching.py"
+
 
 def _python_files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
@@ -66,11 +71,16 @@ def test_every_policy_module_but_the_loop_is_pure() -> None:
         for path in _python_files(_SRC / "policy")
         if "AgentChannel" in _module_source(path)
     ]
-    assert impure == [_LOOP_MODULE]
+    assert sorted(impure) == sorted([_LOOP_MODULE, _SENDING_MODULE])
 
 
 def test_no_module_writes_orders_except_the_loop() -> None:
-    """Dispatch has one owner, so an order cannot be sent from a decision."""
+    """Dispatch has one owner, so an order cannot be sent from a decision.
+
+    The owner is the loop's sending arm: the campaign reads and arbitrates,
+    every order leaves through :mod:`rw_bot.policy.dispatching`, and a pure
+    policy module can do neither.
+    """
     senders = [
         path.name
         for path in _python_files(_SRC)
@@ -79,7 +89,7 @@ def test_no_module_writes_orders_except_the_loop() -> None:
             for verb in ("channel.send_build", "channel.send_produce", "channel.send_attack")
         )
     ]
-    assert senders == [_LOOP_MODULE]
+    assert senders == [_SENDING_MODULE]
 
 
 def _exported_functions(path: Path) -> list[str]:
@@ -145,6 +155,98 @@ def test_no_exported_policy_name_is_unreachable() -> None:
     assert unreachable == []
 
 
+def _module_name(path: Path) -> str:
+    """Return a file's dotted module name as an import would spell it.
+
+    Args:
+        path: A python file under ``src`` or ``scripts``.
+
+    Returns:
+        The dotted name; a package's ``__init__`` answers to the package.
+    """
+    base = _SRC.parent if _SRC.parent in path.parents else _PROJECT_ROOT
+    parts = list(path.relative_to(base).with_suffix("").parts)
+    if parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
+def _imported_modules(path: Path) -> set[str]:
+    """Return every dotted name a module's import statements can reach.
+
+    A ``from a.b import c`` line contributes both ``a.b`` and ``a.b.c``,
+    because ``c`` may be a submodule or a symbol and only the caller's
+    module table can tell which.
+
+    Args:
+        path: The module to read.
+
+    Returns:
+        The imported names, unfiltered.
+    """
+    tree = ast.parse(_module_source(path), filename=str(path))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            names.add(node.module)
+            names.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return names
+
+
+#: Modules pyproject exposes as console scripts, which makes them entry
+#: points exactly as ``scripts/play.py`` is. Named rather than parsed out of
+#: pyproject, for the same reason :data:`_LOOP_MODULE` is: an entry point is
+#: a decision somebody made, so adding one should mean editing this line in
+#: the same commit. A drift is loud either way -- a script added here but
+#: not to pyproject is dead and this check says so; one added to pyproject
+#: but not here fails the same way until the decision is recorded.
+_CONSOLE_SCRIPT_MODULES = ("rw_bot.harness.boot_log_cli",)
+
+
+def test_every_production_module_is_wired_to_an_entry_point() -> None:
+    """A module production never imports is a layer that cannot run.
+
+    The audit that produced this file found functions written, tested and
+    documented, and called by nothing -- and the reachability check above
+    still has the hole that hid them: it counts a mention anywhere,
+    including tests, so a module wired to nothing but its own suite reads
+    as alive. This one walks the import graph from the ``scripts`` entry
+    points -- the surface ``make play``, ``make sweep`` and the analysis
+    tools actually execute -- and refuses any ``rw_bot`` module the walk
+    never reaches. Shipping a new layer therefore *requires* wiring it:
+    the build fails on a module that exists only for its tests.
+
+    Importing ``a.b.c`` imports ``a`` and ``a.b`` on the way, so a reached
+    module marks its ancestor packages reached too.
+    """
+    modules = {
+        _module_name(path): path for root in (_SRC, _SCRIPTS) for path in _python_files(root)
+    }
+    reached = {name for name in modules if name.split(".")[0] == "scripts"}
+    reached.update(name for name in _CONSOLE_SCRIPT_MODULES if name in modules)
+    frontier = list(reached)
+    while frontier:
+        for imported in _imported_modules(modules[frontier.pop()]):
+            if imported not in modules or imported in reached:
+                continue
+            reached.add(imported)
+            frontier.append(imported)
+            parts = imported.split(".")
+            reached.update(
+                ancestor
+                for ancestor in (".".join(parts[:length]) for length in range(1, len(parts)))
+                if ancestor in modules
+            )
+    unwired = sorted(
+        path.relative_to(_PROJECT_ROOT).as_posix()
+        for name, path in modules.items()
+        if name not in reached and name.split(".")[0] == "rw_bot"
+    )
+    assert unwired == []
+
+
 def test_every_decoder_has_an_encoder() -> None:
     """A fact that can be read and not written cannot be re-emitted as a fixture.
 
@@ -208,17 +310,31 @@ def test_the_wire_declares_its_child_counts_in_one_place() -> None:
 _MAX_MODULE_LINES = 600
 
 
+_AGENT_SRC = _PROJECT_ROOT / "agent" / "src" / "rwbot" / "agent"
+
+
 def test_no_module_has_grown_a_second_job() -> None:
     """A module past the ceiling is doing more than one thing.
 
     Checked mechanically because the failure is gradual: nobody writes a
     900-line module, they add forty lines to an already-large one and every
     individual step looks reasonable. The number is arbitrary; noticing is not.
+
+    Everywhere code is written, and deliberately not only ``src``. For a week
+    this ran over ``src`` and ``scripts`` alone while five test modules and
+    three agent classes stood over the line, the worst at 1,170 -- the cap a
+    file nobody checks is no cap. Those eight were named in a shrink-only
+    backlog for exactly one commit and then split, so the list is gone: there
+    is no longer any file this rule is allowed to be lenient about, and adding
+    one back would be a decision somebody has to argue for in review rather
+    than a line quietly appended to a set.
     """
+    watched = [path for root in (_SRC, _SCRIPTS, _TESTS) for path in _python_files(root)] + sorted(
+        _AGENT_SRC.glob("*.java")
+    )
     oversized = [
         f"{path.relative_to(_PROJECT_ROOT).as_posix()}:{len(_module_source(path).splitlines())}"
-        for root in (_SRC, _SCRIPTS)
-        for path in _python_files(root)
+        for path in watched
         if len(_module_source(path).splitlines()) > _MAX_MODULE_LINES
     ]
     assert oversized == []

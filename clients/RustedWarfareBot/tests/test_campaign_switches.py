@@ -1,20 +1,25 @@
-"""The doctrine switches, end to end: counter, intercept, scout, raid and
-the savings clock, each driven through a whole tick.
+"""The doctrine switches that send the army somewhere, end to end.
 
-The growth file: every new behaviour flag lands its loop-level test here,
-beside the others it has to coexist with.
+Release, march, raid, lurk, scatter and intercept: each is driven through a
+whole tick, beside the others it has to coexist with. The reflex table the
+agent is armed with before the first observation is here too, because it is
+the same doctrine being announced.
+
+The growth file: a new behaviour flag lands its loop-level test here, unless
+it is about answering the opponent's composition -- those live beside the
+counter tilt in ``test_campaign_counter``.
 """
 
 from __future__ import annotations
 
 from rw_bot.control.channel import AgentChannel
-from rw_bot.mechanics.placement import TypePlacement
 from rw_bot.policy.campaign import play
+from rw_bot.policy.situation import CLOSE_HOLD
+from rw_bot.wire.state import Sample
 from tests.campaign_fixtures import (
     BUILDER,
     CATALOGUE,
     CENTRE,
-    FACTORY,
     PLACEMENTS,
     PROFILES,
     WAVE,
@@ -28,50 +33,12 @@ from tests.wire_fixtures import (
     entity,
     lines,
     option,
+    player,
     pool,
     profile,
     profiles_for,
     sample,
 )
-
-
-def test_counter_tilts_production_toward_the_air_the_opponent_fields() -> None:
-    """The loop's own record, finally read by the loop.
-
-    ``enemy_types_end`` was carried on every report while production stayed
-    blind to it: three matches ended with 33 identical ``c_tank`` against
-    aircraft none of them could shoot ([[mechanics-combat-profile]]). With the
-    doctrine's counter switch on, the same world and the same mix produce the
-    anti-air unit instead -- and with it off, the stated mix stands, which is
-    the control arm every measurement so far was taken under.
-    """
-    catalogue = {**CATALOGUE, "c_aa": unit_stats("c_aa")}
-    profiles = {**profiles_for(catalogue), "c_aa": profile("c_aa", 120.0, air=True)}
-    world = sample(
-        CENTRE,
-        FACTORY,
-        enemy(9, "heli", x=100.0, flying=True),
-        credits=4000,
-        options=(option(300, "c_tank"), option(300, "c_aa", index=1)),
-    )
-    placements = {**PLACEMENTS}
-
-    held = ScriptedPeer(lines(world))
-    play(AgentChannel(held), (), catalogue, placements, profiles, 1, reinforce=("c_tank", "c_aa"))
-    assert verb(held, "produce") == ['{"kind":"produce","unit_id":300,"type":"c_tank"}']
-
-    tilted = ScriptedPeer(lines(world))
-    play(
-        AgentChannel(tilted),
-        (),
-        catalogue,
-        placements,
-        profiles,
-        1,
-        reinforce=("c_tank", "c_aa"),
-        counter=True,
-    )
-    assert verb(tilted, "produce") == ['{"kind":"produce","unit_id":300,"type":"c_aa"}']
 
 
 def test_intercept_turns_the_reserve_on_a_raider_among_the_extractors() -> None:
@@ -100,180 +67,6 @@ def test_intercept_turns_the_reserve_on_a_raider_among_the_extractors() -> None:
         '{"kind":"attack","unit_id":2,"target_id":9}',
     ]
     assert report["intercepts"] == 2
-
-
-def test_aa_cover_places_an_anti_air_turret_once_air_is_seen() -> None:
-    """The gap this closes is total: the whole army and the ground turret
-    declare ``canAttackFlyingUnits: false``, so before this switch nothing
-    the bot could place touched an aircraft at all
-    ([[policy-holding-ground]]). Only once the opponent has SHOWN aircraft --
-    an anti-air turret cannot hit the ground, so before that it is 600
-    credits pointed at a guess -- and with the switch off, the same world
-    buys nothing, which is the behaviour every prior measurement was taken
-    under.
-    """
-    catalogue = {
-        **CATALOGUE,
-        "c_antiAirTurret": unit_stats("c_antiAirTurret", speed=0.0, armed=True, price=600),
-    }
-    placements = {
-        name: TypePlacement(index=i, type_name=name, needs_pool=False)
-        for i, name in enumerate(catalogue)
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_antiAirTurret": profile("c_antiAirTurret", 250.0, land=False, air=True),
-    }
-    world = sample(
-        CENTRE,
-        BUILDER,
-        enemy(9, "gunShip", x=700.0, flying=True),
-        credits=4000,
-        options=(option(214, "c_antiAirTurret", placed=True),),
-    )
-
-    blind = ScriptedPeer(lines(world, world))
-    play(AgentChannel(blind), (), catalogue, placements, profiles, 2)
-    assert verb(blind, "build") == []
-
-    covered = ScriptedPeer(lines(world, world))
-    play(AgentChannel(covered), (), catalogue, placements, profiles, 2, aa_cover=True)
-    assert verb(covered, "build") == [
-        '{"kind":"build","unit_id":214,"x":60.0,"y":0.0,"type":"c_antiAirTurret"}'
-    ]
-
-
-def test_aa_cover_outranks_ground_cover_once_air_is_shown() -> None:
-    """V1 put anti-air after ground defence and its own reach line convicted
-    it in one batch: reached 50, acted 0, zero AA turrets standing across
-    twelve matches -- never reached with 600 credits left. Ground raiders
-    already have the guard; nothing else touches an aircraft, so on the
-    latch the AA turret is bought first."""
-    catalogue = {
-        **CATALOGUE,
-        "c_turret_t1": unit_stats("c_turret_t1", speed=0.0, armed=True, price=500),
-        "c_antiAirTurret": unit_stats("c_antiAirTurret", speed=0.0, armed=True, price=600),
-    }
-    placements = {
-        name: TypePlacement(index=i, type_name=name, needs_pool=False)
-        for i, name in enumerate(catalogue)
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_turret_t1": profile("c_turret_t1", 165.0),
-        "c_antiAirTurret": profile("c_antiAirTurret", 250.0, land=False, air=True),
-    }
-    world = sample(
-        CENTRE,
-        BUILDER,
-        enemy(9, "gunShip", x=700.0, flying=True),
-        credits=4000,
-        options=(
-            option(214, "c_turret_t1", placed=True),
-            option(214, "c_antiAirTurret", placed=True, index=1),
-        ),
-    )
-    peer = ScriptedPeer(lines(world, world))
-    play(AgentChannel(peer), (), catalogue, placements, profiles, 2, aa_cover=True)
-    builds = verb(peer, "build")
-    assert builds
-    assert '"type":"c_antiAirTurret"' in builds[0]
-
-
-def test_ground_cover_still_happens_when_the_aa_turret_is_unaffordable() -> None:
-    """The inversion is a preference, not a blockade: an AA turret the balance
-    cannot cover falls through to the ground turret it can, rather than
-    holding all cover hostage to 600 credits."""
-    catalogue = {
-        **CATALOGUE,
-        "c_turret_t1": unit_stats("c_turret_t1", speed=0.0, armed=True, price=500),
-        "c_antiAirTurret": unit_stats("c_antiAirTurret", speed=0.0, armed=True, price=600),
-    }
-    placements = {
-        name: TypePlacement(index=i, type_name=name, needs_pool=False)
-        for i, name in enumerate(catalogue)
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_turret_t1": profile("c_turret_t1", 165.0),
-        "c_antiAirTurret": profile("c_antiAirTurret", 250.0, land=False, air=True),
-    }
-    world = sample(
-        CENTRE,
-        BUILDER,
-        enemy(9, "gunShip", x=700.0, flying=True),
-        credits=550,
-        options=(
-            option(214, "c_turret_t1", placed=True),
-            option(214, "c_antiAirTurret", placed=True, index=1),
-        ),
-    )
-    peer = ScriptedPeer(lines(world, world))
-    play(AgentChannel(peer), (), catalogue, placements, profiles, 2, aa_cover=True)
-    builds = verb(peer, "build")
-    assert builds
-    assert '"type":"c_turret_t1"' in builds[0]
-
-
-def test_aa_cover_waits_until_aircraft_are_actually_shown() -> None:
-    """Latched from sight, not assumed: with no aircraft ever seen the switch
-    buys nothing, because an anti-air turret cannot hit the ground."""
-    catalogue = {
-        **CATALOGUE,
-        "c_antiAirTurret": unit_stats("c_antiAirTurret", speed=0.0, armed=True, price=600),
-    }
-    placements = {
-        name: TypePlacement(index=i, type_name=name, needs_pool=False)
-        for i, name in enumerate(catalogue)
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_antiAirTurret": profile("c_antiAirTurret", 250.0, land=False, air=True),
-    }
-    grounded = sample(
-        CENTRE,
-        BUILDER,
-        enemy(9, "c_tank", x=700.0),
-        credits=4000,
-        options=(option(214, "c_antiAirTurret", placed=True),),
-    )
-    peer = ScriptedPeer(lines(grounded, grounded))
-    play(AgentChannel(peer), (), catalogue, placements, profiles, 2, aa_cover=True)
-    assert verb(peer, "build") == []
-
-
-def test_cover_off_buys_no_turret_where_cover_on_buys_one() -> None:
-    """The question working siting finally made askable: "defence on" meant
-    "defence attempted and silently refused" for its whole measured history,
-    and the first batch where turrets landed spent 25-45k a match on them
-    and won 6/24 at a rung the attempted-defence bot won 10/12
-    ([[policy-holding-ground]])."""
-    catalogue = {
-        **CATALOGUE,
-        "c_turret_t1": unit_stats("c_turret_t1", speed=0.0, armed=True, price=500),
-    }
-    placements = {
-        name: TypePlacement(index=i, type_name=name, needs_pool=False)
-        for i, name in enumerate(catalogue)
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_turret_t1": profile("c_turret_t1", 165.0),
-    }
-    world = sample(
-        CENTRE,
-        BUILDER,
-        credits=4000,
-        options=(option(214, "c_turret_t1", placed=True),),
-    )
-
-    covered = ScriptedPeer(lines(world))
-    play(AgentChannel(covered), (), catalogue, placements, profiles, 1)
-    assert '"type":"c_turret_t1"' in verb(covered, "build")[0]
-
-    bare = ScriptedPeer(lines(world))
-    play(AgentChannel(bare), (), catalogue, placements, profiles, 1, cover=False)
-    assert verb(bare, "build") == []
 
 
 def test_rush_marches_the_released_wave_at_the_mirror_of_the_base() -> None:
@@ -306,6 +99,92 @@ def test_rush_marches_the_released_wave_at_the_mirror_of_the_base() -> None:
     assert report["marches"] == 3
 
 
+def test_the_closer_releases_and_marches_on_dominance() -> None:
+    """The verb the vh-close sweep demanded: nineteen dominant positions at
+    the 4,000-sample cap, eleven of them LOST at 10,000 -- dominance decays,
+    so a decided match is ended while it is decided ([[policy-situation]]).
+    Dominance met, the wave releases and marches without the rush switch;
+    dominance short of the multiple, the same world sends nobody anywhere.
+    """
+    scoreboard = (
+        player(0, index=0, local=True, hostile=False, army_value=9_000),
+        player(1, index=1, hostile=True, army_value=3_000),
+    )
+    world = sample(
+        CENTRE,
+        *WAVE,
+        pools=(pool(x=300.0, y=300.0), pool(x=500.0, y=100.0)),
+        players=scoreboard,
+    )
+
+    # CLOSE_HOLD dominant samples: the debounce runs down, the latch
+    # commits, and the wave marches on the committing tick.
+    closing = ScriptedPeer(lines(*(world for _ in range(CLOSE_HOLD))))
+    report = play(AgentChannel(closing), (), CATALOGUE, PLACEMENTS, PROFILES, CLOSE_HOLD, close=3)
+    marched = [line for line in closing.sent if "attack_move" in line]
+    # A FORCED march aims at the income posts rather than the bare mirror --
+    # the all-in's rule, inherited deliberately: the closer exists to end the
+    # match, and the match is ended where the economy stands. The party is
+    # SPREAD across the posts, so each pool meets part of the wave.
+    assert marched == [
+        '{"kind":"attack_move","unit_id":1,"x":500.0,"y":100.0}',
+        '{"kind":"attack_move","unit_id":2,"x":300.0,"y":300.0}',
+        '{"kind":"attack_move","unit_id":3,"x":500.0,"y":100.0}',
+    ]
+    assert report["marches"] == 3
+
+    contested = sample(
+        CENTRE,
+        *WAVE,
+        pools=(pool(x=300.0, y=300.0), pool(x=500.0, y=100.0)),
+        players=(
+            player(0, index=0, local=True, hostile=False, army_value=5_000),
+            player(1, index=1, hostile=True, army_value=3_000),
+        ),
+    )
+    holding = ScriptedPeer(lines(*(contested for _ in range(CLOSE_HOLD))))
+    play(AgentChannel(holding), (), CATALOGUE, PLACEMENTS, PROFILES, CLOSE_HOLD, close=3)
+    assert [line for line in holding.sent if "attack_move" in line] == []
+
+
+def test_the_closer_latches_once_dominance_was_confirmed() -> None:
+    """Dominance confirmed once is a decision, not a reading to re-take:
+    un-latched, the window flickered as trades moved the ratio and three
+    lost matches show 9, 3 and 6 marches dying in dribbles
+    (`runs/sweeps/vh-closer`, log 2026-08-01). A reinforcement built AFTER
+    the ratio has slipped below the multiple still marches."""
+    scoreboard_dominant = (
+        player(0, index=0, local=True, hostile=False, army_value=9_000),
+        player(1, index=1, hostile=True, army_value=3_000),
+    )
+    scoreboard_slipped = (
+        player(0, index=0, local=True, hostile=False, army_value=5_000),
+        player(1, index=1, hostile=True, army_value=3_000),
+    )
+    pools = (pool(x=300.0, y=300.0), pool(x=500.0, y=100.0))
+    dominant = sample(CENTRE, *WAVE, pools=pools, players=scoreboard_dominant)
+    # The ratio has slipped AND a fresh wave-sized group has rolled out:
+    # without the latch this tick sends nobody anywhere. A wave-sized group
+    # rather than a lone tank, because the anti-trickle floor holds under
+    # force too -- fewer than a first wave is not a punch
+    # ([[policy-combat]]).
+    slipped = sample(
+        CENTRE,
+        *WAVE,
+        entity(4, "c_tank", x=60.0),
+        entity(5, "c_tank", x=70.0),
+        entity(6, "c_tank", x=80.0),
+        pools=pools,
+        players=scoreboard_slipped,
+    )
+    script = (*(dominant for _ in range(CLOSE_HOLD)), slipped)
+    peer = ScriptedPeer(lines(*script))
+    play(AgentChannel(peer), (), CATALOGUE, PLACEMENTS, PROFILES, len(script), close=3)
+    marched = "".join(line for line in peer.sent if "attack_move" in line)
+    for unit_id in (4, 5, 6):
+        assert f'{{"kind":"attack_move","unit_id":{unit_id}' in marched
+
+
 def test_creep_walks_a_turret_toward_the_mirror_and_off_builds_none() -> None:
     """The creep verb: the documented human answer to the cheating
     difficulties, expressed as one doctrine flag. With it on, a free worker
@@ -326,79 +205,12 @@ def test_creep_walks_a_turret_toward_the_mirror_and_off_builds_none() -> None:
     assert [line for line in held.sent if "c_turret_t1" in line] == []
 
     creeping = ScriptedPeer(lines(world))
-    play(AgentChannel(creeping), (), catalogue, PLACEMENTS, profiles, 1, creep=True)
+    play(AgentChannel(creeping), (), catalogue, PLACEMENTS, profiles, 1, creep=100)
     built = [line for line in creeping.sent if '"build"' in line and "c_turret_t1" in line]
     # Anchor (0,0), pool centroid (400,200) -> mirror (800,400): one reach
     # (165) along that line is (147.6..., 73.8...).
     assert len(built) == 1
     assert '"unit_id":214' in built[0]
-
-
-def test_scouting_remembers_the_air_after_it_fogs() -> None:
-    """The tilt reacts to what was seen, not only to what is shooting.
-
-    Sample one shows a helicopter; sample two shows empty sky. Without
-    scouting the tilt forgets with the fog and production reverts to the
-    stated mix; with it, the remembered sighting keeps the anti-air share up.
-    The scout itself is excluded from the army, so it is never marched into a
-    wave.
-    """
-    catalogue = {
-        **CATALOGUE,
-        "c_aa": unit_stats("c_aa"),
-        "scout": unit_stats("scout", speed=1.4),
-        # The tilt filters remembered threats to mobile units, so the
-        # helicopter has to be priced and moving to count.
-        "heli": unit_stats("heli", speed=2.0),
-    }
-    profiles = {
-        **profiles_for(catalogue),
-        "c_aa": profile("c_aa", 120.0, air=True),
-    }
-    seen = sample(
-        CENTRE,
-        FACTORY,
-        enemy(9, "heli", x=100.0, flying=True),
-        # A remembered structure must NOT count toward the tilt -- v1 fed the
-        # tilt everything and the flying share drowned in buildings.
-        enemy(15, "extractorT1", x=600.0),
-        credits=4000,
-        options=(option(300, "c_tank"), option(300, "c_aa", index=1)),
-    )
-    fogged = sample(
-        CENTRE,
-        FACTORY,
-        credits=4000,
-        options=(option(300, "c_tank"), option(300, "c_aa", index=1)),
-    )
-
-    forgetful = ScriptedPeer(lines(seen, fogged))
-    play(
-        AgentChannel(forgetful),
-        (),
-        catalogue,
-        PLACEMENTS,
-        profiles,
-        2,
-        reinforce=("c_tank", "c_aa"),
-        counter=True,
-    )
-    assert verb(forgetful, "produce")[-1] == '{"kind":"produce","unit_id":300,"type":"c_tank"}'
-
-    remembering = ScriptedPeer(lines(seen, fogged))
-    report = play(
-        AgentChannel(remembering),
-        (),
-        catalogue,
-        PLACEMENTS,
-        profiles,
-        2,
-        reinforce=("c_tank", "c_aa"),
-        counter=True,
-        scout=True,
-    )
-    assert verb(remembering, "produce")[-1] == '{"kind":"produce","unit_id":300,"type":"c_aa"}'
-    assert report["sightings"] == 2
 
 
 def test_the_raid_sends_a_party_at_remembered_income() -> None:
@@ -469,3 +281,115 @@ def test_the_raid_stands_down_without_surplus() -> None:
     assert [line for line in lean.sent if "attack_move" in line] == []
     assert report["raids"] == 0
     assert report["marches"] == 0
+
+
+def test_the_lurker_walks_to_the_enemy_start_and_off_stays_home() -> None:
+    """The leash verb end to end: with ``lurk`` a scout is sent to the
+    mirrored enemy start, and the same world with it off sends no such
+    move -- the AI recalls its armies home for as long as the intruder
+    stands there ([[ai-opponent-strategy]]).
+    """
+    catalogue = {**CATALOGUE, "scout": unit_stats("scout", price=700)}
+    profiles = profiles_for(catalogue)
+    world = sample(
+        CENTRE,
+        entity(300, "scout", x=10.0, y=0.0),
+        credits=4000,
+        pools=(pool(x=500.0, y=0.0),),
+    )
+    held = ScriptedPeer(lines(world))
+    play(AgentChannel(held), (), catalogue, PLACEMENTS, profiles, 1)
+    assert [line for line in verb(held, "move") if '"unit_id":300' in line] == []
+
+    leashed = ScriptedPeer(lines(world))
+    play(AgentChannel(leashed), (), catalogue, PLACEMENTS, profiles, 1, lurk=1)
+    walked = [line for line in verb(leashed, "move") if '"unit_id":300' in line]
+    # The post is the zone rim: the mirrored start at (1000, 0), pulled back
+    # by the standoff along the line home.
+    assert walked == ['{"kind":"move","unit_id":300,"x":620.0,"y":0.0}']
+
+
+def test_a_committed_marcher_is_withheld_from_the_engagement() -> None:
+    """The strike force walks past the fight it was built to walk past.
+
+    Tick one commits the all-in and marches the tank at the enemy's income;
+    tick two shows a hostile in reach -- and the marcher is NOT re-tasked
+    onto it, where the same world without the all-in attacks it at once
+    ([[policy-combat]], log 2026-07-31).
+    """
+
+    def _tick(hostile_id: int) -> Sample:
+        return sample(
+            CENTRE,
+            entity(10, "c_tank", x=100.0, y=0.0),
+            entity(11, "c_tank", x=110.0, y=0.0),
+            entity(12, "c_tank", x=120.0, y=0.0),
+            enemy(hostile_id, "c_tank", x=200.0, y=0.0),
+            credits=4000,
+            pools=(pool(x=500.0, y=0.0),),
+        )
+
+    # The release tick may still engage -- commitment is read before the
+    # command that sets it, and the march waypoint lands last and wins in
+    # the engine. What must hold is every tick AFTER: a fresh hostile
+    # appears and the marchers ignore it.
+    committed = ScriptedPeer(lines(_tick(9), _tick(8)))
+    play(AgentChannel(committed), (), CATALOGUE, PLACEMENTS, PROFILES, 2, allin=1)
+    retasked = [line for line in verb(committed, "attack") if '"target_id":8' in line]
+    assert retasked == []
+    marched = [line for line in committed.sent if "attack_move" in line and '"unit_id":10' in line]
+    assert len(marched) == 1
+
+    plain = ScriptedPeer(lines(_tick(9), _tick(8)))
+    play(AgentChannel(plain), (), CATALOGUE, PLACEMENTS, PROFILES, 2, intercept=True)
+    assert [line for line in verb(plain, "attack") if '"target_id":8' in line] != []
+
+
+def test_the_decoys_scatter_to_their_posts() -> None:
+    """The scatter verb end to end: with ``decoys`` a scout is sent to a
+    flank post; off, it stays put. The AI's target lottery is uniform over
+    all our units, so the post is a ticket bought on purpose
+    ([[ai-opponent-strategy]]).
+    """
+    catalogue = {**CATALOGUE, "scout": unit_stats("scout", price=700)}
+    profiles = profiles_for(catalogue)
+    world = sample(
+        CENTRE,
+        entity(300, "scout", x=10.0, y=0.0),
+        credits=4000,
+        pools=(pool(x=500.0, y=0.0),),
+    )
+    held = ScriptedPeer(lines(world))
+    play(AgentChannel(held), (), catalogue, PLACEMENTS, profiles, 1)
+    assert [line for line in verb(held, "move") if '"unit_id":300' in line] == []
+
+    scattered = ScriptedPeer(lines(world))
+    play(AgentChannel(scattered), (), catalogue, PLACEMENTS, profiles, 1, decoys=1)
+    walked = [line for line in verb(scattered, "move") if '"unit_id":300' in line]
+    assert len(walked) == 1
+
+
+def test_the_posture_table_is_sent_once_before_the_first_observation() -> None:
+    """The reflex layer's table: one row per profiled type, reach from the
+    planner's own catalogue, the reflexes only on armed mobile types --
+    and with both knobs off, no rows at all
+    ([[community-play-strategies]]).
+    """
+    world = sample(CENTRE, entity(10, "c_tank", x=100.0, y=0.0), credits=4000)
+
+    off = ScriptedPeer(lines(world))
+    play(AgentChannel(off), (), CATALOGUE, PLACEMENTS, PROFILES, 1)
+    assert [line for line in off.sent if '"posture"' in line] == []
+
+    on = ScriptedPeer(lines(world))
+    play(AgentChannel(on), (), CATALOGUE, PLACEMENTS, PROFILES, 1, kite=True, hp_floor=30)
+    rows = [line for line in on.sent if '"posture"' in line]
+    assert len(rows) == len(PROFILES)
+    tank = next(line for line in rows if '"type":"c_tank"' in line)
+    assert '"kite":1' in tank
+    assert '"hp_floor":30' in tank
+    # A structure carries its reach for the threat lookup and no reflexes:
+    # it cannot walk, so a flee order would be noise.
+    centre = next(line for line in rows if '"type":"commandCenter"' in line)
+    assert '"kite":0' in centre
+    assert '"hp_floor":0' in centre
