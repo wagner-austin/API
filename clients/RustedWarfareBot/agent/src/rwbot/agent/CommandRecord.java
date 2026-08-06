@@ -69,6 +69,30 @@ final class CommandRecord {
         ABILITY,
 
         /**
+         * Have a unit fire an action at a chosen ground point.
+         *
+         * <p>The finisher's verb. The nuke launcher's launch is declared
+         * {@code fireTurretXAtGround}: the engine aims the silo turret at
+         * the point the command carries, so the point is the whole
+         * decision -- and the plain ability verb can never express it,
+         * because that verb sends the unit's own position. Same dispatch,
+         * same key, with the point chosen by the planner (wiki:
+         * mechanics-build-actions).
+         */
+        ABILITY_AT,
+
+        /**
+         * Set one unit type's standing reflex posture.
+         *
+         * <p>Not an order to a unit: the type's reach and reflexes, stored
+         * once and applied by the agent's own between-samples pass. The
+         * reach figure rides the wire because the planner owns the
+         * catalogue and the agent never guesses a stat (wiki:
+         * community-play-strategies).
+         */
+        POSTURE,
+
+        /**
          * The planner has finished with the current sample.
          *
          * <p>Not an order. It carries no subject, because it is about the
@@ -153,6 +177,30 @@ final class CommandRecord {
         if ("ack".equals(kindText)) {
             return new CommandRecord(Kind.ACK, 0L, 0.0f, 0.0f, "", 0L, "");
         }
+        if ("posture".equals(kindText)) {
+            // A type's standing orders, not a unit's: reach in the x slot,
+            // speed in the y slot, kite in unit_id, the floor in target_id.
+            reject(fields, "unit_id", line);
+            reject(fields, "action", line);
+            String type = requireType(fields, "posture", line);
+            float reach = requireFloat(fields, "reach", line);
+            if (reach < 0f) {
+                throw new IllegalArgumentException("posture reach is negative: " + line);
+            }
+            float speed = requireFloat(fields, "speed", line);
+            if (speed < 0f) {
+                throw new IllegalArgumentException("posture speed is negative: " + line);
+            }
+            long kite = requireLong(fields, "kite", line);
+            if (kite != 0L && kite != 1L) {
+                throw new IllegalArgumentException("posture kite must be 0 or 1: " + line);
+            }
+            long floor = requireLong(fields, "hp_floor", line);
+            if (floor < 0L || floor > 100L) {
+                throw new IllegalArgumentException("posture hp_floor must be 0-100: " + line);
+            }
+            return new CommandRecord(Kind.POSTURE, kite, reach, speed, type, floor, "");
+        }
         long unitId = requireLong(fields, "unit_id", line);
 
         // Required per verb rather than up front. A produce command has no
@@ -224,9 +272,32 @@ final class CommandRecord {
             }
             return new CommandRecord(Kind.ABILITY, unitId, 0.0f, 0.0f, "", 0L, key);
         }
+        if ("ability_at".equals(kindText)) {
+            // The unit, the key and the ground point are the whole of the
+            // order: the point is required rather than optional, because an
+            // action fired at the ground with no ground to fire at is not a
+            // smaller order, it is a different verb -- the plain ability.
+            reject(fields, "type", line);
+            reject(fields, "target_id", line);
+            reject(fields, "action", line);
+            String key = require(fields, "key", line);
+            if (key.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "ability_at command has a blank action key: " + line);
+            }
+            return new CommandRecord(
+                    Kind.ABILITY_AT,
+                    unitId,
+                    requireFloat(fields, "x", line),
+                    requireFloat(fields, "y", line),
+                    "",
+                    0L,
+                    key);
+        }
         throw new IllegalArgumentException(
                 "unknown command kind '" + kindText
-                        + "'; expected move, attack_move, build, produce, attack, ability or ack: "
+                        + "'; expected move, attack_move, build, produce, attack, ability,"
+                        + " ability_at, posture or ack: "
                         + line);
     }
 

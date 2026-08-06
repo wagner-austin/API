@@ -296,7 +296,7 @@ final class MatchSetup {
         queueScript("mp.setMapFromPopup('" + map + "');");
         Log.info("lobby open; waiting for a player to join before starting");
         int waited = 0;
-        while (Perception.rosterCount() < 2) {
+        while (Scoreboard.rosterCount() < 2) {
             try {
                 Thread.sleep(1000L);
             } catch (InterruptedException e) {

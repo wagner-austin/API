@@ -42,13 +42,13 @@ final class BindingCheck {
         Class<?> command = checkClass(EngineNames.COMMAND_CLASS, problems);
         Class<?> controller = checkClass(EngineNames.CONTROLLER_CLASS, problems);
         Class<?> scripts = checkClass(EngineNames.SCRIPTS_CLASS, problems);
-        Class<?> type = checkClass(EngineNames.TYPE_CLASS, problems);
-        Class<?> registry = checkClass(EngineNames.TYPE_REGISTRY_CLASS, problems);
+        Class<?> type = checkClass(TypeNames.TYPE_CLASS, problems);
+        Class<?> registry = checkClass(TypeNames.TYPE_REGISTRY_CLASS, problems);
         checkClass(EngineNames.TREE_CLASS, problems);
 
         if (entity != null) {
             checkField(entity, EngineNames.ENTITY_ID, problems);
-            checkMethod(entity, EngineNames.TYPE_ACCESSOR, problems);
+            checkMethod(entity, TypeNames.TYPE_ACCESSOR, problems);
             checkField(entity, EngineNames.ENTITY_LIST, problems);
             checkField(entity, EngineNames.OWNER, problems);
             checkField(entity, EngineNames.POS_X, problems);
@@ -90,7 +90,7 @@ final class BindingCheck {
             checkMethod(registry, "a", problems, String.class);
         }
         if (type != null) {
-            checkMethod(type, EngineNames.TYPE_NAME_ACCESSOR, problems);
+            checkMethod(type, TypeNames.TYPE_NAME_ACCESSOR, problems);
         }
         if (command != null && type != null) {
             checkMethod(command, "a", problems, float.class, float.class, type, int.class);
@@ -98,7 +98,7 @@ final class BindingCheck {
 
         Class<?> map = checkClass(EngineNames.MAP_CLASS, problems);
         Class<?> tile = checkClass(EngineNames.TILE_CLASS, problems);
-        Class<?> customType = checkClass(EngineNames.CUSTOM_TYPE_CLASS, problems);
+        Class<?> customType = checkClass(TypeNames.CUSTOM_TYPE_CLASS, problems);
         if (map != null) {
             checkField(map, EngineNames.MAP_TILES_X, problems);
             checkField(map, EngineNames.MAP_TILES_Y, problems);
@@ -118,24 +118,24 @@ final class BindingCheck {
             checkField(tile, EngineNames.TILE_IS_POOL, problems);
         }
         if (type != null) {
-            checkMethod(type, EngineNames.TYPE_NEEDS_POOL, problems);
+            checkMethod(type, TypeNames.TYPE_NEEDS_POOL, problems);
         }
         if (customType != null) {
-            checkField(customType, EngineNames.CUSTOM_TYPE_LIST, problems);
+            checkField(customType, TypeNames.CUSTOM_TYPE_LIST, problems);
         }
 
-        Class<?> action = checkClass(EngineNames.ACTION_CLASS, problems);
+        Class<?> action = checkClass(TypeNames.ACTION_CLASS, problems);
         if (entity != null) {
-            checkMethod(entity, EngineNames.ACTIONS, problems);
+            checkMethod(entity, TypeNames.ACTIONS, problems);
         }
-        Class<?> actionKey = checkClass(EngineNames.ACTION_KEY_CLASS, problems);
-        Class<?> point = checkClass(EngineNames.POINT_CLASS, problems);
+        Class<?> actionKey = checkClass(TypeNames.ACTION_KEY_CLASS, problems);
+        Class<?> point = checkClass(TypeNames.POINT_CLASS, problems);
         if (action != null) {
-            checkMethod(action, EngineNames.ACTION_MAKES, problems);
-            checkMethod(action, EngineNames.ACTION_PLACED_TYPE, problems);
-            checkMethod(action, EngineNames.ACTION_MAKES_SOMETHING, problems);
-            checkMethod(action, EngineNames.ACTION_KEY, problems);
-            checkMethod(action, EngineNames.ACTION_INDEX, problems);
+            checkMethod(action, TypeNames.ACTION_MAKES, problems);
+            checkMethod(action, TypeNames.ACTION_PLACED_TYPE, problems);
+            checkMethod(action, TypeNames.ACTION_MAKES_SOMETHING, problems);
+            checkMethod(action, TypeNames.ACTION_KEY, problems);
+            checkMethod(action, TypeNames.ACTION_INDEX, problems);
         }
         if (command != null && actionKey != null && point != null && entity != null) {
             // The production verb. Distinct from the placement one above, and
@@ -143,16 +143,16 @@ final class BindingCheck {
             checkMethod(command, "a", problems, actionKey, point, entity);
         }
         if (action != null && entity != null) {
-            checkMethod(action, EngineNames.ACTION_AVAILABLE, problems, entity);
-            checkMethod(action, EngineNames.ACTION_LOCKED, problems, entity);
-            checkMethod(action, EngineNames.ACTION_APPLIES, problems, entity, boolean.class);
+            checkMethod(action, TypeNames.ACTION_AVAILABLE, problems, entity);
+            checkMethod(action, TypeNames.ACTION_LOCKED, problems, entity);
+            checkMethod(action, TypeNames.ACTION_APPLIES, problems, entity, boolean.class);
         }
         if (entity != null) {
             checkMethod(entity, EngineNames.ENTITY_COMPLETE, problems);
         }
-        Class<?> queue = checkClass(EngineNames.QUEUE_CLASS, problems);
+        Class<?> queue = checkClass(TypeNames.QUEUE_CLASS, problems);
         if (queue != null) {
-            checkField(queue, EngineNames.QUEUE_ITEMS, problems);
+            checkField(queue, TypeNames.QUEUE_ITEMS, problems);
         }
 
         // The research probe. Checked like everything else, but note what a
@@ -166,11 +166,11 @@ final class BindingCheck {
         // hostile would read as unarmed and the threat filter would pass
         // everything (wiki: policy-threat).
         if (entity != null && type != null) {
-            checkMethod(entity, EngineNames.TYPE_PROTOTYPE, problems, type);
-            checkMethod(entity, EngineNames.UNIT_ARMED, problems);
+            checkMethod(entity, TypeNames.TYPE_PROTOTYPE, problems, type);
+            checkMethod(entity, TypeNames.UNIT_ARMED, problems);
         }
         if (orderable != null) {
-            checkMethod(orderable, EngineNames.UNIT_ATTACK_RANGE, problems);
+            checkMethod(orderable, TypeNames.UNIT_ATTACK_RANGE, problems);
         }
 
         Class<?> pathing = checkClass(EngineNames.PATHING_CLASS, problems);

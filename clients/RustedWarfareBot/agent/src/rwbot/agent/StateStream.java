@@ -53,7 +53,7 @@ final class StateStream {
         java.util.List<Object> visible = Perception.visibleEntities(engine);
         java.util.List<MapTiles.Pool> pools = MapTiles.visiblePools(engine);
         java.util.List<BuildOptions.Option> options = BuildOptions.ownedOptions(engine);
-        java.util.List<Perception.PlayerStat> players = Perception.playerStats(engine);
+        java.util.List<Scoreboard.PlayerStat> players = Scoreboard.playerStats(engine);
         int frame = EngineAccess.readIntField(engine, FRAME_FIELD);
         int clock = EngineAccess.readIntField(engine, CLOCK_FIELD);
 
@@ -65,10 +65,10 @@ final class StateStream {
                                 pools.size(),
                                 options.size(),
                                 players.size(),
-                                Perception.creditsOf(engine),
-                                Perception.isDefeated(engine),
-                                Perception.isWipedOut(engine),
-                                Perception.playersRemaining()))
+                                Scoreboard.creditsOf(engine),
+                                Scoreboard.isDefeated(engine),
+                                Scoreboard.isWipedOut(engine),
+                                Scoreboard.playersRemaining()))
                 .append('\n');
         for (int index = 0; index < visible.size(); index++) {
             out.append(entityRecord(frame, index, visible.get(index), engine)).append('\n');
@@ -80,7 +80,7 @@ final class StateStream {
                                     frame,
                                     index,
                                     pool,
-                                    Perception.landPathGroupAt(pool.x(), pool.y())))
+                                    Mobility.landPathGroupAt(pool.x(), pool.y())))
                     .append('\n');
         }
         for (int index = 0; index < options.size(); index++) {
@@ -102,7 +102,7 @@ final class StateStream {
      * enemy count cannot say because it measures our own vision as much as
      * their army.
      */
-    static String playerRecord(int frame, int index, Perception.PlayerStat player) {
+    static String playerRecord(int frame, int index, Scoreboard.PlayerStat player) {
         StringBuilder out = new StringBuilder();
         out.append('{');
         appendString(out, "kind", "player");
@@ -274,9 +274,9 @@ final class StateStream {
         out.append(',');
         appendBool(out, "hostile", Perception.isHostileToLocalPlayer(engine, entity));
         out.append(',');
-        appendString(out, "movement", Perception.movementOf(entity));
+        appendString(out, "movement", Mobility.movementOf(entity));
         out.append(',');
-        appendInt(out, "group", Perception.pathGroupOf(entity));
+        appendInt(out, "group", Mobility.pathGroupOf(entity));
         out.append(',');
         appendBool(out, "flying", Perception.isFlying(entity));
         out.append(',');

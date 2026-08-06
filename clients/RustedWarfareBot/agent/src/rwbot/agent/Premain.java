@@ -249,7 +249,7 @@ public final class Premain {
         Orders.onGameThread(
                 () -> {
                     Object engine = EngineHandle.current();
-                    Log.info(Perception.describeOwned(engine));
+                    Log.info(Mobility.describeOwned(engine));
                     java.util.List<Object> roster = Perception.ownedUnits(engine);
                     if (unitIndex >= roster.size()) {
                         Log.error(
@@ -295,7 +295,7 @@ public final class Premain {
                             return;
                         }
                         Log.info("order: t+" + elapsed + "s " + Perception.describe(unit));
-                        Log.info(Perception.describeOwned(EngineHandle.current()));
+                        Log.info(Mobility.describeOwned(EngineHandle.current()));
                     });
         }
     }

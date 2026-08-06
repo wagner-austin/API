@@ -155,8 +155,8 @@ final class TypeFlags {
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
                                 EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS),
-                                EngineNames.TYPE_PROTOTYPE,
-                                EngineAccess.pinnedClass(EngineNames.TYPE_CLASS)),
+                                TypeNames.TYPE_PROTOTYPE,
+                                EngineAccess.pinnedClass(TypeNames.TYPE_CLASS)),
                         null,
                         type);
         // A type with no prototype, and a prototype that takes no orders, are
@@ -168,7 +168,7 @@ final class TypeFlags {
         }
         Object armed =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(prototype.getClass(), EngineNames.UNIT_ARMED),
+                        EngineAccess.pinnedMethod(prototype.getClass(), TypeNames.UNIT_ARMED),
                         prototype);
         if (!Boolean.TRUE.equals(armed)) {
             return Combat.UNARMED;
@@ -176,19 +176,19 @@ final class TypeFlags {
         Object range =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
-                                prototype.getClass(), EngineNames.UNIT_ATTACK_RANGE),
+                                prototype.getClass(), TypeNames.UNIT_ATTACK_RANGE),
                         prototype);
         if (!(range instanceof Float)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.UNIT_ATTACK_RANGE + "() did not return a float"
+                    "rw-agent: " + TypeNames.UNIT_ATTACK_RANGE + "() did not return a float"
                             + EngineNames.PIN);
         }
         return new Combat(
                 ((Float) range).floatValue(),
-                layerPredicate(prototype, EngineNames.UNIT_HITS_LAND),
-                layerPredicate(prototype, EngineNames.UNIT_HITS_AIR),
-                layerPredicate(prototype, EngineNames.UNIT_HITS_UNDERWATER),
-                layerPredicate(prototype, EngineNames.UNIT_HITS_LAND_OUT_OF_WATER));
+                layerPredicate(prototype, TypeNames.UNIT_HITS_LAND),
+                layerPredicate(prototype, TypeNames.UNIT_HITS_AIR),
+                layerPredicate(prototype, TypeNames.UNIT_HITS_UNDERWATER),
+                layerPredicate(prototype, TypeNames.UNIT_HITS_LAND_OUT_OF_WATER));
     }
 
     /**
@@ -274,11 +274,11 @@ final class TypeFlags {
      * @return The enum constants.
      */
     private static Object[] builtInTypes() {
-        Class<?> registry = EngineAccess.pinnedClass(EngineNames.TYPE_REGISTRY_CLASS);
+        Class<?> registry = EngineAccess.pinnedClass(TypeNames.TYPE_REGISTRY_CLASS);
         Object[] constants = registry.getEnumConstants();
         if (constants == null) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.TYPE_REGISTRY_CLASS
+                    "rw-agent: " + TypeNames.TYPE_REGISTRY_CLASS
                             + " is no longer an enum, so its built-in types cannot be"
                             + " enumerated" + EngineNames.PIN);
         }
@@ -292,19 +292,19 @@ final class TypeFlags {
      *     mod.
      */
     private static Iterable<?> assetTypes() {
-        Class<?> custom = EngineAccess.pinnedClass(EngineNames.CUSTOM_TYPE_CLASS);
+        Class<?> custom = EngineAccess.pinnedClass(TypeNames.CUSTOM_TYPE_CLASS);
         Object value;
         try {
-            value = EngineAccess.pinnedField(custom, EngineNames.CUSTOM_TYPE_LIST).get(null);
+            value = EngineAccess.pinnedField(custom, TypeNames.CUSTOM_TYPE_LIST).get(null);
         } catch (IllegalAccessException e) {
             throw new IllegalStateException(
-                    "rw-agent: cannot read " + EngineNames.CUSTOM_TYPE_LIST
+                    "rw-agent: cannot read " + TypeNames.CUSTOM_TYPE_LIST
                             + EngineNames.PIN, e);
         }
         if (!(value instanceof Iterable)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.CUSTOM_TYPE_CLASS + "."
-                            + EngineNames.CUSTOM_TYPE_LIST + " is not iterable"
+                    "rw-agent: " + TypeNames.CUSTOM_TYPE_CLASS + "."
+                            + TypeNames.CUSTOM_TYPE_LIST + " is not iterable"
                             + EngineNames.PIN);
         }
         return (Iterable<?>) value;
@@ -321,11 +321,11 @@ final class TypeFlags {
         Object answer =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
-                                type.getClass(), EngineNames.TYPE_NEEDS_POOL),
+                                type.getClass(), TypeNames.TYPE_NEEDS_POOL),
                         type);
         if (!(answer instanceof Boolean)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.TYPE_NEEDS_POOL + "() on "
+                    "rw-agent: " + TypeNames.TYPE_NEEDS_POOL + "() on "
                             + type.getClass().getName() + " did not return a boolean"
                             + EngineNames.PIN);
         }

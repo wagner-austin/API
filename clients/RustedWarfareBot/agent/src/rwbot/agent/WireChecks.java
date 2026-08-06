@@ -43,7 +43,7 @@ final class WireChecks {
                 StateStream.playerRecord(
                                 1918,
                                 2,
-                                new Perception.PlayerStat(
+                                new Scoreboard.PlayerStat(
                                         3, false, true, false, false, 12, 4200, 9100))
                         .equals(
                                 "{\"kind\":\"player\",\"frame\":1918,\"index\":2,\"team\":3,"
@@ -55,7 +55,7 @@ final class WireChecks {
         // name, so their slot is carried rather than dropped.
         failures += Check.expect(
                 StateStream.playerRecord(
-                                1, 0, new Perception.PlayerStat(1, true, false, true, true, 0, 0, 0))
+                                1, 0, new Scoreboard.PlayerStat(1, true, false, true, true, 0, 0, 0))
                         .contains("\"defeated\":true,\"wiped\":true"),
                 "an eliminated player is still on the wire");
 
@@ -237,6 +237,69 @@ final class WireChecks {
         failures += expectBadCommand(
                 "{\"kind\":\"ability\",\"unit_id\":1,\"key\":\"c_2\",\"action\":1}",
                 "an ability carrying the retired index field");
+
+        // The targeted ability: the same key dispatch with the ground point
+        // chosen by the planner -- the point is required, because an action
+        // fired at the ground with no ground to fire at is the other verb.
+        CommandRecord abilityAt =
+                CommandRecord.parse(
+                        "{\"kind\":\"ability_at\",\"unit_id\":213,"
+                                + "\"x\":512.5,\"y\":768.0,\"key\":\"c_3\"}");
+        failures += Check.expect(
+                abilityAt.kind() == CommandRecord.Kind.ABILITY_AT,
+                "targeted ability verb parsed");
+        failures += Check.expect(
+                "c_3".equals(abilityAt.actionKey()), "targeted ability key parsed");
+        failures += Check.expect(
+                abilityAt.unitId() == 213L, "targeted ability unit id parsed");
+        failures += Check.expect(abilityAt.x() == 512.5f, "targeted ability x parsed");
+        failures += Check.expect(abilityAt.y() == 768.0f, "targeted ability y parsed");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"key\":\"c_3\",\"x\":1}",
+                "a targeted ability missing a coordinate");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"key\":\"c_3\"}",
+                "a targeted ability with no position");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"x\":1,\"y\":2}",
+                "a targeted ability with no key");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"x\":1,\"y\":2,\"key\":\"\"}",
+                "a targeted ability with a blank key");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"x\":1,\"y\":2,\"key\":\"c_3\","
+                        + "\"type\":\"tank\"}",
+                "a targeted ability carrying a type");
+        failures += expectBadCommand(
+                "{\"kind\":\"ability_at\",\"unit_id\":1,\"x\":1,\"y\":2,\"key\":\"c_3\","
+                        + "\"target_id\":9}",
+                "a targeted ability carrying a target");
+
+        // The posture verb: a type's standing reflexes, not a unit's order.
+        CommandRecord posture =
+                CommandRecord.parse(
+                        "{\"kind\":\"posture\",\"type\":\"c_artillery\",\"reach\":290.0,"
+                                + "\"speed\":0.6,\"kite\":1,\"hp_floor\":30}");
+        failures += Check.expect(
+                posture.kind() == CommandRecord.Kind.POSTURE, "posture verb parsed");
+        failures += Check.expect(
+                "c_artillery".equals(posture.buildType()), "posture type parsed");
+        failures += Check.expect(posture.x() == 290.0f, "posture reach parsed");
+        failures += Check.expect(posture.unitId() == 1L, "posture kite parsed");
+        failures += Check.expect(posture.y() == 0.6f, "posture speed parsed");
+        failures += Check.expect(posture.targetId() == 30L, "posture floor parsed");
+        failures += expectBadCommand(
+                "{\"kind\":\"posture\",\"type\":\"c_tank\",\"reach\":-1,\"speed\":1.0,\"kite\":0,\"hp_floor\":0}",
+                "a posture with a negative reach");
+        failures += expectBadCommand(
+                "{\"kind\":\"posture\",\"type\":\"c_tank\",\"reach\":100,\"speed\":1.0,\"kite\":2,\"hp_floor\":0}",
+                "a posture with a kite that is not a flag");
+        failures += expectBadCommand(
+                "{\"kind\":\"posture\",\"type\":\"c_tank\",\"reach\":100,\"speed\":1.0,\"kite\":0,\"hp_floor\":101}",
+                "a posture with a floor above one hundred");
+        failures += expectBadCommand(
+                "{\"kind\":\"posture\",\"type\":\"c_tank\",\"reach\":100,\"speed\":1.0,\"kite\":0,\"hp_floor\":0,\"unit_id\":5}",
+                "a posture addressed to a unit");
 
         failures += Check.expect(
                 CommandRecord.parse("{\"kind\":\"move\",\"unit_id\":1,\"x\":-3,\"y\":4}").x()

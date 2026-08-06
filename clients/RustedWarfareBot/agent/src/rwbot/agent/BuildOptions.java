@@ -163,18 +163,18 @@ final class BuildOptions {
     static java.util.List<Option> ownedOptions(Object engine) {
         java.util.List<Option> options = new java.util.ArrayList<Option>();
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
-        Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
-        Method makes = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES);
+        Class<?> actionClass = EngineAccess.pinnedClass(TypeNames.ACTION_CLASS);
+        Method actions = EngineAccess.pinnedMethod(entityClass, TypeNames.ACTIONS);
+        Method makes = EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_MAKES);
         Method placedType =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_PLACED_TYPE);
+                EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_PLACED_TYPE);
         Method makesSomething =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES_SOMETHING);
+                EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_MAKES_SOMETHING);
         Method available =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_AVAILABLE, entityClass);
+                EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_AVAILABLE, entityClass);
         Method locked =
-                EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_LOCKED, entityClass);
-        Method price = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_PRICE);
+                EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_LOCKED, entityClass);
+        Method price = EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_PRICE);
 
         for (Object unit : Perception.ownedUnits(engine)) {
             long id = Perception.idOf(unit);
@@ -201,7 +201,7 @@ final class BuildOptions {
                                         EngineAccess.invoke(makesSomething, action)),
                                 intOf(
                                         EngineAccess.invoke(price, action),
-                                        EngineNames.ACTION_PRICE)));
+                                        TypeNames.ACTION_PRICE)));
             }
         }
         return options;
@@ -220,9 +220,9 @@ final class BuildOptions {
      */
     static Object actionMaking(Object unit, String typeName) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
-        Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
-        Method makes = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES);
+        Class<?> actionClass = EngineAccess.pinnedClass(TypeNames.ACTION_CLASS);
+        Method actions = EngineAccess.pinnedMethod(entityClass, TypeNames.ACTIONS);
+        Method makes = EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_MAKES);
         // Matched on the type alone. This used to skip any action the engine
         // did not call "makes something", which is the same filter the listing
         // path applied -- so removing it there and leaving it here produced the
@@ -260,7 +260,7 @@ final class BuildOptions {
      */
     static Object actionByKey(Object unit, String key) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
+        Method actions = EngineAccess.pinnedMethod(entityClass, TypeNames.ACTIONS);
         for (Object action : actionsOf(actions, unit)) {
             if (action == null) {
                 continue;
@@ -287,14 +287,14 @@ final class BuildOptions {
     static String keyNameOf(Object action) {
         Object key =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        EngineAccess.pinnedMethod(action.getClass(), TypeNames.ACTION_KEY),
                         action);
         if (key == null) {
             return "";
         }
         Object name =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(key.getClass(), EngineNames.ACTION_KEY_NAME),
+                        EngineAccess.pinnedMethod(key.getClass(), TypeNames.ACTION_KEY_NAME),
                         key);
         return name instanceof String ? (String) name : "";
     }
@@ -311,9 +311,9 @@ final class BuildOptions {
      */
     static String describeMakeable(Object unit) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
-        Method actions = EngineAccess.pinnedMethod(entityClass, EngineNames.ACTIONS);
-        Method makes = EngineAccess.pinnedMethod(actionClass, EngineNames.ACTION_MAKES);
+        Class<?> actionClass = EngineAccess.pinnedClass(TypeNames.ACTION_CLASS);
+        Method actions = EngineAccess.pinnedMethod(entityClass, TypeNames.ACTIONS);
+        Method makes = EngineAccess.pinnedMethod(actionClass, TypeNames.ACTION_MAKES);
         StringBuilder out = new StringBuilder();
         // Listed on the same rule the lookup uses, so the failure message and
         // the lookup can never disagree. When they did, an extractor that was
@@ -437,7 +437,7 @@ final class BuildOptions {
      */
     static Gates gatesOf(Object action, Object unit) {
         Class<?> entityClass = EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS);
-        Class<?> actionClass = EngineAccess.pinnedClass(EngineNames.ACTION_CLASS);
+        Class<?> actionClass = EngineAccess.pinnedClass(TypeNames.ACTION_CLASS);
         // False, always. The true branch routes affordability through the
         // engine's check-and-charge helper and spends the credits.
         boolean applies =
@@ -445,7 +445,7 @@ final class BuildOptions {
                         EngineAccess.invoke(
                                 EngineAccess.pinnedMethod(
                                         actionClass,
-                                        EngineNames.ACTION_APPLIES,
+                                        TypeNames.ACTION_APPLIES,
                                         entityClass,
                                         boolean.class),
                                 action,
@@ -455,14 +455,14 @@ final class BuildOptions {
                 Boolean.TRUE.equals(
                         EngineAccess.invoke(
                                 EngineAccess.pinnedMethod(
-                                        actionClass, EngineNames.ACTION_AVAILABLE, entityClass),
+                                        actionClass, TypeNames.ACTION_AVAILABLE, entityClass),
                                 action,
                                 unit));
         boolean locked =
                 Boolean.TRUE.equals(
                         EngineAccess.invoke(
                                 EngineAccess.pinnedMethod(
-                                        actionClass, EngineNames.ACTION_LOCKED, entityClass),
+                                        actionClass, TypeNames.ACTION_LOCKED, entityClass),
                                 action,
                                 unit));
         return new Gates(applies, available, locked, hasRoomFor(action, unit));
@@ -484,8 +484,8 @@ final class BuildOptions {
         Object makesSomething =
                 EngineAccess.invoke(
                         EngineAccess.pinnedMethod(
-                                EngineAccess.pinnedClass(EngineNames.ACTION_CLASS),
-                                EngineNames.ACTION_MAKES_SOMETHING),
+                                EngineAccess.pinnedClass(TypeNames.ACTION_CLASS),
+                                TypeNames.ACTION_MAKES_SOMETHING),
                         action);
         if (!Boolean.TRUE.equals(makesSomething)) {
             return true;
@@ -520,7 +520,7 @@ final class BuildOptions {
         }
         if (!(value instanceof Iterable)) {
             throw new IllegalStateException(
-                    "rw-agent: " + EngineNames.ACTIONS + "() on " + unit.getClass().getName()
+                    "rw-agent: " + TypeNames.ACTIONS + "() on " + unit.getClass().getName()
                             + " is not iterable" + EngineNames.PIN);
         }
         return (Iterable<?>) value;

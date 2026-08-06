@@ -224,7 +224,7 @@ final class Orders {
                         "a",
                         float.class,
                         float.class,
-                        EngineAccess.pinnedClass(EngineNames.TYPE_CLASS),
+                        EngineAccess.pinnedClass(TypeNames.TYPE_CLASS),
                         int.class);
         EngineAccess.invoke(
                 place,
@@ -365,7 +365,7 @@ final class Orders {
 
         Object key =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        EngineAccess.pinnedMethod(action.getClass(), TypeNames.ACTION_KEY),
                         action);
         BuildOptions.Gates gates = BuildOptions.gatesOf(action, producer);
         // The executor drops an action command whose key is null or the
@@ -397,8 +397,8 @@ final class Orders {
                 EngineAccess.pinnedMethod(
                         command.getClass(),
                         "a",
-                        EngineAccess.pinnedClass(EngineNames.ACTION_KEY_CLASS),
-                        EngineAccess.pinnedClass(EngineNames.POINT_CLASS),
+                        EngineAccess.pinnedClass(TypeNames.ACTION_KEY_CLASS),
+                        EngineAccess.pinnedClass(TypeNames.POINT_CLASS),
                         EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS));
         EngineAccess.invoke(setAction, command, key, newPoint(at[0], at[1]), null);
     }
@@ -427,6 +427,30 @@ final class Orders {
      *     key, naming what it offers instead.
      */
     static void ability(Object engine, Object unit, String keyName) {
+        float[] at = Perception.positionOf(unit);
+        abilityAt(engine, unit, keyName, at[0], at[1]);
+    }
+
+    /**
+     * Has a unit fire one of its actions at a chosen ground point.
+     *
+     * <p>The same dispatch as {@link #ability}, with the point chosen by the
+     * planner instead of defaulted to the unit's own position. The engine's
+     * interface sends wherever the player clicked; for a production action
+     * nothing consumes that point, but an action declared
+     * {@code fireTurretXAtGround} -- the nuke launch is the motivating one --
+     * aims its turret at exactly this coordinate, so the point is the whole
+     * decision (wiki: mechanics-build-actions).
+     *
+     * @param engine The live engine instance.
+     * @param unit The unit whose action it is.
+     * @param keyName The action's key name, from the option stream.
+     * @param x Target world x.
+     * @param y Target world y.
+     * @throws IllegalStateException When the unit has no action under that
+     *     key, naming what it offers instead.
+     */
+    static void abilityAt(Object engine, Object unit, String keyName, float x, float y) {
         Object team = EngineAccess.readField(engine, EngineNames.LOCAL_TEAM);
         if (team == null) {
             throw new IllegalStateException("rw-agent: engine has no current player to order for");
@@ -446,7 +470,7 @@ final class Orders {
 
         Object key =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(action.getClass(), EngineNames.ACTION_KEY),
+                        EngineAccess.pinnedMethod(action.getClass(), TypeNames.ACTION_KEY),
                         action);
         BuildOptions.Gates gates = BuildOptions.gatesOf(action, unit);
         Log.info(
@@ -481,15 +505,14 @@ final class Orders {
                         command.getClass(), "a", EngineAccess.pinnedClass(EngineNames.ORDERABLE_CLASS));
         EngineAccess.invoke(addUnit, command, unit);
 
-        float[] at = Perception.positionOf(unit);
         Method setAction =
                 EngineAccess.pinnedMethod(
                         command.getClass(),
                         "a",
-                        EngineAccess.pinnedClass(EngineNames.ACTION_KEY_CLASS),
-                        EngineAccess.pinnedClass(EngineNames.POINT_CLASS),
+                        EngineAccess.pinnedClass(TypeNames.ACTION_KEY_CLASS),
+                        EngineAccess.pinnedClass(TypeNames.POINT_CLASS),
                         EngineAccess.pinnedClass(EngineNames.ENTITY_CLASS));
-        EngineAccess.invoke(setAction, command, key, newPoint(at[0], at[1]), null);
+        EngineAccess.invoke(setAction, command, key, newPoint(x, y), null);
     }
 
     /**
@@ -504,7 +527,7 @@ final class Orders {
         }
         Object name =
                 EngineAccess.invoke(
-                        EngineAccess.pinnedMethod(key.getClass(), EngineNames.ACTION_KEY_NAME),
+                        EngineAccess.pinnedMethod(key.getClass(), TypeNames.ACTION_KEY_NAME),
                         key);
         return name instanceof String ? "'" + name + "'" : "<unnamed>";
     }
@@ -522,19 +545,19 @@ final class Orders {
      * @return A point the command will accept.
      */
     private static Object newPoint(float x, float y) {
-        Class<?> pointClass = EngineAccess.pinnedClass(EngineNames.POINT_CLASS);
+        Class<?> pointClass = EngineAccess.pinnedClass(TypeNames.POINT_CLASS);
         try {
             return pointClass
                     .getConstructor(float.class, float.class)
                     .newInstance(Float.valueOf(x), Float.valueOf(y));
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException(
-                    "rw-agent: cannot construct " + EngineNames.POINT_CLASS + EngineNames.PIN, e);
+                    "rw-agent: cannot construct " + TypeNames.POINT_CLASS + EngineNames.PIN, e);
         }
     }
 
     static Object resolveType(String typeName) {
-        Method lookup = EngineAccess.pinnedMethod(EngineAccess.pinnedClass(EngineNames.TYPE_REGISTRY_CLASS), "a", String.class);
+        Method lookup = EngineAccess.pinnedMethod(EngineAccess.pinnedClass(TypeNames.TYPE_REGISTRY_CLASS), "a", String.class);
         return EngineAccess.invoke(lookup, null, typeName);
     }
 }
