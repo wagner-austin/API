@@ -202,7 +202,7 @@ def _imported_modules(path: Path) -> set[str]:
 #: the same commit. A drift is loud either way -- a script added here but
 #: not to pyproject is dead and this check says so; one added to pyproject
 #: but not here fails the same way until the decision is recorded.
-_CONSOLE_SCRIPT_MODULES = ("rw_bot.harness.boot_log_cli",)
+_CONSOLE_SCRIPT_MODULES = ("rw_bot.harness.boot_log_cli", "rw_bot.harness.fleet_http")
 
 
 def test_every_production_module_is_wired_to_an_entry_point() -> None:

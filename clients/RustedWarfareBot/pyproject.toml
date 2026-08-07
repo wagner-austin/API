@@ -20,6 +20,7 @@ monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 
 [tool.poetry.scripts]
 rw-boot-log = "rw_bot.harness.boot_log_cli:main"
+rw-fleet = "rw_bot.harness.fleet_http:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"

@@ -16,6 +16,7 @@ import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from socketserver import BaseServer
 from typing import Protocol
 
 
@@ -160,6 +161,63 @@ class WriteTextLinesProto(Protocol):
         ...
 
 
+class SpawnedMatchProto(Protocol):
+    """The child-process surface the fleet manager consumes."""
+
+    @property
+    def pid(self) -> int:
+        """The child's process id."""
+        ...
+
+    def poll(self) -> int | None:
+        """Return the exit code, or ``None`` while the child runs."""
+        ...
+
+
+class SpawnMatchProto(Protocol):
+    """Start one detached match process with its transcript on disk."""
+
+    def __call__(self, argv: Sequence[str], transcript: Path) -> SpawnedMatchProto:
+        """Spawn one match.
+
+        Args:
+            argv: Argument vector, program first.
+            transcript: File that receives the child's combined output.
+
+        Returns:
+            The spawned process handle.
+
+        Raises:
+            OSError: When the program cannot be started or the
+                transcript cannot be opened.
+        """
+        ...
+
+
+class ServeForeverProto(Protocol):
+    """Run an HTTP server's accept loop until the process is interrupted."""
+
+    def __call__(self, server: BaseServer) -> None:
+        """Serve until interrupted.
+
+        Args:
+            server: The bound server to run.
+        """
+        ...
+
+
+class KillTreeProto(Protocol):
+    """Terminate a process and every child it spawned."""
+
+    def __call__(self, pid: int) -> None:
+        """Kill one process tree.
+
+        Args:
+            pid: Root process id of the tree.
+        """
+        ...
+
+
 def _run_capture_impl(argv: Sequence[str]) -> tuple[int, tuple[str, ...]]:
     """Production implementation of :class:`RunCaptureProto`.
 
@@ -249,6 +307,56 @@ def _write_text_lines_impl(path: Path, lines: Sequence[str]) -> None:
     path.write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
 
 
+def _spawn_match_impl(argv: Sequence[str], transcript: Path) -> SpawnedMatchProto:
+    """Production implementation of :class:`SpawnMatchProto`.
+
+    The transcript file handle is closed in the parent immediately after
+    the spawn — the child keeps its inherited handle, so the report lines
+    the planner prints at match end still land in the file.
+
+    Args:
+        argv: Argument vector, program first.
+        transcript: File that receives the child's combined output.
+
+    Returns:
+        The spawned process handle.
+
+    Raises:
+        OSError: When the program cannot be started or the transcript
+            cannot be opened.
+    """
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    with transcript.open("ab") as sink:
+        return subprocess.Popen(list(argv), stdout=sink, stderr=subprocess.STDOUT)
+
+
+def _serve_forever_impl(server: BaseServer) -> None:
+    """Production implementation of :class:`ServeForeverProto`.
+
+    Args:
+        server: The bound server to run.
+    """
+    server.serve_forever()
+
+
+def _kill_tree_impl(pid: int) -> None:
+    """Production implementation of :class:`KillTreeProto`.
+
+    ``taskkill /T`` is the Windows way to fell the whole tree — the fleet
+    spawns ``make``, which runs PowerShell, which runs the game JVM and
+    the planner; killing only the root would orphan the match.
+
+    Args:
+        pid: Root process id of the tree.
+    """
+    subprocess.run(
+        ["taskkill", "/PID", str(pid), "/T", "/F"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+
 def _read_argv_impl() -> list[str]:
     """Production implementation of :class:`ReadArgvProto`.
 
@@ -300,33 +408,43 @@ def _write_line_impl(text: str) -> None:
 
 
 copy_entry: CopyEntryProto = _copy_entry_impl
+kill_tree: KillTreeProto = _kill_tree_impl
 list_names: ListNamesProto = _list_names_impl
+spawn_match: SpawnMatchProto = _spawn_match_impl
 make_dirs: MakeDirsProto = _make_dirs_impl
 path_exists: PathExistsProto = _path_exists_impl
 read_argv: ReadArgvProto = _read_argv_impl
 read_text_lines: ReadTextLinesProto = _read_text_lines_impl
 run_capture: RunCaptureProto = _run_capture_impl
+serve_forever: ServeForeverProto = _serve_forever_impl
 write_line: WriteLineProto = _write_line_impl
 write_text_lines: WriteTextLinesProto = _write_text_lines_impl
 
 
 __all__ = [
     "CopyEntryProto",
+    "KillTreeProto",
     "ListNamesProto",
     "MakeDirsProto",
     "PathExistsProto",
     "ReadArgvProto",
     "ReadTextLinesProto",
     "RunCaptureProto",
+    "ServeForeverProto",
+    "SpawnMatchProto",
+    "SpawnedMatchProto",
     "WriteLineProto",
     "WriteTextLinesProto",
     "copy_entry",
+    "kill_tree",
     "list_names",
     "make_dirs",
     "path_exists",
     "read_argv",
     "read_text_lines",
     "run_capture",
+    "serve_forever",
+    "spawn_match",
     "write_line",
     "write_text_lines",
 ]

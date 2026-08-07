@@ -6,7 +6,7 @@ SHELL := powershell.exe
 # and Steam would re-verify the build out from under the class mappings.
 GAME_DIR ?= .game
 
-.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch income sweep
+.PHONY: help lint test check install boot-probe unit-dump type-flags wire-capture agent agent-selftest sandbox-probe discover-probe decompile play host watch fleet income sweep
 
 help:
 	@Write-Host ""
@@ -36,6 +36,7 @@ help:
 	@Write-Host "  make sweep                       play a batch of matches in parallel, resumably"
 	@Write-Host "                                   SWEEP_JOBS=sweeps/x.txt SWEEP_NAME=x SWEEP_WORKERS=4"
 	@Write-Host "  make watch                       one windowed match a human can watch"
+	@Write-Host "  make fleet                       match fleet manager UI on 127.0.0.1:27500 (spawn/kill/restart parallel matches)"
 	@Write-Host "                                   WATCH_DIFFICULTY=3 WATCH_DOCTRINE=doctrines/aa-counter-guard.doctrine"
 	@Write-Host "  make host                        bot-hosted LAN game a human can join"
 	@Write-Host "                                   HOST_MAP=maps/skirmish/[p2]duel_lake.tmx"
@@ -389,6 +390,16 @@ watch:
 	@Write-Host ""
 	@Write-Host "==> watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))" -ForegroundColor Cyan
 	& scripts/make/watch.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(WATCH_LOG)" -Map "$(WATCH_MAP)" -Opponents $(WATCH_OPPONENTS) -Difficulty $(WATCH_DIFFICULTY) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
+
+# The match fleet: one user-owned manager process with a control page,
+# spawning `make play` children (seed, map, opponents, difficulty,
+# fast-forward, frozen tree are spawn parameters). PLAY_PORT already
+# self-randomizes per invocation, which is what makes parallel matches
+# safe. Runs in a terminal the operator owns; browse to the printed URL.
+fleet: install
+	@Write-Host ""
+	@Write-Host "==> fleet (match fleet manager, http://127.0.0.1:27500/)" -ForegroundColor Cyan
+	poetry run rw-fleet
 
 # A batch of matches, played several at a time. Each worker gets its own copy of
 # the game directory because a running match writes three fixed-name paths
