@@ -99,6 +99,13 @@ class Entity(TypedDict):
         complete: Whether construction has finished. A building joins the roster
             the moment construction starts, so presence is not completion — and
             an unfinished factory never advances its production queue.
+        damaged_by: Type name of the unit that last damaged this one, empty
+            when nothing has. The engine maintains the reference natively
+            (``y.bt``); the sampler publishes its TYPE so the trace's loss
+            diff can name the killer off the previous sample exactly as it
+            already names the position ([[policy-trace]]). A damager that
+            has since died still answers -- attribution wants the type, not
+            a live reference.
         queued: Units this entity has queued for production, zero for anything
             that makes nothing. A production order changes no roster until the
             unit is finished, so this is the only immediate evidence that the
@@ -123,6 +130,7 @@ class Entity(TypedDict):
     max_hp: float
     complete: bool
     queued: int
+    damaged_by: str
 
 
 class ResourcePool(TypedDict):

@@ -99,6 +99,7 @@ def _decode_entity(record: Mapping[str, str | int | float | bool]) -> Entity:
         max_hp=require_finite_float(record, "max_hp"),
         complete=require_bool(record, "complete"),
         queued=require_int(record, "queued"),
+        damaged_by=require_str(record, "damaged_by"),
     )
 
 
@@ -430,7 +431,8 @@ def encode_sample(sample: Sample) -> tuple[str, ...]:
             f'"touching_water":{str(entity["touching_water"]).lower()},'
             f'"hp":{entity["hp"]!r},"max_hp":{entity["max_hp"]!r},'
             f'"complete":{str(entity["complete"]).lower()},'
-            f'"queued":{entity["queued"]}}}'
+            f'"queued":{entity["queued"]},'
+            f'"damaged_by":"{_escape(entity["damaged_by"])}"}}'
         )
     for pool in sample["pools"]:
         lines.append(
