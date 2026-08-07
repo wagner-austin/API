@@ -18,8 +18,12 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.bot import ai_strategy
+from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.ai.threats import analyze_threats
-from tankpit_bot.bot.ai.types import AIStateDict, make_initial_ai_state, render_reason
+from tankpit_bot.bot.ai.types import (
+    AIStateDict,
+    make_initial_ai_state,
+)
 from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.bot.types import (
     BotCommand,
