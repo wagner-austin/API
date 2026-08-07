@@ -381,6 +381,8 @@ def test_main_wires_the_app_onto_the_resolved_port() -> None:
         "/accounts",
         "/bots",
         "/bots/{instance}/stats",
+        "/bots/{instance}/hud",
+        "/bots/{instance}/activity",
         "/bots/{instance}/stop",
         "/bots/{instance}/restart",
         "/bots/{instance}",
@@ -504,6 +506,16 @@ async def test_http_page_stats_and_restart(
         payload = narrow_json_to_dict(load_json_str(await stats.text()))
         assert payload == {"available": False}
         assert (await client.get("/bots/ghost/stats")).status == 404
+        activity = await client.get("/bots/alpha/activity")
+        assert activity.status == 200
+        activity_payload = narrow_json_to_dict(load_json_str(await activity.text()))
+        assert activity_payload == {"available": False}
+        assert (await client.get("/bots/ghost/activity")).status == 404
+        hud = await client.get("/bots/alpha/hud")
+        assert hud.status == 200
+        hud_payload = narrow_json_to_dict(load_json_str(await hud.text()))
+        assert hud_payload == {"available": False}
+        assert (await client.get("/bots/ghost/hud")).status == 404
     finally:
         top_hooks.read_text = original_read
 

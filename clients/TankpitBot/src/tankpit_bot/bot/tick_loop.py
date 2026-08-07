@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 from playwright._impl._errors import TargetClosedError
 
@@ -22,11 +23,11 @@ from tankpit_bot.action_lab.page_client_snapshot import (
     capture_page_client_snapshot,
 )
 from tankpit_bot.bot import ai_strategy, executor, world_sync
-from tankpit_bot.bot.ai.combat_strategy import clear_combat_target
+from tankpit_bot.bot.ai.combat_target import clear_combat_target
+from tankpit_bot.bot.ai.scoring_types import render_reason
 from tankpit_bot.bot.ai.types import (
     AIStateDict,
     make_respawn_ai_state,
-    render_reason,
 )
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.combat_feedback import CombatFeedback
@@ -34,7 +35,7 @@ from tankpit_bot.bot.session_exit import SessionExitError
 from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
 from tankpit_bot.browser import get_current_time_ms
-from tankpit_bot.browser.overlay import OverlayStateDict
+from tankpit_bot.browser.overlay import OverlayStateDict, encode_overlay_state
 from tankpit_bot.browser.overlay_hud import update_bot_overlay
 from tankpit_bot.diagnostics.entity_alignment import maybe_emit_entity_alignment_sample
 from tankpit_bot.diagnostics.runs_index import (
@@ -60,6 +61,7 @@ from tankpit_bot.protocol.constants import (
     SUPERVISOR_ERROR_FRIENDLY_FIRE,
     SUPERVISOR_ERROR_INSUFFICIENT_FUEL,
 )
+from tankpit_bot.runtime_artifacts import bot_run_dir, resolve_bot_instance
 from tankpit_bot.runtime_logging import (
     emit_ai,
     emit_diagnostic,
@@ -901,6 +903,12 @@ def _tick_once(bot: Bot) -> None:
     bot._flag_capture.ensure(hud_cdp)
     bot._flag_capture.record_tick(overlay)
     update_bot_overlay(hud_cdp, overlay)
+    # The same payload the in-page HUD renders, mirrored to disk each
+    # tick so the fleet page can show the identical card per instance.
+    _test_hooks.write_text(
+        bot_run_dir(resolve_bot_instance()) / "hud.json",
+        dump_json_str(encode_overlay_state(overlay)),
+    )
 
 
 def _is_page_client_healthy(snapshot: PageClientSnapshotDict) -> bool:

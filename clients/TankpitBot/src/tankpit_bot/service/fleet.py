@@ -53,10 +53,10 @@ from typing_extensions import TypedDict
 
 from tankpit_bot import _test_hooks as top_hooks
 from tankpit_bot.browser.accounts import _ACCOUNTS_PATH, load_accounts
-from tankpit_bot.diagnostics.run_digest import build_run_digest
 from tankpit_bot.runtime_artifacts import _INSTANCE_NAME, bot_run_dir
 from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_page import FLEET_PAGE_HTML
+from tankpit_bot.service.fleet_telemetry import FleetTelemetry
 
 log = get_logger(__name__)
 
@@ -171,6 +171,7 @@ class FleetManager:
     def __init__(self) -> None:
         """Start with an empty registry."""
         self._bots: dict[str, _ManagedBot] = {}
+        self._telemetry = FleetTelemetry()
 
     def accounts(self) -> list[str]:
         """Return the configured account usernames.
@@ -312,13 +313,25 @@ class FleetManager:
             seconds=bot.seconds,
         )
 
+    def stats_gate(self, instance: str) -> None:
+        """Refuse telemetry reads for unregistered instances.
+
+        Args:
+            instance: Candidate instance name.
+
+        Raises:
+            FleetError: If the instance is not registered.
+        """
+        if instance not in self._bots:
+            raise FleetError(f"unknown instance {instance!r}")
+
     def stats(self, instance: str) -> JSONObject:
         """Summarize a registered instance's latest run from its events.
 
-        Reads ``runs/bot/<instance>/latest.events.jsonl`` through the
-        run-digest builder — the same truth table ``make digest``
-        prints, reduced to the fields the control page shows. Works on
-        live runs (the events file grows in place) and on crashed ones.
+        The digest reduction (:mod:`fleet_telemetry`) — the same truth
+        table ``make digest`` prints, reduced to the fields the control
+        page shows, cached so 1 s page polling costs one events parse
+        per cache window. Works on live runs and on crashed ones.
 
         Args:
             instance: Registered instance name.
@@ -332,27 +345,28 @@ class FleetManager:
         """
         if instance not in self._bots:
             raise FleetError(f"unknown instance {instance!r}")
-        events_path = bot_run_dir(instance) / "latest.events.jsonl"
-        try:
-            digest = build_run_digest(events_path)
-        except (OSError, ValueError) as error:
-            log.info("Fleet: no stats for %r yet: %s", instance, error)
-            return {"available": False}
-        return {
-            "available": True,
-            "kills": digest["kills"],
-            "deaths": digest["deaths"],
-            "shots": digest["shots"],
-            "teleports": digest["teleports"],
-            "pickups": digest["pickups"],
-            "duration_s": digest["duration_s"],
-            "clean_exit": digest["clean_exit"],
-            "exit_reason": digest["exit_reason"],
-            "rank_name": digest["rank_name"],
-            "rank_number": digest["rank_number"],
-            "promotion_points": digest["promotion_points"],
-            "started_at": digest["started_at"],
-        }
+        return self._telemetry.stats(instance)
+
+    def activity(self, instance: str) -> JSONObject:
+        """Return the live tail of a registered instance's run.
+
+        Current bot state, tick, fuel, and the last few AI/WORLD/STATE
+        lines (:mod:`fleet_telemetry`) — what the bot is doing right
+        now, for the control page's activity feed.
+
+        Args:
+            instance: Registered instance name.
+
+        Returns:
+            ``{"available": False}`` before the first events, else the
+            tail with ``"available": True``.
+
+        Raises:
+            FleetError: If the instance is not registered.
+        """
+        if instance not in self._bots:
+            raise FleetError(f"unknown instance {instance!r}")
+        return self._telemetry.activity(instance)
 
     def remove(self, instance: str) -> FleetBotDict:
         """Drop a finished instance from the registry.
@@ -459,6 +473,19 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
         names: list[JSONValue] = list(manager.accounts())
         return _json_response({"accounts": names})
 
+    app.router.add_get("/", control_page)
+    app.router.add_get("/accounts", list_accounts)
+    app.router.add_get("/bots", list_bots)
+
+
+def _add_telemetry_routes(app: web.Application, manager: FleetManager) -> None:
+    """Wire the per-instance telemetry routes: stats, hud, activity.
+
+    Args:
+        app: Application under construction.
+        manager: The fleet registry the routes read.
+    """
+
     async def bot_stats(request: web.Request) -> web.Response:
         """``GET /bots/{instance}/stats`` — latest-run digest summary."""
         try:
@@ -468,10 +495,37 @@ def _add_observation_routes(app: web.Application, manager: FleetManager) -> None
             return web.Response(status=404, text=str(error))
         return _json_response(summary)
 
-    app.router.add_get("/", control_page)
-    app.router.add_get("/accounts", list_accounts)
-    app.router.add_get("/bots", list_bots)
+    async def bot_hud(request: web.Request) -> web.Response:
+        """``GET /bots/{instance}/hud`` — this tick's in-page HUD payload.
+
+        The bot mirrors the exact payload the ``make run`` overlay
+        renders to ``runs/bot/<instance>/hud.json`` every tick; the
+        fleet serves it verbatim so the page can draw the same card.
+        """
+        instance = request.match_info["instance"]
+        try:
+            manager.stats_gate(instance)
+        except FleetError as error:
+            log.warning("Fleet: refused hud (404): %s", error)
+            return web.Response(status=404, text=str(error))
+        try:
+            raw = top_hooks.read_text(bot_run_dir(instance) / "hud.json")
+        except OSError:
+            return _json_response({"available": False})
+        return web.Response(text=raw, content_type="application/json")
+
+    async def bot_activity(request: web.Request) -> web.Response:
+        """``GET /bots/{instance}/activity`` — live tail of the run."""
+        try:
+            tail = manager.activity(request.match_info["instance"])
+        except FleetError as error:
+            log.warning("Fleet: refused activity (404): %s", error)
+            return web.Response(status=404, text=str(error))
+        return _json_response(tail)
+
     app.router.add_get("/bots/{instance}/stats", bot_stats)
+    app.router.add_get("/bots/{instance}/hud", bot_hud)
+    app.router.add_get("/bots/{instance}/activity", bot_activity)
 
 
 def _add_lifecycle_routes(app: web.Application, manager: FleetManager) -> None:
@@ -541,6 +595,7 @@ def make_fleet_app(manager: FleetManager) -> web.Application:
     """
     app = web.Application()
     _add_observation_routes(app, manager)
+    _add_telemetry_routes(app, manager)
     _add_lifecycle_routes(app, manager)
     return app
 
