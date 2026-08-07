@@ -202,12 +202,12 @@ other returns the Bresenham raster — so both bind as ``law`` claims
   "claims": [
   {
     "id": "shot-line-tiles",
-    "code": "tankpit_bot.physics.line_of_sight:shot_line_tiles",
+    "code": "tankpit_bot.state.line_of_sight:shot_line_tiles",
     "law": "The shot line is the Bresenham raster between shooter and target with BOTH endpoints excluded - the shooter's own tile and the target tile never occlude their own shot (user law 2026-07-30, flag s3-14 narration)."
   },
   {
     "id": "shot-line-clear",
-    "code": "tankpit_bot.physics.line_of_sight:is_shot_line_clear",
+    "code": "tankpit_bot.state.line_of_sight:is_shot_line_clear",
     "law": "A straight shot is interrupted ONLY by rock/mountain terrain and land movable blocks (bridge/land/stacked/ferry-rock wire types); water never blocks, and mines, containers, and tanks on intermediate tiles never block (user law, verbatim 2026-07-30: 'we can shoot over other mines of course. just not mountains or mobable blocks on land')."
   }
   ]
