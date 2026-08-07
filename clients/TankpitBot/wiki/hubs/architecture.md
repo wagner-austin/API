@@ -1,6 +1,6 @@
 # Architecture
 
-Codebase design decisions, patterns, and coding standards. (15 pages)
+Codebase design decisions, patterns, and coding standards. (16 pages)
 
 [Inheritance Chain](../pages/inheritance-chain.md) -- Bot -> DispatchMixin -> CompletionsMixin -> SessionBase, composition over inheritance
 [Coding Standards](../pages/coding-standards.md) -- no Any/cast/TYPE_CHECKING, no mocks, _test_hooks DI, MonkeyPatchBanRule
@@ -21,3 +21,5 @@ Codebase design decisions, patterns, and coding standards. (15 pages)
 [Session-State De-globalisation](../pages/session-state-deglobalisation.md) -- the 17 modules holding per-session state at module scope, why the divergence exists (a 40-second package split froze an unfinished convergence), the archive measurements that make the cipher swap a lift, and the 11-step ordered plan whose completion criterion is deleting the conftest reset list
 
 [Package Layering](../pages/package-layering.md) -- src/tankpit_bot had ONE strongly-connected component containing all 17 packages; the four leaf packages (types, wire, contracts, facts), the three cycles removed by moving misfiled modules (protocol/container, facts/state, physics/state), the four thin wrappers collapsed in combat_strategy, and why a layering guard must count `from tankpit_bot import X` too
+
+[Quad-Sweep Doctrine](../pages/quad-sweep-doctrine.md) -- stationary recon then loop harvest: four ATOMIC scope shifts from one anchor tile the 31x31 the ANCHOR law reaches, each paying one extra radar; the harvest loop orders clusters by walkable distance and exits by teleport to the next block anchor; archive-mined proof that a shift-framed window is the acceptance window, so pickups need no teleport frame
