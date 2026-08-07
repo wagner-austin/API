@@ -4,7 +4,6 @@ This module provides complete protocol message decoding capabilities,
 organized into submodules:
 
 - constants: Enums, message type codes, shared values
-- helpers: DecodeError, validation functions, byte utilities
 - types: TypedDict definitions for all message types
 - decoders: Message decoding functions organized by category
 """
@@ -130,15 +129,6 @@ from tankpit_bot.protocol.encoders.radar import (
     encode_radar_mine_clear,
     encode_radar_scan_result,
 )
-from tankpit_bot.protocol.helpers import (
-    DecodeError,
-    require_exact_length,
-    require_min_length,
-    require_parts,
-    require_prefix,
-    x16,
-    x24,
-)
 from tankpit_bot.protocol.types import (
     ActionDoneDict,
     ActiveForcesDict,
@@ -248,7 +238,6 @@ __all__ = [
     "ChatMessageDict",
     "ConnectionLostDict",
     "DeactivationDict",
-    "DecodeError",
     "DecodedMessage",
     "DecorationDict",
     "EnemyDetectionDict",
@@ -336,10 +325,6 @@ __all__ = [
     "encode_radar_mine_clear",
     "encode_radar_scan_result",
     "is_text_message",
-    "require_exact_length",
-    "require_min_length",
-    "require_parts",
-    "require_prefix",
     "require_radar_container",
     "require_radar_mine",
     "require_radar_mine_clear",
@@ -353,6 +338,4 @@ __all__ = [
     "viewport_entity_has_equipment_cache",
     "viewport_entity_has_fuel_cache",
     "viewport_entity_has_no_cache",
-    "x16",
-    "x24",
 ]
