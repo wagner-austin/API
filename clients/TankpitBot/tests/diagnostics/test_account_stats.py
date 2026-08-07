@@ -22,10 +22,8 @@ from tankpit_bot.diagnostics.account_stats import (
     parse_account_stats,
 )
 from tankpit_bot.diagnostics.event_stream import load_event_records
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 _PANEL_TEXT = (
     "Name: Artax\n"

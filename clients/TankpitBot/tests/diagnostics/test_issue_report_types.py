@@ -12,22 +12,26 @@ from platform_core.json_utils import (
 )
 
 from tankpit_bot.diagnostics.issue_report_codecs import (
+    decode_issue_report,
+    encode_issue_report,
+)
+from tankpit_bot.diagnostics.issue_report_codecs_records import (
     decode_action_outcome_row,
     decode_fuel_target_selection_record,
-    decode_issue_report,
     decode_map_open_skipped_record,
     decode_session_room_record,
-    decode_state_budget_record,
-    decode_targeted_teleport_record,
     decode_teleport_attempt_record,
     encode_action_outcome_row,
     encode_fuel_target_selection_record,
-    encode_issue_report,
     encode_map_open_skipped_record,
     encode_session_room_record,
+    encode_teleport_attempt_record,
+)
+from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
+    decode_state_budget_record,
+    decode_targeted_teleport_record,
     encode_state_budget_record,
     encode_targeted_teleport_record,
-    encode_teleport_attempt_record,
 )
 from tankpit_bot.diagnostics.issue_report_types import (
     ActionOutcomeRowDict,
@@ -113,14 +117,12 @@ def test_fuel_target_selection_record_rejects_non_bool_target_present() -> None:
 
 def test_decode_scorecard_rejects_non_int_outcome_count() -> None:
     """The outcome-counts codec rejects non-int values."""
-    from tankpit_bot.diagnostics.issue_report_codecs import (
+    from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
         decode_session_scorecard,
         encode_session_scorecard,
     )
-    from tankpit_bot.diagnostics.session_scorecard import (
-        build_session_scorecard,
-        new_scorecard_accumulator,
-    )
+    from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
+    from tankpit_bot.diagnostics.session_scorecard_accumulator import new_scorecard_accumulator
 
     scorecard = build_session_scorecard(new_scorecard_accumulator())
     encoded = encode_session_scorecard(scorecard)
@@ -365,7 +367,7 @@ def test_decode_issue_report_rejects_non_object_session_room() -> None:
 
 def test_decode_issue_report_treats_absent_session_room_as_none() -> None:
     """A record without ``session_room`` decodes with the field set to None."""
-    from tankpit_bot.diagnostics.issue_report_codecs import encode_session_scorecard
+    from tankpit_bot.diagnostics.issue_report_codecs_scorecard import encode_session_scorecard
     from tankpit_bot.diagnostics.issue_report_types import (
         SessionScorecardDict,
         make_unsampled_inventory_counts,
@@ -454,7 +456,7 @@ def test_state_budget_record_decodes_pre_stretch_artifacts() -> None:
 
 def test_fuel_low_water_episode_round_trip() -> None:
     """``FuelLowWaterEpisodeDict`` round-trips through JSON encoding."""
-    from tankpit_bot.diagnostics.issue_report_codecs import (
+    from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
         decode_fuel_low_water_episode,
         encode_fuel_low_water_episode,
     )
@@ -480,7 +482,7 @@ def test_fuel_low_water_episode_round_trip() -> None:
 
 def test_teleport_spend_record_round_trip() -> None:
     """``TeleportSpendRecordDict`` round-trips through JSON encoding."""
-    from tankpit_bot.diagnostics.issue_report_codecs import (
+    from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
         decode_teleport_spend_record,
         encode_teleport_spend_record,
     )
@@ -496,7 +498,7 @@ def test_teleport_spend_record_round_trip() -> None:
 def test_session_scorecard_decodes_pre_upgrade_artifacts() -> None:
     """Scorecards persisted before the 2026-07-29 analyzer upgrades decode
     with the sentinel/empty defaults for every new field."""
-    from tankpit_bot.diagnostics.issue_report_codecs import (
+    from tankpit_bot.diagnostics.issue_report_codecs_scorecard import (
         decode_session_scorecard,
         encode_session_scorecard,
     )
@@ -589,7 +591,7 @@ def test_targeted_teleport_record_round_trip() -> None:
 
 def test_require_object_rejects_non_dict() -> None:
     """``_require_object`` raises ``JSONTypeError`` when the value is not a dict."""
-    from tankpit_bot.diagnostics.issue_report_codecs import _require_object
+    from tankpit_bot.diagnostics.issue_report_codecs_records import _require_object
 
     payload: JSONObject = {"inventory_first": "not a dict"}
 

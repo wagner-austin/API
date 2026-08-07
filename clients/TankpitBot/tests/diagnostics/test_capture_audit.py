@@ -15,7 +15,7 @@ from tankpit_bot import _test_hooks
 from tankpit_bot.capture.xor import build_session_xor_table
 from tankpit_bot.diagnostics.capture_audit import audit_capture
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.types import CapturedMessage, CaptureSession, GameLogEntryWithTimestamp
 
 _MAGIC = "testmagic"

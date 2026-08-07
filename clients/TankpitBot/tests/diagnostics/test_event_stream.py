@@ -13,7 +13,10 @@ import pytest
 from tests.conftest import FakeFileSystem
 
 from tankpit_bot.diagnostics.event_stream import load_event_records, resolve_source_path
-from tankpit_bot.runtime_logging import configure_bot_runtime_logging, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    configure_bot_runtime_logging,
+    emit_diagnostic,
+)
 
 
 def test_resolve_source_path_raises_when_file_missing(

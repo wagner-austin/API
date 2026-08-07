@@ -21,10 +21,8 @@ from tankpit_bot.diagnostics.registry_truth import (
     decode_registry_tank,
     register_tank_truth_from_page_snapshot,
 )
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.sniffer import world_state
 from tankpit_bot.sniffer.world_state import get_world_service
 from tankpit_bot.sniffer.world_state_combat import mark_tank_killed

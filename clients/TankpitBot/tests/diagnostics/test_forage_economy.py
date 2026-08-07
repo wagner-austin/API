@@ -1,7 +1,7 @@
 """Tests for :mod:`tankpit_bot.diagnostics.forage_economy`.
 
 Fixtures are hand-written JSONL records (validated by the REAL
-:func:`tankpit_bot.runtime_logging.decode_runtime_event_record`
+:func:`tankpit_bot.runtime_records.decode_runtime_event_record`
 through the real :func:`load_event_records` path) because the
 economy metrics attribute wall-clock time between records — the
 live emit pipeline stamps real timestamps, which a test cannot

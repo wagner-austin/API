@@ -16,19 +16,15 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, dump_json_str
 from tests.conftest import FakeFileSystem
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    encode_client_collections,
-)
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_collections
 from tankpit_bot.diagnostics.entity_alignment import (
     maybe_emit_entity_alignment_sample,
     reset_entity_alignment_emitter,
 )
 from tankpit_bot.diagnostics.event_stream import load_event_records
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.state import make_empty_world_state
 from tankpit_bot.state.types import (
     WorldStateDict,

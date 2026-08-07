@@ -14,7 +14,10 @@ from tests.conftest import FakeFileSystem
 from tankpit_bot import _test_hooks
 from tankpit_bot.diagnostics.run_audit import build_run_audit, capture_path_for, main
 from tankpit_bot.diagnostics.run_audit_types import make_finding
-from tankpit_bot.runtime_logging import configure_bot_runtime_logging, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    configure_bot_runtime_logging,
+    emit_diagnostic,
+)
 
 _LATEST_EVENTS = Path("runs") / "bot" / "latest.events.jsonl"
 

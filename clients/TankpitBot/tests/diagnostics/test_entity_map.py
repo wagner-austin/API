@@ -30,7 +30,10 @@ from tankpit_bot.diagnostics.entity_map import (
     main,
     render_entity_map_report,
 )
-from tankpit_bot.runtime_logging import configure_bot_runtime_logging, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    configure_bot_runtime_logging,
+    emit_diagnostic,
+)
 from tankpit_bot.state import make_empty_world_state
 from tankpit_bot.state.types import WorldStateDict, coord_key, make_container_state
 

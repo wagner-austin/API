@@ -32,7 +32,10 @@ from tankpit_bot.diagnostics.self_map import (
     main,
     render_self_map_report,
 )
-from tankpit_bot.runtime_logging import configure_bot_runtime_logging, emit_diagnostic
+from tankpit_bot.runtime_logging import (
+    configure_bot_runtime_logging,
+    emit_diagnostic,
+)
 from tankpit_bot.state.types import make_self_state
 
 

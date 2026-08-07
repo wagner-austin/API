@@ -17,19 +17,15 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from tests.conftest import FakeEnv, FakeFileSystem
 from tests.fakes import FakeCDPSession
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    encode_client_field_map,
-)
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_field_map
 from tankpit_bot.diagnostics.event_stream import load_event_records
 from tankpit_bot.diagnostics.self_alignment import (
     maybe_emit_self_alignment_sample,
     reset_self_alignment_emitter,
 )
-from tankpit_bot.runtime_logging import (
-    RuntimeEventRecordDict,
-    configure_bot_runtime_logging,
-)
+from tankpit_bot.runtime_logging import configure_bot_runtime_logging
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.state.types import SelfStateDict, make_self_state
 
 _SELF_FIELDS: dict[str, int | float | bool | str | None] = {
@@ -229,7 +225,7 @@ def test_tick_once_emits_sample_from_live_world_state(
     """
     from tankpit_bot.bot.ai.types import AIStateDict
     from tankpit_bot.bot.base import Bot
-    from tankpit_bot.bot.tick_loop import _tick_once
+    from tankpit_bot.bot.tick_body import _tick_once
     from tankpit_bot.diagnostics.self_alignment_types import (
         SelfFieldCandidateDict,
         SelfMapReportDict,
