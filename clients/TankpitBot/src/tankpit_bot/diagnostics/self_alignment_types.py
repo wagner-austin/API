@@ -21,7 +21,7 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from tankpit_bot.action_lab.page_client_snapshot import (
+from tankpit_bot.action_lab.page_client_snapshot_codecs import (
     decode_client_field_map,
     encode_client_field_map,
 )

@@ -26,7 +26,7 @@ from tankpit_bot.diagnostics.run_audit_types import (
     make_run_audit_report,
     render_run_audit,
 )
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.types import decode_capture_session
 
 log = get_logger(__name__)

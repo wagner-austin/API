@@ -24,10 +24,8 @@ from __future__ import annotations
 
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from tankpit_bot.action_lab.page_client_snapshot import (
-    PageClientSnapshotDict,
-    encode_client_collections,
-)
+from tankpit_bot.action_lab.page_client_snapshot import PageClientSnapshotDict
+from tankpit_bot.action_lab.page_client_snapshot_codecs import encode_client_collections
 from tankpit_bot.runtime_logging import emit_diagnostic
 from tankpit_bot.state.types import WorldStateDict, encode_container_state
 

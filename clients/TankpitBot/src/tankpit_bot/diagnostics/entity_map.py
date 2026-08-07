@@ -30,7 +30,10 @@ from tankpit_bot.diagnostics.event_stream import (
     run_analyzer_cli,
     scan_diagnostic_records,
 )
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict, require_str_field
+from tankpit_bot.runtime_records import (
+    RuntimeEventRecordDict,
+    require_str_field,
+)
 
 log = get_logger(__name__)
 

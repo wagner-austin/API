@@ -2,7 +2,7 @@
 
 Both diagnostic analyzers (:mod:`tankpit_bot.diagnostics.issue_report`
 and :mod:`tankpit_bot.diagnostics.self_map`) consume the same artifact
-format: one :class:`tankpit_bot.runtime_logging.RuntimeEventRecordDict`
+format: one :class:`tankpit_bot.runtime_records.RuntimeEventRecordDict`
 per line, written by the runtime logging handlers during ``make bot`` /
 ``make <name>-probe`` runs. This module owns the load-and-decode step
 plus the CLI source-path resolution so the analyzers never fork it.
@@ -18,7 +18,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict
 from platform_core.logging import setup_rich_logging, stdlib_logging
 
 from tankpit_bot import _test_hooks
-from tankpit_bot.runtime_logging import (
+from tankpit_bot.runtime_records import (
     RuntimeEventRecordDict,
     decode_runtime_event_record,
 )

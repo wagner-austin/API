@@ -33,7 +33,10 @@ from tankpit_bot.diagnostics.self_alignment_types import (
     SelfMapReportDict,
     decode_self_alignment_sample,
 )
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict, require_str_field
+from tankpit_bot.runtime_records import (
+    RuntimeEventRecordDict,
+    require_str_field,
+)
 
 log = get_logger(__name__)
 

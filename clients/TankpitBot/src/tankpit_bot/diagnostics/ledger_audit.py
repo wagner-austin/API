@@ -25,7 +25,7 @@ from itertools import pairwise
 
 from tankpit_bot.diagnostics.run_audit_types import FindingDict, make_finding
 from tankpit_bot.ledger.events import ACTION_KINDS
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 _KILL_WINDOW_S = 30
 """Repeat registrations of one victim inside this window are duplicates.

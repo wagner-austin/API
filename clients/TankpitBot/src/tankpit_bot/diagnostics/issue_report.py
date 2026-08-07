@@ -3,7 +3,7 @@
 This module is pure: it takes a path to a JSONL events stream (the
 artifact :mod:`tankpit_bot.runtime_logging` writes during ``make bot``
 or ``make <name>-probe`` runs), parses every event through the real
-:func:`tankpit_bot.runtime_logging.decode_runtime_event_record`
+:func:`tankpit_bot.runtime_records.decode_runtime_event_record`
 decoder, classifies the relevant DIAGNOSTIC / WIRE
 events into structured records, and returns the aggregate report.
 
@@ -46,13 +46,13 @@ from tankpit_bot.diagnostics.issue_report_types import (
     SessionRoomRecordDict,
     TeleportAttemptRecordDict,
 )
-from tankpit_bot.diagnostics.session_scorecard import (
+from tankpit_bot.diagnostics.session_scorecard import build_session_scorecard
+from tankpit_bot.diagnostics.session_scorecard_accumulator import (
     ScorecardAccumulatorDict,
-    build_session_scorecard,
     new_scorecard_accumulator,
     route_scorecard_record,
 )
-from tankpit_bot.runtime_logging import (
+from tankpit_bot.runtime_records import (
     RuntimeEventRecordDict,
     require_int_field,
     require_str_field,
@@ -324,7 +324,7 @@ def build_issue_report(source_path: Path) -> IssueReportDict:
     Raises:
         FileNotFoundError: When ``source_path`` does not exist on disk.
         Exception: Any decode error from
-            :func:`tankpit_bot.runtime_logging.decode_runtime_event_record`
+            :func:`tankpit_bot.runtime_records.decode_runtime_event_record`
             is propagated unchanged so malformed artifacts are surfaced
             instead of silently dropped.
     """

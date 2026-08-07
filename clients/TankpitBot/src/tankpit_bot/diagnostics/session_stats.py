@@ -22,7 +22,7 @@ from tankpit_bot.diagnostics.session_stats_types import (
     SessionStatsReportDict,
     SessionStatsRowDict,
 )
-from tankpit_bot.runtime_logging import RuntimeEventRecordDict
+from tankpit_bot.runtime_records import RuntimeEventRecordDict
 
 log = get_logger(__name__)
 
